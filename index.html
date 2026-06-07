@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .ebox.rose .eico{background:rgba(255,77,109,0.12)}.ebox.rose .eico svg{stroke:var(--rose)}
 .ebox.gray .eico{background:rgba(136,146,170,0.12)}.ebox.gray .eico svg{stroke:var(--text2)}
 /* Action buttons */
-.agrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.agrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
 .abtn{padding:16px 12px;border-radius:var(--radius);border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transition:all 0.18s}
 .abtn:active{transform:scale(0.96)}
 .abtn .ic{display:flex;align-items:center;justify-content:center;height:28px}
@@ -357,7 +357,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.9 · build 20260607j</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.0 · build 20260607k</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -411,8 +411,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
       <div class="agrid">
         <button class="abtn start" id="btnStart" onclick="doStart()"><div class="ic"><svg viewBox="0 0 24 24" class="fill"><path d="M7 5v14l12-7z"/></svg></div><div>Comenzar</div></button>
         <button class="abtn stop" id="btnStop" onclick="doStop()" disabled><div class="ic"><svg viewBox="0 0 24 24" class="fill"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></div><div>Finalizar</div></button>
-        <button class="abtn brk" id="btnBrk" onclick="openBreakModal()" disabled><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v2M11 4v2"/></svg></div><div>Descanso</div></button>
-        <button class="abtn resume" id="btnResume" onclick="doResume()" disabled style="display:none"><div class="ic"><svg viewBox="0 0 24 24" class="fill"><path d="M7 5v14l12-7z"/></svg></div><div>Reanudar</div></button>
+        <button class="abtn brk" id="btnBrk" onclick="toggleBreak()" disabled><div class="ic" id="brkIco"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v2M11 4v2"/></svg></div><div id="brkLbl">Descanso</div></button>
       </div>
       <div class="wcard"><h3>Resumen semanal</h3><div class="wstats">
         <div class="ws total"><div class="wsico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="wstxt"><div class="v" id="wTotal">0h 0m</div><div class="l">Total semana</div></div></div>
@@ -605,7 +604,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 </div>
 </div>
 <!-- Modals -->
-<div class="mov" id="mBreak"><div class="msh"><h2>☕ Iniciar descanso</h2><p>El descanso no cuenta como horas trabajadas.</p><div class="mbtns"><button class="mbtn confirm" onclick="doBreak()">Iniciar descanso</button><button class="mbtn cancel" onclick="closeMov('mBreak')">Cancelar</button></div></div></div>
+
 <div class="mov" id="mAdmin"><div class="msh"><h2>⚙ Panel administrador</h2><p>Introduce el PIN de administrador.</p><input type="password" id="adminPin" placeholder="PIN admin" maxlength="6" inputmode="numeric" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:10px"><div id="adminErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px;text-align:center"></div><div class="mbtns"><button class="mbtn confirm" onclick="doAdmLogin()">Entrar</button><button class="mbtn cancel" onclick="closeMov('mAdmin')">Cancelar</button></div></div></div>
 <div class="mov" id="mEditEmp"><div class="msh" style="max-height:85vh;overflow-y:auto">
   <h2>✎ Editar empleado</h2>
@@ -928,9 +927,22 @@ function doStop(){
   const ep=document.getElementById('ePct');if(ep)ep.textContent='0%';
   renderWeek();renderRecent();toast('Jornada finalizada correctamente');
 }
-function openBreakModal(){openMov('mBreak');}
-function doBreak(){closeMov('mBreak');const o=openRec();if(!o)return;o.enDescanso=true;o.bStartTs=new Date().toISOString();TM.state='break';save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');}
-function doResume(){const o=openRec();if(!o||!o.enDescanso)return;(o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});o.enDescanso=false;o.bStartTs=null;TM.state='working';save();updBtns();setStatus('trabajando','Trabajando');toast('Jornada reanudada');}
+
+function toggleBreak(){
+  const o=openRec();if(!o)return;
+  if(TM.state==='break'){
+    // Stop break → resume
+    (o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});
+    o.enDescanso=false;o.bStartTs=null;TM.state='working';
+    save();updBtns();setStatus('trabajando','Trabajando');toast('Descanso terminado · jornada reanudada');
+  }else{
+    // Start break
+    o.enDescanso=true;o.bStartTs=new Date().toISOString();TM.state='break';
+    save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');
+  }
+}
+function doBreak(){toggleBreak();}
+function doResume(){toggleBreak();}
 let _tickN=0;
 function tick(){
   const o=openRec();
@@ -950,7 +962,25 @@ function updTimer(){
   b.className='pfill'+(TM.ws>WK*60?' extra':TM.state==='break'?' paused':'');
   document.getElementById('ePct').textContent=p.toFixed(0)+'%';
 }
-function updBtns(){const s=TM.state;document.getElementById('btnStart').disabled=s!=='idle';document.getElementById('btnStop').disabled=s==='idle';document.getElementById('btnBrk').disabled=s!=='working';const br=document.getElementById('btnBrk'),re=document.getElementById('btnResume');if(s==='break'){re.style.display='flex';br.style.display='none';}else{re.style.display='none';br.style.display='flex';}}
+function updBtns(){
+  const s=TM.state;
+  const bStart=document.getElementById('btnStart'),bStop=document.getElementById('btnStop'),bBrk=document.getElementById('btnBrk');
+  if(bStart)bStart.disabled=s!=='idle';
+  if(bStop)bStop.disabled=s==='idle';
+  if(bBrk){
+    bBrk.disabled=s==='idle';
+    const ico=document.getElementById('brkIco'),lbl=document.getElementById('brkLbl');
+    if(s==='break'){
+      bBrk.className='abtn resume';
+      if(ico)ico.innerHTML='<svg viewBox="0 0 24 24" class="fill"><path d="M7 5v14l12-7z"/></svg>';
+      if(lbl)lbl.textContent='Reanudar';
+    }else{
+      bBrk.className='abtn brk';
+      if(ico)ico.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v2M11 4v2"/></svg>';
+      if(lbl)lbl.textContent='Descanso';
+    }
+  }
+}
 function setStatus(cls,lbl){const el=document.getElementById('fStatus');el.className='spill '+cls;el.innerHTML=`<div class="dot"></div><span>${lbl}</span>`;}
 function openRec(){return DB.records.find(r=>r.empId===SES.user?.id&&!r.fin);}
 function renderWeek(){
