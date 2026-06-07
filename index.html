@@ -30,10 +30,11 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.mc{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-.screen{display:none;min-height:100%}
-.screen.active{display:flex;flex-direction:column}
+.app-shell{display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden;max-width:520px;margin:0 auto;width:100%;box-shadow:0 0 60px rgba(0,0,0,0.5)}
+@media(min-width:560px){body{background:#05070d}}
+.mc{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.screen{display:none}
+.screen.active{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 /* TOPBAR */
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;flex-shrink:0}
 .tbrand{display:flex;align-items:center;gap:10px}
@@ -264,6 +265,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 /* Modal */
 .mov{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity 0.2s}
+@media(min-width:560px){.mov{align-items:center}.mov .msh{border-radius:18px!important;transform:scale(0.95)!important}.mov.open .msh{transform:scale(1)!important}}
 .mov.open{opacity:1;pointer-events:all}
 .msh{background:var(--card);border-radius:20px 20px 0 0;border:1px solid var(--border2);border-bottom:none;width:100%;max-width:480px;padding:20px 20px 36px;transform:translateY(100%);transition:transform 0.25s}
 .mov.open .msh{transform:translateY(0)}
@@ -306,6 +308,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .inbox-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-bottom:6px}
 .inbox-tag.nomina{background:rgba(0,230,118,0.15);color:var(--green)}
 .inbox-tag.mensaje{background:rgba(0,212,255,0.15);color:var(--accent)}
+
+/* ===== Optimización móvil ===== */
+@media(max-width:559px){
+  .clk-time{font-size:46px}
+  .abtn{padding:18px 10px}/* botones de fichar más grandes para el dedo */
+  .abtn .ic{height:30px}
+  .etab,.atab{padding:11px 9px;font-size:10px}/* pestañas con más zona táctil */
+  .ibtn{width:40px;height:40px}/* iconos cabecera más tocables */
+  .ff input,.ff select,.ff textarea{font-size:16px}/* evita zoom de iOS al enfocar */
+  .csel select,.fg input[type=password]{font-size:16px}
+  input,select,textarea{font-size:16px!important}
+  .badd,.btn-main,.btn-med,.btn-abs,.btn-vac,.expbtn{padding:15px;font-size:15px}
+  .sgrid{grid-template-columns:1fr 1fr}
+  .wstats{grid-template-columns:1fr 1fr}
+}
+/* Respeta el notch / barra inferior en móviles */
+.topbar{padding-top:max(12px,env(safe-area-inset-top))}
+.fbody,.abody{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+/* Mejor scroll y sin rebote raro */
+.mc{overscroll-behavior:contain}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -323,7 +345,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.0 · build 20260607</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.1 · build 20260607b</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
