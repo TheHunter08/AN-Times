@@ -352,7 +352,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.6 · build 20260607g-diag</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.7 · build 20260607h</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -818,7 +818,7 @@ function doAdmLogin(){
   safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');
   safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderNomMesOptions2,'renderNomMesOptions2');
   safeRun(renderMensajeria,'renderMensajeria');safeRun(renderAdmFilters,'renderAdmFilters');
-  admTab('overview');updateBadges();
+  admTab('overview');updateBadges();antiBlockerDefense();setTimeout(antiBlockerDefense,500);
   // Auto-diagnóstico visible: comprueba si el contenido se generó
   setTimeout(()=>{try{
     const g=document.getElementById('gStats'),e=document.getElementById('eList');
@@ -1763,7 +1763,47 @@ window.addEventListener('unhandledrejection',function(ev){console.error('Promesa
 // Asegura el guardado pendiente antes de cerrar/recargar
 window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
 // Inicialización robusta: cada paso aislado para que un fallo no detenga la app
+
+/* ===== Defensa contra extensiones que ocultan contenido (adblockers) ===== */
+function antiBlockerDefense(){
+  try{
+    // Las extensiones inyectan clases aleatorias con display:none!important.
+    // Recorremos nuestros contenedores y restauramos la visibilidad.
+    const containers=document.querySelectorAll('.adcard,.acard,.hi,.si,.erow,.sc,.expbtn,.inbox-item,.noti-item,.ebox,.ws');
+    containers.forEach(el=>{
+      const cs=getComputedStyle(el);
+      if(cs.display==='none'){
+        // Quitar clases que NO son nuestras (las nuestras son conocidas)
+        const known=['adcard','acard','hi','si','erow','sc','expbtn','inbox-item','noti-item','ebox','ws','blue','grn','org','vio','teal','rose','green','red','orange','violet','gray','unread','ok','csv','vacv','abs','jsnb'];
+        [...el.classList].forEach(cl=>{ if(!known.includes(cl)) el.classList.remove(cl); });
+        // Forzar display visible
+        el.style.setProperty('display','','important');
+        if(getComputedStyle(el).display==='none'){
+          // si una hoja externa lo fuerza, ponemos un display explícito
+          const tag=el.classList.contains('expbtn')?'flex':'block';
+          el.style.setProperty('display',tag,'important');
+        }
+      }
+    });
+  }catch(e){}
+}
+
+
+/* Observer: vigila inyecciones de clases ocultadoras en tiempo real */
+function startBlockerObserver(){
+  try{
+    const root=document.querySelector('.app-shell')||document.body;
+    const obs=new MutationObserver(muts=>{
+      let need=false;
+      for(const m of muts){if(m.type==='attributes'&&m.attributeName==='class')need=true;}
+      if(need)antiBlockerDefense();
+    });
+    obs.observe(root,{subtree:true,attributes:true,attributeFilter:['class','style']});
+  }catch(e){}
+}
+
 function initApp(){
+  startBlockerObserver();
   // Estado inicial garantizado: solo el login visible
   try{document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
     const lg=document.getElementById('sLogin');if(lg){lg.classList.add('active');lg.style.display='block';}}catch(e){}
@@ -1772,6 +1812,7 @@ function initApp(){
   safeRun(popSelects,'popSelects');
   safeRun(autoConnectCloud,'autoConnectCloud');
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
+  try{setInterval(antiBlockerDefense,1000);}catch(e){}
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initApp);}else{initApp();}
 </script>
