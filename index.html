@@ -30,11 +30,13 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh}
-.app-shell{position:relative;width:100%;max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);box-shadow:0 0 60px rgba(0,0,0,0.5)}
-@media(min-width:560px){body{background:#05070d}}
+.app-shell{position:relative;width:100%;min-height:100vh;background:var(--bg)}
 .screen{display:none}
 .screen.active{display:block}
 .mc{width:100%}
+/* Centra el CONTENIDO (no toda la app) para que se lea bien en pantallas grandes */
+.abody,.fbody{max-width:760px;margin:0 auto}
+.lwrap{margin:0 auto}
 /* TOPBAR */
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;flex-shrink:0}
 .tbrand{display:flex;align-items:center;gap:10px}
@@ -347,7 +349,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.2 · build 20260607c</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.3 · build 20260607d-diag</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -615,6 +617,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
   <div id="notiList"><div class="empty">Sin notificaciones</div></div>
   <button class="mbtn cancel" style="width:100%;margin-top:10px" onclick="closeMov('mNotis')">Cerrar</button>
 </div></div>
+<div id="errPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow:auto;background:#1a0000;border-top:2px solid #ff3b3b;color:#ffb3b3;font-family:monospace;font-size:11px;padding:10px 14px;z-index:9999;white-space:pre-wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:#ff6b6b">⚠ Errores detectados (envíale esto al desarrollador)</b><button onclick="document.getElementById('errPanel').style.display='none'" style="background:#ff3b3b;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer">Cerrar</button></div>
+  <div id="errLog"></div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 const ADM_PIN="0824",WK=40*60,VPM=2.5;
@@ -634,7 +640,8 @@ let DB={empresas:["AN Solutions"],employees:[
 ],records:[],vacaciones:[],medicos:[],ausencias:[],cierres:[],mensajes:[],notis:[]};
 let SES={user:null,isAdmin:false};
 let TM={ws:0,bs:0,state:"idle",bStart:null};
-function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label||"")+":",err);}}
+function showErr(msg){try{const p=document.getElementById('errPanel'),l=document.getElementById('errLog');if(p&&l){l.textContent+=msg+'\n';p.style.display='block';}}catch(e){}}
+function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label||"")+":",err);try{showErr("["+(label||"?")+"] "+(err&&err.message?err.message:err));}catch(e){}}}
 
 let FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
 let _saveT=null,_saveRetry=0;
@@ -1052,8 +1059,8 @@ function renderHist(){
 /* ADMIN */
 function admTab(t){
   const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
-  tabs.forEach(x=>{const el=document.getElementById('a'+cap(x));if(el)el.style.display=x===t?'block':'none';});
-  document.querySelectorAll('#admTabBar .atab').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-tab')===t);});
+  tabs.forEach(x=>{const id='a'+cap(x);const el=document.getElementById(id);if(el){el.style.display=(x===t)?'block':'none';}else{showErr('Falta sección #'+id);}});
+  try{document.querySelectorAll('#admTabBar .atab').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-tab')===t);});}catch(e){showErr('tabs active: '+e.message);}
   if(t==='registros')safeRun(renderRecs,'renderRecs');
   else if(t==='empleados')safeRun(renderEmps,'renderEmps');
   else if(t==='exportar'){safeRun(renderExpStats,'renderExpStats');safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');safeRun(renderNomMesOptions,'renderNomMesOptions');}
@@ -1661,8 +1668,8 @@ document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='E
 
 /* INIT */
 // Manejador global de errores: evita que un fallo puntual deje la app inutilizable
-window.addEventListener('error',function(ev){console.error('Error capturado:',ev.message);});
-window.addEventListener('unhandledrejection',function(ev){console.error('Promesa rechazada:',ev.reason);});
+window.addEventListener('error',function(ev){console.error('Error:',ev.message);showErr('JS: '+ev.message+' ('+(ev.filename||'').split('/').pop()+':'+ev.lineno+')');});
+window.addEventListener('unhandledrejection',function(ev){console.error('Promesa:',ev.reason);showErr('Promesa: '+(ev.reason&&ev.reason.message?ev.reason.message:ev.reason));});
 // Asegura el guardado pendiente antes de cerrar/recargar
 window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
 // Inicialización robusta: cada paso aislado para que un fallo no detenga la app
