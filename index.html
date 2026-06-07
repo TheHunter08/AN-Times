@@ -2,8 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>AN Times</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TIMES INC">
+<meta name="description" content="TIMES INC — Control de jornada laboral, fichaje de horas, vacaciones y nóminas.">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22TIMES%20INC%22%2C%22short_name%22%3A%22TIMES%20INC%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230a0e1a%22%2C%22theme_color%22%3A%22%230a0e1a%22%2C%22start_url%22%3A%22.%22%7D">
+<title>TIMES INC</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -194,8 +200,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 /* ADMIN */
 #screenAdmin{padding:0}
 .abody{padding:16px}
-.atabs{display:flex;gap:4px;margin-bottom:16px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border)}
-.atab{flex:1;padding:9px 2px;text-align:center;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px}
+.atabs{display:flex;gap:4px;margin-bottom:16px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.atabs::-webkit-scrollbar{height:0}
+.atab{flex:1 0 auto;min-width:64px;padding:9px 8px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
 .atab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
 .adcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
@@ -268,9 +275,39 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .etabs{display:flex;gap:4px;margin-bottom:14px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto}
 .etab{flex-shrink:0;padding:8px 10px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
 .etab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
+
+/* Notifications & messaging */
+.noti-badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;border:2px solid var(--bg2)}
+.noti-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:3px;vertical-align:middle}
+.ibtn.bell:hover svg{stroke:var(--accent)}
+.noti-item{display:flex;gap:10px;padding:12px;border-radius:var(--radius-sm);background:var(--bg3);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:border-color 0.15s}
+.noti-item.unread{border-color:var(--accent);background:rgba(0,212,255,0.04)}
+.noti-item:hover{border-color:var(--border2)}
+.noti-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.noti-ico svg{width:17px;height:17px;stroke-width:2;fill:none}
+.noti-ico.vac{background:rgba(191,90,242,0.12)}.noti-ico.vac svg{stroke:var(--violet)}
+.noti-ico.med{background:rgba(0,191,165,0.12)}.noti-ico.med svg{stroke:var(--teal)}
+.noti-ico.abs{background:rgba(255,77,109,0.12)}.noti-ico.abs svg{stroke:var(--rose)}
+.noti-ico.msg{background:rgba(0,212,255,0.12)}.noti-ico.msg svg{stroke:var(--accent)}
+.noti-ico.nom{background:rgba(0,230,118,0.12)}.noti-ico.nom svg{stroke:var(--green)}
+.noti-body{flex:1;min-width:0}
+.noti-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.noti-text{font-size:12px;color:var(--text2);line-height:1.5}
+.noti-time{font-size:10px;color:var(--text3);margin-top:4px}
+.inbox-item{padding:14px;border-radius:var(--radius-sm);background:var(--bg3);border:1px solid var(--border);margin-bottom:10px}
+.inbox-item.unread{border-left:3px solid var(--accent)}
+.inbox-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.inbox-subj{font-size:14px;font-weight:700;font-family:'Syne',sans-serif}
+.inbox-date{font-size:10px;color:var(--text3)}
+.inbox-text{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+.inbox-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-bottom:6px}
+.inbox-tag.nomina{background:rgba(0,230,118,0.15);color:var(--green)}
+.inbox-tag.mensaje{background:rgba(0,212,255,0.15);color:var(--accent)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -279,8 +316,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 20px;min-height:100vh">
     <div class="lwrap">
       <div class="lhero">
-        <div class="llogo">AN</div>
-        <h1><span>AN</span> Times</h1>
+        <div class="llogo">TI</div>
+        <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
       </div>
@@ -299,8 +336,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 <!-- FICHAJE -->
 <div class="screen" id="sFichaje">
   <div class="topbar">
-    <div class="tbrand"><div class="tlogo">AN</div><div class="tname"><span>AN</span> Times</div></div>
-    <div class="tright"><span id="syncDotEmp" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><div class="tclock" id="topClk">--:--:--</div></div>
+    <div class="tbrand"><div class="tlogo">TI</div><div class="tname"><span>TIMES</span> INC</div></div>
+    <div class="tright"><span id="syncDotEmp" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><button class="ibtn bell" onclick="openNotis()" style="position:relative"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--text);stroke-width:2;fill:none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="noti-badge" id="notiBadgeEmp" style="display:none"></span></button><div class="tclock" id="topClk">--:--:--</div></div>
   </div>
   <div class="mc"><div class="fbody">
     <div class="ucard">
@@ -314,6 +351,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
       <button class="etab" onclick="empTab('vacaciones')" id="eVacaciones">🌴 Vacaciones</button>
       <button class="etab" onclick="empTab('medico')" id="eMedico">🏥 Médico</button>
       <button class="etab" onclick="empTab('ausencias')" id="eAusencias">⚠ Ausencias</button>
+      <button class="etab" onclick="empTab('mensajes')" id="eMensajes">✉ Mensajes <span class="noti-dot" id="msgDotEmp" style="display:none"></span></button>
       <button class="etab" onclick="empTab('historial')" id="eHistorial">📋 Historial</button>
     </div>
     <!-- JORNADA TAB -->
@@ -379,6 +417,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <div class="ff"><label>Fecha inicio</label><input type="date" id="mFrom"></div>
         <div class="ff"><label>Fecha fin</label><input type="date" id="mTo"></div>
         <div class="ff"><label>Motivo / Descripción</label><textarea id="mNote" placeholder="Ej: consulta médica, baja por enfermedad, revisión..."></textarea></div>
+        <div class="ff"><label>Justificante médico (foto o PDF)</label><input type="file" id="mFile" accept="image/*,application/pdf" style="padding:9px"></div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Adjunta el justificante (máx. 1 MB). Quedará guardado junto al permiso.</div>
         <div style="font-size:12px;color:var(--teal);margin-bottom:10px" id="mDays"></div>
         <button class="btn-med" onclick="doReqMed()">🏥 Registrar permiso médico</button>
       </div>
@@ -401,24 +441,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
     <div id="tHistorial" style="display:none">
       <div class="hsec"><h3>Todos los registros</h3><div id="fullHist"><div class="empty">Sin registros</div></div></div>
     </div>
+    <div id="tMensajes" style="display:none">
+      <div class="hsec"><h3>✉ Bandeja de mensajes</h3><div id="empInbox"><div class="empty">No tienes mensajes</div></div></div>
+    </div>
     <button class="awide logout" onclick="doLogout()">↩ Cambiar empleado</button>
   </div></div>
 </div>
 <!-- ADMIN -->
 <div class="screen" id="sAdmin">
   <div class="topbar">
-    <div class="tbrand"><div class="tlogo">AN</div><div class="tname"><span>AN</span> Admin</div></div>
-    <div class="tright"><span id="syncDotAdm" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><div class="tclock" id="admClk">--:--:--</div><button class="ibtn" onclick="doLogout()">✕</button></div>
+    <div class="tbrand"><div class="tlogo">TI</div><div class="tname"><span>TIMES</span> Admin</div></div>
+    <div class="tright"><span id="syncDotAdm" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><button class="ibtn bell" onclick="openNotis()" style="position:relative"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--text);stroke-width:2;fill:none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="noti-badge" id="notiBadgeAdm" style="display:none"></span></button><div class="tclock" id="admClk">--:--:--</div><button class="ibtn" onclick="doLogout()">✕</button></div>
   </div>
   <div class="mc"><div class="abody">
-    <div class="atabs">
-      <button class="atab active" onclick="admTab('overview')">Resumen</button>
-      <button class="atab" onclick="admTab('control')">Control</button>
-      <button class="atab" onclick="admTab('solicitudes')">Solicit.</button>
-      <button class="atab" onclick="admTab('registros')">Fichajes</button>
-      <button class="atab" onclick="admTab('nominas')">Nóminas</button>
-      <button class="atab" onclick="admTab('empleados')">Empl.</button>
-      <button class="atab" onclick="admTab('exportar')">Export</button>
+    <div class="atabs" id="admTabBar">
+      <button class="atab active" data-tab="overview" onclick="admTab('overview')">Resumen</button>
+      <button class="atab" data-tab="control" onclick="admTab('control')">Control</button>
+      <button class="atab" data-tab="solicitudes" onclick="admTab('solicitudes')">Solicit.</button>
+      <button class="atab" data-tab="registros" onclick="admTab('registros')">Fichajes</button>
+      <button class="atab" data-tab="nominas" onclick="admTab('nominas')">Nóminas</button>
+      <button class="atab" data-tab="empleados" onclick="admTab('empleados')">Empl.</button>
+      <button class="atab" data-tab="exportar" onclick="admTab('exportar')">Export</button>
     </div>
     <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
     <div id="aControl" style="display:none">
@@ -470,14 +513,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
       </div>
     </div>
     <div id="aNominas" style="display:none">
-      <div class="adcard"><h3>Generar y enviar nóminas</h3>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Genera la nómina mensual de cada trabajador con sus horas normales, extras y ausencias. Puedes enviarla por email o compartirla.</div>
-        <div class="ff"><label>Mes</label><select id="nomMes" style="appearance:none"></select></div>
-        <div class="ff"><label>Precio hora normal (€)</label><input type="number" id="nomPrecio" placeholder="ej. 10" step="0.01" inputmode="decimal"></div>
-        <div class="ff"><label>Precio hora extra (€)</label><input type="number" id="nomPrecioExtra" placeholder="ej. 15" step="0.01" inputmode="decimal"></div>
-        <button class="badd" onclick="renderNominas()">Calcular nóminas del mes</button>
+      <div class="adcard"><h3>Enviar nómina a un trabajador</h3>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">La nómina llega a la bandeja de mensajes del trabajador dentro de la propia aplicación. También se adjunta el resumen de horas del mes seleccionado.</div>
+        <div class="ff"><label>Trabajador</label><select id="nomEmp" style="appearance:none"></select></div>
+        <div class="ff"><label>Mes de la nómina</label><select id="nomMes" style="appearance:none"></select></div>
+        <div class="ff"><label>Importe / detalle de la nómina</label><textarea id="nomTexto" placeholder="Escribe aquí el importe y los conceptos de la nómina. Ej:\nSalario base: 1.200€\nHoras extra: 180€\nTotal: 1.380€"></textarea></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);margin-bottom:12px;cursor:pointer"><input type="checkbox" id="nomAdjHoras" checked style="width:auto"> Adjuntar resumen de horas del mes</label>
+        <div class="ff"><label>Adjuntar PDF de nómina (opcional)</label><input type="file" id="nomFile" accept="application/pdf" style="padding:9px"></div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Si no adjuntas un PDF propio, se generará uno automáticamente con los datos de arriba.</div>
+        <button class="badd" onclick="enviarNomina()" style="margin-bottom:8px">📄 Enviar nómina con PDF a su bandeja</button>
+        <button class="btn-sec" onclick="enviarNomina(true)" style="margin:0">Enviar solo como texto (sin PDF)</button>
       </div>
-      <div id="nomResult"></div>
+      <div class="adcard"><h3>Enviar mensaje / aviso</h3>
+        <div class="ff"><label>Para</label><select id="msgDest" style="appearance:none"><option value="__all__">Todos los trabajadores</option></select></div>
+        <div class="ff"><label>Asunto</label><input type="text" id="msgAsunto" placeholder="Asunto del mensaje"></div>
+        <div class="ff"><label>Mensaje</label><textarea id="msgTexto" placeholder="Escribe tu mensaje..."></textarea></div>
+        <button class="badd" onclick="enviarMensaje()">📨 Enviar mensaje</button>
+      </div>
+      <div class="adcard"><h3>Mensajes enviados</h3><div id="msgEnviados"></div></div>
     </div>
     <div id="aExportar" style="display:none">
       <div class="adcard"><h3>Exportar datos</h3>
@@ -515,31 +568,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 <!-- Modals -->
 <div class="mov" id="mBreak"><div class="msh"><h2>☕ Iniciar descanso</h2><p>El descanso no cuenta como horas trabajadas.</p><div class="mbtns"><button class="mbtn confirm" onclick="doBreak()">Iniciar descanso</button><button class="mbtn cancel" onclick="closeMov('mBreak')">Cancelar</button></div></div></div>
 <div class="mov" id="mAdmin"><div class="msh"><h2>⚙ Panel administrador</h2><p>Introduce el PIN de administrador.</p><input type="password" id="adminPin" placeholder="PIN admin" maxlength="6" inputmode="numeric" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:10px"><div id="adminErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px;text-align:center"></div><div class="mbtns"><button class="mbtn confirm" onclick="doAdmLogin()">Entrar</button><button class="mbtn cancel" onclick="closeMov('mAdmin')">Cancelar</button></div></div></div>
-<div class="mov" id="mCloud"><div class="msh" style="max-height:85vh;overflow-y:auto">
-  <h2>☁ Base de datos en la nube</h2>
-  <p>Conecta Firebase para que todos los empleados compartan los mismos datos en tiempo real desde cualquier dispositivo.</p>
-  <div class="ff"><label>Firebase config (pega el objeto completo)</label>
-    <textarea id="fbConfig" style="min-height:140px;font-family:var(--font-mono,monospace);font-size:12px" placeholder='Pega aquí, por ejemplo:
-{
-  apiKey: "AIza...",
-  authDomain: "an-times.firebaseapp.com",
-  databaseURL: "https://an-times-default-rtdb.firebaseio.com",
-  projectId: "an-times",
-  ...
-}'></textarea>
+<div class="mov" id="mNotis"><div class="msh" style="max-height:80vh;overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <h2 style="margin:0">🔔 Notificaciones</h2>
+    <button class="btn-sec" style="width:auto;margin:0;padding:6px 12px" onclick="markAllNotisRead()">Marcar leídas</button>
   </div>
-  <div id="fbErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px"></div>
-  <div class="mbtns"><button class="mbtn confirm" style="background:linear-gradient(135deg,var(--accent),var(--accent2))" onclick="connectCloud()">☁ Conectar</button><button class="mbtn cancel" onclick="closeMov('mCloud')">Cerrar</button></div>
-  <div style="margin-top:14px;background:var(--bg3);border-radius:var(--radius-sm);padding:14px;font-size:11px;color:var(--text2);line-height:1.8">
-    <b style="color:var(--accent);display:block;margin-bottom:8px">📌 Pasos en Firebase (gratis, sin tarjeta):</b>
-    <b style="color:var(--text)">1.</b> Entra en <b>console.firebase.google.com</b> y abre tu proyecto<br>
-    <b style="color:var(--text)">2.</b> Menú izquierdo: <b>Compilación → Realtime Database</b> → <b>Crear base de datos</b><br>
-    <b style="color:var(--text)">3.</b> Ubicación Europa → <b>Iniciar en modo de prueba</b> → Habilitar<br>
-    <b style="color:var(--text)">4.</b> Icono <b>⚙ → Configuración del proyecto</b><br>
-    <b style="color:var(--text)">5.</b> Baja a "Tus apps" → pulsa <b>&lt;/&gt;</b> (Web) → registra la app<br>
-    <b style="color:var(--text)">6.</b> Copia el bloque <b>firebaseConfig</b> entero y pégalo arriba<br>
-    <span style="display:block;margin-top:8px;color:var(--orange)">⚠ La app debe estar abierta desde una URL (https://…), no desde el archivo, para que funcione la conexión.</span>
-  </div>
+  <div id="notiList"><div class="empty">Sin notificaciones</div></div>
+  <button class="mbtn cancel" style="width:100%;margin-top:10px" onclick="closeMov('mNotis')">Cerrar</button>
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -557,16 +592,26 @@ const FB_CONFIG={
 let DB={empresas:["AN Solutions"],employees:[
   {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01",email:""},
   {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01",email:""}
-],records:[],vacaciones:[],medicos:[],ausencias:[],cierres:[]};
+],records:[],vacaciones:[],medicos:[],ausencias:[],cierres:[],mensajes:[],notis:[]};
 let SES={user:null,isAdmin:false};
 let TM={ws:0,bs:0,state:"idle",bStart:null};
 
-let FB={app:null,db:null,ref:null,connected:false,syncing:false};
+let FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
+let _saveT=null,_saveRetry=0;
 function save(){
-  try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){}
+  try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){console.warn('localStorage lleno o no disponible');}
   if(FB.connected&&FB.ref&&!FB.syncing){
-    try{FB.ref.set(DB);}catch(e){console.warn('Error guardando en nube',e);}
+    clearTimeout(_saveT);
+    _saveT=setTimeout(cloudPush,400);
   }
+}
+function cloudPush(){
+  if(!FB.connected||!FB.ref)return;
+  FB.ref.set(DB).then(()=>{_saveRetry=0;}).catch(e=>{
+    console.warn('Error guardando en nube:',e&&e.code);
+    if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1000*_saveRetry);}
+    else{setCloudStatus('connecting');}
+  });
 }
 function load(){
   try{const r=localStorage.getItem("an_times_v1");if(r){const p=JSON.parse(r);applyDB(p);}}catch(e){}
@@ -580,6 +625,13 @@ function applyDB(p){
   DB.medicos=p.medicos||[];
   DB.ausencias=p.ausencias||[];
   DB.cierres=p.cierres||[];
+  DB.mensajes=p.mensajes||[];
+  DB.notis=p.notis||[];
+  // Preserve a locally running timer: keep this device's live seconds on the open record
+  if(SES.user&&TM.state!=='idle'){
+    const o=DB.records.find(r=>r.empId===SES.user.id&&!r.fin);
+    if(o){o.workSecs=TM.ws;o.breakSecs=TM.bs;o.enDescanso=(TM.state==='break');}
+  }
 }
 function setCloudStatus(state){
   const colors={connected:'var(--green)',connecting:'var(--accent)',disconnected:'var(--orange)'};
@@ -592,74 +644,48 @@ function setCloudStatus(state){
   else if(state==='connecting'){el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…';el.style.background='rgba(0,212,255,0.12)';el.style.color='var(--accent)';}
   else{el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Base de datos sin conectar';el.style.background='rgba(255,149,0,0.12)';el.style.color='var(--orange)';}
 }
-function openCloudModal(){
-  const saved=localStorage.getItem('an_times_fbconfig');
-  if(saved)document.getElementById('fbConfig').value=saved;
-  document.getElementById('fbErr').textContent='';
-  openMov('mCloud');
-}
-function parseFbConfig(txt){
-  txt=txt.trim();
-  // Try to extract the object literal
-  let m=txt.match(/\{[\s\S]*\}/);
-  if(m)txt=m[0];
-  // Convert JS object literal to JSON: quote keys, swap single quotes
-  let json=txt
-    .replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g,'$1"$2":')
-    .replace(/'/g,'"')
-    .replace(/,(\s*[}\]])/g,'$1');
-  return JSON.parse(json);
-}
-function connectCloud(){
-  const txt=document.getElementById('fbConfig').value;
-  const err=document.getElementById('fbErr');
-  if(!txt.trim()){err.textContent='Pega la configuración de Firebase';return;}
-  let cfg;
-  try{cfg=parseFbConfig(txt);}catch(e){err.textContent='Configuración no válida. Copia el objeto firebaseConfig completo.';return;}
-  if(!cfg.databaseURL){err.textContent='Falta "databaseURL". Activa Realtime Database en Firebase.';return;}
-  if(typeof firebase==='undefined'){err.textContent='No se pudo cargar Firebase. Comprueba tu conexión a internet y que la app esté abierta desde una URL (https://...), no desde un archivo local.';return;}
-  setCloudStatus('connecting');
-  try{
-    if(FB.app){FB.app.delete&&FB.app.delete();}
-    FB.app=firebase.initializeApp(cfg,'an_'+Date.now());
-    FB.db=firebase.database(FB.app);
-    FB.ref=FB.db.ref('an_times_data');
-    // First read: merge cloud data, then listen
-    FB.ref.once('value').then(snap=>{
-      const cloud=snap.val();
-      if(cloud&&(cloud.employees||cloud.records)){
-        // Cloud has data - use it
-        FB.syncing=true;applyDB(cloud);FB.syncing=false;
-        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-      }else{
-        // Cloud empty - push our local data up
-        FB.ref.set(DB);
-      }
-      // Live listener
-      FB.ref.on('value',s=>{
-        const d=s.val();
-        if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}
-      });
-      FB.connected=true;
-      localStorage.setItem('an_times_fbconfig',txt.trim());
-      setCloudStatus('connected');
-      popSelects();refreshUI();
-      closeMov('mCloud');
-      toast('☁ Conectado — datos sincronizados en la nube');
-    }).catch(e=>{err.textContent='Error de conexión: '+(e.message||e);});
-  }catch(e){err.textContent='Error: '+(e.message||e);}
-}
+let _curEmpTab='jornada';
 function refreshUI(){
-  if(SES.isAdmin){try{renderAdm();const at=document.querySelector('.atab.active');}catch(e){}
-    try{renderAdmSols();renderRecs();renderEmps();renderExpStats();}catch(e){}}
-  else if(SES.user){try{renderWeek();renderRecent();renderVac();renderMed();renderAbs();renderHist();}catch(e){}}
+  try{updateBadges();}catch(e){}
+  if(SES.isAdmin){
+    const at=document.querySelector('#admTabBar .atab.active');
+    const cur=at?at.getAttribute('data-tab'):'overview';
+    try{admTab(cur);}catch(e){console.error(e);}
+  } else if(SES.user){
+    try{
+      renderWeek();renderRecent();
+      // Re-render whichever employee sub-tab is open so live data stays fresh
+      if(_curEmpTab==='vacaciones')renderVac();
+      else if(_curEmpTab==='medico')renderMed();
+      else if(_curEmpTab==='ausencias')renderAbs();
+      else if(_curEmpTab==='historial')renderHist();
+      else if(_curEmpTab==='mensajes')renderInbox();
+    }catch(e){console.error(e);}
+  }
 }
 function autoConnectCloud(){
   if(typeof firebase==='undefined'){setCloudStatus('disconnected');setTimeout(autoConnectCloud,1500);return;}
   setCloudStatus('connecting');
   try{
     FB.app=firebase.initializeApp(FB_CONFIG,'an_'+Date.now());
-    FB.db=firebase.database(FB.app);FB.ref=FB.db.ref('an_times_data');
+    FB.db=firebase.database(FB.app);
+    FB.auth=firebase.auth(FB.app);
+    // Autenticación anónima: necesaria para que las reglas seguras (auth != null) permitan el acceso
+    FB.auth.signInAnonymously().then(()=>{
+      bindCloudRef();
+    }).catch(e=>{
+      console.warn('Auth anónima falló:',e&&e.code);
+      // Si el método anónimo no está habilitado en Firebase, avisamos y seguimos en local
+      if(e&&e.code==='auth/operation-not-allowed'){
+        toast('Activa "Acceso anónimo" en Firebase → Authentication');
+      }
+      setCloudStatus('disconnected');
+    });
+  }catch(e){console.warn('Auto-conexión fallida',e);setCloudStatus('disconnected');}
+}
+function bindCloudRef(){
+  try{
+    FB.ref=FB.db.ref('an_times_data');
     FB.ref.once('value').then(snap=>{
       const cloud=snap.val();
       if(cloud&&(cloud.employees||cloud.records)){FB.syncing=true;applyDB(cloud);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}}
@@ -667,7 +693,11 @@ function autoConnectCloud(){
       FB.ref.on('value',s=>{const d=s.val();if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}});
       FB.connected=true;setCloudStatus('connected');popSelects();refreshUI();
     }).catch(e=>{console.warn('Nube:',e);setCloudStatus('disconnected');});
-  }catch(e){console.warn('Auto-conexión fallida',e);setCloudStatus('disconnected');}
+    // Monitor de conexión en tiempo real
+    FB.db.ref('.info/connected').on('value',s=>{
+      if(FB.connected)setCloudStatus(s.val()?'connected':'connecting');
+    });
+  }catch(e){console.warn('bindCloudRef',e);setCloudStatus('disconnected');}
 }
 
 /* VACATION CALC */
@@ -705,6 +735,10 @@ setInterval(()=>{
   tick();
 },1000);
 
+/* Ordena empleados alfabéticamente por nombre y apellido (inicial) */
+function sortedEmps(list){
+  return [...(list||DB.employees)].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+}
 /* LOGIN */
 function popSelects(){
   const se=document.getElementById('selEmpresa');
@@ -713,7 +747,7 @@ function popSelects(){
 }
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');
-  const list=emp?DB.employees.filter(e=>e.empresa===emp):DB.employees;
+  const list=sortedEmps(emp?DB.employees.filter(e=>e.empresa===emp):DB.employees);
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function doLogin(){
@@ -721,25 +755,29 @@ function doLogin(){
   if(!id){err.textContent='Selecciona un empleado';return;}
   const emp=DB.employees.find(e=>e.id===id);if(!emp){err.textContent='No encontrado';return;}
   if(pin!==emp.pin){err.textContent='PIN incorrecto';return;}
-  err.textContent='';document.getElementById('inputPin').value='';SES.user=emp;showSc('sFichaje');initFichaje();
+  err.textContent='';document.getElementById('inputPin').value='';SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();
 }
 function openAdminLogin(){document.getElementById('adminPin').value='';document.getElementById('adminErr').textContent='';openMov('mAdmin');setTimeout(()=>document.getElementById('adminPin').focus(),300);}
 function doAdmLogin(){
   if(document.getElementById('adminPin').value!==ADM_PIN){document.getElementById('adminErr').textContent='PIN incorrecto';return;}
-  closeMov('mAdmin');SES.isAdmin=true;SES.user=null;showSc('sAdmin');renderAdm();
+  closeMov('mAdmin');SES.isAdmin=true;SES.user=null;showSc('sAdmin');admTab('overview');updateBadges();
 }
 function doLogout(){TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false};showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
 
 /* EMPLOYEE TABS */
 function empTab(t){
-  ['jornada','vacaciones','medico','ausencias','historial'].forEach(x=>{
-    document.getElementById('t'+cap(x)).style.display=x===t?'block':'none';
-    document.getElementById('e'+cap(x)).classList.toggle('active',x===t);
+  _curEmpTab=t;
+  ['jornada','vacaciones','medico','ausencias','mensajes','historial'].forEach(x=>{
+    const tel=document.getElementById('t'+cap(x));if(tel)tel.style.display=x===t?'block':'none';
+    const eel=document.getElementById('e'+cap(x));if(eel)eel.classList.toggle('active',x===t);
   });
-  if(t==='vacaciones')renderVac();
-  if(t==='medico')renderMed();
-  if(t==='ausencias')renderAbs();
-  if(t==='historial')renderHist();
+  try{
+    if(t==='vacaciones')renderVac();
+    else if(t==='medico')renderMed();
+    else if(t==='ausencias')renderAbs();
+    else if(t==='historial')renderHist();
+    else if(t==='mensajes')renderInbox();
+  }catch(err){console.error('empTab error',err);}
 }
 
 /* FICHAJE */
@@ -768,7 +806,15 @@ function doStop(){const o=openRec();if(!o)return;if(TM.state==='break'){TM.bs+=M
 function openBreakModal(){openMov('mBreak');}
 function doBreak(){closeMov('mBreak');const o=openRec();if(!o)return;TM.state='break';TM.bStart=new Date().toISOString();o.enDescanso=true;o.bStartTs=TM.bStart;save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');}
 function doResume(){const o=openRec();if(!o)return;TM.bs+=Math.floor((new Date()-new Date(TM.bStart))/1000);TM.bStart=null;TM.state='working';o.enDescanso=false;o.breakSecs=TM.bs;o.bStartTs=null;save();updBtns();setStatus('trabajando','Trabajando');toast('Jornada reanudada');}
-function tick(){if(TM.state==='idle')return;if(TM.state==='working'){TM.ws++;const o=openRec();if(o)o.workSecs=TM.ws;}else if(TM.state==='break'){TM.bs++;const o=openRec();if(o)o.breakSecs=TM.bs;}updTimer();}
+let _tickN=0;
+function tick(){
+  if(TM.state==='idle')return;
+  if(TM.state==='working'){TM.ws++;const o=openRec();if(o)o.workSecs=TM.ws;}
+  else if(TM.state==='break'){TM.bs++;const o=openRec();if(o)o.breakSecs=TM.bs;}
+  updTimer();
+  // Persist every 30s so a refresh/disconnect doesn't lose progress, without hammering the DB
+  if((++_tickN)%30===0)save();
+}
 function updTimer(){
   document.getElementById('eWorked').textContent=s2h(TM.ws);
   document.getElementById('eBreak').textContent=s2h(TM.bs);
@@ -815,8 +861,9 @@ function doReqVac(){
   const d=wkdays(f,t);if(d<=0){toast('Sin días laborables en ese rango');return;}
   const vd=vacData(e.id);if(d>vd.available){toast(`Solo tienes ${vd.available} días disponibles`);return;}
   DB.vacaciones.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,desde:f,hasta:t,dias:d,estado:'pendiente',solEn:new Date().toISOString()});
+  pushNoti('admin','vac','Nueva petición de vacaciones',`${e.name} solicita ${d} día(s): ${fds(f)} → ${fds(t)}`);
   save();document.getElementById('vFrom').value='';document.getElementById('vTo').value='';document.getElementById('vDays').textContent='';
-  renderVac();toast('🌴 Solicitud enviada — pendiente aprobación');
+  renderVac();toast('Solicitud enviada — pendiente de aprobación');
 }
 function renderVac(){
   const e=SES.user,vd=vacData(e.id);
@@ -842,9 +889,33 @@ function doReqMed(){
   const e=SES.user,f=document.getElementById('mFrom').value,t=document.getElementById('mTo').value,note=document.getElementById('mNote').value.trim();
   if(!f||!t){toast('Selecciona fechas de inicio y fin');return;}if(f>t){toast('Fecha inicio debe ser anterior al fin');return;}
   const d=wkdays(f,t);if(d<=0){toast('Sin días laborables en ese rango');return;}
-  DB.medicos.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,desde:f,hasta:t,dias:d,nota:note,estado:'pendiente',solEn:new Date().toISOString()});
-  save();document.getElementById('mFrom').value='';document.getElementById('mTo').value='';document.getElementById('mNote').value='';document.getElementById('mDays').textContent='';
-  renderMed();toast('🏥 Permiso médico registrado — pendiente de revisión');
+  const fileInput=document.getElementById('mFile');
+  const file=fileInput&&fileInput.files&&fileInput.files[0];
+  const finish=(justif,justifName,justifType)=>{
+    DB.medicos.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,desde:f,hasta:t,dias:d,nota:note,justif:justif||null,justifName:justifName||null,justifType:justifType||null,estado:'pendiente',solEn:new Date().toISOString()});
+    pushNoti('admin','med','Nuevo permiso médico',`${e.name} registra ${d} día(s) de permiso médico: ${fds(f)} → ${fds(t)}${justif?' (con justificante)':''}`);
+    save();document.getElementById('mFrom').value='';document.getElementById('mTo').value='';document.getElementById('mNote').value='';document.getElementById('mDays').textContent='';if(fileInput)fileInput.value='';
+    renderMed();toast('Permiso médico registrado'+(justif?' con justificante':'')+' — pendiente de revisión');
+  };
+  if(file){
+    if(file.size>1024*1024){toast('El justificante no puede superar 1 MB. Comprime la imagen o usa PDF ligero.');return;}
+    const r=new FileReader();
+    r.onload=()=>finish(r.result,file.name,file.type);
+    r.onerror=()=>{toast('No se pudo leer el archivo');finish(null);};
+    r.readAsDataURL(file);
+  }else{finish(null);}
+}
+function verJustif(medId){
+  const m=DB.medicos.find(x=>x.id===medId);if(!m||!m.justif){toast('Sin justificante');return;}
+  const w=window.open();
+  if(w){
+    if((m.justifType||'').indexOf('pdf')>=0){w.document.write('<iframe src="'+m.justif+'" style="border:0;width:100%;height:100vh"></iframe>');}
+    else{w.document.write('<img src="'+m.justif+'" style="max-width:100%">');}
+    w.document.title=m.justifName||'Justificante médico';
+  }else{
+    // fallback: trigger download
+    const a=document.createElement('a');a.href=m.justif;a.download=m.justifName||'justificante';a.click();
+  }
 }
 function renderMed(){
   const e=SES.user;
@@ -853,6 +924,7 @@ function renderMed(){
   el.innerHTML=mine.length?mine.map(m=>`<div class="si">
     <div class="si-top"><span class="si-name">${fds(m.desde)} → ${fds(m.hasta)}</span><span class="badge ${m.estado==='aprobada'?'aprobada':m.estado==='denegada'?'denegada':'medico'}">${m.estado==='pendiente'?'⏳ Pendiente':m.estado==='aprobada'?'✅ Aprobado':'❌ Denegado'}</span></div>
     <div class="si-dates">${m.dias} día${m.dias!==1?'s':''} · ${m.nota?`"${m.nota.substring(0,40)}${m.nota.length>40?'…':''}"`:''}</div>
+    ${m.justif?`<div class="si-actions"><button class="bok" onclick="verJustif('${m.id}')">📎 Ver justificante</button></div>`:'<div style="font-size:11px;color:var(--text3);margin-top:4px">Sin justificante adjunto</div>'}
   </div>`).join(''):'<div class="empty">Sin permisos médicos</div>';
 }
 
@@ -862,8 +934,9 @@ function doReqAbs(){
   if(!fecha){toast('Selecciona la fecha de ausencia');return;}
   if(DB.ausencias.find(a=>a.empId===e.id&&a.fecha===fecha)){toast('Ya existe una ausencia en esa fecha');return;}
   DB.ausencias.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,fecha,nota:note,solEn:new Date().toISOString()});
+  pushNoti('admin','abs','Ausencia registrada',`${e.name} ha registrado una ausencia el ${fds(fecha)}`);
   save();document.getElementById('aDate').value='';document.getElementById('aNote').value='';
-  renderAbs();toast('⚠ Ausencia registrada');
+  renderAbs();toast('Ausencia registrada');
 }
 function renderAbs(){
   const e=SES.user;
@@ -890,15 +963,23 @@ function renderHist(){
 function admTab(t){
   const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
   tabs.forEach(x=>{const el=document.getElementById('a'+cap(x));if(el)el.style.display=x===t?'block':'none';});
-  document.querySelectorAll('.atab').forEach((b,i)=>{b.classList.toggle('active',tabs[i]===t);});
-  if(t==='registros')renderRecs();if(t==='empleados')renderEmps();if(t==='exportar'){renderExpStats();renderCierres();renderCloseMesOptions();}if(t==='solicitudes')renderAdmSols();if(t==='control')renderControl();if(t==='nominas')renderNomMesOptions();
+  document.querySelectorAll('#admTabBar .atab').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-tab')===t);});
+  try{
+    if(t==='registros')renderRecs();
+    else if(t==='empleados')renderEmps();
+    else if(t==='exportar'){renderExpStats();renderCierres();renderCloseMesOptions();}
+    else if(t==='solicitudes')renderAdmSols();
+    else if(t==='control')renderControl();
+    else if(t==='nominas'){renderNomMesOptions();renderMensajeria();}
+    else if(t==='overview')renderAdm();
+  }catch(err){console.error('admTab render error',err);}
 }
 function renderAdm(){renderGStats();renderEList();renderAdmFilters();}
 
 /* ── ADMIN: CONTROL DE JORNADA DE EMPLEADOS ── */
 function renderControl(){
   const el=document.getElementById('ctrlList');
-  el.innerHTML=DB.employees.map(emp=>{
+  el.innerHTML=sortedEmps().map(emp=>{
     const open=DB.records.find(r=>r.empId===emp.id&&!r.fin);
     let estado='Libre',cls='libre',extra='';
     if(open){
@@ -963,7 +1044,7 @@ function renderGStats(){
 }
 function renderEList(){
   const ws=wkStart(new Date());
-  document.getElementById('eList').innerHTML=DB.employees.map(emp=>{
+  document.getElementById('eList').innerHTML=sortedEmps().map(emp=>{
     const wr=DB.records.filter(r=>r.empId===emp.id&&r.fin&&new Date(r.inicio)>=ws);
     let wm=0;wr.forEach(r=>wm+=Math.floor((r.workSecs||0)/60));
     const ext=Math.max(0,wm-WK);const p=Math.min(100,(wm/WK)*100);
@@ -991,11 +1072,11 @@ function renderEList(){
 }
 function renderAdmFilters(){
   const fe=document.getElementById('fEmp');
-  fe.innerHTML='<option value="">Todos los empleados</option>'+DB.employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  fe.innerHTML='<option value="">Todos los empleados</option>'+sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
   const fw=document.getElementById('fWeek');
   const wks=allWeeks();fw.innerHTML='<option value="">Todas las semanas</option>'+wks.map(w=>`<option value="${w.key}">${w.label}</option>`).join('');
   const ne=document.getElementById('nEmpresa');ne.innerHTML='<option value="">— Empresa —</option>'+DB.empresas.map(e=>`<option>${e}</option>`).join('');
-  const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=DB.employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function renderAdmSols(){
   // Vacaciones pendientes
@@ -1015,7 +1096,10 @@ function renderAdmSols(){
         <span class="badge ${m.estado==='aprobada'?'aprobada':m.estado==='denegada'?'denegada':'medico'}">${m.estado==='pendiente'?'⏳ Pendiente':m.estado==='aprobada'?'✅ Aprobado':'❌ Denegado'}</span>
       </div>
       <div class="si-dates">📅 ${fds(m.desde)} → ${fds(m.hasta)} · ${m.dias} días · ${m.nota?`"${m.nota.substring(0,40)}"`:'Sin nota'}</div>
-      ${m.estado==='pendiente'?`<div class="si-actions"><button class="bok" onclick="resMed('${m.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resMed('${m.id}','denegada')">❌ Denegar</button></div>`:''}
+      <div class="si-actions">
+        ${m.justif?`<button class="bok" onclick="verJustif('${m.id}')">📎 Justificante</button>`:'<span style="font-size:11px;color:var(--text3)">Sin justificante</span>'}
+        ${m.estado==='pendiente'?`<button class="bok" onclick="resMed('${m.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resMed('${m.id}','denegada')">❌ Denegar</button>`:''}
+      </div>
     </div>`;
   }).join(''):'<div class="empty">Sin permisos médicos</div>';
   // Ausencias
@@ -1032,7 +1116,7 @@ function renderAdmSols(){
     </div>`;
   }).join(''):'<div class="empty">Sin ausencias</div>';
   // Vac resumen
-  document.getElementById('aVacRes').innerHTML=DB.employees.map(emp=>{
+  document.getElementById('aVacRes').innerHTML=sortedEmps().map(emp=>{
     const vd=vacData(emp.id);
     return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div>
       <div class="einfo"><strong>${emp.name}</strong><span>${vd.months} meses · Gen: ${vd.generated} · Usados: ${vd.used} · Pend: ${vd.pending}</span></div>
@@ -1041,8 +1125,8 @@ function renderAdmSols(){
   }).join('');
   renderAdmFilters();
 }
-function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'✅ Vacaciones aprobadas':'❌ Solicitud denegada');}
-function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;save();renderAdmSols();renderGStats();toast(est==='aprobada'?'🏥 Permiso médico aprobado':'❌ Permiso denegado');}
+function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
+function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
 function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
 function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();renderAdmSols();toast('Fecha de inicio actualizada');}
 function renderRecs(){
@@ -1055,7 +1139,7 @@ function renderRecs(){
   }).join('')+'</div>';
 }
 function renderEmps(){
-  document.getElementById('empList').innerHTML=DB.employees.map(emp=>{const vd=vacData(emp.id);
+  document.getElementById('empList').innerHTML=sortedEmps().map(emp=>{const vd=vacData(emp.id);
     return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d · Alta:${emp.startDate||'—'}</span></div><button class="bdel" onclick="delEmp('${emp.id}')">✕</button></div>`;
   }).join('');
   document.getElementById('empresaList').innerHTML=DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join('');
@@ -1063,8 +1147,11 @@ function renderEmps(){
 function addEmp(){
   const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today(),mail=document.getElementById('nEmail').value.trim();
   if(!n||!em||p.length<4){toast('Completa todos los campos (PIN mín. 4 dígitos)');return;}
-  const init=n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  DB.employees.push({id:'e'+Date.now(),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd,email:mail});
+  if(!/^[0-9]+$/.test(p)){toast('El PIN solo puede contener números');return;}
+  if(DB.employees.some(e=>e.empresa===em&&e.pin===p)){toast('Ya hay un empleado con ese PIN en esta empresa');return;}
+  if(mail&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){toast('Email no válido');return;}
+  const init=n.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  DB.employees.push({id:'e'+Date.now()+Math.random().toString(36).slice(2,5),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd,email:mail});
   document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';document.getElementById('nEmail').value='';
   save();renderEmps();popSelects();toast('Empleado añadido');
 }
@@ -1114,21 +1201,21 @@ function expFichajes(){
     const vd=vacData(emp.id);
     csv+=`"${emp.name}","${emp.empresa}","${mhm(tn)}","${mhm(te)}","${mhm(tn+te)}","${vd.available} dias"\n`;
   });
-  dl("\uFEFF"+csv,'text/csv','AN_Times_Fichajes_'+today()+'.csv');toast('CSV de fichajes descargado');
+  dl("\uFEFF"+csv,'text/csv','TIMES_INC_Fichajes_'+today()+'.csv');toast('CSV de fichajes descargado');
 }
 function expVacaciones(){
   const h="Empleado,Empresa,Desde,Hasta,Dias,Estado,Solicitado\n";
   const rows=DB.vacaciones.sort((a,b)=>a.empName.localeCompare(b.empName)).map(v=>`"${v.empName}","${v.empresa}","${v.desde}","${v.hasta}","${v.dias}","${v.estado}","${new Date(v.solEn).toLocaleDateString('es-ES')}"`).join('\n');
   const sum="\n\nResumen por empleado\nEmpleado,Empresa,Inicio Contrato,Meses,Generados,Usados,Pendientes,Disponibles\n"+
     DB.employees.map(e=>{const vd=vacData(e.id);return`"${e.name}","${e.empresa}","${e.startDate||'—'}","${vd.months}","${vd.generated}","${vd.used}","${vd.pending}","${vd.available}"`;}).join('\n');
-  dl("\uFEFF"+h+rows+sum,'text/csv','AN_Times_Vacaciones_'+today()+'.csv');toast('🌴 CSV Vacaciones descargado');
+  dl("\uFEFF"+h+rows+sum,'text/csv','TIMES_INC_Vacaciones_'+today()+'.csv');toast('🌴 CSV Vacaciones descargado');
 }
 function expAusencias(){
   const hm="Empleado,Empresa,Desde,Hasta,Dias,Estado,Motivo,Solicitado\n";
   const rowsM=DB.medicos.sort((a,b)=>a.empName.localeCompare(b.empName)).map(m=>`"${m.empName}","${m.empresa}","${m.desde}","${m.hasta}","${m.dias}","${m.estado}","${m.nota||''}","${new Date(m.solEn).toLocaleDateString('es-ES')}"`).join('\n');
   const ha="\n\nAUSENCIAS INJUSTIFICADAS\nEmpleado,Empresa,Fecha,Motivo,Registrado\n";
   const rowsA=DB.ausencias.sort((a,b)=>a.empName.localeCompare(b.empName)).map(a=>`"${a.empName}","${a.empresa}","${a.fecha}","${a.nota||''}","${new Date(a.solEn).toLocaleDateString('es-ES')}"`).join('\n');
-  dl("\uFEFF"+hm+rowsM+ha+rowsA,'text/csv','AN_Times_Ausencias_'+today()+'.csv');toast('🏥 CSV Médicos y Ausencias descargado');
+  dl("\uFEFF"+hm+rowsM+ha+rowsA,'text/csv','TIMES_INC_Ausencias_'+today()+'.csv');toast('🏥 CSV Médicos y Ausencias descargado');
 }
 /* ── EXPORT: RESUMEN MENSUAL (Excel) ── */
 function allMonthKeys(){
@@ -1169,7 +1256,7 @@ function expMensual(){
     meses.forEach(mk=>{const d=monthEmpData(emp.id,mk);tn+=d.normalMins;te+=d.extraMins;});
     csv+=`"${emp.name}","${emp.empresa}","${mhm(tn)}","${mhm(te)}","${mhm(tn+te)}"\n`;
   });
-  dl("\uFEFF"+csv,'text/csv','AN_Times_Resumen_Mensual_'+today()+'.csv');toast('📅 CSV Resumen mensual descargado');
+  dl("\uFEFF"+csv,'text/csv','TIMES_INC_Resumen_Mensual_'+today()+'.csv');toast('📅 CSV Resumen mensual descargado');
 }
 
 /* ── CIERRES MENSUALES (admin) ── */
@@ -1203,69 +1290,184 @@ function renderCierres(){
   </div>`).join('');
 }
 
-/* ── NÓMINAS ── */
-function renderNominas(){
+/* ── NÓMINAS & MENSAJERÍA INTERNA ── */
+function renderNomMesOptions2(){
+  const es=document.getElementById('nomEmp');
+  if(es)es.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const ds=document.getElementById('msgDest');
+  if(ds)ds.innerHTML='<option value="__all__">Todos los trabajadores</option>'+sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+}
+function genNominaPDF(emp,mk,texto,d){
+  if(typeof window.jspdf==='undefined'){return null;}
+  const{jsPDF}=window.jspdf;const doc=new jsPDF();
+  const W=210;let y=20;
+  // Header band
+  doc.setFillColor(10,14,26);doc.rect(0,0,W,32,'F');
+  doc.setTextColor(0,212,255);doc.setFont('helvetica','bold');doc.setFontSize(20);
+  doc.text('TIMES INC',14,16);
+  doc.setTextColor(180,190,210);doc.setFontSize(10);doc.setFont('helvetica','normal');
+  doc.text('Recibo de nómina',14,24);
+  doc.setTextColor(180,190,210);doc.setFontSize(9);
+  doc.text(monthLabel(mk),W-14,16,{align:'right'});
+  y=44;
+  doc.setTextColor(20,20,20);doc.setFont('helvetica','bold');doc.setFontSize(13);
+  doc.text(emp.name,14,y);y+=6;
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(90,90,90);
+  doc.text(emp.empresa+'  ·  Periodo: '+monthLabel(mk),14,y);y+=4;
+  doc.setDrawColor(220,220,220);doc.line(14,y,W-14,y);y+=8;
+  // Detalle (texto libre)
+  doc.setTextColor(30,30,30);doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text('Detalle',14,y);y+=6;
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  const lines=doc.splitTextToSize(texto,W-28);
+  doc.text(lines,14,y);y+=lines.length*5+6;
+  // Resumen de horas
+  if(d){
+    doc.setDrawColor(220,220,220);doc.line(14,y,W-14,y);y+=8;
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('Resumen de horas — '+monthLabel(mk),14,y);y+=7;
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(60,60,60);
+    const rows=[['Horas normales',mhm(d.normalMins)],['Horas extra',mhm(d.extraMins)],['Horas totales',mhm(d.totalMins)],['Días de permiso médico',String(d.diasMedico)],['Ausencias',String(d.ausencias)]];
+    rows.forEach(r=>{doc.text(r[0],14,y);doc.text(r[1],W-14,y,{align:'right'});y+=6;});
+  }
+  y+=10;doc.setDrawColor(220,220,220);doc.line(14,y,W-14,y);y+=6;
+  doc.setFontSize(8);doc.setTextColor(150,150,150);
+  doc.text('Documento generado por TIMES INC · '+new Date().toLocaleDateString('es-ES'),14,y);
+  return doc.output('datauristring');
+}
+function enviarNomina(soloTexto){
+  const empId=document.getElementById('nomEmp').value;
   const mk=document.getElementById('nomMes').value;
-  const precio=parseFloat(document.getElementById('nomPrecio').value)||0;
-  const precioEx=parseFloat(document.getElementById('nomPrecioExtra').value)||0;
-  if(!mk){toast('Selecciona un mes');return;}
-  const el=document.getElementById('nomResult');
-  el.innerHTML=DB.employees.map(emp=>{
-    const d=monthEmpData(emp.id,mk);
-    const hN=d.normalMins/60,hE=d.extraMins/60;
-    const pagoN=hN*precio,pagoE=hE*precioEx,totalPago=pagoN+pagoE;
-    return`<div class="adcard">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <div class="eavatar" style="background:${emp.color};width:34px;height:34px">${emp.initials}</div>
-        <div style="flex:1"><strong style="font-size:14px">${emp.name}</strong><div style="font-size:11px;color:var(--text2)">${monthLabel(mk)} · ${emp.empresa}</div></div>
-      </div>
-      <div style="font-size:13px;line-height:2">
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Horas normales</span><span><b>${mhm(d.normalMins)}</b> ${precio?'× '+precio+'€ = '+pagoN.toFixed(2)+'€':''}</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Horas extra</span><span><b style="color:var(--red)">${mhm(d.extraMins)}</b> ${precioEx?'× '+precioEx+'€ = '+pagoE.toFixed(2)+'€':''}</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Días médico</span><span>${d.diasMedico}</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Ausencias</span><span>${d.ausencias}</span></div>
-        ${(precio||precioEx)?`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border2);margin-top:6px;padding-top:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:16px"><span>TOTAL</span><span style="color:var(--green)">${totalPago.toFixed(2)}€</span></div>`:''}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
-        <button class="bok" onclick="sendNomina('${emp.id}','${mk}',${precio},${precioEx},'email')">📧 Enviar email</button>
-        <button class="expbtn jsnb" style="margin:0;padding:8px;font-size:12px" onclick="sendNomina('${emp.id}','${mk}',${precio},${precioEx},'share')">📤 Compartir</button>
-      </div>
+  const texto=document.getElementById('nomTexto').value.trim();
+  const adj=document.getElementById('nomAdjHoras').checked;
+  const fileInput=document.getElementById('nomFile');
+  const file=fileInput&&fileInput.files&&fileInput.files[0];
+  const emp=DB.employees.find(e=>e.id===empId);
+  if(!emp){toast('Selecciona un trabajador');return;}
+  if(!texto){toast('Escribe el detalle de la nómina');return;}
+  const d=adj?monthEmpData(empId,mk):null;
+  let cuerpo=texto;
+  if(adj&&d){cuerpo+=`\n\n— Resumen de horas (${monthLabel(mk)}) —\nHoras normales: ${mhm(d.normalMins)}\nHoras extra: ${mhm(d.extraMins)}\nTotal: ${mhm(d.totalMins)}\nDías de permiso médico: ${d.diasMedico}\nAusencias: ${d.ausencias}`;}
+  const finalizar=(pdfData,pdfName)=>{
+    DB.mensajes.push({id:gid(),empId,tipo:'nomina',asunto:'Nómina '+monthLabel(mk),texto:cuerpo,pdf:pdfData||null,pdfName:pdfName||('Nomina_'+mk+'.pdf'),fecha:new Date().toISOString(),leido:false});
+    pushNoti('emp:'+empId,'nom','Has recibido tu nómina',`Nómina de ${monthLabel(mk)} disponible en tu bandeja${pdfData?' (PDF adjunto)':''}`);
+    save();
+    document.getElementById('nomTexto').value='';if(fileInput)fileInput.value='';
+    renderMensajeria();
+    toast('Nómina enviada a '+emp.name.split(' ')[0]+(pdfData?' con PDF':''));
+  };
+  if(soloTexto===true){finalizar(null);return;}
+  if(file){
+    if(file.size>1024*1024){toast('El PDF no puede superar 1 MB.');return;}
+    const r=new FileReader();r.onload=()=>finalizar(r.result,file.name);r.onerror=()=>finalizar(null);r.readAsDataURL(file);
+  }else{
+    const pdf=genNominaPDF(emp,mk,texto,adj?d:null);
+    if(!pdf){toast('No se pudo generar el PDF, se envía como texto');finalizar(null);return;}
+    finalizar(pdf,'Nomina_TIMES_INC_'+mk+'.pdf');
+  }
+}
+function verPDFNomina(msgId){
+  const m=DB.mensajes.find(x=>x.id===msgId);if(!m||!m.pdf){toast('Sin PDF');return;}
+  const w=window.open();
+  if(w){w.document.write('<iframe src="'+m.pdf+'" style="border:0;width:100%;height:100vh"></iframe>');w.document.title=m.pdfName||'Nómina';}
+  else{const a=document.createElement('a');a.href=m.pdf;a.download=m.pdfName||'nomina.pdf';a.click();}
+}
+function enviarMensaje(){
+  const dest=document.getElementById('msgDest').value;
+  const asunto=document.getElementById('msgAsunto').value.trim();
+  const texto=document.getElementById('msgTexto').value.trim();
+  if(!asunto||!texto){toast('Completa asunto y mensaje');return;}
+  const destinatarios=dest==='__all__'?DB.employees.map(e=>e.id):[dest];
+  destinatarios.forEach(empId=>{
+    DB.mensajes.push({id:gid(),empId,tipo:'mensaje',asunto,texto,fecha:new Date().toISOString(),leido:false});
+    pushNoti('emp:'+empId,'msg','Nuevo mensaje',asunto);
+  });
+  save();
+  document.getElementById('msgAsunto').value='';document.getElementById('msgTexto').value='';
+  renderMensajeria();
+  toast(dest==='__all__'?'Mensaje enviado a todos':'Mensaje enviado');
+}
+function renderMensajeria(){
+  renderNomMesOptions2();
+  const el=document.getElementById('msgEnviados');if(!el)return;
+  const ms=[...DB.mensajes].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,30);
+  if(!ms.length){el.innerHTML='<div class="empty">No has enviado mensajes</div>';return;}
+  el.innerHTML=ms.map(m=>{
+    const emp=DB.employees.find(e=>e.id===m.empId);
+    return`<div class="inbox-item">
+      <div class="inbox-head"><span class="inbox-subj" style="font-size:13px">${m.asunto}</span><span class="inbox-date">${new Date(m.fecha).toLocaleDateString('es-ES')}</span></div>
+      <span class="inbox-tag ${m.tipo==='nomina'?'nomina':'mensaje'}">${m.tipo==='nomina'?'NÓMINA':'MENSAJE'} · ${emp?emp.name:'—'} ${m.leido?'· leído':'· sin leer'}</span>
     </div>`;
   }).join('');
-  toast('Nóminas calculadas');
 }
-function nominaTexto(emp,mk,precio,precioEx){
-  const d=monthEmpData(emp.id,mk);
-  const hN=d.normalMins/60,hE=d.extraMins/60;
-  const pagoN=hN*precio,pagoE=hE*precioEx,total=pagoN+pagoE;
-  let t=`NÓMINA — ${monthLabel(mk)}\n`;
-  t+=`Empleado: ${emp.name}\nEmpresa: ${emp.empresa}\n`;
-  t+=`--------------------------------\n`;
-  t+=`Horas normales: ${mhm(d.normalMins)}`;if(precio)t+=` (${pagoN.toFixed(2)}€)`;t+=`\n`;
-  t+=`Horas extra: ${mhm(d.extraMins)}`;if(precioEx)t+=` (${pagoE.toFixed(2)}€)`;t+=`\n`;
-  t+=`Días de permiso médico: ${d.diasMedico}\n`;
-  t+=`Ausencias injustificadas: ${d.ausencias}\n`;
-  if(precio||precioEx){t+=`--------------------------------\nTOTAL A PERCIBIR: ${total.toFixed(2)}€\n`;}
-  t+=`\nAN Times — Control de jornada`;
-  return t;
+
+/* Bandeja del empleado */
+function renderInbox(){
+  const e=SES.user;if(!e)return;
+  const el=document.getElementById('empInbox');if(!el)return;
+  const mine=DB.mensajes.filter(m=>m.empId===e.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(!mine.length){el.innerHTML='<div class="empty">No tienes mensajes</div>';return;}
+  el.innerHTML=mine.map(m=>`<div class="inbox-item${m.leido?'':' unread'}">
+    <span class="inbox-tag ${m.tipo==='nomina'?'nomina':'mensaje'}">${m.tipo==='nomina'?'💶 NÓMINA':'✉ MENSAJE'}</span>
+    <div class="inbox-head"><span class="inbox-subj">${m.asunto}</span><span class="inbox-date">${new Date(m.fecha).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
+    <div class="inbox-text">${m.texto.replace(/</g,'&lt;')}</div>
+    ${m.pdf?`<div style="margin-top:10px"><button class="btn-med" style="width:auto;padding:8px 14px;font-size:13px" onclick="verPDFNomina('${m.id}')">📄 Ver / descargar PDF</button></div>`:''}
+  </div>`).join('');
+  // Mark messages as read
+  let changed=false;mine.forEach(m=>{if(!m.leido){m.leido=true;changed=true;}});
+  if(changed){save();updateBadges();}
 }
-function sendNomina(empId,mk,precio,precioEx,modo){
-  const emp=DB.employees.find(e=>e.id===empId);if(!emp)return;
-  const texto=nominaTexto(emp,mk,precio,precioEx);
-  const asunto='Nómina '+monthLabel(mk)+' - '+emp.name;
-  if(modo==='email'){
-    const mail='mailto:'+(emp.email||'')+'?subject='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(texto);
-    window.location.href=mail;
-    toast('Abriendo tu app de correo…');
-  }else{
-    if(navigator.share){navigator.share({title:asunto,text:texto}).then(()=>toast('Nómina compartida')).catch(()=>{});}
-    else{navigator.clipboard&&navigator.clipboard.writeText(texto);toast('Nómina copiada al portapapeles');}
+
+/* ── NOTIFICACIONES ── */
+function pushNoti(target,tipo,titulo,texto){
+  DB.notis.push({id:gid(),target,tipo,titulo,texto,fecha:new Date().toISOString(),leido:false});
+}
+function notisFor(){
+  // Returns notis relevant to current session
+  if(SES.isAdmin)return DB.notis.filter(n=>n.target==='admin');
+  if(SES.user)return DB.notis.filter(n=>n.target==='emp:'+SES.user.id);
+  return [];
+}
+function unreadCount(){return notisFor().filter(n=>!n.leido).length;}
+function openNotis(){
+  renderNotis();openMov('mNotis');
+  // mark read after viewing
+  setTimeout(()=>{notisFor().forEach(n=>n.leido=true);save();updateBadges();},800);
+}
+function markAllNotisRead(){notisFor().forEach(n=>n.leido=true);save();renderNotis();updateBadges();toast('Notificaciones marcadas como leídas');}
+function renderNotis(){
+  const el=document.getElementById('notiList');if(!el)return;
+  const ns=notisFor().sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,40);
+  if(!ns.length){el.innerHTML='<div class="empty">Sin notificaciones</div>';return;}
+  const icos={vac:'<svg viewBox=\'0 0 24 24\'><path d=\'M12 21V11M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0\'/></svg>',
+    med:'<svg viewBox=\'0 0 24 24\'><rect x=\'3\' y=\'6\' width=\'18\' height=\'14\' rx=\'2\'/><path d=\'M12 11v5M9.5 13.5h5\'/></svg>',
+    abs:'<svg viewBox=\'0 0 24 24\'><path d=\'M12 3l9 16H3z\'/><path d=\'M12 10v4M12 17h.01\'/></svg>',
+    msg:'<svg viewBox=\'0 0 24 24\'><rect x=\'3\' y=\'5\' width=\'18\' height=\'14\' rx=\'2\'/><path d=\'M3 7l9 6 9-6\'/></svg>',
+    nom:'<svg viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'12\' r=\'9\'/><path d=\'M12 7v10M9.5 9.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3H14\'/></svg>'};
+  el.innerHTML=ns.map(n=>`<div class="noti-item${n.leido?'':' unread'}">
+    <div class="noti-ico ${n.tipo}">${icos[n.tipo]||icos.msg}</div>
+    <div class="noti-body"><div class="noti-title">${n.titulo}</div><div class="noti-text">${n.texto}</div><div class="noti-time">${tAgo(n.fecha)}</div></div>
+  </div>`).join('');
+}
+function tAgo(iso){
+  const s=Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<60)return 'hace un momento';
+  if(s<3600)return 'hace '+Math.floor(s/60)+' min';
+  if(s<86400)return 'hace '+Math.floor(s/3600)+' h';
+  return new Date(iso).toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+}
+function updateBadges(){
+  const u=unreadCount();
+  ['notiBadgeAdm','notiBadgeEmp'].forEach(id=>{const b=document.getElementById(id);if(b){if(u>0){b.textContent=u>9?'9+':u;b.style.display='flex';}else b.style.display='none';}});
+  // Employee message dot
+  if(SES.user){
+    const unreadMsg=DB.mensajes.filter(m=>m.empId===SES.user.id&&!m.leido).length;
+    const dot=document.getElementById('msgDotEmp');if(dot)dot.style.display=unreadMsg>0?'inline-block':'none';
   }
 }
 
 function expJSON(){
-  const data={exportDate:new Date().toISOString(),empresas:DB.empresas,employees:DB.employees,records:DB.records,vacaciones:DB.vacaciones,medicos:DB.medicos,ausencias:DB.ausencias,resumen:DB.employees.map(e=>({id:e.id,name:e.name,...vacData(e.id),medicos:DB.medicos.filter(m=>m.empId===e.id).length,ausencias:DB.ausencias.filter(a=>a.empId===e.id).length}))};
-  dl(JSON.stringify(data,null,2),'application/json','AN_Times_Backup_'+today()+'.json');toast('💾 JSON descargado');
+  const data={exportDate:new Date().toISOString(),empresas:DB.empresas,employees:DB.employees,records:DB.records,vacaciones:DB.vacaciones,medicos:DB.medicos,ausencias:DB.ausencias,cierres:DB.cierres,mensajes:DB.mensajes,notis:DB.notis,resumen:DB.employees.map(e=>({id:e.id,name:e.name,...vacData(e.id),medicos:DB.medicos.filter(m=>m.empId===e.id).length,ausencias:DB.ausencias.filter(a=>a.empId===e.id).length}))};
+  dl(JSON.stringify(data,null,2),'application/json','TIMES_INC_Backup_'+today()+'.json');toast('💾 JSON descargado');
 }
 function dl(c,t,n){const b=new Blob([c],{type:t});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();}
 
@@ -1337,23 +1539,13 @@ document.getElementById('inputPin').addEventListener('keydown',e=>{if(e.key==='E
 document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='Enter')doAdmLogin();});
 
 /* INIT */
+// Manejador global de errores: evita que un fallo puntual deje la app inutilizable
+window.addEventListener('error',function(ev){console.error('Error capturado:',ev.message);});
+window.addEventListener('unhandledrejection',function(ev){console.error('Promesa rechazada:',ev.reason);});
+// Asegura el guardado pendiente antes de cerrar/recargar
+window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
 load();checkMonthlyReset();popSelects();autoConnectCloud();
 setInterval(checkMonthlyReset,3600000);
-if(DB.records.length===0){
-  const now=new Date();
-  function seed(eid,en,em,da,sh,wh,bh){const d=new Date(now);d.setDate(d.getDate()-da);d.setHours(sh,0,0,0);const f=new Date(d);f.setHours(sh+wh+bh,0,0,0);DB.records.push({id:gid(),empId:eid,empName:en,empresa:em,inicio:d.toISOString(),fin:f.toISOString(),workSecs:wh*3600,breakSecs:bh*3600,enDescanso:false,bStartTs:null});}
-  seed("e1","Ismael Angeles de la Cruz","AN Solutions",0,9,7,1);
-  seed("e1","Ismael Angeles de la Cruz","AN Solutions",1,9,8,0);
-  seed("e1","Ismael Angeles de la Cruz","AN Solutions",2,8,9,1);
-  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",0,8,8,0);
-  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",1,9,7,1);
-  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",2,9,8,0);
-  DB.vacaciones.push({id:'v1',empId:'e1',empName:'Ismael Angeles de la Cruz',empresa:'AN Solutions',desde:'2026-07-01',hasta:'2026-07-05',dias:5,estado:'aprobada',solEn:new Date().toISOString()});
-  DB.vacaciones.push({id:'v2',empId:'e2',empName:'Franklin Lisandro Nuñez Roque',empresa:'AN Solutions',desde:'2026-08-04',hasta:'2026-08-08',dias:5,estado:'pendiente',solEn:new Date().toISOString()});
-  DB.medicos.push({id:'m1',empId:'e1',empName:'Ismael Angeles de la Cruz',empresa:'AN Solutions',desde:'2026-05-15',hasta:'2026-05-16',dias:2,nota:'Consulta médica especialista',estado:'aprobada',solEn:new Date().toISOString()});
-  DB.ausencias.push({id:'a1',empId:'e2',empName:'Franklin Lisandro Nuñez Roque',empresa:'AN Solutions',fecha:'2026-05-10',nota:'Sin justificación presentada',solEn:new Date().toISOString()});
-  save();
-}
 </script>
 </body>
 </html>
