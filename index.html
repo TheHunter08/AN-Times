@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AN Times</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e1a;--bg2:#111627;--bg3:#1a2035;--card:#141929;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --accent:#00d4ff;--accent2:#0099cc;
+  --green:#00e676;--green2:#00b359;
+  --orange:#ff9500;--red:#ff3b3b;--yellow:#ffd60a;
+  --violet:#bf5af2;--violet2:#8a2be2;
+  --teal:#00bfa5;--teal2:#007a6a;
+  --rose:#ff4d6d;--rose2:#c9184a;
+  --text:#f0f4ff;--text2:#8892aa;--text3:#4a5570;
+  --radius:16px;--radius-sm:10px;--shadow:0 4px 24px rgba(0,0,0,0.4)
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.mc{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.screen{display:none;min-height:100%}
+.screen.active{display:flex;flex-direction:column}
+/* TOPBAR */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;flex-shrink:0}
+.tbrand{display:flex;align-items:center;gap:10px}
+.tlogo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#000}
+.tname{font-family:'Syne',sans-serif;font-weight:700;font-size:17px}
+.tname span{color:var(--accent)}
+.tright{display:flex;align-items:center;gap:8px}
+.tclock{font-size:13px;color:var(--text2);font-weight:500;font-variant-numeric:tabular-nums}
+.ibtn{width:36px;height:36px;border-radius:9px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all 0.15s}
+.ibtn:hover{background:var(--border2)}
+/* LOGIN */
+#screenLogin{justify-content:center;align-items:center;padding:24px 20px;min-height:100vh}
+.lwrap{width:100%;max-width:380px}
+.lhero{text-align:center;margin-bottom:32px}
+.llogo{width:72px;height:72px;margin:0 auto 16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#000}
+.lhero h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px}
+.lhero h1 span{color:var(--accent)}
+.lhero p{font-size:13px;color:var(--text2);margin-top:6px}
+.lcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:24px}
+.lcard h2{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;margin-bottom:20px;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.csel{position:relative}
+.csel select{width:100%;padding:13px 40px 13px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;appearance:none;cursor:pointer;outline:none;transition:border-color 0.15s}
+.csel select:focus{border-color:var(--accent)}
+.csel::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none;font-size:14px}
+.fg input[type=password]{width:100%;padding:13px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color 0.15s}
+.fg input[type=password]:focus{border-color:var(--accent)}
+.btn-main{width:100%;padding:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:8px}
+.btn-main:hover{opacity:0.88}
+.btn-sec{width:100%;padding:12px;background:transparent;border:1px solid var(--border2);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-weight:500;font-size:14px;color:var(--text2);cursor:pointer;transition:all 0.15s;margin-top:10px}
+.btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+.lerr{color:var(--red);font-size:13px;text-align:center;margin-top:10px;min-height:20px}
+/* FICHAJE BODY */
+#screenFichaje{padding:0}
+.fbody{padding:16px;flex:1}
+.ucard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.uavatar{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#000;flex-shrink:0}
+.uinfo h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+.uinfo p{font-size:12px;color:var(--text2);margin-top:2px}
+.ustatus{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.spill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.spill .dot{width:6px;height:6px;border-radius:50%}
+.spill.libre{background:rgba(136,146,170,0.15);color:var(--text2)}
+.spill.libre .dot{background:var(--text2)}
+.spill.trabajando{background:rgba(0,230,118,0.12);color:var(--green)}
+.spill.trabajando .dot{background:var(--green);animation:pd 1.5s infinite}
+.spill.descanso{background:rgba(255,149,0,0.12);color:var(--orange)}
+.spill.descanso .dot{background:var(--orange);animation:pd 1.5s infinite}
+@keyframes pd{0%,100%{opacity:1}50%{opacity:0.3}}
+/* Clock */
+.clk-sec{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:24px 20px;text-align:center;margin-bottom:14px;position:relative;overflow:hidden}
+.clk-sec::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--violet),var(--teal));opacity:0.8}
+.clk-head{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;color:var(--text2)}
+.clk-head svg{width:16px;height:16px;stroke:var(--text2);stroke-width:2;fill:none}
+.clk-head span{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px}
+.clk-time{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--text);line-height:1;display:flex;align-items:center;justify-content:center;gap:2px}
+.clk-time .sep{color:var(--accent);animation:blink 2s steps(1) infinite}
+@keyframes blink{50%{opacity:0.35}}
+.clk-date{font-size:13px;color:var(--text2);margin-top:6px;font-weight:500}
+.ebar{margin-top:16px}
+.elbl{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px}
+.pbg{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
+.pfill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--accent));transition:width 1s linear}
+.pfill.extra{background:linear-gradient(90deg,var(--orange),var(--red))}
+.pfill.paused{background:linear-gradient(90deg,var(--orange),var(--yellow))}
+.etimes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px}
+.ebox{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 8px;text-align:center;transition:border-color 0.2s}
+.ebox .eico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.ebox .eico svg{width:15px;height:15px;stroke-width:2;fill:none}
+.ebox .v{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
+.ebox .l{font-size:9.5px;color:var(--text2);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px}
+.ebox.green .eico{background:rgba(0,230,118,0.12)}.ebox.green .eico svg{stroke:var(--green)}
+.ebox.orange .eico{background:rgba(255,149,0,0.12)}.ebox.orange .eico svg{stroke:var(--orange)}
+.ebox.red .eico{background:rgba(255,59,59,0.12)}.ebox.red .eico svg{stroke:var(--red)}
+.ebox.blue .eico{background:rgba(0,212,255,0.12)}.ebox.blue .eico svg{stroke:var(--accent)}
+.ebox.violet .eico{background:rgba(191,90,242,0.12)}.ebox.violet .eico svg{stroke:var(--violet)}
+.ebox.teal .eico{background:rgba(0,191,165,0.12)}.ebox.teal .eico svg{stroke:var(--teal)}
+.ebox.rose .eico{background:rgba(255,77,109,0.12)}.ebox.rose .eico svg{stroke:var(--rose)}
+.ebox.gray .eico{background:rgba(136,146,170,0.12)}.ebox.gray .eico svg{stroke:var(--text2)}
+/* Action buttons */
+.agrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.abtn{padding:16px 12px;border-radius:var(--radius);border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transition:all 0.18s}
+.abtn:active{transform:scale(0.96)}
+.abtn .ic{display:flex;align-items:center;justify-content:center;height:28px}
+.abtn .ic svg{width:24px;height:24px;stroke-width:2;fill:none;stroke:currentColor}
+.abtn .ic svg.fill{fill:currentColor;stroke:none}
+.abtn.start{background:linear-gradient(135deg,var(--green2),var(--green));color:#000}
+.abtn.stop{background:linear-gradient(135deg,#cc1a1a,var(--red));color:#fff}
+.abtn.brk{background:linear-gradient(135deg,#cc7000,var(--orange));color:#000}
+.abtn.resume{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#000}
+.abtn.medical{background:linear-gradient(135deg,var(--teal2),var(--teal));color:#000}
+.abtn.absent{background:linear-gradient(135deg,var(--rose2),var(--rose));color:#fff}
+.abtn:disabled{opacity:0.35;cursor:not-allowed}
+.abtn:disabled:active{transform:none}
+.awide{width:100%;padding:15px;border-radius:var(--radius);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;transition:all 0.18s;margin-bottom:10px}
+.awide:active{transform:scale(0.98)}
+.awide.logout{background:var(--bg3);border:1px solid var(--border2);color:var(--text2)}
+/* Summary cards */
+.wcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.wcard h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.wstats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ws{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;display:flex;align-items:center;gap:11px;transition:border-color 0.2s}
+.ws .wsico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ws .wsico svg{width:18px;height:18px;stroke-width:2;fill:none}
+.ws .wstxt{min-width:0;text-align:left}
+.ws .v{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);line-height:1.1}
+.ws .l{font-size:10.5px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws.total .wsico{background:rgba(0,212,255,0.12)}.ws.total .wsico svg{stroke:var(--accent)}
+.ws.normal .wsico{background:rgba(0,230,118,0.12)}.ws.normal .wsico svg{stroke:var(--green)}
+.ws.extra .wsico{background:rgba(255,59,59,0.12)}.ws.extra .wsico svg{stroke:var(--red)}
+.ws.days .wsico{background:rgba(136,146,170,0.12)}.ws.days .wsico svg{stroke:var(--text2)}
+.ws.vac .wsico{background:rgba(191,90,242,0.12)}.ws.vac .wsico svg{stroke:var(--violet)}
+.ws.med .wsico{background:rgba(0,191,165,0.12)}.ws.med .wsico svg{stroke:var(--teal)}
+.ws.abs .wsico{background:rgba(255,77,109,0.12)}.ws.abs .wsico svg{stroke:var(--rose)}
+/* Absence/Medical cards */
+.acard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.acard h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+/* Vacation card */
+.vac-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.vac-card h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.vbig{text-align:center;margin-bottom:14px}
+.vbig .vnum{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;color:var(--violet);line-height:1}
+.vbig .vsub{font-size:13px;color:var(--text2);margin-top:4px}
+.vpbg{background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px}
+.vpfill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--violet2),var(--violet));transition:width 0.4s}
+.vrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.vrow:last-child{border-bottom:none}
+.vrow .vl{font-size:13px;color:var(--text2)}
+.vrow .vv{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text)}
+.vrow .vv.violet{color:var(--violet)}
+.vrow .vv.green{color:var(--green)}
+.vrow .vv.red{color:var(--red)}
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.pendiente{background:rgba(191,90,242,0.15);color:var(--violet)}
+.badge.aprobada{background:rgba(0,230,118,0.15);color:var(--green)}
+.badge.denegada{background:rgba(255,59,59,0.15);color:var(--red)}
+.badge.medico{background:rgba(0,191,165,0.15);color:var(--teal)}
+.badge.ausencia{background:rgba(255,77,109,0.15);color:var(--rose)}
+.badge.vacaciones{background:rgba(191,90,242,0.15);color:var(--violet)}
+/* Buttons for forms */
+.btn-vac{width:100%;padding:13px;background:linear-gradient(135deg,var(--violet2),var(--violet));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.btn-vac:hover{opacity:0.88}
+.btn-med{width:100%;padding:13px;background:linear-gradient(135deg,var(--teal2),var(--teal));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.btn-med:hover{opacity:0.88}
+.btn-abs{width:100%;padding:13px;background:linear-gradient(135deg,var(--rose2),var(--rose));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.btn-abs:hover{opacity:0.88}
+/* History */
+.hsec{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.hsec h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.hi{border-bottom:1px solid var(--border);padding:10px 0;display:flex;align-items:center;justify-content:space-between}
+.hi:last-child{border-bottom:none}
+.hl{display:flex;flex-direction:column;gap:3px}
+.hdate{font-size:13px;font-weight:600}
+.htimes{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.htimes svg{width:12px;height:12px;stroke-width:2;fill:none;vertical-align:middle}
+.hin svg{stroke:var(--green)}.hout svg{stroke:var(--red)}.hbk svg{stroke:var(--orange)}
+.hpill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:10px}
+.hpill.ok{background:rgba(0,230,118,0.15);color:var(--green)}
+.hpill.ex{background:rgba(255,59,59,0.15);color:var(--red)}
+.hpill.med{background:rgba(0,191,165,0.15);color:var(--teal)}
+.hpill.abs{background:rgba(255,77,109,0.15);color:var(--rose)}
+.hpill.vac{background:rgba(191,90,242,0.15);color:var(--violet)}
+.empty{text-align:center;padding:20px;color:var(--text3);font-size:13px}
+/* ADMIN */
+#screenAdmin{padding:0}
+.abody{padding:16px}
+.atabs{display:flex;gap:4px;margin-bottom:16px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.atab{flex:1;padding:9px 2px;text-align:center;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px}
+.atab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
+.adcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.erow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.erow:last-child{border-bottom:none}
+.eavatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#000;flex-shrink:0}
+.einfo{flex:1}
+.einfo strong{font-size:13px;font-weight:600;display:block}
+.einfo span{font-size:11px;color:var(--text2)}
+.bdel{background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.2);border-radius:7px;color:var(--red);padding:5px 10px;font-size:12px;cursor:pointer}
+.bdel:hover{background:rgba(255,59,59,0.2)}
+.bok{background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.2);border-radius:7px;color:var(--green);padding:5px 8px;font-size:12px;cursor:pointer}
+.bok:hover{background:rgba(0,230,118,0.2)}
+.bdeny{background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.2);border-radius:7px;color:var(--red);padding:5px 8px;font-size:12px;cursor:pointer;margin-left:4px}
+.bdeny:hover{background:rgba(255,59,59,0.2)}
+.ff{margin-bottom:12px}
+.ff label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px}
+.ff input,.ff select,.ff textarea{width:100%;padding:11px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
+.ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--accent)}
+.ff select{appearance:none}
+.ff textarea{resize:vertical;min-height:70px}
+.badd{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.badd:hover{opacity:0.88}
+.expbtn{width:100%;padding:14px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:opacity 0.15s}
+.expbtn:hover{opacity:0.88}
+.expbtn.csv{background:linear-gradient(135deg,#00873d,var(--green));color:#000}
+.expbtn.vacv{background:linear-gradient(135deg,var(--violet2),var(--violet));color:#fff}
+.expbtn.abs{background:linear-gradient(135deg,var(--teal2),var(--teal));color:#000}
+.expbtn.jsnb{background:linear-gradient(135deg,#0066bb,var(--accent));color:#000}
+.expinfo{background:var(--bg3);border-radius:var(--radius-sm);padding:14px;font-size:12px;color:var(--text2);line-height:1.7}
+.expinfo b{color:var(--text)}
+.expinfo .step{display:flex;gap:8px;margin-bottom:6px}
+.expinfo .snum{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#000;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.frow{display:flex;gap:8px;margin-bottom:12px}
+.frow select{flex:1;padding:9px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;appearance:none}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sc{background:var(--bg3);border-radius:var(--radius-sm);padding:14px}
+.sc .sv{font-family:'Syne',sans-serif;font-size:24px;font-weight:800}
+.sc .sl{font-size:11px;color:var(--text2);margin-top:3px}
+.sc.blue .sv{color:var(--accent)}
+.sc.grn .sv{color:var(--green)}
+.sc.red .sv{color:var(--red)}
+.sc.org .sv{color:var(--orange)}
+.sc.vio .sv{color:var(--violet)}
+.sc.teal .sv{color:var(--teal)}
+.sc.rose .sv{color:var(--rose)}
+/* Sol item */
+.si{border-bottom:1px solid var(--border);padding:10px 0}
+.si:last-child{border-bottom:none}
+.si-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.si-name{font-size:13px;font-weight:600}
+.si-dates{font-size:12px;color:var(--text2);margin-bottom:6px}
+.si-actions{display:flex;gap:6px;flex-wrap:wrap}
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg2);border:1px solid var(--border2);border-radius:30px;padding:10px 20px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transition:all 0.25s;z-index:200;pointer-events:none;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Modal */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity 0.2s}
+.mov.open{opacity:1;pointer-events:all}
+.msh{background:var(--card);border-radius:20px 20px 0 0;border:1px solid var(--border2);border-bottom:none;width:100%;max-width:480px;padding:20px 20px 36px;transform:translateY(100%);transition:transform 0.25s}
+.mov.open .msh{transform:translateY(0)}
+.msh h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
+.msh p{font-size:13px;color:var(--text2);margin-bottom:16px}
+.mbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mbtn{padding:14px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;transition:opacity 0.15s}
+.mbtn:hover{opacity:0.88}
+.mbtn.confirm{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#000}
+.mbtn.cancel{background:var(--bg3);border:1px solid var(--border2);color:var(--text2)}
+/* Emp sub-tabs */
+.etabs{display:flex;gap:4px;margin-bottom:14px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto}
+.etab{flex-shrink:0;padding:8px 10px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
+.etab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="app-shell">
+<!-- LOGIN -->
+<div class="screen active mc" id="sLogin">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 20px;min-height:100vh">
+    <div class="lwrap">
+      <div class="lhero">
+        <div class="llogo">AN</div>
+        <h1><span>AN</span> Times</h1>
+        <p>Sistema de control de jornada laboral</p>
+        <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(255,149,0,0.12);color:var(--orange)"><span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Base de datos sin conectar</div>
+      </div>
+      <div class="lcard">
+        <h2>Acceso empleado</h2>
+        <div class="fg"><label>Empresa</label><div class="csel"><select id="selEmpresa"></select></div></div>
+        <div class="fg"><label>Empleado</label><div class="csel"><select id="selEmpleado"></select></div></div>
+        <div class="fg"><label>PIN de acceso</label><input type="password" id="inputPin" placeholder="••••" maxlength="6" inputmode="numeric"></div>
+        <div class="lerr" id="loginErr"></div>
+        <button class="btn-main" onclick="doLogin()">Entrar</button>
+        <button class="btn-sec" onclick="openAdminLogin()">⚙ Acceso administrador</button>
+        <button class="btn-sec" onclick="openCloudModal()" style="margin-top:8px">☁ Configuración de la base de datos</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- FICHAJE -->
+<div class="screen" id="sFichaje">
+  <div class="topbar">
+    <div class="tbrand"><div class="tlogo">AN</div><div class="tname"><span>AN</span> Times</div></div>
+    <div class="tright"><span id="syncDotEmp" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><div class="tclock" id="topClk">--:--:--</div></div>
+  </div>
+  <div class="mc"><div class="fbody">
+    <div class="ucard">
+      <div class="uavatar" id="fAvatar">?</div>
+      <div class="uinfo"><h3 id="fNombre">—</h3><p id="fEmpresa">—</p></div>
+      <div class="ustatus"><div class="spill libre" id="fStatus"><div class="dot"></div><span>Libre</span></div></div>
+    </div>
+    <!-- Employee sub-tabs -->
+    <div class="etabs">
+      <button class="etab active" onclick="empTab('jornada')" id="eJornada">⏱ Jornada</button>
+      <button class="etab" onclick="empTab('vacaciones')" id="eVacaciones">🌴 Vacaciones</button>
+      <button class="etab" onclick="empTab('medico')" id="eMedico">🏥 Médico</button>
+      <button class="etab" onclick="empTab('ausencias')" id="eAusencias">⚠ Ausencias</button>
+      <button class="etab" onclick="empTab('historial')" id="eHistorial">📋 Historial</button>
+    </div>
+    <!-- JORNADA TAB -->
+    <div id="tJornada">
+      <div class="clk-sec">
+        <div class="clk-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Hora actual</span></div>
+        <div class="clk-time" id="bigClk">00:00:00</div>
+        <div class="clk-date" id="bigDate">—</div>
+        <div class="ebar">
+          <div class="elbl"><span>Jornada trabajada</span><span id="ePct">0%</span></div>
+          <div class="pbg"><div class="pfill" id="pFill" style="width:0%"></div></div>
+          <div class="etimes">
+            <div class="ebox green"><div class="eico"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div class="v" id="eWorked">0:00:00</div><div class="l">Trabajado</div></div>
+            <div class="ebox orange"><div class="eico"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v2M11 4v2"/></svg></div><div class="v" id="eBreak">0:00:00</div><div class="l">Descanso</div></div>
+            <div class="ebox red"><div class="eico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/></svg></div><div class="v" id="eExtra">0:00</div><div class="l">Extras hoy</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="agrid">
+        <button class="abtn start" id="btnStart" onclick="doStart()"><div class="ic"><svg viewBox="0 0 24 24" class="fill"><path d="M7 5v14l12-7z"/></svg></div><div>Comenzar</div></button>
+        <button class="abtn stop" id="btnStop" onclick="doStop()" disabled><div class="ic"><svg viewBox="0 0 24 24" class="fill"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></div><div>Finalizar</div></button>
+        <button class="abtn brk" id="btnBrk" onclick="openBreakModal()" disabled><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v2M11 4v2"/></svg></div><div>Descanso</div></button>
+        <button class="abtn resume" id="btnResume" onclick="doResume()" disabled style="display:none"><div class="ic"><svg viewBox="0 0 24 24" class="fill"><path d="M7 5v14l12-7z"/></svg></div><div>Reanudar</div></button>
+      </div>
+      <div class="wcard"><h3>Resumen semanal</h3><div class="wstats">
+        <div class="ws total"><div class="wsico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="wstxt"><div class="v" id="wTotal">0h 0m</div><div class="l">Total semana</div></div></div>
+        <div class="ws normal"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div><div class="wstxt"><div class="v" id="wNormal">0h 0m</div><div class="l">Normales</div></div></div>
+        <div class="ws extra"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/></svg></div><div class="wstxt"><div class="v" id="wExtra">0h 0m</div><div class="l">Extras</div></div></div>
+        <div class="ws days"><div class="wsico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></div><div class="wstxt"><div class="v" id="wDays">0</div><div class="l">Días</div></div></div>
+        <div class="ws med"><div class="wsico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="wstxt"><div class="v" id="wMed">0</div><div class="l">Días médico</div></div></div>
+        <div class="ws abs"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="wstxt"><div class="v" id="wAbs">0</div><div class="l">Ausencias</div></div></div>
+      </div></div>
+      <div class="hsec"><h3>Últimos registros</h3><div id="recentList"><div class="empty">Sin registros aún</div></div></div>
+    </div>
+    <!-- VACACIONES TAB -->
+    <div id="tVacaciones" style="display:none">
+      <div class="vac-card"><h3>🌴 Mis vacaciones</h3>
+        <div class="vbig"><div class="vnum" id="vacDisp">0</div><div class="vsub">días disponibles</div></div>
+        <div class="vpbg"><div class="vpfill" id="vacPBar" style="width:0%"></div></div>
+        <div style="font-size:11px;color:var(--text2);text-align:right;margin-bottom:14px" id="vacPLbl"></div>
+        <div class="vrow"><span class="vl">Generados (2,5 días/mes)</span><span class="vv violet" id="vacGen">0</span></div>
+        <div class="vrow"><span class="vl">Disfrutados</span><span class="vv red" id="vacUsed">0</span></div>
+        <div class="vrow"><span class="vl">Pendientes aprobación</span><span class="vv" style="color:var(--orange)" id="vacPend">0</span></div>
+        <div class="vrow"><span class="vl">Tasa acumulación</span><span class="vv" style="font-size:12px;color:var(--text2)">2,5 días / mes</span></div>
+        <div class="vrow"><span class="vl">Inicio contrato</span><span class="vv" id="vacStart" style="font-size:12px">—</span></div>
+        <div class="vrow"><span class="vl">Meses trabajados</span><span class="vv green" id="vacMonths">0</span></div>
+      </div>
+      <div class="vac-card"><h3>Solicitar vacaciones</h3>
+        <div class="ff"><label>Fecha inicio</label><input type="date" id="vFrom"></div>
+        <div class="ff"><label>Fecha fin</label><input type="date" id="vTo"></div>
+        <div style="font-size:12px;color:var(--violet);margin-bottom:10px" id="vDays"></div>
+        <button class="btn-vac" onclick="doReqVac()">🌴 Enviar solicitud</button>
+      </div>
+      <div class="vac-card"><h3>Mis solicitudes</h3><div id="mySols"><div class="empty">Sin solicitudes</div></div></div>
+    </div>
+    <!-- MEDICO TAB -->
+    <div id="tMedico" style="display:none">
+      <div class="acard">
+        <h3>🏥 Permisos médicos</h3>
+        <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:13px;color:var(--text2);line-height:1.6">
+          Registra ausencias por motivos de salud. El permiso médico <b style="color:var(--teal)">no descuenta vacaciones</b> pero queda registrado en tu expediente.
+        </div>
+        <div class="ff"><label>Fecha inicio</label><input type="date" id="mFrom"></div>
+        <div class="ff"><label>Fecha fin</label><input type="date" id="mTo"></div>
+        <div class="ff"><label>Motivo / Descripción</label><textarea id="mNote" placeholder="Ej: consulta médica, baja por enfermedad, revisión..."></textarea></div>
+        <div style="font-size:12px;color:var(--teal);margin-bottom:10px" id="mDays"></div>
+        <button class="btn-med" onclick="doReqMed()">🏥 Registrar permiso médico</button>
+      </div>
+      <div class="acard"><h3>Mis permisos médicos</h3><div id="myMeds"><div class="empty">Sin permisos médicos</div></div></div>
+    </div>
+    <!-- AUSENCIAS TAB -->
+    <div id="tAusencias" style="display:none">
+      <div class="acard">
+        <h3>⚠ Ausencia injustificada</h3>
+        <div style="background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:13px;color:var(--rose);line-height:1.6">
+          Las ausencias injustificadas quedan registradas y pueden tener consecuencias disciplinarias según el convenio colectivo.
+        </div>
+        <div class="ff"><label>Fecha</label><input type="date" id="aDate"></div>
+        <div class="ff"><label>Motivo declarado (opcional)</label><textarea id="aNote" placeholder="Explicación o motivo..."></textarea></div>
+        <button class="btn-abs" onclick="doReqAbs()">⚠ Registrar ausencia</button>
+      </div>
+      <div class="acard"><h3>Mis ausencias</h3><div id="myAbs"><div class="empty">Sin ausencias registradas</div></div></div>
+    </div>
+    <!-- HISTORIAL TAB -->
+    <div id="tHistorial" style="display:none">
+      <div class="hsec"><h3>Todos los registros</h3><div id="fullHist"><div class="empty">Sin registros</div></div></div>
+    </div>
+    <button class="awide logout" onclick="doLogout()">↩ Cambiar empleado</button>
+  </div></div>
+</div>
+<!-- ADMIN -->
+<div class="screen" id="sAdmin">
+  <div class="topbar">
+    <div class="tbrand"><div class="tlogo">AN</div><div class="tname"><span>AN</span> Admin</div></div>
+    <div class="tright"><span id="syncDotAdm" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><div class="tclock" id="admClk">--:--:--</div><button class="ibtn" onclick="doLogout()">✕</button></div>
+  </div>
+  <div class="mc"><div class="abody">
+    <div class="atabs">
+      <button class="atab active" onclick="admTab('overview')">Resumen</button>
+      <button class="atab" onclick="admTab('solicitudes')">📋 Solicitudes</button>
+      <button class="atab" onclick="admTab('registros')">Fichajes</button>
+      <button class="atab" onclick="admTab('empleados')">Empl.</button>
+      <button class="atab" onclick="admTab('exportar')">Export</button>
+    </div>
+    <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
+    <div id="aSolicitudes" style="display:none">
+      <div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
+      <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
+      <div class="adcard"><h3>⚠ Ausencias injustificadas</h3><div id="aAbsList"><div class="empty">Sin ausencias</div></div></div>
+      <div class="adcard"><h3>Vacaciones por empleado</h3><div id="aVacRes"></div></div>
+      <div class="adcard"><h3>Ajustar fecha inicio contrato</h3>
+        <div class="ff"><label>Empleado</label><select id="adjEmp" style="appearance:none"></select></div>
+        <div class="ff"><label>Fecha inicio</label><input type="date" id="adjDate"></div>
+        <button class="badd" onclick="adjStart()">Guardar fecha</button>
+      </div>
+    </div>
+    <div id="aRegistros" style="display:none">
+      <div class="frow">
+        <select id="fEmp" onchange="renderRecs()"><option value="">Todos</option></select>
+        <select id="fWeek" onchange="renderRecs()"><option value="">Todas las semanas</option></select>
+      </div>
+      <div id="recList"></div>
+    </div>
+    <div id="aEmpleados" style="display:none">
+      <div class="adcard"><h3>Empleados activos</h3><div id="empList"></div></div>
+      <div class="adcard"><h3>Empresas</h3><div id="empresaList"></div></div>
+      <div class="adcard"><h3>Añadir empleado</h3>
+        <div class="ff"><label>Nombre completo</label><input type="text" id="nNombre" placeholder="Nombre y apellidos"></div>
+        <div class="ff"><label>Empresa</label><select id="nEmpresa" style="appearance:none"><option value="">— Empresa —</option></select></div>
+        <div class="ff"><label>PIN (4-6 dígitos)</label><input type="text" id="nPin" placeholder="ej. 1234" maxlength="6" inputmode="numeric"></div>
+        <div class="ff"><label>Fecha inicio contrato</label><input type="date" id="nStart"></div>
+        <div class="ff"><label>Color avatar</label>
+          <select id="nColor" style="appearance:none">
+            <option value="#00d4ff">Azul cyan</option><option value="#00e676">Verde</option>
+            <option value="#ff9500">Naranja</option><option value="#ff3b3b">Rojo</option>
+            <option value="#bf5af2">Violeta</option><option value="#ffd60a">Amarillo</option>
+            <option value="#00bfa5">Turquesa</option>
+          </select>
+        </div>
+        <button class="badd" onclick="addEmp()">+ Añadir empleado</button>
+      </div>
+      <div class="adcard"><h3>Añadir empresa</h3>
+        <div class="ff"><label>Nombre</label><input type="text" id="nEmpNom" placeholder="Nombre de la empresa"></div>
+        <button class="badd" onclick="addEmpresa()">+ Añadir empresa</button>
+      </div>
+    </div>
+    <div id="aExportar" style="display:none">
+      <div class="adcard"><h3>Exportar datos</h3>
+        <button class="expbtn csv" onclick="expFichajes()"><span>📊</span> CSV Fichajes (Excel/Sheets)</button>
+        <button class="expbtn vacv" onclick="expVacaciones()"><span>🌴</span> CSV Vacaciones</button>
+        <button class="expbtn abs" onclick="expAusencias()"><span>🏥⚠</span> CSV Médicos y Ausencias</button>
+        <button class="expbtn jsnb" onclick="expJSON()"><span>💾</span> JSON Backup completo</button>
+        <div class="expinfo">
+          <b style="display:block;margin-bottom:8px">📋 Subir a Google Sheets:</b>
+          <div class="step"><div class="snum">1</div><div>Descarga el CSV</div></div>
+          <div class="step"><div class="snum">2</div><div>Abre <b>sheets.google.com</b> → Nueva hoja</div></div>
+          <div class="step"><div class="snum">3</div><div>Archivo → <b>Importar → Subir</b></div></div>
+          <div class="step"><div class="snum">4</div><div>Selecciona el CSV → "Reemplazar hoja"</div></div>
+          <div class="step"><div class="snum">5</div><div>¡Datos importados con todo calculado!</div></div>
+        </div>
+      </div>
+      <div class="adcard"><h3>Base de datos en la nube</h3>
+        <div id="dbStatusCard" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:12px">
+          <span id="dbStatusDot" style="width:10px;height:10px;border-radius:50%;background:var(--orange)"></span>
+          <div style="flex:1"><div id="dbStatusText" style="font-size:13px;font-weight:600">Sin conectar</div><div style="font-size:11px;color:var(--text2)">Conecta Firebase para sincronizar todos los dispositivos</div></div>
+        </div>
+        <button class="badd" onclick="openCloudModal()">☁ Configurar base de datos</button>
+      </div>
+      <div class="adcard"><h3>Estadísticas</h3><div id="expStats"></div></div>
+    </div>
+  </div></div>
+</div>
+</div>
+<!-- Modals -->
+<div class="mov" id="mBreak"><div class="msh"><h2>☕ Iniciar descanso</h2><p>El descanso no cuenta como horas trabajadas.</p><div class="mbtns"><button class="mbtn confirm" onclick="doBreak()">Iniciar descanso</button><button class="mbtn cancel" onclick="closeMov('mBreak')">Cancelar</button></div></div></div>
+<div class="mov" id="mAdmin"><div class="msh"><h2>⚙ Panel administrador</h2><p>Introduce el PIN de administrador.</p><input type="password" id="adminPin" placeholder="PIN admin" maxlength="6" inputmode="numeric" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:10px"><div id="adminErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px;text-align:center"></div><div class="mbtns"><button class="mbtn confirm" onclick="doAdmLogin()">Entrar</button><button class="mbtn cancel" onclick="closeMov('mAdmin')">Cancelar</button></div></div></div>
+<div class="mov" id="mCloud"><div class="msh" style="max-height:85vh;overflow-y:auto">
+  <h2>☁ Base de datos en la nube</h2>
+  <p>Conecta Firebase para que todos los empleados compartan los mismos datos en tiempo real desde cualquier dispositivo.</p>
+  <div class="ff"><label>Firebase config (pega el objeto completo)</label>
+    <textarea id="fbConfig" style="min-height:140px;font-family:var(--font-mono,monospace);font-size:12px" placeholder='Pega aquí, por ejemplo:
+{
+  apiKey: "AIza...",
+  authDomain: "an-times.firebaseapp.com",
+  databaseURL: "https://an-times-default-rtdb.firebaseio.com",
+  projectId: "an-times",
+  ...
+}'></textarea>
+  </div>
+  <div id="fbErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px"></div>
+  <div class="mbtns"><button class="mbtn confirm" style="background:linear-gradient(135deg,var(--accent),var(--accent2))" onclick="connectCloud()">☁ Conectar</button><button class="mbtn cancel" onclick="closeMov('mCloud')">Cerrar</button></div>
+  <div style="margin-top:14px;background:var(--bg3);border-radius:var(--radius-sm);padding:14px;font-size:11px;color:var(--text2);line-height:1.8">
+    <b style="color:var(--accent);display:block;margin-bottom:8px">📌 Pasos en Firebase (gratis, sin tarjeta):</b>
+    <b style="color:var(--text)">1.</b> Entra en <b>console.firebase.google.com</b> y abre tu proyecto<br>
+    <b style="color:var(--text)">2.</b> Menú izquierdo: <b>Compilación → Realtime Database</b> → <b>Crear base de datos</b><br>
+    <b style="color:var(--text)">3.</b> Ubicación Europa → <b>Iniciar en modo de prueba</b> → Habilitar<br>
+    <b style="color:var(--text)">4.</b> Icono <b>⚙ → Configuración del proyecto</b><br>
+    <b style="color:var(--text)">5.</b> Baja a "Tus apps" → pulsa <b>&lt;/&gt;</b> (Web) → registra la app<br>
+    <b style="color:var(--text)">6.</b> Copia el bloque <b>firebaseConfig</b> entero y pégalo arriba<br>
+    <span style="display:block;margin-top:8px;color:var(--orange)">⚠ La app debe estar abierta desde una URL (https://…), no desde el archivo, para que funcione la conexión.</span>
+  </div>
+</div></div>
+<div class="toast" id="toast"></div>
+<script>
+const ADM_PIN="0000",WK=40*60,VPM=2.5;
+let DB={empresas:["AN Solutions"],employees:[
+  {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01"},
+  {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01"}
+],records:[],vacaciones:[],medicos:[],ausencias:[]};
+let SES={user:null,isAdmin:false};
+let TM={ws:0,bs:0,state:"idle",bStart:null};
+
+let FB={app:null,db:null,ref:null,connected:false,syncing:false};
+function save(){
+  try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){}
+  if(FB.connected&&FB.ref&&!FB.syncing){
+    try{FB.ref.set(DB);}catch(e){console.warn('Error guardando en nube',e);}
+  }
+}
+function load(){
+  try{const r=localStorage.getItem("an_times_v1");if(r){const p=JSON.parse(r);applyDB(p);}}catch(e){}
+}
+function applyDB(p){
+  if(!p)return;
+  DB.empresas=p.empresas||DB.empresas;
+  DB.employees=p.employees||DB.employees;
+  DB.records=p.records||[];
+  DB.vacaciones=p.vacaciones||[];
+  DB.medicos=p.medicos||[];
+  DB.ausencias=p.ausencias||[];
+}
+function setCloudStatus(state){
+  const colors={connected:'var(--green)',connecting:'var(--accent)',disconnected:'var(--orange)'};
+  const labels={connected:'Conectada y sincronizando',connecting:'Conectando…',disconnected:'Sin conectar'};
+  ['syncDotEmp','syncDotAdm'].forEach(id=>{const d=document.getElementById(id);if(d){d.style.background=colors[state]||colors.disconnected;d.style.animation=(state==='connected'||state==='connecting')?'pd 1.5s infinite':'none';}});
+  const dd=document.getElementById('dbStatusDot');if(dd)dd.style.background=colors[state]||colors.disconnected;
+  const dt=document.getElementById('dbStatusText');if(dt)dt.textContent=labels[state]||labels.disconnected;
+  const el=document.getElementById('cloudStatus');if(!el)return;
+  if(state==='connected'){el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--green);animation:pd 1.5s infinite"></span>Base de datos conectada · sincronizando';el.style.background='rgba(0,230,118,0.12)';el.style.color='var(--green)';}
+  else if(state==='connecting'){el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…';el.style.background='rgba(0,212,255,0.12)';el.style.color='var(--accent)';}
+  else{el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Base de datos sin conectar';el.style.background='rgba(255,149,0,0.12)';el.style.color='var(--orange)';}
+}
+function openCloudModal(){
+  const saved=localStorage.getItem('an_times_fbconfig');
+  if(saved)document.getElementById('fbConfig').value=saved;
+  document.getElementById('fbErr').textContent='';
+  openMov('mCloud');
+}
+function parseFbConfig(txt){
+  txt=txt.trim();
+  // Try to extract the object literal
+  let m=txt.match(/\{[\s\S]*\}/);
+  if(m)txt=m[0];
+  // Convert JS object literal to JSON: quote keys, swap single quotes
+  let json=txt
+    .replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g,'$1"$2":')
+    .replace(/'/g,'"')
+    .replace(/,(\s*[}\]])/g,'$1');
+  return JSON.parse(json);
+}
+function connectCloud(){
+  const txt=document.getElementById('fbConfig').value;
+  const err=document.getElementById('fbErr');
+  if(!txt.trim()){err.textContent='Pega la configuración de Firebase';return;}
+  let cfg;
+  try{cfg=parseFbConfig(txt);}catch(e){err.textContent='Configuración no válida. Copia el objeto firebaseConfig completo.';return;}
+  if(!cfg.databaseURL){err.textContent='Falta "databaseURL". Activa Realtime Database en Firebase.';return;}
+  if(typeof firebase==='undefined'){err.textContent='No se pudo cargar Firebase. Comprueba tu conexión a internet y que la app esté abierta desde una URL (https://...), no desde un archivo local.';return;}
+  setCloudStatus('connecting');
+  try{
+    if(FB.app){FB.app.delete&&FB.app.delete();}
+    FB.app=firebase.initializeApp(cfg,'an_'+Date.now());
+    FB.db=firebase.database(FB.app);
+    FB.ref=FB.db.ref('an_times_data');
+    // First read: merge cloud data, then listen
+    FB.ref.once('value').then(snap=>{
+      const cloud=snap.val();
+      if(cloud&&(cloud.employees||cloud.records)){
+        // Cloud has data - use it
+        FB.syncing=true;applyDB(cloud);FB.syncing=false;
+        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+      }else{
+        // Cloud empty - push our local data up
+        FB.ref.set(DB);
+      }
+      // Live listener
+      FB.ref.on('value',s=>{
+        const d=s.val();
+        if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}
+      });
+      FB.connected=true;
+      localStorage.setItem('an_times_fbconfig',txt.trim());
+      setCloudStatus('connected');
+      popSelects();refreshUI();
+      closeMov('mCloud');
+      toast('☁ Conectado — datos sincronizados en la nube');
+    }).catch(e=>{err.textContent='Error de conexión: '+(e.message||e);});
+  }catch(e){err.textContent='Error: '+(e.message||e);}
+}
+function refreshUI(){
+  if(SES.isAdmin){try{renderAdm();const at=document.querySelector('.atab.active');}catch(e){}
+    try{renderAdmSols();renderRecs();renderEmps();renderExpStats();}catch(e){}}
+  else if(SES.user){try{renderWeek();renderRecent();renderVac();renderMed();renderAbs();renderHist();}catch(e){}}
+}
+function autoConnectCloud(){
+  const saved=localStorage.getItem('an_times_fbconfig');
+  if(!saved)return;
+  if(typeof firebase==='undefined'){setCloudStatus('disconnected');return;}
+  setCloudStatus('connecting');
+  let cfg;try{cfg=parseFbConfig(saved);}catch(e){return;}
+  if(!cfg.databaseURL)return;
+  try{
+    FB.app=firebase.initializeApp(cfg,'an_auto_'+Date.now());
+    FB.db=firebase.database(FB.app);FB.ref=FB.db.ref('an_times_data');
+    FB.ref.on('value',s=>{const d=s.val();if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}});
+    FB.connected=true;setCloudStatus('connected');
+  }catch(e){console.warn('Auto-conexión nube fallida',e);}
+}
+
+/* VACATION CALC */
+function vacData(empId){
+  const emp=DB.employees.find(e=>e.id===empId);if(!emp)return{months:0,generated:0,used:0,pending:0,available:0};
+  const s=emp.startDate?new Date(emp.startDate):new Date(),n=new Date();
+  let m=(n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth());
+  if(n.getDate()<s.getDate())m--;m=Math.max(0,m);
+  const gen=parseFloat((m*VPM).toFixed(1));
+  const used=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada').reduce((s,v)=>s+v.dias,0);
+  const pend=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='pendiente').reduce((s,v)=>s+v.dias,0);
+  return{months:m,generated:gen,used,pending:pend,available:parseFloat((gen-used).toFixed(1)),startDate:emp.startDate||'—'};
+}
+function wkdays(f,t){let c=0;const d=new Date(f),e=new Date(t);while(d<=e){const wd=d.getDay();if(wd!==0&&wd!==6)c++;d.setDate(d.getDate()+1);}return c;}
+
+/* CLOCK */
+function hms(d){return[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');}
+function fdate(d){return d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function ftime(iso){return new Date(iso).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
+function fds(iso){return new Date(iso+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});}
+function fdf(iso){return new Date(iso).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});}
+function s2h(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;}
+function mhm(m){return`${Math.floor(m/60)}h ${m%60}m`;}
+function today(){return new Date().toISOString().slice(0,10);}
+
+setInterval(()=>{
+  const n=new Date(),ts=hms(n);
+  const c1=document.getElementById('topClk');if(c1)c1.textContent=ts;
+  const c2=document.getElementById('admClk');if(c2)c2.textContent=ts;
+  document.getElementById('bigClk').innerHTML=ts.replace(/:/g,'<span class="sep">:</span>');
+  document.getElementById('bigDate').textContent=fdate(n);
+  tick();
+},1000);
+
+/* LOGIN */
+function popSelects(){
+  const se=document.getElementById('selEmpresa');
+  se.innerHTML='<option value="">— Selecciona empresa —</option>'+DB.empresas.map(e=>`<option>${e}</option>`).join('');
+  se.onchange=()=>popEmps(se.value);popEmps('');
+}
+function popEmps(emp){
+  const se=document.getElementById('selEmpleado');
+  const list=emp?DB.employees.filter(e=>e.empresa===emp):DB.employees;
+  se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+}
+function doLogin(){
+  const id=document.getElementById('selEmpleado').value,pin=document.getElementById('inputPin').value,err=document.getElementById('loginErr');
+  if(!id){err.textContent='Selecciona un empleado';return;}
+  const emp=DB.employees.find(e=>e.id===id);if(!emp){err.textContent='No encontrado';return;}
+  if(pin!==emp.pin){err.textContent='PIN incorrecto';return;}
+  err.textContent='';document.getElementById('inputPin').value='';SES.user=emp;showSc('sFichaje');initFichaje();
+}
+function openAdminLogin(){document.getElementById('adminPin').value='';document.getElementById('adminErr').textContent='';openMov('mAdmin');setTimeout(()=>document.getElementById('adminPin').focus(),300);}
+function doAdmLogin(){
+  if(document.getElementById('adminPin').value!==ADM_PIN){document.getElementById('adminErr').textContent='PIN incorrecto';return;}
+  closeMov('mAdmin');SES.isAdmin=true;SES.user=null;showSc('sAdmin');renderAdm();
+}
+function doLogout(){TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false};showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
+
+/* EMPLOYEE TABS */
+function empTab(t){
+  ['jornada','vacaciones','medico','ausencias','historial'].forEach(x=>{
+    document.getElementById('t'+cap(x)).style.display=x===t?'block':'none';
+    document.getElementById('e'+cap(x)).classList.toggle('active',x===t);
+  });
+  if(t==='vacaciones')renderVac();
+  if(t==='medico')renderMed();
+  if(t==='ausencias')renderAbs();
+  if(t==='historial')renderHist();
+}
+
+/* FICHAJE */
+function initFichaje(){
+  const e=SES.user;
+  document.getElementById('fAvatar').textContent=e.initials;
+  document.getElementById('fAvatar').style.background=e.color;
+  document.getElementById('fNombre').textContent=e.name;
+  document.getElementById('fEmpresa').textContent=e.empresa;
+  empTab('jornada');
+  const open=openRec();
+  if(open){TM.state=open.enDescanso?'break':'working';TM.ws=open.workSecs||0;TM.bs=open.breakSecs||0;if(open.enDescanso)TM.bStart=open.bStartTs||new Date().toISOString();updBtns();setStatus(open.enDescanso?'descanso':'trabajando',open.enDescanso?'En descanso':'Trabajando');}
+  renderWeek();renderRecent();
+  // vac date listeners
+  ['vFrom','vTo'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+    const f=document.getElementById('vFrom').value,t=document.getElementById('vTo').value,el=document.getElementById('vDays');
+    if(f&&t&&f<=t){const d=wkdays(f,t);el.textContent=`📅 ${d} día${d!==1?'s':''} laborable${d!==1?'s':''}`;el.style.color='var(--violet)';}else el.textContent='';
+  }));
+  ['mFrom','mTo'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+    const f=document.getElementById('mFrom').value,t=document.getElementById('mTo').value,el=document.getElementById('mDays');
+    if(f&&t&&f<=t){const d=wkdays(f,t);el.textContent=`📅 ${d} día${d!==1?'s':''} de permiso médico`;el.style.color='var(--teal)';}else el.textContent='';
+  }));
+}
+function doStart(){const e=SES.user,now=new Date().toISOString();DB.records.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,inicio:now,fin:null,workSecs:0,breakSecs:0,enDescanso:false,bStartTs:null});save();TM.state='working';TM.ws=0;TM.bs=0;updBtns();setStatus('trabajando','Trabajando');toast('Jornada iniciada');}
+function doStop(){const o=openRec();if(!o)return;if(TM.state==='break'){TM.bs+=Math.floor((new Date()-new Date(TM.bStart))/1000);}o.fin=new Date().toISOString();o.workSecs=TM.ws;o.breakSecs=TM.bs;o.enDescanso=false;save();TM={ws:0,bs:0,state:'idle',bStart:null};updBtns();setStatus('libre','Libre');['eWorked','eBreak'].forEach(id=>document.getElementById(id).textContent='0:00:00');document.getElementById('eExtra').textContent='0:00';document.getElementById('pFill').style.width='0%';document.getElementById('ePct').textContent='0%';renderWeek();renderRecent();toast('Jornada finalizada correctamente');}
+function openBreakModal(){openMov('mBreak');}
+function doBreak(){closeMov('mBreak');const o=openRec();if(!o)return;TM.state='break';TM.bStart=new Date().toISOString();o.enDescanso=true;o.bStartTs=TM.bStart;save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');}
+function doResume(){const o=openRec();if(!o)return;TM.bs+=Math.floor((new Date()-new Date(TM.bStart))/1000);TM.bStart=null;TM.state='working';o.enDescanso=false;o.breakSecs=TM.bs;o.bStartTs=null;save();updBtns();setStatus('trabajando','Trabajando');toast('Jornada reanudada');}
+function tick(){if(TM.state==='idle')return;if(TM.state==='working'){TM.ws++;const o=openRec();if(o)o.workSecs=TM.ws;}else if(TM.state==='break'){TM.bs++;const o=openRec();if(o)o.breakSecs=TM.bs;}updTimer();}
+function updTimer(){
+  document.getElementById('eWorked').textContent=s2h(TM.ws);
+  document.getElementById('eBreak').textContent=s2h(TM.bs);
+  const ex=Math.floor(Math.max(0,TM.ws-WK*60)/60);
+  document.getElementById('eExtra').textContent=`${Math.floor(ex/60)}:${String(ex%60).padStart(2,'0')}`;
+  const p=Math.min(100,(TM.ws/(WK*60))*100);
+  const b=document.getElementById('pFill');b.style.width=p.toFixed(1)+'%';
+  b.className='pfill'+(TM.ws>WK*60?' extra':TM.state==='break'?' paused':'');
+  document.getElementById('ePct').textContent=p.toFixed(0)+'%';
+}
+function updBtns(){const s=TM.state;document.getElementById('btnStart').disabled=s!=='idle';document.getElementById('btnStop').disabled=s==='idle';document.getElementById('btnBrk').disabled=s!=='working';const br=document.getElementById('btnBrk'),re=document.getElementById('btnResume');if(s==='break'){re.style.display='flex';br.style.display='none';}else{re.style.display='none';br.style.display='flex';}}
+function setStatus(cls,lbl){const el=document.getElementById('fStatus');el.className='spill '+cls;el.innerHTML=`<div class="dot"></div><span>${lbl}</span>`;}
+function openRec(){return DB.records.find(r=>r.empId===SES.user?.id&&!r.fin);}
+function renderWeek(){
+  const e=SES.user;if(!e)return;
+  const ws=wkStart(new Date()),recs=DB.records.filter(r=>r.empId===e.id&&r.fin&&new Date(r.inicio)>=ws);
+  let tot=0;recs.forEach(r=>tot+=Math.floor((r.workSecs||0)/60));tot+=Math.floor(TM.ws/60);
+  const norm=Math.min(tot,WK),ext=Math.max(0,tot-WK);
+  const days=new Set(recs.map(r=>fdf(r.inicio))).size+(TM.state!=='idle'?1:0);
+  const medDays=DB.medicos.filter(m=>m.empId===e.id&&m.estado!=='denegado').reduce((s,m)=>{
+    if(new Date(m.desde)>=ws)return s+m.dias;return s;},0);
+  const absDays=DB.ausencias.filter(a=>a.empId===e.id&&new Date(a.fecha+'T00:00:00')>=ws).length;
+  document.getElementById('wTotal').textContent=mhm(tot);
+  document.getElementById('wNormal').textContent=mhm(norm);
+  document.getElementById('wExtra').textContent=mhm(ext);
+  document.getElementById('wDays').textContent=days;
+  document.getElementById('wMed').textContent=medDays;
+  document.getElementById('wAbs').textContent=absDays;
+}
+function renderRecent(){
+  const e=SES.user;
+  const recs=DB.records.filter(r=>r.empId===e.id&&r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).slice(0,5);
+  const el=document.getElementById('recentList');
+  if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
+  el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div></div>`;
+  }).join('');
+}
+
+/* VACACIONES */
+function doReqVac(){
+  const e=SES.user,f=document.getElementById('vFrom').value,t=document.getElementById('vTo').value;
+  if(!f||!t){toast('Selecciona fechas');return;}if(f>t){toast('Fecha inicio debe ser anterior al fin');return;}
+  const d=wkdays(f,t);if(d<=0){toast('Sin días laborables en ese rango');return;}
+  const vd=vacData(e.id);if(d>vd.available){toast(`Solo tienes ${vd.available} días disponibles`);return;}
+  DB.vacaciones.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,desde:f,hasta:t,dias:d,estado:'pendiente',solEn:new Date().toISOString()});
+  save();document.getElementById('vFrom').value='';document.getElementById('vTo').value='';document.getElementById('vDays').textContent='';
+  renderVac();toast('🌴 Solicitud enviada — pendiente aprobación');
+}
+function renderVac(){
+  const e=SES.user,vd=vacData(e.id);
+  document.getElementById('vacDisp').textContent=vd.available;
+  const p=vd.generated>0?Math.min(100,(vd.used/vd.generated)*100):0;
+  document.getElementById('vacPBar').style.width=p.toFixed(1)+'%';
+  document.getElementById('vacPLbl').textContent=`${vd.used} de ${vd.generated} generados`;
+  document.getElementById('vacGen').textContent=vd.generated;
+  document.getElementById('vacUsed').textContent=vd.used;
+  document.getElementById('vacPend').textContent=vd.pending;
+  document.getElementById('vacStart').textContent=vd.startDate;
+  document.getElementById('vacMonths').textContent=vd.months;
+  const mine=DB.vacaciones.filter(v=>v.empId===e.id).sort((a,b)=>b.solEn.localeCompare(a.solEn));
+  const el=document.getElementById('mySols');
+  el.innerHTML=mine.length?mine.map(v=>`<div class="si">
+    <div class="si-top"><span class="si-name">${fds(v.desde)} → ${fds(v.hasta)}</span><span class="badge ${v.estado}">${v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✅':'❌'} ${v.estado}</span></div>
+    <div class="si-dates">${v.dias} día${v.dias!==1?'s':''} laborable${v.dias!==1?'s':''}</div>
+  </div>`).join(''):'<div class="empty">Sin solicitudes</div>';
+}
+
+/* MÉDICO */
+function doReqMed(){
+  const e=SES.user,f=document.getElementById('mFrom').value,t=document.getElementById('mTo').value,note=document.getElementById('mNote').value.trim();
+  if(!f||!t){toast('Selecciona fechas de inicio y fin');return;}if(f>t){toast('Fecha inicio debe ser anterior al fin');return;}
+  const d=wkdays(f,t);if(d<=0){toast('Sin días laborables en ese rango');return;}
+  DB.medicos.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,desde:f,hasta:t,dias:d,nota:note,estado:'pendiente',solEn:new Date().toISOString()});
+  save();document.getElementById('mFrom').value='';document.getElementById('mTo').value='';document.getElementById('mNote').value='';document.getElementById('mDays').textContent='';
+  renderMed();toast('🏥 Permiso médico registrado — pendiente de revisión');
+}
+function renderMed(){
+  const e=SES.user;
+  const mine=DB.medicos.filter(m=>m.empId===e.id).sort((a,b)=>b.solEn.localeCompare(a.solEn));
+  const el=document.getElementById('myMeds');
+  el.innerHTML=mine.length?mine.map(m=>`<div class="si">
+    <div class="si-top"><span class="si-name">${fds(m.desde)} → ${fds(m.hasta)}</span><span class="badge ${m.estado==='aprobada'?'aprobada':m.estado==='denegada'?'denegada':'medico'}">${m.estado==='pendiente'?'⏳ Pendiente':m.estado==='aprobada'?'✅ Aprobado':'❌ Denegado'}</span></div>
+    <div class="si-dates">${m.dias} día${m.dias!==1?'s':''} · ${m.nota?`"${m.nota.substring(0,40)}${m.nota.length>40?'…':''}"`:''}</div>
+  </div>`).join(''):'<div class="empty">Sin permisos médicos</div>';
+}
+
+/* AUSENCIAS */
+function doReqAbs(){
+  const e=SES.user,fecha=document.getElementById('aDate').value,note=document.getElementById('aNote').value.trim();
+  if(!fecha){toast('Selecciona la fecha de ausencia');return;}
+  if(DB.ausencias.find(a=>a.empId===e.id&&a.fecha===fecha)){toast('Ya existe una ausencia en esa fecha');return;}
+  DB.ausencias.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,fecha,nota:note,solEn:new Date().toISOString()});
+  save();document.getElementById('aDate').value='';document.getElementById('aNote').value='';
+  renderAbs();toast('⚠ Ausencia registrada');
+}
+function renderAbs(){
+  const e=SES.user;
+  const mine=DB.ausencias.filter(a=>a.empId===e.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const el=document.getElementById('myAbs');
+  el.innerHTML=mine.length?mine.map(a=>`<div class="si">
+    <div class="si-top"><span class="si-name">📅 ${fds(a.fecha)}</span><span class="badge ausencia">⚠ Injustificada</span></div>
+    <div class="si-dates">${a.nota?`"${a.nota.substring(0,50)}"`:''}</div>
+  </div>`).join(''):'<div class="empty">Sin ausencias registradas</div>';
+}
+
+/* HISTORIAL */
+function renderHist(){
+  const e=SES.user;
+  const recs=DB.records.filter(r=>r.empId===e.id&&r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio));
+  const el=document.getElementById('fullHist');
+  if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
+  el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div></div>`;
+  }).join('');
+}
+
+/* ADMIN */
+function admTab(t){
+  ['overview','solicitudes','registros','empleados','exportar'].forEach(x=>{document.getElementById('a'+cap(x)).style.display=x===t?'block':'none';});
+  document.querySelectorAll('.atab').forEach((b,i)=>{b.classList.toggle('active',['overview','solicitudes','registros','empleados','exportar'][i]===t);});
+  if(t==='registros')renderRecs();if(t==='empleados')renderEmps();if(t==='exportar')renderExpStats();if(t==='solicitudes')renderAdmSols();
+}
+function renderAdm(){renderGStats();renderEList();renderAdmFilters();}
+function renderGStats(){
+  const tr=DB.records.filter(r=>r.fin).length;
+  let tm=0;DB.records.filter(r=>r.fin).forEach(r=>tm+=Math.floor((r.workSecs||0)/60));
+  const act=DB.records.filter(r=>!r.fin).length;
+  const pv=DB.vacaciones.filter(v=>v.estado==='pendiente').length;
+  const pm=DB.medicos.filter(m=>m.estado==='pendiente').length;
+  const pa=DB.ausencias.length;
+  document.getElementById('gStats').innerHTML=`
+    <div class="sc blue"><div class="sv">${DB.employees.length}</div><div class="sl">Empleados</div></div>
+    <div class="sc grn"><div class="sv">${tr}</div><div class="sl">Fichajes</div></div>
+    <div class="sc org"><div class="sv">${act}</div><div class="sl">En jornada</div></div>
+    <div class="sc vio"><div class="sv">${pv}</div><div class="sl">Vacac. pendientes</div></div>
+    <div class="sc teal"><div class="sv">${pm}</div><div class="sl">Médicos pendientes</div></div>
+    <div class="sc rose"><div class="sv">${pa}</div><div class="sl">Ausencias totales</div></div>`;
+}
+function renderEList(){
+  const ws=wkStart(new Date());
+  document.getElementById('eList').innerHTML=DB.employees.map(emp=>{
+    const wr=DB.records.filter(r=>r.empId===emp.id&&r.fin&&new Date(r.inicio)>=ws);
+    let wm=0;wr.forEach(r=>wm+=Math.floor((r.workSecs||0)/60));
+    const ext=Math.max(0,wm-WK);const p=Math.min(100,(wm/WK)*100);
+    const open=DB.records.find(r=>r.empId===emp.id&&!r.fin);
+    const vd=vacData(emp.id);
+    const medTot=DB.medicos.filter(m=>m.empId===emp.id&&m.estado!=='denegado').reduce((s,m)=>s+m.dias,0);
+    const absTot=DB.ausencias.filter(a=>a.empId===emp.id).length;
+    return`<div class="adcard" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="eavatar" style="background:${emp.color}">${emp.initials}</div>
+        <div style="flex:1"><strong style="font-size:14px;font-family:'Syne',sans-serif">${emp.name}</strong><div style="font-size:11px;color:var(--text2)">${emp.empresa}</div></div>
+        ${open?'<span class="spill trabajando" style="font-size:10px"><div class="dot"></div>Activo</span>':''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+        <div class="ebox blue"><div class="eico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></div><div class="v" style="font-size:14px">${mhm(wm)}</div><div class="l">Semana</div></div>
+        <div class="ebox red"><div class="eico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/></svg></div><div class="v" style="font-size:14px">${mhm(ext)}</div><div class="l">Extra</div></div>
+        <div class="ebox violet"><div class="eico"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg></div><div class="v" style="font-size:14px">${vd.available}</div><div class="l">Vac. disp.</div></div>
+        <div class="ebox teal"><div class="eico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="v" style="font-size:14px">${medTot}</div><div class="l">Días médico</div></div>
+        <div class="ebox rose"><div class="eico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="v" style="font-size:14px">${absTot}</div><div class="l">Ausencias</div></div>
+        <div class="ebox gray"><div class="eico"><svg viewBox="0 0 24 24"><path d="M12 13l4-4"/><path d="M3 17a9 9 0 1 1 18 0"/></svg></div><div class="v" style="font-size:14px">${p.toFixed(0)}%</div><div class="l">Jornada</div></div>
+      </div>
+      <div class="pbg"><div class="pfill${wm>WK?' extra':''}" style="width:${p.toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+function renderAdmFilters(){
+  const fe=document.getElementById('fEmp');
+  fe.innerHTML='<option value="">Todos los empleados</option>'+DB.employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const fw=document.getElementById('fWeek');
+  const wks=allWeeks();fw.innerHTML='<option value="">Todas las semanas</option>'+wks.map(w=>`<option value="${w.key}">${w.label}</option>`).join('');
+  const ne=document.getElementById('nEmpresa');ne.innerHTML='<option value="">— Empresa —</option>'+DB.empresas.map(e=>`<option>${e}</option>`).join('');
+  const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=DB.employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+}
+function renderAdmSols(){
+  // Vacaciones pendientes
+  const vp=DB.vacaciones.filter(v=>v.estado==='pendiente');
+  document.getElementById('aVacPend').innerHTML=vp.length?vp.map(v=>`<div class="si">
+    <div class="si-top"><span class="si-name">${v.empName}</span><span class="badge pendiente">⏳ Pendiente</span></div>
+    <div class="si-dates">📅 ${fds(v.desde)} → ${fds(v.hasta)} · <b>${v.dias} días</b></div>
+    <div class="si-actions"><button class="bok" onclick="resVac('${v.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resVac('${v.id}','denegada')">❌ Denegar</button></div>
+  </div>`).join(''):'<div class="empty">Sin solicitudes pendientes ✅</div>';
+  // Médicos todos
+  const ml=DB.medicos.sort((a,b)=>b.solEn.localeCompare(a.solEn));
+  document.getElementById('aMedList').innerHTML=ml.length?ml.map(m=>{
+    const emp=DB.employees.find(e=>e.id===m.empId);
+    return`<div class="si">
+      <div class="si-top">
+        <span class="si-name" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${emp?emp.color:'#888'};display:inline-block"></span>${m.empName}</span>
+        <span class="badge ${m.estado==='aprobada'?'aprobada':m.estado==='denegada'?'denegada':'medico'}">${m.estado==='pendiente'?'⏳ Pendiente':m.estado==='aprobada'?'✅ Aprobado':'❌ Denegado'}</span>
+      </div>
+      <div class="si-dates">📅 ${fds(m.desde)} → ${fds(m.hasta)} · ${m.dias} días · ${m.nota?`"${m.nota.substring(0,40)}"`:'Sin nota'}</div>
+      ${m.estado==='pendiente'?`<div class="si-actions"><button class="bok" onclick="resMed('${m.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resMed('${m.id}','denegada')">❌ Denegar</button></div>`:''}
+    </div>`;
+  }).join(''):'<div class="empty">Sin permisos médicos</div>';
+  // Ausencias
+  const al=DB.ausencias.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  document.getElementById('aAbsList').innerHTML=al.length?al.map(a=>{
+    const emp=DB.employees.find(e=>e.id===a.empId);
+    return`<div class="si">
+      <div class="si-top">
+        <span class="si-name" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${emp?emp.color:'#888'};display:inline-block"></span>${a.empName}</span>
+        <span class="badge ausencia">⚠ Injustificada</span>
+      </div>
+      <div class="si-dates">📅 ${fds(a.fecha)} ${a.nota?`· "${a.nota.substring(0,40)}"`:''}</div>
+      <div class="si-actions"><button class="bdel" onclick="delAbs('${a.id}')">🗑 Eliminar</button></div>
+    </div>`;
+  }).join(''):'<div class="empty">Sin ausencias</div>';
+  // Vac resumen
+  document.getElementById('aVacRes').innerHTML=DB.employees.map(emp=>{
+    const vd=vacData(emp.id);
+    return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div>
+      <div class="einfo"><strong>${emp.name}</strong><span>${vd.months} meses · Gen: ${vd.generated} · Usados: ${vd.used} · Pend: ${vd.pending}</span></div>
+      <div style="text-align:right"><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--violet)">${vd.available}</div><div style="font-size:10px;color:var(--text2)">disponibles</div></div>
+    </div>`;
+  }).join('');
+  renderAdmFilters();
+}
+function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'✅ Vacaciones aprobadas':'❌ Solicitud denegada');}
+function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;save();renderAdmSols();renderGStats();toast(est==='aprobada'?'🏥 Permiso médico aprobado':'❌ Permiso denegado');}
+function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
+function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();renderAdmSols();toast('Fecha de inicio actualizada');}
+function renderRecs(){
+  const ef=document.getElementById('fEmp').value,wf=document.getElementById('fWeek').value;
+  let recs=DB.records.filter(r=>r.fin);if(ef)recs=recs.filter(r=>r.empId===ef);if(wf)recs=recs.filter(r=>wkKey(new Date(r.inicio))===wf);recs=recs.sort((a,b)=>b.inicio.localeCompare(a.inicio));
+  const el=document.getElementById('recList');
+  if(!recs.length){el.innerHTML='<div class="empty">Sin registros</div>';return;}
+  el.innerHTML='<div class="adcard">'+recs.map(r=>{const e=DB.employees.find(x=>x.id===r.empId);const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div></div>`;
+  }).join('')+'</div>';
+}
+function renderEmps(){
+  document.getElementById('empList').innerHTML=DB.employees.map(emp=>{const vd=vacData(emp.id);
+    return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d · Alta:${emp.startDate||'—'}</span></div><button class="bdel" onclick="delEmp('${emp.id}')">✕</button></div>`;
+  }).join('');
+  document.getElementById('empresaList').innerHTML=DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join('');
+}
+function addEmp(){
+  const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today();
+  if(!n||!em||p.length<4){toast('Completa todos los campos (PIN mín. 4 dígitos)');return;}
+  const init=n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  DB.employees.push({id:'e'+Date.now(),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd});
+  document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';
+  save();renderEmps();popSelects();toast('Empleado añadido');
+}
+function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))return;DB.employees=DB.employees.filter(e=>e.id!==id);DB.records=DB.records.filter(r=>r.empId!==id);DB.vacaciones=DB.vacaciones.filter(v=>v.empId!==id);DB.medicos=DB.medicos.filter(m=>m.empId!==id);DB.ausencias=DB.ausencias.filter(a=>a.empId!==id);save();renderEmps();renderGStats();renderEList();popSelects();toast('Empleado eliminado');}
+function addEmpresa(){const n=document.getElementById('nEmpNom').value.trim();if(!n){toast('Introduce nombre');return;}if(DB.empresas.includes(n)){toast('Ya existe');return;}DB.empresas.push(n);document.getElementById('nEmpNom').value='';save();renderEmps();renderAdmFilters();toast('Empresa añadida');}
+function delEmpresa(n){if(!confirm(`¿Eliminar empresa "${n}"?`))return;DB.empresas=DB.empresas.filter(e=>e!==n);save();renderEmps();toast('Empresa eliminada');}
+function renderExpStats(){
+  const tr=DB.records.filter(r=>r.fin).length;let tm=0;DB.records.filter(r=>r.fin).forEach(r=>tm+=Math.floor((r.workSecs||0)/60));
+  const tv=DB.vacaciones.filter(v=>v.estado==='aprobada').reduce((s,v)=>s+v.dias,0);
+  const tmd=DB.medicos.filter(m=>m.estado!=='denegado').reduce((s,m)=>s+m.dias,0);
+  const ta=DB.ausencias.length;
+  document.getElementById('expStats').innerHTML=`<div class="wstats">
+    <div class="ws total"><div class="wsico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="wstxt"><div class="v">${tr}</div><div class="l">Fichajes</div></div></div>
+    <div class="ws normal"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div><div class="wstxt"><div class="v">${mhm(tm)}</div><div class="l">Horas totales</div></div></div>
+    <div class="ws vac"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg></div><div class="wstxt"><div class="v">${tv}</div><div class="l">Vac. aprobadas</div></div></div>
+    <div class="ws med"><div class="wsico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="wstxt"><div class="v">${tmd}</div><div class="l">Días médico</div></div></div>
+    <div class="ws abs"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="wstxt"><div class="v">${ta}</div><div class="l">Ausencias</div></div></div>
+    <div class="ws days"><div class="wsico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg></div><div class="wstxt"><div class="v">${DB.employees.length}</div><div class="l">Empleados</div></div></div>
+  </div>`;
+}
+
+/* EXPORTS */
+function expFichajes(){
+  const recs=DB.records.filter(r=>r.fin).sort((a,b)=>a.inicio.localeCompare(b.inicio));
+  const h="Empleado,Empresa,Fecha,Hora Entrada,Hora Salida,Horas Trabajadas,Descanso,Horas Normales,Horas Extra,Total Min,Semana\n";
+  const rows=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);const norm=Math.min(m,WK),ext=Math.max(0,m-WK);return`"${r.empName}","${r.empresa}","${new Date(r.inicio).toLocaleDateString('es-ES')}","${ftime(r.inicio)}","${ftime(r.fin)}","${mhm(m)}","${mhm(bm)}","${mhm(norm)}","${mhm(ext)}","${m}","${wkKey(new Date(r.inicio))}"`}).join('\n');
+  dl("\uFEFF"+h+rows,'text/csv','AN_Times_Fichajes_'+today()+'.csv');toast('📊 CSV Fichajes descargado');
+}
+function expVacaciones(){
+  const h="Empleado,Empresa,Desde,Hasta,Dias,Estado,Solicitado\n";
+  const rows=DB.vacaciones.sort((a,b)=>a.empName.localeCompare(b.empName)).map(v=>`"${v.empName}","${v.empresa}","${v.desde}","${v.hasta}","${v.dias}","${v.estado}","${new Date(v.solEn).toLocaleDateString('es-ES')}"`).join('\n');
+  const sum="\n\nResumen por empleado\nEmpleado,Empresa,Inicio Contrato,Meses,Generados,Usados,Pendientes,Disponibles\n"+
+    DB.employees.map(e=>{const vd=vacData(e.id);return`"${e.name}","${e.empresa}","${e.startDate||'—'}","${vd.months}","${vd.generated}","${vd.used}","${vd.pending}","${vd.available}"`;}).join('\n');
+  dl("\uFEFF"+h+rows+sum,'text/csv','AN_Times_Vacaciones_'+today()+'.csv');toast('🌴 CSV Vacaciones descargado');
+}
+function expAusencias(){
+  const hm="Empleado,Empresa,Desde,Hasta,Dias,Estado,Motivo,Solicitado\n";
+  const rowsM=DB.medicos.sort((a,b)=>a.empName.localeCompare(b.empName)).map(m=>`"${m.empName}","${m.empresa}","${m.desde}","${m.hasta}","${m.dias}","${m.estado}","${m.nota||''}","${new Date(m.solEn).toLocaleDateString('es-ES')}"`).join('\n');
+  const ha="\n\nAUSENCIAS INJUSTIFICADAS\nEmpleado,Empresa,Fecha,Motivo,Registrado\n";
+  const rowsA=DB.ausencias.sort((a,b)=>a.empName.localeCompare(b.empName)).map(a=>`"${a.empName}","${a.empresa}","${a.fecha}","${a.nota||''}","${new Date(a.solEn).toLocaleDateString('es-ES')}"`).join('\n');
+  dl("\uFEFF"+hm+rowsM+ha+rowsA,'text/csv','AN_Times_Ausencias_'+today()+'.csv');toast('🏥 CSV Médicos y Ausencias descargado');
+}
+function expJSON(){
+  const data={exportDate:new Date().toISOString(),empresas:DB.empresas,employees:DB.employees,records:DB.records,vacaciones:DB.vacaciones,medicos:DB.medicos,ausencias:DB.ausencias,resumen:DB.employees.map(e=>({id:e.id,name:e.name,...vacData(e.id),medicos:DB.medicos.filter(m=>m.empId===e.id).length,ausencias:DB.ausencias.filter(a=>a.empId===e.id).length}))};
+  dl(JSON.stringify(data,null,2),'application/json','AN_Times_Backup_'+today()+'.json');toast('💾 JSON descargado');
+}
+function dl(c,t,n){const b=new Blob([c],{type:t});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();}
+
+/* HELPERS */
+function showSc(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function openMov(id){document.getElementById(id).classList.add('open');}
+function closeMov(id){document.getElementById(id).classList.remove('open');}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function gid(){return 'r'+Date.now()+Math.random().toString(36).slice(2,6);}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function wkStart(d){const dt=new Date(d),day=dt.getDay(),diff=(day===0?-6:1-day);dt.setDate(dt.getDate()+diff);dt.setHours(0,0,0,0);return dt;}
+function wkKey(d){return wkStart(d).toISOString().slice(0,10);}
+function allWeeks(){const keys=[...new Set(DB.records.filter(r=>r.inicio).map(r=>wkKey(new Date(r.inicio))))];return keys.sort((a,b)=>b.localeCompare(a)).map(k=>{const ws=new Date(k),we=new Date(ws);we.setDate(we.getDate()+6);return{key:k,label:`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`};});}
+
+/* KEY EVENTS */
+document.getElementById('inputPin').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='Enter')doAdmLogin();});
+
+/* INIT */
+load();popSelects();autoConnectCloud();
+if(DB.records.length===0){
+  const now=new Date();
+  function seed(eid,en,em,da,sh,wh,bh){const d=new Date(now);d.setDate(d.getDate()-da);d.setHours(sh,0,0,0);const f=new Date(d);f.setHours(sh+wh+bh,0,0,0);DB.records.push({id:gid(),empId:eid,empName:en,empresa:em,inicio:d.toISOString(),fin:f.toISOString(),workSecs:wh*3600,breakSecs:bh*3600,enDescanso:false,bStartTs:null});}
+  seed("e1","Ismael Angeles de la Cruz","AN Solutions",0,9,7,1);
+  seed("e1","Ismael Angeles de la Cruz","AN Solutions",1,9,8,0);
+  seed("e1","Ismael Angeles de la Cruz","AN Solutions",2,8,9,1);
+  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",0,8,8,0);
+  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",1,9,7,1);
+  seed("e2","Franklin Lisandro Nuñez Roque","AN Solutions",2,9,8,0);
+  DB.vacaciones.push({id:'v1',empId:'e1',empName:'Ismael Angeles de la Cruz',empresa:'AN Solutions',desde:'2026-07-01',hasta:'2026-07-05',dias:5,estado:'aprobada',solEn:new Date().toISOString()});
+  DB.vacaciones.push({id:'v2',empId:'e2',empName:'Franklin Lisandro Nuñez Roque',empresa:'AN Solutions',desde:'2026-08-04',hasta:'2026-08-08',dias:5,estado:'pendiente',solEn:new Date().toISOString()});
+  DB.medicos.push({id:'m1',empId:'e1',empName:'Ismael Angeles de la Cruz',empresa:'AN Solutions',desde:'2026-05-15',hasta:'2026-05-16',dias:2,nota:'Consulta médica especialista',estado:'aprobada',solEn:new Date().toISOString()});
+  DB.ausencias.push({id:'a1',empId:'e2',empName:'Franklin Lisandro Nuñez Roque',empresa:'AN Solutions',fecha:'2026-05-10',nota:'Sin justificación presentada',solEn:new Date().toISOString()});
+  save();
+}
+</script>
+</body>
+</html>
