@@ -8,6 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TIMES INC">
 <meta name="description" content="TIMES INC — Control de jornada laboral, fichaje de horas, vacaciones y nóminas.">
@@ -31,8 +32,8 @@
 html,body{height:100%}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh}
 .app-shell{position:relative;width:100%;min-height:100vh;background:var(--bg)}
-.screen{display:none}
-.screen.active{display:block}
+.screen{display:none!important}
+.screen.active{display:block!important}
 .mc{width:100%;display:block}
 /* Centra el CONTENIDO (no toda la app) para que se lea bien en pantallas grandes */
 .abody{max-width:820px;margin:0 auto;width:100%}
@@ -343,7 +344,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 <body>
 <div class="app-shell">
 <!-- LOGIN -->
-<div class="screen active mc" id="sLogin">
+<div class="screen active" id="sLogin">
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 20px;min-height:100vh">
     <div class="lwrap">
       <div class="lhero">
@@ -351,7 +352,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.4 · build 20260607e</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.5 · build 20260607f</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -1665,7 +1666,12 @@ function expJSON(){
 function dl(c,t,n){const b=new Blob([c],{type:t});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();}
 
 /* HELPERS */
-function showSc(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function showSc(id){
+  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
+  const t=document.getElementById(id);
+  if(t){t.classList.add('active');t.style.display='block';}
+  window.scrollTo(0,0);
+}
 function openMov(id){document.getElementById(id).classList.add('open');}
 function closeMov(id){document.getElementById(id).classList.remove('open');}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
@@ -1739,6 +1745,9 @@ window.addEventListener('unhandledrejection',function(ev){console.error('Promesa
 window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
 // Inicialización robusta: cada paso aislado para que un fallo no detenga la app
 function initApp(){
+  // Estado inicial garantizado: solo el login visible
+  try{document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
+    const lg=document.getElementById('sLogin');if(lg){lg.classList.add('active');lg.style.display='block';}}catch(e){}
   safeRun(load,'load');
   safeRun(checkMonthlyReset,'checkMonthlyReset');
   safeRun(popSelects,'popSelects');
