@@ -81,10 +81,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .clk-head{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;color:var(--text2)}
 .clk-head svg{width:16px;height:16px;stroke:var(--text2);stroke-width:2;fill:none}
 .clk-head span{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px}
-.clk-time{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--text);line-height:1;display:flex;align-items:center;justify-content:center;gap:2px}
+.clk-time{font-family:'Syne',sans-serif;font-size:54px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--text);line-height:1;display:flex;align-items:baseline;justify-content:center;gap:1px}
+.clk-time .secs{font-size:24px;color:var(--text2);font-weight:700;margin-left:4px;letter-spacing:-1px}
 .clk-time .sep{color:var(--accent);animation:blink 2s steps(1) infinite}
 @keyframes blink{50%{opacity:0.35}}
-.clk-date{font-size:13px;color:var(--text2);margin-top:6px;font-weight:500}
+.clk-date{font-size:13px;color:var(--text2);margin-top:8px;font-weight:500;text-transform:capitalize;letter-spacing:0.3px}
 .ebar{margin-top:16px}
 .elbl{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px}
 .pbg{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
@@ -281,7 +282,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <div class="llogo">AN</div>
         <h1><span>AN</span> Times</h1>
         <p>Sistema de control de jornada laboral</p>
-        <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(255,149,0,0.12);color:var(--orange)"><span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Base de datos sin conectar</div>
+        <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -291,7 +292,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <div class="lerr" id="loginErr"></div>
         <button class="btn-main" onclick="doLogin()">Entrar</button>
         <button class="btn-sec" onclick="openAdminLogin()">⚙ Acceso administrador</button>
-        <button class="btn-sec" onclick="openCloudModal()" style="margin-top:8px">☁ Configuración de la base de datos</button>
       </div>
     </div>
   </div>
@@ -413,12 +413,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
   <div class="mc"><div class="abody">
     <div class="atabs">
       <button class="atab active" onclick="admTab('overview')">Resumen</button>
-      <button class="atab" onclick="admTab('solicitudes')">📋 Solicitudes</button>
+      <button class="atab" onclick="admTab('control')">Control</button>
+      <button class="atab" onclick="admTab('solicitudes')">Solicit.</button>
       <button class="atab" onclick="admTab('registros')">Fichajes</button>
+      <button class="atab" onclick="admTab('nominas')">Nóminas</button>
       <button class="atab" onclick="admTab('empleados')">Empl.</button>
       <button class="atab" onclick="admTab('exportar')">Export</button>
     </div>
     <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
+    <div id="aControl" style="display:none">
+      <div class="adcard"><h3>Control de jornada de empleados</h3>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Como administrador puedes iniciar, pausar o finalizar la jornada de cualquier trabajador de forma remota.</div>
+        <div id="ctrlList"></div>
+      </div>
+    </div>
     <div id="aSolicitudes" style="display:none">
       <div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
       <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
@@ -445,6 +453,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <div class="ff"><label>Empresa</label><select id="nEmpresa" style="appearance:none"><option value="">— Empresa —</option></select></div>
         <div class="ff"><label>PIN (4-6 dígitos)</label><input type="text" id="nPin" placeholder="ej. 1234" maxlength="6" inputmode="numeric"></div>
         <div class="ff"><label>Fecha inicio contrato</label><input type="date" id="nStart"></div>
+        <div class="ff"><label>Email (para nóminas)</label><input type="email" id="nEmail" placeholder="correo@ejemplo.com"></div>
         <div class="ff"><label>Color avatar</label>
           <select id="nColor" style="appearance:none">
             <option value="#00d4ff">Azul cyan</option><option value="#00e676">Verde</option>
@@ -460,11 +469,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <button class="badd" onclick="addEmpresa()">+ Añadir empresa</button>
       </div>
     </div>
+    <div id="aNominas" style="display:none">
+      <div class="adcard"><h3>Generar y enviar nóminas</h3>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Genera la nómina mensual de cada trabajador con sus horas normales, extras y ausencias. Puedes enviarla por email o compartirla.</div>
+        <div class="ff"><label>Mes</label><select id="nomMes" style="appearance:none"></select></div>
+        <div class="ff"><label>Precio hora normal (€)</label><input type="number" id="nomPrecio" placeholder="ej. 10" step="0.01" inputmode="decimal"></div>
+        <div class="ff"><label>Precio hora extra (€)</label><input type="number" id="nomPrecioExtra" placeholder="ej. 15" step="0.01" inputmode="decimal"></div>
+        <button class="badd" onclick="renderNominas()">Calcular nóminas del mes</button>
+      </div>
+      <div id="nomResult"></div>
+    </div>
     <div id="aExportar" style="display:none">
       <div class="adcard"><h3>Exportar datos</h3>
         <button class="expbtn csv" onclick="expFichajes()"><span>📊</span> CSV Fichajes (Excel/Sheets)</button>
         <button class="expbtn vacv" onclick="expVacaciones()"><span>🌴</span> CSV Vacaciones</button>
         <button class="expbtn abs" onclick="expAusencias()"><span>🏥⚠</span> CSV Médicos y Ausencias</button>
+        <button class="expbtn csv" onclick="expMensual()" style="background:linear-gradient(135deg,var(--violet2),var(--violet));color:#fff"><span>📅</span> CSV Resumen Mensual (horas + extras por trabajador)</button>
         <button class="expbtn jsnb" onclick="expJSON()"><span>💾</span> JSON Backup completo</button>
         <div class="expinfo">
           <b style="display:block;margin-bottom:8px">📋 Subir a Google Sheets:</b>
@@ -476,11 +496,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         </div>
       </div>
       <div class="adcard"><h3>Base de datos en la nube</h3>
-        <div id="dbStatusCard" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:12px">
+        <div id="dbStatusCard" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm)">
           <span id="dbStatusDot" style="width:10px;height:10px;border-radius:50%;background:var(--orange)"></span>
-          <div style="flex:1"><div id="dbStatusText" style="font-size:13px;font-weight:600">Sin conectar</div><div style="font-size:11px;color:var(--text2)">Conecta Firebase para sincronizar todos los dispositivos</div></div>
+          <div style="flex:1"><div id="dbStatusText" style="font-size:13px;font-weight:600">Sin conectar</div><div style="font-size:11px;color:var(--text2)">Proyecto Firebase <b>an-times</b> · sincronización automática</div></div>
         </div>
-        <button class="badd" onclick="openCloudModal()">☁ Configurar base de datos</button>
+      </div>
+      <div class="adcard"><h3>Cierres mensuales archivados</h3>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Al terminar cada mes las horas se reinician automáticamente, pero quedan guardadas aquí y en la base de datos. También puedes cerrar un mes manualmente.</div>
+        <div class="ff"><label>Cerrar mes manualmente</label><select id="closeMes" style="appearance:none"></select></div>
+        <button class="badd" onclick="doCloseMonth()" style="margin-bottom:14px">Cerrar mes y reiniciar horas</button>
+        <div id="cierresList"></div>
       </div>
       <div class="adcard"><h3>Estadísticas</h3><div id="expStats"></div></div>
     </div>
@@ -518,11 +543,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
-const ADM_PIN="0000",WK=40*60,VPM=2.5;
+const ADM_PIN="0824",WK=40*60,VPM=2.5;
+const FB_CONFIG={
+  apiKey:"AIzaSyCARE-JiP8LLw-Si-CewVbrz72GsfTm9HQ",
+  authDomain:"an-times.firebaseapp.com",
+  databaseURL:"https://an-times-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"an-times",
+  storageBucket:"an-times.firebasestorage.app",
+  messagingSenderId:"650059384349",
+  appId:"1:650059384349:web:9b525ffcc53c8b3ca1e8f4",
+  measurementId:"G-86XRFV4N0J"
+};
 let DB={empresas:["AN Solutions"],employees:[
-  {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01"},
-  {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01"}
-],records:[],vacaciones:[],medicos:[],ausencias:[]};
+  {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01",email:""},
+  {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01",email:""}
+],records:[],vacaciones:[],medicos:[],ausencias:[],cierres:[]};
 let SES={user:null,isAdmin:false};
 let TM={ws:0,bs:0,state:"idle",bStart:null};
 
@@ -544,6 +579,7 @@ function applyDB(p){
   DB.vacaciones=p.vacaciones||[];
   DB.medicos=p.medicos||[];
   DB.ausencias=p.ausencias||[];
+  DB.cierres=p.cierres||[];
 }
 function setCloudStatus(state){
   const colors={connected:'var(--green)',connecting:'var(--accent)',disconnected:'var(--orange)'};
@@ -619,18 +655,19 @@ function refreshUI(){
   else if(SES.user){try{renderWeek();renderRecent();renderVac();renderMed();renderAbs();renderHist();}catch(e){}}
 }
 function autoConnectCloud(){
-  const saved=localStorage.getItem('an_times_fbconfig');
-  if(!saved)return;
-  if(typeof firebase==='undefined'){setCloudStatus('disconnected');return;}
+  if(typeof firebase==='undefined'){setCloudStatus('disconnected');setTimeout(autoConnectCloud,1500);return;}
   setCloudStatus('connecting');
-  let cfg;try{cfg=parseFbConfig(saved);}catch(e){return;}
-  if(!cfg.databaseURL)return;
   try{
-    FB.app=firebase.initializeApp(cfg,'an_auto_'+Date.now());
+    FB.app=firebase.initializeApp(FB_CONFIG,'an_'+Date.now());
     FB.db=firebase.database(FB.app);FB.ref=FB.db.ref('an_times_data');
-    FB.ref.on('value',s=>{const d=s.val();if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}});
-    FB.connected=true;setCloudStatus('connected');
-  }catch(e){console.warn('Auto-conexión nube fallida',e);}
+    FB.ref.once('value').then(snap=>{
+      const cloud=snap.val();
+      if(cloud&&(cloud.employees||cloud.records)){FB.syncing=true;applyDB(cloud);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}}
+      else{FB.ref.set(DB);}
+      FB.ref.on('value',s=>{const d=s.val();if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}});
+      FB.connected=true;setCloudStatus('connected');popSelects();refreshUI();
+    }).catch(e=>{console.warn('Nube:',e);setCloudStatus('disconnected');});
+  }catch(e){console.warn('Auto-conexión fallida',e);setCloudStatus('disconnected');}
 }
 
 /* VACATION CALC */
@@ -660,8 +697,11 @@ setInterval(()=>{
   const n=new Date(),ts=hms(n);
   const c1=document.getElementById('topClk');if(c1)c1.textContent=ts;
   const c2=document.getElementById('admClk');if(c2)c2.textContent=ts;
-  document.getElementById('bigClk').innerHTML=ts.replace(/:/g,'<span class="sep">:</span>');
-  document.getElementById('bigDate').textContent=fdate(n);
+  const hh=String(n.getHours()).padStart(2,'0'),mm=String(n.getMinutes()).padStart(2,'0'),ss=String(n.getSeconds()).padStart(2,'0');
+  const bc=document.getElementById('bigClk');
+  if(bc)bc.innerHTML=hh+'<span class="sep">:</span>'+mm+'<span class="secs">'+ss+'</span>';
+  const bd=document.getElementById('bigDate');
+  if(bd)bd.textContent=fdate(n);
   tick();
 },1000);
 
@@ -848,11 +888,64 @@ function renderHist(){
 
 /* ADMIN */
 function admTab(t){
-  ['overview','solicitudes','registros','empleados','exportar'].forEach(x=>{document.getElementById('a'+cap(x)).style.display=x===t?'block':'none';});
-  document.querySelectorAll('.atab').forEach((b,i)=>{b.classList.toggle('active',['overview','solicitudes','registros','empleados','exportar'][i]===t);});
-  if(t==='registros')renderRecs();if(t==='empleados')renderEmps();if(t==='exportar')renderExpStats();if(t==='solicitudes')renderAdmSols();
+  const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
+  tabs.forEach(x=>{const el=document.getElementById('a'+cap(x));if(el)el.style.display=x===t?'block':'none';});
+  document.querySelectorAll('.atab').forEach((b,i)=>{b.classList.toggle('active',tabs[i]===t);});
+  if(t==='registros')renderRecs();if(t==='empleados')renderEmps();if(t==='exportar'){renderExpStats();renderCierres();renderCloseMesOptions();}if(t==='solicitudes')renderAdmSols();if(t==='control')renderControl();if(t==='nominas')renderNomMesOptions();
 }
 function renderAdm(){renderGStats();renderEList();renderAdmFilters();}
+
+/* ── ADMIN: CONTROL DE JORNADA DE EMPLEADOS ── */
+function renderControl(){
+  const el=document.getElementById('ctrlList');
+  el.innerHTML=DB.employees.map(emp=>{
+    const open=DB.records.find(r=>r.empId===emp.id&&!r.fin);
+    let estado='Libre',cls='libre',extra='';
+    if(open){
+      if(open.enDescanso){estado='En descanso';cls='descanso';}
+      else{estado='Trabajando';cls='trabajando';}
+      const mins=Math.floor((open.workSecs||0)/60);
+      extra=`<div style="font-size:11px;color:var(--text2);margin-top:2px">Lleva ${mhm(mins)} trabajados hoy</div>`;
+    }
+    return`<div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="eavatar" style="background:${emp.color};width:34px;height:34px">${emp.initials}</div>
+        <div style="flex:1"><strong style="font-size:13px">${emp.name}</strong>${extra}</div>
+        <span class="spill ${cls}" style="font-size:10px"><div class="dot"></div>${estado}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <button class="bok" onclick="admStart('${emp.id}')" ${open?'disabled style=\'opacity:0.35\'':''}>▶ Iniciar</button>
+        ${open&&!open.enDescanso?`<button class="expbtn brk" style="margin:0;padding:7px;font-size:12px;background:linear-gradient(135deg,#cc7000,var(--orange));color:#000" onclick="admBreak('${emp.id}')">⏸ Pausar</button>`:open&&open.enDescanso?`<button class="bok" onclick="admResume('${emp.id}')">↩ Reanudar</button>`:`<button class="bok" disabled style="opacity:0.35">⏸ Pausar</button>`}
+        <button class="bdeny" onclick="admStop('${emp.id}')" ${!open?'disabled style=\'opacity:0.35\'':''}>⏹ Finalizar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function admStart(empId){
+  if(DB.records.find(r=>r.empId===empId&&!r.fin)){toast('Ya tiene una jornada activa');return;}
+  const emp=DB.employees.find(e=>e.id===empId);
+  DB.records.push({id:gid(),empId,empName:emp.name,empresa:emp.empresa,inicio:new Date().toISOString(),fin:null,workSecs:0,breakSecs:0,enDescanso:false,bStartTs:null,adminControl:true});
+  save();renderControl();renderGStats();renderEList();toast('Jornada iniciada para '+emp.name.split(' ')[0]);
+}
+function admStop(empId){
+  const o=DB.records.find(r=>r.empId===empId&&!r.fin);if(!o)return;
+  if(o.enDescanso&&o.bStartTs){o.breakSecs=(o.breakSecs||0)+Math.floor((new Date()-new Date(o.bStartTs))/1000);}
+  o.fin=new Date().toISOString();o.enDescanso=false;o.bStartTs=null;
+  // If this is the currently logged-in employee's own session, reset their timer
+  if(SES.user&&SES.user.id===empId){TM={ws:0,bs:0,state:'idle',bStart:null};}
+  save();renderControl();renderGStats();renderEList();toast('Jornada finalizada');
+}
+function admBreak(empId){
+  const o=DB.records.find(r=>r.empId===empId&&!r.fin);if(!o||o.enDescanso)return;
+  o.enDescanso=true;o.bStartTs=new Date().toISOString();
+  save();renderControl();toast('Empleado en descanso');
+}
+function admResume(empId){
+  const o=DB.records.find(r=>r.empId===empId&&!r.fin);if(!o||!o.enDescanso)return;
+  o.breakSecs=(o.breakSecs||0)+Math.floor((new Date()-new Date(o.bStartTs))/1000);
+  o.enDescanso=false;o.bStartTs=null;
+  save();renderControl();toast('Jornada reanudada');
+}
 function renderGStats(){
   const tr=DB.records.filter(r=>r.fin).length;
   let tm=0;DB.records.filter(r=>r.fin).forEach(r=>tm+=Math.floor((r.workSecs||0)/60));
@@ -968,11 +1061,11 @@ function renderEmps(){
   document.getElementById('empresaList').innerHTML=DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join('');
 }
 function addEmp(){
-  const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today();
+  const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today(),mail=document.getElementById('nEmail').value.trim();
   if(!n||!em||p.length<4){toast('Completa todos los campos (PIN mín. 4 dígitos)');return;}
   const init=n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  DB.employees.push({id:'e'+Date.now(),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd});
-  document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';
+  DB.employees.push({id:'e'+Date.now(),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd,email:mail});
+  document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';document.getElementById('nEmail').value='';
   save();renderEmps();popSelects();toast('Empleado añadido');
 }
 function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))return;DB.employees=DB.employees.filter(e=>e.id!==id);DB.records=DB.records.filter(r=>r.empId!==id);DB.vacaciones=DB.vacaciones.filter(v=>v.empId!==id);DB.medicos=DB.medicos.filter(m=>m.empId!==id);DB.ausencias=DB.ausencias.filter(a=>a.empId!==id);save();renderEmps();renderGStats();renderEList();popSelects();toast('Empleado eliminado');}
@@ -995,10 +1088,33 @@ function renderExpStats(){
 
 /* EXPORTS */
 function expFichajes(){
-  const recs=DB.records.filter(r=>r.fin).sort((a,b)=>a.inicio.localeCompare(b.inicio));
-  const h="Empleado,Empresa,Fecha,Hora Entrada,Hora Salida,Horas Trabajadas,Descanso,Horas Normales,Horas Extra,Total Min,Semana\n";
-  const rows=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);const norm=Math.min(m,WK),ext=Math.max(0,m-WK);return`"${r.empName}","${r.empresa}","${new Date(r.inicio).toLocaleDateString('es-ES')}","${ftime(r.inicio)}","${ftime(r.fin)}","${mhm(m)}","${mhm(bm)}","${mhm(norm)}","${mhm(ext)}","${m}","${wkKey(new Date(r.inicio))}"`}).join('\n');
-  dl("\uFEFF"+h+rows,'text/csv','AN_Times_Fichajes_'+today()+'.csv');toast('📊 CSV Fichajes descargado');
+  const recs=DB.records.filter(r=>r.fin).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio));
+  let csv="REGISTRO DETALLADO DE FICHAJES\n";
+  csv+="Nombre,Empresa,Fecha,Dia,Entrada,Salida,Horas Trabajadas,Descanso,Horas Normales,Horas Extra\n";
+  // Per-week normal/extra: compute extra only beyond 40h/week per employee
+  const weekAcc={}; // key empId|weekKey -> minutes already counted
+  recs.forEach(r=>{
+    const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    const wk=wkKey(new Date(r.inicio));const key=r.empId+'|'+wk;
+    const prev=weekAcc[key]||0;const after=prev+m;
+    const norm=Math.max(0,Math.min(after,WK)-Math.min(prev,WK));
+    const ext=m-norm;weekAcc[key]=after;
+    const dia=new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'});
+    csv+=`"${r.empName}","${r.empresa}","${new Date(r.inicio).toLocaleDateString('es-ES')}","${dia}","${ftime(r.inicio)}","${ftime(r.fin)}","${mhm(m)}","${mhm(bm)}","${mhm(norm)}","${mhm(ext)}"\n`;
+  });
+  // Totals per employee
+  csv+="\n\nRESUMEN POR TRABAJADOR (acumulado)\n";
+  csv+="Nombre,Empresa,Total Horas Normales,Total Horas Extra,Total Horas,Vacaciones Disponibles\n";
+  DB.employees.forEach(emp=>{
+    let tn=0,te=0;const wacc={};
+    DB.records.filter(r=>r.empId===emp.id&&r.fin).sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+      const m=Math.floor((r.workSecs||0)/60);const wk=wkKey(new Date(r.inicio));const prev=wacc[wk]||0;const after=prev+m;
+      const norm=Math.max(0,Math.min(after,WK)-Math.min(prev,WK));tn+=norm;te+=(m-norm);wacc[wk]=after;
+    });
+    const vd=vacData(emp.id);
+    csv+=`"${emp.name}","${emp.empresa}","${mhm(tn)}","${mhm(te)}","${mhm(tn+te)}","${vd.available} dias"\n`;
+  });
+  dl("\uFEFF"+csv,'text/csv','AN_Times_Fichajes_'+today()+'.csv');toast('CSV de fichajes descargado');
 }
 function expVacaciones(){
   const h="Empleado,Empresa,Desde,Hasta,Dias,Estado,Solicitado\n";
@@ -1014,6 +1130,139 @@ function expAusencias(){
   const rowsA=DB.ausencias.sort((a,b)=>a.empName.localeCompare(b.empName)).map(a=>`"${a.empName}","${a.empresa}","${a.fecha}","${a.nota||''}","${new Date(a.solEn).toLocaleDateString('es-ES')}"`).join('\n');
   dl("\uFEFF"+hm+rowsM+ha+rowsA,'text/csv','AN_Times_Ausencias_'+today()+'.csv');toast('🏥 CSV Médicos y Ausencias descargado');
 }
+/* ── EXPORT: RESUMEN MENSUAL (Excel) ── */
+function allMonthKeys(){
+  const set=new Set();
+  DB.records.filter(r=>r.fin).forEach(r=>set.add(monthKey(r.inicio)));
+  DB.cierres.forEach(c=>set.add(c.mes));
+  set.add(monthKey(new Date()));
+  return [...set].sort((a,b)=>b.localeCompare(a));
+}
+function monthEmpData(empId,mk){
+  // returns {normalMins,extraMins,totalMins,diasMedico,ausencias} from live records OR archived closure
+  const closure=DB.cierres.find(c=>c.mes===mk);
+  if(closure){const e=closure.empleados.find(x=>x.empId===empId);if(e)return e;}
+  let normalMins=0,extraMins=0,total=0;const weeks={};
+  DB.records.filter(r=>r.empId===empId&&r.fin&&monthKey(r.inicio)===mk).forEach(r=>{const wk=wkKey(new Date(r.inicio));weeks[wk]=(weeks[wk]||0)+Math.floor((r.workSecs||0)/60);total+=Math.floor((r.workSecs||0)/60);});
+  Object.values(weeks).forEach(wm=>{normalMins+=Math.min(wm,WK);extraMins+=Math.max(0,wm-WK);});
+  const med=DB.medicos.filter(m=>m.empId===empId&&m.estado!=='denegada'&&monthKey(m.desde)===mk).reduce((s,m)=>s+m.dias,0);
+  const abs=DB.ausencias.filter(a=>a.empId===empId&&monthKey(a.fecha+'T00:00:00')===mk).length;
+  return{normalMins,extraMins,totalMins:total,diasMedico:med,ausencias:abs};
+}
+function expMensual(){
+  const meses=allMonthKeys();
+  let csv="RESUMEN MENSUAL POR TRABAJADOR\n";
+  csv+="Mes,Empleado,Empresa,Horas Normales,Horas Extra,Horas Totales,Min Normales,Min Extra,Dias Medico,Ausencias\n";
+  meses.forEach(mk=>{
+    DB.employees.forEach(emp=>{
+      const d=monthEmpData(emp.id,mk);
+      if(d.totalMins>0||d.diasMedico>0||d.ausencias>0){
+        csv+=`"${monthLabel(mk)}","${emp.name}","${emp.empresa}","${mhm(d.normalMins)}","${mhm(d.extraMins)}","${mhm(d.totalMins)}","${d.normalMins}","${d.extraMins}","${d.diasMedico}","${d.ausencias}"\n`;
+      }
+    });
+  });
+  // Totales acumulados por trabajador (todas las épocas)
+  csv+="\n\nTOTALES ACUMULADOS POR TRABAJADOR\n";
+  csv+="Empleado,Empresa,Total Horas Normales,Total Horas Extra,Total Horas\n";
+  DB.employees.forEach(emp=>{
+    let tn=0,te=0;
+    meses.forEach(mk=>{const d=monthEmpData(emp.id,mk);tn+=d.normalMins;te+=d.extraMins;});
+    csv+=`"${emp.name}","${emp.empresa}","${mhm(tn)}","${mhm(te)}","${mhm(tn+te)}"\n`;
+  });
+  dl("\uFEFF"+csv,'text/csv','AN_Times_Resumen_Mensual_'+today()+'.csv');toast('📅 CSV Resumen mensual descargado');
+}
+
+/* ── CIERRES MENSUALES (admin) ── */
+function renderNomMesOptions(){
+  const sel=document.getElementById('nomMes');if(!sel)return;
+  const meses=allMonthKeys();
+  sel.innerHTML=meses.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
+}
+function renderCloseMesOptions(){
+  const sel=document.getElementById('closeMes');if(!sel)return;
+  const cur=monthKey(new Date());
+  const meses=allMonthKeys().filter(mk=>!DB.cierres.find(c=>c.mes===mk));
+  sel.innerHTML=meses.length?meses.map(mk=>`<option value="${mk}">${monthLabel(mk)}${mk===cur?' (mes actual)':''}</option>`).join(''):'<option value="">No hay meses por cerrar</option>';
+}
+function doCloseMonth(){
+  const mk=document.getElementById('closeMes').value;
+  if(!mk){toast('No hay meses por cerrar');return;}
+  if(!confirm('¿Cerrar '+monthLabel(mk)+'? Las horas de ese mes se archivarán y se reiniciarán.'))return;
+  forceMonthClose(mk);
+}
+function renderCierres(){
+  const el=document.getElementById('cierresList');if(!el)return;
+  const cs=[...DB.cierres].sort((a,b)=>b.mes.localeCompare(a.mes));
+  if(!cs.length){el.innerHTML='<div class="empty">Sin cierres archivados todavía</div>';return;}
+  el.innerHTML=cs.map(cl=>`<div class="adcard" style="margin-bottom:8px;background:var(--bg3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong style="font-size:14px;font-family:'Syne',sans-serif">${cl.label}</strong>
+      <span style="font-size:10px;color:var(--text2)">Cerrado ${new Date(cl.cerradoEn).toLocaleDateString('es-ES')}</span>
+    </div>
+    ${cl.empleados.filter(e=>e.totalMins>0).map(e=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--border)"><span>${e.empName}</span><span><b style="color:var(--green)">${mhm(e.normalMins)}</b> + <b style="color:var(--red)">${mhm(e.extraMins)}</b> extra</span></div>`).join('')||'<div style="font-size:12px;color:var(--text2)">Sin horas registradas</div>'}
+  </div>`).join('');
+}
+
+/* ── NÓMINAS ── */
+function renderNominas(){
+  const mk=document.getElementById('nomMes').value;
+  const precio=parseFloat(document.getElementById('nomPrecio').value)||0;
+  const precioEx=parseFloat(document.getElementById('nomPrecioExtra').value)||0;
+  if(!mk){toast('Selecciona un mes');return;}
+  const el=document.getElementById('nomResult');
+  el.innerHTML=DB.employees.map(emp=>{
+    const d=monthEmpData(emp.id,mk);
+    const hN=d.normalMins/60,hE=d.extraMins/60;
+    const pagoN=hN*precio,pagoE=hE*precioEx,totalPago=pagoN+pagoE;
+    return`<div class="adcard">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="eavatar" style="background:${emp.color};width:34px;height:34px">${emp.initials}</div>
+        <div style="flex:1"><strong style="font-size:14px">${emp.name}</strong><div style="font-size:11px;color:var(--text2)">${monthLabel(mk)} · ${emp.empresa}</div></div>
+      </div>
+      <div style="font-size:13px;line-height:2">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Horas normales</span><span><b>${mhm(d.normalMins)}</b> ${precio?'× '+precio+'€ = '+pagoN.toFixed(2)+'€':''}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Horas extra</span><span><b style="color:var(--red)">${mhm(d.extraMins)}</b> ${precioEx?'× '+precioEx+'€ = '+pagoE.toFixed(2)+'€':''}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Días médico</span><span>${d.diasMedico}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Ausencias</span><span>${d.ausencias}</span></div>
+        ${(precio||precioEx)?`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border2);margin-top:6px;padding-top:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:16px"><span>TOTAL</span><span style="color:var(--green)">${totalPago.toFixed(2)}€</span></div>`:''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+        <button class="bok" onclick="sendNomina('${emp.id}','${mk}',${precio},${precioEx},'email')">📧 Enviar email</button>
+        <button class="expbtn jsnb" style="margin:0;padding:8px;font-size:12px" onclick="sendNomina('${emp.id}','${mk}',${precio},${precioEx},'share')">📤 Compartir</button>
+      </div>
+    </div>`;
+  }).join('');
+  toast('Nóminas calculadas');
+}
+function nominaTexto(emp,mk,precio,precioEx){
+  const d=monthEmpData(emp.id,mk);
+  const hN=d.normalMins/60,hE=d.extraMins/60;
+  const pagoN=hN*precio,pagoE=hE*precioEx,total=pagoN+pagoE;
+  let t=`NÓMINA — ${monthLabel(mk)}\n`;
+  t+=`Empleado: ${emp.name}\nEmpresa: ${emp.empresa}\n`;
+  t+=`--------------------------------\n`;
+  t+=`Horas normales: ${mhm(d.normalMins)}`;if(precio)t+=` (${pagoN.toFixed(2)}€)`;t+=`\n`;
+  t+=`Horas extra: ${mhm(d.extraMins)}`;if(precioEx)t+=` (${pagoE.toFixed(2)}€)`;t+=`\n`;
+  t+=`Días de permiso médico: ${d.diasMedico}\n`;
+  t+=`Ausencias injustificadas: ${d.ausencias}\n`;
+  if(precio||precioEx){t+=`--------------------------------\nTOTAL A PERCIBIR: ${total.toFixed(2)}€\n`;}
+  t+=`\nAN Times — Control de jornada`;
+  return t;
+}
+function sendNomina(empId,mk,precio,precioEx,modo){
+  const emp=DB.employees.find(e=>e.id===empId);if(!emp)return;
+  const texto=nominaTexto(emp,mk,precio,precioEx);
+  const asunto='Nómina '+monthLabel(mk)+' - '+emp.name;
+  if(modo==='email'){
+    const mail='mailto:'+(emp.email||'')+'?subject='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(texto);
+    window.location.href=mail;
+    toast('Abriendo tu app de correo…');
+  }else{
+    if(navigator.share){navigator.share({title:asunto,text:texto}).then(()=>toast('Nómina compartida')).catch(()=>{});}
+    else{navigator.clipboard&&navigator.clipboard.writeText(texto);toast('Nómina copiada al portapapeles');}
+  }
+}
+
 function expJSON(){
   const data={exportDate:new Date().toISOString(),empresas:DB.empresas,employees:DB.employees,records:DB.records,vacaciones:DB.vacaciones,medicos:DB.medicos,ausencias:DB.ausencias,resumen:DB.employees.map(e=>({id:e.id,name:e.name,...vacData(e.id),medicos:DB.medicos.filter(m=>m.empId===e.id).length,ausencias:DB.ausencias.filter(a=>a.empId===e.id).length}))};
   dl(JSON.stringify(data,null,2),'application/json','AN_Times_Backup_'+today()+'.json');toast('💾 JSON descargado');
@@ -1029,6 +1278,58 @@ function gid(){return 'r'+Date.now()+Math.random().toString(36).slice(2,6);}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function wkStart(d){const dt=new Date(d),day=dt.getDay(),diff=(day===0?-6:1-day);dt.setDate(dt.getDate()+diff);dt.setHours(0,0,0,0);return dt;}
 function wkKey(d){return wkStart(d).toISOString().slice(0,10);}
+function monthKey(d){d=new Date(d);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function monthLabel(mk){const[y,m]=mk.split('-');const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];return meses[parseInt(m)-1]+' '+y;}
+function empMonthMins(empId,mk){
+  // Sum worked minutes of finished records for an employee in a given month
+  let total=0;
+  DB.records.filter(r=>r.empId===empId&&r.fin&&monthKey(r.inicio)===mk).forEach(r=>total+=Math.floor((r.workSecs||0)/60));
+  return total;
+}
+function buildMonthClosure(mk){
+  // Build a closure snapshot for month mk for all employees
+  const empleados=DB.employees.map(emp=>{
+    const mins=empMonthMins(emp.id,mk);
+    const normal=Math.min(mins,WK*4); // approx monthly normal cap reference (40h x ~4 weeks)
+    // Better: compute per-week normal/extra within the month
+    let normalMins=0,extraMins=0;
+    const weeks={};
+    DB.records.filter(r=>r.empId===emp.id&&r.fin&&monthKey(r.inicio)===mk).forEach(r=>{
+      const wk=wkKey(new Date(r.inicio));weeks[wk]=(weeks[wk]||0)+Math.floor((r.workSecs||0)/60);
+    });
+    Object.values(weeks).forEach(wm=>{normalMins+=Math.min(wm,WK);extraMins+=Math.max(0,wm-WK);});
+    const med=DB.medicos.filter(m=>m.empId===emp.id&&m.estado!=='denegada'&&monthKey(m.desde)===mk).reduce((s,m)=>s+m.dias,0);
+    const abs=DB.ausencias.filter(a=>a.empId===emp.id&&monthKey(a.fecha+'T00:00:00')===mk).length;
+    return{empId:emp.id,empName:emp.name,empresa:emp.empresa,totalMins:mins,normalMins,extraMins,diasMedico:med,ausencias:abs};
+  });
+  return{mes:mk,label:monthLabel(mk),cerradoEn:new Date().toISOString(),empleados};
+}
+function checkMonthlyReset(){
+  // Auto-close previous months: if there are finished records from a month earlier than current
+  // that haven't been archived, archive them and remove their records (reset hours).
+  const curMK=monthKey(new Date());
+  const closedMonths=new Set(DB.cierres.map(c=>c.mes));
+  const monthsWithRecords=new Set(DB.records.filter(r=>r.fin).map(r=>monthKey(r.inicio)));
+  let changed=false;
+  monthsWithRecords.forEach(mk=>{
+    if(mk<curMK&&!closedMonths.has(mk)){
+      // Archive this month then remove its finished records
+      const closure=buildMonthClosure(mk);
+      DB.cierres.push(closure);
+      DB.records=DB.records.filter(r=>!(r.fin&&monthKey(r.inicio)===mk));
+      changed=true;
+    }
+  });
+  if(changed)save();
+}
+function forceMonthClose(mk){
+  // Admin manual close of a given month
+  if(DB.cierres.find(c=>c.mes===mk)){toast('Ese mes ya está cerrado');return;}
+  const closure=buildMonthClosure(mk);
+  DB.cierres.push(closure);
+  DB.records=DB.records.filter(r=>!(r.fin&&monthKey(r.inicio)===mk));
+  save();renderAdm();renderCierres&&renderCierres();toast('Mes cerrado y archivado · horas reiniciadas');
+}
 function allWeeks(){const keys=[...new Set(DB.records.filter(r=>r.inicio).map(r=>wkKey(new Date(r.inicio))))];return keys.sort((a,b)=>b.localeCompare(a)).map(k=>{const ws=new Date(k),we=new Date(ws);we.setDate(we.getDate()+6);return{key:k,label:`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`};});}
 
 /* KEY EVENTS */
@@ -1036,7 +1337,8 @@ document.getElementById('inputPin').addEventListener('keydown',e=>{if(e.key==='E
 document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='Enter')doAdmLogin();});
 
 /* INIT */
-load();popSelects();autoConnectCloud();
+load();checkMonthlyReset();popSelects();autoConnectCloud();
+setInterval(checkMonthlyReset,3600000);
 if(DB.records.length===0){
   const now=new Date();
   function seed(eid,en,em,da,sh,wh,bh){const d=new Date(now);d.setDate(d.getDate()-da);d.setHours(sh,0,0,0);const f=new Date(d);f.setHours(sh+wh+bh,0,0,0);DB.records.push({id:gid(),empId:eid,empName:en,empresa:em,inicio:d.toISOString(),fin:f.toISOString(),workSecs:wh*3600,breakSecs:bh*3600,enDescanso:false,bStartTs:null});}
