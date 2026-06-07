@@ -960,21 +960,20 @@ function renderHist(){
 }
 
 /* ADMIN */
+function safeRun(fn,label){try{fn();}catch(err){console.error('Error en '+label+':',err);}}
 function admTab(t){
   const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
   tabs.forEach(x=>{const el=document.getElementById('a'+cap(x));if(el)el.style.display=x===t?'block':'none';});
   document.querySelectorAll('#admTabBar .atab').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-tab')===t);});
-  try{
-    if(t==='registros')renderRecs();
-    else if(t==='empleados')renderEmps();
-    else if(t==='exportar'){renderExpStats();renderCierres();renderCloseMesOptions();}
-    else if(t==='solicitudes')renderAdmSols();
-    else if(t==='control')renderControl();
-    else if(t==='nominas'){renderNomMesOptions();renderMensajeria();}
-    else if(t==='overview')renderAdm();
-  }catch(err){console.error('admTab render error',err);}
+  if(t==='registros')safeRun(renderRecs,'renderRecs');
+  else if(t==='empleados')safeRun(renderEmps,'renderEmps');
+  else if(t==='exportar'){safeRun(renderExpStats,'renderExpStats');safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');safeRun(renderNomMesOptions,'renderNomMesOptions');}
+  else if(t==='solicitudes')safeRun(renderAdmSols,'renderAdmSols');
+  else if(t==='control')safeRun(renderControl,'renderControl');
+  else if(t==='nominas'){safeRun(renderNomMesOptions2,'renderNomMesOptions2');safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderMensajeria,'renderMensajeria');}
+  else if(t==='overview')safeRun(renderAdm,'renderAdm');
 }
-function renderAdm(){renderGStats();renderEList();renderAdmFilters();}
+function renderAdm(){safeRun(renderGStats,"renderGStats");safeRun(renderEList,"renderEList");safeRun(renderAdmFilters,"renderAdmFilters");}
 
 /* ── ADMIN: CONTROL DE JORNADA DE EMPLEADOS ── */
 function renderControl(){
@@ -1139,10 +1138,12 @@ function renderRecs(){
   }).join('')+'</div>';
 }
 function renderEmps(){
-  document.getElementById('empList').innerHTML=sortedEmps().map(emp=>{const vd=vacData(emp.id);
+  const elE=document.getElementById('empList');
+  if(elE){const emps=sortedEmps();elE.innerHTML=emps.length?emps.map(emp=>{const vd=vacData(emp.id);
     return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d · Alta:${emp.startDate||'—'}</span></div><button class="bdel" onclick="delEmp('${emp.id}')">✕</button></div>`;
-  }).join('');
-  document.getElementById('empresaList').innerHTML=DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join('');
+  }).join(''):'<div class="empty">Sin empleados. Añade uno abajo.</div>';}
+  const elC=document.getElementById('empresaList');
+  if(elC)elC.innerHTML=(DB.empresas||[]).length?DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join(''):'<div class="empty">Sin empresas</div>';
 }
 function addEmp(){
   const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today(),mail=document.getElementById('nEmail').value.trim();
@@ -1159,10 +1160,11 @@ function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))re
 function addEmpresa(){const n=document.getElementById('nEmpNom').value.trim();if(!n){toast('Introduce nombre');return;}if(DB.empresas.includes(n)){toast('Ya existe');return;}DB.empresas.push(n);document.getElementById('nEmpNom').value='';save();renderEmps();renderAdmFilters();toast('Empresa añadida');}
 function delEmpresa(n){if(!confirm(`¿Eliminar empresa "${n}"?`))return;DB.empresas=DB.empresas.filter(e=>e!==n);save();renderEmps();toast('Empresa eliminada');}
 function renderExpStats(){
-  const tr=DB.records.filter(r=>r.fin).length;let tm=0;DB.records.filter(r=>r.fin).forEach(r=>tm+=Math.floor((r.workSecs||0)/60));
-  const tv=DB.vacaciones.filter(v=>v.estado==='aprobada').reduce((s,v)=>s+v.dias,0);
-  const tmd=DB.medicos.filter(m=>m.estado!=='denegado').reduce((s,m)=>s+m.dias,0);
-  const ta=DB.ausencias.length;
+  const cont=document.getElementById('expStats');if(!cont)return;
+  const tr=(DB.records||[]).filter(r=>r.fin).length;let tm=0;(DB.records||[]).filter(r=>r.fin).forEach(r=>tm+=Math.floor((r.workSecs||0)/60));
+  const tv=(DB.vacaciones||[]).filter(v=>v.estado==='aprobada').reduce((s,v)=>s+(v.dias||0),0);
+  const tmd=(DB.medicos||[]).filter(m=>m.estado!=='denegado').reduce((s,m)=>s+(m.dias||0),0);
+  const ta=(DB.ausencias||[]).length;
   document.getElementById('expStats').innerHTML=`<div class="wstats">
     <div class="ws total"><div class="wsico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="wstxt"><div class="v">${tr}</div><div class="l">Fichajes</div></div></div>
     <div class="ws normal"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div><div class="wstxt"><div class="v">${mhm(tm)}</div><div class="l">Horas totales</div></div></div>
@@ -1220,20 +1222,19 @@ function expAusencias(){
 /* ── EXPORT: RESUMEN MENSUAL (Excel) ── */
 function allMonthKeys(){
   const set=new Set();
-  DB.records.filter(r=>r.fin).forEach(r=>set.add(monthKey(r.inicio)));
-  DB.cierres.forEach(c=>set.add(c.mes));
+  (DB.records||[]).filter(r=>r&&r.fin&&r.inicio).forEach(r=>set.add(monthKey(r.inicio)));
+  (DB.cierres||[]).forEach(c=>{if(c&&c.mes)set.add(c.mes);});
   set.add(monthKey(new Date()));
-  return [...set].sort((a,b)=>b.localeCompare(a));
+  return [...set].filter(Boolean).sort((a,b)=>b.localeCompare(a));
 }
 function monthEmpData(empId,mk){
-  // returns {normalMins,extraMins,totalMins,diasMedico,ausencias} from live records OR archived closure
-  const closure=DB.cierres.find(c=>c.mes===mk);
-  if(closure){const e=closure.empleados.find(x=>x.empId===empId);if(e)return e;}
+  const closure=(DB.cierres||[]).find(c=>c&&c.mes===mk);
+  if(closure&&Array.isArray(closure.empleados)){const e=closure.empleados.find(x=>x.empId===empId);if(e)return e;}
   let normalMins=0,extraMins=0,total=0;const weeks={};
-  DB.records.filter(r=>r.empId===empId&&r.fin&&monthKey(r.inicio)===mk).forEach(r=>{const wk=wkKey(new Date(r.inicio));weeks[wk]=(weeks[wk]||0)+Math.floor((r.workSecs||0)/60);total+=Math.floor((r.workSecs||0)/60);});
+  (DB.records||[]).filter(r=>r&&r.empId===empId&&r.fin&&r.inicio&&monthKey(r.inicio)===mk).forEach(r=>{const wk=wkKey(new Date(r.inicio));weeks[wk]=(weeks[wk]||0)+Math.floor((r.workSecs||0)/60);total+=Math.floor((r.workSecs||0)/60);});
   Object.values(weeks).forEach(wm=>{normalMins+=Math.min(wm,WK);extraMins+=Math.max(0,wm-WK);});
-  const med=DB.medicos.filter(m=>m.empId===empId&&m.estado!=='denegada'&&monthKey(m.desde)===mk).reduce((s,m)=>s+m.dias,0);
-  const abs=DB.ausencias.filter(a=>a.empId===empId&&monthKey(a.fecha+'T00:00:00')===mk).length;
+  const med=(DB.medicos||[]).filter(m=>m&&m.empId===empId&&m.estado!=='denegada'&&m.desde&&monthKey(m.desde)===mk).reduce((s,m)=>s+(m.dias||0),0);
+  const abs=(DB.ausencias||[]).filter(a=>a&&a.empId===empId&&a.fecha&&monthKey(a.fecha+'T00:00:00')===mk).length;
   return{normalMins,extraMins,totalMins:total,diasMedico:med,ausencias:abs};
 }
 function expMensual(){
@@ -1480,8 +1481,8 @@ function gid(){return 'r'+Date.now()+Math.random().toString(36).slice(2,6);}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function wkStart(d){const dt=new Date(d),day=dt.getDay(),diff=(day===0?-6:1-day);dt.setDate(dt.getDate()+diff);dt.setHours(0,0,0,0);return dt;}
 function wkKey(d){return wkStart(d).toISOString().slice(0,10);}
-function monthKey(d){d=new Date(d);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function monthLabel(mk){const[y,m]=mk.split('-');const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];return meses[parseInt(m)-1]+' '+y;}
+function monthKey(d){d=new Date(d);if(isNaN(d.getTime()))d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function monthLabel(mk){if(!mk||typeof mk!=='string'||mk.indexOf('-')<0)return String(mk||'—');const[y,m]=mk.split('-');const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];const nm=meses[parseInt(m)-1]||'';return (nm?nm+' ':'')+y;}
 function empMonthMins(empId,mk){
   // Sum worked minutes of finished records for an employee in a given month
   let total=0;
