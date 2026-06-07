@@ -17,15 +17,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0a0e1a;--bg2:#111627;--bg3:#1a2035;--card:#141929;
-  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --accent:#00d4ff;--accent2:#0099cc;
-  --green:#00e676;--green2:#00b359;
-  --orange:#ff9500;--red:#ff3b3b;--yellow:#ffd60a;
-  --violet:#bf5af2;--violet2:#8a2be2;
-  --teal:#00bfa5;--teal2:#007a6a;
-  --rose:#ff4d6d;--rose2:#c9184a;
-  --text:#f0f4ff;--text2:#8892aa;--text3:#4a5570;
+  --bg:#0e1116;--bg2:#161b22;--bg3:#1f2530;--card:#181d26;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --accent:#5aa9e6;--accent2:#3d7cb5;
+  --green:#5cb88a;--green2:#3f8f68;
+  --orange:#d99a5b;--red:#cc6b6b;--yellow:#d4b75a;
+  --violet:#9b8cc4;--violet2:#7a6aa8;
+  --teal:#5fa8a0;--teal2:#3f7a73;
+  --rose:#c97b8e;--rose2:#a85a6d;
+  --text:#e8ecf2;--text2:#8b94a6;--text3:#5a6478;
   --radius:16px;--radius-sm:10px;--shadow:0 4px 24px rgba(0,0,0,0.4)
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -42,7 +42,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 /* TOPBAR */
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:50}
 .tbrand{display:flex;align-items:center;gap:10px}
-.tlogo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#000}
+.tlogo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#0e1116}
 .tname{font-family:'Syne',sans-serif;font-weight:700;font-size:17px}
 .tname span{color:var(--accent)}
 .tright{display:flex;align-items:center;gap:8px}
@@ -53,7 +53,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 #screenLogin{justify-content:center;align-items:center;padding:24px 20px;min-height:100vh}
 .lwrap{width:100%;max-width:380px}
 .lhero{text-align:center;margin-bottom:32px}
-.llogo{width:72px;height:72px;margin:0 auto 16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#000}
+.llogo{width:72px;height:72px;margin:0 auto 16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#0e1116}
 .lhero h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px}
 .lhero h1 span{color:var(--accent)}
 .lhero p{font-size:13px;color:var(--text2);margin-top:6px}
@@ -67,7 +67,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .csel::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none;font-size:14px}
 .fg input[type=password]{width:100%;padding:13px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color 0.15s}
 .fg input[type=password]:focus{border-color:var(--accent)}
-.btn-main{width:100%;padding:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:8px}
+.btn-main{width:100%;padding:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#0e1116;cursor:pointer;transition:opacity 0.15s;margin-top:8px}
 .btn-main:hover{opacity:0.88}
 .btn-sec{width:100%;padding:12px;background:transparent;border:1px solid var(--border2);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-weight:500;font-size:14px;color:var(--text2);cursor:pointer;transition:all 0.15s;margin-top:10px}
 .btn-sec:hover{border-color:var(--accent);color:var(--accent)}
@@ -184,7 +184,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 /* Buttons for forms */
 .btn-vac{width:100%;padding:13px;background:linear-gradient(135deg,var(--violet2),var(--violet));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
 .btn-vac:hover{opacity:0.88}
-.btn-med{width:100%;padding:13px;background:linear-gradient(135deg,var(--teal2),var(--teal));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.btn-med{width:100%;padding:13px;background:linear-gradient(135deg,var(--teal2),var(--teal));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#0e1116;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
 .btn-med:hover{opacity:0.88}
 .btn-abs{width:100%;padding:13px;background:linear-gradient(135deg,var(--rose2),var(--rose));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
 .btn-abs:hover{opacity:0.88}
@@ -210,7 +210,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .abody{padding:16px}
 .atabs{display:flex;gap:4px;margin-bottom:16px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
 .atabs::-webkit-scrollbar{height:0}
-.atab{flex:1 0 auto;min-width:64px;padding:9px 8px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
+.atab{flex:1 0 auto;min-width:62px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
+.atab svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
 .atab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
 .adcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
@@ -234,7 +235,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--accent)}
 .ff select{appearance:none}
 .ff textarea{resize:vertical;min-height:70px}
-.badd{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#000;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
+.badd{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#0e1116;cursor:pointer;transition:opacity 0.15s;margin-top:4px}
 .badd:hover{opacity:0.88}
 .expbtn{width:100%;padding:14px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:opacity 0.15s}
 .expbtn:hover{opacity:0.88}
@@ -249,16 +250,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .frow{display:flex;gap:8px;margin-bottom:12px}
 .frow select{flex:1;padding:9px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;appearance:none}
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.sc{background:var(--bg3);border-radius:var(--radius-sm);padding:14px}
-.sc .sv{font-family:'Syne',sans-serif;font-size:24px;font-weight:800}
-.sc .sl{font-size:11px;color:var(--text2);margin-top:3px}
-.sc.blue .sv{color:var(--accent)}
-.sc.grn .sv{color:var(--green)}
-.sc.red .sv{color:var(--red)}
-.sc.org .sv{color:var(--orange)}
-.sc.vio .sv{color:var(--violet)}
-.sc.teal .sv{color:var(--teal)}
-.sc.rose .sv{color:var(--rose)}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;align-items:center;gap:12px}
+.sc .scico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sc .scico svg{width:19px;height:19px;stroke-width:2;fill:none}
+.sc .sctxt{min-width:0}
+.sc .sv{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1.1}
+.sc .sl{font-size:11px;color:var(--text2);margin-top:2px}
+.sc.blue .scico{background:rgba(90,169,230,0.13)}.sc.blue .scico svg{stroke:var(--accent)}
+.sc.grn .scico{background:rgba(92,184,138,0.13)}.sc.grn .scico svg{stroke:var(--green)}
+.sc.red .scico{background:rgba(204,107,107,0.13)}.sc.red .scico svg{stroke:var(--red)}
+.sc.org .scico{background:rgba(217,154,91,0.13)}.sc.org .scico svg{stroke:var(--orange)}
+.sc.vio .scico{background:rgba(155,140,196,0.13)}.sc.vio .scico svg{stroke:var(--violet)}
+.sc.teal .scico{background:rgba(95,168,160,0.13)}.sc.teal .scico svg{stroke:var(--teal)}
+.sc.rose .scico{background:rgba(201,123,142,0.13)}.sc.rose .scico svg{stroke:var(--rose)}
 /* Sol item */
 .si{border-bottom:1px solid var(--border);padding:10px 0}
 .si:last-child{border-bottom:none}
@@ -284,7 +288,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .mbtn.cancel{background:var(--bg3);border:1px solid var(--border2);color:var(--text2)}
 /* Emp sub-tabs */
 .etabs{display:flex;gap:4px;margin-bottom:14px;background:var(--card);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto}
-.etab{flex-shrink:0;padding:8px 10px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:7px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
+.etab{flex-shrink:0;padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
+.etab svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
 .etab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
 
 /* Notifications & messaging */
@@ -352,7 +357,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.7 · build 20260607h</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.9 · build 20260607j</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -380,12 +385,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
     </div>
     <!-- Employee sub-tabs -->
     <div class="etabs">
-      <button class="etab active" onclick="empTab('jornada')" id="eJornada">⏱ Jornada</button>
-      <button class="etab" onclick="empTab('vacaciones')" id="eVacaciones">🌴 Vacaciones</button>
-      <button class="etab" onclick="empTab('medico')" id="eMedico">🏥 Médico</button>
-      <button class="etab" onclick="empTab('ausencias')" id="eAusencias">⚠ Ausencias</button>
-      <button class="etab" onclick="empTab('mensajes')" id="eMensajes">✉ Mensajes <span class="noti-dot" id="msgDotEmp" style="display:none"></span></button>
-      <button class="etab" onclick="empTab('historial')" id="eHistorial">📋 Historial</button>
+      <button class="etab active" onclick="empTab('jornada')" id="eJornada"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Jornada</span></button>
+      <button class="etab" onclick="empTab('vacaciones')" id="eVacaciones"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg><span>Vacaciones</span></button>
+      <button class="etab" onclick="empTab('medico')" id="eMedico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg><span>Médico</span></button>
+      <button class="etab" onclick="empTab('ausencias')" id="eAusencias"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg><span>Ausencias</span></button>
+      <button class="etab" onclick="empTab('mensajes')" id="eMensajes"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>Mensajes</span><span class="noti-dot" id="msgDotEmp" style="display:none"></span></button>
+      <button class="etab" onclick="empTab('historial')" id="eHistorial"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 8v4l3 2"/></svg><span>Historial</span></button>
     </div>
     <!-- JORNADA TAB -->
     <div id="tJornada">
@@ -488,13 +493,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
   </div>
   <div class="mc"><div class="abody">
     <div class="atabs" id="admTabBar">
-      <button class="atab active" data-tab="overview" onclick="admTab('overview')">Resumen</button>
-      <button class="atab" data-tab="control" onclick="admTab('control')">Control</button>
-      <button class="atab" data-tab="solicitudes" onclick="admTab('solicitudes')">Solicit.</button>
-      <button class="atab" data-tab="registros" onclick="admTab('registros')">Fichajes</button>
-      <button class="atab" data-tab="nominas" onclick="admTab('nominas')">Nóminas</button>
-      <button class="atab" data-tab="empleados" onclick="admTab('empleados')">Empl.</button>
-      <button class="atab" data-tab="exportar" onclick="admTab('exportar')">Export</button>
+      <button class="atab active" data-tab="overview" onclick="admTab('overview')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>Resumen</span></button>
+      <button class="atab" data-tab="control" onclick="admTab('control')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Control</span></button>
+      <button class="atab" data-tab="solicitudes" onclick="admTab('solicitudes')"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg><span>Solicit.</span></button>
+      <button class="atab" data-tab="registros" onclick="admTab('registros')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span>Fichajes</span></button>
+      <button class="atab" data-tab="nominas" onclick="admTab('nominas')"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg><span>Nóminas</span></button>
+      <button class="atab" data-tab="empleados" onclick="admTab('empleados')"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg><span>Empl.</span></button>
+      <button class="atab" data-tab="exportar" onclick="admTab('exportar')"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Export</span></button>
     </div>
     <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
     <div id="aControl" style="display:none">
@@ -567,7 +572,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
     </div>
     <div id="aExportar" style="display:none">
       <div class="adcard"><h3>Exportar datos</h3>
-        <button class="expbtn" onclick="expExcelCompleto()" style="background:linear-gradient(135deg,#1d6f42,#0f9d58);color:#fff;font-weight:700"><span>📗</span> Excel COMPLETO (todo en un archivo, por hojas)</button>
+        <button class="expbtn" onclick="expExcelCompleto()" style="background:linear-gradient(135deg,var(--green2),var(--green));color:#0e1116;font-weight:700"><span>📗</span> Excel COMPLETO (todo en un archivo, por hojas)</button>
         <button class="expbtn csv" onclick="expFichajes()"><span>📊</span> CSV Fichajes (Excel/Sheets)</button>
         <button class="expbtn vacv" onclick="expVacaciones()"><span>🌴</span> CSV Vacaciones</button>
         <button class="expbtn abs" onclick="expAusencias()"><span>🏥⚠</span> CSV Médicos y Ausencias</button>
@@ -1156,12 +1161,12 @@ function renderGStats(){
   const pm=DB.medicos.filter(m=>m.estado==='pendiente').length;
   const pa=DB.ausencias.length;
   document.getElementById('gStats').innerHTML=`
-    <div class="sc blue"><div class="sv">${DB.employees.length}</div><div class="sl">Empleados</div></div>
-    <div class="sc grn"><div class="sv">${tr}</div><div class="sl">Fichajes</div></div>
-    <div class="sc org"><div class="sv">${act}</div><div class="sl">En jornada</div></div>
-    <div class="sc vio"><div class="sv">${pv}</div><div class="sl">Vacac. pendientes</div></div>
-    <div class="sc teal"><div class="sv">${pm}</div><div class="sl">Médicos pendientes</div></div>
-    <div class="sc rose"><div class="sv">${pa}</div><div class="sl">Ausencias totales</div></div>`;
+    <div class="sc blue"><div class="scico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg></div><div class="sctxt"><div class="sv">${DB.employees.length}</div><div class="sl">Empleados</div></div></div>
+    <div class="sc grn"><div class="scico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></div><div class="sctxt"><div class="sv">${tr}</div><div class="sl">Fichajes</div></div></div>
+    <div class="sc org"><div class="scico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="sctxt"><div class="sv">${act}</div><div class="sl">En jornada</div></div></div>
+    <div class="sc vio"><div class="scico"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg></div><div class="sctxt"><div class="sv">${pv}</div><div class="sl">Vacac. pendientes</div></div></div>
+    <div class="sc teal"><div class="scico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="sctxt"><div class="sv">${pm}</div><div class="sl">Médicos pendientes</div></div></div>
+    <div class="sc rose"><div class="scico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="sctxt"><div class="sv">${pa}</div><div class="sl">Ausencias totales</div></div></div>`;
 }
 function renderEList(){
   const ws=wkStart(new Date());
