@@ -28,13 +28,13 @@
   --radius:16px;--radius-sm:10px;--shadow:0 4px 24px rgba(0,0,0,0.4)
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.app-shell{display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden;max-width:520px;margin:0 auto;width:100%;box-shadow:0 0 60px rgba(0,0,0,0.5)}
+html,body{height:100%}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh}
+.app-shell{position:relative;width:100%;max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);box-shadow:0 0 60px rgba(0,0,0,0.5)}
 @media(min-width:560px){body{background:#05070d}}
-.mc{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .screen{display:none}
-.screen.active{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.screen.active{display:block}
+.mc{width:100%}
 /* TOPBAR */
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;flex-shrink:0}
 .tbrand{display:flex;align-items:center;gap:10px}
@@ -210,7 +210,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 .atab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
 .adcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.erow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.erow{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
+.bedit{width:32px;height:32px;border-radius:8px;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);color:var(--accent);cursor:pointer;font-size:14px;flex-shrink:0}
+.bloc{font-size:11px;padding:5px 10px;border-radius:7px;background:rgba(0,191,165,0.12);border:1px solid rgba(0,191,165,0.25);color:var(--teal);cursor:pointer}
 .erow:last-child{border-bottom:none}
 .eavatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#000;flex-shrink:0}
 .einfo{flex:1}
@@ -329,10 +331,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 /* Mejor scroll y sin rebote raro */
 .mc{overscroll-behavior:contain}
 </style>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" onerror="window._fbBlocked=true"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js" onerror="window._fbBlocked=true"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" onerror="window._fbBlocked=true"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -345,7 +347,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.1 · build 20260607b</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.2 · build 20260607c</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -594,6 +596,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
 <!-- Modals -->
 <div class="mov" id="mBreak"><div class="msh"><h2>☕ Iniciar descanso</h2><p>El descanso no cuenta como horas trabajadas.</p><div class="mbtns"><button class="mbtn confirm" onclick="doBreak()">Iniciar descanso</button><button class="mbtn cancel" onclick="closeMov('mBreak')">Cancelar</button></div></div></div>
 <div class="mov" id="mAdmin"><div class="msh"><h2>⚙ Panel administrador</h2><p>Introduce el PIN de administrador.</p><input type="password" id="adminPin" placeholder="PIN admin" maxlength="6" inputmode="numeric" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:10px"><div id="adminErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px;text-align:center"></div><div class="mbtns"><button class="mbtn confirm" onclick="doAdmLogin()">Entrar</button><button class="mbtn cancel" onclick="closeMov('mAdmin')">Cancelar</button></div></div></div>
+<div class="mov" id="mEditEmp"><div class="msh" style="max-height:85vh;overflow-y:auto">
+  <h2>✎ Editar empleado</h2>
+  <div class="ff"><label>Nombre completo</label><input type="text" id="edNombre"></div>
+  <div class="ff"><label>Empresa</label><select id="edEmpresa" style="appearance:none"></select></div>
+  <div class="ff"><label>PIN (mín. 4 dígitos)</label><input type="text" id="edPin" inputmode="numeric" maxlength="6"></div>
+  <div class="ff"><label>Email (para nóminas)</label><input type="email" id="edEmail"></div>
+  <div class="ff"><label>Fecha inicio contrato</label><input type="date" id="edStart"></div>
+  <div class="ff"><label>Color avatar</label><input type="color" id="edColor" style="width:100%;height:42px;padding:4px"></div>
+  <div id="edErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px"></div>
+  <div class="mbtns"><button class="mbtn confirm" onclick="saveEditEmp()">Guardar cambios</button><button class="mbtn cancel" onclick="closeMov('mEditEmp')">Cancelar</button></div>
+</div></div>
 <div class="mov" id="mNotis"><div class="msh" style="max-height:80vh;overflow-y:auto">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
     <h2 style="margin:0">🔔 Notificaciones</h2>
@@ -621,6 +634,7 @@ let DB={empresas:["AN Solutions"],employees:[
 ],records:[],vacaciones:[],medicos:[],ausencias:[],cierres:[],mensajes:[],notis:[]};
 let SES={user:null,isAdmin:false};
 let TM={ws:0,bs:0,state:"idle",bStart:null};
+function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label||"")+":",err);}}
 
 let FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
 let _saveT=null,_saveRetry=0;
@@ -815,7 +829,7 @@ function initFichaje(){
   document.getElementById('fEmpresa').textContent=e.empresa;
   empTab('jornada');
   const open=openRec();
-  if(open){TM.state=open.enDescanso?'break':'working';TM.ws=open.workSecs||0;TM.bs=open.breakSecs||0;if(open.enDescanso)TM.bStart=open.bStartTs||new Date().toISOString();updBtns();setStatus(open.enDescanso?'descanso':'trabajando',open.enDescanso?'En descanso':'Trabajando');}
+  if(open){TM.state=open.enDescanso?'break':'working';const t=calcSecs(open);TM.ws=t.work;TM.bs=t.brk;updBtns();setStatus(open.enDescanso?'descanso':'trabajando',open.enDescanso?'En descanso':'Trabajando');tick();}else{TM.state='idle';updBtns();}
   renderWeek();renderRecent();
   // vac date listeners
   ['vFrom','vTo'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
@@ -827,19 +841,69 @@ function initFichaje(){
     if(f&&t&&f<=t){const d=wkdays(f,t);el.textContent=`📅 ${d} día${d!==1?'s':''} de permiso médico`;el.style.color='var(--teal)';}else el.textContent='';
   }));
 }
-function doStart(){const e=SES.user,now=new Date().toISOString();DB.records.push({id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,inicio:now,fin:null,workSecs:0,breakSecs:0,enDescanso:false,bStartTs:null});save();TM.state='working';TM.ws=0;TM.bs=0;updBtns();setStatus('trabajando','Trabajando');toast('Jornada iniciada');}
-function doStop(){const o=openRec();if(!o)return;if(TM.state==='break'){TM.bs+=Math.floor((new Date()-new Date(TM.bStart))/1000);}o.fin=new Date().toISOString();o.workSecs=TM.ws;o.breakSecs=TM.bs;o.enDescanso=false;save();TM={ws:0,bs:0,state:'idle',bStart:null};updBtns();setStatus('libre','Libre');['eWorked','eBreak'].forEach(id=>document.getElementById(id).textContent='0:00:00');document.getElementById('eExtra').textContent='0:00';document.getElementById('pFill').style.width='0%';document.getElementById('ePct').textContent='0%';renderWeek();renderRecent();toast('Jornada finalizada correctamente');}
+// ===== UBICACIÓN (geolocalización con permiso del navegador) =====
+function captureLocation(rec,campo){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const loc={lat:+pos.coords.latitude.toFixed(5),lng:+pos.coords.longitude.toFixed(5),ts:new Date().toISOString()};
+      if(campo==='inicio')rec.locInicio=loc;else rec.locFin=loc;
+      save();
+    },
+    err=>{console.warn('Ubicación no disponible:',err&&err.message);},
+    {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+  );
+}
+function verUbicacion(lat,lng){window.open('https://www.google.com/maps?q='+lat+','+lng,'_blank');}
+// ===== CRONÓMETRO BASADO EN TIMESTAMPS REALES =====
+// El tiempo se calcula desde la hora de inicio guardada, así sigue contando
+// aunque se cierre la app o el navegador, hasta que se pulse "Finalizar".
+function calcSecs(o){
+  if(!o)return{work:0,brk:0};
+  const start=new Date(o.inicio).getTime();
+  const end=o.fin?new Date(o.fin).getTime():Date.now();
+  let elapsed=Math.floor((end-start)/1000);
+  // Suma de descansos completados
+  let brk=0;
+  (o.breaks||[]).forEach(b=>{if(b.start&&b.end)brk+=Math.floor((new Date(b.end)-new Date(b.start))/1000);});
+  // Descanso en curso
+  if(o.enDescanso&&o.bStartTs){brk+=Math.floor((Date.now()-new Date(o.bStartTs).getTime())/1000);}
+  const work=Math.max(0,elapsed-brk);
+  return{work,brk};
+}
+function doStart(){
+  const e=SES.user,now=new Date().toISOString();
+  const rec={id:gid(),empId:e.id,empName:e.name,empresa:e.empresa,inicio:now,fin:null,enDescanso:false,bStartTs:null,breaks:[],workSecs:0,breakSecs:0};
+  DB.records.push(rec);
+  TM.state='working';
+  captureLocation(rec,'inicio');
+  save();updBtns();setStatus('trabajando','Trabajando');tick();toast('Jornada iniciada');
+}
+function doStop(){
+  const o=openRec();if(!o)return;
+  if(o.enDescanso&&o.bStartTs){(o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});o.enDescanso=false;o.bStartTs=null;}
+  const t=calcSecs(o);
+  o.fin=new Date().toISOString();o.workSecs=t.work;o.breakSecs=t.brk;
+  TM.state='idle';
+  captureLocation(o,'fin');
+  save();updBtns();setStatus('libre','Libre');
+  ['eWorked','eBreak'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='0:00:00';});
+  const ee=document.getElementById('eExtra');if(ee)ee.textContent='0:00';
+  const pf=document.getElementById('pFill');if(pf)pf.style.width='0%';
+  const ep=document.getElementById('ePct');if(ep)ep.textContent='0%';
+  renderWeek();renderRecent();toast('Jornada finalizada correctamente');
+}
 function openBreakModal(){openMov('mBreak');}
-function doBreak(){closeMov('mBreak');const o=openRec();if(!o)return;TM.state='break';TM.bStart=new Date().toISOString();o.enDescanso=true;o.bStartTs=TM.bStart;save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');}
-function doResume(){const o=openRec();if(!o)return;TM.bs+=Math.floor((new Date()-new Date(TM.bStart))/1000);TM.bStart=null;TM.state='working';o.enDescanso=false;o.breakSecs=TM.bs;o.bStartTs=null;save();updBtns();setStatus('trabajando','Trabajando');toast('Jornada reanudada');}
+function doBreak(){closeMov('mBreak');const o=openRec();if(!o)return;o.enDescanso=true;o.bStartTs=new Date().toISOString();TM.state='break';save();updBtns();setStatus('descanso','En descanso');toast('Descanso iniciado');}
+function doResume(){const o=openRec();if(!o||!o.enDescanso)return;(o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});o.enDescanso=false;o.bStartTs=null;TM.state='working';save();updBtns();setStatus('trabajando','Trabajando');toast('Jornada reanudada');}
 let _tickN=0;
 function tick(){
-  if(TM.state==='idle')return;
-  if(TM.state==='working'){TM.ws++;const o=openRec();if(o)o.workSecs=TM.ws;}
-  else if(TM.state==='break'){TM.bs++;const o=openRec();if(o)o.breakSecs=TM.bs;}
+  const o=openRec();
+  if(!o){TM.state='idle';return;}
+  TM.state=o.enDescanso?'break':'working';
+  const t=calcSecs(o);TM.ws=t.work;TM.bs=t.brk;
   updTimer();
-  // Persist every 30s so a refresh/disconnect doesn't lose progress, without hammering the DB
-  if((++_tickN)%30===0)save();
+  if((++_tickN)%30===0){o.workSecs=t.work;o.breakSecs=t.brk;save();}
 }
 function updTimer(){
   document.getElementById('eWorked').textContent=s2h(TM.ws);
@@ -986,7 +1050,6 @@ function renderHist(){
 }
 
 /* ADMIN */
-function safeRun(fn,label){try{fn();}catch(err){console.error('Error en '+label+':',err);}}
 function admTab(t){
   const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
   tabs.forEach(x=>{const el=document.getElementById('a'+cap(x));if(el)el.style.display=x===t?'block':'none';});
@@ -1160,13 +1223,13 @@ function renderRecs(){
   const el=document.getElementById('recList');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros</div>';return;}
   el.innerHTML='<div class="adcard">'+recs.map(r=>{const e=DB.employees.find(x=>x.id===r.empId);const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div></div>`;
+    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div></div>${(r.locInicio||r.locFin)?`<div style="display:flex;gap:8px;padding:4px 0 10px;margin-top:-4px">${r.locInicio?`<button class="bloc" onclick="verUbicacion(${r.locInicio.lat},${r.locInicio.lng})">📍 Entrada</button>`:''}${r.locFin?`<button class="bloc" onclick="verUbicacion(${r.locFin.lat},${r.locFin.lng})">📍 Salida</button>`:''}</div>`:''}`;
   }).join('')+'</div>';
 }
 function renderEmps(){
   const elE=document.getElementById('empList');
   if(elE){const emps=sortedEmps();elE.innerHTML=emps.length?emps.map(emp=>{const vd=vacData(emp.id);
-    return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d · Alta:${emp.startDate||'—'}</span></div><button class="bdel" onclick="delEmp('${emp.id}')">✕</button></div>`;
+    return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d</span></div><button class="bedit" onclick="editEmp('${emp.id}')" title="Editar">✎</button><button class="bdel" onclick="delEmp('${emp.id}')" title="Eliminar">✕</button></div>`;
   }).join(''):'<div class="empty">Sin empleados. Añade uno abajo.</div>';}
   const elC=document.getElementById('empresaList');
   if(elC)elC.innerHTML=(DB.empresas||[]).length?DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join(''):'<div class="empty">Sin empresas</div>';
@@ -1181,6 +1244,37 @@ function addEmp(){
   DB.employees.push({id:'e'+Date.now()+Math.random().toString(36).slice(2,5),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd,email:mail});
   document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';document.getElementById('nEmail').value='';
   save();renderEmps();popSelects();toast('Empleado añadido');
+}
+let _editEmpId=null;
+function editEmp(id){
+  const emp=DB.employees.find(e=>e.id===id);if(!emp)return;
+  _editEmpId=id;
+  document.getElementById('edNombre').value=emp.name;
+  document.getElementById('edPin').value=emp.pin;
+  document.getElementById('edEmail').value=emp.email||'';
+  document.getElementById('edStart').value=emp.startDate||'';
+  document.getElementById('edColor').value=emp.color;
+  const sel=document.getElementById('edEmpresa');
+  sel.innerHTML=DB.empresas.map(x=>`<option value="${x}"${x===emp.empresa?' selected':''}>${x}</option>`).join('');
+  document.getElementById('edErr').textContent='';
+  openMov('mEditEmp');
+}
+function saveEditEmp(){
+  const emp=DB.employees.find(e=>e.id===_editEmpId);if(!emp)return;
+  const n=document.getElementById('edNombre').value.trim();
+  const p=document.getElementById('edPin').value.trim();
+  const em=document.getElementById('edEmpresa').value;
+  const mail=document.getElementById('edEmail').value.trim();
+  const sd=document.getElementById('edStart').value||emp.startDate;
+  const col=document.getElementById('edColor').value;
+  const err=document.getElementById('edErr');
+  if(!n||p.length<4){err.textContent='Nombre y PIN (mín. 4 dígitos) obligatorios';return;}
+  if(!/^[0-9]+$/.test(p)){err.textContent='El PIN solo puede contener números';return;}
+  if(DB.employees.some(e=>e.id!==_editEmpId&&e.empresa===em&&e.pin===p)){err.textContent='Ya hay otro empleado con ese PIN en esta empresa';return;}
+  if(mail&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){err.textContent='Email no válido';return;}
+  emp.name=n;emp.pin=p;emp.empresa=em;emp.email=mail;emp.startDate=sd;emp.color=col;
+  emp.initials=n.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  save();closeMov('mEditEmp');renderEmps();renderGStats();renderEList();popSelects();toast('Empleado actualizado');
 }
 function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))return;DB.employees=DB.employees.filter(e=>e.id!==id);DB.records=DB.records.filter(r=>r.empId!==id);DB.vacaciones=DB.vacaciones.filter(v=>v.empId!==id);DB.medicos=DB.medicos.filter(m=>m.empId!==id);DB.ausencias=DB.ausencias.filter(a=>a.empId!==id);save();renderEmps();renderGStats();renderEList();popSelects();toast('Empleado eliminado');}
 function addEmpresa(){const n=document.getElementById('nEmpNom').value.trim();if(!n){toast('Introduce nombre');return;}if(DB.empresas.includes(n)){toast('Ya existe');return;}DB.empresas.push(n);document.getElementById('nEmpNom').value='';save();renderEmps();renderAdmFilters();toast('Empresa añadida');}
@@ -1571,8 +1665,15 @@ window.addEventListener('error',function(ev){console.error('Error capturado:',ev
 window.addEventListener('unhandledrejection',function(ev){console.error('Promesa rechazada:',ev.reason);});
 // Asegura el guardado pendiente antes de cerrar/recargar
 window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
-load();checkMonthlyReset();popSelects();autoConnectCloud();
-setInterval(checkMonthlyReset,3600000);
+// Inicialización robusta: cada paso aislado para que un fallo no detenga la app
+function initApp(){
+  safeRun(load,'load');
+  safeRun(checkMonthlyReset,'checkMonthlyReset');
+  safeRun(popSelects,'popSelects');
+  safeRun(autoConnectCloud,'autoConnectCloud');
+  try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initApp);}else{initApp();}
 </script>
 </body>
 </html>
