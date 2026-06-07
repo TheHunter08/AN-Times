@@ -33,12 +33,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .app-shell{position:relative;width:100%;min-height:100vh;background:var(--bg)}
 .screen{display:none}
 .screen.active{display:block}
-.mc{width:100%}
+.mc{width:100%;display:block}
 /* Centra el CONTENIDO (no toda la app) para que se lea bien en pantallas grandes */
-.abody,.fbody{max-width:760px;margin:0 auto}
+.abody{max-width:820px;margin:0 auto;width:100%}
+.fbody{max-width:760px;margin:0 auto;width:100%}
 .lwrap{margin:0 auto}
 /* TOPBAR */
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;flex-shrink:0}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:50}
 .tbrand{display:flex;align-items:center;gap:10px}
 .tlogo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#000}
 .tname{font-family:'Syne',sans-serif;font-weight:700;font-size:17px}
@@ -331,12 +332,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .topbar{padding-top:max(12px,env(safe-area-inset-top))}
 .fbody,.abody{padding-bottom:max(16px,env(safe-area-inset-bottom))}
 /* Mejor scroll y sin rebote raro */
-.mc{overscroll-behavior:contain}
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" onerror="window._fbBlocked=true"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js" onerror="window._fbBlocked=true"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" onerror="window._fbBlocked=true"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="window._xlsxBlocked=true"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -349,7 +351,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.3 · build 20260607d-diag</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v2.4 · build 20260607e</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -564,6 +566,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
     </div>
     <div id="aExportar" style="display:none">
       <div class="adcard"><h3>Exportar datos</h3>
+        <button class="expbtn" onclick="expExcelCompleto()" style="background:linear-gradient(135deg,#1d6f42,#0f9d58);color:#fff;font-weight:700"><span>📗</span> Excel COMPLETO (todo en un archivo, por hojas)</button>
         <button class="expbtn csv" onclick="expFichajes()"><span>📊</span> CSV Fichajes (Excel/Sheets)</button>
         <button class="expbtn vacv" onclick="expVacaciones()"><span>🌴</span> CSV Vacaciones</button>
         <button class="expbtn abs" onclick="expAusencias()"><span>🏥⚠</span> CSV Médicos y Ausencias</button>
@@ -1059,7 +1062,10 @@ function renderHist(){
 /* ADMIN */
 function admTab(t){
   const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
-  tabs.forEach(x=>{const id='a'+cap(x);const el=document.getElementById(id);if(el){el.style.display=(x===t)?'block':'none';}else{showErr('Falta sección #'+id);}});
+  tabs.forEach(x=>{const id='a'+cap(x);const el=document.getElementById(id);if(el){
+    if(x===t){el.style.display='block';el.style.visibility='visible';el.style.opacity='1';el.style.height='auto';el.removeAttribute('hidden');}
+    else{el.style.display='none';}
+  }else{showErr('Falta sección #'+id);}});
   try{document.querySelectorAll('#admTabBar .atab').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-tab')===t);});}catch(e){showErr('tabs active: '+e.message);}
   if(t==='registros')safeRun(renderRecs,'renderRecs');
   else if(t==='empleados')safeRun(renderEmps,'renderEmps');
@@ -1303,6 +1309,65 @@ function renderExpStats(){
 }
 
 /* EXPORTS */
+function expExcelCompleto(){
+  if(typeof XLSX==='undefined'){toast('No se pudo cargar el generador de Excel. Revisa tu conexión.');return;}
+  const wb=XLSX.utils.book_new();
+  // ---- Hoja 1: FICHAJES ----
+  const fich=[['Nombre','Empresa','Fecha','Día','Entrada','Salida','Horas Trabajadas','Descanso','Horas Normales','Horas Extra']];
+  const weekAcc={};
+  DB.records.filter(r=>r.fin).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio)).forEach(r=>{
+    const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    const wk=wkKey(new Date(r.inicio));const key=r.empId+'|'+wk;const prev=weekAcc[key]||0;const after=prev+m;
+    const norm=Math.max(0,Math.min(after,WK)-Math.min(prev,WK));const ext=m-norm;weekAcc[key]=after;
+    fich.push([r.empName,r.empresa,new Date(r.inicio).toLocaleDateString('es-ES'),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),ftime(r.fin),mhm(m),mhm(bm),mhm(norm),mhm(ext)]);
+  });
+  const wsF=XLSX.utils.aoa_to_sheet(fich);
+  wsF['!cols']=[{wch:26},{wch:16},{wch:12},{wch:11},{wch:9},{wch:9},{wch:16},{wch:10},{wch:15},{wch:13}];
+  XLSX.utils.book_append_sheet(wb,wsF,'Fichajes');
+  // ---- Hoja 2: VACACIONES ----
+  const vac=[['Nombre','Empresa','Desde','Hasta','Días','Estado','Solicitado']];
+  DB.vacaciones.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(v=>{
+    vac.push([v.empName,v.empresa,fds(v.desde),fds(v.hasta),v.dias,v.estado,new Date(v.solEn).toLocaleDateString('es-ES')]);
+  });
+  const wsV=XLSX.utils.aoa_to_sheet(vac);
+  wsV['!cols']=[{wch:26},{wch:16},{wch:13},{wch:13},{wch:7},{wch:12},{wch:13}];
+  XLSX.utils.book_append_sheet(wb,wsV,'Vacaciones');
+  // ---- Hoja 3: MÉDICOS ----
+  const med=[['Nombre','Empresa','Desde','Hasta','Días','Estado','Justificante','Nota']];
+  DB.medicos.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(m=>{
+    med.push([m.empName,m.empresa,fds(m.desde),fds(m.hasta),m.dias,m.estado,m.justif?'Sí':'No',m.nota||'']);
+  });
+  const wsM=XLSX.utils.aoa_to_sheet(med);
+  wsM['!cols']=[{wch:26},{wch:16},{wch:13},{wch:13},{wch:7},{wch:12},{wch:12},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,wsM,'Médicos');
+  // ---- Hoja 4: AUSENCIAS ----
+  const aus=[['Nombre','Empresa','Fecha','Motivo']];
+  DB.ausencias.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(a=>{
+    aus.push([a.empName,a.empresa,fds(a.fecha),a.nota||'']);
+  });
+  const wsA=XLSX.utils.aoa_to_sheet(aus);
+  wsA['!cols']=[{wch:26},{wch:16},{wch:13},{wch:34}];
+  XLSX.utils.book_append_sheet(wb,wsA,'Ausencias');
+  // ---- Hoja 5: RESUMEN POR TRABAJADOR ----
+  const res=[['Nombre','Empresa','Total Horas Normales','Total Horas Extra','Total Horas','Vacaciones Disponibles','Días Médico','Ausencias']];
+  sortedEmps().forEach(emp=>{
+    let tn=0,te=0;const wacc={};
+    DB.records.filter(r=>r.empId===emp.id&&r.fin).sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+      const m=Math.floor((r.workSecs||0)/60);const wk=wkKey(new Date(r.inicio));const prev=wacc[wk]||0;const after=prev+m;
+      const norm=Math.max(0,Math.min(after,WK)-Math.min(prev,WK));tn+=norm;te+=(m-norm);wacc[wk]=after;
+    });
+    const vd=vacData(emp.id);
+    const md=DB.medicos.filter(m=>m.empId===emp.id&&m.estado!=='denegada').reduce((s,m)=>s+(m.dias||0),0);
+    const ab=DB.ausencias.filter(a=>a.empId===emp.id).length;
+    res.push([emp.name,emp.empresa,mhm(tn),mhm(te),mhm(tn+te),vd.available+' días',md,ab]);
+  });
+  const wsR=XLSX.utils.aoa_to_sheet(res);
+  wsR['!cols']=[{wch:26},{wch:16},{wch:20},{wch:18},{wch:14},{wch:20},{wch:11},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
+  // Guardar
+  XLSX.writeFile(wb,'TIMES_INC_Completo_'+today()+'.xlsx');
+  toast('Excel completo descargado (5 hojas)');
+}
 function expFichajes(){
   const recs=DB.records.filter(r=>r.fin).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio));
   let csv="REGISTRO DETALLADO DE FICHAJES\n";
