@@ -364,7 +364,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.0 · build 20260608j</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.1 · build 20260608k</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -706,7 +706,7 @@ const FB_CONFIG={
   appId:"1:650059384349:web:9b525ffcc53c8b3ca1e8f4",
   measurementId:"G-86XRFV4N0J"
 };
-let DB={empresas:["AN Solutions"],centrosTrabajo:["Oficina Central"],employees:[
+let DB={empresas:[],centrosTrabajo:[],employees:[
   {id:"admin",name:"Administrador",empresa:"AN Solutions",pin:"0824",color:"#5aa9e6",initials:"AD",startDate:"2024-01-01",email:"",isAdmin:true},
   {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01",email:""},
   {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01",email:""}
@@ -759,7 +759,10 @@ function applyDB(p){
   if(!p)return;
   DB.empresas=(p.empresas&&p.empresas.length)?p.empresas:DB.empresas;
   DB.centrosTrabajo=(p.centrosTrabajo&&p.centrosTrabajo.length)?p.centrosTrabajo:(DB.centrosTrabajo||[]);
-  DB.employees=(p.employees&&p.employees.length)?p.employees:DB.employees;
+  // Siempre preservar el admin aunque Firebase no lo tenga
+  const _adminUser=DB.employees.find(e=>e.isAdmin)||{id:'admin',name:'Administrador',empresa:DB.empresas&&DB.empresas[0]||'',pin:ADM_PIN,color:'#5aa9e6',initials:'AD',startDate:'2024-01-01',email:'',isAdmin:true};
+  const _incoming=p.employees&&p.employees.length?p.employees:DB.employees;
+  DB.employees=_incoming.some(e=>e.isAdmin)?_incoming:[..._incoming,_adminUser];
   DB.records=p.records||[];
   DB.aprobaciones=p.aprobaciones||[];
   DB.vacaciones=p.vacaciones||[];
@@ -948,21 +951,17 @@ function allEmps(list){
 }
 /* LOGIN */
 function popSelects(){
-  // Garantizar datos mínimos aunque Firebase no haya conectado
-  const obras=DB.empresas&&DB.empresas.length?DB.empresas:['AN Solutions'];
+  const obras=DB.empresas&&DB.empresas.length?DB.empresas:[];
   const se=document.getElementById('selEmpresa');if(!se)return;
   se.innerHTML='<option value="">— Selecciona obra —</option>'+obras.map(e=>`<option>${e}</option>`).join('');
-  se.onchange=()=>popEmps(se.value);
+  if(!se.onchange)se.onchange=()=>popEmps(se.value);
   popEmps('');
 }
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');if(!se)return;
-  // Garantizar datos mínimos
-  const allEmps2=DB.employees&&DB.employees.length?DB.employees:[
-    {id:'admin',name:'Administrador',empresa:'AN Solutions',pin:'0824',color:'#5aa9e6',initials:'AD',isAdmin:true},
-  ];
-  const workers=sortedEmps(emp?allEmps2.filter(e=>e.empresa===emp&&!e.isAdmin):allEmps2.filter(e=>!e.isAdmin));
-  const admins=allEmps2.filter(e=>e.isAdmin);
+  const all=DB.employees&&DB.employees.length?DB.employees:[];
+  const workers=sortedEmps(emp?all.filter(e=>e.empresa===emp&&!e.isAdmin):all.filter(e=>!e.isAdmin));
+  const admins=all.filter(e=>e.isAdmin);
   const list=[...admins,...workers];
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
@@ -2182,9 +2181,17 @@ function initApp(){
     const lg=document.getElementById('sLogin');if(lg){lg.classList.add('active');lg.style.display='block';}}catch(e){}
   safeRun(load,'load');
   safeRun(checkMonthlyReset,'checkMonthlyReset');
-  safeRun(popSelects,'popSelects');           // primero poblar selectores
-  setTimeout(()=>safeRun(restoreSession,'restoreSession'),100); // luego restaurar sesión
-  setTimeout(()=>safeRun(autoConnectCloud,'autoConnectCloud'),300); // Firebase al final
+  // Poblar selectores inmediatamente con datos locales
+  safeRun(popSelects,'popSelects');
+  // Reintentar cada segundo hasta que Firebase conecte y los selects tengan datos
+  let _popRetries=0;
+  const _popInterval=setInterval(()=>{
+    const se=document.getElementById('selEmpresa');
+    if(se&&se.options.length<2){safeRun(popSelects,'popSelects_retry');}
+    if(++_popRetries>10||FB.connected)clearInterval(_popInterval);
+  },800);
+  setTimeout(()=>safeRun(restoreSession,'restoreSession'),200);
+  setTimeout(()=>safeRun(autoConnectCloud,'autoConnectCloud'),400);
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
