@@ -364,7 +364,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.9 · build 20260608i</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.0 · build 20260608j</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -757,9 +757,9 @@ function restoreSession(){
 }
 function applyDB(p){
   if(!p)return;
-  DB.empresas=p.empresas||DB.empresas;
-  DB.centrosTrabajo=p.centrosTrabajo||DB.centrosTrabajo||[];
-  DB.employees=p.employees||DB.employees;
+  DB.empresas=(p.empresas&&p.empresas.length)?p.empresas:DB.empresas;
+  DB.centrosTrabajo=(p.centrosTrabajo&&p.centrosTrabajo.length)?p.centrosTrabajo:(DB.centrosTrabajo||[]);
+  DB.employees=(p.employees&&p.employees.length)?p.employees:DB.employees;
   DB.records=p.records||[];
   DB.aprobaciones=p.aprobaciones||[];
   DB.vacaciones=p.vacaciones||[];
@@ -807,7 +807,12 @@ function refreshUI(){
 }
 let _connTimeout=null,_connAttempts=0;
 function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
-function retryConnection(){showRetryBtn(false);_connAttempts=0;FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};autoConnectCloud();}
+function retryConnection(){
+  showRetryBtn(false);_connAttempts=0;
+  if(FB.app){try{FB.ref&&FB.ref.off();FB.db&&FB.db.ref('.info/connected').off();}catch(e){}}
+  FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
+  autoConnectCloud();
+}
 function accesoRapidoAdmin(){
   const inp=document.getElementById('adminPinRapido');
   if(inp)inp.value='';
@@ -829,78 +834,62 @@ function doAdminRapido(){
 }
 
 function autoConnectCloud(){
-  // Si Firebase no cargó todavía, reintenta cada 1.5s hasta 5 veces
   if(typeof firebase==='undefined'||!firebase.initializeApp){
     _connAttempts++;
-    if(_connAttempts>5){setCloudStatus('disconnected');showRetryBtn(true);return;}
+    if(_connAttempts>6){
+      setCloudStatus('disconnected');showRetryBtn(true);
+      console.warn('Firebase SDK no cargó');return;
+    }
     setCloudStatus('connecting');
-    setTimeout(autoConnectCloud,1500);
-    return;
+    setTimeout(autoConnectCloud,1500);return;
   }
   setCloudStatus('connecting');showRetryBtn(false);
+  clearTimeout(_connTimeout);
+  _connTimeout=setTimeout(()=>{
+    if(!FB.connected){setCloudStatus('disconnected');showRetryBtn(true);}
+  },12000);
   try{
-    // Reutilizar app existente o crear una nueva (evita error "duplicate app")
-    const existingApp=firebase.apps&&firebase.apps.find(a=>a.name==='an_main');
-    FB.app=existingApp||firebase.initializeApp(FB_CONFIG,'an_main');
+    // Reusar app existente o crear nueva
+    FB.app=(firebase.apps&&firebase.apps.find(a=>a.name==='an_main'))||firebase.initializeApp(FB_CONFIG,'an_main');
     FB.db=firebase.database(FB.app);
-    FB.auth=firebase.auth(FB.app);
-    // Timeout: si en 12s no conecta, mostrar botón reintentar
-    clearTimeout(_connTimeout);
-    _connTimeout=setTimeout(()=>{
-      if(!FB.connected){setCloudStatus('disconnected');showRetryBtn(true);}
-    },12000);
-    // Usar sesión existente si hay, o autenticar de nuevo
-    const doConnect=()=>{
-      FB.ref=FB.db.ref('an_times_data');
-      FB.ref.once('value').then(snap=>{
-        clearTimeout(_connTimeout);
-        const cloud=snap.val();
-        if(cloud&&cloud.employees){
-          FB.syncing=true;applyDB(cloud);FB.syncing=false;
+    FB.ref=FB.db.ref('an_times_data');
+    // Conectar SIN auth — requiere reglas Firebase: ".read":true, ".write":true
+    FB.ref.once('value').then(snap=>{
+      clearTimeout(_connTimeout);
+      const cloud=snap.val();
+      if(cloud&&cloud.employees&&cloud.employees.length){
+        FB.syncing=true;applyDB(cloud);FB.syncing=false;
+        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+      }else if(!cloud||!cloud.employees){
+        FB.ref.set(DB).catch(e=>console.warn('Init DB:',e));
+      }
+      FB.ref.on('value',s=>{
+        const d=s.val();
+        if(d&&!FB.syncing){
+          FB.syncing=true;applyDB(d);FB.syncing=false;
           try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-        }else{
-          FB.ref.set(DB).catch(e=>console.warn('Init DB:',e));
+          refreshUI();popSelects();
         }
-        FB.ref.on('value',s=>{
-          const d=s.val();
-          if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
-            try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-            refreshUI();}
-        });
-        FB.db.ref('.info/connected').on('value',s=>{
-          if(FB.connected)setCloudStatus(s.val()?'connected':'connecting');
-        });
-        FB.connected=true;
-        setCloudStatus('connected');
-        popSelects();
-        safeRun(restoreSession,'restoreSession');
-        console.info('TIMES INC: Firebase conectado ✓');
-      }).catch(e=>{
-        clearTimeout(_connTimeout);
-        console.warn('Firebase lectura falló:',e&&e.code);
-        setCloudStatus('disconnected');showRetryBtn(true);
       });
-    };
-    if(FB.auth.currentUser){doConnect();}
-    else{
-      FB.auth.signInAnonymously()
-        .then(doConnect)
-        .catch(e=>{
-          clearTimeout(_connTimeout);
-          const code=e&&e.code||'unknown';
-          console.warn('Auth falló:',code,e&&e.message);
-          const el=document.getElementById('cloudStatus');
-          if(el){el.style.color='var(--orange)';el.style.background='rgba(217,154,91,0.12)';}
-          if(code==='auth/operation-not-allowed'){
-            if(el)el.innerHTML='⚠ Activa Acceso anónimo en Firebase → Authentication → Sign-in method';
-          }else if(code==='auth/unauthorized-domain'){
-            if(el)el.innerHTML='⚠ Añade <b>times-inc.vercel.app</b> a Firebase → Authentication → Dominios autorizados';
-          }else{
-            if(el)el.innerHTML='⚠ Error de conexión: '+code;
-            showRetryBtn(true);
-          }
-        });
-    }
+      FB.db.ref('.info/connected').on('value',s=>{
+        if(FB.connected)setCloudStatus(s.val()?'connected':'connecting');
+      });
+      FB.connected=true;
+      setCloudStatus('connected');
+      popSelects();
+      console.info('Firebase conectado ✓');
+    }).catch(e=>{
+      clearTimeout(_connTimeout);
+      const code=e&&e.code||'';
+      console.warn('Firebase falló:',code,e&&e.message);
+      const el=document.getElementById('cloudStatus');
+      if(el)el.style.color='var(--orange)';
+      if(code.includes('permission')||code.includes('PERMISSION')){
+        if(el)el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>⚠ Cambia las reglas Firebase a lectura pública';
+      }else{
+        setCloudStatus('disconnected');showRetryBtn(true);
+      }
+    });
   }catch(e){
     clearTimeout(_connTimeout);
     console.warn('autoConnectCloud error:',e&&e.message);
@@ -909,9 +898,6 @@ function autoConnectCloud(){
   }
 }
 
-
-
-/* VACATION CALC */
 let _vacCache={};
 function vacData(empId){
   if(_vacCache[empId])return _vacCache[empId];
@@ -962,16 +948,21 @@ function allEmps(list){
 }
 /* LOGIN */
 function popSelects(){
-  const se=document.getElementById('selEmpresa');
-  se.innerHTML='<option value="">— Selecciona obra —</option>'+DB.empresas.map(e=>`<option>${e}</option>`).join('');
-  se.onchange=()=>popEmps(se.value);popEmps('');
+  // Garantizar datos mínimos aunque Firebase no haya conectado
+  const obras=DB.empresas&&DB.empresas.length?DB.empresas:['AN Solutions'];
+  const se=document.getElementById('selEmpresa');if(!se)return;
+  se.innerHTML='<option value="">— Selecciona obra —</option>'+obras.map(e=>`<option>${e}</option>`).join('');
+  se.onchange=()=>popEmps(se.value);
+  popEmps('');
 }
 function popEmps(emp){
-  const se=document.getElementById('selEmpleado');
-  // Empleados de la obra seleccionada (sin admin)
-  const workers=sortedEmps(emp?DB.employees.filter(e=>e.empresa===emp):DB.employees);
-  // Admin siempre al principio
-  const admins=DB.employees.filter(e=>e.isAdmin);
+  const se=document.getElementById('selEmpleado');if(!se)return;
+  // Garantizar datos mínimos
+  const allEmps2=DB.employees&&DB.employees.length?DB.employees:[
+    {id:'admin',name:'Administrador',empresa:'AN Solutions',pin:'0824',color:'#5aa9e6',initials:'AD',isAdmin:true},
+  ];
+  const workers=sortedEmps(emp?allEmps2.filter(e=>e.empresa===emp&&!e.isAdmin):allEmps2.filter(e=>!e.isAdmin));
+  const admins=allEmps2.filter(e=>e.isAdmin);
   const list=[...admins,...workers];
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
@@ -2190,10 +2181,10 @@ function initApp(){
   try{document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
     const lg=document.getElementById('sLogin');if(lg){lg.classList.add('active');lg.style.display='block';}}catch(e){}
   safeRun(load,'load');
-  safeRun(restoreSession,'restoreSession');
   safeRun(checkMonthlyReset,'checkMonthlyReset');
-  safeRun(popSelects,'popSelects');
-  safeRun(autoConnectCloud,'autoConnectCloud');
+  safeRun(popSelects,'popSelects');           // primero poblar selectores
+  setTimeout(()=>safeRun(restoreSession,'restoreSession'),100); // luego restaurar sesión
+  setTimeout(()=>safeRun(autoConnectCloud,'autoConnectCloud'),300); // Firebase al final
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
