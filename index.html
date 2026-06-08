@@ -346,9 +346,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .atab{position:relative}
 .tab-badge{position:absolute;top:3px;right:3px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;pointer-events:none}
 </style>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" onerror="window._fbBlocked=true"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js" onerror="window._fbBlocked=true"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" onerror="window._fbBlocked=true"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 <!-- SheetJS se carga bajo demanda en expExcelCompleto() -->
 </head>
@@ -364,7 +361,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.2 · build 20260608L</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.3 · build 20260608M</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -717,23 +714,13 @@ function showErr(msg){try{console.warn('[TIMES INC]',msg);}catch(e){}}
 function esc(s){const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML;}
 function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label||"")+":",err);try{showErr("["+(label||"?")+"] "+(err&&err.message?err.message:err));}catch(e){}}}
 
-let FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
-let _saveT=null,_saveRetry=0;
+let FB={connected:false,syncing:false};let _saveRetry=0;
+let _saveT=null;
 function save(){clearVacCache();
   try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){console.warn('localStorage lleno o no disponible');}
-  if(FB.connected&&FB.ref&&!FB.syncing){
-    clearTimeout(_saveT);
-    _saveT=setTimeout(cloudPush,400);
-  }
+  if(FB.connected&&!FB.syncing){clearTimeout(_saveT);_saveT=setTimeout(cloudPush,400);}
 }
-function cloudPush(){
-  if(!FB.connected||!FB.ref)return;
-  FB.ref.set(DB).then(()=>{_saveRetry=0;}).catch(e=>{
-    console.warn('Error guardando en nube:',e&&e.code);
-    if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1000*_saveRetry);}
-    else{setCloudStatus('connecting');}
-  });
-}
+
 function load(){
   try{const r=localStorage.getItem("an_times_v1");if(r){const p=JSON.parse(r);applyDB(p);}}catch(e){}
 }
@@ -808,9 +795,13 @@ function refreshUI(){
     }catch(e){console.error(e);}
   }
 }
-let _connTimeout=null,_connAttempts=0,_connDone=false;
+/* ═══ FIREBASE REST API — sin SDK, sin dependencias ═══ */
+const DB_URL='https://an-times-default-rtdb.europe-west1.firebasedatabase.app/an_times_data';
+let _es=null,_connDone=false,_connAttempts=0;
+
 function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
-function retryConnection(){showRetryBtn(false);_connAttempts=0;_connDone=false;autoConnectCloud();}
+function retryConnection(){showRetryBtn(false);_connAttempts=0;_connDone=false;if(_es){try{_es.close();}catch(e){}_es=null;}FB.connected=false;autoConnectCloud();}
+
 function accesoRapidoAdmin(){
   const inp=document.getElementById('adminPinRapido');if(inp)inp.value='';
   const err=document.getElementById('adminErrRapido');if(err)err.textContent='';
@@ -827,57 +818,84 @@ function doAdminRapido(){
   persistSession();
 }
 
-function connectDB(){
-  // Función que realmente conecta — llamable desde cualquier lugar
-  if(_connDone)return;
-  if(typeof firebase==='undefined'||!firebase.database){return;}
-  try{
-    const existingApp=firebase.apps&&firebase.apps.find(a=>a.name==='times_main');
-    FB.app=existingApp||firebase.initializeApp(FB_CONFIG,'times_main');
-    FB.db=firebase.database(FB.app);
-    FB.ref=FB.db.ref('an_times_data');
-    clearTimeout(_connTimeout);
-    _connTimeout=setTimeout(()=>{if(!_connDone){setCloudStatus('disconnected');showRetryBtn(true);}},15000);
-    FB.ref.once('value').then(snap=>{
-      clearTimeout(_connTimeout);
-      _connDone=true;
-      const cloud=snap.val();
-      if(cloud&&cloud.employees&&cloud.employees.length){
-        FB.syncing=true;applyDB(cloud);FB.syncing=false;
-        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-      }else{
-        FB.ref.set(DB).catch(e=>console.warn('Init DB:',e));
-      }
-      FB.ref.on('value',s=>{
-        const d=s.val();
-        if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
-          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-        }
-      });
-      FB.db.ref('.info/connected').on('value',s=>setCloudStatus(s.val()?'connected':'connecting'));
-      FB.connected=true;setCloudStatus('connected');
-      popSelects();safeRun(restoreSession,'restoreSession');
-      console.info('TIMES INC: Firebase OK ✓');
-    }).catch(e=>{
-      clearTimeout(_connTimeout);
-      console.warn('Firebase read error:',e&&e.code);
-      setCloudStatus('disconnected');showRetryBtn(true);
-    });
-  }catch(e){
-    console.warn('connectDB error:',e&&e.message);
-    setCloudStatus('disconnected');showRetryBtn(true);
-  }
+function cloudPush(){
+  if(!FB.connected)return;
+  fetch(DB_URL+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);_saveRetry=0;})
+    .catch(e=>{console.warn('Save error:',e.message);if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1500*_saveRetry);}});
 }
 
 function autoConnectCloud(){
   if(_connDone)return;
   setCloudStatus('connecting');showRetryBtn(false);
-  if(typeof firebase==='undefined'||!firebase.database){
-    _connAttempts++;
-    if(_connAttempts>8){setCloudStatus('disconnected');showRetryBtn(true);return;}
-    setTimeout(autoConnectCloud,1000);return;
-  }
-  connectDB();
+  // Leer datos iniciales vía REST
+  fetch(DB_URL+'.json')
+    .then(r=>{
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    })
+    .then(data=>{
+      // Aplicar datos de Firebase
+      if(data&&data.employees&&data.employees.length){
+        FB.syncing=true;applyDB(data);FB.syncing=false;
+        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+      }else{
+        // Base de datos vacía: escribir datos iniciales
+        cloudPush();
+      }
+      FB.connected=true;_connDone=true;
+      setCloudStatus('connected');
+      popSelects();
+      safeRun(restoreSession,'restoreSession');
+      // Escuchar cambios en tiempo real via Server-Sent Events
+      startRealtime();
+      console.info('TIMES INC: Firebase REST conectado ✓');
+    })
+    .catch(e=>{
+      console.warn('Firebase connect error:',e.message);
+      _connAttempts++;
+      if(_connAttempts<5){
+        setTimeout(autoConnectCloud,2000*_connAttempts);
+      }else{
+        setCloudStatus('disconnected');showRetryBtn(true);
+      }
+    });
+}
+
+function startRealtime(){
+  // Server-Sent Events para actualizaciones en tiempo real
+  if(_es){try{_es.close();}catch(e){}}
+  try{
+    _es=new EventSource(DB_URL+'.json?accept=text/event-stream&timeout=30000');
+    _es.addEventListener('put',e=>{
+      try{
+        const msg=JSON.parse(e.data);
+        const d=msg.path==='/'?msg.data:null;
+        if(d&&d.employees&&!FB.syncing){
+          FB.syncing=true;applyDB(d);FB.syncing=false;
+          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e2){}
+          refreshUI();popSelects();
+        }
+        setCloudStatus('connected');
+      }catch(err){}
+    });
+    _es.addEventListener('patch',e=>{
+      try{
+        setCloudStatus('connected');
+        // Recargar datos completos en un patch
+        fetch(DB_URL+'.json').then(r=>r.json()).then(d=>{
+          if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
+            try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e2){}
+            refreshUI();popSelects();}
+        }).catch(()=>{});
+      }catch(err){}
+    });
+    _es.onerror=()=>{
+      setCloudStatus('connecting');
+      // Reconectar SSE en 5s si se cae
+      setTimeout(()=>{if(FB.connected)startRealtime();},5000);
+    };
+  }catch(e){console.warn('SSE no disponible:',e.message);}
 }
 
 let _vacCache={};
@@ -2111,7 +2129,7 @@ document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='E
 window.addEventListener('error',function(ev){try{console.warn('[TI]',ev.message);}catch(e){}},true);
 window.addEventListener('unhandledrejection',function(ev){try{console.warn('[TI promise]',ev.reason);}catch(e){}});
 // Asegura el guardado pendiente antes de cerrar/recargar
-window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected&&FB.ref)cloudPush();}});
+window.addEventListener('beforeunload',function(){if(_saveT){clearTimeout(_saveT);try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}if(FB.connected)cloudPush();}});
 // Inicialización robusta: cada paso aislado para que un fallo no detenga la app
 
 /* ===== Defensa contra extensiones que ocultan contenido (adblockers) ===== */
@@ -2161,19 +2179,15 @@ function initApp(){
   safeRun(load,'load');
   safeRun(checkMonthlyReset,'checkMonthlyReset');
   safeRun(popSelects,'popSelects');
-  // Restaurar sesión después de cargar datos
-  setTimeout(()=>safeRun(restoreSession,'restoreSession'),150);
-  // Conectar Firebase: inmediatamente + reintentos si el SDK no está listo
+  setTimeout(()=>safeRun(restoreSession,'restoreSession'),100);
+  // Conectar usando API REST — no necesita SDK ni auth
   safeRun(autoConnectCloud,'autoConnectCloud');
-  // Fallback: si en 1s aún no conectó (SDK tardó), reintentar
-  setTimeout(()=>{if(!_connDone)safeRun(connectDB,'connectDB_1s');},1000);
-  setTimeout(()=>{if(!_connDone)safeRun(connectDB,'connectDB_3s');},3000);
-  // Repoblar selectores cuando Firebase conecte
+  // Repoblar selects si llegan datos después de conectar
   const _selChk=setInterval(()=>{
     const se=document.getElementById('selEmpresa');
-    if(se&&se.options.length<2&&DB.empresas&&DB.empresas.length)safeRun(popSelects,'popSelects_chk');
-    if(_connDone||DB.empresas.length>0)clearInterval(_selChk);
-  },500);
+    if(se&&se.options.length<2&&DB.empresas.length)safeRun(popSelects,'popSelects_chk');
+    if(_connDone)clearInterval(_selChk);
+  },600);
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
