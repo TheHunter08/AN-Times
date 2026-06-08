@@ -364,7 +364,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.8 · build 20260608h</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.9 · build 20260608i</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -887,12 +887,18 @@ function autoConnectCloud(){
         .then(doConnect)
         .catch(e=>{
           clearTimeout(_connTimeout);
-          console.warn('Auth falló:',e&&e.code);
-          if(e&&e.code==='auth/operation-not-allowed'){
-            const el=document.getElementById('cloudStatus');
-            if(el){el.textContent='⚠ Activa Acceso anónimo en Firebase → Authentication';
-              el.style.color='var(--orange)';el.style.background='rgba(217,154,91,0.12)';}
-          }else{setCloudStatus('disconnected');showRetryBtn(true);}
+          const code=e&&e.code||'unknown';
+          console.warn('Auth falló:',code,e&&e.message);
+          const el=document.getElementById('cloudStatus');
+          if(el){el.style.color='var(--orange)';el.style.background='rgba(217,154,91,0.12)';}
+          if(code==='auth/operation-not-allowed'){
+            if(el)el.innerHTML='⚠ Activa Acceso anónimo en Firebase → Authentication → Sign-in method';
+          }else if(code==='auth/unauthorized-domain'){
+            if(el)el.innerHTML='⚠ Añade <b>times-inc.vercel.app</b> a Firebase → Authentication → Dominios autorizados';
+          }else{
+            if(el)el.innerHTML='⚠ Error de conexión: '+code;
+            showRetryBtn(true);
+          }
         });
     }
   }catch(e){
