@@ -820,7 +820,7 @@ function doAdminRapido(){
 
 function cloudPush(){
   if(!FB.connected)return;
-  fetch(DB_URL+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)})
+  fetch(DB_URL+'.json',{method:'PUT',cache:'no-store',headers:{'Content-Type':'application/json','Cache-Control':'no-cache'},body:JSON.stringify(DB)})
     .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);_saveRetry=0;})
     .catch(e=>{console.warn('Save error:',e.message);if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1500*_saveRetry);}});
 }
@@ -830,7 +830,7 @@ function doFetch(){
   // AbortController para timeout de 8 segundos
   const ctrl=new AbortController();
   const tid=setTimeout(()=>ctrl.abort(),8000);
-  fetch(DB_URL+'.json',{signal:ctrl.signal})
+  fetch(DB_URL+'.json',{signal:ctrl.signal,cache:'no-store',headers:{'Cache-Control':'no-cache'}})
     .then(r=>{clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(data=>{
       if(_connDone)return;
@@ -881,7 +881,7 @@ function startRealtime(){
       try{
         setCloudStatus('connected');
         // Recargar datos completos en un patch
-        fetch(DB_URL+'.json').then(r=>r.json()).then(d=>{
+        fetch(DB_URL+'.json',{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(r=>r.json()).then(d=>{
           if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
             try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e2){}
             refreshUI();popSelects();}
