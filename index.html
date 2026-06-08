@@ -364,7 +364,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.1 · build 20260608k</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.2 · build 20260608L</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -706,10 +706,10 @@ const FB_CONFIG={
   appId:"1:650059384349:web:9b525ffcc53c8b3ca1e8f4",
   measurementId:"G-86XRFV4N0J"
 };
-let DB={empresas:[],centrosTrabajo:[],employees:[
-  {id:"admin",name:"Administrador",empresa:"AN Solutions",pin:"0824",color:"#5aa9e6",initials:"AD",startDate:"2024-01-01",email:"",isAdmin:true},
-  {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"AN Solutions",pin:"1111",color:"#00d4ff",initials:"IA",startDate:"2024-01-01",email:""},
-  {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"AN Solutions",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01",email:""}
+let DB={empresas:["Soluciones Mata"],centrosTrabajo:["Obra Principal"],employees:[
+  {id:"admin",name:"Administrador",empresa:"Soluciones Mata",pin:"0824",color:"#5aa9e6",initials:"AD",startDate:"2024-01-01",email:"",isAdmin:true},
+  {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"Soluciones Mata",pin:"1111",color:"#5aa9e6",initials:"IA",startDate:"2024-01-01",email:""},
+  {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"Soluciones Mata",pin:"2222",color:"#00e676",initials:"FL",startDate:"2024-01-01",email:""}
 ],records:[],aprobaciones:[],vacaciones:[],medicos:[],ausencias:[],cierres:[],mensajes:[],notis:[]};
 let SES={user:null,isAdmin:false};
 let TM={ws:0,bs:0,state:"idle",bStart:null};
@@ -808,97 +808,76 @@ function refreshUI(){
     }catch(e){console.error(e);}
   }
 }
-let _connTimeout=null,_connAttempts=0;
+let _connTimeout=null,_connAttempts=0,_connDone=false;
 function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
-function retryConnection(){
-  showRetryBtn(false);_connAttempts=0;
-  if(FB.app){try{FB.ref&&FB.ref.off();FB.db&&FB.db.ref('.info/connected').off();}catch(e){}}
-  FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
-  autoConnectCloud();
-}
+function retryConnection(){showRetryBtn(false);_connAttempts=0;_connDone=false;autoConnectCloud();}
 function accesoRapidoAdmin(){
-  const inp=document.getElementById('adminPinRapido');
-  if(inp)inp.value='';
-  const err=document.getElementById('adminErrRapido');
-  if(err)err.textContent='';
-  openMov('mAdminRapido');
-  setTimeout(()=>{if(inp)inp.focus();},300);
+  const inp=document.getElementById('adminPinRapido');if(inp)inp.value='';
+  const err=document.getElementById('adminErrRapido');if(err)err.textContent='';
+  openMov('mAdminRapido');setTimeout(()=>{if(inp)inp.focus();},300);
 }
 function doAdminRapido(){
   const pin=document.getElementById('adminPinRapido').value;
   const err=document.getElementById('adminErrRapido');
   const admin=DB.employees.find(e=>e.isAdmin&&e.pin===pin);
   if(!admin&&pin!==ADM_PIN){setTimeout(()=>{if(err)err.textContent='PIN incorrecto';},200);return;}
-  closeMov('mAdminRapido');
-  SES.isAdmin=true;SES.user=null;
+  closeMov('mAdminRapido');SES.isAdmin=true;SES.user=null;
   showSc('sAdmin');
   safeRun(()=>{admTab('overview');updateBadges();antiBlockerDefense();},'adminRapido');
   persistSession();
 }
 
-function autoConnectCloud(){
-  if(typeof firebase==='undefined'||!firebase.initializeApp){
-    _connAttempts++;
-    if(_connAttempts>6){
-      setCloudStatus('disconnected');showRetryBtn(true);
-      console.warn('Firebase SDK no cargó');return;
-    }
-    setCloudStatus('connecting');
-    setTimeout(autoConnectCloud,1500);return;
-  }
-  setCloudStatus('connecting');showRetryBtn(false);
-  clearTimeout(_connTimeout);
-  _connTimeout=setTimeout(()=>{
-    if(!FB.connected){setCloudStatus('disconnected');showRetryBtn(true);}
-  },12000);
+function connectDB(){
+  // Función que realmente conecta — llamable desde cualquier lugar
+  if(_connDone)return;
+  if(typeof firebase==='undefined'||!firebase.database){return;}
   try{
-    // Reusar app existente o crear nueva
-    FB.app=(firebase.apps&&firebase.apps.find(a=>a.name==='an_main'))||firebase.initializeApp(FB_CONFIG,'an_main');
+    const existingApp=firebase.apps&&firebase.apps.find(a=>a.name==='times_main');
+    FB.app=existingApp||firebase.initializeApp(FB_CONFIG,'times_main');
     FB.db=firebase.database(FB.app);
     FB.ref=FB.db.ref('an_times_data');
-    // Conectar SIN auth — requiere reglas Firebase: ".read":true, ".write":true
+    clearTimeout(_connTimeout);
+    _connTimeout=setTimeout(()=>{if(!_connDone){setCloudStatus('disconnected');showRetryBtn(true);}},15000);
     FB.ref.once('value').then(snap=>{
       clearTimeout(_connTimeout);
+      _connDone=true;
       const cloud=snap.val();
       if(cloud&&cloud.employees&&cloud.employees.length){
         FB.syncing=true;applyDB(cloud);FB.syncing=false;
         try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-      }else if(!cloud||!cloud.employees){
+      }else{
         FB.ref.set(DB).catch(e=>console.warn('Init DB:',e));
       }
       FB.ref.on('value',s=>{
         const d=s.val();
-        if(d&&!FB.syncing){
-          FB.syncing=true;applyDB(d);FB.syncing=false;
+        if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
           try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-          refreshUI();popSelects();
         }
       });
-      FB.db.ref('.info/connected').on('value',s=>{
-        if(FB.connected)setCloudStatus(s.val()?'connected':'connecting');
-      });
-      FB.connected=true;
-      setCloudStatus('connected');
-      popSelects();
-      console.info('Firebase conectado ✓');
+      FB.db.ref('.info/connected').on('value',s=>setCloudStatus(s.val()?'connected':'connecting'));
+      FB.connected=true;setCloudStatus('connected');
+      popSelects();safeRun(restoreSession,'restoreSession');
+      console.info('TIMES INC: Firebase OK ✓');
     }).catch(e=>{
       clearTimeout(_connTimeout);
-      const code=e&&e.code||'';
-      console.warn('Firebase falló:',code,e&&e.message);
-      const el=document.getElementById('cloudStatus');
-      if(el)el.style.color='var(--orange)';
-      if(code.includes('permission')||code.includes('PERMISSION')){
-        if(el)el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>⚠ Cambia las reglas Firebase a lectura pública';
-      }else{
-        setCloudStatus('disconnected');showRetryBtn(true);
-      }
+      console.warn('Firebase read error:',e&&e.code);
+      setCloudStatus('disconnected');showRetryBtn(true);
     });
   }catch(e){
-    clearTimeout(_connTimeout);
-    console.warn('autoConnectCloud error:',e&&e.message);
+    console.warn('connectDB error:',e&&e.message);
     setCloudStatus('disconnected');showRetryBtn(true);
-    FB={app:null,db:null,ref:null,auth:null,connected:false,syncing:false};
   }
+}
+
+function autoConnectCloud(){
+  if(_connDone)return;
+  setCloudStatus('connecting');showRetryBtn(false);
+  if(typeof firebase==='undefined'||!firebase.database){
+    _connAttempts++;
+    if(_connAttempts>8){setCloudStatus('disconnected');showRetryBtn(true);return;}
+    setTimeout(autoConnectCloud,1000);return;
+  }
+  connectDB();
 }
 
 let _vacCache={};
@@ -2181,17 +2160,20 @@ function initApp(){
     const lg=document.getElementById('sLogin');if(lg){lg.classList.add('active');lg.style.display='block';}}catch(e){}
   safeRun(load,'load');
   safeRun(checkMonthlyReset,'checkMonthlyReset');
-  // Poblar selectores inmediatamente con datos locales
   safeRun(popSelects,'popSelects');
-  // Reintentar cada segundo hasta que Firebase conecte y los selects tengan datos
-  let _popRetries=0;
-  const _popInterval=setInterval(()=>{
+  // Restaurar sesión después de cargar datos
+  setTimeout(()=>safeRun(restoreSession,'restoreSession'),150);
+  // Conectar Firebase: inmediatamente + reintentos si el SDK no está listo
+  safeRun(autoConnectCloud,'autoConnectCloud');
+  // Fallback: si en 1s aún no conectó (SDK tardó), reintentar
+  setTimeout(()=>{if(!_connDone)safeRun(connectDB,'connectDB_1s');},1000);
+  setTimeout(()=>{if(!_connDone)safeRun(connectDB,'connectDB_3s');},3000);
+  // Repoblar selectores cuando Firebase conecte
+  const _selChk=setInterval(()=>{
     const se=document.getElementById('selEmpresa');
-    if(se&&se.options.length<2){safeRun(popSelects,'popSelects_retry');}
-    if(++_popRetries>10||FB.connected)clearInterval(_popInterval);
-  },800);
-  setTimeout(()=>safeRun(restoreSession,'restoreSession'),200);
-  setTimeout(()=>safeRun(autoConnectCloud,'autoConnectCloud'),400);
+    if(se&&se.options.length<2&&DB.empresas&&DB.empresas.length)safeRun(popSelects,'popSelects_chk');
+    if(_connDone||DB.empresas.length>0)clearInterval(_selChk);
+  },500);
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
