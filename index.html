@@ -363,7 +363,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <h1><span>TIMES</span> INC</h1>
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.5 · build 20260608e</div>
+        <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v3.7 · build 20260608g</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -372,6 +373,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div class="fg"><label>PIN de acceso</label><input type="password" id="inputPin" placeholder="••••" maxlength="6" inputmode="numeric"></div>
         <div class="lerr" id="loginErr"></div>
         <button class="btn-main" onclick="doLogin()">Entrar</button>
+        <div style="text-align:center;margin-top:14px">
+          <button onclick="accesoRapidoAdmin()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline">⚙ Acceso administrador directo</button>
+        </div>
       </div>
     </div>
   </div>
@@ -679,6 +683,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
   <div id="notiList"><div class="empty">Sin notificaciones</div></div>
   <button class="mbtn cancel" style="width:100%;margin-top:10px" onclick="closeMov('mNotis')">Cerrar</button>
 </div></div>
+<div class="mov" id="mAdminRapido"><div class="msh">
+  <h2>⚙ Acceso administrador</h2>
+  <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Introduce el PIN de administrador para acceder al panel.</p>
+  <div class="ff"><label>PIN de administrador</label><input type="password" id="adminPinRapido" placeholder="••••" maxlength="6" inputmode="numeric" onkeydown="if(event.key==='Enter')doAdminRapido()"></div>
+  <div class="lerr" id="adminErrRapido" style="min-height:16px;margin-bottom:8px"></div>
+  <div class="mbtns">
+    <button class="mbtn confirm" onclick="doAdminRapido()">Entrar</button>
+    <button class="mbtn cancel" onclick="closeMov('mAdminRapido')">Cancelar</button>
+  </div>
+</div></div>
 <div class="toast" id="toast"></div>
 <script>
 const ADM_PIN="0824",WK=40*60,VPM=2.5;
@@ -767,6 +781,7 @@ function setCloudStatus(state){
   const dd=document.getElementById('dbStatusDot');if(dd)dd.style.background=colors[state]||colors.disconnected;
   const dt=document.getElementById('dbStatusText');if(dt)dt.textContent=labels[state]||labels.disconnected;
   const el=document.getElementById('cloudStatus');if(!el)return;
+  showRetryBtn(false);
   if(state==='connected'){el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--green);animation:pd 1.5s infinite"></span>Base de datos conectada · sincronizando';el.style.background='rgba(0,230,118,0.12)';el.style.color='var(--green)';}
   else if(state==='connecting'){el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…';el.style.background='rgba(0,212,255,0.12)';el.style.color='var(--accent)';}
   else{el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Base de datos sin conectar';el.style.background='rgba(255,149,0,0.12)';el.style.color='var(--orange)';}
@@ -790,41 +805,113 @@ function refreshUI(){
     }catch(e){console.error(e);}
   }
 }
+let _connTimeout=null,_connAttempts=0;
+function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
+function retryConnection(){showRetryBtn(false);_connAttempts=0;autoConnectCloud();}
+function accesoRapidoAdmin(){
+  const inp=document.getElementById('adminPinRapido');
+  if(inp)inp.value='';
+  const err=document.getElementById('adminErrRapido');
+  if(err)err.textContent='';
+  openMov('mAdminRapido');
+  setTimeout(()=>{if(inp)inp.focus();},300);
+}
+function doAdminRapido(){
+  const pin=document.getElementById('adminPinRapido').value;
+  const err=document.getElementById('adminErrRapido');
+  // Buscar empleado admin por PIN
+  const admin=DB.employees.find(e=>e.isAdmin&&e.pin===pin);
+  if(!admin&&pin!==ADM_PIN){
+    setTimeout(()=>{if(err)err.textContent='PIN incorrecto';},200);return;
+  }
+  closeMov('mAdminRapido');
+  SES.isAdmin=true;SES.user=null;
+  showSc('sAdmin');
+  safeRun(()=>{admTab('overview');updateBadges();antiBlockerDefense();},'adminRapido');
+  persistSession();
+}
+
 function autoConnectCloud(){
-  if(typeof firebase==='undefined'){setCloudStatus('disconnected');setTimeout(autoConnectCloud,1500);return;}
-  setCloudStatus('connecting');
+  // Espera a que Firebase esté disponible (máx. 6 segundos)
+  if(typeof firebase==='undefined'){
+    _connAttempts++;
+    if(_connAttempts>4){setCloudStatus('disconnected');showRetryBtn(true);return;}
+    setCloudStatus('connecting');
+    setTimeout(autoConnectCloud,1500);return;
+  }
+  setCloudStatus('connecting');showRetryBtn(false);
+  clearTimeout(_connTimeout);
+  // Timeout de seguridad: si en 10s no conecta → muestra reintentar
+  _connTimeout=setTimeout(()=>{
+    if(!FB.connected){setCloudStatus('disconnected');showRetryBtn(true);console.warn('Firebase: timeout de conexión');}
+  },10000);
   try{
-    FB.app=firebase.initializeApp(FB_CONFIG,'an_'+Date.now());
-    FB.db=firebase.database(FB.app);
-    FB.auth=firebase.auth(FB.app);
-    // Autenticación anónima: necesaria para que las reglas seguras (auth != null) permitan el acceso
+    // Reutilizar app si ya existe (evita múltiples instancias en reintentos)
+    if(!FB.app){
+      FB.app=firebase.initializeApp(FB_CONFIG,'an_times_app');
+    }
+    FB.db=FB.db||firebase.database(FB.app);
+    FB.auth=FB.auth||firebase.auth(FB.app);
+    // Si ya hay sesión activa, conectar directamente
+    const user=FB.auth.currentUser;
+    if(user){bindCloudRef();return;}
     FB.auth.signInAnonymously().then(()=>{
-      bindCloudRef();
+      clearTimeout(_connTimeout);bindCloudRef();
     }).catch(e=>{
+      clearTimeout(_connTimeout);
       console.warn('Auth anónima falló:',e&&e.code);
-      // Si el método anónimo no está habilitado en Firebase, avisamos y seguimos en local
       if(e&&e.code==='auth/operation-not-allowed'){
-        toast('Activa "Acceso anónimo" en Firebase → Authentication');
+        setCloudStatus('disconnected');
+        const el=document.getElementById('cloudStatus');
+        if(el)el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:var(--orange)"></span>Activa "Acceso anónimo" en Firebase';
+        el.style.background='rgba(217,154,91,0.12)';el.style.color='var(--orange)';
+      }else{
+        setCloudStatus('disconnected');showRetryBtn(true);
       }
-      setCloudStatus('disconnected');
     });
-  }catch(e){console.warn('Auto-conexión fallida',e);setCloudStatus('disconnected');}
+  }catch(e){
+    clearTimeout(_connTimeout);
+    console.warn('Auto-conexión fallida',e);
+    setCloudStatus('disconnected');showRetryBtn(true);
+    // Reset para permitir nuevo intento limpio
+    FB.app=null;FB.db=null;FB.auth=null;
+  }
 }
 function bindCloudRef(){
   try{
     FB.ref=FB.db.ref('an_times_data');
+    // Timeout para la lectura inicial (8s)
+    let readOk=false;
+    const readTimeout=setTimeout(()=>{
+      if(!readOk){console.warn('Firebase: lectura inicial lenta');setCloudStatus('disconnected');showRetryBtn(true);}
+    },8000);
     FB.ref.once('value').then(snap=>{
+      readOk=true;clearTimeout(readTimeout);
       const cloud=snap.val();
-      if(cloud&&(cloud.employees||cloud.records)){FB.syncing=true;applyDB(cloud);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}}
-      else{FB.ref.set(DB);}
-      FB.ref.on('value',s=>{const d=s.val();if(d){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}});
-      FB.connected=true;setCloudStatus('connected');popSelects();refreshUI();
-    }).catch(e=>{console.warn('Nube:',e);setCloudStatus('disconnected');});
+      if(cloud&&(cloud.employees||cloud.records)){
+        FB.syncing=true;applyDB(cloud);FB.syncing=false;
+        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+      }else{
+        // Base de datos vacía: escribir datos iniciales
+        FB.ref.set(DB).catch(e=>console.warn('Error escribiendo datos iniciales:',e));
+      }
+      // Listener en tiempo real
+      FB.ref.on('value',s=>{
+        const d=s.val();
+        if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}refreshUI();}
+      });
+      FB.connected=true;setCloudStatus('connected');
+      popSelects();safeRun(restoreSession,'restoreSession');
+    }).catch(e=>{
+      readOk=true;clearTimeout(readTimeout);
+      console.warn('Firebase lectura falló:',e&&e.code||e);
+      setCloudStatus('disconnected');showRetryBtn(true);
+    });
     // Monitor de conexión en tiempo real
     FB.db.ref('.info/connected').on('value',s=>{
       if(FB.connected)setCloudStatus(s.val()?'connected':'connecting');
     });
-  }catch(e){console.warn('bindCloudRef',e);setCloudStatus('disconnected');}
+  }catch(e){console.warn('bindCloudRef error:',e);setCloudStatus('disconnected');showRetryBtn(true);}
 }
 
 /* VACATION CALC */
@@ -884,7 +971,11 @@ function popSelects(){
 }
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');
-  const list=allEmps(emp?DB.employees.filter(e=>e.empresa===emp):DB.employees);
+  // Empleados de la obra seleccionada (sin admin)
+  const workers=sortedEmps(emp?DB.employees.filter(e=>e.empresa===emp):DB.employees);
+  // Admin siempre al principio
+  const admins=DB.employees.filter(e=>e.isAdmin);
+  const list=[...admins,...workers];
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function doLogin(){
