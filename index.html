@@ -361,7 +361,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.3 · build 20260608M</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.4 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -825,41 +825,39 @@ function cloudPush(){
     .catch(e=>{console.warn('Save error:',e.message);if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1500*_saveRetry);}});
 }
 
-function autoConnectCloud(){
+function doFetch(){
   if(_connDone)return;
-  setCloudStatus('connecting');showRetryBtn(false);
-  // Leer datos iniciales vía REST
-  fetch(DB_URL+'.json')
-    .then(r=>{
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      return r.json();
-    })
+  // AbortController para timeout de 8 segundos
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),8000);
+  fetch(DB_URL+'.json',{signal:ctrl.signal})
+    .then(r=>{clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(data=>{
-      // Aplicar datos de Firebase
+      if(_connDone)return;
       if(data&&data.employees&&data.employees.length){
         FB.syncing=true;applyDB(data);FB.syncing=false;
         try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-      }else{
-        // Base de datos vacía: escribir datos iniciales
-        cloudPush();
-      }
+      }else{cloudPush();}
       FB.connected=true;_connDone=true;
       setCloudStatus('connected');
       popSelects();
       safeRun(restoreSession,'restoreSession');
-      // Escuchar cambios en tiempo real via Server-Sent Events
       startRealtime();
-      console.info('TIMES INC: Firebase REST conectado ✓');
+      console.info('TIMES INC: conectado ✓');
     })
     .catch(e=>{
-      console.warn('Firebase connect error:',e.message);
+      clearTimeout(tid);
+      if(_connDone)return;
+      console.warn('Fetch error:',e.message);
       _connAttempts++;
-      if(_connAttempts<5){
-        setTimeout(autoConnectCloud,2000*_connAttempts);
-      }else{
-        setCloudStatus('disconnected');showRetryBtn(true);
-      }
+      if(_connAttempts<8){setTimeout(doFetch,1500);}
+      else{setCloudStatus('disconnected');showRetryBtn(true);}
     });
+}
+function autoConnectCloud(){
+  if(_connDone)return;
+  setCloudStatus('connecting');showRetryBtn(false);
+  doFetch();
 }
 
 function startRealtime(){
@@ -2181,20 +2179,28 @@ function initApp(){
   safeRun(popSelects,'popSelects');
   setTimeout(()=>safeRun(restoreSession,'restoreSession'),100);
   // Conectar usando API REST — no necesita SDK ni auth
-  safeRun(autoConnectCloud,'autoConnectCloud');
-  // Repoblar selects si llegan datos después de conectar
+  // Llamar conexión de 3 formas diferentes para garantizar que arranque
+  safeRun(autoConnectCloud,'autoConnectCloud');        // 1. Inmediata
+  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_1s');},1000);  // 2. Reintento 1s
+  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_3s');},3000);  // 3. Reintento 3s
+  // Repoblar selects cada 500ms hasta conectar
   const _selChk=setInterval(()=>{
-    const se=document.getElementById('selEmpresa');
-    if(se&&se.options.length<2&&DB.empresas.length)safeRun(popSelects,'popSelects_chk');
+    if(DB.empresas.length){const se=document.getElementById('selEmpresa');if(se&&se.options.length<2)safeRun(popSelects,'pop_chk');}
     if(_connDone)clearInterval(_selChk);
-  },600);
+  },500);
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
-try{
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initApp);}
-  else{initApp();}
-}catch(_ie){console.warn('Init error:',_ie);}
+// Arrancar de ambas formas para garantizar ejecución
+function _startApp(){if(!window._appStarted){window._appStarted=true;try{initApp();}catch(e){console.warn('Init error:',e);}}}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_startApp);}
+else{_startApp();}
+// Doble seguro: window.onload por si DOMContentLoaded no disparó
+window.addEventListener('load',()=>{
+  _startApp(); // no-op si ya arrancó
+  // Si después de onload aún no conecta, forzar
+  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_onload');},500);
+});
 </script>
 </body>
 </html>
