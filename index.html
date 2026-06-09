@@ -13,6 +13,8 @@
 <meta name="description" content="TIMES INC — Control de jornada laboral, fichaje de horas, vacaciones y nóminas.">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22TIMES%20INC%22%2C%22short_name%22%3A%22TIMES%20INC%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230a0e1a%22%2C%22theme_color%22%3A%22%230a0e1a%22%2C%22start_url%22%3A%22.%22%7D">
 <title>TIMES INC</title>
+<link rel="preconnect" href="https://times-inc-default-rtdb.europe-west1.firebasedatabase.app" crossorigin>
+<link rel="dns-prefetch" href="https://times-inc-default-rtdb.europe-west1.firebasedatabase.app">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -379,7 +381,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v6.2 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v6.3 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -864,40 +866,58 @@ function doAdminRapido(){
   persistSession();
 }
 
-function cloudPush(){
-  if(!FB.connected)return;
+function cloudPush(force){
+  if(!FB.connected&&!force)return;
   fetch(DB_URL+'.json',{method:'PUT',cache:'no-store',headers:{'Content-Type':'application/json','Cache-Control':'no-cache'},body:JSON.stringify(DB)})
     .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);_saveRetry=0;})
     .catch(e=>{console.warn('Save error:',e.message);if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1500*_saveRetry);}});
 }
 
+let _fetchInFlight=false;
 function doFetch(){
-  if(_connDone)return;
-  // AbortController para timeout de 8 segundos
-  const ctrl=new AbortController();
-  const tid=setTimeout(()=>ctrl.abort(),8000);
-  fetch(DB_URL+'.json',{signal:ctrl.signal,cache:'no-store',headers:{'Cache-Control':'no-cache'}})
-    .then(r=>{clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  if(_connDone||_fetchInFlight)return;
+  _fetchInFlight=true;
+  const url=DB_URL+'.json?t='+Date.now(); // cache-bust via query param
+  // Use Promise.race with a manual 10s timeout
+  const fetchPromise=fetch(url,{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
+  const timeoutPromise=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000));
+  Promise.race([fetchPromise,timeoutPromise])
     .then(data=>{
+      _fetchInFlight=false;
       if(_connDone)return;
-      if(data&&data.employees&&data.employees.length){
-        FB.syncing=true;applyDB(data);FB.syncing=false;
-        try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-      }else{cloudPush();}
-      FB.connected=true;_connDone=true;
-      setCloudStatus('connected');
-      popSelects();
-      safeRun(restoreSession,'restoreSession');
-      startRealtime();
-      console.info('TIMES INC: conectado ✓');
+      try{
+        if(data&&data.employees&&data.employees.length){
+          FB.syncing=true;applyDB(data);FB.syncing=false;
+          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+        }else{
+          // BD vacía: subir datos locales
+          cloudPush(true); // force push even though FB.connected not set yet
+        }
+        FB.connected=true;_connDone=true;
+        setCloudStatus('connected');
+        popSelects();
+        safeRun(restoreSession,'restoreSession');
+        safeRun(loadRemembered,'loadRemembered_afterConnect'); // re-run after data loaded
+        startRealtime();
+        try{window._registerSW&&window._registerSW();}catch(e){} // register SW after connect
+        console.info('TIMES INC: conectado ✓');
+      }catch(applyErr){
+        console.warn('applyDB error:',applyErr.message);
+        // Still mark connected even if applyDB had issues
+        FB.connected=true;_connDone=true;
+        setCloudStatus('connected');
+        popSelects();
+      }
     })
     .catch(e=>{
-      clearTimeout(tid);
+      _fetchInFlight=false;
       if(_connDone)return;
-      console.warn('Fetch error:',e.message);
+      console.warn('doFetch error:',e.message,'attempt:',_connAttempts);
       _connAttempts++;
-      if(_connAttempts<8){setTimeout(doFetch,1500);}
-      else{setCloudStatus('disconnected');showRetryBtn(true);}
+      if(_connAttempts<10){
+        const delay=Math.min(1500*_connAttempts,8000);
+        setTimeout(doFetch,delay);
+      }else{setCloudStatus('disconnected');showRetryBtn(true);}
     });
 }
 function autoConnectCloud(){
@@ -996,15 +1016,34 @@ function loadRemembered(){
   try{
     const raw=localStorage.getItem('an_times_remember');if(!raw)return;
     const saved=JSON.parse(raw);
+    // Mark checkbox
     const remCk=document.getElementById('chkRemember');if(remCk)remCk.checked=true;
-    const emp=DB.employees.find(e=>e.id===saved.empId);if(!emp)return;
+    // Find employee — could be in DB after Firebase loads
+    const emp=DB.employees.find(e=>e.id===saved.empId&&!e.isAdmin&&e.role!=='encargado');
+    if(!emp)return; // employee not found yet, will retry after Firebase loads
+    // Fill obra select
     const seE=document.getElementById('selEmpresa');
-    if(seE&&emp.empresa){seE.value=emp.empresa;popEmps(emp.empresa);}
+    if(seE){
+      seE.value=emp.empresa;
+      if(seE.value!==emp.empresa){
+        // Option not in list yet — add it
+        const opt=new Option(emp.empresa,emp.empresa);seE.add(opt);seE.value=emp.empresa;
+      }
+      popEmps(emp.empresa);
+    }
+    // Fill employee select
     const seEmp=document.getElementById('selEmpleado');
-    if(seEmp)seEmp.value=saved.empId;
+    if(seEmp){
+      seEmp.value=saved.empId;
+      if(seEmp.value!==saved.empId){
+        const opt2=new Option(emp.name,saved.empId);seEmp.add(opt2);seEmp.value=saved.empId;
+      }
+    }
+    // Fill PIN
     const pinI=document.getElementById('inputPin');
     if(pinI&&saved.pin)pinI.value=saved.pin;
-  }catch(e){}
+    console.info('[TI] Remember me: restored',emp.name);
+  }catch(e){console.warn('loadRemembered error:',e.message);}
 }
 function popSelects(){
   const obras=DB.empresas&&DB.empresas.length?DB.empresas:[];
@@ -2460,9 +2499,10 @@ function initApp(){
   setTimeout(()=>{safeRun(restoreSession,'restoreSession');safeRun(loadRemembered,'loadRemembered');},100);
   // Conectar usando API REST — no necesita SDK ni auth
   // Llamar conexión de 3 formas diferentes para garantizar que arranque
-  safeRun(autoConnectCloud,'autoConnectCloud');        // 1. Inmediata
-  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_1s');},1000);  // 2. Reintento 1s
-  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_3s');},3000);  // 3. Reintento 3s
+  // Conectar: primera llamada a 200ms para que el DOM esté completamente listo
+  setTimeout(()=>safeRun(doFetch,'doFetch_200ms'),200);
+  setTimeout(()=>{if(!_connDone&&!_fetchInFlight)safeRun(doFetch,'doFetch_2s');},2000);
+  setTimeout(()=>{if(!_connDone&&!_fetchInFlight)safeRun(doFetch,'doFetch_5s');},5000);
   // Repoblar selects cada 500ms hasta conectar
   const _selChk=setInterval(()=>{
     if(DB.empresas.length){const se=document.getElementById('selEmpresa');if(se&&se.options.length<2)safeRun(popSelects,'pop_chk');}
@@ -2472,15 +2512,17 @@ function initApp(){
   try{setInterval(antiBlockerDefense,2000);}catch(e){}
 }
 // Arrancar de ambas formas para garantizar ejecución
-if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+// SW registration deferred to after first connection
+window._registerSW=function(){if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}};
 function _startApp(){if(!window._appStarted){window._appStarted=true;try{initApp();}catch(e){console.warn('Init error:',e);}}}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_startApp);}
 else{_startApp();}
 // Doble seguro: window.onload por si DOMContentLoaded no disparó
 window.addEventListener('load',()=>{
   _startApp(); // no-op si ya arrancó
-  // Si después de onload aún no conecta, forzar
-  setTimeout(()=>{if(!_connDone)safeRun(doFetch,'doFetch_onload');},500);
+  // Si después de onload aún no conecta, forzar (sin SW activo todavía)
+  setTimeout(()=>{if(!_connDone&&!_fetchInFlight)safeRun(doFetch,'doFetch_onload_800');},800);
+  setTimeout(()=>{if(!_connDone&&!_fetchInFlight)safeRun(doFetch,'doFetch_onload_4s');},4000);
 });
 </script>
 </body>
