@@ -526,6 +526,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
       <button class="atab" data-tab="registros" onclick="admTab('registros')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span>Fichajes</span></button>
       <button class="atab" data-tab="nominas" onclick="admTab('nominas')"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg><span>Nóminas</span></button>
       <button class="atab" data-tab="empleados" onclick="admTab('empleados')"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg><span>Empl.</span></button>
+      <button class="atab" data-tab="vacgestion" onclick="admTab('vacgestion')"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg><span>Vacac.</span></button>
       <button class="atab" data-tab="exportar" onclick="admTab('exportar')"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Export</span></button>
     </div>
     <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
@@ -541,7 +542,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Valida las jornadas finalizadas de cada empleado. Deberías hacerlo cada día.</div>
         <div id="aprobList"><div class="empty">Sin jornadas pendientes de validar</div></div>
       </div>
-      <div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
+          </div>
+
+    <div id="aVacgestion" style="display:none">
+      <div class="adcard" style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(79,70,229,0.03));border-color:rgba(99,102,241,0.15)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg>
+          <h3 style="margin:0;font-size:15px;color:var(--accent3)">Gestión de Vacaciones</h3>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">Consulta, asigna y gestiona las vacaciones de todos los empleados</div>
+      </div>
+<div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
       <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
       <div class="adcard"><h3>⚠ Ausencias injustificadas</h3><div id="aAbsList"><div class="empty">Sin ausencias</div></div></div>
       <div class="adcard"><h3>Vacaciones por empleado</h3><div id="aVacRes"></div></div>
@@ -587,6 +598,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <button class="badd" onclick="adjStart()">Guardar fecha</button>
       </div>
     </div>
+    </div>
+
     <div id="aRegistros" style="display:none">
       <div class="frow">
         <select id="fEmp" onchange="renderRecs()"><option value="">Todos</option></select>
@@ -1479,7 +1492,7 @@ function renderHist(){
 
 /* ADMIN */
 function admTab(t){
-  const tabs=['overview','control','solicitudes','registros','nominas','empleados','exportar'];
+  const tabs=['overview','control','solicitudes','registros','nominas','empleados','vacgestion','exportar'];
   tabs.forEach(x=>{const id='a'+cap(x);const el=document.getElementById(id);if(el){
     if(x===t){el.style.display='block';el.style.visibility='visible';el.style.opacity='1';el.style.height='auto';el.removeAttribute('hidden');}
     else{el.style.display='none';}
@@ -1489,6 +1502,7 @@ function admTab(t){
   else if(t==='empleados')safeRun(renderEmps,'renderEmps');
   else if(t==='exportar'){safeRun(renderExpStats,'renderExpStats');safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');safeRun(renderNomMesOptions,'renderNomMesOptions');}
   else if(t==='solicitudes'){safeRun(renderAdmSols,'renderAdmSols');safeRun(renderAprobaciones,'renderAprobaciones');}
+  else if(t==='vacgestion'){safeRun(renderVacGestion,'renderVacGestion');}
   else if(t==='control')safeRun(renderControl,'renderControl');
   else if(t==='nominas'){safeRun(renderNomMesOptions2,'renderNomMesOptions2');safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderMensajeria,'renderMensajeria');}
   else if(t==='overview')safeRun(renderAdm,'renderAdm');
@@ -1601,10 +1615,9 @@ function updateTabsForRole(){
   const isEnc=!!SES.isEncargado && !SES.isAdmin;
   const tabBtns=document.querySelectorAll('#admTabBar .atab');
   tabBtns.forEach(btn=>{
-    // Admin: todas las pestañas visibles
-    // Encargado: solo solicitudes, fichajes, exportar
     const t=btn.getAttribute('onclick')||'';
-    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'"));
+    // Encargado: ocultar control, nominas, empleados, vacgestion
+    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'")||t.includes("'vacgestion'"));
     btn.style.display=isHidden?'none':'';
   });
   renderExportTab();
@@ -1836,6 +1849,31 @@ function renderAdmSols(){
   }).join('');
   renderAdmFilters();
 }
+
+function renderVacGestion(){
+  // Render all vacation sub-sections
+  safeRun(()=>{
+    // Vacation pending approvals
+    const vp=DB.vacaciones.filter(v=>v.estado==='pendiente').sort((a,b)=>a.solEn.localeCompare(b.solEn));
+    const vpEl=document.getElementById('aVacPend');
+    if(vpEl)vpEl.innerHTML=vp.length?vp.map(v=>`<div class="si">
+      <div class="si-top"><span class="si-name">${v.empName}</span><span class="badge pendiente">⏳ Pendiente</span></div>
+      <div class="si-dates">📅 ${fds(v.desde)} → ${fds(v.hasta)} · <b>${v.dias} días</b></div>
+      <div class="si-actions"><button class="bok" onclick="resVac('${v.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resVac('${v.id}','denegada')">❌ Denegar</button></div>
+    </div>`).join(''):'<div class="empty">Sin solicitudes pendientes ✅</div>';
+  },'vg_pend');
+  safeRun(renderVacResEmp,'vg_res');
+  safeRun(renderAutoVacPreview,'vg_auto');
+  safeRun(()=>{
+    const ne=document.getElementById('nomEmpVac')||document.getElementById('vacEmp');
+    if(ne)ne.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+    const ae=document.getElementById('adjEmp');
+    if(ae)ae.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+    const av=document.getElementById('autoVacEmp');
+    if(av)av.innerHTML='<option value="">Todos los empleados</option>'+sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  },'vg_selects');
+}
+
 function toggleVacDisfrutada(id){
   const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;
   v.disfrutada=!v.disfrutada;
