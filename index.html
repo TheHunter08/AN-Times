@@ -402,7 +402,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 <div class="screen" id="sFichaje">
   <div class="topbar">
     <div class="tbrand"><div class="tlogo">TI</div><div class="tname" id="topEmpName"><span>TIMES</span> INC</div></div>
-    <div class="tright"><span id="syncDotEmp" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><button class="ibtn bell" onclick="openNotis()" style="position:relative"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--text);stroke-width:2;fill:none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="noti-badge" id="notiBadgeEmp" style="display:none"></span></button><div class="tclock" id="topClk">--:--:--</div></div>
+    <div class="tright">
+    <button id="btnEncPanel" onclick="openPanelEncargado()" style="display:none;padding:6px 10px;border-radius:9px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:var(--accent3);font-size:11px;font-weight:700;cursor:pointer;margin-right:4px">⭐ Mi panel</button>
+    <span id="syncDotEmp" title="Estado de la base de datos" style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span><button class="ibtn bell" onclick="openNotis()" style="position:relative"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--text);stroke-width:2;fill:none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="noti-badge" id="notiBadgeEmp" style="display:none"></span></button><div class="tclock" id="topClk">--:--:--</div></div>
   </div>
   <div class="mc"><div class="fbody">
     <div class="ucard">
@@ -810,7 +812,13 @@ function restoreSession(){
     if(s.isAdmin){SES.isAdmin=true;SES.isEncargado=false;showSc('sAdmin');setTimeout(()=>safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();},'restore'),100);}
     else if(s.empId){
       const emp=DB.employees.find(e=>e.id===s.empId);
-      if(emp&&!emp.isAdmin){SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();}
+      if(emp&&!emp.isAdmin){
+        SES.user=emp;
+        SES.isEncargado=emp.role==='encargado';
+        showSc('sFichaje');initFichaje();updateBadges();
+        // Si es encargado, mostrar botón de panel
+        if(SES.isEncargado)safeRun(showEncargadoBtn,'showEncBtn_restore');
+      }
     }
   }catch(e){}
 }
@@ -1139,9 +1147,11 @@ function doLogin(){
     showSc('sAdmin');safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();antiBlockerDefense();},'admLogin');persistSession();
   } else if(emp.role==='encargado'){
     SES.isAdmin=false;SES.isEncargado=true;SES.user=emp;
-    showSc('sAdmin');safeRun(()=>{admTab('solicitudes');updateBadges();renderAdm();updateTabsForRole();antiBlockerDefense();},'encLogin');
-    persistSession();toast('Bienvenido '+emp.name);
+    // Encargado va al fichaje normal (puede fichar como empleado)
+    showSc('sFichaje');initFichaje();updateBadges();persistSession();
     registerForPush(emp.id);
+    // Mostrar botón de panel encargado en topbar
+    safeRun(showEncargadoBtn,'showEncBtn');
   } else {
     SES.isEncargado=false;SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();persistSession();
     registerForPush(emp.id);
@@ -1173,7 +1183,10 @@ function doAdmLogin(){
     }
   }catch(err){showErr('diag: '+err.message);}},600);
 }
-function doLogout(){TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false,isEncargado:false};try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
+function doLogout(){
+  TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false,isEncargado:false};
+  const btn=document.getElementById('btnEncPanel');if(btn)btn.style.display='none';
+  const btnB=document.getElementById('btnBackFichaje');if(btnB)btnB.remove();try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
 
 /* EMPLOYEE TABS */
 function empTab(t){
@@ -2782,6 +2795,47 @@ function cancelVacEmp(vacId){
   DB.vacaciones=DB.vacaciones.filter(x=>x.id!==vacId);
   clearVacCache();save();renderVac();
   toast('Solicitud cancelada');
+}
+
+
+/* ── ENCARGADO: puede fichar Y acceder a su panel ── */
+function showEncargadoBtn(){
+  const btn=document.getElementById('btnEncPanel');
+  if(btn)btn.style.display=SES.isEncargado?'inline-flex':'none';
+}
+
+function openPanelEncargado(){
+  if(!SES.isEncargado||!SES.user)return;
+  // Guardar estado del fichaje actual
+  showSc('sAdmin');
+  safeRun(()=>{
+    admTab('solicitudes');
+    updateBadges();
+    renderAdm();
+    updateTabsForRole();
+    antiBlockerDefense();
+  },'encPanel');
+  // Añadir botón "Volver a fichar" en el admin
+  safeRun(addBackToFichajeBtn,'addBackBtn');
+}
+
+function addBackToFichajeBtn(){
+  // Añadir botón de regreso en la topbar de admin para encargado
+  const existing=document.getElementById('btnBackFichaje');
+  if(existing)return;
+  const tbrand=document.querySelector('#sAdmin .tbrand');
+  if(!tbrand)return;
+  const btn=document.createElement('button');
+  btn.id='btnBackFichaje';
+  btn.innerHTML='← Volver a fichar';
+  btn.style.cssText='margin-left:8px;padding:5px 10px;border-radius:8px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:var(--accent3);font-size:11px;font-weight:600;cursor:pointer';
+  btn.onclick=()=>{
+    document.getElementById('btnBackFichaje')?.remove();
+    showSc('sFichaje');
+    initFichaje();
+    showEncargadoBtn();
+  };
+  tbrand.appendChild(btn);
 }
 
 /* KEY EVENTS */
