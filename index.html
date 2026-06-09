@@ -560,6 +560,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
             <div class="ff"><label>Hasta</label><input type="date" id="vacHasta"></div>
           </div>
           <div id="vacDiasInfo" style="font-size:12px;color:var(--accent);min-height:16px;margin-bottom:10px"></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);margin-bottom:12px;cursor:pointer;padding:8px 10px;background:rgba(16,185,129,0.06);border-radius:10px;border:1px solid rgba(16,185,129,0.15)">
+            <input type="checkbox" id="chkVacDisf" style="width:auto;accent-color:var(--green)">
+            <span>Marcar como <strong style="color:var(--green)">disfrutada</strong> al añadir</span>
+          </label>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <button class="badd" onclick="adminAddVac('aprobada')">✅ Añadir aprobada</button>
             <button class="btn-sec" onclick="adminAddVac('pendiente')" style="margin:0">⏳ Añadir pendiente</button>
@@ -1710,9 +1714,12 @@ function adminAddVac(estado){
   // Check if overlaps existing
   const overlap=DB.vacaciones.find(v=>v.empId===empId&&v.estado!=='denegada'&&!(hasta<v.desde||desde>v.hasta));
   if(overlap){toast('Ya existe un período de vacaciones que se solapa con esas fechas');return;}
+  const chkDisf=document.getElementById('chkVacDisf');
+  const marcarDisf=estado==='aprobada'&&chkDisf&&chkDisf.checked;
   DB.vacaciones.push({
     id:gid(),empId,empName:emp.name,empresa:emp.empresa,
     desde,hasta,dias,estado,
+    disfrutada:marcarDisf||false,
     solEn:new Date().toISOString(),
     addedByAdmin:true
   });
@@ -1724,8 +1731,9 @@ function adminAddVac(estado){
   document.getElementById('vacDesde').value='';
   document.getElementById('vacHasta').value='';
   document.getElementById('vacDiasInfo').textContent='';
+  const chkR=document.getElementById('chkVacDisf');if(chkR)chkR.checked=false;
   save();safeRun(renderAdmSols,'renderAdmSols');safeRun(updateBadges,'badges');
-  toast(`✅ Vacaciones ${estado==='aprobada'?'aprobadas':'pendientes'} añadidas (${dias} días)`);
+  toast(`✅ Vacaciones ${estado==='aprobada'?'aprobadas':'pendientes'} añadidas (${dias} días)${marcarDisf?' · marcadas como disfrutadas':''}`);
 }
 function updateVacAutoPreview(){
   const sel=document.getElementById('vacAutoEmp');
@@ -1816,7 +1824,7 @@ function renderAdmSols(){
           <div style="font-size:13px;color:var(--text)">📅 ${fds(v.desde)} → ${fds(v.hasta)}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">${v.dias} días · ${v.disfrutada?'<span style="color:var(--green)">✓ Disfrutada</span>':'<span style="color:var(--text3)">No marcada</span>'}</div>
         </div>
-        <button onclick="toggleVacDisfrutada('${v.id}')" style="padding:5px 10px;border-radius:8px;border:1px solid ${v.disfrutada?'rgba(16,185,129,0.3)':'var(--border2)'};background:${v.disfrutada?'rgba(16,185,129,0.1)':'rgba(255,255,255,0.04)'};color:${v.disfrutada?'var(--green)':'var(--text2)'};font-size:11px;font-weight:600;cursor:pointer">${v.disfrutada?'Disfrutada ✓':'Marcar disfrutada'}</button>
+        <button onclick="toggleVacDisfrutada('${v.id}')" style="padding:8px 14px;border-radius:10px;border:1px solid ${v.disfrutada?'rgba(16,185,129,0.4)':'rgba(99,102,241,0.3)'};background:${v.disfrutada?'rgba(16,185,129,0.12)':'rgba(99,102,241,0.08)'};color:${v.disfrutada?'var(--green)':'var(--accent3)'};font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">${v.disfrutada?'✓ Disfrutada':'◦ Marcar disfrutada'}</button>
       </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:6px 0">Sin vacaciones aprobadas</div>`;
     return`<div class="adcard" style="margin-bottom:8px;padding:14px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
