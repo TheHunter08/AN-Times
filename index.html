@@ -790,8 +790,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         <div id="encargadoList"></div>
         <div style="font-size:11px;color:var(--text3);margin-top:8px">Los encargados pueden validar las horas de sus trabajadores asignados.</div>
       </div>
-      <div class="adcard"><h3>Obras</h3><div id="empresaList"></div></div>
-      <div class="adcard"><h3>Añadir empleado</h3>
+            <div class="adcard"><h3>Añadir empleado</h3>
         <div class="ff"><label>Nombre completo</label><input type="text" id="nNombre" placeholder="Nombre y apellidos"></div>
         <div class="ff"><label>Obra</label><select id="nEmpresa" style="appearance:none"><option value="">— Empresa —</option></select></div>
         <div class="ff"><label>PIN (4-6 dígitos)</label><input type="text" id="nPin" placeholder="ej. 1234" maxlength="6" inputmode="numeric"></div>
@@ -818,16 +817,8 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         </div>
         <button class="badd" onclick="addEmp()">+ Añadir empleado</button>
       </div>
-      <div class="adcard"><h3>Añadir obra</h3>
-        <div class="ff"><label>Nombre</label><input type="text" id="nEmpNom" placeholder="Nombre de la obra"></div>
-        <button class="badd" onclick="addEmpresa()">+ Añadir obra</button>
-      </div>
-      <div class="adcard"><h3>Centros de trabajo</h3>
-        <div id="centrosList"></div>
-        <div class="ff" style="margin-top:12px"><label>Nuevo centro</label><input type="text" id="nCentroNom" placeholder="Ej: Planta Norte, Almacén A..."></div>
-        <button class="badd" onclick="addCentro()">+ Añadir centro de trabajo</button>
-      </div>
-    </div>
+          </div>
+
     <div id="aNominas" style="display:none">
       <div class="adcard"><h3>Enviar nómina a un trabajador</h3>
         <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">La nómina llega a la bandeja de mensajes del trabajador dentro de la propia aplicación. También se adjunta el resumen de horas del mes seleccionado.</div>
@@ -979,7 +970,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
-const ADM_PIN="0824",WK=40*60,WM=160*60,VPM=2.5;
+const ADM_PIN="0824",WK=40*60,WM=160*60,WD=8*60,VPM=2.5; // WD=jornada diaria 8h(min)
 const FB_CONFIG={
   apiKey:"AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ",
   authDomain:"times-inc.firebaseapp.com",
@@ -1591,7 +1582,7 @@ function renderRecent(){
   const el=document.getElementById('recentList');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}${Math.floor((r.workSecs||0)/60)>480?'<span style="font-size:10px;color:var(--orange);margin-left:4px" title="Más de 8h">+8h</span>':''}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
   }).join('');
 }
 
@@ -1722,7 +1713,7 @@ function renderHist(){
   const el=document.getElementById('fullHist');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${SES.isAdmin?`<button onclick="adminDelRecord('${r.id}')" style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;background:rgba(239,68,68,0.08);border:none;color:var(--text3);font-size:12px;cursor:pointer">✕</button>`:''}
+    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${SES.isAdmin?`<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px"><button onclick="openEditRecord('${r.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(99,102,241,0.1);border:none;color:var(--accent3);font-size:11px;cursor:pointer">✎</button><button onclick="adminDelRecord('${r.id}')" style="width:22px;height:22px;border-radius:6px;background:rgba(239,68,68,0.08);border:none;color:var(--text3);font-size:12px;cursor:pointer">✕</button></div>`:''}
 </div>`;
   }).join('');
 }
@@ -2298,7 +2289,7 @@ function expExcelCompleto(){
   }
   const wb=XLSX.utils.book_new();
   // ---- Hoja 1: FICHAJES ----
-  const fich=[['Nombre','Empresa','Fecha','Día','Entrada','Salida','Horas Trabajadas','Descanso','Horas Normales','Horas Extra']];
+  const fich=[['Nombre','Obra','Fecha','Día','Entrada','Salida','Horas Trabajadas','Descanso','Horas Normales','Horas Extra']];
   const weekAcc={};
   DB.records.filter(r=>r.fin).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
@@ -2306,9 +2297,8 @@ function expExcelCompleto(){
     const wKey=r.empId+'|'+wk;const mKey=r.empId+'|M|'+mk;
     const prevW=weekAcc[wKey]||0;const prevM=weekAcc[mKey]||0;
     const afterW=prevW+m;const afterM=prevM+m;
-    const normByW=Math.max(0,Math.min(afterW,WK)-Math.min(prevW,WK));
-    const normByM=Math.max(0,Math.min(afterM,WM)-Math.min(prevM,WM));
-    const norm=Math.min(normByW,normByM);const ext=m-norm;
+    const _ce=calcExtra(m,prevW,prevM);
+    const norm=_ce.norm;const ext=_ce.extra;
     weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
     const obra=r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra';
   fich.push([r.empName,obra,new Date(r.inicio).toLocaleDateString('es-ES'),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),ftime(r.fin),mhm(m),mhm(bm),mhm(norm),mhm(ext),r.validadoPor||'Pendiente']);
@@ -2317,7 +2307,7 @@ function expExcelCompleto(){
   wsF['!cols']=[{wch:26},{wch:16},{wch:12},{wch:11},{wch:9},{wch:9},{wch:16},{wch:10},{wch:15},{wch:13}];
   XLSX.utils.book_append_sheet(wb,wsF,'Fichajes');
   // ---- Hoja 2: VACACIONES ----
-  const vac=[['Nombre','Empresa','Desde','Hasta','Días','Estado','Solicitado']];
+  const vac=[['Nombre','Obra','Desde','Hasta','Días','Estado','Solicitado']];
   DB.vacaciones.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(v=>{
     vac.push([v.empName,v.empresa,fds(v.desde),fds(v.hasta),v.dias,v.estado,new Date(v.solEn).toLocaleDateString('es-ES')]);
   });
@@ -2325,7 +2315,7 @@ function expExcelCompleto(){
   wsV['!cols']=[{wch:26},{wch:16},{wch:13},{wch:13},{wch:7},{wch:12},{wch:13}];
   XLSX.utils.book_append_sheet(wb,wsV,'Vacaciones');
   // ---- Hoja 3: MÉDICOS ----
-  const med=[['Nombre','Empresa','Desde','Hasta','Días','Estado','Justificante','Nota']];
+  const med=[['Nombre','Obra','Desde','Hasta','Días','Estado','Justificante','Nota']];
   DB.medicos.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(m=>{
     med.push([m.empName,m.empresa,fds(m.desde),fds(m.hasta),m.dias,m.estado,m.justif?'Sí':'No',m.nota||'']);
   });
@@ -2333,7 +2323,7 @@ function expExcelCompleto(){
   wsM['!cols']=[{wch:26},{wch:16},{wch:13},{wch:13},{wch:7},{wch:12},{wch:12},{wch:30}];
   XLSX.utils.book_append_sheet(wb,wsM,'Médicos');
   // ---- Hoja 4: AUSENCIAS ----
-  const aus=[['Nombre','Empresa','Fecha','Motivo']];
+  const aus=[['Nombre','Obra','Fecha','Motivo']];
   DB.ausencias.sort((a,b)=>a.empName.localeCompare(b.empName)).forEach(a=>{
     aus.push([a.empName,a.empresa,fds(a.fecha),a.nota||'']);
   });
@@ -2341,7 +2331,7 @@ function expExcelCompleto(){
   wsA['!cols']=[{wch:26},{wch:16},{wch:13},{wch:34}];
   XLSX.utils.book_append_sheet(wb,wsA,'Ausencias');
   // ---- Hoja 5: RESUMEN POR TRABAJADOR ----
-  const res=[['Nombre','Empresa','Total Horas Normales','Total Horas Extra','Total Horas','Vacaciones Disponibles','Días Médico','Ausencias']];
+  const res=[['Nombre','Obra','Total Horas Normales','Total Horas Extra','Total Horas','Días Médico','Ausencias']];
   sortedEmps().forEach(emp=>{
     let tn=0,te=0;const wacc={};
     DB.records.filter(r=>r.empId===emp.id&&r.fin).sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
@@ -2351,10 +2341,11 @@ function expExcelCompleto(){
     const vd=vacData(emp.id);
     const md=DB.medicos.filter(m=>m.empId===emp.id&&m.estado!=='denegada').reduce((s,m)=>s+(m.dias||0),0);
     const ab=DB.ausencias.filter(a=>a.empId===emp.id).length;
-    res.push([emp.name,emp.empresa,mhm(tn),mhm(te),mhm(tn+te),vd.available+' días',md,ab]);
+    const obra2=emp.empresa||'Sin obra';
+  res.push([emp.name,obra2,mhm(tn),mhm(te),mhm(tn+te),md,ab]);
   });
   const wsR=XLSX.utils.aoa_to_sheet(res);
-  wsR['!cols']=[{wch:26},{wch:16},{wch:20},{wch:18},{wch:14},{wch:20},{wch:11},{wch:10}];
+  wsR['!cols']=[{wch:26},{wch:16},{wch:20},{wch:18},{wch:14},{wch:11},{wch:10}];
   XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
   // Guardar
   XLSX.writeFile(wb,'TIMES_INC_Completo_'+today()+'.xlsx');
@@ -2461,6 +2452,42 @@ function doCloseMonth(){
   if(!mk){toast('No hay meses por cerrar');return;}
   if(!confirm('¿Cerrar '+monthLabel(mk)+'? Las horas de ese mes se archivarán y se reiniciarán.'))return;
   forceMonthClose(mk);
+}
+function downloadCierre(mk){
+  // Download archived month as Excel
+  const closure=DB.cierres.find(c=>c.mes===mk);
+  if(!closure){toast('Archivo no encontrado');return;}
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.crossOrigin='anonymous';s.onload=()=>downloadCierre(mk);
+    s.onerror=()=>toast('Error cargando Excel');document.head.appendChild(s);
+    toast('Cargando…');return;
+  }
+  const wb=XLSX.utils.book_new();
+  // Fichajes del mes archivado
+  const rows=[['Nombre','Obra','Fecha','Entrada','Salida','H.Trabajadas','H.Normales','H.Extra','Estado']];
+  (closure.records||[]).forEach(r=>{
+    const m=Math.floor((r.workSecs||0)/60);
+    const obra=r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra';
+    rows.push([r.empName,obra,fdate(r.inicio),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),'—','—',r.aprobado?'Aprobado':'Pendiente']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:26},{wch:18},{wch:12},{wch:9},{wch:9},{wch:14},{wch:13},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'Fichajes');
+  // Resumen empleados
+  const resRows=[['Empleado','Obra','H.Normales','H.Extra','Jornadas']];
+  const empSummary={};
+  (closure.records||[]).forEach(r=>{
+    if(!empSummary[r.empId])empSummary[r.empId]={name:r.empName,obra:r.empresa||'',n:0,e:0,j:0};
+    const m=Math.floor((r.workSecs||0)/60);
+    empSummary[r.empId].n+=m;empSummary[r.empId].j++;
+  });
+  Object.values(empSummary).forEach(s=>resRows.push([s.name,s.obra,mhm(s.n),'—',s.j]));
+  const ws2=XLSX.utils.aoa_to_sheet(resRows);
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen');
+  XLSX.writeFile(wb,'Archivo_'+monthLabel(mk).replace(/\s/g,'_')+'.xlsx');
+  toast('Descargado: '+monthLabel(mk));
 }
 function renderCierres(){
   const el=document.getElementById('cierresList');if(!el)return;
@@ -2637,9 +2664,11 @@ function notisFor(){
   return [];
 }
 function unreadCount(){return notisFor().filter(n=>!n.leido).length;}
+let _notisOpen=false;
 function openNotis(){
+  if(_notisOpen)return;_notisOpen=true;
+  setTimeout(()=>_notisOpen=false,500);
   renderNotis();openMov('mNotis');
-  // mark read after viewing
   setTimeout(()=>{notisFor().forEach(n=>n.leido=true);save();updateBadges();},800);
 }
 function deleteReadNotis(){
@@ -2720,13 +2749,37 @@ function showSc(id){
   if(t){t.classList.add('active');t.style.display='block';}
   window.scrollTo(0,0);
 }
-function openMov(id){document.getElementById(id).classList.add('open');}
+function openMov(id){
+  const el=document.getElementById(id);if(!el)return;
+  if(el.classList.contains('open'))return;
+  el.style.display='flex';setTimeout(()=>el.classList.add('open'),10);
+}
 function closeMov(id){document.getElementById(id).classList.remove('open');}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function gid(){return 'r'+Date.now()+Math.random().toString(36).slice(2,6);}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function wkStart(d){const dt=new Date(d),day=dt.getDay(),diff=(day===0?-6:1-day);dt.setDate(dt.getDate()+diff);dt.setHours(0,0,0,0);return dt;}
 function wkKey(d){return wkStart(d).toISOString().slice(0,10);}
+
+/* ══════════════════════════════════════════════════════════
+   CÁLCULO DE HORAS EXTRA — Regla TIMES INC
+   Una hora cuenta como EXTRA solo si:
+   1. Ese día se superan las 8h diarias (WD), Y
+   2. La semana ya superó las 40h (WK) y el mes las 160h (WM)
+   Si la semana NO llega a 40h, las horas que superan las 8h
+   diarias se reclasifican como NORMALES para completar la jornada.
+   ══════════════════════════════════════════════════════════ */
+function calcExtra(minutos, prevWeekMin, prevMonthMin){
+  // Horas normales: las que caben dentro del tope semanal (40h) Y mensual (160h)
+  const normByWeek = Math.max(0, Math.min(prevWeekMin + minutos, WK) - Math.min(prevWeekMin, WK));
+  const normByMonth = Math.max(0, Math.min(prevMonthMin + minutos, WM) - Math.min(prevMonthMin, WM));
+  // Las normales se limitan por el tope más restrictivo (semana o mes)
+  const norm = Math.min(normByWeek, normByMonth);
+  // Extra = todo lo que supera el tope. Si la semana no llega a 40h,
+  // las horas que excedan las 8h diarias quedan como NORMALES (norm absorbe).
+  const extra = Math.max(0, minutos - norm);
+  return { norm: Math.max(0, norm), extra };
+}
 function monthKey(d){d=new Date(d);if(isNaN(d.getTime()))d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function monthLabel(mk){if(!mk||typeof mk!=='string'||mk.indexOf('-')<0)return String(mk||'—');const[y,m]=mk.split('-');const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];const nm=meses[parseInt(m)-1]||'';return (nm?nm+' ':'')+y;}
 function empMonthMins(empId,mk){
@@ -2774,7 +2827,8 @@ function checkMonthlyReset(){
 function forceMonthClose(mk){
   // Admin manual close of a given month
   if(DB.cierres.find(c=>c.mes===mk)){toast('Ese mes ya está cerrado');return;}
-  const closure=buildMonthClosure(mk);
+  const monthRecords=DB.records.filter(r=>r.fin&&monthKey(r.inicio)===mk);
+  const closure={...buildMonthClosure(mk),records:monthRecords};
   DB.cierres.push(closure);
   DB.records=DB.records.filter(r=>!(r.fin&&monthKey(r.inicio)===mk));
   save();renderAdm();renderCierres&&renderCierres();toast('Mes cerrado y archivado · horas reiniciadas');
@@ -2917,9 +2971,16 @@ function expExcelEncargado(){
   const obrasEnc=(SES.user&&SES.user.obrasAsignadas)||[];
   if(!obrasEnc.length){toast('No tienes obras asignadas');return;}
 
-  // Empleados de sus obras
-  const empsEnc=DB.employees.filter(e=>!e.isAdmin&&e.role!=='encargado'&&obrasEnc.includes(e.empresa));
+  // Empleados de sus obras (incluye al encargado mismo y otros encargados de esas obras)
+  const empsEnc=DB.employees.filter(e=>{
+    if(e.isAdmin)return false;
+    // El encargado mismo siempre incluido
+    if(SES.user&&e.id===SES.user.id)return true;
+    // Empleados/encargados cuya obra principal está en las obras asignadas
+    return obrasEnc.includes(e.empresa);
+  });
   const empIds=new Set(empsEnc.map(e=>e.id));
+  if(!empIds.size){toast('No hay empleados en tus obras asignadas');return;}
 
   const wb=XLSX.utils.book_new();
 
@@ -2932,9 +2993,8 @@ function expExcelEncargado(){
     const wKey=r.empId+'|'+wk;const mKey=r.empId+'|M|'+mk;
     const prevW=weekAcc[wKey]||0;const prevM=weekAcc[mKey]||0;
     const afterW=prevW+m;const afterM=prevM+m;
-    const normByW=Math.max(0,Math.min(afterW,WK)-Math.min(prevW,WK));
-    const normByM=Math.max(0,Math.min(afterM,WM)-Math.min(prevM,WM));
-    const norm=Math.min(normByW,normByM);const ext=m-norm;
+    const _ce=calcExtra(m,prevW,prevM);
+    const norm=_ce.norm;const ext=_ce.extra;
     weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
     const estado=r.aprobado?'✅ Aprobado':r.rechazado?'❌ Rechazado':'⏳ Pendiente';
     fich.push([r.empName,r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra',fdate(r.inicio),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado,r.validadoPor||'Pendiente']);
@@ -2954,9 +3014,8 @@ function expExcelEncargado(){
       const wk2=wkKey(new Date(r.inicio));const mk2=r.inicio.slice(0,7);
       const wK2=emp.id+'|'+wk2;const mK2=emp.id+'|M|'+mk2;
       const pW=wAcc2[wK2]||0;const pM=wAcc2[mK2]||0;
-      const nW=Math.max(0,Math.min(pW+m2,WK)-Math.min(pW,WK));
-      const nM=Math.max(0,Math.min(pM+m2,WM)-Math.min(pM,WM));
-      const n=Math.min(nW,nM);tn+=n;te+=m2-n;
+      const _ce=calcExtra(m2,pW,pM);
+      tn+=_ce.norm;te+=_ce.extra;
       wAcc2[wK2]=pW+m2;wAcc2[mK2]=pM+m2;
     });
     res.push([emp.name,emp.empresa,mhm(tn),mhm(te),recs.length]);
@@ -3124,10 +3183,9 @@ function renderMonthSummary(){
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const m=Math.floor((r.workSecs||0)/60);
     const wk=wkKey(new Date(r.inicio));const wK=emp.id+'|'+wk;
-    const prevW=weekAcc2[wK]||0;const afterW=prevW+m;
-    const normByW=Math.max(0,Math.min(afterW,WK)-Math.min(prevW,WK));
-    const normByM=Math.max(0,Math.min(normAcc+m,WM)-Math.min(normAcc,WM));
-    normAcc+=Math.min(normByW,normByM);weekAcc2[wK]=afterW;
+    const prevW=weekAcc2[wK]||0;
+    const _ce=calcExtra(m,prevW,normAcc);
+    normAcc+=_ce.norm;weekAcc2[wK]=prevW+m;
   });
   const extraMin=Math.max(0,totalMin-normAcc);
   // Update UI
@@ -3275,6 +3333,54 @@ function initTheme(){
     _darkMode=saved!=='light';
     applyTheme(_darkMode);
   }catch(e){}
+}
+
+
+/* ── ADMIN: EDITAR REGISTRO DIRECTO ── */
+function openEditRecord(recId){
+  if(!SES.isAdmin){toast('Solo el administrador puede editar registros');return;}
+  const r=DB.records.find(x=>x.id===recId);if(!r)return;
+  const existing=document.getElementById('mEditRec');if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='mEditRec';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:400;display:flex;align-items:flex-end;justify-content:center';
+  const inH=r.inicio?String(new Date(r.inicio).getHours()).padStart(2,'0')+':'+String(new Date(r.inicio).getMinutes()).padStart(2,'0'):'';
+  const outH=r.fin?String(new Date(r.fin).getHours()).padStart(2,'0')+':'+String(new Date(r.fin).getMinutes()).padStart(2,'0'):'';
+  const inDate=r.inicio?new Date(r.inicio).toISOString().split('T')[0]:'';
+  modal.innerHTML=`<div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;border-top:3px solid var(--accent)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:16px">✏️ Editar registro</h3>
+      <button onclick="document.getElementById('mEditRec').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Fecha</label>
+        <input type="date" id="erDate" value="${inDate}" style="width:100%;margin-top:4px"></div>
+      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Entrada</label>
+        <input type="time" id="erIn" value="${inH}" style="width:100%;margin-top:4px"></div>
+      <div></div>
+      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Salida</label>
+        <input type="time" id="erOut" value="${outH}" style="width:100%;margin-top:4px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="saveEditRecord('${recId}')" style="padding:13px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;font-weight:700;cursor:pointer">Guardar</button>
+      <button onclick="document.getElementById('mEditRec').remove()" style="padding:13px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function saveEditRecord(recId){
+  const r=DB.records.find(x=>x.id===recId);if(!r)return;
+  const date=document.getElementById('erDate')?.value;
+  const inT=document.getElementById('erIn')?.value;
+  const outT=document.getElementById('erOut')?.value;
+  if(!date||!inT){toast('Fecha y entrada son obligatorias');return;}
+  const [ih,im]=inT.split(':');
+  const dIn=new Date(date);dIn.setHours(+ih,+im,0,0);r.inicio=dIn.toISOString();
+  if(outT){const [oh,om]=outT.split(':');const dOut=new Date(date);dOut.setHours(+oh,+om,0,0);r.fin=dOut.toISOString();
+    if(dOut>dIn){const elapsed=Math.floor((dOut-dIn)/1000);r.workSecs=Math.max(0,elapsed-(r.breakSecs||0));}}
+  save();document.getElementById('mEditRec')?.remove();
+  safeRun(renderHist,'renderHist');safeRun(renderGStats,'renderGStats');
+  toast('Registro actualizado ✓');
 }
 
 /* KEY EVENTS */
