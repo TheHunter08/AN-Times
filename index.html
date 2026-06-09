@@ -381,7 +381,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v6.3 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v7.0 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -450,6 +450,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div class="ws med"><div class="wsico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="wstxt"><div class="v" id="wMed">0</div><div class="l">Días médico</div></div></div>
         <div class="ws abs"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="wstxt"><div class="v" id="wAbs">0</div><div class="l">Ausencias</div></div></div>
       </div></div>
+      <div class="adcard" id="monthSummaryCard" style="margin:8px 0 0;padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase" id="monthSummaryLabel">Este mes</div>
+          <div id="monthSummaryBadge" style="font-size:10px;padding:3px 8px;border-radius:20px;background:rgba(99,102,241,0.12);color:var(--accent3);font-weight:600"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text)" id="msWorked">0h 0m</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">TRABAJADAS</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--rose)" id="msExtra">0h 0m</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">EXTRAS</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--green)" id="msDays">0</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">JORNADAS</div>
+          </div>
+        </div>
+      </div>
       <div class="hsec"><h3>Últimos registros</h3><div id="recentList"><div class="empty">Sin registros aún</div></div></div>
     </div>
     <!-- VACACIONES TAB -->
@@ -987,7 +1007,7 @@ function startPolling(){
       }
     })
     .catch(function(){/* polling falla silenciosamente */});
-  },30000);
+  },60000); // Polling optimizado para producción
 }
 
 function autoConnectCloud(){
@@ -1371,7 +1391,7 @@ function renderRecent(){
   const el=document.getElementById('recentList');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?'<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ Aprobado</span>':r.aprobado===false?'<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado</span>':'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
   }).join('');
 }
 
@@ -1502,7 +1522,7 @@ function renderHist(){
   const el=document.getElementById('fullHist');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?'<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ Aprobado</span>':r.aprobado===false?'<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado</span>':'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
   }).join('');
 }
 
@@ -1523,7 +1543,7 @@ function admTab(t){
   else if(t==='nominas'){safeRun(renderNomMesOptions2,'renderNomMesOptions2');safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderMensajeria,'renderMensajeria');}
   else if(t==='overview')safeRun(renderAdm,'renderAdm');
 }
-let _gsT=null;function renderAdm(){clearTimeout(_gsT);_gsT=setTimeout(()=>{safeRun(renderGStats,"renderGStats");safeRun(renderEList,"renderEList");safeRun(renderAdmFilters,"renderAdmFilters");safeRun(updateTabsForRole,"updateTabsForRole");},80);}
+let _gsT=null;function renderAdm(){clearTimeout(_gsT);_gsT=setTimeout(()=>{safeRun(renderGStats,"renderGStats");safeRun(renderEList,"renderEList");safeRun(renderAdmFilters,"renderAdmFilters");safeRun(updateTabsForRole,"updateTabsForRole");},120);}
 
 /* ── ADMIN: CONTROL DE JORNADA DE EMPLEADOS ── */
 function renderControl(){
@@ -1713,9 +1733,13 @@ function aprobarHorasConEdicion(recId,aprobado){
 function aprobarHoras(recId,aprobado){
   const r=DB.records.find(x=>x.id===recId);if(!r)return;
   r.aprobado=aprobado;
+  // Guardar quién validó (admin o encargado)
+  const validador=SES.isEncargado&&SES.user?SES.user.name:'Administrador';
+  r.validadoPor=validador;
+  r.validadoEn=new Date().toISOString();
   pushNoti('emp:'+r.empId,aprobado?'vac':'abs',
     aprobado?'Horas aprobadas ✅':'Horas rechazadas ❌',
-    (aprobado?'Tu jornada del ':'Tu jornada del ')+new Date(r.inicio).toLocaleDateString('es-ES')+' ha sido '+(aprobado?'validada por el administrador.':'rechazada. Contacta con el administrador.'));
+    `Tu jornada del ${new Date(r.inicio).toLocaleDateString('es-ES')} ha sido ${aprobado?`validada por ${validador}.`:`rechazada. Contacta con ${validador}.`}`);
   save();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas':'Horas rechazadas');
 }
 /* ── Gestión de vacaciones (admin) ── */
@@ -1923,7 +1947,7 @@ function renderRecs(){
   const el=document.getElementById('recList');
   if(!recs.length){el.innerHTML='<div class="empty">Aún no hay registros. Los fichajes aparecerán aquí.</div>';return;}
   el.innerHTML='<div class="adcard">'+recs.map(r=>{const e=DB.employees.find(x=>x.id===r.empId);const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?'<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ Aprobado</span>':r.aprobado===false?'<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado</span>':'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${(r.locInicio||r.locFin)?`<div style="display:flex;gap:8px;padding:4px 0 10px;margin-top:-4px">${r.locInicio?`<button class="bloc" onclick="verUbicacion(${r.locInicio.lat},${r.locInicio.lng})">📍 Entrada</button>`:''}${r.locFin?`<button class="bloc" onclick="verUbicacion(${r.locFin.lat},${r.locFin.lng})">📍 Salida</button>`:''}</div>`:''}`;
+    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${(r.locInicio||r.locFin)?`<div style="display:flex;gap:8px;padding:4px 0 10px;margin-top:-4px">${r.locInicio?`<button class="bloc" onclick="verUbicacion(${r.locInicio.lat},${r.locInicio.lng})">📍 Entrada</button>`:''}${r.locFin?`<button class="bloc" onclick="verUbicacion(${r.locFin.lat},${r.locFin.lng})">📍 Salida</button>`:''}</div>`:''}`;
   }).join('')+'</div>';
 }
 function renderCentros(){
@@ -2875,6 +2899,41 @@ function addBackToFichajeBtn(){
     showEncargadoBtn();
   };
   tbrand.appendChild(btn);
+}
+
+
+/* ── RESUMEN MENSUAL EMPLEADO ── */
+function renderMonthSummary(){
+  const emp=SES.user;if(!emp)return;
+  const now=new Date();
+  const mk=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthName=now.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  // Records de este mes
+  const recs=DB.records.filter(r=>r.empId===emp.id&&r.fin&&r.inicio.startsWith(mk));
+  const totalMin=recs.reduce((s,r)=>s+Math.floor((r.workSecs||0)/60),0);
+  const days=recs.length;
+  // Horas extras del mes
+  let normAcc=0;const weekAcc2={};
+  recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+    const m=Math.floor((r.workSecs||0)/60);
+    const wk=wkKey(new Date(r.inicio));const wK=emp.id+'|'+wk;
+    const prevW=weekAcc2[wK]||0;const afterW=prevW+m;
+    const normByW=Math.max(0,Math.min(afterW,WK)-Math.min(prevW,WK));
+    const normByM=Math.max(0,Math.min(normAcc+m,WM)-Math.min(normAcc,WM));
+    normAcc+=Math.min(normByW,normByM);weekAcc2[wK]=afterW;
+  });
+  const extraMin=Math.max(0,totalMin-normAcc);
+  // Update UI
+  const label=document.getElementById('monthSummaryLabel');
+  const badge=document.getElementById('monthSummaryBadge');
+  const worked=document.getElementById('msWorked');
+  const extra=document.getElementById('msExtra');
+  const daysEl=document.getElementById('msDays');
+  if(label)label.textContent=monthName.charAt(0).toUpperCase()+monthName.slice(1);
+  if(badge)badge.textContent=`${days} jornada${days!==1?'s':''}`;
+  if(worked)worked.textContent=mhm(totalMin);
+  if(extra){extra.textContent=mhm(extraMin);extra.style.color=extraMin>0?'var(--rose)':'var(--text2)';}
+  if(daysEl)daysEl.textContent=days;
 }
 
 /* KEY EVENTS */
