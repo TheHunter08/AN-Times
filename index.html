@@ -1029,36 +1029,49 @@ function allEmps(list){
 /* LOGIN */
 function loadRemembered(){
   try{
-    const raw=localStorage.getItem('an_times_remember');if(!raw)return;
+    const raw=localStorage.getItem('an_times_remember');
+    if(!raw)return;
     const saved=JSON.parse(raw);
-    // Mark checkbox
-    const remCk=document.getElementById('chkRemember');if(remCk)remCk.checked=true;
-    // Find employee — could be in DB after Firebase loads
+    if(!saved||!saved.empId)return;
+
+    // 1. Marcar checkbox
+    const remCk=document.getElementById('chkRemember');
+    if(remCk)remCk.checked=true;
+
+    // 2. Buscar empleado (puede que Firebase no haya cargado aún)
     const emp=DB.employees.find(e=>e.id===saved.empId&&!e.isAdmin);
-    if(!emp)return; // employee not found yet, will retry after Firebase loads
-    // Fill obra select
+    const empresa=emp?emp.empresa:(saved.empresa||'');
+    const nombre=emp?emp.name:(saved.name||'');
+
+    // 3. Rellenar select de OBRA
     const seE=document.getElementById('selEmpresa');
-    if(seE){
-      seE.value=emp.empresa;
-      if(seE.value!==emp.empresa){
-        // Option not in list yet — add it
-        const opt=new Option(emp.empresa,emp.empresa);seE.add(opt);seE.value=emp.empresa;
+    if(seE&&empresa){
+      // Asegurarse de que la opción existe
+      if(![...seE.options].some(o=>o.value===empresa)){
+        seE.add(new Option(empresa,empresa));
       }
-      popEmps(emp.empresa);
+      seE.value=empresa;
     }
-    // Fill employee select
+
+    // 4. Rellenar select de EMPLEADO — primero repoblar con los de esa obra
+    popEmps(empresa);
     const seEmp=document.getElementById('selEmpleado');
     if(seEmp){
-      seEmp.value=saved.empId;
-      if(seEmp.value!==saved.empId){
-        const opt2=new Option(emp.name,saved.empId);seEmp.add(opt2);seEmp.value=saved.empId;
+      // Si la opción del empleado no está, añadirla
+      if(![...seEmp.options].some(o=>o.value===saved.empId)){
+        seEmp.add(new Option(nombre,saved.empId));
       }
+      seEmp.value=saved.empId;
     }
-    // Fill PIN
+
+    // 5. Rellenar PIN
     const pinI=document.getElementById('inputPin');
     if(pinI&&saved.pin)pinI.value=saved.pin;
-    console.info('[TI] Remember me: restored',emp.name);
-  }catch(e){console.warn('loadRemembered error:',e.message);}
+
+    console.info('[TI] Recordar usuario: restaurado →',nombre);
+  }catch(ex){
+    console.warn('[TI] loadRemembered error:',ex.message);
+  }
 }
 function popSelects(){
   const obras=DB.empresas&&DB.empresas.length?DB.empresas:[];
@@ -1084,8 +1097,17 @@ function doLogin(){
   if(pin!==emp.pin){err.textContent='PIN incorrecto';return;}
   err.textContent='';document.getElementById('inputPin').value='';
   const remCk=document.getElementById('chkRemember');
-  if(remCk&&remCk.checked){try{localStorage.setItem('an_times_remember',JSON.stringify({empId:id,pin}));}catch(e){}}
-  else{try{localStorage.removeItem('an_times_remember');}catch(e){}}
+  if(remCk&&remCk.checked){
+    try{
+      const seEmpresa=document.getElementById('selEmpresa');
+      localStorage.setItem('an_times_remember',JSON.stringify({
+        empId:id,
+        pin:pin,
+        empresa:emp.empresa||'',
+        name:emp.name||''
+      }));
+    }catch(ex){}
+  }else{try{localStorage.removeItem('an_times_remember');}catch(ex){}}
   if(emp.isAdmin){
     SES.isAdmin=true;SES.isEncargado=false;SES.user=null;
     showSc('sAdmin');safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();antiBlockerDefense();},'admLogin');persistSession();
@@ -2620,7 +2642,7 @@ function initApp(){
       if(se&&se.options.length<2)safeRun(popSelects,'pop_chk');
       // También refrescar empleados si Firebase ya cargó y el select sigue vacío
       const seE=document.getElementById('selEmpleado');
-      if(_connDone&&seE&&seE.options.length<2)popEmps(se?se.value:'');
+      if(_connDone&&seE&&seE.options.length<2){popEmps(se?se.value:'');safeRun(loadRemembered,'lr_chk');}
     }
     if(_connDone)clearInterval(_selChk);
   },500);
