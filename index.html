@@ -457,7 +457,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div class="vpbg"><div class="vpfill" id="vacPBar" style="width:0%"></div></div>
         <div style="font-size:11px;color:var(--text2);text-align:right;margin-bottom:14px" id="vacPLbl"></div>
         <div class="vrow"><span class="vl">Generados (2,5 días/mes)</span><span class="vv violet" id="vacGen">0</span></div>
-        <div class="vrow"><span class="vl">Disfrutados</span><span class="vv red" id="vacUsed">0</span></div>
+        <div class="vrow"><span class="vl">Disfrutadas ✓</span><span class="vv" style="color:var(--green)" id="vacDisf">0</span></div>
+        <div class="vrow"><span class="vl">Aprobadas (total)</span><span class="vv red" id="vacUsed">0</span></div>
         <div class="vrow"><span class="vl">Pendientes aprobación</span><span class="vv" style="color:var(--orange)" id="vacPend">0</span></div>
         <div class="vrow"><span class="vl">Tasa acumulación</span><span class="vv" style="font-size:12px;color:var(--text2)">2,5 días / mes</span></div>
         <div class="vrow"><span class="vl">Inicio contrato</span><span class="vv" id="vacStart" style="font-size:12px">—</span></div>
@@ -999,6 +1000,7 @@ function vacData(empId){
 }
 function clearVacCache(){_vacCache={};}
 function wkdays(f,t){let c=0;const d=new Date(f),e=new Date(t);while(d<=e){const wd=d.getDay();if(wd!==0&&wd!==6)c++;d.setDate(d.getDate()+1);}return c;}
+const calcDiasLab=(f,t)=>wkdays(f,t); // alias
 
 /* CLOCK */
 function hms(d){return[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');}
@@ -1352,22 +1354,48 @@ function doReqVac(){
   renderVac();toast('Solicitud enviada — pendiente de aprobación');
 }
 function renderVac(){
-  const e=SES.user,vd=vacData(e.id);
+  const emp=SES.user;if(!emp)return;
+  clearVacCache();
+  const vd=vacData(emp.id);
+  // Calcular disfrutadas
+  const disf=DB.vacaciones.filter(v=>v.empId===emp.id&&v.estado==='aprobada'&&v.disfrutada).reduce((s,v)=>s+v.dias,0);
+  const totalAprobadas=DB.vacaciones.filter(v=>v.empId===emp.id&&v.estado==='aprobada').reduce((s,v)=>s+v.dias,0);
+  // Actualizar stats
   document.getElementById('vacDisp').textContent=vd.available;
-  const p=vd.generated>0?Math.min(100,(vd.used/vd.generated)*100):0;
+  const p=vd.generated>0?Math.min(100,(totalAprobadas/vd.generated)*100):0;
   document.getElementById('vacPBar').style.width=p.toFixed(1)+'%';
-  document.getElementById('vacPLbl').textContent=`${vd.used} de ${vd.generated} generados`;
+  document.getElementById('vacPLbl').textContent=`${totalAprobadas} de ${vd.generated} generadas`;
   document.getElementById('vacGen').textContent=vd.generated;
-  document.getElementById('vacUsed').textContent=vd.used;
+  document.getElementById('vacDisf').textContent=disf;
+  document.getElementById('vacUsed').textContent=totalAprobadas;
   document.getElementById('vacPend').textContent=vd.pending;
   document.getElementById('vacStart').textContent=vd.startDate;
   document.getElementById('vacMonths').textContent=vd.months;
-  const mine=DB.vacaciones.filter(v=>v.empId===e.id).sort((a,b)=>b.solEn.localeCompare(a.solEn));
+  // Lista de solicitudes con editor
+  const mine=DB.vacaciones.filter(v=>v.empId===emp.id).sort((a,b)=>(b.desde||'').localeCompare(a.desde||''));
   const el=document.getElementById('mySols');
-  el.innerHTML=mine.length?mine.map(v=>`<div class="si">
-    <div class="si-top"><span class="si-name">${fds(v.desde)} → ${fds(v.hasta)}</span><span class="badge ${v.estado}">${v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✅':'❌'} ${v.estado}</span></div>
-    <div class="si-dates">${v.dias} día${v.dias!==1?'s':''} laborable${v.dias!==1?'s':''}</div>
-  </div>`).join(''):'<div class="empty">Sin solicitudes</div>';
+  if(!el)return;
+  if(!mine.length){el.innerHTML='<div class="empty">Sin solicitudes de vacaciones</div>';return;}
+  el.innerHTML=mine.map(v=>{
+    const isPending=v.estado==='pendiente';
+    const isApproved=v.estado==='aprobada';
+    const stateLabel=isPending?'⏳ Pendiente':isApproved?'✅ Aprobada':'❌ Denegada';
+    const disfLabel=isApproved?(v.disfrutada?'<span style="font-size:11px;color:var(--green);font-weight:600">✓ Disfrutada</span>':'<span style="font-size:11px;color:var(--text3)">No disfrutada</span>'):'';
+    const editBtn=isPending
+      ?`<button onclick="openEditVac('${v.id}')" style="padding:5px 10px;border-radius:8px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);color:var(--accent3);font-size:11px;font-weight:600;cursor:pointer">✎ Editar</button>`
+      :'';
+    const cancelBtn=isPending
+      ?`<button onclick="cancelVacEmp('${v.id}')" style="padding:5px 10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--red);font-size:11px;cursor:pointer">✕ Cancelar</button>`
+      :'';
+    return`<div class="si" style="border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;background:rgba(255,255,255,0.02)">
+      <div class="si-top" style="margin-bottom:6px">
+        <span class="si-name" style="font-size:14px;font-weight:600">📅 ${fds(v.desde)} → ${fds(v.hasta)}</span>
+        <span class="badge ${v.estado}">${stateLabel}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${v.dias} día${v.dias!==1?'s':''} laborable${v.dias!==1?'s':''} ${disfLabel}</div>
+      ${(editBtn||cancelBtn)?`<div style="display:flex;gap:8px">${editBtn}${cancelBtn}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 /* MÉDICO */
@@ -2647,6 +2675,67 @@ if('serviceWorker' in navigator){
       sendBrowserNotif(event.data.title,event.data.body,event.data.notiType||'info');
     }
   });
+}
+
+
+/* ── EDITAR VACACIONES (empleado) ── */
+function openEditVac(vacId){
+  const v=DB.vacaciones.find(x=>x.id===vacId);
+  if(!v||v.estado!=='pendiente'){toast('Solo se pueden editar solicitudes pendientes');return;}
+  // Crear modal de edición inline
+  const existing=document.getElementById('mEditVacEmp');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='mEditVacEmp';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;border-top:2px solid rgba(99,102,241,0.3)">
+      <h3 style="margin:0 0 4px;font-size:16px">✎ Editar solicitud</h3>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 16px">Solo puedes editar solicitudes pendientes de aprobar</p>
+      <div class="ff"><label>Fecha inicio</label><input type="date" id="editVacDesde" value="${v.desde}"></div>
+      <div class="ff"><label>Fecha fin</label><input type="date" id="editVacHasta" value="${v.hasta}"></div>
+      <div id="editVacInfo" style="font-size:12px;color:var(--accent3);margin-bottom:12px;min-height:16px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="document.getElementById('mEditVacEmp').remove()" style="padding:13px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-weight:600">Cancelar</button>
+        <button onclick="saveEditVac('${vacId}')" style="padding:13px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;cursor:pointer;font-weight:700">Guardar</button>
+      </div>
+    </div>`;
+  // Actualizar info de días al cambiar fechas
+  function updateDays(){
+    const d=document.getElementById('editVacDesde')?.value;
+    const h=document.getElementById('editVacHasta')?.value;
+    const info=document.getElementById('editVacInfo');
+    if(d&&h&&d<=h){
+      const dias=calcDiasLab(d,h);
+      if(info)info.textContent=`${dias} día${dias!==1?'s':''} laborable${dias!==1?'s':''}`;
+    } else if(info){info.textContent=d&&h&&d>h?'La fecha de fin debe ser posterior al inicio':'';}
+  }
+  modal.querySelector('#editVacDesde').addEventListener('change',updateDays);
+  modal.querySelector('#editVacHasta').addEventListener('change',updateDays);
+  document.body.appendChild(modal);
+  updateDays();
+}
+
+function saveEditVac(vacId){
+  const v=DB.vacaciones.find(x=>x.id===vacId);
+  if(!v||v.estado!=='pendiente')return;
+  const desde=document.getElementById('editVacDesde')?.value;
+  const hasta=document.getElementById('editVacHasta')?.value;
+  if(!desde||!hasta||desde>hasta){toast('Fechas inválidas');return;}
+  v.desde=desde;v.hasta=hasta;v.dias=calcDiasLab(desde,hasta);
+  clearVacCache();save();
+  document.getElementById('mEditVacEmp')?.remove();
+  renderVac();
+  toast('Solicitud actualizada ✓');
+}
+
+function cancelVacEmp(vacId){
+  const v=DB.vacaciones.find(x=>x.id===vacId);
+  if(!v||v.estado!=='pendiente'){toast('Solo puedes cancelar solicitudes pendientes');return;}
+  if(!confirm('¿Cancelar esta solicitud de vacaciones?'))return;
+  DB.vacaciones=DB.vacaciones.filter(x=>x.id!==vacId);
+  clearVacCache();save();renderVac();
+  toast('Solicitud cancelada');
 }
 
 /* KEY EVENTS */
