@@ -282,8 +282,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg2);border:1px solid var(--border2);border-radius:30px;padding:10px 20px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transition:all 0.25s;z-index:200;pointer-events:none;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 /* Modal */
-.mov{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity 0.2s}
-@media(min-width:560px){.mov{align-items:center}.mov .msh{border-radius:18px!important;transform:scale(0.95)!important}.mov.open .msh{transform:scale(1)!important}}
+.mov{contain:layout style;position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity 0.2s}
+@media(min-width:560px){.mov{align-items:center}.mov .msh{will-change:transform;border-radius:18px!important;transform:scale(0.95)!important}.mov.open .msh{transform:scale(1)!important}}
 .mov.open{opacity:1;pointer-events:all}
 .msh{background:linear-gradient(180deg,rgba(13,20,40,0.98),rgba(10,15,26,0.98));backdrop-filter:blur(24px);border-radius:24px 24px 0 0;border:1px solid rgba(99,102,241,0.15);border-bottom:none;width:100%;max-width:480px;padding:20px 20px 36px;transform:translateY(100%);transition:transform 0.25s;box-shadow:0 -8px 48px rgba(0,0,0,0.5)}
 .mov.open .msh{transform:translateY(0);animation:slideUp 0.22s cubic-bezier(0.34,1.56,0.64,1)}
@@ -351,6 +351,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 
 .atab{position:relative}
 .tab-badge{position:absolute;top:3px;right:3px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;pointer-events:none}
+
+/* ── LIST CARD style (Obras / Centros) ── */
+.list-card{background:var(--card);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;margin-bottom:0}
+.list-card-label{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);padding:14px 16px 6px;text-transform:uppercase}
+.list-card-item{display:flex;align-items:center;justify-content:space-between;padding:15px 14px;margin:4px 10px;border-radius:14px;transition:background 0.15s}
+.list-card-item:hover{background:rgba(99,102,241,0.04)}
+.list-card-item:last-child{margin-bottom:8px}
+.list-card-name{font-size:17px;font-weight:500;color:var(--text);letter-spacing:-0.2px}
+.list-card-del{width:42px;height:42px;border-radius:12px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.2);color:#f87171;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;font-weight:300}
+.list-card-del:hover{background:rgba(220,38,38,0.2);border-color:rgba(220,38,38,0.4);transform:scale(1.05)}
+.list-card-empty{padding:18px 16px;font-size:13px;color:var(--text3);text-align:center}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 <!-- SheetJS se carga bajo demanda en expExcelCompleto() -->
@@ -367,7 +379,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v6.0 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v6.2 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -577,6 +589,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
     </div>
     <div id="aEmpleados" style="display:none">
       <div class="adcard"><h3>Empleados activos</h3><div id="empList"></div></div>
+      <div class="adcard"><h3>Encargados</h3>
+        <div id="encargadoList"></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px">Los encargados pueden validar las horas de sus trabajadores asignados.</div>
+      </div>
       <div class="adcard"><h3>Obras</h3><div id="empresaList"></div></div>
       <div class="adcard"><h3>Añadir empleado</h3>
         <div class="ff"><label>Nombre completo</label><input type="text" id="nNombre" placeholder="Nombre y apellidos"></div>
@@ -591,6 +607,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
             <option value="#bf5af2">Violeta</option><option value="#ffd60a">Amarillo</option>
             <option value="#00bfa5">Turquesa</option>
           </select>
+        </div>
+        <div class="ff">
+          <label>Rol del empleado</label>
+          <select id="nRol" style="appearance:none" onchange="toggleRolObras()">
+            <option value="">Empleado</option>
+            <option value="encargado">⭐ Encargado (puede validar horas)</option>
+          </select>
+        </div>
+        <div id="fObrasEncargado" style="display:none" class="ff">
+          <label>Obras asignadas (encargado)</label>
+          <div id="obrasEncargadoCheck" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"></div>
         </div>
         <button class="badd" onclick="addEmp()">+ Añadir empleado</button>
       </div>
@@ -625,22 +652,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
       <div class="adcard"><h3>Mensajes enviados</h3><div id="msgEnviados"></div></div>
     </div>
     <div id="aExportar" style="display:none">
-      <div class="adcard"><h3>Exportar datos</h3>
-        <button class="expbtn" onclick="expExcelCompleto()" style="background:linear-gradient(135deg,var(--green2),var(--green));color:#0e1116;font-weight:700"><span>📗</span> Excel COMPLETO (todo en un archivo, por hojas)</button>
-        <button class="expbtn csv" onclick="expFichajes()"><span>📊</span> CSV Fichajes (Excel/Sheets)</button>
-        <button class="expbtn vacv" onclick="expVacaciones()"><span>🌴</span> CSV Vacaciones</button>
-        <button class="expbtn abs" onclick="expAusencias()"><span>🏥⚠</span> CSV Médicos y Ausencias</button>
-        <button class="expbtn csv" onclick="expMensual()" style="background:linear-gradient(135deg,var(--violet2),var(--violet));color:#fff"><span>📅</span> CSV Resumen Mensual (horas + extras por trabajador)</button>
-        <button class="expbtn jsnb" onclick="expJSON()"><span>💾</span> JSON Backup completo</button>
-        <div class="expinfo">
-          <b style="display:block;margin-bottom:8px">📋 Subir a Google Sheets:</b>
-          <div class="step"><div class="snum">1</div><div>Descarga el CSV</div></div>
-          <div class="step"><div class="snum">2</div><div>Abre <b>sheets.google.com</b> → Nueva hoja</div></div>
-          <div class="step"><div class="snum">3</div><div>Archivo → <b>Importar → Subir</b></div></div>
-          <div class="step"><div class="snum">4</div><div>Selecciona el CSV → "Reemplazar hoja"</div></div>
-          <div class="step"><div class="snum">5</div><div>¡Datos importados con todo calculado!</div></div>
+      <div class="adcard">
+        <h3>📊 Exportar datos</h3>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Descarga toda la información en formato Excel con múltiples hojas.</p>
+        <button class="expbtn" onclick="expExcelCompleto()" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-weight:700;padding:16px;font-size:15px"><span>📗</span>&nbsp; Excel COMPLETO — Fichajes, Vacaciones, Médicos, Ausencias, Resumen</button>
+        <div style="margin-top:12px;padding:12px;background:rgba(99,102,241,0.05);border-radius:12px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">El archivo incluye 5 hojas:</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">📋 Hoja 1 — Fichajes detallados &nbsp;|&nbsp; 🌴 Hoja 2 — Vacaciones &nbsp;|&nbsp; 🏥 Hoja 3 — Médicos &nbsp;|&nbsp; ⚠️ Hoja 4 — Ausencias &nbsp;|&nbsp; 📅 Hoja 5 — Resumen mensual</div>
         </div>
       </div>
+    </div>
       <div class="adcard"><h3>Base de datos en la nube</h3>
         <div id="dbStatusCard" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm)">
           <span id="dbStatusDot" style="width:10px;height:10px;border-radius:50%;background:var(--orange)"></span>
@@ -675,7 +696,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
   <div class="ff"><label>PIN (mín. 4 dígitos)</label><input type="text" id="edPin" inputmode="numeric" maxlength="6"></div>
   <div class="ff"><label>Email (para nóminas)</label><input type="email" id="edEmail"></div>
   <div class="ff"><label>Fecha inicio contrato</label><input type="date" id="edStart"></div>
-  <div class="ff"><label>Color avatar</label><input type="color" id="edColor" style="width:100%;height:42px;padding:4px"></div>
+  <div class="ff"><label>Color avatar</label>
+    <select id="edColor" style="appearance:none">
+      <option value="#6366f1">Índigo</option><option value="#10b981">Verde</option>
+      <option value="#f59e0b">Naranja</option><option value="#ef4444">Rojo</option>
+      <option value="#8b5cf6">Violeta</option><option value="#eab308">Amarillo</option>
+      <option value="#14b8a6">Turquesa</option><option value="#f43f5e">Rosa</option>
+    </select>
+  </div>
+  <div class="ff">
+    <label>Rol</label>
+    <select id="edRol" style="appearance:none" onchange="toggleEdRolObras()">
+      <option value="">Empleado</option>
+      <option value="encargado">⭐ Encargado (puede validar horas)</option>
+    </select>
+  </div>
+  <div id="edFObrasEncargado" style="display:none" class="ff">
+    <label>Obras asignadas al encargado</label>
+    <div id="edObrasCheck" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"></div>
+  </div>
   <div id="edErr" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px"></div>
   <div class="mbtns"><button class="mbtn confirm" onclick="saveEditEmp()">Guardar cambios</button><button class="mbtn cancel" onclick="closeMov('mEditEmp')">Cancelar</button></div>
 </div></div>
@@ -977,9 +1016,7 @@ function popSelects(){
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');if(!se)return;
   const all=DB.employees&&DB.employees.length?DB.employees:[];
-  const workers=sortedEmps(emp?all.filter(e=>e.empresa===emp&&!e.isAdmin):all.filter(e=>!e.isAdmin));
-  const admins=all.filter(e=>e.isAdmin);
-  const list=[...admins,...workers];
+  const list=sortedEmps(emp?all.filter(e=>e.empresa===emp&&!e.isAdmin&&e.role!=='encargado'):all.filter(e=>!e.isAdmin&&e.role!=='encargado'));
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function doLogin(){
@@ -991,8 +1028,16 @@ function doLogin(){
   const remCk=document.getElementById('chkRemember');
   if(remCk&&remCk.checked){try{localStorage.setItem('an_times_remember',JSON.stringify({empId:id,pin}));}catch(e){}}
   else{try{localStorage.removeItem('an_times_remember');}catch(e){}}
-  if(emp.isAdmin){SES.isAdmin=true;SES.user=null;showSc('sAdmin');safeRun(()=>{admTab('overview');updateBadges();antiBlockerDefense();},'admLogin');persistSession();}
-  else{SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();persistSession();}
+  if(emp.isAdmin){
+    SES.isAdmin=true;SES.isEncargado=false;SES.user=null;
+    showSc('sAdmin');safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();antiBlockerDefense();},'admLogin');persistSession();
+  } else if(emp.role==='encargado'){
+    SES.isAdmin=false;SES.isEncargado=true;SES.user=emp;
+    showSc('sAdmin');safeRun(()=>{admTab('solicitudes');updateBadges();renderAdm();updateTabsForRole();antiBlockerDefense();},'encLogin');
+    persistSession();toast('Bienvenido '+emp.name);
+  } else {
+    SES.isEncargado=false;SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();persistSession();
+  }
 }
 function openAdminLogin(){accesoRapidoAdmin();}
 function doAdmLogin(){
@@ -1431,6 +1476,26 @@ function renderAdmFilters(){
   const ne=document.getElementById('nEmpresa');ne.innerHTML='<option value="">— Empresa —</option>'+DB.empresas.map(e=>`<option>${e}</option>`).join('');
   const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
+function updateTabsForRole(){
+  const isEnc=SES.isEncargado;
+  // Encargados can only see: solicitudes, fichajes
+  // Hide: control (remote start/stop), nominas, empleados, export
+  const hiddenForEnc=['aControl','aNominas','aEmpleados','aExportar'];
+  const tabBtns=document.querySelectorAll('#admTabBar .atab');
+  tabBtns.forEach(btn=>{
+    const t=btn.getAttribute('onclick')||'';
+    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'")||t.includes("'exportar'"));
+    btn.style.display=isHidden?'none':'';
+  });
+}
+function encargadoFilter(empId){
+  // Returns true if current user (encargado) can see this employee
+  if(!SES.isEncargado)return true;
+  const enc=SES.user;if(!enc)return false;
+  const obras=enc.obrasAsignadas||[];
+  const emp=DB.employees.find(e=>e.id===empId);
+  return emp&&obras.includes(emp.empresa);
+}
 function renderAprobaciones(){
   const el=document.getElementById('aprobList');if(!el)return;
   const pending=(DB.records||[]).filter(r=>r.fin&&(r.aprobado===undefined||r.aprobado===null));
@@ -1649,19 +1714,19 @@ function renderRecs(){
 function renderCentros(){
   const el=document.getElementById('centrosList');if(!el)return;
   const cts=DB.centrosTrabajo||[];
-  el.innerHTML=cts.length?cts.map(ct=>`<div class="erow"><div style="flex:1;font-size:14px">${ct}</div><button class="bdel" onclick="delCentro('${ct}')">✕</button></div>`).join(''):'<div class="empty">Sin centros configurados todavía</div>';
+  el.innerHTML=`<div class="list-card"><div class="list-card-label">Centros de Trabajo</div>${cts.length?cts.map(ct=>`<div class="list-card-item"><span class="list-card-name">${ct}</span><button class="list-card-del" onclick="delCentro('${ct}')" title="Eliminar">✕</button></div>`).join(''):'<div class="list-card-empty">Sin centros configurados</div>'}</div>`;
 }
 function addCentro(){
   const inp=document.getElementById('nCentroNom'),nom=inp?inp.value.trim():'';
   if(!nom){toast('Escribe el nombre del centro');return;}
   if((DB.centrosTrabajo=DB.centrosTrabajo||[]).includes(nom)){toast('Ese centro ya existe');return;}
   DB.centrosTrabajo.push(nom);if(inp)inp.value='';
-  save();safeRun(renderCentros,'renderCentros');toast('Centro de trabajo añadido');
+  save();safeRun(renderCentros,'renderCentros');safeRun(renderEncargados,'renderEncargados');toast('Centro de trabajo añadido');
 }
 function delCentro(nom){
   if(!confirm('¿Eliminar el centro "'+nom+'"?'))return;
   DB.centrosTrabajo=(DB.centrosTrabajo||[]).filter(x=>x!==nom);
-  save();safeRun(renderCentros,'renderCentros');toast('Centro eliminado');
+  save();safeRun(renderCentros,'renderCentros');safeRun(renderEncargados,'renderEncargados');toast('Centro eliminado');
 }
 function renderEmps(){
   const elE=document.getElementById('empList');
@@ -1669,10 +1734,15 @@ function renderEmps(){
     return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div><div class="einfo"><strong>${emp.name}</strong><span>${emp.empresa} · PIN:${emp.pin} · 🌴${vd.available}d</span></div><button class="bedit" onclick="editEmp('${emp.id}')" title="Editar">✎</button><button class="bdel" onclick="delEmp('${emp.id}')" title="Eliminar">✕</button></div>`;
   }).join(''):'<div class="empty">Sin empleados. Añade uno abajo.</div>';}
   const elC=document.getElementById('empresaList');
-  if(elC)elC.innerHTML=(DB.empresas||[]).length?DB.empresas.map(e=>`<div class="erow"><div style="flex:1;font-size:14px;font-weight:500">${e}</div><button class="bdel" onclick="delEmpresa('${e}')">✕</button></div>`).join(''):'<div class="empty">Sin empresas</div>';
+  if(elC)elC.innerHTML=`<div class="list-card"><div class="list-card-label">Obras</div>${(DB.empresas||[]).length?(DB.empresas||[]).map(e=>`<div class="list-card-item"><span class="list-card-name">${e}</span><button class="list-card-del" onclick="delEmpresa('${e}')" title="Eliminar">✕</button></div>`).join(''):'<div class="list-card-empty">Sin obras configuradas</div>'}</div>`;
+  safeRun(renderEncargados,'renderEncargados');
+  safeRun(renderCentros,'renderCentros');
 }
 function addEmp(){
   const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today(),mail=document.getElementById('nEmail').value.trim();
+  const rol=document.getElementById('nRol')?document.getElementById('nRol').value:'';
+  const checks=document.querySelectorAll('#obrasEncargadoCheck input:checked');
+  const obrasAsignadas=[...checks].map(ch=>ch.value);
   if(!n||!em||p.length<4){toast('Completa todos los campos (PIN mín. 4 dígitos)');return;}
   if(!/^[0-9]+$/.test(p)){toast('El PIN solo puede contener números');return;}
   if(DB.employees.some(e=>e.empresa===em&&e.pin===p)){toast('Ya hay un empleado con ese PIN en esta empresa');return;}
@@ -1690,11 +1760,39 @@ function editEmp(id){
   document.getElementById('edPin').value=emp.pin;
   document.getElementById('edEmail').value=emp.email||'';
   document.getElementById('edStart').value=emp.startDate||'';
-  document.getElementById('edColor').value=emp.color;
+  // Color select
+  const colSel=document.getElementById('edColor');
+  if(colSel){
+    // Try to match existing color or add it
+    const opt=[...colSel.options].find(o=>o.value===emp.color);
+    if(opt){colSel.value=emp.color;}
+    else{const o=new Option(emp.color,emp.color);colSel.add(o);colSel.value=emp.color;}
+  }
   const sel=document.getElementById('edEmpresa');
   sel.innerHTML=DB.empresas.map(x=>`<option value="${x}"${x===emp.empresa?' selected':''}>${x}</option>`).join('');
+  // Role
+  const rolSel=document.getElementById('edRol');
+  if(rolSel)rolSel.value=emp.role||'';
+  // Obras encargado
+  const fObras=document.getElementById('edFObrasEncargado');
+  if(fObras)fObras.style.display=emp.role==='encargado'?'block':'none';
+  const cont=document.getElementById('edObrasCheck');
+  if(cont){
+    const asig=emp.obrasAsignadas||[];
+    cont.innerHTML=(DB.empresas||[]).map(o=>`<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);cursor:pointer"><input type="checkbox" value="${o}" ${asig.includes(o)?'checked':''} style="accent-color:var(--accent);width:auto"><span style="font-size:13px">${o}</span></label>`).join('');
+  }
   document.getElementById('edErr').textContent='';
   openMov('mEditEmp');
+}
+function toggleEdRolObras(){
+  const rol=document.getElementById('edRol');
+  const fObras=document.getElementById('edFObrasEncargado');
+  if(!rol||!fObras)return;
+  fObras.style.display=rol.value==='encargado'?'block':'none';
+  if(rol.value==='encargado'){
+    const cont=document.getElementById('edObrasCheck');
+    if(cont)cont.innerHTML=(DB.empresas||[]).map(o=>`<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);cursor:pointer"><input type="checkbox" value="${o}" style="accent-color:var(--accent);width:auto"><span style="font-size:13px">${o}</span></label>`).join('');
+  }
 }
 function saveEditEmp(){
   const emp=DB.employees.find(e=>e.id===_editEmpId);if(!emp)return;
@@ -1711,7 +1809,16 @@ function saveEditEmp(){
   if(mail&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){err.textContent='Email no válido';return;}
   emp.name=n;emp.pin=p;emp.empresa=em;emp.email=mail;emp.startDate=sd;emp.color=col;
   emp.initials=n.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  save();closeMov('mEditEmp');renderEmps();renderGStats();renderEList();popSelects();toast('Empleado actualizado');
+  // Save role
+  const rolSel=document.getElementById('edRol');
+  const newRol=rolSel?rolSel.value:'';
+  emp.role=newRol||undefined;
+  if(newRol==='encargado'){
+    const checks=document.querySelectorAll('#edObrasCheck input:checked');
+    emp.obrasAsignadas=[...checks].map(ch=>ch.value);
+  }else{emp.obrasAsignadas=undefined;}
+  save();closeMov('mEditEmp');renderEmps();renderGStats();renderEList();popSelects();
+  safeRun(renderEncargados,'renderEncargados');toast('Empleado actualizado');
 }
 function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))return;DB.employees=DB.employees.filter(e=>e.id!==id);DB.records=DB.records.filter(r=>r.empId!==id);DB.vacaciones=DB.vacaciones.filter(v=>v.empId!==id);DB.medicos=DB.medicos.filter(m=>m.empId!==id);DB.ausencias=DB.ausencias.filter(a=>a.empId!==id);save();renderEmps();renderGStats();renderEList();popSelects();toast('Empleado eliminado');}
 function addEmpresa(){const n=document.getElementById('nEmpNom').value.trim();if(!n){toast('Introduce nombre');return;}if(DB.empresas.includes(n)){toast('Ya existe');return;}DB.empresas.push(n);document.getElementById('nEmpNom').value='';save();renderEmps();renderAdmFilters();toast('Empresa añadida');}
@@ -2189,6 +2296,105 @@ function forceMonthClose(mk){
   save();renderAdm();renderCierres&&renderCierres();toast('Mes cerrado y archivado · horas reiniciadas');
 }
 function allWeeks(){const keys=[...new Set(DB.records.filter(r=>r.inicio).map(r=>wkKey(new Date(r.inicio))))];return keys.sort((a,b)=>b.localeCompare(a)).map(k=>{const ws=new Date(k),we=new Date(ws);we.setDate(we.getDate()+6);return{key:k,label:`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`};});}
+
+
+/* ── ENCARGADOS ── */
+function toggleRolObras(){
+  const rol=document.getElementById('nRol');
+  const fObras=document.getElementById('fObrasEncargado');
+  if(!rol||!fObras)return;
+  fObras.style.display=rol.value==='encargado'?'block':'none';
+  if(rol.value==='encargado'){
+    const cont=document.getElementById('obrasEncargadoCheck');
+    if(cont)cont.innerHTML=(DB.empresas||[]).map(o=>`<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);cursor:pointer"><input type="checkbox" value="${o}" style="accent-color:var(--accent);width:auto"><span style="font-size:13px">${o}</span></label>`).join('');
+  }
+}
+function renderEncargados(){
+  const el=document.getElementById('encargadoList');if(!el)return;
+  const encs=DB.employees.filter(e=>e.role==='encargado');
+  if(!encs.length){el.innerHTML='<div class="list-card-empty" style="padding:12px 0;color:var(--text3);font-size:13px">Sin encargados configurados. Edita un empleado y asígnale el rol de encargado.</div>';return;}
+  el.innerHTML=encs.map(e=>{
+    const obras=(e.obrasAsignadas||[]).join(', ')||'Ninguna';
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(99,102,241,0.04);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="eavatar" style="background:${e.color};width:30px;height:30px;font-size:11px">${e.initials}</div>
+          <span style="font-weight:600;font-size:14px">${e.name}</span>
+          <span style="font-size:10px;padding:2px 8px;background:rgba(99,102,241,0.15);color:var(--accent3);border-radius:20px;font-weight:600">ENCARGADO</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;margin-left:38px">Obras: ${obras}</div>
+      </div>
+      <button onclick="openEditEncargado('${e.id}')" style="padding:6px 12px;border-radius:8px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:var(--accent3);font-size:12px;cursor:pointer">Editar obras</button>
+    </div>`;
+  }).join('');
+}
+
+function openEditEncargado(empId){
+  const emp=DB.employees.find(e=>e.id===empId);if(!emp)return;
+  const obras=DB.empresas||[];
+  const asignadas=emp.obrasAsignadas||[];
+  const checksHtml=obras.map(o=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);cursor:pointer;margin-bottom:6px">
+      <input type="checkbox" value="${o}" ${asignadas.includes(o)?'checked':''} style="accent-color:var(--accent);width:auto">
+      <span style="font-size:14px">${o}</span>
+    </label>`).join('');
+  const modal=`<div id="mEditEnc" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:flex-end;justify-content:center">
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;border-top:2px solid rgba(99,102,241,0.3)">
+      <h3 style="margin:0 0 4px;font-size:16px">Obras de ${emp.name}</h3>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 16px">Selecciona las obras que puede gestionar este encargado</p>
+      <div>${checksHtml||'<div class="empty">No hay obras creadas</div>'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">
+        <button onclick="document.getElementById('mEditEnc').remove()" style="padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-weight:600">Cancelar</button>
+        <button onclick="saveEncargadoObras('${empId}')" style="padding:12px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;cursor:pointer;font-weight:700">Guardar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend',modal);
+}
+
+function saveEncargadoObras(empId){
+  const modal=document.getElementById('mEditEnc');if(!modal)return;
+  const checks=modal.querySelectorAll('input[type="checkbox"]:checked');
+  const obras=[...checks].map(ch=>ch.value);
+  const emp=DB.employees.find(e=>e.id===empId);
+  if(emp){emp.obrasAsignadas=obras;save();toast('Obras del encargado actualizadas');}
+  modal.remove();
+  renderEncargados();
+}
+
+// Toggle obras field when role changes
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='nRol'){
+    const fObras=document.getElementById('fObrasEncargado');
+    if(fObras)fObras.style.display=e.target.value==='encargado'?'block':'none';
+    if(e.target.value==='encargado'){
+      const cont=document.getElementById('obrasEncargadoCheck');
+      if(cont){
+        cont.innerHTML=(DB.empresas||[]).map(o=>`
+          <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+            <input type="checkbox" value="${o}" style="accent-color:var(--accent);width:auto">
+            <span style="font-size:13px">${o}</span>
+          </label>`).join('');
+      }
+    }
+  }
+});
+
+/* ── LOGIN ENCARGADO ── */
+function loginAsEncargado(emp){
+  SES.isAdmin=false;SES.user=emp;SES.isEncargado=true;
+  showSc('sAdmin');
+  // Only show works assigned to this encargado
+  admTab('solicitudes');
+  safeRun(updateBadges,'badges');
+  toast('Bienvenido, '+emp.name+' (Encargado)');
+}
+
+/* ── PANEL ENCARGADO: filtrar por obras asignadas ── */
+function getEncargadoObras(){
+  if(!SES.isEncargado||!SES.user)return null;
+  return SES.user.obrasAsignadas||[];
+}
 
 /* KEY EVENTS */
 document.getElementById('inputPin').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
