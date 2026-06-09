@@ -16,21 +16,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0e1116;--bg2:#161b22;--bg3:#1f2530;--card:#181d26;
-  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
-  --accent:#5aa9e6;--accent2:#3d7cb5;
-  --green:#5cb88a;--green2:#3f8f68;
-  --orange:#d99a5b;--red:#cc6b6b;--yellow:#d4b75a;
-  --violet:#9b8cc4;--violet2:#7a6aa8;
-  --teal:#5fa8a0;--teal2:#3f7a73;
-  --rose:#c97b8e;--rose2:#a85a6d;
-  --text:#e8ecf2;--text2:#8b94a6;--text3:#5a6478;
-  --radius:16px;--radius-sm:10px;--shadow:0 4px 24px rgba(0,0,0,0.4)
+  --bg:#080c12;--bg2:#0f1520;--bg3:#162030;--card:#111827;
+  --border:rgba(255,255,255,0.05);--border2:rgba(255,255,255,0.09);
+  --accent:#4f8ef7;--accent2:#2563eb;
+  --green:#34d399;--green2:#059669;
+  --orange:#f59e0b;--red:#f87171;--yellow:#fcd34d;
+  --violet:#a78bfa;--violet2:#7c3aed;
+  --teal:#2dd4bf;--teal2:#0d9488;
+  --rose:#fb7185;--rose2:#e11d48;
+  --text:#f1f5f9;--text2:#94a3b8;--text3:#475569;
+  --radius:14px;--radius-sm:10px;--shadow:0 8px 32px rgba(0,0,0,0.6)
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:auto}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh;height:auto;overflow-y:auto;overflow-x:hidden}
-.app-shell{position:relative;width:100%;min-height:100vh;height:auto;background:var(--bg)}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh;height:auto;overflow-y:auto;overflow-x:hidden;font-size:15px}
+.app-shell{position:relative;width:100%;min-height:100vh;height:auto;background:radial-gradient(ellipse at 20% 0%,rgba(79,142,247,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(167,139,250,0.04) 0%,transparent 60%),var(--bg)}
 .screen{display:none!important}.screen.active{display:block!important}
 .mc{width:100%;display:block}
 /* Centra el CONTENIDO (no toda la app) para que se lea bien en pantallas grandes */
@@ -38,9 +38,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .fbody{max-width:760px;margin:0 auto;width:100%}
 .lwrap{margin:0 auto}
 /* TOPBAR */
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:50}
+.topbar{background:rgba(15,21,32,0.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .tbrand{display:flex;align-items:center;gap:10px}
-.tlogo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#0e1116}
+.tlogo{width:34px;height:34px;background:linear-gradient(135deg,#4f8ef7,#2563eb);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:12px;color:#fff;box-shadow:0 4px 12px rgba(79,142,247,0.35)}
 .tname{font-family:'Syne',sans-serif;font-weight:700;font-size:17px}
 .tname span{color:var(--accent)}
 .tright{display:flex;align-items:center;gap:8px}
@@ -51,7 +51,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 #screenLogin{justify-content:center;align-items:center;padding:24px 20px;min-height:100vh}
 .lwrap{width:100%;max-width:380px}
 .lhero{text-align:center;margin-bottom:32px}
-.llogo{width:72px;height:72px;margin:0 auto 16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#0e1116}
+.llogo{width:76px;height:76px;margin:0 auto 20px;background:linear-gradient(135deg,#4f8ef7,#2563eb);border-radius:22px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#fff;box-shadow:0 8px 24px rgba(79,142,247,0.4)}
 .lhero h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px}
 .lhero h1 span{color:var(--accent)}
 .lhero p{font-size:13px;color:var(--text2);margin-top:6px}
@@ -214,7 +214,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .atab{flex:1 0 auto;min-width:62px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
 .atab svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
 .atab.active{background:var(--bg3);color:var(--accent);border:1px solid var(--border2)}
-.adcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:border-color 0.2s}
+.adcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;transition:border-color 0.2s,box-shadow 0.2s}
+.adcard:hover{border-color:var(--border2);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
 .adcard:hover{border-color:var(--border2)}
 .adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
 .erow{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
@@ -252,7 +253,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .frow{display:flex;gap:8px;margin-bottom:12px}
 .frow select{flex:1;padding:9px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;appearance:none}
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.sc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;align-items:center;gap:12px}
+.sc{background:linear-gradient(135deg,var(--card),var(--bg3));border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;align-items:center;gap:14px;transition:transform 0.15s}
+.sc:hover{transform:translateY(-1px)}
 .sc .scico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .sc .scico svg{width:19px;height:19px;stroke-width:2;fill:none}
 .sc .sctxt{min-width:0}
@@ -361,7 +363,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v4.4 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v5.0 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -637,7 +639,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
       <div class="adcard"><h3>Base de datos en la nube</h3>
         <div id="dbStatusCard" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm)">
           <span id="dbStatusDot" style="width:10px;height:10px;border-radius:50%;background:var(--orange)"></span>
-          <div style="flex:1"><div id="dbStatusText" style="font-size:13px;font-weight:600">Sin conectar</div><div style="font-size:11px;color:var(--text2)">Proyecto Firebase <b>an-times</b> · sincronización automática</div></div>
+          <div style="flex:1"><div id="dbStatusText" style="font-size:13px;font-weight:600">Sin conectar</div><div style="font-size:11px;color:var(--text2)">Proyecto Firebase <b>times-inc</b> · sincronización automática</div></div>
         </div>
       </div>
       <div class="adcard"><h3>Cierres mensuales archivados</h3>
@@ -694,11 +696,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 <script>
 const ADM_PIN="0824",WK=40*60,VPM=2.5;
 const FB_CONFIG={
-  apiKey:"AIzaSyCARE-JiP8LLw-Si-CewVbrz72GsfTm9HQ",
-  authDomain:"an-times.firebaseapp.com",
-  databaseURL:"https://an-times-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:"an-times",
-  storageBucket:"an-times.firebasestorage.app",
+  apiKey:"AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ",
+  authDomain:"times-inc.firebaseapp.com",
+  databaseURL:"https://times-inc-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"times-inc",
+  storageBucket:"times-inc.firebasestorage.app",
   messagingSenderId:"650059384349",
   appId:"1:650059384349:web:9b525ffcc53c8b3ca1e8f4",
   measurementId:"G-86XRFV4N0J"
@@ -796,7 +798,7 @@ function refreshUI(){
   }
 }
 /* ═══ FIREBASE REST API — sin SDK, sin dependencias ═══ */
-const DB_URL='https://an-times-default-rtdb.europe-west1.firebasedatabase.app/an_times_data';
+const DB_URL='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data';
 let _es=null,_connDone=false,_connAttempts=0;
 
 function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
