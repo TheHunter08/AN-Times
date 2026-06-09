@@ -748,8 +748,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 </div></div>
 <div class="mov" id="mNotis"><div class="msh" style="max-height:80vh;overflow-y:auto">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-    <h2 style="margin:0">🔔 Notificaciones</h2>
-    <button class="btn-sec" style="width:auto;margin:0;padding:6px 12px" onclick="markAllNotisRead()">Marcar leídas</button>
+    <h2 style="margin:0;font-size:16px">🔔 Notificaciones</h2>
+    <div style="display:flex;gap:6px">
+      <button class="btn-sec" style="width:auto;margin:0;padding:6px 10px;font-size:12px" onclick="markAllNotisRead()">✓ Marcar leídas</button>
+      <button style="width:auto;margin:0;padding:6px 10px;font-size:12px;border-radius:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red);cursor:pointer;font-weight:600" onclick="deleteReadNotis()">🗑 Borrar leídas</button>
+    </div>
   </div>
   <div id="notiList"><div class="empty">Sin notificaciones</div></div>
   <button class="mbtn cancel" style="width:100%;margin-top:10px" onclick="closeMov('mNotis')">Cerrar</button>
@@ -1520,7 +1523,7 @@ function admTab(t){
   else if(t==='nominas'){safeRun(renderNomMesOptions2,'renderNomMesOptions2');safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderMensajeria,'renderMensajeria');}
   else if(t==='overview')safeRun(renderAdm,'renderAdm');
 }
-let _gsT=null;function renderAdm(){clearTimeout(_gsT);_gsT=setTimeout(()=>{safeRun(renderGStats,"renderGStats");safeRun(renderEList,"renderEList");safeRun(renderAdmFilters,"renderAdmFilters");},80);}
+let _gsT=null;function renderAdm(){clearTimeout(_gsT);_gsT=setTimeout(()=>{safeRun(renderGStats,"renderGStats");safeRun(renderEList,"renderEList");safeRun(renderAdmFilters,"renderAdmFilters");safeRun(updateTabsForRole,"updateTabsForRole");},80);}
 
 /* ── ADMIN: CONTROL DE JORNADA DE EMPLEADOS ── */
 function renderControl(){
@@ -1625,15 +1628,26 @@ function renderAdmFilters(){
   const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function updateTabsForRole(){
-  const isEnc=!!SES.isEncargado && !SES.isAdmin;
-  const tabBtns=document.querySelectorAll('#admTabBar .atab');
-  tabBtns.forEach(btn=>{
+  // Determinar rol activo de forma segura
+  const isAdmin=SES.isAdmin===true;
+  const isEnc=SES.isEncargado===true && !isAdmin;
+
+  document.querySelectorAll('#admTabBar .atab').forEach(btn=>{
     const t=btn.getAttribute('onclick')||'';
-    // Encargado: ocultar control, nominas, empleados, vacgestion
-    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'")||t.includes("'vacgestion'"));
-    btn.style.display=isHidden?'none':'';
+    const tabName=btn.getAttribute('data-tab')||t;
+    if(isAdmin){
+      // Admin: SIEMPRE mostrar todas las pestañas
+      btn.style.removeProperty('display');
+    } else if(isEnc){
+      // Encargado: solo solicit, registros, exportar
+      const HIDE=['control','nominas','empleados','vacgestion'];
+      const mustHide=HIDE.some(x=>tabName.includes(x));
+      btn.style.display=mustHide?'none':'';
+    } else {
+      btn.style.removeProperty('display');
+    }
   });
-  renderExportTab();
+  safeRun(renderExportTab,'renderExportTab');
 }
 function encargadoFilter(empId){
   // Returns true if current user (encargado) can see this employee
@@ -2397,6 +2411,26 @@ function openNotis(){
   // mark read after viewing
   setTimeout(()=>{notisFor().forEach(n=>n.leido=true);save();updateBadges();},800);
 }
+function deleteReadNotis(){
+  const target=SES.user?('emp:'+SES.user.id):(SES.isAdmin?'admin':null);
+  if(!target)return;
+  const before=DB.notis.length;
+  // Borrar solo las leídas del usuario actual
+  DB.notis=DB.notis.filter(n=>!(n.target===target&&n.leido));
+  const deleted=before-DB.notis.length;
+  if(deleted>0){
+    save();
+    renderNotis();
+    updateBadges();
+    toast(`🗑 ${deleted} notificación${deleted!==1?'es':''} borrada${deleted!==1?'s':''}`);
+  }else{
+    toast('No hay notificaciones leídas que borrar');
+  }
+}
+function deleteSingleNoti(notiId){
+  DB.notis=DB.notis.filter(n=>n.id!==notiId);
+  save();renderNotis();updateBadges();
+}
 function markAllNotisRead(){notisFor().forEach(n=>n.leido=true);save();renderNotis();updateBadges();toast('Notificaciones marcadas como leídas');}
 function renderNotis(){
   const el=document.getElementById('notiList');if(!el)return;
@@ -2407,9 +2441,14 @@ function renderNotis(){
     abs:'<svg viewBox=\'0 0 24 24\'><path d=\'M12 3l9 16H3z\'/><path d=\'M12 10v4M12 17h.01\'/></svg>',
     msg:'<svg viewBox=\'0 0 24 24\'><rect x=\'3\' y=\'5\' width=\'18\' height=\'14\' rx=\'2\'/><path d=\'M3 7l9 6 9-6\'/></svg>',
     nom:'<svg viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'12\' r=\'9\'/><path d=\'M12 7v10M9.5 9.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3H14\'/></svg>'};
-  el.innerHTML=ns.map(n=>`<div class="noti-item${n.leido?'':' unread'}">
+  el.innerHTML=ns.map(n=>`<div class="noti-item${n.leido?'':' unread'}" style="position:relative">
     <div class="noti-ico ${n.tipo}">${icos[n.tipo]||icos.msg}</div>
-    <div class="noti-body"><div class="noti-title">${n.titulo}</div><div class="noti-text">${n.texto}</div><div class="noti-time">${tAgo(n.fecha)}</div></div>
+    <div class="noti-body" style="flex:1">
+      <div class="noti-title">${n.titulo}</div>
+      <div class="noti-text">${n.texto}</div>
+      <div class="noti-time">${tAgo(n.fecha)}</div>
+    </div>
+    ${n.leido?`<button onclick="deleteSingleNoti('${n.id}')" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:6px;background:rgba(239,68,68,0.08);border:none;color:var(--text3);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Borrar">✕</button>`:''}
   </div>`).join('');
 }
 function tAgo(iso){
