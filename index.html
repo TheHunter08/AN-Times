@@ -392,7 +392,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:4px;cursor:pointer"><input type="checkbox" id="chkRemember" style="width:auto;accent-color:var(--accent)"> Recordar usuario y PIN</label>
         <button class="btn-main" onclick="doLogin()">Entrar</button>
         <div style="text-align:center;margin-top:14px">
-          <button onclick="accesoRapidoAdmin()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline">⚙ Acceso administrador directo</button>
+          <button onclick="accesoRapidoAdmin()" style="display:inline-flex;align-items:center;gap:7px;margin-top:2px;padding:10px 20px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:12px;color:var(--accent3);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;letter-spacing:0.2px" onmouseover="this.style.background='rgba(99,102,241,0.16)';this.style.borderColor='rgba(99,102,241,0.4)'" onmouseout="this.style.background='rgba(99,102,241,0.08)';this.style.borderColor='rgba(99,102,241,0.22)'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="3"/><path d="M22 14c0-2-1.3-3.5-3-4"/></svg>Acceso Administrador</button>
         </div>
       </div>
     </div>
@@ -1069,7 +1069,10 @@ function popSelects(){
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');if(!se)return;
   const all=DB.employees&&DB.employees.length?DB.employees:[];
-  const list=sortedEmps(emp?all.filter(e=>e.empresa===emp&&!e.isAdmin&&e.role!=='encargado'):all.filter(e=>!e.isAdmin&&e.role!=='encargado'));
+  // Muestra empleados Y encargados — solo oculta al admin (acceso directo)
+  const list=sortedEmps(emp
+    ?all.filter(e=>e.empresa===emp&&!e.isAdmin)
+    :all.filter(e=>!e.isAdmin));
   se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function doLogin(){
@@ -1531,15 +1534,16 @@ function renderAdmFilters(){
 }
 function updateTabsForRole(){
   const isEnc=SES.isEncargado;
-  // Encargados can only see: solicitudes, fichajes
-  // Hide: control (remote start/stop), nominas, empleados, export
-  const hiddenForEnc=['aControl','aNominas','aEmpleados','aExportar'];
+  // Encargados ven: solicitudes, fichajes, exportar
+  // Ocultan: control, nominas, empleados
   const tabBtns=document.querySelectorAll('#admTabBar .atab');
   tabBtns.forEach(btn=>{
     const t=btn.getAttribute('onclick')||'';
-    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'")||t.includes("'exportar'"));
+    const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'"));
     btn.style.display=isHidden?'none':'';
   });
+  // Personalizar el contenido de aExportar según rol
+  renderExportTab();
 }
 function encargadoFilter(empId){
   // Returns true if current user (encargado) can see this employee
@@ -2447,6 +2451,96 @@ function loginAsEncargado(emp){
 function getEncargadoObras(){
   if(!SES.isEncargado||!SES.user)return null;
   return SES.user.obrasAsignadas||[];
+}
+
+
+/* ── EXPORT TAB: diferente según admin o encargado ── */
+function renderExportTab(){
+  const el=document.getElementById('aExportar');if(!el)return;
+  if(SES.isEncargado){
+    const obras=(SES.user&&SES.user.obrasAsignadas&&SES.user.obrasAsignadas.length)
+      ?SES.user.obrasAsignadas.join(', '):'todas las obras asignadas';
+    el.innerHTML=`<div class="adcard">
+      <h3>📊 Exportar horas de mis obras</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Descarga las horas fichadas de los trabajadores de tus obras: <strong style="color:var(--text)">${obras}</strong></p>
+      <button class="expbtn" onclick="expExcelEncargado()" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-weight:700;padding:16px;font-size:15px">
+        <span>📗</span>&nbsp; Descargar Excel de mis obras
+      </button>
+      <div style="margin-top:12px;padding:12px;background:rgba(99,102,241,0.05);border-radius:12px;border:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.7">
+        El archivo incluye los fichajes aprobados de los trabajadores de tus obras asignadas.
+      </div>
+    </div>`;
+  }else{
+    // Admin: contenido completo (ya está en el HTML, no tocar)
+  }
+}
+
+/* ── EXPORT EXCEL PARA ENCARGADO (solo sus obras) ── */
+function expExcelEncargado(){
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.crossOrigin='anonymous';
+    s.onload=()=>expExcelEncargado();
+    s.onerror=()=>toast('No se pudo cargar el generador de Excel');
+    document.head.appendChild(s);
+    toast('Cargando Excel…');return;
+  }
+  // Filtrar solo las obras asignadas al encargado
+  const obrasEnc=(SES.user&&SES.user.obrasAsignadas)||[];
+  if(!obrasEnc.length){toast('No tienes obras asignadas');return;}
+
+  // Empleados de sus obras
+  const empsEnc=DB.employees.filter(e=>!e.isAdmin&&e.role!=='encargado'&&obrasEnc.includes(e.empresa));
+  const empIds=new Set(empsEnc.map(e=>e.id));
+
+  const wb=XLSX.utils.book_new();
+
+  // ── Hoja 1: FICHAJES de sus obras ──
+  const fich=[['Nombre','Obra','Fecha','Día','Entrada','Salida','Horas Trabajadas','H.Normales','H.Extra','Estado']];
+  const weekAcc={};
+  DB.records.filter(r=>r.fin&&empIds.has(r.empId)).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio)).forEach(r=>{
+    const m=Math.floor((r.workSecs||0)/60);
+    const wk=wkKey(new Date(r.inicio));const mk=r.inicio.slice(0,7);
+    const wKey=r.empId+'|'+wk;const mKey=r.empId+'|M|'+mk;
+    const prevW=weekAcc[wKey]||0;const prevM=weekAcc[mKey]||0;
+    const afterW=prevW+m;const afterM=prevM+m;
+    const normByW=Math.max(0,Math.min(afterW,WK)-Math.min(prevW,WK));
+    const normByM=Math.max(0,Math.min(afterM,WM)-Math.min(prevM,WM));
+    const norm=Math.min(normByW,normByM);const ext=m-norm;
+    weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
+    const estado=r.aprobado?'✅ Aprobado':r.rechazado?'❌ Rechazado':'⏳ Pendiente';
+    fich.push([r.empName,r.empresa,fdate(r.inicio),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado]);
+  });
+  const wsF=XLSX.utils.aoa_to_sheet(fich);
+  wsF['!cols']=[{wch:26},{wch:20},{wch:12},{wch:12},{wch:9},{wch:9},{wch:16},{wch:13},{wch:10},{wch:13}];
+  XLSX.utils.book_append_sheet(wb,wsF,'Fichajes');
+
+  // ── Hoja 2: RESUMEN por trabajador ──
+  const res=[['Empleado','Obra','H.Normales Total','H.Extra Total','Fichajes']];
+  empsEnc.forEach(emp=>{
+    const recs=DB.records.filter(r=>r.fin&&r.empId===emp.id);
+    let tn=0,te=0;
+    const wAcc2={};
+    recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+      const m2=Math.floor((r.workSecs||0)/60);
+      const wk2=wkKey(new Date(r.inicio));const mk2=r.inicio.slice(0,7);
+      const wK2=emp.id+'|'+wk2;const mK2=emp.id+'|M|'+mk2;
+      const pW=wAcc2[wK2]||0;const pM=wAcc2[mK2]||0;
+      const nW=Math.max(0,Math.min(pW+m2,WK)-Math.min(pW,WK));
+      const nM=Math.max(0,Math.min(pM+m2,WM)-Math.min(pM,WM));
+      const n=Math.min(nW,nM);tn+=n;te+=m2-n;
+      wAcc2[wK2]=pW+m2;wAcc2[mK2]=pM+m2;
+    });
+    res.push([emp.name,emp.empresa,mhm(tn),mhm(te),recs.length]);
+  });
+  const wsR=XLSX.utils.aoa_to_sheet(res);
+  wsR['!cols']=[{wch:26},{wch:20},{wch:16},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
+
+  const encName=(SES.user&&SES.user.name)||'encargado';
+  XLSX.writeFile(wb,'Horas_'+encName.replace(/\s+/g,'_')+'_'+today()+'.xlsx');
+  toast('Excel descargado ✓');
 }
 
 /* KEY EVENTS */
