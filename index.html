@@ -214,7 +214,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 /* ADMIN */
 #screenAdmin{padding:0}
 .abody{padding:16px}
-.atabs{display:flex;gap:3px;margin-bottom:16px;background:rgba(5,8,15,0.7);padding:4px;border-radius:14px;border:1px solid rgba(255,255,255,0.06);overflow-x:auto;-webkit-overflow-scrolling:touch;backdrop-filter:blur(12px)}
+.atabs{display:flex;gap:2px;margin-bottom:16px;background:rgba(5,8,15,0.7);padding:4px;border-radius:14px;border:1px solid rgba(255,255,255,0.06);overflow-x:auto;-webkit-overflow-scrolling:touch;backdrop-filter:blur(12px);scrollbar-width:none}
+.atabs::-webkit-scrollbar{display:none}
 .atabs::-webkit-scrollbar{height:0}
 .atab{flex:1 0 auto;min-width:62px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
 .atab svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
@@ -365,6 +366,154 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .list-card-del:hover{background:rgba(220,38,38,0.2);border-color:rgba(220,38,38,0.4);transform:scale(1.05)}
 .list-card-empty{padding:18px 16px;font-size:13px;color:var(--text3);text-align:center}
 
+
+/* ═══════════════════════════════════════════════════
+   MODO CLARO EJECUTIVO — Estilo profesional
+   ═══════════════════════════════════════════════════ */
+body.light-mode {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* App shell y fondo */
+body.light-mode .app-shell {
+  background: linear-gradient(160deg, #eef2ff 0%, #f7f8fc 40%, #f0f4ff 100%) !important;
+}
+
+/* Topbar */
+body.light-mode .topbar {
+  background: rgba(255,255,255,0.92) !important;
+  border-bottom: 1px solid rgba(79,70,229,0.12) !important;
+  box-shadow: 0 1px 8px rgba(17,24,39,0.08) !important;
+}
+body.light-mode .tname span,
+body.light-mode .tname { color: #4f46e5 !important; }
+
+/* Cards */
+body.light-mode .adcard,
+body.light-mode .lcard {
+  background: #ffffff !important;
+  border: 1px solid rgba(17,24,39,0.09) !important;
+  box-shadow: 0 2px 12px rgba(17,24,39,0.07) !important;
+}
+body.light-mode .adcard:hover { box-shadow: 0 4px 20px rgba(79,70,229,0.1) !important; border-color: rgba(79,70,229,0.2) !important; }
+
+/* Login card */
+body.light-mode .lcard {
+  background: #ffffff !important;
+  box-shadow: 0 20px 60px rgba(17,24,39,0.14) !important;
+  border: 1px solid rgba(79,70,229,0.1) !important;
+}
+
+/* Inputs y selects */
+body.light-mode input, body.light-mode select, body.light-mode textarea {
+  background: #f8fafc !important;
+  border: 1px solid rgba(17,24,39,0.14) !important;
+  color: #111827 !important;
+}
+body.light-mode input::placeholder, body.light-mode textarea::placeholder { color: #9ca3af !important; }
+body.light-mode input:focus, body.light-mode select:focus, body.light-mode textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+  background: #ffffff !important;
+}
+
+/* Botón principal */
+body.light-mode .btn-main {
+  background: linear-gradient(135deg,#6366f1,#4f46e5) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.35) !important;
+}
+
+/* Tabs admin */
+body.light-mode .atabs {
+  background: rgba(237,240,255,0.8) !important;
+  border: 1px solid rgba(79,70,229,0.12) !important;
+}
+body.light-mode .atab { color: #6b7280 !important; }
+body.light-mode .atab.active {
+  background: linear-gradient(135deg,rgba(99,102,241,0.15),rgba(79,70,229,0.08)) !important;
+  color: #4f46e5 !important;
+  border: 1px solid rgba(99,102,241,0.25) !important;
+}
+body.light-mode .atab:hover { background: rgba(99,102,241,0.06) !important; color: #4f46e5 !important; }
+
+/* Modal / bottom sheet */
+body.light-mode .msh {
+  background: #ffffff !important;
+  border-top: 3px solid #6366f1 !important;
+  box-shadow: 0 -8px 40px rgba(17,24,39,0.15) !important;
+}
+
+/* Stat cards */
+body.light-mode .sc {
+  background: #ffffff !important;
+  border: 1px solid rgba(17,24,39,0.08) !important;
+  box-shadow: 0 2px 8px rgba(17,24,39,0.06) !important;
+}
+body.light-mode .sc:hover { box-shadow: 0 6px 20px rgba(79,70,229,0.12) !important; border-color: rgba(79,70,229,0.18) !important; }
+
+/* Reloj fichar */
+body.light-mode .clk-sec {
+  background: linear-gradient(135deg,#4f46e5,#6366f1) !important;
+  border: none !important;
+  box-shadow: 0 8px 30px rgba(79,70,229,0.3) !important;
+}
+body.light-mode .clk-time, body.light-mode .clk-date { color: #fff !important; }
+body.light-mode .clk-head { color: rgba(255,255,255,0.8) !important; }
+body.light-mode .pbg { background: rgba(255,255,255,0.25) !important; }
+body.light-mode .pfill { background: rgba(255,255,255,0.9) !important; }
+
+/* Badges */
+body.light-mode .badge.pendiente { background: rgba(245,158,11,0.12); color: #d97706; border: 1px solid rgba(245,158,11,0.25); }
+body.light-mode .badge.aprobada { background: rgba(5,150,105,0.1); color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+body.light-mode .badge.denegada { background: rgba(220,38,38,0.08); color: #dc2626; border: 1px solid rgba(220,38,38,0.18); }
+
+/* Toast */
+body.light-mode .toast {
+  background: rgba(17,24,39,0.92) !important;
+  color: #f9fafb !important;
+  border: 1px solid rgba(17,24,39,0.15) !important;
+}
+
+/* Notificación badge */
+body.light-mode .noti-badge { background: linear-gradient(135deg,#dc2626,#ef4444) !important; }
+
+/* Botón badd */
+body.light-mode .badd {
+  background: linear-gradient(135deg,#6366f1,#4f46e5) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 12px rgba(99,102,241,0.3) !important;
+}
+
+/* List cards (obras/centros) */
+body.light-mode .list-card { background: #ffffff !important; border-color: rgba(17,24,39,0.09) !important; }
+body.light-mode .list-card-name { color: #111827 !important; }
+
+/* Employee tabs */
+body.light-mode .empTabs { background: rgba(237,240,255,0.7) !important; border-color: rgba(79,70,229,0.1) !important; }
+body.light-mode .etab { color: #6b7280 !important; }
+body.light-mode .etab.active { background: linear-gradient(135deg,rgba(99,102,241,0.15),rgba(79,70,229,0.08)) !important; color: #4f46e5 !important; border-color: rgba(99,102,241,0.25) !important; }
+
+/* Wcard semanal */
+body.light-mode .wcard { background: #ffffff !important; border: 1px solid rgba(17,24,39,0.08) !important; }
+body.light-mode .ws { background: #f8fafc !important; }
+
+/* Botones acción fichar */
+body.light-mode .abtn.start { box-shadow: 0 4px 16px rgba(5,150,105,0.25) !important; }
+body.light-mode .abtn.stop { box-shadow: 0 4px 16px rgba(220,38,38,0.25) !important; }
+body.light-mode .abtn.brk { box-shadow: 0 4px 16px rgba(245,158,11,0.25) !important; }
+
+/* Logo en login */
+body.light-mode .llogo { box-shadow: 0 12px 40px rgba(99,102,241,0.45),0 0 0 1px rgba(99,102,241,0.2) !important; }
+
+/* Cloud status */
+body.light-mode #cloudStatus { background: rgba(5,150,105,0.1) !important; color: #059669 !important; border-color: rgba(5,150,105,0.2) !important; }
+
+/* Modo oscuro text en theme btn */
+body.light-mode #themeToggleBtn { color: #6366f1 !important; background: rgba(99,102,241,0.08) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 10px !important; }
+body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 <!-- SheetJS se carga bajo demanda en expExcelCompleto() -->
@@ -381,7 +530,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v7.0 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v7.1 · build 20260609</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -392,6 +541,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:4px;cursor:pointer"><input type="checkbox" id="chkRemember" style="width:auto;accent-color:var(--accent)"> Recordar usuario y PIN</label>
         <button class="btn-main" onclick="doLogin()">Entrar</button>
         <div style="text-align:center;margin-top:14px">
+          <button onclick="toggleTheme()" id="themeToggleBtn" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:4px 8px;display:inline-flex;align-items:center;gap:5px;margin-bottom:8px">
+            <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span id="themeLabel">Modo claro</span>
+          </button><br>
           <button onclick="accesoRapidoAdmin()" style="display:inline-flex;align-items:center;gap:7px;margin-top:2px;padding:10px 20px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:12px;color:var(--accent3);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;letter-spacing:0.2px" onmouseover="this.style.background='rgba(99,102,241,0.16)';this.style.borderColor='rgba(99,102,241,0.4)'" onmouseout="this.style.background='rgba(99,102,241,0.08)';this.style.borderColor='rgba(99,102,241,0.22)'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="3"/><path d="M22 14c0-2-1.3-3.5-3-4"/></svg>Acceso Administrador</button>
         </div>
       </div>
@@ -549,6 +702,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
       <button class="atab" data-tab="nominas" onclick="admTab('nominas')"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg><span>Nóminas</span></button>
       <button class="atab" data-tab="empleados" onclick="admTab('empleados')"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg><span>Empl.</span></button>
       <button class="atab" data-tab="vacgestion" onclick="admTab('vacgestion')"><svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5M12 11c0-3-2-5-5-5M12 11c2-2 5-2 7 0M12 11c-2-2-5-2-7 0"/></svg><span>Vacac.</span></button>
+      <button class="atab" data-tab="obrasCentros" onclick="admTab('obrasCentros')"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Obras</span></button>
+      <button class="atab" data-tab="mensajes" onclick="admTab('mensajes')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>Mensajes</span></button>
       <button class="atab" data-tab="exportar" onclick="admTab('exportar')"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Export</span></button>
     </div>
     <div id="aOverview"><div class="sgrid" id="gStats"></div><div id="eList"></div></div>
@@ -564,7 +719,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Valida las jornadas finalizadas de cada empleado. Deberías hacerlo cada día.</div>
         <div id="aprobList"><div class="empty">Sin jornadas pendientes de validar</div></div>
       </div>
-          </div>
+      <div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
+    </div>
 
     <div id="aVacgestion" style="display:none">
       <div class="adcard" style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(79,70,229,0.03));border-color:rgba(99,102,241,0.15)">
@@ -574,7 +730,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         </div>
         <div style="font-size:11px;color:var(--text3)">Consulta, asigna y gestiona las vacaciones de todos los empleados</div>
       </div>
-<div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
       <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
       <div class="adcard"><h3>⚠ Ausencias injustificadas</h3><div id="aAbsList"><div class="empty">Sin ausencias</div></div></div>
       <div class="adcard"><h3>Vacaciones por empleado</h3><div id="aVacRes"></div></div>
@@ -684,6 +839,41 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
         <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Si no adjuntas un PDF propio, se generará uno automáticamente con los datos de arriba.</div>
         <button class="badd" onclick="enviarNomina()" style="margin-bottom:8px">📄 Enviar nómina con PDF a su bandeja</button>
         <button class="btn-sec" onclick="enviarNomina(true)" style="margin:0">Enviar solo como texto (sin PDF)</button>
+      </div>
+    </div>
+    <div id="aObrasCentros" style="display:none">
+      <div class="adcard" style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(79,70,229,0.03));border-color:rgba(99,102,241,0.15)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3 style="margin:0;font-size:15px;color:var(--accent3)">Obras y Centros de Trabajo</h3>
+        </div>
+      </div>
+
+      <div class="adcard">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--text3);margin-bottom:10px">OBRAS</div>
+        <div id="empresaList2"></div>
+        <div class="ff" style="margin-top:12px"><label>Nueva obra</label>
+          <div style="display:flex;gap:8px"><input type="text" id="nEmpresaNom2" placeholder="Ej: Edificio Torre, Local A...">
+          <button class="badd" onclick="addEmpresa2()" style="width:auto;padding:10px 16px;white-space:nowrap">+ Añadir</button></div>
+        </div>
+      </div>
+
+      <div class="adcard">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--text3);margin-bottom:10px">CENTROS DE TRABAJO</div>
+        <div id="centrosList2"></div>
+        <div class="ff" style="margin-top:12px"><label>Nuevo centro</label>
+          <div style="display:flex;gap:8px"><input type="text" id="nCentroNom2" placeholder="Ej: Planta Norte, Almacén A...">
+          <button class="badd" onclick="addCentro2()" style="width:auto;padding:10px 16px;white-space:nowrap">+ Añadir</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="aMensajes" style="display:none">
+      <div class="adcard" style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(79,70,229,0.03));border-color:rgba(99,102,241,0.15)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          <h3 style="margin:0;font-size:15px;color:var(--accent3)">Mensajes y Avisos</h3>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">Envía notificaciones y mensajes a tus empleados</div>
       </div>
       <div class="adcard"><h3>Enviar mensaje / aviso</h3>
         <div class="ff"><label>Para</label><select id="msgDest" style="appearance:none"><option value="__all__">Todos los trabajadores</option></select></div>
@@ -1385,13 +1575,23 @@ function renderWeek(){
   document.getElementById('wMed').textContent=medDays;
   document.getElementById('wAbs').textContent=absDays;
 }
+
+/* ── ELIMINAR REGISTRO (solo admin) ── */
+function adminDelRecord(recId){
+  if(!SES.isAdmin){toast('Solo el administrador puede eliminar registros');return;}
+  if(!confirm('¿Eliminar este registro de fichaje permanentemente?'))return;
+  DB.records=DB.records.filter(r=>r.id!==recId);
+  save();safeRun(renderRecent,'renderRecent');safeRun(renderGStats,'renderGStats');
+  toast('Registro eliminado');
+}
+
 function renderRecent(){
   const e=SES.user;
   const recs=DB.records.filter(r=>r.empId===e.id&&r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).slice(0,5);
   const el=document.getElementById('recentList');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
   }).join('');
 }
 
@@ -1522,13 +1722,14 @@ function renderHist(){
   const el=document.getElementById('fullHist');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${SES.isAdmin?`<button onclick="adminDelRecord('${r.id}')" style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;background:rgba(239,68,68,0.08);border:none;color:var(--text3);font-size:12px;cursor:pointer">✕</button>`:''}
+</div>`;
   }).join('');
 }
 
 /* ADMIN */
 function admTab(t){
-  const tabs=['overview','control','solicitudes','registros','nominas','empleados','vacgestion','exportar'];
+  const tabs=['overview','control','solicitudes','registros','nominas','empleados','vacgestion','obrasCentros','mensajes','exportar'];
   tabs.forEach(x=>{const id='a'+cap(x);const el=document.getElementById(id);if(el){
     if(x===t){el.style.display='block';el.style.visibility='visible';el.style.opacity='1';el.style.height='auto';el.removeAttribute('hidden');}
     else{el.style.display='none';}
@@ -1537,8 +1738,13 @@ function admTab(t){
   if(t==='registros')safeRun(renderRecs,'renderRecs');
   else if(t==='empleados')safeRun(renderEmps,'renderEmps');
   else if(t==='exportar'){safeRun(renderExpStats,'renderExpStats');safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');safeRun(renderNomMesOptions,'renderNomMesOptions');}
-  else if(t==='solicitudes'){safeRun(renderAdmSols,'renderAdmSols');safeRun(renderAprobaciones,'renderAprobaciones');}
+  else if(t==='solicitudes'){safeRun(renderAdmSols,'renderAdmSols');safeRun(renderAprobaciones,'renderAprobaciones');
+    // Actualizar vacaciones pendientes en esta pestaña
+    setTimeout(()=>{const vp=(DB.vacaciones||[]).filter(v=>v.estado==='pendiente');const vpEl=document.getElementById('aVacPend');
+    if(vpEl)vpEl.innerHTML=vp.length?vp.map(v=>`<div class="si"><div class="si-top"><span class="si-name">${v.empName}</span><span class="badge pendiente">⏳ Pendiente</span></div><div class="si-dates">📅 ${fds(v.desde)} → ${fds(v.hasta)} · <b>${v.dias} días</b></div><div class="si-actions"><button class="bok" onclick="resVac('${v.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resVac('${v.id}','denegada')">❌ Denegar</button></div></div>`).join(''):'<div class="empty">Sin solicitudes pendientes ✅</div>';},50);}
   else if(t==='vacgestion'){safeRun(renderVacGestion,'renderVacGestion');}
+  else if(t==='obrasCentros'){safeRun(renderObrasCentros,'renderObrasCentros');}
+  else if(t==='mensajes'){safeRun(renderMensajesTab,'renderMensajesTab');}
   else if(t==='control')safeRun(renderControl,'renderControl');
   else if(t==='nominas'){safeRun(renderNomMesOptions2,'renderNomMesOptions2');safeRun(renderNomMesOptions,'renderNomMesOptions');safeRun(renderMensajeria,'renderMensajeria');}
   else if(t==='overview')safeRun(renderAdm,'renderAdm');
@@ -1660,7 +1866,7 @@ function updateTabsForRole(){
       btn.style.removeProperty('display');
     } else if(isEnc){
       // Encargado: solo solicit, registros, exportar
-      const HIDE=['control','nominas','empleados','vacgestion'];
+      const HIDE=['control','nominas','empleados','vacgestion','obrasCentros','mensajes'];
       const mustHide=HIDE.some(x=>tabName.includes(x));
       btn.style.display=mustHide?'none':'';
     } else {
@@ -2104,7 +2310,8 @@ function expExcelCompleto(){
     const normByM=Math.max(0,Math.min(afterM,WM)-Math.min(prevM,WM));
     const norm=Math.min(normByW,normByM);const ext=m-norm;
     weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
-    fich.push([r.empName,r.empresa,new Date(r.inicio).toLocaleDateString('es-ES'),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),ftime(r.fin),mhm(m),mhm(bm),mhm(norm),mhm(ext)]);
+    const obra=r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra';
+  fich.push([r.empName,obra,new Date(r.inicio).toLocaleDateString('es-ES'),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),ftime(r.fin),mhm(m),mhm(bm),mhm(norm),mhm(ext),r.validadoPor||'Pendiente']);
   });
   const wsF=XLSX.utils.aoa_to_sheet(fich);
   wsF['!cols']=[{wch:26},{wch:16},{wch:12},{wch:11},{wch:9},{wch:9},{wch:16},{wch:10},{wch:15},{wch:13}];
@@ -2717,7 +2924,7 @@ function expExcelEncargado(){
   const wb=XLSX.utils.book_new();
 
   // ── Hoja 1: FICHAJES de sus obras ──
-  const fich=[['Nombre','Obra','Fecha','Día','Entrada','Salida','Horas Trabajadas','H.Normales','H.Extra','Estado']];
+  const fich=[['Nombre','Obra','Fecha','Día','Entrada','Salida','Horas Trabajadas','H.Normales','H.Extra','Estado','Validado por']];
   const weekAcc={};
   DB.records.filter(r=>r.fin&&empIds.has(r.empId)).sort((a,b)=>a.empName.localeCompare(b.empName)||a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const m=Math.floor((r.workSecs||0)/60);
@@ -2730,7 +2937,7 @@ function expExcelEncargado(){
     const norm=Math.min(normByW,normByM);const ext=m-norm;
     weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
     const estado=r.aprobado?'✅ Aprobado':r.rechazado?'❌ Rechazado':'⏳ Pendiente';
-    fich.push([r.empName,r.empresa,fdate(r.inicio),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado]);
+    fich.push([r.empName,r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra',fdate(r.inicio),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado,r.validadoPor||'Pendiente']);
   });
   const wsF=XLSX.utils.aoa_to_sheet(fich);
   wsF['!cols']=[{wch:26},{wch:20},{wch:12},{wch:12},{wch:9},{wch:9},{wch:16},{wch:13},{wch:10},{wch:13}];
@@ -2936,6 +3143,140 @@ function renderMonthSummary(){
   if(daysEl)daysEl.textContent=days;
 }
 
+
+/* ── OBRAS Y CENTROS TAB ── */
+function renderObrasCentros(){
+  // Obras list
+  const elO=document.getElementById('empresaList2');
+  if(elO)elO.innerHTML=(DB.empresas||[]).length?
+    DB.empresas.map(e=>`<div class="list-card-item"><span class="list-card-name">${e}</span><button class="list-card-del" onclick="delEmpresa2('${e}')">✕</button></div>`).join(''):
+    '<div class="list-card-empty">Sin obras</div>';
+  // Centros list
+  const elC=document.getElementById('centrosList2');
+  if(elC)elC.innerHTML=(DB.centrosTrabajo||[]).length?
+    DB.centrosTrabajo.map(ct=>`<div class="list-card-item"><span class="list-card-name">${ct}</span><button class="list-card-del" onclick="delCentro2('${ct}')">✕</button></div>`).join(''):
+    '<div class="list-card-empty">Sin centros</div>';
+}
+function addEmpresa2(){
+  const inp=document.getElementById('nEmpresaNom2'),nom=inp?.value.trim();
+  if(!nom){toast('Escribe el nombre de la obra');return;}
+  if((DB.empresas=DB.empresas||[]).includes(nom)){toast('Esa obra ya existe');return;}
+  DB.empresas.push(nom);if(inp)inp.value='';
+  save();safeRun(renderObrasCentros,'rc_obras');safeRun(renderEmpresas,'re');safeRun(popSelects,'ps');
+  toast('Obra añadida ✓');
+}
+function delEmpresa2(nom){
+  if(!confirm('¿Eliminar la obra "'+nom+'"?'))return;
+  DB.empresas=DB.empresas.filter(e=>e!==nom);
+  save();safeRun(renderObrasCentros,'rc_obras');safeRun(renderEmpresas,'re');safeRun(popSelects,'ps');
+  toast('Obra eliminada');
+}
+function addCentro2(){
+  const inp=document.getElementById('nCentroNom2'),nom=inp?.value.trim();
+  if(!nom){toast('Escribe el nombre del centro');return;}
+  if((DB.centrosTrabajo=DB.centrosTrabajo||[]).includes(nom)){toast('Ese centro ya existe');return;}
+  DB.centrosTrabajo.push(nom);if(inp)inp.value='';
+  save();safeRun(renderObrasCentros,'rc_centros');safeRun(renderCentros,'rcent');
+  toast('Centro de trabajo añadido ✓');
+}
+function delCentro2(nom){
+  if(!confirm('¿Eliminar el centro "'+nom+'"?'))return;
+  DB.centrosTrabajo=DB.centrosTrabajo.filter(c=>c!==nom);
+  save();safeRun(renderObrasCentros,'rc_centros');safeRun(renderCentros,'rcent');
+  toast('Centro eliminado');
+}
+
+/* ── MENSAJES TAB ── */
+function renderMensajesTab(){
+  const sel=document.getElementById('msgDest');
+  if(sel&&sel.options.length<=1){
+    sel.innerHTML='<option value="__all__">Todos los trabajadores</option>'+
+      sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  }
+  // Mensajes enviados
+  const el=document.getElementById('msgEnviados');
+  if(!el)return;
+  const msgs=(DB.mensajes||[]).filter(m=>m.tipo!=='nomina').sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  el.innerHTML=msgs.length?msgs.slice(0,30).map(m=>`
+    <div style="padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">${m.asunto}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${m.empId==='__all__'?'Todos':DB.employees.find(e=>e.id===m.empId)?.name||'?'} · ${new Date(m.fecha).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <button onclick="deleteMensaje('${m.id}')" style="width:28px;height:28px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--red);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>
+      </div>
+    </div>`).join(''):'<div class="empty">Sin mensajes enviados</div>';
+}
+function deleteMensaje(id){
+  DB.mensajes=DB.mensajes.filter(m=>m.id!==id);
+  save();renderMensajesTab();toast('Mensaje eliminado');
+}
+
+
+/* ── DARK / LIGHT MODE ── */
+let _darkMode=true;
+function toggleTheme(){
+  _darkMode=!_darkMode;
+  applyTheme(_darkMode);
+  try{localStorage.setItem('an_times_theme',_darkMode?'dark':'light');}catch(e){}
+}
+function applyTheme(dark){
+  const root=document.documentElement;
+  const body=document.body;
+  if(dark){
+    // ── MODO OSCURO ──
+    root.style.setProperty('--bg','#05080f');
+    root.style.setProperty('--bg2','#0a0f1a');
+    root.style.setProperty('--bg3','#0f1628');
+    root.style.setProperty('--card','#0d1422');
+    root.style.setProperty('--text','#f8fafc');
+    root.style.setProperty('--text2','#94a3b8');
+    root.style.setProperty('--text3','#475569');
+    root.style.setProperty('--border','rgba(255,255,255,0.06)');
+    root.style.setProperty('--border2','rgba(255,255,255,0.11)');
+    root.style.setProperty('--accent','#6366f1');
+    root.style.setProperty('--accent3','#818cf8');
+    root.style.setProperty('--green','#10b981');
+    root.style.setProperty('--red','#ef4444');
+    root.style.setProperty('--shadow-color','rgba(0,0,0,0.6)');
+    body.classList.remove('light-mode');
+    body.classList.add('dark-mode');
+    // Icono luna
+    const icon=document.getElementById('themeIcon');
+    if(icon){icon.innerHTML='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';}
+    const lbl=document.getElementById('themeLabel');if(lbl)lbl.textContent='Modo claro';
+  }else{
+    // ── MODO CLARO EJECUTIVO ──
+    root.style.setProperty('--bg','#f7f8fc');
+    root.style.setProperty('--bg2','#eef0f6');
+    root.style.setProperty('--bg3','#e4e7f0');
+    root.style.setProperty('--card','#ffffff');
+    root.style.setProperty('--text','#111827');
+    root.style.setProperty('--text2','#4b5563');
+    root.style.setProperty('--text3','#9ca3af');
+    root.style.setProperty('--border','rgba(17,24,39,0.08)');
+    root.style.setProperty('--border2','rgba(17,24,39,0.13)');
+    root.style.setProperty('--accent','#4f46e5');
+    root.style.setProperty('--accent3','#4f46e5');
+    root.style.setProperty('--green','#059669');
+    root.style.setProperty('--red','#dc2626');
+    root.style.setProperty('--shadow-color','rgba(17,24,39,0.12)');
+    body.classList.remove('dark-mode');
+    body.classList.add('light-mode');
+    // Icono sol
+    const icon=document.getElementById('themeIcon');
+    if(icon){icon.innerHTML='<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';}
+    const lbl=document.getElementById('themeLabel');if(lbl)lbl.textContent='Modo oscuro';
+  }
+}
+function initTheme(){
+  try{
+    const saved=localStorage.getItem('an_times_theme');
+    _darkMode=saved!=='light';
+    applyTheme(_darkMode);
+  }catch(e){}
+}
+
 /* KEY EVENTS */
 document.getElementById('inputPin').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 // Admin PIN listeners (null-safe)
@@ -3021,6 +3362,7 @@ function initApp(){
 // Arrancar de ambas formas para garantizar ejecución
 // SW registration deferred to after first connection
 window._registerSW=function(){if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}};
+safeRun(initTheme,'initTheme');
 function _startApp(){if(!window._appStarted){window._appStarted=true;try{initApp();}catch(e){console.warn('Init error:',e);}}}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_startApp);}
 else{_startApp();}
