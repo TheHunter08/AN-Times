@@ -991,7 +991,8 @@ function vacData(empId){
   let m=(n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth());
   if(n.getDate()<s.getDate())m--;m=Math.max(0,m);
   const gen=parseFloat((m*VPM).toFixed(1));
-  const used=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada').reduce((s,v)=>s+v.dias,0);
+  const used=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada'&&v.disfrutada).reduce((s,v)=>s+v.dias,0);
+  const aprobNoDisf=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada'&&!v.disfrutada).reduce((s,v)=>s+v.dias,0);
   const pend=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='pendiente').reduce((s,v)=>s+v.dias,0);
   const res={months:m,generated:gen,used,pending:pend,available:parseFloat((gen-used).toFixed(1)),startDate:emp.startDate||'—'};
   _vacCache[empId]=res;return res;
@@ -1121,8 +1122,10 @@ function doLogin(){
     SES.isAdmin=false;SES.isEncargado=true;SES.user=emp;
     showSc('sAdmin');safeRun(()=>{admTab('solicitudes');updateBadges();renderAdm();updateTabsForRole();antiBlockerDefense();},'encLogin');
     persistSession();toast('Bienvenido '+emp.name);
+    registerForPush(emp.id);
   } else {
     SES.isEncargado=false;SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();persistSession();
+    registerForPush(emp.id);
   }
 }
 function openAdminLogin(){accesoRapidoAdmin();}
@@ -1776,14 +1779,39 @@ function renderAdmSols(){
     </div>`;
   }).join(''):'<div class="empty">Sin ausencias</div>';
   // Vac resumen
-  document.getElementById('aVacRes').innerHTML=sortedEmps().map(emp=>{
+  const vacEl=document.getElementById('aVacRes');if(!vacEl)return;
+  vacEl.innerHTML=sortedEmps().map(emp=>{
     const vd=vacData(emp.id);
-    return`<div class="erow"><div class="eavatar" style="background:${emp.color}">${emp.initials}</div>
-      <div class="einfo"><strong>${emp.name}</strong><span>${vd.months} meses · Gen: ${vd.generated} · Usados: ${vd.used} · Pend: ${vd.pending}</span></div>
-      <div style="text-align:right"><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--violet)">${vd.available}</div><div style="font-size:10px;color:var(--text2)">disponibles</div></div>
+    const aprobadas=DB.vacaciones.filter(v=>v.empId===emp.id&&v.estado==='aprobada');
+    const vacsHtml=aprobadas.length?aprobadas.map(v=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:4px;border:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;color:var(--text)">📅 ${fds(v.desde)} → ${fds(v.hasta)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${v.dias} días · ${v.disfrutada?'<span style="color:var(--green)">✓ Disfrutada</span>':'<span style="color:var(--text3)">No marcada</span>'}</div>
+        </div>
+        <button onclick="toggleVacDisfrutada('${v.id}')" style="padding:5px 10px;border-radius:8px;border:1px solid ${v.disfrutada?'rgba(16,185,129,0.3)':'var(--border2)'};background:${v.disfrutada?'rgba(16,185,129,0.1)':'rgba(255,255,255,0.04)'};color:${v.disfrutada?'var(--green)':'var(--text2)'};font-size:11px;font-weight:600;cursor:pointer">${v.disfrutada?'Disfrutada ✓':'Marcar disfrutada'}</button>
+      </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:6px 0">Sin vacaciones aprobadas</div>`;
+    return`<div class="adcard" style="margin-bottom:8px;padding:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="eavatar" style="background:${emp.color};width:30px;height:30px;font-size:11px">${emp.initials}</div>
+        <div style="flex:1"><strong style="font-size:14px">${emp.name}</strong><div style="font-size:11px;color:var(--text2)">${vd.months} meses · ${vd.generated} días generados · <span style="color:var(--violet)">${vd.available} disponibles</span></div></div>
+      </div>
+      ${vacsHtml}
     </div>`;
   }).join('');
   renderAdmFilters();
+}
+function toggleVacDisfrutada(id){
+  const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;
+  v.disfrutada=!v.disfrutada;
+  save();
+  // Notify employee
+  const msg=v.disfrutada
+    ?`Tus vacaciones del ${fds(v.desde)} al ${fds(v.hasta)} han sido marcadas como disfrutadas.`
+    :`Tus vacaciones del ${fds(v.desde)} al ${fds(v.hasta)} han sido desmarcadas.`;
+  pushNoti('emp:'+v.empId,'vac',v.disfrutada?'Vacaciones registradas':'Vacaciones actualizadas',msg);
+  renderAdmSols();
+  toast(v.disfrutada?'Marcadas como disfrutadas ✓':'Desmarcadas');
 }
 function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
 function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
@@ -2255,8 +2283,21 @@ function requestNotifPermission(){
   }
 }
 function pushNoti(target,tipo,titulo,texto){
-  DB.notis.push({id:gid(),target,tipo,titulo,texto,fecha:new Date().toISOString(),leido:false});
-  if(SES.user&&(target==='emp:'+SES.user.id||target===SES.user.id))sendBrowserNotif(titulo,texto,tipo);
+  const noti={id:gid(),target,tipo,titulo,texto,fecha:new Date().toISOString(),leido:false,push:true};
+  DB.notis.push(noti);
+  // Si el usuario está activo en este dispositivo, notificar directamente
+  if(SES.user&&(target==='emp:'+SES.user.id||target===SES.user.id)){
+    sendBrowserNotif(titulo,texto,tipo);
+  }
+  // Guardar en localStorage para que el SW lo detecte (cross-device)
+  try{
+    const pending=JSON.parse(localStorage.getItem('an_times_push_pending')||'[]');
+    pending.push({id:noti.id,target,titulo,texto,tipo,fecha:noti.fecha});
+    // Mantener solo los últimos 50
+    if(pending.length>50)pending.splice(0,pending.length-50);
+    localStorage.setItem('an_times_push_pending',JSON.stringify(pending));
+  }catch(ex){}
+  save();
 }
 function notisFor(){
   // Returns notis relevant to current session
@@ -2571,6 +2612,42 @@ function expExcelEncargado(){
   const encName=(SES.user&&SES.user.name)||'encargado';
   XLSX.writeFile(wb,'Horas_'+encName.replace(/\s+/g,'_')+'_'+today()+'.xlsx');
   toast('Excel descargado ✓');
+}
+
+
+/* ── NOTIFICACIONES PUSH (Service Worker) ── */
+function registerForPush(empId){
+  // 1. Solicitar permiso de notificaciones
+  if('Notification' in window&&Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p==='granted')console.info('[TI] Notificaciones: permiso concedido');
+    });
+  }
+  // 2. Guardar empId en localStorage para que el SW sepa a quién servir
+  try{
+    localStorage.setItem('an_times_push_user',JSON.stringify({
+      empId,
+      db:DB_URL,
+      registered:new Date().toISOString()
+    }));
+  }catch(ex){}
+  // 3. Informar al SW del usuario activo
+  if('serviceWorker' in navigator&&navigator.serviceWorker.controller){
+    navigator.serviceWorker.controller.postMessage({
+      type:'SET_USER',
+      empId,
+      dbUrl:DB_URL
+    });
+  }
+}
+
+// Escuchar mensajes del SW (cuando envía una notificación con foco en esta pestaña)
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',function(event){
+    if(event.data&&event.data.type==='NOTIFICATION'){
+      sendBrowserNotif(event.data.title,event.data.body,event.data.notiType||'info');
+    }
+  });
 }
 
 /* KEY EVENTS */
