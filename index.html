@@ -908,6 +908,7 @@ function doFetch(){
     _connDone=true;
     setCloudStatus('connected');
     popSelects();
+    popEmps('');
     safeRun(restoreSession,'restoreSession');
     safeRun(loadRemembered,'loadRemembered');
     // Iniciar polling silencioso en lugar de SSE (más estable)
@@ -1033,7 +1034,7 @@ function loadRemembered(){
     // Mark checkbox
     const remCk=document.getElementById('chkRemember');if(remCk)remCk.checked=true;
     // Find employee — could be in DB after Firebase loads
-    const emp=DB.employees.find(e=>e.id===saved.empId&&!e.isAdmin&&e.role!=='encargado');
+    const emp=DB.employees.find(e=>e.id===saved.empId&&!e.isAdmin);
     if(!emp)return; // employee not found yet, will retry after Firebase loads
     // Fill obra select
     const seE=document.getElementById('selEmpresa');
@@ -1068,12 +1069,13 @@ function popSelects(){
 }
 function popEmps(emp){
   const se=document.getElementById('selEmpleado');if(!se)return;
-  const all=DB.employees&&DB.employees.length?DB.employees:[];
-  // Muestra empleados Y encargados — solo oculta al admin (acceso directo)
-  const list=sortedEmps(emp
-    ?all.filter(e=>e.empresa===emp&&!e.isAdmin)
-    :all.filter(e=>!e.isAdmin));
-  se.innerHTML='<option value="">— Selecciona empleado —</option>'+list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const all=(DB.employees&&DB.employees.length)?DB.employees:[];
+  // Mostrar TODOS menos el admin — empleados normales Y encargados
+  let list=all.filter(e=>!e.isAdmin);
+  if(emp)list=list.filter(e=>e.empresa===emp);
+  list.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  se.innerHTML='<option value="">— Selecciona empleado —</option>'+
+    list.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function doLogin(){
   const id=document.getElementById('selEmpleado').value,pin=document.getElementById('inputPin').value,err=document.getElementById('loginErr');
@@ -2613,7 +2615,13 @@ function initApp(){
   setTimeout(()=>{if(!_connDone&&!_fetchInFlight)safeRun(doFetch,'doFetch_5s');},5000);
   // Repoblar selects cada 500ms hasta conectar
   const _selChk=setInterval(()=>{
-    if(DB.empresas.length){const se=document.getElementById('selEmpresa');if(se&&se.options.length<2)safeRun(popSelects,'pop_chk');}
+    if(DB.empresas.length){
+      const se=document.getElementById('selEmpresa');
+      if(se&&se.options.length<2)safeRun(popSelects,'pop_chk');
+      // También refrescar empleados si Firebase ya cargó y el select sigue vacío
+      const seE=document.getElementById('selEmpleado');
+      if(_connDone&&seE&&seE.options.length<2)popEmps(se?se.value:'');
+    }
     if(_connDone)clearInterval(_selChk);
   },500);
   try{setInterval(()=>safeRun(checkMonthlyReset,'checkMonthlyReset'),3600000);}catch(e){}
