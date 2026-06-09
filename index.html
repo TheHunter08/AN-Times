@@ -789,7 +789,7 @@ function restoreSession(){
   try{
     const raw=localStorage.getItem('an_times_ses');if(!raw)return;
     const s=JSON.parse(raw);
-    if(s.isAdmin){SES.isAdmin=true;showSc('sAdmin');setTimeout(()=>safeRun(()=>{admTab('overview');updateBadges();},'restore'),100);}
+    if(s.isAdmin){SES.isAdmin=true;SES.isEncargado=false;showSc('sAdmin');setTimeout(()=>safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();},'restore'),100);}
     else if(s.empId){
       const emp=DB.employees.find(e=>e.id===s.empId);
       if(emp&&!emp.isAdmin){SES.user=emp;showSc('sFichaje');initFichaje();updateBadges();}
@@ -866,9 +866,9 @@ function doAdminRapido(){
   const err=document.getElementById('adminErrRapido');
   const admin=DB.employees.find(e=>e.isAdmin&&e.pin===pin);
   if(!admin&&pin!==ADM_PIN){setTimeout(()=>{if(err)err.textContent='PIN incorrecto';},200);return;}
-  closeMov('mAdminRapido');SES.isAdmin=true;SES.user=null;
+  closeMov('mAdminRapido');SES.isAdmin=true;SES.user=null;SES.isEncargado=false;
   showSc('sAdmin');
-  safeRun(()=>{admTab('overview');updateBadges();antiBlockerDefense();},'adminRapido');
+  safeRun(()=>{admTab('overview');updateBadges();updateTabsForRole();antiBlockerDefense();},'adminRapido');
   persistSession();
 }
 
@@ -1154,7 +1154,7 @@ function doAdmLogin(){
     }
   }catch(err){showErr('diag: '+err.message);}},600);
 }
-function doLogout(){TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false};try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
+function doLogout(){TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false,isEncargado:false};try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
 
 /* EMPLOYEE TABS */
 function empTab(t){
@@ -1566,16 +1566,15 @@ function renderAdmFilters(){
   const ae=document.getElementById('adjEmp');if(ae)ae.innerHTML=sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
 }
 function updateTabsForRole(){
-  const isEnc=SES.isEncargado;
-  // Encargados ven: solicitudes, fichajes, exportar
-  // Ocultan: control, nominas, empleados
+  const isEnc=!!SES.isEncargado && !SES.isAdmin;
   const tabBtns=document.querySelectorAll('#admTabBar .atab');
   tabBtns.forEach(btn=>{
+    // Admin: todas las pestañas visibles
+    // Encargado: solo solicitudes, fichajes, exportar
     const t=btn.getAttribute('onclick')||'';
     const isHidden=isEnc&&(t.includes("'control'")||t.includes("'nominas'")||t.includes("'empleados'"));
     btn.style.display=isHidden?'none':'';
   });
-  // Personalizar el contenido de aExportar según rol
   renderExportTab();
 }
 function encargadoFilter(empId){
