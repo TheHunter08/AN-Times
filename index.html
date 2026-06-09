@@ -848,7 +848,7 @@ const DB_URL='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/a
 let _es=null,_connDone=false,_connAttempts=0;
 
 function showRetryBtn(show){const b=document.getElementById('retryBtn');if(b)b.style.display=show?'block':'none';}
-function retryConnection(){showRetryBtn(false);_connAttempts=0;_connDone=false;if(_es){try{_es.close();}catch(e){}_es=null;}FB.connected=false;autoConnectCloud();}
+// retryConnection defined above in connection block
 
 function accesoRapidoAdmin(){
   const inp=document.getElementById('adminPinRapido');if(inp)inp.value='';
@@ -874,93 +874,107 @@ function cloudPush(force){
 }
 
 let _fetchInFlight=false;
+let _pollTimer=null;
+
+/* ── Conexión a Firebase: GET limpio, sin params extra ── */
 function doFetch(){
   if(_connDone||_fetchInFlight)return;
   _fetchInFlight=true;
-  const url=DB_URL+'.json?t='+Date.now(); // cache-bust via query param
-  // Use Promise.race with a manual 10s timeout
-  const fetchPromise=fetch(url,{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
-  const timeoutPromise=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000));
-  Promise.race([fetchPromise,timeoutPromise])
-    .then(data=>{
-      _fetchInFlight=false;
-      if(_connDone)return;
-      try{
-        if(data&&data.employees&&data.employees.length){
+
+  // Fetch simple y limpio — Firebase no acepta query params arbitrarios
+  fetch(DB_URL+'.json',{
+    method:'GET',
+    cache:'no-store',
+    headers:{'Cache-Control':'no-cache','Pragma':'no-cache'}
+  })
+  .then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  })
+  .then(function(data){
+    _fetchInFlight=false;
+    if(_connDone)return;
+    // Aplicar datos de Firebase
+    if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length){
+      try{FB.syncing=true;applyDB(data);FB.syncing=false;}catch(ex){console.warn('applyDB:',ex.message);}
+      try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
+    }else{
+      // Base de datos vacía — subir seed local
+      FB.connected=true;
+      cloudPush(true);
+    }
+    // Marcar como conectado
+    FB.connected=true;
+    _connDone=true;
+    setCloudStatus('connected');
+    popSelects();
+    safeRun(restoreSession,'restoreSession');
+    safeRun(loadRemembered,'loadRemembered');
+    // Iniciar polling silencioso en lugar de SSE (más estable)
+    startPolling();
+    // Registrar Service Worker solo después de conectar
+    try{if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});}catch(ex){}
+    console.info('[TIMES INC] Firebase conectado ✓');
+  })
+  .catch(function(err){
+    _fetchInFlight=false;
+    if(_connDone)return;
+    console.warn('[TIMES INC] doFetch error:',err.message,'intento:',_connAttempts+1);
+    _connAttempts++;
+    if(_connAttempts<=12){
+      // Backoff exponencial: 1s, 2s, 3s… hasta 8s
+      var delay=Math.min(_connAttempts*1000,8000);
+      setTimeout(doFetch,delay);
+    }else{
+      setCloudStatus('disconnected');
+      showRetryBtn(true);
+    }
+  });
+}
+
+/* ── Polling silencioso cada 30s para mantener datos frescos ── */
+function startPolling(){
+  if(_pollTimer)clearInterval(_pollTimer);
+  _pollTimer=setInterval(function(){
+    if(!FB.connected||!_connDone)return;
+    fetch(DB_URL+'.json',{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache'}})
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(data){
+      if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length&&!FB.syncing){
+        var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length});
+        var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length});
+        if(localStr!==remoteStr){
           FB.syncing=true;applyDB(data);FB.syncing=false;
-          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
-        }else{
-          // BD vacía: subir datos locales
-          cloudPush(true); // force push even though FB.connected not set yet
+          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
+          refreshUI();
         }
-        FB.connected=true;_connDone=true;
-        setCloudStatus('connected');
-        popSelects();
-        safeRun(restoreSession,'restoreSession');
-        safeRun(loadRemembered,'loadRemembered_afterConnect'); // re-run after data loaded
-        startRealtime();
-        try{window._registerSW&&window._registerSW();}catch(e){} // register SW after connect
-        console.info('TIMES INC: conectado ✓');
-      }catch(applyErr){
-        console.warn('applyDB error:',applyErr.message);
-        // Still mark connected even if applyDB had issues
-        FB.connected=true;_connDone=true;
-        setCloudStatus('connected');
-        popSelects();
       }
     })
-    .catch(e=>{
-      _fetchInFlight=false;
-      if(_connDone)return;
-      console.warn('doFetch error:',e.message,'attempt:',_connAttempts);
-      _connAttempts++;
-      if(_connAttempts<10){
-        const delay=Math.min(1500*_connAttempts,8000);
-        setTimeout(doFetch,delay);
-      }else{setCloudStatus('disconnected');showRetryBtn(true);}
-    });
+    .catch(function(){/* polling falla silenciosamente */});
+  },30000);
 }
+
 function autoConnectCloud(){
   if(_connDone)return;
-  setCloudStatus('connecting');showRetryBtn(false);
+  setCloudStatus('connecting');
+  showRetryBtn(false);
   doFetch();
 }
 
-function startRealtime(){
-  // Server-Sent Events para actualizaciones en tiempo real
-  if(_es){try{_es.close();}catch(e){}}
-  try{
-    _es=new EventSource(DB_URL+'.json?accept=text/event-stream&timeout=30000');
-    _es.addEventListener('put',e=>{
-      try{
-        const msg=JSON.parse(e.data);
-        const d=msg.path==='/'?msg.data:null;
-        if(d&&d.employees&&!FB.syncing){
-          FB.syncing=true;applyDB(d);FB.syncing=false;
-          try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e2){}
-          refreshUI();popSelects();
-        }
-        setCloudStatus('connected');
-      }catch(err){}
-    });
-    _es.addEventListener('patch',e=>{
-      try{
-        setCloudStatus('connected');
-        // Recargar datos completos en un patch
-        fetch(DB_URL+'.json',{cache:'no-store',headers:{'Cache-Control':'no-cache'}}).then(r=>r.json()).then(d=>{
-          if(d&&!FB.syncing){FB.syncing=true;applyDB(d);FB.syncing=false;
-            try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e2){}
-            refreshUI();popSelects();}
-        }).catch(()=>{});
-      }catch(err){}
-    });
-    _es.onerror=()=>{
-      setCloudStatus('connecting');
-      // Reconectar SSE en 5s si se cae
-      setTimeout(()=>{if(FB.connected)startRealtime();},5000);
-    };
-  }catch(e){console.warn('SSE no disponible:',e.message);}
+function retryConnection(){
+  showRetryBtn(false);
+  _connAttempts=0;
+  _connDone=false;
+  _fetchInFlight=false;
+  FB.connected=false;
+  if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}
+  setCloudStatus('connecting');
+  doFetch();
 }
+
+/* SSE eliminado — reemplazado por polling silencioso */
+function startRealtime(){startPolling();}
+
 
 let _vacCache={};
 function vacData(empId){
