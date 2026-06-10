@@ -2477,7 +2477,7 @@ function downloadCierre(mk){
   (closure.records||[]).forEach(r=>{
     const m=Math.floor((r.workSecs||0)/60);
     const obra=r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra';
-    rows.push([r.empName,obra,fdate(r.inicio),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),'—','—',r.aprobado?'Aprobado':'Pendiente']);
+    rows.push([r.empName,obra,new Date(r.inicio).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),'—','—',r.aprobado?'Aprobado':'Pendiente']);
   });
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:26},{wch:18},{wch:12},{wch:9},{wch:9},{wch:14},{wch:13},{wch:10},{wch:12}];
@@ -3008,7 +3008,11 @@ function expExcelEncargado(){
     const norm=_ce.norm;const ext=_ce.extra;
     weekAcc[wKey]=afterW;weekAcc[mKey]=afterM;
     const estado=r.aprobado?'✅ Aprobado':r.rechazado?'❌ Rechazado':'⏳ Pendiente';
-    fich.push([r.empName,r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra',fdate(r.inicio),new Date(r.inicio).toLocaleDateString('es-ES',{weekday:'long'}),ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado,r.validadoPor||'Pendiente']);
+    const _d=new Date(r.inicio);
+    fich.push([r.empName,r.empresa||(DB.employees.find(x=>x.id===r.empId)||{}).empresa||'Sin obra',
+      _d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}),
+      _d.toLocaleDateString('es-ES',{weekday:'long'}),
+      ftime(r.inicio),r.fin?ftime(r.fin):'—',mhm(m),mhm(norm),mhm(ext),estado,r.validadoPor||'Pendiente']);
   });
   const wsF=XLSX.utils.aoa_to_sheet(fich);
   wsF['!cols']=[{wch:26},{wch:20},{wch:12},{wch:12},{wch:9},{wch:9},{wch:16},{wch:13},{wch:10},{wch:13}];
