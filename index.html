@@ -1008,11 +1008,25 @@ function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label
 
 let FB={connected:false,syncing:false};let _saveRetry=0;
 let _saveT=null;
-function save(){clearVacCache();
-  // Timestamp de última modificación para detección de cambios en poll
+/* ── SAVE: push inmediato a Firebase ── */
+function save(){
+  clearVacCache();
   DB._ts=Date.now();
-  try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){console.warn('localStorage lleno o no disponible');}
-  if(FB.connected&&!FB.syncing){clearTimeout(_saveT);_saveT=setTimeout(cloudPush,400);}
+  // Backup en localStorage
+  try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+  // Push inmediato a Firebase — sin debounce para acciones de usuario
+  if(FB.connected&&!FB.syncing){
+    clearTimeout(_saveT);
+    cloudPush(true);
+  }
+}
+/* ── SAVE_TICK: solo para actualizaciones automáticas del timer (debounced) ── */
+function saveTick(){
+  try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+  if(FB.connected&&!FB.syncing){
+    clearTimeout(_saveT);
+    _saveT=setTimeout(cloudPush,5000); // 5s debounce solo para tick
+  }
 }
 
 function load(){
@@ -1131,11 +1145,29 @@ function doAdminRapido(){
   persistSession();
 }
 
+let _pushInFlight=false;
 function cloudPush(force){
   if(!FB.connected&&!force)return;
-  fetch(DB_URL+'.json',{method:'PUT',cache:'no-store',headers:{'Content-Type':'application/json','Cache-Control':'no-cache'},body:JSON.stringify(DB)})
-    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);_saveRetry=0;})
-    .catch(e=>{console.warn('Save error:',e.message);if(_saveRetry<3){_saveRetry++;setTimeout(cloudPush,1500*_saveRetry);}});
+  if(_pushInFlight)return; // Evitar pushes concurrentes
+  _pushInFlight=true;
+  const payload=JSON.stringify(DB);
+  fetch(DB_URL+'.json',{
+    method:'PUT',
+    cache:'no-store',
+    headers:{'Content-Type':'application/json','Cache-Control':'no-cache'},
+    body:payload
+  })
+  .then(r=>{
+    _pushInFlight=false;
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    _saveRetry=0;
+    console.debug('[TIMES INC] ✓ Firebase sync OK',new Date().toLocaleTimeString());
+  })
+  .catch(e=>{
+    _pushInFlight=false;
+    console.warn('[TIMES INC] Push error:',e.message);
+    if(_saveRetry<5){_saveRetry++;setTimeout(()=>cloudPush(true),800*_saveRetry);}
+  });
 }
 
 let _fetchInFlight=false;
@@ -1223,18 +1255,31 @@ function startPolling(){
         var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length,n:(DB.notis||[]).length,v:(DB.vacaciones||[]).length,a:_aprov,ts:DB._ts||0});
         var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length,n:(data.notis||[]).length,v:(data.vacaciones||[]).length,a:_remAprov,ts:data._ts||0});
         if(localStr!==remoteStr){
-          FB.syncing=true;applyDB(data);FB.syncing=false;
+          FB.syncing=true;
+          try{applyDB(data);}catch(ex){console.warn('applyDB error:',ex.message);}
+          FB.syncing=false;
+          // Actualizar referencia de SES.user
           if(SES.user){const fresh=DB.employees.find(e=>e.id===SES.user.id);if(fresh)SES.user=fresh;}
+          // Backup local
           try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
+          // Refrescar toda la UI inmediatamente
           safeRun(refreshUI,'pollRefresh');
           safeRun(refreshAfterRecordChange,'pollRecs');
-          // Actualizar badge de notificaciones
           safeRun(updateBadges,'pollBadges');
+          // Si hay notificaciones nuevas para este usuario, mostrarlas
+          if(SES.user){
+            const myNew=notisFor().filter(n=>!n.leido&&n.push);
+            if(myNew.length>0){
+              const latest=myNew[myNew.length-1];
+              sendBrowserNotif(latest.titulo,latest.texto,latest.tipo);
+            }
+          }
+          console.debug('[TIMES INC] Poll: cambios detectados, UI actualizada');
         }
       }
     })
     .catch(function(){/* polling falla silenciosamente */});
-  },20000); // Polling cada 20s para sincronización en tiempo real
+  },10000); // Polling cada 10s — real-time sync
 }
 
 function autoConnectCloud(){
@@ -1598,7 +1643,7 @@ function tick(){
   TM.state=o.enDescanso?'break':'working';
   const t=calcSecs(o);TM.ws=t.work;TM.bs=t.brk;
   updTimer();
-  if((++_tickN)%30===0){o.workSecs=t.work;o.breakSecs=t.brk;save();}
+  if((++_tickN)%30===0){o.workSecs=t.work;o.breakSecs=t.brk;saveTick();}
 }
 function updTimer(){
   document.getElementById('eWorked').textContent=s2h(TM.ws);
@@ -3702,7 +3747,10 @@ function initApp(){
 // SW registration deferred to after first connection
 window._registerSW=function(){if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}};
 safeRun(initTheme,'initTheme');
-function _startApp(){if(!window._appStarted){window._appStarted=true;try{initApp();}catch(e){console.warn('Init error:',e);}}}
+function _startApp(){
+  // Limpiar localStorage obsoleto si Firebase está disponible
+  // El localStorage solo es fallback, Firebase es la fuente de verdad
+  if(!window._appStarted){window._appStarted=true;try{initApp();}catch(e){console.warn('Init error:',e);}}}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_startApp);}
 else{_startApp();}
 // Doble seguro: window.onload por si DOMContentLoaded no disparó
