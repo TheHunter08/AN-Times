@@ -720,6 +720,8 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         <div id="aprobList"><div class="empty">Sin jornadas pendientes de validar</div></div>
       </div>
       <div class="adcard"><h3>🌴 Vacaciones pendientes</h3><div id="aVacPend"><div class="empty">Sin solicitudes</div></div></div>
+      <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
+      <div class="adcard"><h3>⚠ Ausencias injustificadas</h3><div id="aAbsList"><div class="empty">Sin ausencias</div></div></div>
     </div>
 
     <div id="aVacgestion" style="display:none">
@@ -730,8 +732,6 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         </div>
         <div style="font-size:11px;color:var(--text3)">Consulta, asigna y gestiona las vacaciones de todos los empleados</div>
       </div>
-      <div class="adcard"><h3>🏥 Permisos médicos</h3><div id="aMedList"><div class="empty">Sin permisos</div></div></div>
-      <div class="adcard"><h3>⚠ Ausencias injustificadas</h3><div id="aAbsList"><div class="empty">Sin ausencias</div></div></div>
       <div class="adcard"><h3>Vacaciones por empleado</h3><div id="aVacRes"></div></div>
 
       <div class="adcard">
@@ -769,11 +769,6 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         </div>
       </div>
 
-      <div class="adcard"><h3>Ajustar fecha inicio contrato</h3>
-        <div class="ff"><label>Empleado</label><select id="adjEmp" style="appearance:none"></select></div>
-        <div class="ff"><label>Fecha inicio</label><input type="date" id="adjDate"></div>
-        <button class="badd" onclick="adjStart()">Guardar fecha</button>
-      </div>
     </div>
     </div>
 
@@ -785,14 +780,13 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
       <div id="recList"></div>
     </div>
     <div id="aEmpleados" style="display:none">
-      <div class="adcard"><h3>Empleados activos</h3><div id="empList"></div></div>
       <div class="adcard"><h3>Encargados</h3>
         <div id="encargadoList"></div>
         <div style="font-size:11px;color:var(--text3);margin-top:8px">Los encargados pueden validar las horas de sus trabajadores asignados.</div>
       </div>
             <div class="adcard"><h3>Añadir empleado</h3>
         <div class="ff"><label>Nombre completo</label><input type="text" id="nNombre" placeholder="Nombre y apellidos"></div>
-        <div class="ff"><label>Obra</label><select id="nEmpresa" style="appearance:none"><option value="">— Empresa —</option></select></div>
+        <div class="ff"><label>Obra</label><select id="nEmpresa" style="appearance:none"><option value="">— Obra —</option></select></div>
         <div class="ff"><label>PIN (4-6 dígitos)</label><input type="text" id="nPin" placeholder="ej. 1234" maxlength="6" inputmode="numeric"></div>
         <div class="ff"><label>Fecha inicio contrato</label><input type="date" id="nStart"></div>
         <div class="ff"><label>Email (para nóminas)</label><input type="email" id="nEmail" placeholder="correo@ejemplo.com"></div>
@@ -817,7 +811,14 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         </div>
         <button class="badd" onclick="addEmp()">+ Añadir empleado</button>
       </div>
-          </div>
+
+      <div class="adcard">
+        <h3>📅 Ajustar fecha inicio contrato</h3>
+        <div class="ff"><label>Empleado</label><select id="adjEmp" style="appearance:none"></select></div>
+        <div class="ff"><label>Fecha inicio</label><input type="date" id="adjDate"></div>
+        <button class="badd" onclick="adjStart()" style="margin-top:4px">Guardar fecha</button>
+      </div>
+    </div>
 
     <div id="aNominas" style="display:none">
       <div class="adcard"><h3>Enviar nómina a un trabajador</h3>
@@ -1736,7 +1737,7 @@ function admTab(t){
   if(t==='registros')safeRun(renderRecs,'renderRecs');
   else if(t==='empleados')safeRun(renderEmps,'renderEmps');
   else if(t==='exportar'){safeRun(renderExpStats,'renderExpStats');safeRun(renderCierres,'renderCierres');safeRun(renderCloseMesOptions,'renderCloseMesOptions');safeRun(renderNomMesOptions,'renderNomMesOptions');}
-  else if(t==='solicitudes'){safeRun(renderAdmSols,'renderAdmSols');safeRun(renderAprobaciones,'renderAprobaciones');
+  else if(t==='solicitudes'){safeRun(renderAdmSols,'renderAdmSols');safeRun(renderAprobaciones,'renderAprobaciones');safeRun(renderMedAbs,'renderMedAbs');
     // Actualizar vacaciones pendientes en esta pestaña
     setTimeout(()=>{const vp=(DB.vacaciones||[]).filter(v=>v.estado==='pendiente');const vpEl=document.getElementById('aVacPend');
     if(vpEl)vpEl.innerHTML=vp.length?vp.map(v=>`<div class="si"><div class="si-top"><span class="si-name">${v.empName}</span><span class="badge pendiente">⏳ Pendiente</span></div><div class="si-dates">📅 ${fds(v.desde)} → ${fds(v.hasta)} · <b>${v.dias} días</b></div><div class="si-actions"><button class="bok" onclick="resVac('${v.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resVac('${v.id}','denegada')">❌ Denegar</button></div></div>`).join(''):'<div class="empty">Sin solicitudes pendientes ✅</div>';},50);}
@@ -2145,15 +2146,54 @@ function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.
 function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
 function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
 function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();renderAdmSols();toast('Fecha de inicio actualizada');}
+
 function renderRecs(){
   const ef=document.getElementById('fEmp').value,wf=document.getElementById('fWeek').value;
-  let recs=DB.records.filter(r=>r.fin);if(ef)recs=recs.filter(r=>r.empId===ef);if(wf)recs=recs.filter(r=>wkKey(new Date(r.inicio))===wf);recs=recs.sort((a,b)=>b.inicio.localeCompare(a.inicio));
+  let recs=DB.records.filter(r=>r.fin);
+  if(ef)recs=recs.filter(r=>r.empId===ef);
+  if(wf)recs=recs.filter(r=>wkKey(new Date(r.inicio))===wf);
+  recs=recs.sort((a,b)=>b.inicio.localeCompare(a.inicio));
   const el=document.getElementById('recList');
-  if(!recs.length){el.innerHTML='<div class="empty">Aún no hay registros. Los fichajes aparecerán aquí.</div>';return;}
-  el.innerHTML='<div class="adcard">'+recs.map(r=>{const e=DB.employees.find(x=>x.id===r.empId);const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi"><div class="hl"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:50%;background:${e?e.color:'#888'};display:inline-block"></span><strong style="font-size:13px">${r.empName}</strong></div><div class="htimes">${fdf(r.inicio)} · <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>${(r.locInicio||r.locFin)?`<div style="display:flex;gap:8px;padding:4px 0 10px;margin-top:-4px">${r.locInicio?`<button class="bloc" onclick="verUbicacion(${r.locInicio.lat},${r.locInicio.lng})">📍 Entrada</button>`:''}${r.locFin?`<button class="bloc" onclick="verUbicacion(${r.locFin.lat},${r.locFin.lng})">📍 Salida</button>`:''}</div>`:''}`;
+  if(!recs.length){el.innerHTML='<div class="empty">Sin registros aún.</div>';return;}
+  el.innerHTML='<div class="adcard">'+recs.map(r=>{
+    const emp=DB.employees.find(x=>x.id===r.empId);
+    const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
+    const badgeHtml=r.aprobado===true
+      ?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis">✓ ${r.validadoPor||'Aprobado'}</span>`
+      :r.aprobado===false
+      ?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red);white-space:nowrap">✗ Rechazado</span>`
+      :`<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2);white-space:nowrap">⏳ Pendiente</span>`;
+    const locHtml=(r.locInicio||r.locFin)
+      ?`<div style="display:flex;gap:8px;margin-top:2px">${r.locInicio?`<button class="bloc" onclick="verUbicacion(${r.locInicio.lat},${r.locInicio.lng})">📍 Entrada</button>`:``}${r.locFin?`<button class="bloc" onclick="verUbicacion(${r.locFin.lat},${r.locFin.lng})">📍 Salida</button>`:``}</div>`
+      :``;
+    const adminHtml=SES.isAdmin
+      ?`<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px"><button onclick="openEditRecord('${r.id}')" title="Editar" style="width:26px;height:26px;border-radius:7px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.2);color:var(--accent3);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">✎</button><button onclick="adminDelRecord('${r.id}')" title="Eliminar" style="width:26px;height:26px;border-radius:7px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:var(--red);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button></div>`
+      :``;
+    return`<div class="hi" style="position:relative;flex-direction:column;align-items:stretch;gap:6px${SES.isAdmin?';padding-right:62px':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0;flex:1;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${emp?emp.color:'#888'};flex-shrink:0"></span>
+            <strong style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.empName}</strong>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">${fdf(r.inicio)}</div>
+          <div class="htimes" style="margin-top:2px">
+            <span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)}
+            <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)}
+            <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+          <div class="hpill ok" style="white-space:nowrap">${mhm(m)}</div>
+          ${badgeHtml}
+        </div>
+      </div>
+      ${locHtml}
+      ${adminHtml}
+    </div>`;
   }).join('')+'</div>';
 }
+
 function renderCentros(){
   const el=document.getElementById('centrosList');if(!el)return;
   const cts=DB.centrosTrabajo||[];
@@ -3412,6 +3452,25 @@ function saveEditRecord(recId){
   save();document.getElementById('mEditRec')?.remove();
   safeRun(renderHist,'renderHist');safeRun(renderGStats,'renderGStats');
   toast('Registro actualizado ✓');
+}
+
+
+/* ── Render médico + ausencias en Solicit. ── */
+function renderMedAbs(){
+  const medEl=document.getElementById('aMedList');
+  if(medEl){const meds=(DB.medicos||[]).filter(m=>m.estado!=='denegada');
+    medEl.innerHTML=meds.length?meds.map(m=>{const emp=DB.employees.find(e=>e.id===m.empId);
+      return`<div class="si"><div class="si-top"><span class="si-name">${m.empName||emp?.name||'?'}</span>
+        <span class="badge ${m.estado}">${m.estado==='pendiente'?'⏳':m.estado==='aprobada'?'✅':'❌'} ${m.estado}</span></div>
+        <div class="si-dates">📅 ${fds(m.desde)} → ${fds(m.hasta)} · ${m.dias} días</div>
+        ${m.estado==='pendiente'?`<div class="si-actions"><button class="bok" onclick="resMed('${m.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resMed('${m.id}','denegada')">❌ Denegar</button></div>`:''}
+      </div>`;}).join(''):'<div class="empty">Sin permisos médicos</div>';}
+  const absEl=document.getElementById('aAbsList');
+  if(absEl){const abs=(DB.ausencias||[]);
+    absEl.innerHTML=abs.length?abs.map(a=>`<div class="si"><div class="si-top"><span class="si-name">${a.empName||'?'}</span>
+      <span class="badge denegada">⚠ Ausencia</span></div>
+      <div class="si-dates">📅 ${fds(a.fecha)} · ${a.motivo||'Sin motivo'}</div>
+    </div>`).join(''):'<div class="empty">Sin ausencias</div>';}
 }
 
 /* KEY EVENTS */
