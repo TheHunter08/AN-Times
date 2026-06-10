@@ -1083,7 +1083,7 @@ function refreshUI(){
     try{admTab(cur);}catch(e){console.error(e);}
   } else if(SES.user){
     try{
-      renderWeek();renderRecent();
+      renderWeek();renderRecent();renderMonthSummary();
       // Re-render whichever employee sub-tab is open so live data stays fresh
       if(_curEmpTab==='vacaciones')renderVac();
       else if(_curEmpTab==='medico')renderMed();
@@ -1165,6 +1165,8 @@ function doFetch(){
     safeRun(loadRemembered,'loadRemembered');
     // Refrescar resumen mensual tras cargar datos de Firebase
     if(SES.user)safeRun(renderMonthSummary,'renderMonthSummary_afterLoad');
+    // Llamada adicional con delay para asegurar que el DOM está listo
+    setTimeout(()=>{if(SES.user)safeRun(renderMonthSummary,'renderMonthSummary_delayed');},500);
     // Iniciar polling silencioso en lugar de SSE (más estable)
     startPolling();
     // Registrar Service Worker solo después de conectar
@@ -1195,6 +1197,8 @@ function startPolling(){
     fetch(DB_URL+'.json',{method:'GET',cache:'no-store',headers:{'Cache-Control':'no-cache'}})
     .then(function(r){return r.ok?r.json():null;})
     .then(function(data){
+      // Actualizar resumen mensual con la sesión activa aunque no haya cambios remotos
+      if(SES.user&&!SES.isAdmin)safeRun(renderMonthSummary,'pollMonthS');
       if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length&&!FB.syncing){
         var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length});
         var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length});
@@ -1450,6 +1454,9 @@ function initFichaje(){
     const f=document.getElementById('mFrom').value,t=document.getElementById('mTo').value,el=document.getElementById('mDays');
     if(f&&t&&f<=t){const d=wkdays(f,t);el.textContent=`📅 ${d} día${d!==1?'s':''} de permiso médico`;el.style.color='var(--teal)';}else el.textContent='';
   }));
+  // Actualizar resumen mensual inmediatamente
+  safeRun(renderMonthSummary,'renderMonthSummary_init');
+  setTimeout(()=>safeRun(renderMonthSummary,'renderMonthSummary_init2'),300);
 }
 // ===== UBICACIÓN (geolocalización con permiso del navegador) =====
 function captureLocation(rec,campo){
@@ -3270,13 +3277,15 @@ function renderMonthSummary(){
     return recMk===mk;
   });
   const totalMin=recs.reduce((s,r)=>{
-    // Duración real: fin - inicio - descanso (igual que renderRecent)
     const worked=r.workSecs>0
       ?Math.floor(r.workSecs/60)
       :Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));
     return s+worked;
   },0);
-  const days=recs.length;
+  // Incluir sesión activa si está en el mismo mes
+  const activeMin=(TM.state!=='idle'&&TM.ws>0)?Math.floor(TM.ws/60):0;
+  const totalMinWithActive=totalMin+activeMin;
+  const days=recs.length+(TM.state!=='idle'?1:0);
   // Horas extra del mes usando calcExtra
   let normAcc=0,totalMonthAcc=0;const weekAcc2={};
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
@@ -3298,7 +3307,7 @@ function renderMonthSummary(){
   const daysEl=document.getElementById('msDays');
   if(label)label.textContent=monthName.charAt(0).toUpperCase()+monthName.slice(1);
   if(badge)badge.textContent=`${days} jornada${days!==1?'s':''}`;
-  if(worked)worked.textContent=mhm(totalMin);
+  if(worked)worked.textContent=mhm(totalMinWithActive);
   if(extra){extra.textContent=mhm(extraMin);extra.style.color=extraMin>0?'var(--rose)':'var(--text2)';}
   if(daysEl)daysEl.textContent=days;
 }
