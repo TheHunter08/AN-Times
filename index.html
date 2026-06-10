@@ -197,14 +197,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 /* History */
 .hsec{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:14px}
 .hsec h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-.hi{border-bottom:1px solid var(--border);padding:10px 0;display:flex;align-items:center;justify-content:space-between}
+.hi{border-bottom:1px solid var(--border);padding:10px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
 .hi:last-child{border-bottom:none}
-.hl{display:flex;flex-direction:column;gap:3px}
-.hdate{font-size:13px;font-weight:600}
+.hl{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hiddenx}
+.hdate{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
 .htimes{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .htimes svg{width:12px;height:12px;stroke-width:2;fill:none;vertical-align:middle}
 .hin svg{stroke:var(--green)}.hout svg{stroke:var(--red)}.hbk svg{stroke:var(--orange)}
-.hpill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:10px}
+.hpill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hpill.ok{background:rgba(0,230,118,0.15);color:var(--green)}
 .hpill.ex{background:rgba(255,59,59,0.15);color:var(--red)}
 .hpill.med{background:rgba(0,191,165,0.15);color:var(--teal)}
@@ -530,7 +530,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         <p>Sistema de control de jornada laboral</p>
         <div id="cloudStatus" style="margin-top:10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(0,212,255,0.12);color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pd 1s infinite"></span>Conectando con la base de datos…</div>
         <div id="retryBtn" style="display:none;margin-top:8px"><button onclick="retryConnection()" style="font-size:12px;padding:7px 16px;border-radius:20px;border:1px solid rgba(90,169,230,0.4);background:transparent;color:var(--accent);cursor:pointer">↺ Reintentar conexión</button></div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v7.1 · build 20260609</div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3);letter-spacing:1px">v7.2 · build 20260610</div>
       </div>
       <div class="lcard">
         <h2>Acceso empleado</h2>
@@ -603,7 +603,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
         <div class="ws med"><div class="wsico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/></svg></div><div class="wstxt"><div class="v" id="wMed">0</div><div class="l">Días médico</div></div></div>
         <div class="ws abs"><div class="wsico"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><div class="wstxt"><div class="v" id="wAbs">0</div><div class="l">Ausencias</div></div></div>
       </div></div>
-      <div class="adcard" id="monthSummaryCard" style="margin:8px 0 0;padding:14px">
+      <div class="adcard" id="monthSummaryCard" style="margin:16px 0 0;padding:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase" id="monthSummaryLabel">Este mes</div>
           <div id="monthSummaryBadge" style="font-size:10px;padding:3px 8px;border-radius:20px;background:rgba(99,102,241,0.12);color:var(--accent3);font-weight:600"></div>
@@ -623,7 +623,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
           </div>
         </div>
       </div>
-      <div class="hsec"><h3>Últimos registros</h3><div id="recentList"><div class="empty">Sin registros aún</div></div></div>
+      <div class="hsec" style="margin-top:20px"><h3>Últimos registros</h3><div id="recentList"><div class="empty">Sin registros aún</div></div></div>
     </div>
     <!-- VACACIONES TAB -->
     <div id="tVacaciones" style="display:none">
@@ -1147,6 +1147,8 @@ function doFetch(){
     popEmps('');
     safeRun(restoreSession,'restoreSession');
     safeRun(loadRemembered,'loadRemembered');
+    // Refrescar resumen mensual tras cargar datos de Firebase
+    if(SES.user)safeRun(renderMonthSummary,'renderMonthSummary_afterLoad');
     // Iniciar polling silencioso en lugar de SSE (más estable)
     startPolling();
     // Registrar Service Worker solo después de conectar
@@ -1582,7 +1584,12 @@ function renderRecent(){
   const el=document.getElementById('recentList');
   if(!recs.length){el.innerHTML='<div class="empty">Sin registros finalizados</div>';return;}
   el.innerHTML=recs.map(r=>{const m=Math.floor((r.workSecs||0)/60),bm=Math.floor((r.breakSecs||0)/60);
-    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}${Math.floor((r.workSecs||0)/60)>480?'<span style="font-size:10px;color:var(--orange);margin-left:4px" title="Más de 8h">+8h</span>':''}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}</div>`;
+    return`<div class="hi" style="position:relative"><div class="hl"><div class="hdate">${fdf(r.inicio)}${(()=>{const mins=r.workSecs>0?Math.floor(r.workSecs/60):Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));return mins>480?'<span style="font-size:10px;color:var(--orange);margin-left:4px" title="Jornada de más de 8h">+8h</span>':''})()}</div><div class="htimes"><span class="hin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>${ftime(r.inicio)} <span class="hout"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>${ftime(r.fin)} <span class="hbk"><svg viewBox="0 0 24 24"><path d="M4 9h13v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/></svg></span>${mhm(bm)}</div></div><div class="hpill ok">${mhm(m)}</div>${r.aprobado===true?`<span class="hpill" style="background:rgba(92,184,138,0.18);color:var(--green)">✓ ${r.validadoPor||'Aprobado'}</span>`:r.aprobado===false?`<span class="hpill" style="background:rgba(204,107,107,0.18);color:var(--red)">✗ Rechazado por ${r.validadoPor||'admin'}</span>`:'<span class="hpill" style="background:rgba(139,148,166,0.12);color:var(--text2)">⏳ Pdte. validar</span>'}
+    ${SES.isAdmin?`<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px">
+      <button onclick="openEditRecord('${r.id}')" title="Editar registro" style="width:26px;height:26px;border-radius:7px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.2);color:var(--accent3);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">✎</button>
+      <button onclick="adminDelRecord('${r.id}')" title="Eliminar registro" style="width:26px;height:26px;border-radius:7px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:var(--red);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`:''}
+  </div>`;
   }).join('');
 }
 
@@ -2939,8 +2946,9 @@ function getEncargadoObras(){
 function renderExportTab(){
   const el=document.getElementById('aExportar');if(!el)return;
   if(SES.isEncargado){
-    const obras=(SES.user&&SES.user.obrasAsignadas&&SES.user.obrasAsignadas.length)
-      ?SES.user.obrasAsignadas.join(', '):'todas las obras asignadas';
+    const _encNow = DB.employees.find(e=>SES.user&&e.id===SES.user.id)||SES.user;
+    const obras=(_encNow&&_encNow.obrasAsignadas&&_encNow.obrasAsignadas.length)
+      ?_encNow.obrasAsignadas.join(', '):'Sin obras asignadas aún';
     el.innerHTML=`<div class="adcard">
       <h3>📊 Exportar horas de mis obras</h3>
       <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Descarga las horas fichadas de los trabajadores de tus obras: <strong style="color:var(--text)">${obras}</strong></p>
@@ -2968,14 +2976,17 @@ function expExcelEncargado(){
     toast('Cargando Excel…');return;
   }
   // Filtrar solo las obras asignadas al encargado
-  const obrasEnc=(SES.user&&SES.user.obrasAsignadas)||[];
-  if(!obrasEnc.length){toast('No tienes obras asignadas');return;}
+  // Leer siempre del DB actualizado (SES.user puede ser referencia obsoleta tras applyDB)
+  const _encActual = DB.employees.find(e => SES.user && e.id === SES.user.id) || SES.user;
+  const obrasEnc = (_encActual && _encActual.obrasAsignadas) || [];
+  console.info('[Excel Enc] obras:', obrasEnc, 'enc:', _encActual?.name);
+  if(!obrasEnc.length){toast('No tienes obras asignadas. Pide al admin que te asigne obras en Empl.');return;}
 
-  // Empleados de sus obras (incluye al encargado mismo y otros encargados de esas obras)
+  // Empleados de sus obras (incluye al encargado mismo)
   const empsEnc=DB.employees.filter(e=>{
     if(e.isAdmin)return false;
     // El encargado mismo siempre incluido
-    if(SES.user&&e.id===SES.user.id)return true;
+    if(_encActual && e.id === _encActual.id)return true;
     // Empleados/encargados cuya obra principal está en las obras asignadas
     return obrasEnc.includes(e.empresa);
   });
@@ -3171,17 +3182,33 @@ function addBackToFichajeBtn(){
 /* ── RESUMEN MENSUAL EMPLEADO ── */
 function renderMonthSummary(){
   const emp=SES.user;if(!emp)return;
+  // Buscar siempre en DB actualizado
+  const empActual=DB.employees.find(e=>e.id===emp.id)||emp;
   const now=new Date();
   const mk=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const monthName=now.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-  // Records de este mes
-  const recs=DB.records.filter(r=>r.empId===emp.id&&r.fin&&r.inicio.startsWith(mk));
-  const totalMin=recs.reduce((s,r)=>s+Math.floor((r.workSecs||0)/60),0);
+  // Records de este mes — calcular duración desde fin-inicio (igual que renderRecent)
+  const recs=DB.records.filter(r=>{
+    if(r.empId!==emp.id||!r.fin)return false;
+    // Comparar por fecha local del inicio
+    const d=new Date(r.inicio);
+    const recMk=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    return recMk===mk;
+  });
+  const totalMin=recs.reduce((s,r)=>{
+    // Duración real: fin - inicio - descanso (igual que renderRecent)
+    const worked=r.workSecs>0
+      ?Math.floor(r.workSecs/60)
+      :Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));
+    return s+worked;
+  },0);
   const days=recs.length;
-  // Horas extras del mes
+  // Horas extra del mes usando calcExtra
   let normAcc=0;const weekAcc2={};
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
-    const m=Math.floor((r.workSecs||0)/60);
+    const m=r.workSecs>0
+      ?Math.floor(r.workSecs/60)
+      :Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));
     const wk=wkKey(new Date(r.inicio));const wK=emp.id+'|'+wk;
     const prevW=weekAcc2[wK]||0;
     const _ce=calcExtra(m,prevW,normAcc);
