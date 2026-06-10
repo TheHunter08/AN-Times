@@ -199,7 +199,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .hsec h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
 .hi{border-bottom:1px solid var(--border);padding:10px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
 .hi:last-child{border-bottom:none}
-.hl{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hiddenx}
+.hl{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hidden}
 .hdate{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
 .htimes{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .htimes svg{width:12px;height:12px;stroke-width:2;fill:none;vertical-align:middle}
@@ -220,7 +220,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .atab{flex:1 0 auto;min-width:62px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Syne',sans-serif;font-size:9px;font-weight:700;color:var(--text2);background:transparent;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
 .atab svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
 .atab.active{background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(79,70,229,0.12));color:var(--accent3);border:1px solid rgba(99,102,241,0.3);border-radius:10px}
-.adcard{background:rgba(13,20,34,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);padding:18px;margin-bottom:12px;transition:all 0.2s;backdrop-filter:blur(8px)}
+.adcard{background:rgba(13,20,34,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);padding:18px;margin-bottom:12px;transition:all 0.2s;backdrop-filter:blur(8px);overflow:hidden;box-sizing:border-box}
 .adcard:hover{border-color:rgba(99,102,241,0.25);box-shadow:0 8px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(99,102,241,0.1)}
 .adcard:hover{border-color:var(--border2)}
 .adcard h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
@@ -238,7 +238,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);mar
 .bok:hover{background:rgba(0,230,118,0.2)}
 .bdeny{background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.2);border-radius:7px;color:var(--red);padding:5px 8px;font-size:12px;cursor:pointer;margin-left:4px}
 .bdeny:hover{background:rgba(255,59,59,0.2)}
-.ff{margin-bottom:12px}
+.ff{margin-bottom:12px;width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
 .ff label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px}
 .ff input,.ff select,.ff textarea{width:100%;padding:11px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
 .ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--accent)}
@@ -514,7 +514,15 @@ body.light-mode #cloudStatus { background: rgba(5,150,105,0.1) !important; color
 body.light-mode #themeToggleBtn { color: #6366f1 !important; background: rgba(99,102,241,0.08) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 10px !important; }
 body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
 
-input[type="date"]{width:100%;box-sizing:border-box;max-width:100%}
+input[type="date"],input[type="time"]{
+  width:100%!important;
+  box-sizing:border-box!important;
+  max-width:100%!important;
+  min-width:0!important;
+  -webkit-appearance:none;
+  appearance:none;
+  display:block;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 <!-- SheetJS se carga bajo demanda en expExcelCompleto() -->
@@ -3462,14 +3470,15 @@ function openEditRecord(recId){
       <h3 style="margin:0;font-size:16px">✏️ Editar registro</h3>
       <button onclick="document.getElementById('mEditRec').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">✕</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Fecha</label>
-        <input type="date" id="erDate" value="${inDate}" style="width:100%;margin-top:4px"></div>
-      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Entrada</label>
-        <input type="time" id="erIn" value="${inH}" style="width:100%;margin-top:4px"></div>
-      <div></div>
-      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase">Salida</label>
-        <input type="time" id="erOut" value="${outH}" style="width:100%;margin-top:4px"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+      <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px">Fecha</label>
+        <input type="date" id="erDate" value="${inDate}" style="width:100%;box-sizing:border-box;max-width:100%;display:block"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px">Entrada</label>
+          <input type="time" id="erIn" value="${inH}" style="width:100%;box-sizing:border-box"></div>
+        <div><label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px">Salida</label>
+          <input type="time" id="erOut" value="${outH}" style="width:100%;box-sizing:border-box"></div>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button onclick="saveEditRecord('${recId}')" style="padding:13px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;font-weight:700;cursor:pointer">Guardar</button>
