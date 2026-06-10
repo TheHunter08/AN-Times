@@ -1009,6 +1009,8 @@ function safeRun(fn,label){try{fn();}catch(err){console.error("Error en "+(label
 let FB={connected:false,syncing:false};let _saveRetry=0;
 let _saveT=null;
 function save(){clearVacCache();
+  // Timestamp de última modificación para detección de cambios en poll
+  DB._ts=Date.now();
   try{localStorage.setItem("an_times_v1",JSON.stringify(DB));}catch(e){console.warn('localStorage lleno o no disponible');}
   if(FB.connected&&!FB.syncing){clearTimeout(_saveT);_saveT=setTimeout(cloudPush,400);}
 }
@@ -1215,8 +1217,11 @@ function startPolling(){
       // Actualizar control panel para mostrar tiempo real de cada empleado
       if(SES.isAdmin){const ctEl=document.getElementById('ctrlList');if(ctEl&&ctEl.children.length>0)safeRun(renderControl,'pollCtrl');}
       if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length&&!FB.syncing){
-        var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length});
-        var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length});
+        // Comparar más campos para detectar aprobaciones, notificaciones y vacaciones
+        const _aprov=(DB.records||[]).filter(r=>r.aprobado!==undefined&&r.aprobado!==null).length;
+        const _remAprov=((data.records||[]).filter(r=>r.aprobado!==undefined&&r.aprobado!==null)||[]).length;
+        var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length,n:(DB.notis||[]).length,v:(DB.vacaciones||[]).length,a:_aprov,ts:DB._ts||0});
+        var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length,n:(data.notis||[]).length,v:(data.vacaciones||[]).length,a:_remAprov,ts:data._ts||0});
         if(localStr!==remoteStr){
           FB.syncing=true;applyDB(data);FB.syncing=false;
           if(SES.user){const fresh=DB.employees.find(e=>e.id===SES.user.id);if(fresh)SES.user=fresh;}
@@ -1430,7 +1435,10 @@ function doAdmLogin(){
 function doLogout(){
   TM={ws:0,bs:0,state:'idle',bStart:null};SES={user:null,isAdmin:false,isEncargado:false};
   const btn=document.getElementById('btnEncPanel');if(btn)btn.style.display='none';
-  const btnB=document.getElementById('btnBackFichaje');if(btnB)btnB.remove();try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';}
+  const btnB=document.getElementById('btnBackFichaje');if(btnB)btnB.remove();try{localStorage.removeItem('an_times_ses');}catch(e){}showSc('sLogin');popSelects();document.getElementById('inputPin').value='';document.getElementById('loginErr').textContent='';
+  // Restaurar usuario/PIN guardado al volver al login
+  setTimeout(()=>safeRun(loadRemembered,'lr_logout'),300);
+}
 
 /* EMPLOYEE TABS */
 function empTab(t){
@@ -2036,7 +2044,10 @@ function aprobarHoras(recId,aprobado){
   pushNoti('emp:'+r.empId,aprobado?'vac':'abs',
     aprobado?'Horas aprobadas ✅':'Horas rechazadas ❌',
     `Tu jornada del ${new Date(r.inicio).toLocaleDateString('es-ES')} ha sido ${aprobado?`validada por ${validador}.`:`rechazada. Contacta con ${validador}.`}`);
-  save();refreshAfterRecordChange();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas ✓':'Horas rechazadas');
+  save();
+  // cloudPush inmediato para que la aprobación llegue a Firebase sin esperar debounce
+  if(FB.connected)setTimeout(cloudPush,100);
+  refreshAfterRecordChange();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas ✓':'Horas rechazadas');
 }
 /* ── Gestión de vacaciones (admin) ── */
 function renderVacAdminSelects(){
@@ -2233,7 +2244,7 @@ function toggleVacDisfrutada(id){
   renderAdmSols();
   toast(v.disfrutada?'Marcadas como disfrutadas ✓':'Desmarcadas');
 }
-function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
+function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;save();if(FB.connected)setTimeout(cloudPush,100);pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
 function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
 function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
 function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();clearVacCache();renderAdmSols();safeRun(renderEmps,'renderEmps');toast('Fecha de inicio actualizada ✓');}
@@ -2330,7 +2341,7 @@ function addEmp(){
   const init=n.split(' ').filter(Boolean).map(w=>w[0]).join('').substring(0,2).toUpperCase();
   DB.employees.push({id:'e'+Date.now()+Math.random().toString(36).slice(2,5),name:n,empresa:em,pin:p,color:c,initials:init,startDate:sd,email:mail});
   document.getElementById('nNombre').value='';document.getElementById('nPin').value='';document.getElementById('nStart').value='';document.getElementById('nEmail').value='';
-  save();renderEmps();popSelects();toast('Empleado añadido');
+  save();if(FB.connected)setTimeout(cloudPush,100);renderEmps();popSelects();toast('Empleado añadido');
 }
 let _editEmpId=null;
 function editEmp(id){
@@ -2397,7 +2408,7 @@ function saveEditEmp(){
     const checks=document.querySelectorAll('#edObrasCheck input:checked');
     emp.obrasAsignadas=[...checks].map(ch=>ch.value);
   }else{emp.obrasAsignadas=undefined;}
-  save();closeMov('mEditEmp');renderEmps();renderGStats();renderEList();popSelects();
+  save();if(FB.connected)setTimeout(cloudPush,100);closeMov('mEditEmp');renderEmps();renderGStats();renderEList();popSelects();
   safeRun(renderEncargados,'renderEncargados');toast('Empleado actualizado');
 }
 function delEmp(id){if(!confirm('¿Eliminar empleado y todos sus registros?'))return;DB.employees=DB.employees.filter(e=>e.id!==id);DB.records=DB.records.filter(r=>r.empId!==id);DB.vacaciones=DB.vacaciones.filter(v=>v.empId!==id);DB.medicos=DB.medicos.filter(m=>m.empId!==id);DB.ausencias=DB.ausencias.filter(a=>a.empId!==id);save();renderEmps();renderGStats();renderEList();popSelects();toast('Empleado eliminado');}
@@ -2787,6 +2798,9 @@ function requestNotifPermission(){
 function pushNoti(target,tipo,titulo,texto){
   const noti={id:gid(),target,tipo,titulo,texto,fecha:new Date().toISOString(),leido:false,push:true};
   DB.notis.push(noti);
+  // Guardar inmediatamente a Firebase para que llegue al destinatario
+  save();
+  if(FB.connected)setTimeout(cloudPush,150);
   // Si el usuario está activo en este dispositivo, notificar directamente
   if(SES.user&&(target==='emp:'+SES.user.id||target===SES.user.id)){
     sendBrowserNotif(titulo,texto,tipo);
