@@ -1228,11 +1228,13 @@ function startPolling(){
           try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
           safeRun(refreshUI,'pollRefresh');
           safeRun(refreshAfterRecordChange,'pollRecs');
+          // Actualizar badge de notificaciones
+          safeRun(updateBadges,'pollBadges');
         }
       }
     })
     .catch(function(){/* polling falla silenciosamente */});
-  },60000); // Polling optimizado para producción
+  },20000); // Polling cada 20s para sincronización en tiempo real
 }
 
 function autoConnectCloud(){
@@ -1983,7 +1985,17 @@ function encargadoFilter(empId){
 }
 function renderAprobaciones(){
   const el=document.getElementById('aprobList');if(!el)return;
-  const pending=(DB.records||[]).filter(r=>r.fin&&(r.aprobado===undefined||r.aprobado===null));
+  // Filtrar registros pendientes según rol
+  let pending=(DB.records||[]).filter(r=>r.fin&&(r.aprobado===undefined||r.aprobado===null));
+  // Encargado: solo ve los empleados de sus obras asignadas
+  if(SES.isEncargado&&SES.user){
+    const enc=DB.employees.find(e=>e.id===SES.user.id)||SES.user;
+    const obras=enc.obrasAsignadas||[];
+    pending=pending.filter(r=>{
+      const emp=DB.employees.find(e=>e.id===r.empId);
+      return emp&&obras.includes(emp.empresa);
+    });
+  }
   if(!pending.length){el.innerHTML='<div class="empty">✓ Todas las jornadas están validadas</div>';return;}
   const byDate={};
   pending.sort((a,b)=>b.inicio.localeCompare(a.inicio)).forEach(r=>{
@@ -2044,9 +2056,9 @@ function aprobarHoras(recId,aprobado){
   pushNoti('emp:'+r.empId,aprobado?'vac':'abs',
     aprobado?'Horas aprobadas ✅':'Horas rechazadas ❌',
     `Tu jornada del ${new Date(r.inicio).toLocaleDateString('es-ES')} ha sido ${aprobado?`validada por ${validador}.`:`rechazada. Contacta con ${validador}.`}`);
-  save();
-  // cloudPush inmediato para que la aprobación llegue a Firebase sin esperar debounce
-  if(FB.connected)setTimeout(cloudPush,100);
+  DB._ts=Date.now();
+  try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
+  if(FB.connected){clearTimeout(_saveT);cloudPush(true);}  // Push inmediato sin debounce
   refreshAfterRecordChange();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas ✓':'Horas rechazadas');
 }
 /* ── Gestión de vacaciones (admin) ── */
@@ -2244,7 +2256,7 @@ function toggleVacDisfrutada(id){
   renderAdmSols();
   toast(v.disfrutada?'Marcadas como disfrutadas ✓':'Desmarcadas');
 }
-function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;save();if(FB.connected)setTimeout(cloudPush,100);pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
+function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;DB._ts=Date.now();try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}if(FB.connected){clearTimeout(_saveT);cloudPush(true);}pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
 function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
 function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
 function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();clearVacCache();renderAdmSols();safeRun(renderEmps,'renderEmps');toast('Fecha de inicio actualizada ✓');}
@@ -2798,22 +2810,21 @@ function requestNotifPermission(){
 function pushNoti(target,tipo,titulo,texto){
   const noti={id:gid(),target,tipo,titulo,texto,fecha:new Date().toISOString(),leido:false,push:true};
   DB.notis.push(noti);
-  // Guardar inmediatamente a Firebase para que llegue al destinatario
-  save();
-  if(FB.connected)setTimeout(cloudPush,150);
-  // Si el usuario está activo en este dispositivo, notificar directamente
+  // Una sola llamada a save() + cloudPush inmediato
+  DB._ts=Date.now();
+  try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
+  if(FB.connected){clearTimeout(_saveT);cloudPush(true);}  // Push inmediato
+  // Notificar en este dispositivo si es el destinatario
   if(SES.user&&(target==='emp:'+SES.user.id||target===SES.user.id)){
     sendBrowserNotif(titulo,texto,tipo);
   }
-  // Guardar en localStorage para que el SW lo detecte (cross-device)
+  // SW bridge para notificaciones en segundo plano
   try{
-    const pending=JSON.parse(localStorage.getItem('an_times_push_pending')||'[]');
-    pending.push({id:noti.id,target,titulo,texto,tipo,fecha:noti.fecha});
-    // Mantener solo los últimos 50
-    if(pending.length>50)pending.splice(0,pending.length-50);
-    localStorage.setItem('an_times_push_pending',JSON.stringify(pending));
+    const pend=JSON.parse(localStorage.getItem('an_times_push_pending')||'[]');
+    pend.push({id:noti.id,target,titulo,texto,tipo,fecha:noti.fecha});
+    if(pend.length>50)pend.splice(0,pend.length-50);
+    localStorage.setItem('an_times_push_pending',JSON.stringify(pend));
   }catch(ex){}
-  save();
 }
 function notisFor(){
   // Returns notis relevant to current session
