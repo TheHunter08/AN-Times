@@ -1192,8 +1192,10 @@ function startPolling(){
         var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length});
         if(localStr!==remoteStr){
           FB.syncing=true;applyDB(data);FB.syncing=false;
+          if(SES.user){const fresh=DB.employees.find(e=>e.id===SES.user.id);if(fresh)SES.user=fresh;}
           try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
-          refreshUI();
+          safeRun(refreshUI,'pollRefresh');
+          safeRun(refreshAfterRecordChange,'pollRecs');
         }
       }
     })
@@ -1588,8 +1590,9 @@ function adminDelRecord(recId){
   if(!SES.isAdmin){toast('Solo el administrador puede eliminar registros');return;}
   if(!confirm('¿Eliminar este registro de fichaje permanentemente?'))return;
   DB.records=DB.records.filter(r=>r.id!==recId);
-  save();safeRun(renderRecent,'renderRecent');safeRun(renderGStats,'renderGStats');safeRun(renderMonthSummary,'mS');
-  toast('Registro eliminado');
+  save();
+  refreshAfterRecordChange();
+  toast('Registro eliminado ✓');
 }
 
 function renderRecent(){
@@ -1958,7 +1961,7 @@ function aprobarHoras(recId,aprobado){
   pushNoti('emp:'+r.empId,aprobado?'vac':'abs',
     aprobado?'Horas aprobadas ✅':'Horas rechazadas ❌',
     `Tu jornada del ${new Date(r.inicio).toLocaleDateString('es-ES')} ha sido ${aprobado?`validada por ${validador}.`:`rechazada. Contacta con ${validador}.`}`);
-  save();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas':'Horas rechazadas');
+  save();refreshAfterRecordChange();safeRun(renderAprobaciones,'renderAprobaciones');toast(aprobado?'Horas aprobadas ✓':'Horas rechazadas');
 }
 /* ── Gestión de vacaciones (admin) ── */
 function renderVacAdminSelects(){
@@ -3427,6 +3430,22 @@ function initTheme(){
 }
 
 
+
+/* ── Actualizar TODAS las vistas tras borrar/editar un fichaje ── */
+function refreshAfterRecordChange(){
+  // Vista admin FICHAJES (pestaña registros)
+  safeRun(renderRecs,'recs');
+  // Vista empleado: últimos registros + historial
+  safeRun(renderRecent,'recent');
+  safeRun(renderHist,'hist');
+  // Stats admin + resumen semanal/mensual empleado
+  safeRun(renderGStats,'gStats');
+  safeRun(renderEList,'eList');
+  safeRun(renderWeek,'week');
+  safeRun(renderMonthSummary,'monthS');
+  safeRun(updateBadges,'badges');
+}
+
 /* ── ADMIN: EDITAR REGISTRO DIRECTO ── */
 function openEditRecord(recId){
   if(!SES.isAdmin){toast('Solo el administrador puede editar registros');return;}
@@ -3469,8 +3488,9 @@ function saveEditRecord(recId){
   const dIn=new Date(date);dIn.setHours(+ih,+im,0,0);r.inicio=dIn.toISOString();
   if(outT){const [oh,om]=outT.split(':');const dOut=new Date(date);dOut.setHours(+oh,+om,0,0);r.fin=dOut.toISOString();
     if(dOut>dIn){const elapsed=Math.floor((dOut-dIn)/1000);r.workSecs=Math.max(0,elapsed-(r.breakSecs||0));}}
-  save();document.getElementById('mEditRec')?.remove();
-  safeRun(renderHist,'renderHist');safeRun(renderGStats,'renderGStats');
+  save();
+  document.getElementById('mEditRec')?.remove();
+  refreshAfterRecordChange();
   toast('Registro actualizado ✓');
 }
 
