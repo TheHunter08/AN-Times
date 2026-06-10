@@ -514,6 +514,7 @@ body.light-mode #cloudStatus { background: rgba(5,150,105,0.1) !important; color
 body.light-mode #themeToggleBtn { color: #6366f1 !important; background: rgba(99,102,241,0.08) !important; border: 1px solid rgba(99,102,241,0.2) !important; border-radius: 10px !important; }
 body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
 
+input[type="date"]{width:100%;box-sizing:border-box;max-width:100%}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="window._jspdfBlocked=true"></script>
 <!-- SheetJS se carga bajo demanda en expExcelCompleto() -->
@@ -780,6 +781,10 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
       <div id="recList"></div>
     </div>
     <div id="aEmpleados" style="display:none">
+      <div class="adcard">
+        <h3>Empleados activos</h3>
+        <div id="empList"></div>
+      </div>
       <div class="adcard"><h3>Encargados</h3>
         <div id="encargadoList"></div>
         <div style="font-size:11px;color:var(--text3);margin-top:8px">Los encargados pueden validar las horas de sus trabajadores asignados.</div>
@@ -815,7 +820,7 @@ body.light-mode #themeToggleBtn svg { stroke: #6366f1 !important; }
       <div class="adcard">
         <h3>📅 Ajustar fecha inicio contrato</h3>
         <div class="ff"><label>Empleado</label><select id="adjEmp" style="appearance:none"></select></div>
-        <div class="ff"><label>Fecha inicio</label><input type="date" id="adjDate"></div>
+        <div class="ff"><label>Fecha inicio</label><input type="date" id="adjDate" style="width:100%;box-sizing:border-box;max-width:100%;display:block"></div>
         <button class="badd" onclick="adjStart()" style="margin-top:4px">Guardar fecha</button>
       </div>
     </div>
@@ -1133,7 +1138,9 @@ function doFetch(){
     if(_connDone)return;
     // Aplicar datos de Firebase
     if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length){
-      try{FB.syncing=true;applyDB(data);FB.syncing=false;}catch(ex){console.warn('applyDB:',ex.message);}
+      try{FB.syncing=true;applyDB(data);FB.syncing=false;
+          // Refresh SES.user from updated DB to avoid stale references
+          if(SES.user){const fresh=DB.employees.find(e=>e.id===SES.user.id);if(fresh)SES.user=fresh;}}catch(ex){console.warn('applyDB:',ex.message);}
       try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(ex){}
     }else{
       // Base de datos vacía — subir seed local
@@ -1220,9 +1227,10 @@ let _vacCache={};
 function vacData(empId){
   if(_vacCache[empId])return _vacCache[empId];
   const emp=DB.employees.find(e=>e.id===empId);if(!emp)return{months:0,generated:0,used:0,pending:0,available:0};
-  const s=emp.startDate?new Date(emp.startDate):new Date(),n=new Date();
-  let m=(n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth());
-  if(n.getDate()<s.getDate())m--;m=Math.max(0,m);
+  const sDate=emp.startDate?new Date(emp.startDate):new Date();
+  const n=new Date();
+  let m=(n.getFullYear()-sDate.getFullYear())*12+(n.getMonth()-sDate.getMonth());
+  if(n.getDate()<sDate.getDate())m--;m=Math.max(0,m);
   const gen=parseFloat((m*VPM).toFixed(1));
   const used=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada'&&v.disfrutada).reduce((s,v)=>s+v.dias,0);
   const aprobNoDisf=DB.vacaciones.filter(v=>v.empId===empId&&v.estado==='aprobada'&&!v.disfrutada).reduce((s,v)=>s+v.dias,0);
@@ -1556,7 +1564,12 @@ function openRec(){return DB.records.find(r=>r.empId===SES.user?.id&&!r.fin);}
 function renderWeek(){
   const e=SES.user;if(!e)return;
   const ws=wkStart(new Date()),recs=DB.records.filter(r=>r.empId===e.id&&r.fin&&new Date(r.inicio)>=ws);
-  let tot=0;recs.forEach(r=>tot+=Math.floor((r.workSecs||0)/60));tot+=Math.floor(TM.ws/60);
+  let tot=0;recs.forEach(r=>{
+    const m=r.workSecs>0
+      ?Math.floor(r.workSecs/60)
+      :Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));
+    tot+=m;
+  });tot+=Math.floor(TM.ws/60);
   const norm=Math.min(tot,WK),ext=Math.max(0,tot-WK);
   const days=new Set(recs.map(r=>fdf(r.inicio))).size+(TM.state!=='idle'?1:0);
   const medDays=DB.medicos.filter(m=>m.empId===e.id&&m.estado!=='denegado').reduce((s,m)=>{
@@ -1575,7 +1588,7 @@ function adminDelRecord(recId){
   if(!SES.isAdmin){toast('Solo el administrador puede eliminar registros');return;}
   if(!confirm('¿Eliminar este registro de fichaje permanentemente?'))return;
   DB.records=DB.records.filter(r=>r.id!==recId);
-  save();safeRun(renderRecent,'renderRecent');safeRun(renderGStats,'renderGStats');
+  save();safeRun(renderRecent,'renderRecent');safeRun(renderGStats,'renderGStats');safeRun(renderMonthSummary,'mS');
   toast('Registro eliminado');
 }
 
@@ -2145,7 +2158,7 @@ function toggleVacDisfrutada(id){
 function resVac(id,est){const v=DB.vacaciones.find(x=>x.id===id);if(!v)return;v.estado=est;pushNoti('emp:'+v.empId,'vac',est==='aprobada'?'Vacaciones aprobadas':'Vacaciones denegadas',`Tu solicitud (${fds(v.desde)} → ${fds(v.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();renderEList();toast(est==='aprobada'?'Vacaciones aprobadas':'Solicitud denegada');}
 function resMed(id,est){const m=DB.medicos.find(x=>x.id===id);if(!m)return;m.estado=est;pushNoti('emp:'+m.empId,'med',est==='aprobada'?'Permiso médico aprobado':'Permiso médico denegado',`Tu permiso médico (${fds(m.desde)} → ${fds(m.hasta)}) ha sido ${est}.`);save();renderAdmSols();renderGStats();toast(est==='aprobada'?'Permiso médico aprobado':'Permiso denegado');}
 function delAbs(id){if(!confirm('¿Eliminar esta ausencia?'))return;DB.ausencias=DB.ausencias.filter(a=>a.id!==id);save();renderAdmSols();renderGStats();toast('Ausencia eliminada');}
-function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();renderAdmSols();toast('Fecha de inicio actualizada');}
+function adjStart(){const id=document.getElementById('adjEmp').value,f=document.getElementById('adjDate').value;if(!id||!f){toast('Selecciona empleado y fecha');return;}const e=DB.employees.find(x=>x.id===id);if(!e)return;e.startDate=f;save();clearVacCache();renderAdmSols();safeRun(renderEmps,'renderEmps');toast('Fecha de inicio actualizada ✓');}
 
 function renderRecs(){
   const ef=document.getElementById('fEmp').value,wf=document.getElementById('fWeek').value;
@@ -2220,6 +2233,12 @@ function renderEmps(){
   if(elC)elC.innerHTML=`<div class="list-card"><div class="list-card-label">Obras</div>${(DB.empresas||[]).length?(DB.empresas||[]).map(e=>`<div class="list-card-item"><span class="list-card-name">${e}</span><button class="list-card-del" onclick="delEmpresa('${e}')" title="Eliminar">✕</button></div>`).join(''):'<div class="list-card-empty">Sin obras configuradas</div>'}</div>`;
   safeRun(renderEncargados,'renderEncargados');
   safeRun(renderCentros,'renderCentros');
+  // Populate adjEmp select (Ajustar fecha)
+  const adjEl=document.getElementById('adjEmp');
+  if(adjEl){
+    adjEl.innerHTML='<option value="">— Empleado —</option>'+
+      sortedEmps().map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  }
 }
 function addEmp(){
   const n=document.getElementById('nNombre').value.trim(),em=document.getElementById('nEmpresa').value,p=document.getElementById('nPin').value.trim(),c=document.getElementById('nColor').value,sd=document.getElementById('nStart').value||today(),mail=document.getElementById('nEmail').value.trim();
@@ -3248,15 +3267,16 @@ function renderMonthSummary(){
   },0);
   const days=recs.length;
   // Horas extra del mes usando calcExtra
-  let normAcc=0;const weekAcc2={};
+  let normAcc=0,totalMonthAcc=0;const weekAcc2={};
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const m=r.workSecs>0
       ?Math.floor(r.workSecs/60)
       :Math.max(0,Math.floor((new Date(r.fin)-new Date(r.inicio))/60000)-Math.floor((r.breakSecs||0)/60));
     const wk=wkKey(new Date(r.inicio));const wK=emp.id+'|'+wk;
     const prevW=weekAcc2[wK]||0;
-    const _ce=calcExtra(m,prevW,normAcc);
-    normAcc+=_ce.norm;weekAcc2[wK]=prevW+m;
+    // Pasar total mes acumulado (no solo normal) para el cap de 160h
+    const _ce=calcExtra(m,prevW,totalMonthAcc);
+    normAcc+=_ce.norm;totalMonthAcc+=m;weekAcc2[wK]=prevW+m;
   });
   const extraMin=Math.max(0,totalMin-normAcc);
   // Update UI
@@ -3462,14 +3482,14 @@ function renderMedAbs(){
     medEl.innerHTML=meds.length?meds.map(m=>{const emp=DB.employees.find(e=>e.id===m.empId);
       return`<div class="si"><div class="si-top"><span class="si-name">${m.empName||emp?.name||'?'}</span>
         <span class="badge ${m.estado}">${m.estado==='pendiente'?'⏳':m.estado==='aprobada'?'✅':'❌'} ${m.estado}</span></div>
-        <div class="si-dates">📅 ${fds(m.desde)} → ${fds(m.hasta)} · ${m.dias} días</div>
+        <div class="si-dates">📅 ${m.desde?fds(m.desde):'—'} → ${m.hasta?fds(m.hasta):'—'} · ${m.dias||'?'} días</div>
         ${m.estado==='pendiente'?`<div class="si-actions"><button class="bok" onclick="resMed('${m.id}','aprobada')">✅ Aprobar</button><button class="bdeny" onclick="resMed('${m.id}','denegada')">❌ Denegar</button></div>`:''}
       </div>`;}).join(''):'<div class="empty">Sin permisos médicos</div>';}
   const absEl=document.getElementById('aAbsList');
   if(absEl){const abs=(DB.ausencias||[]);
     absEl.innerHTML=abs.length?abs.map(a=>`<div class="si"><div class="si-top"><span class="si-name">${a.empName||'?'}</span>
       <span class="badge denegada">⚠ Ausencia</span></div>
-      <div class="si-dates">📅 ${fds(a.fecha)} · ${a.motivo||'Sin motivo'}</div>
+      <div class="si-dates">📅 ${a.fecha?fds(a.fecha):'—'} · ${a.motivo||'Sin motivo'}</div>
     </div>`).join(''):'<div class="empty">Sin ausencias</div>';}
 }
 
