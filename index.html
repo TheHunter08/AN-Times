@@ -1061,6 +1061,19 @@ function applyDB(p){
     const o=DB.records.find(r=>r.empId===SES.user.id&&!r.fin);
     if(o){o.workSecs=TM.ws;o.breakSecs=TM.bs;o.enDescanso=(TM.state==='break');}
   }
+  // PROTECCIÓN: si localmente TM.state='idle' pero Firebase devuelve un registro abierto,
+  // forzar su cierre para evitar que el timer se reactive por una carrera de red
+  if(SES.user&&TM.state==='idle'&&!_doStopInProgress){
+    const badRec=DB.records.find(r=>r.empId===SES.user.id&&!r.fin&&r.closed===true);
+    if(badRec){
+      // Registro marcado localmente como cerrado pero Firebase aún no lo tiene
+      badRec.fin=badRec.fin||new Date().toISOString();
+      const elap=Math.floor((new Date(badRec.fin)-new Date(badRec.inicio))/1000);
+      badRec.workSecs=Math.max(0,elap-(badRec.breakSecs||0));
+      // Re-push a Firebase
+      if(FB.connected)setTimeout(()=>cloudPush(true),500);
+    }
+  }
 }
 function setCloudStatus(state){
   const colors={connected:'var(--green)',connecting:'var(--accent)',disconnected:'var(--orange)'};
@@ -1509,19 +1522,45 @@ function confirmarCentroYComenzar(){
   captureLocation(rec,'inicio');
   save();updBtns();setStatus('trabajando','Trabajando · '+centro);tick();toast('Jornada iniciada en '+centro);
 }
+let _doStopInProgress=false;
 function doStop(){
+  if(_doStopInProgress)return; // Evitar doble-click
   const o=openRec();if(!o)return;
-  if(o.enDescanso&&o.bStartTs){(o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});o.enDescanso=false;o.bStartTs=null;}
+  _doStopInProgress=true;
+
+  if(o.enDescanso&&o.bStartTs){
+    (o.breaks=o.breaks||[]).push({start:o.bStartTs,end:new Date().toISOString()});
+    o.enDescanso=false;o.bStartTs=null;
+  }
   const t=calcSecs(o);
-  o.fin=new Date().toISOString();o.workSecs=t.work;o.breakSecs=t.brk;
+  o.fin=new Date().toISOString();
+  o.workSecs=t.work;
+  o.breakSecs=t.brk;
+  o.closed=true; // Marca extra para evitar reapertura accidental
   TM.state='idle';
+  TM.ws=0;TM.bs=0;
+
+  // Guardar en localStorage primero
+  try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
+
+  // CloudPush INMEDIATO (sin debounce) para que Firebase se actualice antes de cualquier poll
+  if(FB.connected){
+    clearTimeout(_saveT);
+    cloudPush(true); // force=true
+  }
+
+  // Capturar ubicación después (no bloquea el cierre)
   captureLocation(o,'fin');
-  save();updBtns();setStatus('libre','Libre');
+
+  updBtns();setStatus('libre','Libre');
   ['eWorked','eBreak'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='0:00:00';});
   const ee=document.getElementById('eExtra');if(ee)ee.textContent='0:00';
   const pf=document.getElementById('pFill');if(pf)pf.style.width='0%';
   const ep=document.getElementById('ePct');if(ep)ep.textContent='0%';
-  renderWeek();renderRecent();toast('Jornada finalizada correctamente');
+  renderWeek();renderRecent();renderMonthSummary();
+  toast('✅ Jornada finalizada — '+mhm(Math.floor(t.work/60))+' trabajados');
+
+  setTimeout(()=>{_doStopInProgress=false;},2000); // Reset flag después de 2s
 }
 
 function toggleBreak(){
@@ -1543,7 +1582,9 @@ let _tickN=0;
 function tick(){
   if(!SES.user&&!SES.isAdmin)return;
   const o=openRec();
-  if(!o){TM.state='idle';return;}
+  if(!o||o.closed){TM.state='idle';return;} // o.closed = registro cerrado localmente
+  // No iniciar timer si doStop está en progreso
+  if(_doStopInProgress){TM.state='idle';return;}
   TM.state=o.enDescanso?'break':'working';
   const t=calcSecs(o);TM.ws=t.work;TM.bs=t.brk;
   updTimer();
