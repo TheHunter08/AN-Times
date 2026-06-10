@@ -1199,6 +1199,8 @@ function startPolling(){
     .then(function(data){
       // Actualizar resumen mensual con la sesión activa aunque no haya cambios remotos
       if(SES.user&&!SES.isAdmin)safeRun(renderMonthSummary,'pollMonthS');
+      // Actualizar control panel para mostrar tiempo real de cada empleado
+      if(SES.isAdmin){const ctEl=document.getElementById('ctrlList');if(ctEl&&ctEl.children.length>0)safeRun(renderControl,'pollCtrl');}
       if(data&&data.employees&&Array.isArray(data.employees)&&data.employees.length&&!FB.syncing){
         var localStr=JSON.stringify({r:DB.records.length,e:DB.employees.length});
         var remoteStr=JSON.stringify({r:(data.records||[]).length,e:data.employees.length});
@@ -1790,8 +1792,12 @@ function renderControl(){
     if(open){
       if(open.enDescanso){estado='En descanso';cls='descanso';}
       else{estado='Trabajando';cls='trabajando';}
-      const mins=Math.floor((open.workSecs||0)/60);
-      extra=`<div style="font-size:11px;color:var(--text2);margin-top:2px">Lleva ${mhm(mins)} trabajados hoy</div>`;
+      // Calcular tiempo real: total - descansos - pausa actual
+      const nowMs=Date.now();
+      const totalSec=Math.floor((nowMs-new Date(open.inicio).getTime())/1000);
+      const pauseSec=open.enDescanso&&open.bStartTs?Math.floor((nowMs-new Date(open.bStartTs).getTime())/1000):0;
+      const realMin=Math.max(0,Math.floor((totalSec-(open.breakSecs||0)-pauseSec)/60));
+      extra=`<div style="font-size:11px;color:var(--text2);margin-top:2px">Lleva ${mhm(realMin)} trabajados hoy</div>`;
     }
     return`<div style="padding:12px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -1810,16 +1816,29 @@ function renderControl(){
 function admStart(empId){
   if(DB.records.find(r=>r.empId===empId&&!r.fin)){toast('Ya tiene una jornada activa');return;}
   const emp=DB.employees.find(e=>e.id===empId);
-  DB.records.push({id:gid(),empId,empName:emp.name,empresa:emp.empresa,inicio:new Date().toISOString(),fin:null,workSecs:0,breakSecs:0,enDescanso:false,bStartTs:null,adminControl:true});
-  save();renderControl();renderGStats();renderEList();toast('Jornada iniciada para '+emp.name.split(' ')[0]);
+  const r={id:gid(),empId,empName:emp.name,empresa:emp.empresa,inicio:new Date().toISOString(),fin:null,workSecs:0,breakSecs:0,enDescanso:false,bStartTs:null,adminControl:true};
+  DB.records.push(r);
+  save();refreshAfterRecordChange();renderControl();
+  toast('Jornada iniciada para '+emp.name.split(' ')[0]);
 }
 function admStop(empId){
   const o=DB.records.find(r=>r.empId===empId&&!r.fin);if(!o)return;
-  if(o.enDescanso&&o.bStartTs){o.breakSecs=(o.breakSecs||0)+Math.floor((new Date()-new Date(o.bStartTs))/1000);}
-  o.fin=new Date().toISOString();o.enDescanso=false;o.bStartTs=null;
-  // If this is the currently logged-in employee's own session, reset their timer
+  const now=new Date();
+  // Acumular descanso si estaba en pausa
+  if(o.enDescanso&&o.bStartTs){
+    o.breakSecs=(o.breakSecs||0)+Math.floor((now-new Date(o.bStartTs))/1000);
+    o.enDescanso=false;o.bStartTs=null;
+  }
+  o.fin=now.toISOString();
+  // CALCULAR workSecs = tiempo total - descansos
+  const totalSecs=Math.floor((now-new Date(o.inicio))/1000);
+  o.workSecs=Math.max(0,totalSecs-(o.breakSecs||0));
+  // Si es la sesión del empleado logueado, resetear su timer
   if(SES.user&&SES.user.id===empId){TM={ws:0,bs:0,state:'idle',bStart:null};}
-  save();renderControl();renderGStats();renderEList();toast('Jornada finalizada');
+  save();
+  refreshAfterRecordChange();
+  renderControl();
+  toast('Jornada finalizada — '+mhm(Math.floor(o.workSecs/60))+' trabajados');
 }
 function admBreak(empId){
   const o=DB.records.find(r=>r.empId===empId&&!r.fin);if(!o||o.enDescanso)return;
