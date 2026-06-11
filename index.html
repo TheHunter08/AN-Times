@@ -747,14 +747,14 @@ select.login-input{padding-left:38px}
    Firebase: REST API · No SDK · Vercel-ready
 ══════════════════════════════════════════════════════ */
 
-// ── Config (update with your Firebase URL + Admin PIN) ──
-const FB_URL='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/ti_data';
+// ── Config (update with your Firebase URL + Admin 
+const FB_URL='https://an-times-default-rtdb.europe-west1.firebasedatabase.app/ti_data';
 const ADMIN_PIN='0824';
 const WK=40*60; // weekly normal hours in minutes
 const WD=8*60;  // daily normal hours in minutes
 
 // ── DB (local state) ──
-let DB={employees:[],records:[],vacaciones:[],notis:[],obras:['Gecama','Sin obra'],_ts:0};
+let DB={employees:[],records:[],vacaciones:[],notis:[],:['Gecama','Sin obra'],_ts:0};
 let SES={user:null,isAdmin:false,isEnc:false};
 let TM={ws:0,bs:0,state:'idle',bStart:null};
 let _tickN=0,_saveT=null,_pushFlight=false,_saveRetry=0;
