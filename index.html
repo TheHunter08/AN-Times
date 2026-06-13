@@ -400,16 +400,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   .rec-table thead th:nth-child(3),.rec-table tbody td:nth-child(3),.rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
 }
 
-/* Login fields */
-.login-field-group{position:relative;display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);transition:border-color .2s}
-.login-field-group:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.login-field-group{position:relative;display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r)}
+.login-field-group:focus-within{border-color:var(--accent)}
 .login-field-group input{background:none;border:none;padding:13px 12px 13px 40px;font-size:15px;color:var(--text);width:100%;outline:none}
 .login-field-group input::placeholder{color:var(--text3)}
 .lf-ico{position:absolute;left:12px;color:var(--text3);display:flex;align-items:center;pointer-events:none}
+
 </style>
 </head>
 <body>
-
 <!-- PWA Banner -->
 <div id="pwaInstall" style="display:none;position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:16px;right:16px;background:linear-gradient(135deg,#7c3aed,#6366f1);border-radius:14px;padding:14px 16px;align-items:center;gap:12px;z-index:800;box-shadow:0 8px 32px rgba(99,102,241,.4)">
   <div style="font-size:24px">📲</div>
@@ -821,6 +820,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   </main>
 </div>
 
+
+
+</body>
+</html
 <script>
 
 // ── Firebase Auth — carga diferida (solo cuando el usuario lo pide) ──
@@ -1338,35 +1341,25 @@ function doLogin(){
 }
 // quickAdmin defined above (email-based)
 function doLogout(){
-  // 1. Stop timer
-  if(window._tickInterval) clearInterval(window._tickInterval);
-  // 2. Reset state
+  // Reset timer & session
   TM={ws:0,bs:0,state:'idle'};
   SES={user:null,isAdmin:false,isEnc:false};
   _pin='';
-  _doStopLock=false;
-  _doStopInProgress=false;
-  // 3. Clear storage
   try{localStorage.removeItem('an_times_ses');}catch(e){}
-  // 4. Firebase signout
+  // Firebase signout (safe — no error if not ready)
   try{if(window._fbReady&&window._fbSignOut)window._fbSignOut().catch(()=>{});}catch(e){}
-  // 5. Reset UI elements
+  // Reset UI
   updatePinDots();
-  const le=document.getElementById('loginEmail');if(le)le.value='';
-  const lp=document.getElementById('loginPass');if(lp)lp.value='';
-  const li=document.getElementById('loginErr');if(li)li.textContent='';
-  const pi=document.getElementById('pinErr');if(pi)pi.textContent='';
-  const ip=document.getElementById('inPin');if(ip)ip.value='';
-  const eb=document.getElementById('encBtn');if(eb)eb.style.display='none';
-  const ebb=document.getElementById('encBackBtn');if(ebb)ebb.style.display='none';
-  // 6. Show login in email mode
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
-  const sl=document.getElementById('sLogin');if(sl)sl.classList.add('show');
-  switchLoginMode('email');
+  showScr('sLogin');
+  if(typeof switchLoginMode==='function')switchLoginMode('email');
   populateSelect();
   loadRemembered();
+  if($('loginErr'))$('loginErr').textContent='';
+  if($('inPin'))$('inPin').value='';
+  // Reset Firebase initial check flag for next login
+  if(typeof _fbInitialCheckDone !== 'undefined')window._fbInitialCheckDone = false;
+  if($('encBtn'))$('encBtn').style.display='none';
 }
-
 function doAdminLogin(){
   updateSBUser();showScr('sAdmin');
   safeRun(populateSelect,'sel');safeRun(populateFilters,'filt');
@@ -1374,33 +1367,25 @@ function doAdminLogin(){
   safeRun(applyEncPermissions,'enc');
 }
 function doEmpLogin(){
-  const u=SES.user;if(!u){doLogout();return;}
-  // Update greeting
-  const fn=document.getElementById('empFirstName');if(fn)fn.textContent=u.name.split(' ')[0];
-  const sd=document.getElementById('empSubdate');if(sd)sd.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  // Update perfil
-  const pa=document.getElementById('prfAv');if(pa){pa.textContent=u.initials||u.name.slice(0,2).toUpperCase();pa.style.background=u.color||'var(--accent)';}
-  const pn=document.getElementById('prfName');if(pn)pn.textContent=u.name;
-  const pr=document.getElementById('prfRole');if(pr)pr.textContent=u.role==='encargado'?'Encargado ⭐':'Empleado';
-  const pl=document.getElementById('prfLoc');if(pl)pl.textContent=u.empresa||'Sin obra';
-  // Show enc button
-  const eb=document.getElementById('encBtn');if(eb)eb.style.display=SES.isEnc?'flex':'none';
-  const ebb=document.getElementById('encBackBtn');if(ebb)ebb.style.display=SES.isEnc?'flex':'none';
-  // Switch screen
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
-  const se=document.getElementById('sEmp');if(se)se.classList.add('show');
-  // Restore timer state
+  const u=SES.user;
+  // Update topbar
+  const fn=$('empFirstName');if(fn)fn.textContent=u.name.split(' ')[0];
+  const sd=$('empSubdate');if(sd)sd.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  // Perfil tab
+  const pa=$('prfAv');if(pa){pa.textContent=u.initials||u.name.slice(0,2).toUpperCase();pa.style.background=u.color||'var(--accent)';}
+  if($('prfName'))$('prfName').textContent=u.name;
+  if($('prfRole'))$('prfRole').textContent=u.role==='encargado'?'Encargado ⭐':'Empleado';
+  if($('prfLoc'))$('prfLoc').textContent=u.empresa||'Sin obra';
+  // Enc btn
+  if(SES.isEnc&&$('encBtn'))$('encBtn').style.display='flex';
+  showScr('sEmp');
+  // Restore session timer
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
   if(open){TM.state=open.enDescanso?'break':'working';const t=calcSecs(open);TM.ws=t.work;TM.bs=t.brk;}
-  else{TM.state='idle';TM.ws=0;TM.bs=0;}
-  // Show inicio tab
   empNavTo('inicio');
-  // Render
-  safeRun(updJorCircle,'jc');
-  safeRun(renderResumen,'rs');
+  safeRun(updJorCircle,'jc');safeRun(renderResumen,'rs');
   safeRun(loadUserPhoto,'lp');
 }
-
 function showEncPanel(){SES.isAdmin=true;doAdminLogin();}
 
 
@@ -2716,15 +2701,9 @@ setInterval(()=>{
 
 // ── Init ──
 (function(){
-  // 1. Load cached DB
   try{const c=JSON.parse(localStorage.getItem('an_times_v1')||'null');if(c&&c.employees)applyDB(c);}catch(e){}
-  // 2. Show email login mode by default
-  switchLoginMode('email');
-  // 3. Populate PIN selector
   populateSelect();
-  // 4. Start data sync
   doFetch();startPolling();
-  // 5. Restore session (after 600ms to let DB load)
   setTimeout(()=>{
     populateSelect();loadRemembered();
     try{
@@ -2755,7 +2734,6 @@ function renderVacDash(){
 if("serviceWorker" in navigator && location.protocol === "https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){});
 }
-
 
 </script>
 </body>
