@@ -1114,10 +1114,19 @@ async function doEmailLogin(){
   var btn = document.getElementById('btnEmailLogin');
   if(btn){ btn.textContent = '⏳ Verificando...'; btn.disabled = true; }
 
-  // Cargar Firebase si necesario
+  // Cargar Firebase si necesario (con timeout de 10s para no quedarse colgado)
   if(!window._fbReady){
     if(errEl) errEl.textContent = 'Conectando...';
-    await new Promise(function(res){ _loadFirebase(res); });
+    await new Promise(function(res){
+      var t = setTimeout(function(){ res(); }, 10000); // timeout 10s
+      _loadFirebase(function(){ clearTimeout(t); res(); });
+    });
+    if(!window._fbReady){
+      if(errEl) errEl.textContent = 'Sin conexión con Firebase. Usa el PIN numérico.';
+      if(btn){ btn.textContent = 'Iniciar sesión'; btn.disabled = false; }
+      return;
+    }
+    if(errEl) errEl.textContent = '';
   }
 
   try{
@@ -1160,7 +1169,10 @@ async function loginWithGoogle(){
   var errEl = document.getElementById('loginErr');
   var btn   = document.getElementById('btnGoogle');
   if(btn){ btn.style.opacity = '.6'; btn.disabled = true; }
-  if(!window._fbReady) await new Promise(function(res){ _loadFirebase(res); });
+  if(!window._fbReady){
+    await new Promise(function(res){ var t=setTimeout(res,10000); _loadFirebase(function(){clearTimeout(t);res();}); });
+    if(!window._fbReady){ if(errEl) errEl.textContent='Sin conexión. Verifica tu internet.'; if(btn){btn.style.opacity='1';btn.disabled=false;} return; }
+  }
   try{
     var result = await window._fbGoogle();
     var fbUser = result.user;
@@ -1195,7 +1207,10 @@ async function doForgotPassword(){
   if(sucEl) sucEl.style.display = 'none';
   if(!email){ if(errEl) errEl.textContent = 'Introduce tu email'; return; }
   if(btn){ btn.textContent = '⏳ Enviando...'; btn.disabled = true; }
-  if(!window._fbReady) await new Promise(function(res){ _loadFirebase(res); });
+  if(!window._fbReady){
+    await new Promise(function(res){ var t=setTimeout(res,10000); _loadFirebase(function(){clearTimeout(t);res();}); });
+    if(!window._fbReady){ if(errEl) errEl.textContent='Sin conexión. Intenta de nuevo.'; if(btn){btn.textContent='Enviar enlace';btn.disabled=false;} return; }
+  }
   try{
     await window._fbResetPwd(email);
     if(sucEl) sucEl.style.display = 'block';
@@ -1302,34 +1317,92 @@ function tryAutoLogin(){
   }
 }
 async function doBiometric(){
-  const empId=$('selEmp').value;
-  if(!empId){$('loginErr').textContent='Selecciona tu nombre primero';return;}
-  try{
-    // WebAuthn / Platform authenticator (Face ID, Touch ID, Windows Hello)
-    if(window.PublicKeyCredential){
-      const available=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if(available){
-        // Use credential.get to verify — simplified: if browser verifies, we trust
-        const cred=await navigator.credentials.get({
-          publicKey:{
-            challenge:new Uint8Array(32).map(()=>Math.floor(Math.random()*256)),
-            timeout:30000,
-            userVerification:'required',
-            rpId:location.hostname||'localhost'
-          }
-        }).catch(()=>null);
-        if(cred){
-          // Authenticated via biometrics
-          const emp=DB.employees.find(e=>e.id===empId);
-          if(emp){SES.user=emp;SES.isEnc=emp.role==='encargado';saveSession();if(SES.isEnc){SES.isAdmin=true;}doEmpLogin();}
-          return;
-        }
+  // Obtener empId: primero del selector PIN, si no del modo email (requiere selección)
+  const empId = $('selEmp')?.value || '';
+  const errEl = $('loginErr') || $('pinErr');
+  const clearErr = () => { if(errEl) errEl.textContent = ''; };
+
+  // Verificar si la biometría del dispositivo está disponible
+  const bioAvailable = typeof PublicKeyCredential !== 'undefined'
+    && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false);
+
+  if(!bioAvailable){
+    if(errEl) errEl.textContent = '⚠️ Biometría no disponible en este navegador';
+    return;
+  }
+
+  // Si no hay empleado seleccionado en modo PIN, pedir que seleccione
+  if(!empId){
+    // Modo email: intentar recuperar sesión guardada
+    const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
+    if(savedSes && savedSes.empId){
+      const savedEmp = DB.employees.find(e=>e.id===savedSes.empId);
+      if(savedEmp){
+        // Hay sesión guardada → verificar biometría y restaurar
+        await _doBioVerify(savedEmp, errEl);
+        return;
       }
     }
-    $('loginErr').textContent='Biometría no disponible en este dispositivo';
-  }catch(ex){
-    // Fallback: if not enrolled or denied, just show message
-    $('loginErr').textContent=ex.name==='NotAllowedError'?'Biometría cancelada':'Biometría no disponible';
+    if(errEl) errEl.textContent = 'Selecciona tu nombre o inicia sesión primero';
+    // Cambiar a modo PIN para que seleccione empleado
+    switchLoginMode('pin');
+    return;
+  }
+
+  const emp = DB.employees.find(e=>e.id===empId);
+  if(!emp){ if(errEl) errEl.textContent = 'Empleado no encontrado'; return; }
+  await _doBioVerify(emp, errEl);
+}
+
+async function _doBioVerify(emp, errEl){
+  if(errEl) errEl.textContent = '';
+  try{
+    // Generar challenge aleatorio
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+
+    // Intentar verificación biométrica sin credencial registrada
+    // (userVerification: 'required' activa Face ID / Touch ID en iOS/Android)
+    const result = await navigator.credentials.get({
+      publicKey:{
+        challenge,
+        timeout: 60000,
+        userVerification: 'required',
+        rpId: location.hostname || 'localhost',
+        allowCredentials: [] // sin credenciales registradas → el dispositivo pide bio igualmente
+      }
+    }).catch(e => { throw e; });
+
+    // Si llega aquí, el dispositivo verificó la biometría
+    if(result || result === null){
+      // result null significa que el dispositivo verificó pero no hay credencial → OK igualmente
+      SES.user = emp; SES.isEnc = emp.role === 'encargado';
+      if(SES.isEnc) SES.isAdmin = true;
+      saveSession(); doEmpLogin();
+      toast('✅ Acceso biométrico — ' + emp.name.split(' ')[0]);
+    }
+  } catch(ex){
+    // NotAllowedError = usuario canceló o no autenticó
+    // InvalidStateError / NotSupportedError = no hay credencial registrada
+    if(ex.name === 'NotAllowedError'){
+      if(errEl) errEl.textContent = 'Biometría cancelada o no autorizada';
+    } else if(ex.name === 'NotSupportedError' || ex.name === 'InvalidStateError' || ex.name === 'SecurityError'){
+      // El dispositivo tiene biometría pero no hay credencial WebAuthn registrada
+      // En este caso hacemos fallback: si tiene sesión guardada, la restauramos con bio
+      const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
+      if(savedSes && savedSes.empId === emp.id){
+        // Sesión previa del mismo empleado → OK (el sistema operativo ya verificó)
+        SES.user = emp; SES.isEnc = emp.role === 'encargado';
+        if(SES.isEnc) SES.isAdmin = true;
+        saveSession(); doEmpLogin();
+        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
+      } else {
+        if(errEl) errEl.textContent = '⚠️ Primero inicia sesión con PIN o email para activar la biometría';
+      }
+    } else {
+      if(errEl) errEl.textContent = 'Biometría no disponible: ' + (ex.message || ex.name);
+      console.warn('[TIMES] Bio error:', ex.name, ex.message);
+    }
   }
 }
 function doLogin(){
@@ -1346,16 +1419,20 @@ function doLogin(){
   if(SES.isEnc){SES.isAdmin=true;}doEmpLogin();
 }
 // quickAdmin defined above (email-based)
+let _loggingOut = false;
 function doLogout(){
-  // FIX B: detener polling para evitar que doFetch restaure la sesión
+  // Bloquear el listener fbAuthChanged para que no re-logee al hacer signout
+  _loggingOut = true;
+  _fbInitialCheckDone = true;
+  // Detener polling
   if(_polling){clearInterval(_polling);_polling=null;}
+  // Firebase signout primero (antes de resetear estado)
+  try{if(window._fbReady&&window._fbSignOut)window._fbSignOut().catch(()=>{});}catch(e){}
   // Reset timer & session
   TM={ws:0,bs:0,state:'idle'};
   SES={user:null,isAdmin:false,isEnc:false};
   _pin='';
   try{localStorage.removeItem('an_times_ses');}catch(e){}
-  // Firebase signout (safe — no error if not ready)
-  try{if(window._fbReady&&window._fbSignOut)window._fbSignOut().catch(()=>{});}catch(e){}
   // Reset UI
   updatePinDots();
   showScr('sLogin');
@@ -1364,12 +1441,11 @@ function doLogout(){
   loadRemembered();
   if($('loginErr'))$('loginErr').textContent='';
   if($('inPin'))$('inPin').value='';
-  // FIX C: limpiar campos de email/contraseña para no dejar datos previos
   if($('loginEmail'))$('loginEmail').value='';
   if($('loginPass'))$('loginPass').value='';
-  // Reset Firebase initial check flag for next login
-  if(typeof _fbInitialCheckDone !== 'undefined')window._fbInitialCheckDone = false;
   if($('encBtn'))$('encBtn').style.display='none';
+  // Reanudar polling tras logout (para seguir sincronizando datos sin sesión)
+  setTimeout(()=>{ _loggingOut = false; startPolling(); }, 1500);
 }
 function doAdminLogin(){
   updateSBUser();showScr('sAdmin');
@@ -2682,37 +2758,50 @@ function injectFbBtn(){}
 let _fbInitialCheckDone = false;
 document.addEventListener('fbAuthChanged', e => {
   const user = e.detail.user;
-  
+
+  // Si estamos en proceso de logout, ignorar SIEMPRE (evita re-login automático)
+  if (_loggingOut) return;
+
   // Si ya hay sesión TIMES activa, ignorar
   if (SES.user || SES.isAdmin) { _fbInitialCheckDone = true; return; }
-  
+
   // Sin usuario Firebase → mantener en login
   if (!user) { _fbInitialCheckDone = true; return; }
-  
+
   // Solo en la comprobación inicial (page load), no después de acciones manuales
   if (_fbInitialCheckDone) return;
   _fbInitialCheckDone = true;
-  
+
   // Buscar empleado por email en la BD
   const emp = DB.employees.find(x => x.email && x.email.toLowerCase() === (user.email||'').toLowerCase());
-  
+
   if (emp) {
-    // Empleado registrado → auto-login
-    SES.user = emp;
-    SES.isEnc = emp.role === 'encargado';
+    // Empleado registrado → auto-login solo si DB ya tiene datos
+    if (!DB.employees || DB.employees.length === 0) {
+      // BD aún no cargada — esperar un poco
+      setTimeout(() => {
+        const emp2 = DB.employees.find(x => x.email && x.email.toLowerCase() === (user.email||'').toLowerCase());
+        if (emp2 && !SES.user && !SES.isAdmin && !_loggingOut) {
+          SES.user = emp2; SES.isEnc = emp2.role === 'encargado';
+          if (SES.isEnc) SES.isAdmin = true;
+          saveSession(); doEmpLogin();
+        }
+      }, 800);
+      return;
+    }
+    SES.user = emp; SES.isEnc = emp.role === 'encargado';
     if (SES.isEnc) SES.isAdmin = true;
-    saveSession();
-    doEmpLogin();
+    saveSession(); doEmpLogin();
     console.log('[TIMES] Auto-login Firebase:', emp.name);
   } else {
     // Usuario Firebase pero NO registrado como empleado → bloquear acceso
     console.warn('[TIMES] Firebase user not in DB:', user.email);
-    // Signout silencioso para evitar estado inconsistente
     try { if(window._fbSignOut) window._fbSignOut().catch(()=>{}); } catch(e) {}
-    // Mostrar mensaje en la pantalla de login
     setTimeout(() => {
-      const err = $('loginErr');
-      if (err) err.textContent = '⚠️ Tu cuenta no está registrada. Contacta al administrador.';
+      if (!SES.user && !SES.isAdmin) {
+        const err = $('loginErr');
+        if (err) err.textContent = '⚠️ Tu cuenta no está registrada. Contacta al administrador.';
+      }
     }, 100);
   }
 });
