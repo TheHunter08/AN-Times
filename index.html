@@ -1347,6 +1347,8 @@ function doLogin(){
 }
 // quickAdmin defined above (email-based)
 function doLogout(){
+  // FIX B: detener polling para evitar que doFetch restaure la sesión
+  if(_polling){clearInterval(_polling);_polling=null;}
   // Reset timer & session
   TM={ws:0,bs:0,state:'idle'};
   SES={user:null,isAdmin:false,isEnc:false};
@@ -1362,6 +1364,9 @@ function doLogout(){
   loadRemembered();
   if($('loginErr'))$('loginErr').textContent='';
   if($('inPin'))$('inPin').value='';
+  // FIX C: limpiar campos de email/contraseña para no dejar datos previos
+  if($('loginEmail'))$('loginEmail').value='';
+  if($('loginPass'))$('loginPass').value='';
   // Reset Firebase initial check flag for next login
   if(typeof _fbInitialCheckDone !== 'undefined')window._fbInitialCheckDone = false;
   if($('encBtn'))$('encBtn').style.display='none';
@@ -1636,7 +1641,8 @@ function updTimer(){
 }
 
 function tick(){
-  if(!SES.user||SES.isAdmin)return;
+  // FIX A: encargados tienen isAdmin=true pero SÍ deben tener cronómetro
+  if(!SES.user)return;
   const o=openRec();if(!o){if(TM.state!=='idle'){TM.state='idle';updBtns();}return;}
   TM.state=o.enDescanso?'break':'working';
   const t=calcSecs(o);TM.ws=t.work;TM.bs=t.brk;
@@ -1891,7 +1897,7 @@ function updateSBUser(){
   if($('sbAv'))$('sbAv').textContent=av;if($('sbName'))$('sbName').textContent=n;if($('sbRole'))$('sbRole').textContent=r;
 }
 function refreshUI(){
-  if(SES.isAdmin){const cur=document.querySelector('.sni.on');safeRun(()=>showPage(cur?.dataset?.p||'dashboard'),'pg');}
+  if(SES.isAdmin&&!SES.isEnc){const cur=document.querySelector('.sni.on');safeRun(()=>showPage(cur?.dataset?.p||'dashboard'),'pg');}
   else if(SES.user){safeRun(updJorCircle,'s');safeRun(renderResumen,'r');safeRun(renderJorTab,'j');safeRun(renderVacList,'v');}
   setSyncDot(true);updateSBBadges();
 }
