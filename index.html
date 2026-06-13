@@ -122,7 +122,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-#sEmp{overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+/* FIX 1: eliminado display:flex — respeta .scr/.scr.show */
+#sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
 .emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
@@ -1234,12 +1235,16 @@ function logoTap(){
   }
 }
 function quickAdmin(){
-  // Admin can login with email in the normal flow
-  // OR with PIN 0824 via PIN mode
-  switchLoginMode('email');
-  var el = document.getElementById('loginEmail');
-  if(el){ el.value = 'admin@times-inc.com'; el.focus(); }
-  toast('Introduce la contraseña admin');
+  // FIX 2: acceso rápido admin — muestra panel y renderiza dashboard correctamente
+  SES = {user:null, isAdmin:true, isEnc:false};
+  saveSession();
+  updateSBUser();
+  showScr('sAdmin');
+  safeRun(populateSelect,'sel');
+  safeRun(populateFilters,'filt');
+  showPage('dashboard');
+  safeRun(applyEncPermissions,'enc');
+  toast('⚡ Modo admin activado');
 }
 
 // ── Login / Numpad ──
@@ -1368,6 +1373,8 @@ function doAdminLogin(){
   safeRun(applyEncPermissions,'enc');
 }
 function doEmpLogin(){
+  // FIX 3: guard contra llamadas sin sesión activa (evita null.name)
+  if(!SES.user) return;
   const u=SES.user;
   // Update topbar
   const fn=$('empFirstName');if(fn)fn.textContent=u.name.split(' ')[0];
@@ -2719,6 +2726,7 @@ setInterval(()=>{
 (function(){
   try{const c=JSON.parse(localStorage.getItem('an_times_v1')||'null');if(c&&c.employees)applyDB(c);}catch(e){}
   populateSelect();
+  // FIX 4: una sola llamada directa a doFetch + polling cada 10s (reduce ~20 requests en arranque)
   doFetch();startPolling();
   setTimeout(()=>{
     populateSelect();loadRemembered();
