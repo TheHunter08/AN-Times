@@ -1,6 +1,6 @@
-// TIMES INC — Service Worker v1
-const CACHE = 'times-v1';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './firebase.js', './manifest.json', './icon.svg'];
+// TIMES INC — Service Worker v2
+const CACHE = 'times-v2';
+const ASSETS = ['./', './index.html', './style.css', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -20,6 +20,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // Network first for Firebase/CDN, cache first for local assets
   const url = e.request.url;
+  // Skip non-http(s) requests (chrome-extension://, etc.)
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
   if (url.includes('firebase') || url.includes('fonts.googleapis') || url.includes('gstatic')) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
   } else {

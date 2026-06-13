@@ -49,10 +49,10 @@ projectId: "tu-proyecto",
 ## 🔑 Acceso Empleados
 
 1. Los empleados inician sesión con **email + contraseña** (Firebase Auth)
-1. El email en Firebase debe coincidir con el email del empleado en la BD
-1. Alternativa: modo **PIN numérico** (botón “Usar PIN numérico”)
+2. El email en Firebase debe coincidir con el email del empleado en la BD
+3. Alternativa: modo **PIN numérico** (botón "Usar PIN numérico")
 
 ## 📱 Instalar como PWA
 
-- **iOS Safari**: Compartir → “Añadir a pantalla de inicio”
-- **Android Chrome**: Banner automático o menú → “Instalar app”
+- **iOS Safari**: Compartir → "Añadir a pantalla de inicio"
+- **Android Chrome**: Banner automático o menú → "Instalar app"
