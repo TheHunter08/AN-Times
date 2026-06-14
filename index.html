@@ -122,6 +122,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 
 .lh-admin-link button{background:none;border:none;color:var(--accent3);font-size:12px;cursor:pointer;font-weight:600}
 @keyframes shake{0%,100%{transform:translateX(0)}15%,45%,75%{transform:translateX(-9px)}30%,60%,90%{transform:translateX(9px)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
@@ -153,13 +154,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* ═══ INICIO TAB (from image 6) ═══ */
 .ini-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:calc(16px + var(--safe-bot))}
 /* Jornada actual card */
-.jor-main-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-xl);padding:24px 20px;text-align:center}
-.jor-mc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.jor-mc-title{font-size:14px;font-weight:600;color:var(--text2)}
-.jor-mc-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--green-dim);color:var(--green)}
+.jor-main-card{background:linear-gradient(160deg,rgba(79,70,229,.12) 0%,var(--bg3) 60%);border:1px solid rgba(99,102,241,.25);border-radius:var(--r-xl);padding:20px 20px 18px;text-align:center;position:relative;overflow:hidden}
+.jor-main-card::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.12) 0%,transparent 70%);pointer-events:none}
+.jor-mc-clock-time{font-size:46px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.jor-mc-clock-date{font-size:12px;color:var(--text3);margin-top:3px;text-transform:capitalize;font-weight:400}
+.jor-mc-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;background:var(--green-dim);color:var(--green)}
 .jor-mc-status.idle{background:rgba(100,116,139,.12);color:var(--text3)}
 .jor-mc-status.break{background:var(--orange-dim);color:var(--orange)}
-.jor-mc-status .sdot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.jor-mc-status .sdot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:none}
+.jor-mc-status:not(.idle) .sdot{animation:pulse 1.5s infinite}
 /* Big timer */
 .jor-timer{font-size:52px;font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px}
 .jor-timer-sub{font-size:12px;color:var(--text3);margin-bottom:24px;font-weight:400}
@@ -195,20 +198,39 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .resumen-val.muted{color:var(--text4)}
 .resumen-total{font-size:16px;font-weight:700;color:var(--text)}
 
-/* ═══ JORNADA TAB (image 3) ═══ */
-.jor-tab-wrap{padding:16px;padding-bottom:calc(16px + var(--safe-bot))}
-.jor-tab-title{font-size:22px;font-weight:700;margin-bottom:4px}
-.jor-tab-date{font-size:13px;color:var(--text3);margin-bottom:16px}
+/* ═══ JORNADA TAB — SaaS redesign ═══ */
+.jor-tab-hdr{padding:20px 16px 16px;background:linear-gradient(160deg,rgba(79,70,229,.1) 0%,transparent 100%);border-bottom:1px solid var(--border)}
+.jor-tab-hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.jor-tab-h1{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.jor-tab-h2{font-size:13px;color:var(--text3);font-weight:400;text-transform:capitalize}
+.jor-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px}
+.jor-stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center;position:relative;overflow:hidden}
+.jor-stat-card.primary{background:linear-gradient(135deg,rgba(79,70,229,.15),rgba(6,182,212,.08));border-color:rgba(99,102,241,.3)}
+.jor-stat-card.orange{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(239,68,68,.06));border-color:rgba(245,158,11,.25)}
+.jor-stat-ico{font-size:18px;margin-bottom:6px}
+.jor-stat-val{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text)}
+.jor-stat-card.primary .jor-stat-val{color:var(--accent3)}
+.jor-stat-card.orange .jor-stat-val{color:var(--orange)}
+.jor-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;font-weight:600}
+.jor-week-wrap{padding:0 16px 16px}
+.jor-week-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.jor-week-days{display:flex;gap:6px}
+.jor-week-day{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.jor-week-dot{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .2s}
+.jor-week-lbl{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase}
 /* Timeline */
-.timeline{display:flex;flex-direction:column;gap:0;margin-bottom:16px}
+.jor-tl-wrap{padding:0 16px 12px}
+.jor-tl-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
+.timeline{display:flex;flex-direction:column;gap:0}
 .tl-item{display:flex;align-items:stretch;gap:14px}
 .tl-left{display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0}
-.tl-ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
-.tl-line{flex:1;width:2px;background:var(--border2);margin:4px 0}
+.tl-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.tl-line{flex:1;width:2px;background:linear-gradient(to bottom,var(--border2),transparent);margin:4px 0}
 .tl-item:last-child .tl-line{display:none}
-.tl-right{flex:1;display:flex;align-items:center;justify-content:space-between;padding:10px 0 18px}
-.tl-label{font-size:14px;font-weight:500;color:var(--text2)}
-.tl-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.tl-right{flex:1;display:flex;align-items:center;justify-content:space-between;padding:10px 0 18px;border-bottom:1px solid rgba(255,255,255,.04)}
+.tl-item:last-child .tl-right{border-bottom:none}
+.tl-label{font-size:14px;font-weight:600;color:var(--text2)}
+.tl-time{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 /* Total */
 .jor-total-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .jor-total-lbl{font-size:12px;color:var(--text3);margin-bottom:4px;font-weight:500}
@@ -755,18 +777,24 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     <!-- INICIO -->
     <div id="tabInicio" class="tab-content" style="display:block;overflow-y:auto">
       <div class="ini-wrap">
-        <!-- Live clock -->
-        <div style="text-align:center;padding:16px 0 12px">
-          <div id="liveTime" style="font-size:48px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">00:00</div>
-          <div id="liveDateStr" style="font-size:13px;color:var(--text3);margin-top:4px;text-transform:capitalize"></div>
-        </div>
-        <!-- Main fichar card -->
+        <!-- Main fichar card con reloj integrado -->
         <div class="jor-main-card">
-          <div class="jor-mc-header"><span class="jor-mc-title">Jornada actual</span><span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Libre</span></span></div>
-          <div class="jor-timer" id="jorTimer">00:00:00</div>
-          <div class="jor-timer-sub">Horas trabajadas</div>
+          <!-- Reloj arriba -->
+          <div style="margin-bottom:14px">
+            <div id="liveTime" class="jor-mc-clock-time">00:00</div>
+            <div id="liveDateStr" class="jor-mc-clock-date"></div>
+          </div>
+          <!-- Botón circular fichar -->
           <div class="jor-circle-wrap"><div class="jor-circle-glow" id="jorCircleGlow"></div><button class="jor-circle-btn" id="jorCircleBtn" onclick="jorBtnTap()"><svg viewBox="0 0 24 24" id="jorCircleIco"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span id="jorCircleLine1">FICHAR</span><span id="jorCircleLine2">ENTRADA</span></button></div>
+          <!-- Timer horas trabajadas -->
+          <div class="jor-timer" id="jorTimer">00:00:00</div>
+          <div class="jor-timer-sub">Horas trabajadas hoy</div>
+          <!-- Botón descanso -->
           <div class="jor-break-row"><button class="jor-break-chip" id="jorBreakChip" onclick="toggleBreak()" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/></svg><span id="jorBreakTxt">Iniciar descanso</span></button></div>
+          <!-- Estado en la parte inferior -->
+          <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;display:flex;justify-content:center">
+            <span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Sin jornada</span></span>
+          </div>
         </div>
         <!-- Status pill -->
         <div style="display:flex;justify-content:center;margin-bottom:16px">
@@ -833,27 +861,44 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     </div>
     <!-- JORNADA -->
     <div id="tabJornada" style="display:none;overflow-y:auto">
-      <div class="jor-tab-wrap">
-        <div class="jor-tab-title">Jornada actual</div><div class="jor-tab-date" id="jorTabDate"></div>
-        <div id="jorWeekDots" style="display:flex;justify-content:space-around;background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px"></div>
-        <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;margin-bottom:12px">
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x23F1; Total</div>
-            <div id="jorTotalVal" style="font-size:15px;font-weight:800;color:var(--accent3)">0h 0m</div>
-          </div>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x2705; Normal</div>
-            <div id="jorNorm" style="font-size:15px;font-weight:700">0h 0m</div>
-          </div>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x26A1; Extra</div>
-            <div id="jorExtra" style="font-size:15px;font-weight:700;color:var(--orange)">0h 0m</div>
-          </div>
+      <!-- Header SaaS -->
+      <div class="jor-tab-hdr">
+        <div class="jor-tab-hdr-top">
+          <span class="jor-tab-h1">Mi Jornada</span>
+          <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()" style="font-size:11px;padding:6px 12px;border-radius:20px;margin:0">✏️ Corrección</button>
         </div>
-        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">&#x270F;&#xFE0F; Solicitar corrección de fichaje</button>
+        <div class="jor-tab-h2" id="jorTabDate"></div>
       </div>
-      <div id="jorResumenMes" style="padding:0 16px 16px"></div>
+      <!-- Stats row -->
+      <div class="jor-stats-row">
+        <div class="jor-stat-card primary">
+          <div class="jor-stat-ico">⏱️</div>
+          <div class="jor-stat-val" id="jorTotalVal">0h 0m</div>
+          <div class="jor-stat-lbl">Total</div>
+        </div>
+        <div class="jor-stat-card">
+          <div class="jor-stat-ico">✅</div>
+          <div class="jor-stat-val" id="jorNorm">0h 0m</div>
+          <div class="jor-stat-lbl">Normal</div>
+        </div>
+        <div class="jor-stat-card orange">
+          <div class="jor-stat-ico">⚡</div>
+          <div class="jor-stat-val" id="jorExtra">0h 0m</div>
+          <div class="jor-stat-lbl">Extra</div>
+        </div>
+      </div>
+      <!-- Semana -->
+      <div class="jor-week-wrap">
+        <div class="jor-week-title">Esta semana</div>
+        <div id="jorWeekDots" class="jor-week-days"></div>
+      </div>
+      <!-- Timeline -->
+      <div class="jor-tl-wrap">
+        <div class="jor-tl-title">Actividad de hoy</div>
+        <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
+      </div>
+      <!-- Resumen mensual -->
+      <div id="jorResumenMes" style="padding:0 16px calc(16px + env(safe-area-inset-bottom))"></div>
     </div>
     <!-- VACACIONES -->
     <div id="tabVacaciones" style="display:none;overflow-y:auto">
@@ -1314,11 +1359,24 @@ function applyDB(p){
 function doFetch(){
   fetch(DB_URL+'.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(data=>{
     if(!data)return;
-    const merge=!DB._ts||data._ts>DB._ts||(data.records||[]).length!==(DB.records||[]).length||(data.employees||[]).length!==(DB.employees||[]).length;
+    // Sólo fusionar si Firebase tiene datos más nuevos o más empleados — NO por longitud de records
+    // (evita borrar registros abiertos recién creados que aún no llegaron a Firebase)
+    const merge=!DB._ts||data._ts>=DB._ts||(data.employees||[]).length!==(DB.employees||[]).length;
     if(merge){
-      const prev=DB.records.find(r=>r.empId===SES.user?.id&&!r.fin);
+      const prev=DB.records.find(r=>r.empId===SES.user?.id&&!r.fin&&!r.closed);
       applyDB(data);
-      if(prev&&TM.state!=='idle'){const fr=DB.records.find(r=>r.id===prev.id);if(fr&&!fr.fin){fr.workSecs=TM.ws;fr.breakSecs=TM.bs;}}
+      if(prev&&TM.state!=='idle'){
+        const fr=DB.records.find(r=>r.id===prev.id);
+        if(fr&&!fr.fin){
+          fr.workSecs=TM.ws;fr.breakSecs=TM.bs;
+        }else if(!fr){
+          // Firebase aún no tiene el registro abierto → restaurarlo localmente
+          prev.workSecs=TM.ws;prev.breakSecs=TM.bs;
+          DB.records.push(prev);
+        }
+        // Si fr existe y tiene fin → el admin lo cerró, aceptar y parar timer
+        else if(fr&&fr.fin){TM.state='idle';TM.ws=0;TM.bs=0;updBtns();updTimer();}
+      }
       try{localStorage.setItem('an_times_v1',JSON.stringify(DB));}catch(e){}
       refreshUI();
     }
@@ -1784,14 +1842,25 @@ function empNavTo(tab){
 function renderResumen(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
-  const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod));
-  const first=recs[0];
-  if($('resEntrada'))$('resEntrada').textContent=first?ftime(first.inicio):'--:--';
-  if($('resSalida')){const s=recs.find(r=>r.fin);$('resSalida').textContent=s?ftime(s.fin):'--:--';}
+  const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
+  const openRec2=recs.find(r=>!r.fin&&!r.closed);
+  const firstRec=recs[0];
+  // Entrada: mostrar solo cuando hay jornada iniciada
+  if($('resEntrada'))$('resEntrada').textContent=(openRec2||firstRec)?ftime((openRec2||firstRec).inicio):'--:--';
+  // Salida: mostrar solo cuando la jornada ha TERMINADO (no hay registro abierto)
+  if($('resSalida')){
+    const lastClosed=[...recs].reverse().find(r=>r.fin&&r.closed);
+    $('resSalida').textContent=(!openRec2&&lastClosed)?ftime(lastClosed.fin):'--:--';
+  }
   const brk=recs.reduce((a,r)=>a+Math.floor((r.breakSecs||0)/60),0);
-  const tot=recs.reduce((a,r)=>a+calcMin(r),0)+(TM.state!=='idle'?Math.floor(TM.ws/60):0);
+  const completedMin=recs.reduce((a,r)=>a+calcMin(r),0);
+  const tot=completedMin+(TM.state!=='idle'?Math.floor(TM.ws/60):0);
   if($('resDescanso'))$('resDescanso').textContent=brk>0?`${Math.floor(brk/60).toString().padStart(2,'0')}:${p2(brk%60)}`:'00:00';
-  if($('resTotal'))$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;
+  // Total: en vivo HH:MM:SS cuando trabajando, HH:MM cuando parado
+  if($('resTotal')){
+    if(TM.state!=='idle'){$('resTotal').textContent=s2t(completedMin*60+TM.ws);}
+    else{$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;}
+  }
   // GPS card
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
   const gc=$('gpsCard');if(gc){gc.style.display=open?'flex':'none';}
@@ -1816,29 +1885,43 @@ function renderJorTab(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
   const tl=$('jorTimeline');if(!tl)return;
-  const td=$('jorTabDate');if(td)td.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const td=$('jorTabDate');if(td)td.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
-  if(!recs.length){tl.innerHTML='<div class="empty">Sin actividad hoy</div>';return;}
-  const items=[];
-  recs.forEach(r=>{
-    items.push({ico:'🟢',label:'Entrada',time:ftime(r.inicio),color:'var(--green)',bg:'rgba(16,185,129,.15)'});
-    (r.breaks||[]).forEach(b=>{
-      if(b.start)items.push({ico:'🟡',label:'Pausa comida',time:ftime(b.start),color:'var(--orange)',bg:'rgba(245,158,11,.15)'});
-      if(b.end)items.push({ico:'🟣',label:'Reanudado',time:ftime(b.end),color:'var(--accent3)',bg:'var(--accent-dim)'});
+  // Timeline
+  if(!recs.length){tl.innerHTML='<div class="empty" style="padding:24px 0;text-align:center;color:var(--text3)">Sin actividad registrada hoy</div>';}
+  else{
+    const items=[];
+    recs.forEach(r=>{
+      items.push({ico:'🟢',label:'Entrada',time:ftime(r.inicio),bg:'rgba(16,185,129,.15)',dot:'var(--green)'});
+      (r.breaks||[]).forEach(b=>{
+        if(b.start)items.push({ico:'☕',label:'Pausa',time:ftime(b.start),bg:'rgba(245,158,11,.15)',dot:'var(--orange)'});
+        if(b.end)items.push({ico:'▶️',label:'Reanudado',time:ftime(b.end),bg:'var(--accent-dim)',dot:'var(--accent)'});
+      });
+      if(r.fin)items.push({ico:'🔴',label:'Salida',time:ftime(r.fin),bg:'rgba(239,68,68,.12)',dot:'var(--red)'});
+      else items.push({ico:'⏳',label:'Trabajando',time:'En curso',bg:'rgba(99,102,241,.12)',dot:'var(--accent)',live:true});
     });
-    if(r.fin)items.push({ico:'⚪',label:'Salida',time:ftime(r.fin),color:'var(--text3)',bg:'var(--bg4)'});
-  });
-  tl.innerHTML=items.map((it,i)=>`<div class="tl-item"><div class="tl-left"><div class="tl-ico" style="background:${it.bg}">${it.ico}</div>${i<items.length-1?'<div class="tl-line"></div>':''}</div><div class="tl-right"><span class="tl-label">${it.label}</span><span class="tl-time">${it.time}</span></div></div>`).join('');
-  // Total
-  const tot=recs.reduce((a,r)=>a+calcMin(r),0)+(TM.state!=='idle'?Math.floor(TM.ws/60):0);
+    tl.innerHTML=items.map((it,i)=>`<div class="tl-item">
+      <div class="tl-left">
+        <div class="tl-ico" style="background:${it.bg}">${it.ico}</div>
+        ${i<items.length-1?'<div class="tl-line"></div>':''}
+      </div>
+      <div class="tl-right">
+        <span class="tl-label">${it.label}</span>
+        <span class="tl-time"${it.live?' id="jorLiveTime"':''}>${it.time}</span>
+      </div>
+    </div>`).join('');
+  }
+  // Stats — en vivo si está trabajando
+  const completedMin=recs.reduce((a,r)=>a+calcMin(r),0);
+  const liveMin=TM.state!=='idle'?Math.floor(TM.ws/60):0;
+  const tot=completedMin+liveMin;
   const norm=Math.min(tot,WD),extra=Math.max(0,tot-WD);
-  const fmt=m=>`${Math.floor(m/60).toString().padStart(2,'0')}h ${p2(m%60)}m`;
+  const fmt=m=>TM.state!=='idle'&&m===tot?s2t(completedMin*60+TM.ws):`${Math.floor(m/60).toString().padStart(2,'0')}h ${p2(m%60)}m`;
   if($('jorTotalVal'))$('jorTotalVal').textContent=fmt(tot);
-  if($('jorNorm'))$('jorNorm').textContent=fmt(norm);
-  if($('jorExtra'))$('jorExtra').textContent=fmt(extra);
-  // Resumen mensual con botón de firma
+  if($('jorNorm'))$('jorNorm').textContent=`${Math.floor(norm/60).toString().padStart(2,'0')}h ${p2(norm%60)}m`;
+  if($('jorExtra'))$('jorExtra').textContent=`${Math.floor(extra/60).toString().padStart(2,'0')}h ${p2(extra%60)}m`;
+  // Resumen mensual + week dots
   safeRun(renderResumenMensualBtn,'rmb');
-  // Weekly dots
   renderWeekDots();
 }
 
@@ -1850,14 +1933,15 @@ function renderWeekDots(){
   el.innerHTML=days.map(function(d,i){
     const day=new Date(monday);day.setDate(monday.getDate()+i);
     const dk=day.getFullYear()+'-'+p2(day.getMonth()+1)+'-'+p2(day.getDate());
-    const hasRec=(DB.records||[]).some(function(r){return r.empId===SES.user.id&&r.inicio.startsWith(dk)&&r.fin;});
+    const hasRec=(DB.records||[]).some(function(r){return r.empId===SES.user.id&&r.inicio.startsWith(dk)&&r.fin&&r.closed;});
     const isToday=dk===today();
-    const col=hasRec?'var(--green)':isToday?'var(--accent)':'var(--bg4)';
-    const border=isToday?'2px solid var(--accent)':'2px solid transparent';
-    return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
-      +'<div style="font-size:10px;color:'+(isToday?'var(--accent)':'var(--text3)')+'">'+d+'</div>'
-      +'<div style="width:8px;height:8px;border-radius:50%;background:'+col+';border:'+border+'"></div>'
-      +'<div style="font-size:9px;color:var(--text3)">'+day.getDate()+'</div>'
+    const isFuture=day>now&&!isToday;
+    let bg=isFuture?'var(--bg2)':hasRec?'rgba(16,185,129,.2)':isToday?'rgba(99,102,241,.2)':'var(--bg4)';
+    let txtColor=hasRec?'var(--green)':isToday?'var(--accent)':'var(--text3)';
+    let border=isToday?'2px solid var(--accent)':hasRec?'2px solid rgba(16,185,129,.4)':'2px solid transparent';
+    return '<div class="jor-week-day">'
+      +'<div class="jor-week-dot" style="background:'+bg+';border:'+border+';color:'+txtColor+'">'+d+'</div>'
+      +'<div class="jor-week-lbl" style="color:'+txtColor+'">'+day.getDate()+'</div>'
       +'</div>';
   }).join('');
 }
@@ -1992,7 +2076,7 @@ function updJorCircle(){
     if(l1)l1.textContent='FICHAR';if(l2)l2.textContent='ENTRADA';
     if(ico)ico.innerHTML='<path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/>';
     if(chip)chip.style.display='none';
-    if(st)st.className='jor-mc-status idle';if(stTxt)stTxt.textContent='Libre';
+    if(st)st.className='jor-mc-status idle';if(stTxt)stTxt.textContent='Sin jornada';
     if(glw)glw.style.background='radial-gradient(circle,rgba(99,102,241,.25) 0%,transparent 70%)';
   }else if(s==='working'){
     btn.className='jor-circle-btn working';
