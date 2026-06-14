@@ -465,7 +465,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <div class="field"><label>PIN (4-6 dígitos)</label><input type="text" id="newPin" placeholder="1234" maxlength="6" inputmode="numeric"></div>
   <div class="field-row">
     <div class="field"><label>Color</label><select id="newColor"><option value="#6366f1">Índigo</option><option value="#10b981">Verde</option><option value="#f59e0b">Naranja</option><option value="#ef4444">Rojo</option><option value="#06b6d4">Cyan</option><option value="#8b5cf6">Violeta</option><option value="#ec4899">Rosa</option><option value="#5aa9e6">Azul</option></select></div>
-    <div class="field"><label>Rol</label><select id="newRole"><option value="empleado">Empleado</option><option value="encargado">Encargado ⭐</option></select></div>
+    <div class="field"><label>Rol</label><select id="newRole"><option value="empleado">Empleado</option><option value="encargado">Encargado ⭐</option><option value="jefe_obra">Jefe de Obra 🏗️</option></select></div>
   </div>
   <div class="field"><label>Inicio contrato</label><input type="date" id="newStart"></div>
   <div class="modal-btns"><button class="btn btn-secondary" onclick="closeModal('mAddEmp')">Cancelar</button><button class="btn btn-primary" onclick="doAddEmp()">Añadir</button></div>
@@ -481,7 +481,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <div class="field"><label>Centro</label><select id="eeCentro"><option value="">—</option></select></div>
   <div class="field-row">
     <div class="field"><label>Color</label><select id="eeColor"><option value="#6366f1">Índigo</option><option value="#10b981">Verde</option><option value="#f59e0b">Naranja</option><option value="#ef4444">Rojo</option><option value="#06b6d4">Cyan</option><option value="#8b5cf6">Violeta</option><option value="#ec4899">Rosa</option><option value="#5aa9e6">Azul</option></select></div>
-    <div class="field"><label>Rol</label><select id="eeRole"><option value="empleado">Empleado</option><option value="encargado">Encargado ⭐</option></select></div>
+    <div class="field"><label>Rol</label><select id="eeRole"><option value="empleado">Empleado</option><option value="encargado">Encargado ⭐</option><option value="jefe_obra">Jefe de Obra 🏗️</option></select></div>
   </div>
   <div class="modal-btns"><button class="btn btn-secondary" onclick="closeModal('mEditEmp')">Cancelar</button><button class="btn btn-primary" onclick="saveEditEmp()">Guardar</button></div>
 </div></div>
@@ -531,13 +531,22 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <!-- MODAL DOCUMENTOS -->
 <div class="modal-ov" id="mDocumentos"><div class="modal">
   <div class="modal-drag"></div>
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><button onclick="closeModal('mDocumentos')" class="btn btn-secondary btn-sm">←</button><h2 style="margin:0">Documentos</h2></div>
-  <div class="field" style="margin-bottom:8px"><label>📄 Contrato</label></div>
-  <div style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px"><div style="font-size:24px;flex-shrink:0">📄</div><div style="flex:1"><div style="font-size:13px;font-weight:600" id="docContratoName">Contrato.pdf</div><div style="font-size:11px;color:var(--text3)">Firmado · <span id="docContratoDate">2024</span></div></div><span style="font-size:18px">⬇️</span></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><button onclick="closeModal('mDocumentos')" class="btn btn-secondary btn-sm">←</button><h2 style="margin:0">Mis documentos</h2></div>
+  <div class="field" style="margin-bottom:8px"><label>📄 Contrato de trabajo</label></div>
+  <div style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+    <div style="font-size:28px;flex-shrink:0">📄</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="docContratoName">Sin contrato asignado</div>
+      <div style="font-size:11px;color:var(--text3)"><span id="docContratoDate">—</span></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn btn-secondary btn-sm" onclick="verDocEmp('contrato')">Ver</button>
+      <button id="btnFirmarContrato" class="btn btn-primary btn-sm" onclick="firmarDocEmp('contrato')" style="display:none">✍️ Firmar</button>
+    </div>
+  </div>
   <div class="field" style="margin-bottom:8px"><label>💰 Nóminas</label></div>
-  <div style="display:flex;flex-direction:column;gap:8px">
-    <div style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px"><div style="font-size:24px;flex-shrink:0">💰</div><div style="flex:1"><div style="font-size:13px;font-weight:600">Nómina Mayo 2026</div><div style="font-size:11px;color:var(--text3)">01/06/2026</div></div><span style="font-size:18px">⬇️</span></div>
-    <div style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px"><div style="font-size:24px;flex-shrink:0">💰</div><div style="flex:1"><div style="font-size:13px;font-weight:600">Nómina Abril 2026</div><div style="font-size:11px;color:var(--text3)">01/05/2026</div></div><span style="font-size:18px">⬇️</span></div>
+  <div id="docNominasList" style="display:flex;flex-direction:column;gap:8px">
+    <div class="empty">Sin nóminas. El administrador las subirá aquí.</div>
   </div>
 </div></div>
 
@@ -605,7 +614,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <div class="login-wrap">
     <div class="lh-top">
       <div class="lh-logo" onclick="logoTap()" style="cursor:pointer">
-        <svg viewBox="0 0 44 44" fill="none"><rect width="44" height="44" rx="12" fill="url(#lgg)"/><defs><linearGradient id="lgg" x1="0" y1="0" x2="44" y2="44"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient></defs><circle cx="22" cy="22" r="13" stroke="rgba(255,255,255,.2)" stroke-width="1.5"/><line x1="22" y1="22" x2="22" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="22" x2="28" y2="25" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="22" r="2" fill="white"/><line x1="22" y1="10" x2="22" y2="12" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round"/><line x1="34" y1="22" x2="32" y2="22" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="34" x2="22" y2="32" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round"/><line x1="10" y1="22" x2="12" y2="22" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 44 44" fill="none"><defs><linearGradient id="lgg" x1="0" y1="0" x2="44" y2="44"><stop offset="0%" stop-color="#c026d3"/><stop offset="40%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient><filter id="lgw"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="44" height="44" rx="10" fill="url(#lgg)"/><rect x="10" y="10" width="24" height="7" rx="2.5" fill="white"/><rect x="18.5" y="10" width="7" height="28" rx="2.5" fill="white"/><text x="26" y="37" font-family="Georgia,serif" font-size="8" font-style="italic" font-weight="700" fill="#22d3ee" filter="url(#lgw)">Inc</text></svg>
       </div>
       <div class="lh-brand">TIMES <span>INC</span></div>
     </div>
@@ -774,7 +783,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <div class="scr" id="sAdmin">
   <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
   <div class="sidebar" id="adminSidebar">
-    <div class="sb-head"><div class="sb-logo"><div class="sb-logo-icon" style="background:none;padding:1px"><svg viewBox="0 0 44 44" fill="none"><rect width="44" height="44" rx="12" fill="url(#lgg2)"/><defs><linearGradient id="lgg2" x1="0" y1="0" x2="44" y2="44"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient></defs><circle cx="22" cy="22" r="13" stroke="rgba(255,255,255,.2)" stroke-width="1.5"/><line x1="22" y1="22" x2="22" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="22" x2="28" y2="25" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="22" r="2" fill="white"/></svg></div><div class="sb-logo-name">TIMES <span>INC</span></div></div></div>
+    <div class="sb-head"><div class="sb-logo"><div class="sb-logo-icon" style="background:none;padding:1px"><svg viewBox="0 0 44 44" fill="none"><defs><linearGradient id="lgg2" x1="0" y1="0" x2="44" y2="44"><stop offset="0%" stop-color="#c026d3"/><stop offset="40%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient><filter id="lgw2"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="44" height="44" rx="10" fill="url(#lgg2)"/><rect x="10" y="10" width="24" height="7" rx="2.5" fill="white"/><rect x="18.5" y="10" width="7" height="28" rx="2.5" fill="white"/><text x="26" y="37" font-family="Georgia,serif" font-size="8" font-style="italic" font-weight="700" fill="#22d3ee" filter="url(#lgw2)">Inc</text></svg></div><div class="sb-logo-name">TIMES <span>INC</span></div></div></div>
     <nav class="sb-nav">
       <div class="sni on" data-p="dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</div>
       <div class="sni" data-p="control" onclick="showPage('control')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Control<span class="sni-badge" id="bControl">0</span></div>
@@ -784,6 +793,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
       <div class="sni" data-p="informes" onclick="showPage('informes')"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Informes</div>
       <div class="sni" data-p="obras" id="sniObras" onclick="showPage('obras')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Obras</div>
       <div class="sni" data-p="exportar" onclick="showPage('exportar')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar</div>
+      <div class="sni" data-p="docsnominas" id="sniDocs" onclick="showPage('docsnominas')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Contratos y Nóminas</div>
     </nav>
     <div class="sb-foot"><div class="sb-user"><div class="sb-user-av" id="sbAv">A</div><div class="sb-user-info"><div class="sb-user-name" id="sbName">Admin</div><div class="sb-user-role" id="sbRole">Administrador</div></div><button class="sb-logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div></div>
   </div>
@@ -816,9 +826,38 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
       <div id="pEmpleados" style="display:none"><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><input id="empSearch" type="text" placeholder="🔍 Buscar..." style="flex:1;min-width:150px" oninput="renderEmps()"><button class="btn btn-primary" onclick="openAddEmp()">+ Nuevo</button></div><div class="card"><div id="empList"><div class="empty">Sin empleados</div></div></div><div class="card"><h3>⭐ Encargados</h3><div id="encargadoList"></div></div></div>
       <div id="pInformes" style="display:none"><div class="card"><h3>📊 Por empleado</h3><div id="informesList"><div class="empty">Sin datos</div></div></div><div class="card"><h3>📅 Resumen mensual</h3><div id="informesMes"><div class="empty">Sin datos</div></div></div></div>
       <div id="pObras" style="display:none"><div class="card" id="cardObrasAdd"><h3>🏗️ Obras</h3><div id="obrasList" style="margin-bottom:10px"></div><div style="display:flex;gap:8px"><input id="newObra" type="text" placeholder="Nueva obra..." style="flex:1"><button class="btn btn-primary btn-sm" onclick="addObra()">Añadir</button></div></div><div class="card" id="cardCentrosAdd"><h3>📍 Centros de trabajo</h3><div id="centrosList" style="margin-bottom:10px"></div><div style="display:flex;gap:8px"><input id="newCentroInput" type="text" placeholder="Nuevo centro..." style="flex:1"><button class="btn btn-primary btn-sm" onclick="addCentro()">Añadir</button></div></div></div>
+      <div id="pDocsnominas" style="display:none">
+        <div style="margin-bottom:14px"><div style="font-size:20px;font-weight:800">📋 Contratos y Nóminas</div><div style="font-size:13px;color:var(--text3);margin-top:3px">Sube y gestiona los documentos de todos los empleados</div></div>
+        <div class="card">
+          <div class="card-hd"><h3>📤 Subir documento</h3></div>
+          <div class="field"><label>Empleado</label><select id="docEmpSelect" onchange="renderDocsPanel()"><option value="">— Selecciona empleado —</option></select></div>
+          <div class="field"><label>Tipo de documento</label>
+            <select id="docTipoSelect" onchange="toggleDocMes()">
+              <option value="contrato">📄 Contrato de trabajo</option>
+              <option value="nomina">💰 Nómina</option>
+              <option value="otro">📎 Otro documento</option>
+            </select>
+          </div>
+          <div class="field" id="docNominaMes" style="display:none"><label>Mes / periodo</label><input type="month" id="docMesInput"></div>
+          <div style="border:2px dashed var(--border2);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="document.getElementById('docFileInput').click()" id="docDropzone">
+            <div style="font-size:32px;margin-bottom:8px">📂</div>
+            <div style="font-size:14px;font-weight:600">Arrastra o toca para subir</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px">PDF, DOC, DOCX — máx. 8MB</div>
+            <input type="file" id="docFileInput" accept=".pdf,.doc,.docx" style="display:none" onchange="subirDocumentoAdmin(this)">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3 id="docPanelTitle">📁 Documentos del empleado</h3><button class="btn btn-secondary btn-sm" onclick="exportAllDocs()">⬇️ Exportar</button></div>
+          <div id="docPanelList"><div class="empty">Selecciona un empleado para ver sus documentos</div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>👥 Estado por empleado</h3></div>
+          <div id="docStatusList"><div class="empty">Cargando...</div></div>
+        </div>
+      </div>
       <div id="pExportar" style="display:none"><div class="card"><h3>📊 Exportar</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn btn-secondary" onclick="exportXLSX()">📥 Excel</button><button class="btn btn-secondary" onclick="exportPDF()">📄 PDF</button><button class="btn btn-secondary" onclick="exportJSON()">💾 Backup</button><label class="btn btn-secondary" style="cursor:pointer;justify-content:center">🔄 Restaurar<input type="file" accept=".json" style="display:none" onchange="restoreJSON(this)"></label></div></div><div class="card"><h3>📈 Estadísticas</h3><div id="expStatsContent"></div></div></div>
     </div>
-    <div id="admBottomNav"><div class="adm-bnav-item on" data-p="dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Inicio</div><div class="adm-bnav-item" data-p="fichajes" onclick="showPage('fichajes')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Fichajes</div><div class="adm-bnav-item" data-p="solicitudes" onclick="showPage('solicitudes')" style="position:relative"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span id="botSolBadge" style="position:absolute;top:0;right:6px;background:var(--red);color:#fff;font-size:7px;width:13px;height:13px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700">0</span>Solicitudes</div><div class="adm-bnav-item" data-p="empleados" onclick="showPage('empleados')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Empleados</div><div onclick="toggleSidebar()" class="adm-bnav-item"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Más</div></div>
+    <div id="admBottomNav"><div class="adm-bnav-item on" data-p="dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Inicio</div><div class="adm-bnav-item" data-p="fichajes" onclick="showPage('fichajes')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Fichajes</div><div class="adm-bnav-item" data-p="solicitudes" onclick="showPage('solicitudes')" style="position:relative"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span id="botSolBadge" style="position:absolute;top:0;right:6px;background:var(--red);color:#fff;font-size:7px;width:13px;height:13px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700">0</span>Solicitudes</div><div class="adm-bnav-item" data-p="empleados" onclick="showPage('empleados')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Empleados</div><div class="adm-bnav-item" data-p="docsnominas" onclick="showPage('docsnominas')" id="botDocs"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Contratos</div><div onclick="toggleSidebar()" class="adm-bnav-item"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Más</div></div>
   </main>
 </div>
 
@@ -948,7 +987,7 @@ let DB={
   ],
   records:[],vacaciones:[],medicos:[],ausencias:[],mensajes:[],notis:[],cierres:[],_ts:0
 };
-let SES={user:null,isAdmin:false,isEnc:false};
+let SES={user:null,isAdmin:false,isEnc:false,isJO:false};
 let TM={ws:0,bs:0,state:'idle'};
 let _tickN=0,_saveT=null,_pushFlight=false,_saveRetry=0,_polling=null;
 let _doStopInProgress=false,_doStopLock=false,_pendingGPS=null;
@@ -1135,10 +1174,11 @@ async function doEmailLogin(){
     // Buscar empleado por email
     var emp = DB.employees.find(function(e){ return e.email && e.email.toLowerCase() === fbUser.email.toLowerCase(); });
     if(emp){
-      SES.user = emp; SES.isEnc = emp.role === 'encargado';
-      if(SES.isEnc) SES.isAdmin = true;
+      SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
+      // Encargados y empleados NO son admins — solo Jefe de Obra y Admin tienen panel
+      SES.isAdmin = emp.role === 'jefe_obra';
       saveSession();
-      doEmpLogin();
+      if(SES.isAdmin){ doAdminLogin(); } else { doEmpLogin(); }
       toast('✅ Bienvenido, ' + emp.name.split(' ')[0]);
     } else if(fbUser.email.toLowerCase() === 'admin@times-inc.com' || fbUser.email.toLowerCase() === 'admin@timesync.app'){
       // Admin especial por email
@@ -1178,9 +1218,10 @@ async function loginWithGoogle(){
     var fbUser = result.user;
     var emp = DB.employees.find(function(e){ return e.email && e.email.toLowerCase() === fbUser.email.toLowerCase(); });
     if(emp){
-      SES.user = emp; SES.isEnc = emp.role === 'encargado';
-      if(SES.isEnc) SES.isAdmin = true;
-      saveSession(); doEmpLogin();
+      SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
+      SES.isAdmin = emp.role === 'jefe_obra';
+      saveSession();
+      if(SES.isAdmin){ doAdminLogin(); } else { doEmpLogin(); }
       toast('✅ Bienvenido, ' + (fbUser.displayName || fbUser.email).split(' ')[0]);
     } else {
       try{ if(window._fbSignOut) window._fbSignOut().catch(function(){}); }catch(e){}
@@ -1307,10 +1348,11 @@ function tryAutoLogin(){
   if(!emp)return;
   if(emp.pin===pin){
     var _le=$('pinErr')||$('loginErr');if(_le)_le.textContent='';
-    SES.user=emp;SES.isEnc=emp.role==='encargado';
+    SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+    SES.isAdmin=emp.role==='jefe_obra';
     try{localStorage.setItem('an_times_rem',JSON.stringify({empId}));}catch(e){}
     saveSession();
-    if(SES.isEnc){SES.isAdmin=true;}doEmpLogin();
+    if(SES.isAdmin){doAdminLogin();}else{doEmpLogin();}
   } else if(pin.length>=4&&_pin.length>=4){
     var _pe=$('pinErr')||$('loginErr');if(_pe)_pe.textContent='PIN incorrecto';
     shakeDots();
@@ -1414,9 +1456,10 @@ function doLogin(){
   const emp=DB.employees.find(e=>e.id===empId);
   if(!emp){$('loginErr').textContent='Empleado no encontrado';return;}
   if(emp.pin!==pin){$('loginErr').textContent='PIN incorrecto';shakeDots&&shakeDots();return;}
-  SES.user=emp;SES.isEnc=emp.role==='encargado';
+  SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+  SES.isAdmin=emp.role==='jefe_obra';
   saveSession();
-  if(SES.isEnc){SES.isAdmin=true;}doEmpLogin();
+  if(SES.isAdmin){doAdminLogin();}else{doEmpLogin();}
 }
 // quickAdmin defined above (email-based)
 let _loggingOut = false;
@@ -1430,7 +1473,7 @@ function doLogout(){
   try{if(window._fbReady&&window._fbSignOut)window._fbSignOut().catch(()=>{});}catch(e){}
   // Reset timer & session
   TM={ws:0,bs:0,state:'idle'};
-  SES={user:null,isAdmin:false,isEnc:false};
+  SES={user:null,isAdmin:false,isEnc:false,isJO:false};
   _pin='';
   try{localStorage.removeItem('an_times_ses');}catch(e){}
   // Reset UI
@@ -1463,10 +1506,11 @@ function doEmpLogin(){
   // Perfil tab
   const pa=$('prfAv');if(pa){pa.textContent=u.initials||u.name.slice(0,2).toUpperCase();pa.style.background=u.color||'var(--accent)';}
   if($('prfName'))$('prfName').textContent=u.name;
-  if($('prfRole'))$('prfRole').textContent=u.role==='encargado'?'Encargado ⭐':'Empleado';
+  if($('prfRole'))$('prfRole').textContent=u.role==='encargado'?'Encargado ⭐':u.role==='jefe_obra'?'Jefe de Obra 🏗️':'Empleado';
   if($('prfLoc'))$('prfLoc').textContent=u.empresa||'Sin obra';
   // Enc btn
-  if(SES.isEnc&&$('encBtn'))$('encBtn').style.display='flex';
+  if((SES.isEnc||SES.isJO)&&$('encBtn'))$('encBtn').style.display='flex';
+  if($('encBtn')&&SES.isJO)$('encBtn').textContent='🏗️ Panel';
   showScr('sEmp');
   // Restore session timer
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
@@ -1483,7 +1527,12 @@ function doEmpLogin(){
   safeRun(updJorCircle,'jc');safeRun(renderResumen,'rs');
   safeRun(loadUserPhoto,'lp');
 }
-function showEncPanel(){SES.isAdmin=true;doAdminLogin();}
+function showEncPanel(){
+  // Encargados ven el panel con permisos limitados (solo su obra)
+  // Jefe de Obra tiene acceso a Contratos y Nóminas + aprobar horas de todos en su obra
+  SES.isAdmin=true; // Temporal para mostrar panel
+  doAdminLogin();
+}
 
 
 
@@ -1941,7 +1990,7 @@ function showPage(p){
   document.querySelectorAll('.adm-content>[id^="p"]').forEach(el=>el.style.display='none');
   const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg)pg.style.display='';
   document.querySelectorAll('.sni').forEach(el=>el.classList.toggle('on',el.dataset.p===p));
-  const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar'};
+  const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar',docsnominas:'Contratos y Nóminas'};
   if($('admTitle'))$('admTitle').textContent=titles[p]||p;
   if($('admSubtitle'))$('admSubtitle').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   closeSidebar();
@@ -1956,6 +2005,7 @@ function showPage(p){
   if(p==='obras'){safeRun(renderObras,'ob');safeRun(renderCentros,'ct');}
   if(p==='informes')safeRun(renderInformes,'inf');
   if(p==='exportar')safeRun(renderExpStats,'exp');
+  if(p==='docsnominas'){safeRun(initDocsPanel,'docs');}
 }
 function updateSBBadges(){
   const pend=(DB.records||[]).filter(r=>r.fin&&r.aprobado===undefined).length;
@@ -1967,8 +2017,8 @@ function updateSBBadges(){
   document.querySelectorAll('#admBottomNav .adm-bnav-item[data-p]').forEach(el=>el.className='adm-bnav-item'+(el.dataset.p===document.querySelector('.sni.on')?.dataset?.p?' on':''));
 }
 function updateSBUser(){
-  const n=SES.isAdmin&&!SES.isEnc?'Administrador':(SES.user?.name||'Admin');
-  const r=SES.isEnc?'Encargado ⭐':'Administrador';
+  const n=SES.isAdmin&&!SES.isEnc&&!SES.isJO?'Administrador':(SES.user?.name||'Admin');
+  const r=SES.isJO?'Jefe de Obra 🏗️':SES.isEnc?'Encargado ⭐':'Administrador';
   const av=n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
   if($('sbAv'))$('sbAv').textContent=av;if($('sbName'))$('sbName').textContent=n;if($('sbRole'))$('sbRole').textContent=r;
 }
@@ -1982,7 +2032,8 @@ function refreshUI(){
 function renderDashboard(){
   const now=new Date(),todayStr=today();
   if($('dashDate'))$('dashDate').textContent=now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  if($('dashGreeting'))$('dashGreeting').textContent=`¡Hola, ${SES.isAdmin&&!SES.isEnc?'Admin':SES.user?.name?.split(' ')[0]||'Admin'}! 👋`;
+  const _greetName=SES.isAdmin&&!SES.isEnc&&!SES.isJO?'Admin':SES.user?.name?.split(' ')[0]||'Admin';
+  if($('dashGreeting'))$('dashGreeting').textContent=`¡Hola, ${_greetName}! 👋`;
   const emps=sortedEmps();
   const fichHoy=(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(todayStr));
   const active=(DB.records||[]).filter(r=>!r.fin);
@@ -2186,7 +2237,7 @@ function renderEmps(){
   if(!emps.length){el.innerHTML='<div class="empty">Sin empleados</div>';return;}
   el.innerHTML=emps.map(emp=>{
     const open=DB.records.find(r=>r.empId===emp.id&&!r.fin);
-    const rb=emp.role==='encargado'?'<span class="badge badge-purple" style="font-size:8px">⭐ ENC</span>':'<span class="badge badge-gray" style="font-size:8px">EMP</span>';
+    const rb=emp.role==='encargado'?'<span class="badge badge-purple" style="font-size:8px">⭐ ENC</span>':emp.role==='jefe_obra'?'<span class="badge badge-orange" style="font-size:8px">🏗️ JEFE</span>':'<span class="badge badge-gray" style="font-size:8px">EMP</span>';
     return`<div class="erow"><div class="erow-av" style="background:${emp.color||'var(--accent)'}">${emp.initials||emp.name.slice(0,2)}</div><div class="erow-info"><div class="erow-name">${emp.name} ${rb}</div><div class="erow-sub">${emp.empresa||'Sin obra'}${emp.centroTrabajo?' · 📍 '+emp.centroTrabajo:''} · PIN:${emp.pin}</div></div>${open?'<span class="badge badge-green"><span class="dot"></span>Activo</span>':''}<div class="erow-btns"><button class="btn btn-secondary btn-sm" onclick="editEmp('${emp.id}')">✎</button><button class="btn btn-red btn-sm" onclick="removeEmp('${emp.id}')">✕</button></div></div>`;
   }).join('');
   populateSelect();populateFilters();
@@ -2425,11 +2476,24 @@ function encVolver(){
 // ── Admin login — mostrar/ocultar según rol ──
 function applyEncPermissions(){
   const isEnc=SES.isEnc;
-  // Ocultar Obras en sidebar a encargados
-  const sniObras=$('sniObras');if(sniObras)sniObras.style.display=isEnc?'none':'flex';
-  // Mostrar botón retorno a encargados
-  const backBtn=$('encBackBtn');if(backBtn)backBtn.style.display=isEnc?'flex':'none';
-  // En pObras ocultar formularios de añadir a encargados
+  const isJO=SES.isJO;
+  const isPureAdmin=SES.isAdmin&&!SES.isEnc&&!SES.isJO;
+
+  // Sidebar: Obras solo para admin puro y JO
+  const sniObras=$('sniObras');
+  if(sniObras)sniObras.style.display=isEnc?'none':'flex';
+
+  // Contratos y Nóminas: visible para admin puro y JO, oculto para encargados
+  const sniDocs=$('sniDocs');
+  if(sniDocs)sniDocs.style.display=(isPureAdmin||isJO)?'flex':'none';
+  const botDocs=$('botDocs');
+  if(botDocs)botDocs.style.display=(isPureAdmin||isJO)?'flex':'none';
+
+  // Botón retorno a vista empleado (solo encargados y JO)
+  const backBtn=$('encBackBtn');
+  if(backBtn)backBtn.style.display=(isEnc||isJO)?'flex':'none';
+
+  // En Obras ocultar añadir/eliminar a encargados
   const addObrasCard=$('cardObrasAdd'),addCentrosCard=$('cardCentrosAdd');
   if(addObrasCard){
     const addBtn=addObrasCard.querySelector('input[id="newObra"]')?.closest('div');
@@ -2438,6 +2502,18 @@ function applyEncPermissions(){
   if(addCentrosCard){
     const addBtn2=addCentrosCard.querySelector('input[id="newCentroInput"]')?.closest('div');
     if(addBtn2)addBtn2.style.display=isEnc?'none':'flex';
+  }
+
+  // Empleados: encargados NO pueden crear/eliminar empleados
+  const addEmpBtn=document.querySelector('#pEmpleados .btn-primary[onclick="openAddEmp()"]');
+  if(addEmpBtn)addEmpBtn.style.display=isEnc?'none':'inline-flex';
+
+  // Título del panel según rol
+  const sbRole=$('sbRole');
+  if(sbRole){
+    if(isJO)sbRole.textContent='Jefe de Obra';
+    else if(isEnc)sbRole.textContent='Encargado ⭐';
+    else sbRole.textContent='Administrador';
   }
 }
 
@@ -2458,8 +2534,7 @@ function openPrfPanel(panel){
     if($('ipVac'))$('ipVac').value=vd.available+' días ('+vd.generated+' generados, '+vd.used+' usados)';
     openModal('mInfoPersonal');
   }else if(panel==='documentos'){
-    if($('docContratoName'))$('docContratoName').textContent='Contrato_'+u.name.split(' ')[0]+'.pdf';
-    if($('docContratoDate'))$('docContratoDate').textContent=u.startDate?new Date(u.startDate+'T00:00:00').toLocaleDateString('es-ES',{month:'short',year:'numeric'}):'—';
+    renderDocumentosEmpleado(u.id);
     openModal('mDocumentos');
   }else if(panel==='configuracion'){
     openModal('mConfiguracion');
@@ -2601,6 +2676,209 @@ function loadUserPhoto(){
   const u=SES.user;if(!u)return;
   if(u.photo)updateAvatarUI(u.photo,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
   else updateAvatarUI(null,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
+}
+
+// ══════════════════════════════════════════════
+// CONTRATOS Y NÓMINAS
+// ══════════════════════════════════════════════
+function initDocsPanel(){
+  const sel=$('docEmpSelect');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Selecciona empleado —</option>';
+  sortedEmps().forEach(e=>{
+    const o=document.createElement('option');
+    o.value=e.id;
+    o.textContent=e.name+' ('+roleLabel(e.role)+')';
+    sel.appendChild(o);
+  });
+  if(cur)sel.value=cur;
+  renderDocStatusList();
+  renderDocsPanel();
+}
+
+function roleLabel(r){
+  return r==='encargado'?'Encargado':r==='jefe_obra'?'Jefe de Obra':'Empleado';
+}
+
+function toggleDocMes(){
+  const tipo=$('docTipoSelect')?.value;
+  const mes=$('docNominaMes');
+  if(mes)mes.style.display=tipo==='nomina'?'block':'none';
+}
+
+function subirDocumentoAdmin(input){
+  const empId=$('docEmpSelect')?.value;
+  if(!empId){toast('⚠️ Selecciona un empleado primero');input.value='';return;}
+  const tipo=$('docTipoSelect')?.value||'otro';
+  const file=input.files[0];if(!file)return;
+  if(file.size>8*1024*1024){toast('⚠️ El archivo supera 8MB');input.value='';return;}
+  const mes=$('docMesInput')?.value||'';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const emp=DB.employees.find(x=>x.id===empId);if(!emp)return;
+    if(!emp.docs)emp.docs={contrato:null,nominas:[],otros:[]};
+    const doc={id:gid(),name:file.name,tipo,data:e.target.result,fecha:new Date().toISOString(),subidoPor:SES.user?.name||'Admin',mes:mes||null,firmado:false};
+    if(tipo==='contrato'){emp.docs.contrato=doc;}
+    else if(tipo==='nomina'){
+      if(!emp.docs.nominas)emp.docs.nominas=[];
+      emp.docs.nominas.unshift(doc);
+      if(emp.docs.nominas.length>24)emp.docs.nominas=emp.docs.nominas.slice(0,24);
+    } else {
+      if(!emp.docs.otros)emp.docs.otros=[];
+      emp.docs.otros.unshift(doc);
+    }
+    save();
+    pushNoti('emp:'+empId, tipo==='nomina'?'info':'info',
+      tipo==='contrato'?'📄 Nuevo contrato disponible':tipo==='nomina'?'💰 Nueva nómina disponible':'📎 Nuevo documento disponible',
+      'Disponible en Perfil → Documentos.');
+    renderDocsPanel();
+    renderDocStatusList();
+    toast('✅ '+file.name+' subido correctamente');
+    input.value='';
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderDocsPanel(){
+  const empId=$('docEmpSelect')?.value;
+  const list=$('docPanelList');
+  const title=$('docPanelTitle');
+  if(!empId){if(list)list.innerHTML='<div class="empty">Selecciona un empleado para ver sus documentos</div>';return;}
+  const emp=DB.employees.find(e=>e.id===empId);
+  if(!emp){if(list)list.innerHTML='<div class="empty">Empleado no encontrado</div>';return;}
+  if(title)title.textContent='📁 Documentos de '+emp.name.split(' ')[0];
+  const docs=emp.docs||{};
+  const allDocs=[];
+  if(docs.contrato)allDocs.push({...docs.contrato,_tipo:'contrato'});
+  (docs.nominas||[]).forEach(d=>allDocs.push({...d,_tipo:'nomina'}));
+  (docs.otros||[]).forEach(d=>allDocs.push({...d,_tipo:'otro'}));
+  if(!allDocs.length){if(list)list.innerHTML='<div class="empty">Sin documentos. Sube el primero arriba.</div>';return;}
+  if(list)list.innerHTML=allDocs.map(d=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:28px;flex-shrink:0">${d._tipo==='contrato'?'📄':d._tipo==='nomina'?'💰':'📎'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.name}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${d._tipo==='nomina'&&d.mes?'📅 '+d.mes+' · ':''}${new Date(d.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} · ${d.subidoPor||'Admin'}${d.firmado?' · <span style="color:var(--green)">✅ Firmado</span>':' · <span style="color:var(--orange)">Sin firmar</span>'}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <button class="btn btn-secondary btn-sm" onclick="verDocAdmin('${d.id}','${empId}')">👁️ Ver</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarDoc('${d.id}','${empId}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function verDocAdmin(docId,empId){
+  const emp=DB.employees.find(e=>e.id===empId);if(!emp||!emp.docs)return;
+  const allDocs=[emp.docs.contrato,...(emp.docs.nominas||[]),...(emp.docs.otros||[])].filter(Boolean);
+  const doc=allDocs.find(d=>d.id===docId);
+  if(!doc||!doc.data){toast('Documento no disponible');return;}
+  const w=window.open('','_blank');if(!w)return;
+  if(doc.data.includes('application/pdf')){
+    w.document.write('<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe>');
+  } else {
+    w.document.write('<body style="margin:0;background:#000"><img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto"></body>');
+  }
+}
+
+function eliminarDoc(docId,empId){
+  if(!confirm('¿Eliminar este documento?'))return;
+  const emp=DB.employees.find(e=>e.id===empId);if(!emp||!emp.docs)return;
+  if(emp.docs.contrato?.id===docId){emp.docs.contrato=null;}
+  else{emp.docs.nominas=(emp.docs.nominas||[]).filter(d=>d.id!==docId);emp.docs.otros=(emp.docs.otros||[]).filter(d=>d.id!==docId);}
+  save();renderDocsPanel();renderDocStatusList();toast('🗑️ Documento eliminado');
+}
+
+function renderDocStatusList(){
+  const el=$('docStatusList');if(!el)return;
+  const emps=sortedEmps();
+  if(!emps.length){el.innerHTML='<div class="empty">Sin empleados</div>';return;}
+  el.innerHTML=emps.map(emp=>{
+    const docs=emp.docs||{};
+    const tieneContrato=!!docs.contrato;
+    const numNominas=(docs.nominas||[]).length;
+    const sinFirmar=[docs.contrato,...(docs.nominas||[])].filter(Boolean).filter(d=>!d.firmado).length;
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:34px;height:34px;border-radius:9px;background:${emp.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${emp.initials||emp.name.slice(0,2)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${emp.name}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${roleLabel(emp.role)}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <span class="badge ${tieneContrato?'badge-green':'badge-gray'}">${tieneContrato?'📄 Contrato':'Sin contrato'}</span>
+        <span class="badge ${numNominas>0?'badge-purple':'badge-gray'}">${numNominas>0?numNominas+' nóminas':'Sin nóminas'}</span>
+        ${sinFirmar>0?`<span class="badge badge-orange">${sinFirmar} sin firmar</span>`:''}
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('docEmpSelect').value='${emp.id}';renderDocsPanel();document.getElementById('docEmpSelect').scrollIntoView()">Gestionar</button>
+    </div>`;
+  }).join('');
+}
+
+function exportAllDocs(){
+  const empId=$('docEmpSelect')?.value;
+  if(!empId){toast('Selecciona un empleado primero');return;}
+  const emp=DB.employees.find(e=>e.id===empId);
+  if(!emp||!emp.docs){toast('Sin documentos');return;}
+  const docs=[emp.docs.contrato,...(emp.docs.nominas||[]),...(emp.docs.otros||[])].filter(Boolean);
+  if(!docs.length){toast('Sin documentos para exportar');return;}
+  // Descarga el primero disponible como demo
+  docs.forEach(d=>{
+    const a=document.createElement('a');
+    a.href=d.data;a.download=d.name;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  });
+  toast('✅ Descargando '+docs.length+' documento(s)');
+}
+
+// Funciones para EMPLEADOS - ver sus propios documentos desde Perfil
+function renderDocumentosEmpleado(empId){
+  const emp=DB.employees.find(e=>e.id===empId);
+  if(!emp)return;
+  const docs=emp.docs||{};
+  const cn=$('docContratoName');if(cn)cn.textContent=docs.contrato?docs.contrato.name:'Sin contrato asignado';
+  const cd=$('docContratoDate');if(cd)cd.textContent=docs.contrato?new Date(docs.contrato.fecha).toLocaleDateString('es-ES',{month:'short',year:'numeric'}):'—';
+  const fb=$('btnFirmarContrato');
+  if(fb)fb.style.display=(docs.contrato&&!docs.contrato.firmado)?'inline-flex':'none';
+  const nl=$('docNominasList');
+  if(nl){
+    const nominas=docs.nominas||[];
+    if(!nominas.length){nl.innerHTML='<div class="empty">Sin nóminas. El administrador las subirá aquí.</div>';return;}
+    nl.innerHTML=nominas.map((n,i)=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:24px;flex-shrink:0">💰</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${n.name}${n.mes?' ('+n.mes+')':''}</div>
+      <div style="font-size:11px;color:var(--text3)">${new Date(n.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} ${n.firmado?'· <span style=\'color:var(--green)\'>✅ Firmada</span>':'· <span style=\'color:var(--orange)\'>Sin firmar</span>'}</div></div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-secondary btn-sm" onclick="verDocEmp('nomina',${i})">Ver</button>
+        ${!n.firmado?`<button class="btn btn-primary btn-sm" onclick="firmarDocEmp('nomina',${i})">✍️ Firmar</button>`:''}
+      </div>
+    </div>`).join('');
+  }
+}
+
+function verDocEmp(tipo,idx=0){
+  const u=SES.user;if(!u)return;
+  const emp=DB.employees.find(e=>e.id===u.id);if(!emp||!emp.docs)return;
+  let doc=tipo==='contrato'?emp.docs.contrato:(emp.docs.nominas||[])[idx];
+  if(!doc||!doc.data){toast('Documento no disponible');return;}
+  const w=window.open('','_blank');if(!w)return;
+  if(doc.data.includes('application/pdf')){
+    w.document.write('<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe>');
+  } else {
+    w.document.write('<body style="margin:0;background:#000"><img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto"></body>');
+  }
+}
+
+function firmarDocEmp(tipo,idx=0){
+  const u=SES.user;if(!u)return;
+  const emp=DB.employees.find(e=>e.id===u.id);if(!emp||!emp.docs)return;
+  let doc=tipo==='contrato'?emp.docs.contrato:(emp.docs.nominas||[])[idx];
+  if(!doc){toast('Documento no encontrado');return;}
+  if(doc.firmado){toast('Ya está firmado');return;}
+  if(!confirm('¿Confirmas la firma electrónica de "'+doc.name+'"?'))return;
+  doc.firmado=true;doc.firmadoEn=new Date().toISOString();doc.firmadoPor=u.name;
+  save();
+  renderDocumentosEmpleado(u.id);
+  toast('✅ Documento firmado');
 }
 
 // ── PWA Install ──
@@ -2789,9 +3067,10 @@ document.addEventListener('fbAuthChanged', e => {
       }, 800);
       return;
     }
-    SES.user = emp; SES.isEnc = emp.role === 'encargado';
-    if (SES.isEnc) SES.isAdmin = true;
-    saveSession(); doEmpLogin();
+    SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
+    SES.isAdmin = emp.role === 'jefe_obra';
+    saveSession();
+    if(SES.isAdmin){ doAdminLogin(); } else { doEmpLogin(); }
     console.log('[TIMES] Auto-login Firebase:', emp.name);
   } else {
     // Usuario Firebase pero NO registrado como empleado → bloquear acceso
@@ -2831,8 +3110,9 @@ setInterval(()=>{
         if(ses.isAdmin&&!ses.empId){SES={user:null,isAdmin:true,isEnc:false};doAdminLogin();}
         else if(ses.empId){
           const emp=DB.employees.find(e=>e.id===ses.empId);
-          if(emp){SES.user=emp;SES.isEnc=emp.role==='encargado';
-            if(SES.isEnc){SES.isAdmin=true;}doEmpLogin();}
+          if(emp){SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+            SES.isAdmin=emp.role==='jefe_obra';
+            if(SES.isAdmin){doAdminLogin();}else{doEmpLogin();}}
         }
       }
     }catch(e){}

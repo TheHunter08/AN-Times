@@ -1,17 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="100%" stop-color="#4f46e5"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c026d3"/>
+      <stop offset="35%" stop-color="#7c3aed"/>
+      <stop offset="70%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
     </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0abfc"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="100" height="100" rx="22" fill="url(#g)"/>
-  <circle cx="50" cy="50" r="30" stroke="rgba(255,255,255,0.25)" stroke-width="3" fill="none"/>
-  <line x1="50" y1="50" x2="50" y2="26" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <line x1="50" y1="50" x2="66" y2="58" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="50" cy="50" r="4" fill="white"/>
-  <line x1="50" y1="22" x2="50" y2="26" stroke="rgba(255,255,255,0.6)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="78" y1="50" x2="74" y2="50" stroke="rgba(255,255,255,0.6)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="50" y1="78" x2="50" y2="74" stroke="rgba(255,255,255,0.6)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="22" y1="50" x2="26" y2="50" stroke="rgba(255,255,255,0.6)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Background rounded rect -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+  <!-- Subtle inner glow overlay -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="rgba(255,255,255,0.06)"/>
+  <!-- Arc ring (partial circle, pink-to-cyan) -->
+  <circle cx="420" cy="440" r="310" fill="none" stroke="url(#ring)" stroke-width="18" stroke-linecap="round" stroke-dasharray="1100 850" stroke-dashoffset="-580" opacity="0.9" filter="url(#glow)"/>
+  <!-- Big T letter - white with subtle shadow -->
+  <g filter="url(#shadow)">
+    <!-- T crossbar -->
+    <rect x="155" y="220" width="520" height="130" rx="40" fill="white"/>
+    <!-- T stem -->
+    <rect x="340" y="220" width="150" height="590" rx="40" fill="white"/>
+  </g>
+  <!-- "Inc" text in cyan script style -->
+  <text x="490" y="730" font-family="Georgia, serif" font-size="190" font-weight="700" font-style="italic" fill="#22d3ee" filter="url(#glow)" text-anchor="start">Inc</text>
+  <!-- Underline stroke in cyan -->
+  <path d="M 490 755 Q 620 775 760 745" stroke="#22d3ee" stroke-width="18" fill="none" stroke-linecap="round" filter="url(#glow)" opacity="0.9"/>
 </svg>
