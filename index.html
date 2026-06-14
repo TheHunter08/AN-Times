@@ -571,14 +571,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <div class="modal-drag"></div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><button onclick="closeModal('mConfiguracion')" class="btn btn-secondary btn-sm">←</button><h2 style="margin:0">Configuración</h2></div>
   <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">Recordatorio de fichaje</div><div style="font-size:11px;color:var(--text3)">Aviso al olvidar fichar salida</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgNotiFichaje" checked style="display:none"><span style="position:absolute;inset:0;background:var(--accent);border-radius:12px"></span><span style="position:absolute;top:2px;right:2px;width:20px;height:20px;background:#fff;border-radius:50%"></span></label></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px"><div><div style="font-size:13px;font-weight:500">GPS automático</div><div style="font-size:11px;color:var(--text3)">Captura ubicación al iniciar</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgGps" checked style="display:none"><span style="position:absolute;inset:0;background:var(--accent);border-radius:12px"></span><span style="position:absolute;top:2px;right:2px;width:20px;height:20px;background:#fff;border-radius:50%"></span></label></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">Recordatorio de fichaje</div><div style="font-size:11px;color:var(--text3)">Aviso al olvidar fichar salida</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgNotiFichaje" style="display:none" onchange="setCfg('notiFichaje',this.checked);updateCfgToggle('cfgNotiFichaje',this.checked)"><span id="cfgNotiFichajeTrack" style="position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:.2s"></span><span id="cfgNotiFichajeKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s"></span></label></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px"><div><div style="font-size:13px;font-weight:500">GPS automático</div><div style="font-size:11px;color:var(--text3)">Captura ubicación al iniciar</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgGps" style="display:none" onchange="setCfg('gpsAuto',this.checked);updateCfgToggle('cfgGps',this.checked)"><span id="cfgGpsTrack" style="position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:.2s"></span><span id="cfgGpsKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s"></span></label></div>
   </div>
   <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:500">Idioma</span><select style="width:120px;font-size:13px;padding:6px 8px;border-radius:8px"><option>Español</option><option>English</option></select></div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px"><span style="font-size:13px;font-weight:500">Formato hora</span><select style="width:100px;font-size:13px;padding:6px 8px;border-radius:8px"><option>24h</option><option>12h AM/PM</option></select></div>
   </div>
-  <button class="btn btn-primary btn-full" style="margin-top:16px" onclick="toast('✅ Guardado');closeModal('mConfiguracion')">Guardar</button>
+  <button class="btn btn-primary btn-full" style="margin-top:16px" onclick="closeModal('mConfiguracion');toast('✅ Configuración guardada')">Guardar</button>
 </div></div>
 
 <!-- MODAL SEGURIDAD -->
@@ -1051,10 +1051,12 @@ let DB={
     {id:"e1",name:"Ismael Angeles de la Cruz",empresa:"Soluciones Mata",centroTrabajo:"Obra Principal",pin:"1111",color:"#6366f1",initials:"IA",startDate:"2024-01-01",email:"",role:"encargado",obrasAsignadas:["Soluciones Mata"]},
     {id:"e2",name:"Franklin Lisandro Nuñez Roque",empresa:"Soluciones Mata",centroTrabajo:"Obra Principal",pin:"2222",color:"#10b981",initials:"FL",startDate:"2024-01-01",email:"",role:"empleado",obrasAsignadas:[]}
   ],
-  records:[],vacaciones:[],medicos:[],ausencias:[],mensajes:[],notis:[],cierres:[],_ts:0
+  records:[],vacaciones:[],medicos:[],ausencias:[],mensajes:[],notis:[],cierres:[],monthSnapshots:{},_ts:0
 };
 let SES={user:null,isAdmin:false,isEnc:false,isJO:false};
 let TM={ws:0,bs:0,state:'idle'};
+function getCfg(k,d){const v=localStorage.getItem('cfg_'+k);if(v===null)return d;return v==='true'?true:v==='false'?false:v;}
+function setCfg(k,v){localStorage.setItem('cfg_'+k,String(v));}
 let _tickN=0,_saveT=null,_pushFlight=false,_saveRetry=0,_polling=null;
 let _doStopInProgress=false,_doStopLock=false,_pendingGPS=null;
 let _vacCache={};
@@ -1561,6 +1563,7 @@ function doAdminLogin(){
   safeRun(populateSelect,'sel');safeRun(populateFilters,'filt');
   showPage('dashboard');
   safeRun(applyEncPermissions,'enc');
+  setTimeout(checkMonthRollover,2000);
 }
 function doEmpLogin(){
   // FIX 3: guard contra llamadas sin sesión activa (evita null.name)
@@ -1862,16 +1865,17 @@ function doStart(){
   sel.innerHTML='<option value="">— Selecciona —</option>';
   cs.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   if(SES.user?.centroTrabajo)sel.value=SES.user.centroTrabajo;
-  const gs=$('gpsStatus');if(gs)gs.textContent='📡 Obteniendo GPS...';
+  const gs=$('gpsStatus');
   _pendingGPS=null;
-  if(navigator.geolocation){
+  if(getCfg('gpsAuto',true)&&navigator.geolocation){
+    if(gs)gs.textContent='📡 Obteniendo GPS...';
     navigator.geolocation.getCurrentPosition(
       pos=>{_pendingGPS={lat:+pos.coords.latitude.toFixed(5),lng:+pos.coords.longitude.toFixed(5),ts:new Date().toISOString()};
         const g=$('gpsStatus');if(g)g.textContent='✅ GPS: '+_pendingGPS.lat+', '+_pendingGPS.lng;},
       ()=>{const g=$('gpsStatus');if(g)g.textContent='⚠️ GPS no disponible';},
       {enableHighAccuracy:true,timeout:10000,maximumAge:0}
     );
-  }else{if(gs)gs.textContent='⚠️ GPS no soportado en este dispositivo';}
+  }else{if(gs)gs.textContent=getCfg('gpsAuto',true)?'⚠️ GPS no soportado':'📵 GPS desactivado';}
   openModal('mSelCentro');
 }
 function confirmarCentroYIniciar(){
@@ -1897,7 +1901,7 @@ function doStop(){
   o.fin=now.toISOString();
   const t=calcSecs(o);o.workSecs=t.work;o.breakSecs=t.brk;o.closed=true;
   TM.state='idle';TM.ws=0;TM.bs=0;
-  if(navigator.geolocation){navigator.geolocation.getCurrentPosition(
+  if(getCfg('gpsAuto',true)&&navigator.geolocation){navigator.geolocation.getCurrentPosition(
     pos=>{o.locFin={lat:+pos.coords.latitude.toFixed(5),lng:+pos.coords.longitude.toFixed(5),ts:new Date().toISOString()};save();},
     ()=>{},{enableHighAccuracy:true,timeout:8000,maximumAge:0});
   }
@@ -2462,24 +2466,27 @@ function renderInformes(){
       <div style="height:4px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width .4s"></div></div>
     </div>`;
   }).join('');
-  // Resumen mensual por semana
+  // Resumen mensual estilo Excel
   if(el2){
-    const weeks=[];
-    for(let i=3;i>=0;i--){
-      const wDate=new Date(now);wDate.setDate(wDate.getDate()-i*7);
-      const wk=wkKey(wDate);
-      const wRecs=DB.records.filter(r=>r.fin&&wkKey(new Date(r.inicio))===wk);
-      const wMins=wRecs.reduce((s,r)=>s+calcMin(r),0);
-      const wJorn=new Set(wRecs.map(r=>r.empId)).size;
-      weeks.push({wk,mins:wMins,jorn:wJorn,recs:wRecs.length});
+    const curYm=`${now.getFullYear()}-${p2(now.getMonth()+1)}`;
+    // Recopilar meses disponibles (actual + snapshots)
+    const meses=new Set([curYm]);
+    Object.keys(DB.monthSnapshots||{}).forEach(k=>meses.add(k));
+    (DB.records||[]).filter(r=>r.fin).forEach(r=>meses.add(r.inicio.slice(0,7)));
+    const mesesSorted=[...meses].sort().reverse();
+    const selId='infMesSelect';
+    if(!el2.querySelector('#'+selId)){
+      el2.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <select id="${selId}" onchange="actualizarTablaInformes(this.value)" style="flex:1;min-width:140px;font-size:13px;padding:6px 8px;border-radius:8px">
+          ${mesesSorted.map(m=>`<option value="${m}"${m===curYm?' selected':''}>${new Date(m+'-15').toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</option>`).join('')}
+        </select>
+      </div><div id="infMesTabla">${renderResumenMensualTabla(curYm)}</div>`;
+    }else{
+      const sel=el2.querySelector('#'+selId);
+      mesesSorted.forEach(m=>{if(![...sel.options].find(o=>o.value===m)){const o=document.createElement('option');o.value=m;o.textContent=new Date(m+'-15').toLocaleDateString('es-ES',{month:'long',year:'numeric'});sel.appendChild(o);}});
+      const tabla=el2.querySelector('#infMesTabla');
+      if(tabla)tabla.innerHTML=renderResumenMensualTabla(sel.value||curYm);
     }
-    el2.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-      ${weeks.map((w,i)=>`<div style="background:var(--bg4);border-radius:var(--r-sm);padding:10px;text-align:center">
-        <div style="font-size:9px;color:var(--text3);margin-bottom:6px">${i===3?'Esta semana':i===2?'Hace 1 sem':i===1?'Hace 2 sem':'Hace 3 sem'}</div>
-        <div style="font-size:15px;font-weight:700;color:var(--accent)">${mhm(w.mins)}</div>
-        <div style="font-size:9px;color:var(--text3);margin-top:2px">${w.jorn} empleados · ${w.recs} fichajes</div>
-      </div>`).join('')}
-    </div>`;
   }
 }
 // ── Exportar ──
@@ -2549,22 +2556,39 @@ function renderExpStats(){
     if(!emps.length){resEl.innerHTML='<div class="empty">Sin empleados</div>';return;}
     const m1=now.getMonth()+1,a1=now.getFullYear(),m0=m1===1?12:m1-1,a0=m1===1?a1-1:a1;
     const mk0=`${a0}-${p2(m0)}`;
-    resEl.innerHTML=emps.map(emp=>{
-      const docs=emp.docs||{};
+    // Recopilar todos los meses con datos
+    const mesesSet=new Set([mk,mk0]);
+    Object.keys(DB.monthSnapshots||{}).forEach(k=>mesesSet.add(k));
+    (DB.records||[]).filter(r=>r.fin).forEach(r=>mesesSet.add(r.inicio.slice(0,7)));
+    const mesesDisp=[...mesesSet].filter(m=>{
+      const snap=DB.monthSnapshots&&DB.monthSnapshots[m];
+      const lr=(DB.records||[]).some(r=>r.fin&&r.inicio.startsWith(m));
+      return snap||lr;
+    }).sort().reverse().slice(0,12);
+    let html=`<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:8px">⬇️ Excel mensual completo (todos los empleados)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${mesesDisp.map(m=>`<button class="btn btn-secondary btn-sm" onclick="exportMesXLSX('${m}')" style="gap:4px">
+          📊 ${new Date(m+'-15').toLocaleDateString('es-ES',{month:'short',year:'numeric'})}
+        </button>`).join('')}
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:8px">📄 PDF individual por empleado</div>`;
+    html+=emps.map(emp=>{
       const firmaMes=emp.resumenFirmas?.[mk];
-      const firmaMes0=emp.resumenFirmas?.[mk0];
       const recsM=recs.filter(r=>r.empId===emp.id&&r.inicio.startsWith(mk));
       const recsM0=(DB.records||[]).filter(r=>r.empId===emp.id&&r.fin&&r.inicio.startsWith(mk0));
       return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
         <div style="width:32px;height:32px;border-radius:8px;background:${emp.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${emp.initials||emp.name.slice(0,2)}</div>
         <div style="flex:1;min-width:120px"><div style="font-size:12px;font-weight:600">${emp.name}</div><div style="font-size:10px;color:var(--text3)">${emp.empresa||'—'}</div></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          ${recsM.length?`<button class="btn btn-secondary btn-sm" onclick="generarResumenMensualPDF('${emp.id}',${a1},${m1})">📄 ${new Date(a1,m1-1,1).toLocaleDateString('es-ES',{month:'short'})}</button>`:''} 
+          ${recsM.length?`<button class="btn btn-secondary btn-sm" onclick="generarResumenMensualPDF('${emp.id}',${a1},${m1})">📄 ${new Date(a1,m1-1,1).toLocaleDateString('es-ES',{month:'short'})}</button>`:''}
           ${recsM0.length?`<button class="btn btn-secondary btn-sm" onclick="generarResumenMensualPDF('${emp.id}',${a0},${m0})">📄 ${new Date(a0,m0-1,1).toLocaleDateString('es-ES',{month:'short'})}</button>`:''}
           <span class="badge ${firmaMes?'badge-green':recsM.length?'badge-orange':'badge-gray'}">${firmaMes?'✅ Firmado':recsM.length?'⏳ Sin firmar':'—'}</span>
         </div>
       </div>`;
     }).join('');
+    resEl.innerHTML=html;
   }
 }
 function exportXLSX(){
@@ -2687,7 +2711,7 @@ function openPrfPanel(panel){
     renderDocumentosEmpleado(u.id);
     openModal('mDocumentos');
   }else if(panel==='configuracion'){
-    openModal('mConfiguracion');
+    openConfiguracion();
   }else if(panel==='seguridad'){
     // Detect device
     const dev=$('secDevice');if(dev){const ua=navigator.userAgent;dev.textContent=ua.includes('iPhone')||ua.includes('iPad')?'iPhone / iPad':ua.includes('Android')?'Android':ua.includes('Mac')?'Mac':'Navegador web';}
@@ -3507,6 +3531,206 @@ function sendLocalNotif(title, body, icon){
       new Notification(title, { body, icon: icon || './icon.svg' });
     }
   } catch(e) {}
+}
+
+function actualizarTablaInformes(ym){const t=$('infMesTabla');if(t)t.innerHTML=renderResumenMensualTabla(ym);}
+
+// ── Config modal ──
+function updateCfgToggle(id,on){
+  const track=$(id+'Track'),knob=$(id+'Knob');
+  if(track)track.style.background=on?'var(--accent)':'var(--border2)';
+  if(knob)knob.style.left=on?'22px':'2px';
+}
+function openConfiguracion(){
+  const noti=getCfg('notiFichaje',true),gps=getCfg('gpsAuto',true);
+  const cn=$('cfgNotiFichaje'),cg=$('cfgGps');
+  if(cn){cn.checked=noti;updateCfgToggle('cfgNotiFichaje',noti);}
+  if(cg){cg.checked=gps;updateCfgToggle('cfgGps',gps);}
+  openModal('mConfiguracion');
+}
+
+// ── Archivo mensual automático ──
+function checkMonthRollover(){
+  if(!DB.monthSnapshots)DB.monthSnapshots={};
+  const now=new Date();
+  // Revisar hasta 12 meses atrás buscando meses con registros sin snapshot
+  for(let i=1;i<=12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const ym=`${d.getFullYear()}-${p2(d.getMonth()+1)}`;
+    if(!DB.monthSnapshots[ym]){
+      const recs=(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
+      if(recs.length){
+        DB.monthSnapshots[ym]={ym,recs:JSON.parse(JSON.stringify(recs)),createdAt:new Date().toISOString()};
+      }
+    }
+  }
+  save();
+}
+
+// ── Resumen mensual tipo Excel ──
+function renderResumenMensualTabla(ym){
+  if(!ym){const now=new Date();ym=`${now.getFullYear()}-${p2(now.getMonth()+1)}`;}
+  const [anyo,mes]=ym.split('-').map(Number);
+  const emps=sortedEmps().filter(e=>!e.isAdmin);
+  // Días del mes
+  const daysInMonth=new Date(anyo,mes,0).getDate();
+  const dias=[];
+  for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
+  // Obtener registros del mes (de snapshots o live)
+  let recs;
+  const now=new Date(),curYm=`${now.getFullYear()}-${p2(now.getMonth()+1)}`;
+  if(ym===curYm){
+    recs=(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
+  }else{
+    const snap=DB.monthSnapshots&&DB.monthSnapshots[ym];
+    recs=snap?snap.recs:(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
+  }
+  // Construir tabla: emp → día → minutos
+  const data={};
+  emps.forEach(e=>data[e.id]={});
+  recs.forEach(r=>{
+    if(!data[r.empId])return;
+    const dk=r.inicio.slice(0,10);
+    if(!data[r.empId][dk])data[r.empId][dk]=0;
+    data[r.empId][dk]+=calcMin(r);
+  });
+  // Totales
+  const empTotals={};
+  emps.forEach(e=>empTotals[e.id]=Object.values(data[e.id]).reduce((s,v)=>s+v,0));
+  const dayTotals={};
+  dias.forEach(d=>{dayTotals[d]=emps.reduce((s,e)=>s+(data[e.id][d]||0),0);});
+  const grandTotal=emps.reduce((s,e)=>s+empTotals[e.id],0);
+  // Render cabecera (solo días laborables o todos)
+  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const fmtH=m=>m>0?`${Math.floor(m/60)}h${m%60>0?p2(m%60):''}`:'-';
+  let html=`<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <b style="font-size:14px;text-transform:capitalize">${monthName}</b>
+    <button class="btn btn-secondary btn-sm" onclick="exportMesXLSX('${ym}')">⬇️ Excel</button>
+  </div>
+  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+  <table style="border-collapse:collapse;font-size:11px;min-width:600px;width:100%">
+    <thead>
+      <tr style="background:var(--bg4)">
+        <th style="padding:6px 8px;text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--bg4);min-width:120px">Empleado</th>`;
+  dias.forEach(d=>{
+    const dt=new Date(d+'T12:00:00');
+    const dom=dt.getDate(),dow=dt.toLocaleDateString('es-ES',{weekday:'short'});
+    const isWk=dt.getDay()===0||dt.getDay()===6;
+    html+=`<th style="padding:4px 3px;text-align:center;min-width:28px;color:${isWk?'var(--text3)':'var(--text)'}">${dom}<br><span style="font-size:9px;opacity:.7">${dow}</span></th>`;
+  });
+  html+=`<th style="padding:6px 8px;text-align:center;background:var(--accent-dim);color:var(--accent3);white-space:nowrap">TOTAL</th></tr></thead><tbody>`;
+  emps.forEach((emp,idx)=>{
+    const bg=idx%2===0?'var(--bg2)':'var(--bg3)';
+    html+=`<tr style="background:${bg}">
+      <td style="padding:6px 8px;position:sticky;left:0;background:${bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px" title="${emp.name}">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${emp.color||'var(--accent)'};margin-right:4px"></span>${emp.name}
+      </td>`;
+    dias.forEach(d=>{
+      const m=data[emp.id][d]||0;
+      const dt=new Date(d+'T12:00:00'),isWk=dt.getDay()===0||dt.getDay()===6;
+      const bg2=m>0?'rgba(16,185,129,.12)':isWk?'rgba(255,255,255,.02)':'';
+      html+=`<td style="padding:4px 2px;text-align:center;background:${bg2};color:${m>0?'var(--green)':'var(--text3)'}">${fmtH(m)}</td>`;
+    });
+    html+=`<td style="padding:6px 8px;text-align:center;font-weight:700;color:var(--accent3);background:var(--accent-dim)">${fmtH(empTotals[emp.id])}</td></tr>`;
+  });
+  // Fila total
+  html+=`<tr style="background:var(--bg4);border-top:2px solid var(--border2)">
+    <td style="padding:6px 8px;font-weight:700;position:sticky;left:0;background:var(--bg4)">SUMA TOTAL</td>`;
+  dias.forEach(d=>{
+    const m=dayTotals[d];
+    html+=`<td style="padding:4px 2px;text-align:center;font-weight:600;color:${m>0?'var(--text)':'var(--text3)'}">${fmtH(m)}</td>`;
+  });
+  html+=`<td style="padding:6px 8px;text-align:center;font-weight:800;color:var(--accent3);background:var(--accent-dim)">${fmtH(grandTotal)}</td></tr>`;
+  html+=`</tbody></table></div>`;
+  return html;
+}
+
+// ── Export mes como Excel (estilo CONTROL HORAS GECAMA) ──
+function exportMesXLSX(ym){
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=()=>exportMesXLSX(ym);document.head.appendChild(s);toast('Cargando…');return;
+  }
+  if(!ym){const now=new Date();ym=`${now.getFullYear()}-${p2(now.getMonth()+1)}`;}
+  const [anyo,mes]=ym.split('-').map(Number);
+  const emps=sortedEmps().filter(e=>!e.isAdmin);
+  const daysInMonth=new Date(anyo,mes,0).getDate();
+  const dias=[];
+  for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
+  const now2=new Date(),curYm=`${now2.getFullYear()}-${p2(now2.getMonth()+1)}`;
+  let recs;
+  if(ym===curYm){
+    recs=(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
+  }else{
+    const snap=DB.monthSnapshots&&DB.monthSnapshots[ym];
+    recs=snap?snap.recs:(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
+  }
+  const data={};
+  const dataRaw={};
+  emps.forEach(e=>{data[e.id]={};dataRaw[e.id]={};});
+  recs.forEach(r=>{
+    if(!data[r.empId])return;
+    const dk=r.inicio.slice(0,10);
+    if(!data[r.empId][dk])data[r.empId][dk]=0;
+    data[r.empId][dk]+=calcMin(r);
+    if(!dataRaw[r.empId][dk])dataRaw[r.empId][dk]=r;
+  });
+  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const fmtH=m=>m>0?`${Math.floor(m/60)}:${p2(m%60)}`:'-';
+  // Cabecera
+  const header=['NOMBRE',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'TOTAL HORAS'];
+  const rows=[
+    [`CONTROL HORAS - ${monthName.toUpperCase()}`],
+    [],
+    header
+  ];
+  let grandTotal=0;
+  emps.forEach(emp=>{
+    const row=[emp.name];
+    let empTotal=0;
+    dias.forEach(d=>{
+      const m=data[emp.id][d]||0;
+      empTotal+=m;
+      row.push(m>0?parseFloat((m/60).toFixed(2)):'-');
+    });
+    row.push(parseFloat((empTotal/60).toFixed(2)));
+    grandTotal+=empTotal;
+    rows.push(row);
+  });
+  // Fila total
+  const totRow=['SUMA TOTAL'];
+  dias.forEach(d=>{
+    const m=emps.reduce((s,e)=>s+(data[e.id][d]||0),0);
+    totRow.push(m>0?parseFloat((m/60).toFixed(2)):'-');
+  });
+  totRow.push(parseFloat((grandTotal/60).toFixed(2)));
+  rows.push([]);
+  rows.push(totRow);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:28},...dias.map(()=>({wch:5})),{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,monthName.slice(0,31));
+  // Segunda hoja: detalle por día
+  const rows2=[['NOMBRE','FECHA','HORA ENTRADA','HORA SALIDA','PAUSA MEDIODIA','NO PRESENCIA','TOTAL HORAS']];
+  recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+    const emp=DB.employees.find(e=>e.id===r.empId);
+    const bm=Math.floor((r.breakSecs||0)/60);
+    rows2.push([
+      emp?emp.name:r.empId,
+      r.inicio.slice(0,10),
+      ftime(r.inicio),
+      r.fin?ftime(r.fin):'-',
+      bm>0?`${Math.floor(bm/60)}:${p2(bm%60)}`:'NO',
+      '',
+      parseFloat((calcMin(r)/60).toFixed(2))
+    ]);
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(rows2);
+  ws2['!cols']=[{wch:28},{wch:12},{wch:12},{wch:12},{wch:14},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Detalle');
+  XLSX.writeFile(wb,`CONTROL_HORAS_${ym}.xlsx`);
+  toast('✅ Excel del mes descargado');
 }
 
 // Recordatorio fin de jornada a las 20:00
