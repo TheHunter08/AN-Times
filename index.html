@@ -547,7 +547,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_13';
+  var V='20260614_14';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1372,6 +1372,30 @@ window._fbResetPwd = function(){ return Promise.reject(new Error('Firebase no ca
 
 // ── Config ──
 const DB_URL='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data';
+const _VAPID_PUB='BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ';
+const _FB_BASE='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app';
+function _b64ToUint8(b){const p='='.repeat((4-b.length%4)%4);const s=atob((b+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...s].map(c=>c.charCodeAt(0)));}
+function _buf2b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+async function subscribePush(userId){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')return;
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_b64ToUint8(_VAPID_PUB)});
+    const key=sub.getKey('p256dh'),auth=sub.getKey('auth');
+    await fetch(_FB_BASE+'/pushSubs/'+encodeURIComponent(userId)+'.json',{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({endpoint:sub.endpoint,keys:{p256dh:_buf2b64url(key),auth:_buf2b64url(auth)}})
+    });
+  }catch(e){console.warn('[PUSH] subscribe:',e);}
+}
+function queuePushNotif(userId,title,body,tag){
+  fetch('/api/sendpush',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({userId,title,body:body||'',tag:tag||'times'})
+  }).catch(()=>{});
+}
 const ADMIN_PIN='0824';
 const WK=40*60,WD=8*60,WM=160*60,VPM=2.5;
 
@@ -1529,12 +1553,33 @@ function startPolling(){
 }
 // Sincronizar inmediatamente al recuperar conexión o volver a la app
 window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
-// Desktop: click outside the centered body window closes the session
+// Block zoom: gesture events (iOS Safari) + pinch + double-tap
+document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gestureend',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',function(e){if(e.touches.length>1)e.preventDefault();},{passive:false});
+var _lastTap=0;
+document.addEventListener('touchend',function(e){
+  var now=Date.now();
+  if(now-_lastTap<300&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))e.preventDefault();
+  _lastTap=now;
+},{passive:false});
+
+function _desktopGoBack(){
+  var openModal=document.querySelector('.modal-wrap.show');
+  if(openModal){openModal.classList.remove('show');return;}
+  var np=$('notisPanel');if(np&&np.classList.contains('show')){closeNotis();return;}
+  var sb=$('adminSidebar');if(sb&&sb.classList.contains('mob-open')){closeSidebar();return;}
+  if($('sEmp')&&$('sEmp').classList.contains('show')){if(typeof empNavTo==='function')empNavTo('inicio');return;}
+  if($('sAdmin')&&$('sAdmin').classList.contains('show')){if(typeof showPage==='function')showPage('dashboard');return;}
+}
+
+// Desktop: click outside the centered body window goes back
 document.addEventListener('click',function(e){
   if(window.innerWidth<=768)return;
   const r=document.body.getBoundingClientRect();
   if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){
-    if(typeof doLogout==='function')doLogout();
+    _desktopGoBack();
   }
 },true);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
@@ -1979,6 +2024,7 @@ function doEmpLogin(){
   // Pedir permisos de notificación y programar recordatorio
   setTimeout(requestNotifPermission, 2000);
   setTimeout(scheduleEndOfDayReminder, 3000);
+  setTimeout(function(){subscribePush('emp:'+SES.user.id);},4000);
 }
 function showEncPanel(){
   // Encargados ven el panel con permisos limitados (solo su obra)
@@ -2805,7 +2851,10 @@ function delRec(id){if(!confirm('¿Eliminar fichaje?'))return;DB.records=DB.reco
 function aprobar(id,aprobado){
   const r=DB.records.find(x=>x.id===id);if(!r)return;
   r.aprobado=aprobado;r.validadoPor=SES.user?.name||'Admin';
-  pushNoti('emp:'+r.empId,'info',aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas',`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`);
+  const _t=aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas';
+  const _b=`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`;
+  pushNoti('emp:'+r.empId,'info',_t,_b);
+  queuePushNotif('emp:'+r.empId,_t,_b,'horas');
   save();renderFichajes();safeRun(renderSolicitudes,'sol');toast(aprobado?'✅ Aprobado':'❌ Rechazado');
 }
 
@@ -2842,7 +2891,10 @@ function aprobarConEdicion(recId,date,aprobado){
   if(inT){const dIn=new Date(date);const[ih,im]=inT.split(':');dIn.setHours(+ih,+im,0,0);r.inicio=dIn.toISOString();}
   if(outT){const dOut=new Date(date);const[oh,om]=outT.split(':');dOut.setHours(+oh,+om,0,0);r.fin=dOut.toISOString();r.workSecs=Math.max(0,Math.floor((dOut-new Date(r.inicio))/1000)-(r.breakSecs||0));}
   r.aprobado=aprobado;r.validadoPor=SES.user?.name||'Encargado';
-  pushNoti('emp:'+r.empId,'info',aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas',`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`);
+  const _t2=aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas';
+  const _b2=`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`;
+  pushNoti('emp:'+r.empId,'info',_t2,_b2);
+  queuePushNotif('emp:'+r.empId,_t2,_b2,'horas');
   save();renderSolicitudes();toast(aprobado?'✅ Aprobado':'❌ Rechazado');
 }
 function renderVacPend(){
@@ -2854,7 +2906,10 @@ function renderVacPend(){
 function resolveVac(id,estado){
   const v=(DB.vacaciones||[]).find(x=>x.id===id);if(!v)return;
   v.estado=estado;v.validadoPor=SES.user?.name||'Admin';
-  pushNoti('emp:'+v.empId,'vac',estado==='aprobada'?'🌴 Vacaciones aprobadas':'❌ Denegadas',`Solicitud ${v.desde}→${v.hasta} ${estado}.`);
+  const _tv=estado==='aprobada'?'🌴 Vacaciones aprobadas':'❌ Vacaciones denegadas';
+  const _bv=`Solicitud ${v.desde}→${v.hasta} ${estado}.`;
+  pushNoti('emp:'+v.empId,'vac',_tv,_bv);
+  queuePushNotif('emp:'+v.empId,_tv,_bv,'vac');
   save();renderSolicitudes();toast(estado==='aprobada'?'✅ Aprobadas':'❌ Denegadas');
 }
 function renderMedList(){const el=$('medList');if(!el)return;const items=DB.medicos||[];if(!items.length){el.innerHTML='<div class="empty">Sin permisos médicos</div>';return;}el.innerHTML=items.map(m=>{const bc=m.estado==='aprobada'?'badge-green':m.estado==='denegada'?'badge-red':'badge-orange';return`<div class="sol-item"><div class="sol-top"><div class="sol-name">${m.empName||'?'} <span class="badge ${bc}">${m.estado||'pendiente'}</span></div></div><div class="sol-meta">📅 ${m.desde||'?'} → ${m.hasta||'?'}</div>${m.estado==='pendiente'?`<div class="sol-acts"><button class="btn btn-green btn-sm" onclick="resMed('${m.id}','aprobada')">✓ Aprobar</button><button class="btn btn-red btn-sm" onclick="resMed('${m.id}','denegada')">✗ Denegar</button></div>`:''}</div>`;}).join('');}
@@ -4190,6 +4245,7 @@ function requestNotifPermission(){
     if(p === 'granted'){
       toast('🔔 Notificaciones activadas');
       scheduleEndOfDayReminder();
+      if(SES.user)subscribePush('emp:'+SES.user.id);
     }
   });
 }

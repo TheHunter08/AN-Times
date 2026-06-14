@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "firebase-tools": "^15.20.0",
+    "web-push": "^3.6.7"
+  }
+}
