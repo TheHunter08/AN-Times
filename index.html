@@ -430,8 +430,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   .sb-overlay.show{display:block}
   .adm-main{width:100%;display:flex;flex-direction:column;overflow:hidden}
   #admHam{display:flex!important}
-  #admBottomNav{display:flex!important;position:static;flex-shrink:0}
-  .adm-content{flex:1;overflow-y:auto;min-height:0;padding-bottom:4px}
+  #admBottomNav{display:flex!important;position:static!important;bottom:auto!important;left:auto!important;right:auto!important;flex-shrink:0;z-index:auto!important}
+  .adm-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding-bottom:env(safe-area-inset-bottom,0px)}
   .dash-stats{grid-template-columns:1fr 1fr}
   .dash-row{grid-template-columns:1fr}
   .rec-table thead th:nth-child(3),.rec-table tbody td:nth-child(3),.rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
@@ -474,7 +474,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_6';
+  var V='20260614_7';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -814,7 +814,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           </div>
         </div>
         <!-- Resumen header -->
-        <div style="display:flex;align-items:center;gap:8px;padding:0 4px;margin-bottom:12px;margin-top:4px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 4px;margin-bottom:12px;margin-top:4px">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Resumen de horas trabajadas</span>
         </div>
@@ -2431,9 +2431,10 @@ function populateModalEmps(){
 }
 
 // ── Admin pages ──
+const _ADMIN_PAGES=['pDashboard','pControl','pFichajes','pSolicitudes','pEmpleados','pObras','pInformes','pExportar','pDocsnominas'];
 function showPage(p){
-  document.querySelectorAll('.adm-content>[id^="p"]').forEach(el=>el.style.display='none');
-  const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg)pg.style.display='';
+  _ADMIN_PAGES.forEach(id=>{const el=$(id);if(el)el.style.display='none';});
+  const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg){pg.style.display='';pg.scrollTop=0;}
   document.querySelectorAll('.sni').forEach(el=>el.classList.toggle('on',el.dataset.p===p));
   const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar',docsnominas:'Contratos y Nóminas'};
   if($('admTitle'))$('admTitle').textContent=titles[p]||p;
