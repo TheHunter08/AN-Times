@@ -151,7 +151,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .emp-nav-item.on{color:var(--accent3)}
 .emp-nav-item.on svg{stroke:var(--accent3)}
 /* Emp body */
-.emp-body{flex:1;overflow:hidden;min-height:0;background:var(--bg);position:relative}
+.emp-body{flex:1;height:0;overflow:hidden;min-height:0;background:var(--bg);position:relative}
 /* Tab pages */
 .emp-tab-page{display:none;flex-direction:column;min-height:0;overflow-y:auto}
 .emp-tab-page.show{display:flex;flex:1;min-height:0}
@@ -471,6 +471,12 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
 .ini-wrap{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 #tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+/* ═══ iOS PWA standalone: forzar layout correcto ═══ */
+@media(display-mode:standalone){
+  #sEmp{display:flex!important;flex-direction:column!important}
+  .emp-body{flex:1 1 0!important;height:0!important;min-height:0!important}
+  .emp-nav{flex-shrink:0!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important}
+}
 
 </style>
 </head>
@@ -478,7 +484,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_8';
+  var V='20260614_9';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -3018,14 +3024,57 @@ function renderExpStats(){
 }
 function exportXLSX(){
   if(typeof XLSX==='undefined'){const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=exportXLSX;document.head.appendChild(s);toast('Cargando…');return;}
+  const now=new Date();
   const wb=XLSX.utils.book_new();
-  const rows=[['Nombre','Rol','Obra','Centro','Fecha','Entrada','Salida','Horas','Descanso','Estado','GPS Entrada','GPS Salida']];
-  DB.records.filter(r=>r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).forEach(r=>{
+  // ── Hoja 1: Todos los fichajes ──
+  const meta=[
+    ['TIMES INC — INFORME COMPLETO DE FICHAJES'],
+    ['Exportado el '+now.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})+' a las '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})],
+    ['Total de registros: '+(DB.records||[]).filter(r=>r.fin).length],
+    [],
+    ['EMPLEADO','ROL','EMPRESA','CENTRO DE TRABAJO','FECHA','HORA ENTRADA','HORA SALIDA','HORAS TRABAJADAS','PAUSA (h)','ESTADO','VALIDADO POR','GPS ENTRADA','GPS SALIDA']
+  ];
+  const dataRows=(DB.records||[]).filter(r=>r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(r=>{
     const emp=DB.employees.find(x=>x.id===r.empId);
-    rows.push([r.empName,emp?.role||'empleado',r.empresa||'',r.centro||'',new Date(r.inicio).toLocaleDateString('es-ES'),ftime(r.inicio),ftime(r.fin),mhm(calcMin(r)),mhm(Math.floor((r.breakSecs||0)/60)),r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente',r.locInicio?r.locInicio.lat+','+r.locInicio.lng:'',r.locFin?r.locFin.lat+','+r.locFin.lng:'']);
+    const rol=emp?.role==='encargado'?'Encargado':emp?.role==='jefe_obra'?'Jefe de Obra':'Empleado';
+    return [
+      r.empName||'—',rol,r.empresa||'—',r.centro||'—',
+      new Date(r.inicio).toLocaleDateString('es-ES'),
+      ftime(r.inicio),ftime(r.fin),
+      parseFloat((calcMin(r)/60).toFixed(2)),
+      parseFloat((Math.floor((r.breakSecs||0)/60)/60).toFixed(2)),
+      r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente',
+      r.validadoPor||'—',
+      r.locInicio?r.locInicio.lat+','+r.locInicio.lng:'—',
+      r.locFin?r.locFin.lat+','+r.locFin.lng:'—'
+    ];
   });
-  const ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Fichajes');
-  XLSX.writeFile(wb,'TIMES_INC_'+today()+'.xlsx');toast('✅ Excel descargado');
+  const ws=XLSX.utils.aoa_to_sheet([...meta,...dataRows]);
+  ws['!cols']=[{wch:28},{wch:14},{wch:20},{wch:22},{wch:13},{wch:13},{wch:13},{wch:17},{wch:10},{wch:12},{wch:20},{wch:24},{wch:24}];
+  ws['!freeze']={xSplit:0,ySplit:5};
+  XLSX.utils.book_append_sheet(wb,ws,'Fichajes');
+  // ── Hoja 2: Totales por empleado (todos los tiempos) ──
+  const empTotals={};
+  (DB.records||[]).filter(r=>r.fin).forEach(r=>{
+    if(!empTotals[r.empId])empTotals[r.empId]={name:r.empName,mins:0,dias:new Set(),registros:0};
+    empTotals[r.empId].mins+=calcMin(r);
+    empTotals[r.empId].dias.add(r.inicio.slice(0,10));
+    empTotals[r.empId].registros++;
+  });
+  const totRows=[
+    ['TIMES INC — RESUMEN TOTAL POR EMPLEADO'],
+    ['Exportado el '+now.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})],
+    [],
+    ['EMPLEADO','DÍAS TRABAJADOS','REGISTROS','TOTAL HORAS']
+  ];
+  Object.values(empTotals).sort((a,b)=>a.name.localeCompare(b.name)).forEach(e=>{
+    totRows.push([e.name,e.dias.size,e.registros,parseFloat((e.mins/60).toFixed(2))]);
+  });
+  const wsTot=XLSX.utils.aoa_to_sheet(totRows);
+  wsTot['!cols']=[{wch:30},{wch:17},{wch:12},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,wsTot,'Totales por Empleado');
+  XLSX.writeFile(wb,'TIMES_INC_fichajes_'+today()+'.xlsx');
+  toast('✅ Excel descargado');
 }
 function exportJSON(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='backup_'+today()+'.json';a.click();URL.revokeObjectURL(a.href);toast('💾 Backup descargado');}
 function exportPDF(){
@@ -4182,47 +4231,56 @@ function exportMesXLSX(ym){
     const snap=DB.monthSnapshots&&DB.monthSnapshots[ym];
     recs=snap?snap.recs:(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
   }
-  // Helpers para fechas Excel (serial desde 1/1/1900)
   const toExcelDate=d=>Math.floor(d.getTime()/86400000)+25569;
   const toExcelTime=d=>(d.getHours()*3600+d.getMinutes()*60+d.getSeconds())/86400;
-  const cell=(v,t,z)=>({t:t||'s',v,z:z||undefined});
-
-  // ── Hoja 1: CONTROL HORAS GECAMA (formato exacto) ──
+  const monthLabel=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const exportDate=now2.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
   const wb=XLSX.utils.book_new();
-  const ws={'!ref':'A1:H1'};
-  const headers=['Marca temporal','FECHA','NOMBRE','HORA ENTRADA','HORA SALIDA','PAUSA MEDIODIA','NO PRESENCIA','TOTAL HORAS'];
-  const cols='ABCDEFGH';
-  // Cabecera fila 1
-  headers.forEach((h,i)=>{ws[cols[i]+'1']={t:'s',v:h};});
-  let row=2;
+
+  // ── Hoja 1: Control de Horas (detalle diario) ──
+  const ws={'!ref':'A1:J1'};
+  const h1Meta=[
+    ['TIMES INC — CONTROL DE HORAS'],
+    ['Período: '+monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1)],
+    ['Exportado: '+exportDate+'  |  Total fichajes: '+recs.length],
+    [],
+    ['FECHA','EMPLEADO','EMPRESA','CENTRO DE TRABAJO','HORA ENTRADA','HORA SALIDA','PAUSA','HORAS TRABAJADAS','ESTADO','VALIDADO POR']
+  ];
+  h1Meta.forEach((rowData,ri)=>{
+    rowData.forEach((v,ci)=>{
+      const addr=XLSX.utils.encode_cell({r:ri,c:ci});
+      ws[addr]={t:'s',v:String(v)};
+    });
+  });
+  let rowIdx=5;
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const emp=DB.employees.find(e=>e.id===r.empId);
     const dIni=new Date(r.inicio),dFin=r.fin?new Date(r.fin):null;
     const bm=Math.floor((r.breakSecs||0)/60);
-    const pausa=bm>0?`${Math.floor(bm/60)}h ${p2(bm%60)}m`:'NO';
-    const iC=cols.indexOf;
-    ws['A'+row]={t:'n',v:toExcelDate(dIni)+(toExcelTime(dIni)),z:'dd/mm/yyyy hh:mm:ss'};
-    ws['B'+row]={t:'n',v:toExcelDate(dIni),z:'dd/mm/yyyy'};
-    ws['C'+row]={t:'s',v:emp?emp.name:r.empName||r.empId};
-    ws['D'+row]={t:'n',v:toExcelTime(dIni),z:'hh:mm'};
-    ws['E'+row]=dFin?{t:'n',v:toExcelTime(dFin),z:'hh:mm'}:{t:'s',v:'-'};
-    ws['F'+row]={t:'s',v:pausa};
-    ws['G'+row]={t:'s',v:''};
-    if(dFin){
-      const diffH=dFin.getHours()-dIni.getHours(),diffM=dFin.getMinutes()-dIni.getMinutes();
-      const totalMin=(dFin-dIni)/60000-bm;
-      ws['H'+row]={t:'n',v:parseFloat((totalMin/60).toFixed(2)),f:`HOUR(E${row}-D${row})+MINUTE(E${row}-D${row})/60`};
-    }else{
-      ws['H'+row]={t:'s',v:'-'};
-    }
-    row++;
+    const totalMin=dFin?Math.max(0,(dFin-dIni)/60000-bm):0;
+    const rowData=[
+      {t:'n',v:toExcelDate(dIni),z:'dd/mm/yyyy'},
+      {t:'s',v:emp?emp.name:r.empName||r.empId},
+      {t:'s',v:r.empresa||'—'},
+      {t:'s',v:r.centro||'—'},
+      {t:'n',v:toExcelTime(dIni),z:'hh:mm'},
+      dFin?{t:'n',v:toExcelTime(dFin),z:'hh:mm'}:{t:'s',v:'—'},
+      {t:'s',v:bm>0?`${Math.floor(bm/60)}h ${p2(bm%60)}m`:'—'},
+      {t:'n',v:parseFloat((totalMin/60).toFixed(2))},
+      {t:'s',v:r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente'},
+      {t:'s',v:r.validadoPor||'—'}
+    ];
+    rowData.forEach((cell,ci)=>{
+      ws[XLSX.utils.encode_cell({r:rowIdx,c:ci})]=cell;
+    });
+    rowIdx++;
   });
-  ws['!ref']=`A1:H${Math.max(row-1,1)}`;
-  ws['!cols']=[{wch:20},{wch:12},{wch:30},{wch:12},{wch:12},{wch:14},{wch:20},{wch:12}];
-  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-  XLSX.utils.book_append_sheet(wb,ws,'CONTROL HORAS GECAMA');
+  ws['!ref']=`A1:J${Math.max(rowIdx,6)}`;
+  ws['!cols']=[{wch:13},{wch:28},{wch:18},{wch:22},{wch:13},{wch:13},{wch:10},{wch:17},{wch:12},{wch:20}];
+  ws['!freeze']={xSplit:0,ySplit:5};
+  XLSX.utils.book_append_sheet(wb,ws,'Control de Horas');
 
-  // ── Hoja 2: Resumen mensual por empleado ──
+  // ── Hoja 2: Resumen diario por empleado ──
   const emps=sortedEmps().filter(e=>!e.isAdmin);
   const daysInMonth=new Date(anyo,mes,0).getDate();
   const dias=[];for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
@@ -4233,21 +4291,52 @@ function exportMesXLSX(ym){
     if(!data[r.empId][dk])data[r.empId][dk]=0;
     data[r.empId][dk]+=calcMin(r);
   });
-  const header2=['NOMBRE',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'SUM de TOTAL HORAS'];
-  const rows2=[header2];
+  const hdr2=[
+    ['TIMES INC — RESUMEN DIARIO DE HORAS — '+(monthLabel.toUpperCase())],
+    [],
+    ['EMPLEADO',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'TOTAL HORAS MES']
+  ];
+  const rows2=[...hdr2];
   let grandTotal=0;
   emps.forEach(emp=>{
     const row2=[emp.name];let empTotal=0;
     dias.forEach(d=>{const m=data[emp.id][d]||0;empTotal+=m;row2.push(m>0?parseFloat((m/60).toFixed(2)):0);});
-    row2.push(parseFloat((empTotal/60).toFixed(2)));grandTotal+=empTotal;rows2.push(row2);
+    row2.push(parseFloat((empTotal/60).toFixed(2)));
+    grandTotal+=empTotal;rows2.push(row2);
   });
-  const totRow2=['Suma total',...dias.map(d=>parseFloat((emps.reduce((s,e)=>s+(data[e.id][d]||0),0)/60).toFixed(2))),parseFloat((grandTotal/60).toFixed(2))];
+  const totRow2=['TOTAL EQUIPO',...dias.map(d=>parseFloat((emps.reduce((s,e)=>s+(data[e.id][d]||0),0)/60).toFixed(2))),parseFloat((grandTotal/60).toFixed(2))];
   rows2.push(totRow2);
   const ws2=XLSX.utils.aoa_to_sheet(rows2);
-  ws2['!cols']=[{wch:30},...dias.map(()=>({wch:5})),{wch:14}];
-  XLSX.utils.book_append_sheet(wb,ws2,'Resumen');
+  ws2['!cols']=[{wch:28},...dias.map(()=>({wch:5})),{wch:16}];
+  ws2['!freeze']={xSplit:1,ySplit:3};
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen Diario');
 
-  XLSX.writeFile(wb,`CONTROL_HORAS_GECAMA_${ym}.xlsx`);
+  // ── Hoja 3 (NUEVA): Totales por Empleado (normal + extra) ──
+  const LIMITE_NORMAL=160; // horas normales al mes
+  const tot3=[
+    ['TIMES INC — TOTALES POR EMPLEADO — '+(monthLabel.toUpperCase())],
+    ['Límite horas normales: '+LIMITE_NORMAL+'h/mes'],
+    [],
+    ['EMPLEADO','EMPRESA','DÍAS TRABAJADOS','TOTAL HORAS','HORAS NORMALES (≤'+LIMITE_NORMAL+'h)','HORAS EXTRA (>'+LIMITE_NORMAL+'h)','REGISTROS']
+  ];
+  let gDias=0,gTotal=0,gNorm=0,gExtra=0,gRegs=0;
+  emps.forEach(emp=>{
+    const empMins=Object.values(data[emp.id]||{}).reduce((s,m)=>s+m,0);
+    const empH=parseFloat((empMins/60).toFixed(2));
+    const norm=parseFloat(Math.min(empH,LIMITE_NORMAL).toFixed(2));
+    const extra=parseFloat(Math.max(0,empH-LIMITE_NORMAL).toFixed(2));
+    const dias2=Object.keys(data[emp.id]||{}).filter(d=>data[emp.id][d]>0).length;
+    const regs=recs.filter(r=>r.empId===emp.id).length;
+    tot3.push([emp.name,emp.empresa||'—',dias2,empH,norm,extra,regs]);
+    gDias+=dias2;gTotal+=empH;gNorm+=norm;gExtra+=extra;gRegs+=regs;
+  });
+  tot3.push([]);
+  tot3.push(['TOTAL EQUIPO','',gDias,parseFloat(gTotal.toFixed(2)),parseFloat(gNorm.toFixed(2)),parseFloat(gExtra.toFixed(2)),gRegs]);
+  const ws3=XLSX.utils.aoa_to_sheet(tot3);
+  ws3['!cols']=[{wch:28},{wch:18},{wch:16},{wch:14},{wch:22},{wch:22},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Totales por Empleado');
+
+  XLSX.writeFile(wb,`TIMES_INC_${ym}.xlsx`);
   toast('✅ Excel del mes descargado');
 }
 
