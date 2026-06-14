@@ -36,3 +36,21 @@ self.addEventListener('fetch', e => {
     );
   }
 });
+
+// ── Push notifications ──
+self.addEventListener('push', e => {
+  const data = e.data ? e.data.json() : {title: 'TIMES INC', body: 'Nueva notificación'};
+  e.waitUntil(self.registration.showNotification(data.title || 'TIMES INC', {
+    body: data.body || '',
+    icon: './icon.svg',
+    badge: './icon.svg',
+    tag: data.tag || 'times-notif',
+    renotify: true,
+    requireInteraction: false
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow('/'));
+});

@@ -411,6 +411,29 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .login-field-group input::placeholder{color:var(--text3)}
 .lf-ico{position:absolute;left:12px;color:var(--text3);display:flex;align-items:center;pointer-events:none}
 
+/* ═══ LIGHT MODE ═══ */
+[data-theme="light"]{
+  --bg:#f8f9fa;--bg2:#ffffff;--bg3:#f1f3f5;--bg4:#e9ecef;--bg5:#dee2e6;
+  --text:#1a1a2e;--text2:#374151;--text3:#6b7280;--text4:#9ca3af;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);--border3:rgba(0,0,0,.2);
+}
+[data-theme="light"] body,[data-theme="light"] html{background:#f8f9fa;color:#1a1a2e}
+[data-theme="light"] input,[data-theme="light"] select,[data-theme="light"] textarea{background:var(--bg4);color:var(--text);border-color:var(--border2)}
+[data-theme="light"] .toast{background:#ffffff;color:#1a1a2e}
+[data-theme="light"] .modal{background:var(--bg3)}
+[data-theme="light"] .sidebar{background:var(--bg2)}
+[data-theme="light"] #sLogin{background:linear-gradient(180deg,#f8f9fa 0%,#ede9fe 100%)}
+[data-theme="light"] .lh-key{background:var(--bg3);color:var(--text)}
+[data-theme="light"] .lh-key:active{background:var(--bg4)}
+
+/* ═══ THEME TOGGLE BUTTON ═══ */
+.theme-toggle-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:background .15s;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.theme-toggle-btn:active{background:var(--bg4)}
+
+/* ═══ iOS SAFE AREA ═══ */
+.emp-nav{padding-bottom:max(env(safe-area-inset-bottom),8px)}
+.login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
+
 </style>
 </head>
 <body>
@@ -572,7 +595,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><button onclick="closeModal('mConfiguracion')" class="btn btn-secondary btn-sm">←</button><h2 style="margin:0">Configuración</h2></div>
   <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">Recordatorio de fichaje</div><div style="font-size:11px;color:var(--text3)">Aviso al olvidar fichar salida</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgNotiFichaje" style="display:none" onchange="setCfg('notiFichaje',this.checked);updateCfgToggle('cfgNotiFichaje',this.checked)"><span id="cfgNotiFichajeTrack" style="position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:.2s"></span><span id="cfgNotiFichajeKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s"></span></label></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px"><div><div style="font-size:13px;font-weight:500">GPS automático</div><div style="font-size:11px;color:var(--text3)">Captura ubicación al iniciar</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgGps" style="display:none" onchange="setCfg('gpsAuto',this.checked);updateCfgToggle('cfgGps',this.checked)"><span id="cfgGpsTrack" style="position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:.2s"></span><span id="cfgGpsKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s"></span></label></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:13px;font-weight:500">GPS automático</div><div style="font-size:11px;color:var(--text3)">Captura ubicación al iniciar</div></div><label style="position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0"><input type="checkbox" id="cfgGps" style="display:none" onchange="setCfg('gpsAuto',this.checked);updateCfgToggle('cfgGps',this.checked)"><span id="cfgGpsTrack" style="position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:.2s"></span><span id="cfgGpsKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s"></span></label></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px"><div><div style="font-size:13px;font-weight:500">Hora del recordatorio</div><div style="font-size:11px;color:var(--text3)">Por defecto a las 20:00</div></div><input type="time" id="cfgReminderTime" value="20:00" style="font-size:13px;padding:6px 8px;border-radius:8px;width:90px;background:var(--bg4);border:1px solid var(--border2);color:var(--text)" onchange="setCfg('reminderTime',this.value)"></div>
   </div>
   <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:500">Idioma</span><select style="width:120px;font-size:13px;padding:6px 8px;border-radius:8px"><option>Español</option><option>English</option></select></div>
@@ -654,9 +678,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 
       <div class="login-field-group"><div class="lf-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><input type="email" id="loginEmail" placeholder="correo@empresa.com" autocomplete="email" inputmode="email" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
       <div class="login-field-group" style="margin-top:10px;position:relative"><div class="lf-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doEmailLogin()"><button onclick="toggleLoginPass()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;-webkit-tap-highlight-color:transparent"><svg id="loginPassIco" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-      <div style="text-align:right;margin:8px 0 16px"><button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:var(--accent3);cursor:pointer;font-weight:500;-webkit-tap-highlight-color:transparent">¿Olvidaste tu contraseña?</button></div>
-      <div class="lh-err" id="loginErr"></div>
+      <div class="lh-err" id="loginErr" style="margin-top:10px"></div>
       <button onclick="doEmailLogin()" id="btnEmailLogin" class="btn btn-primary btn-full" style="padding:14px;font-size:15px;font-weight:700">Iniciar sesión</button>
+      <div style="text-align:center;margin-top:12px"><button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:var(--accent3);cursor:pointer;font-weight:500;-webkit-tap-highlight-color:transparent">¿Olvidaste tu contraseña?</button></div>
       <button onclick="doBiometric()" class="lh-bio-btn" style="margin-top:10px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>Huella / Face ID</button>
       <div style="text-align:center;margin-top:10px"><button onclick="switchLoginMode('pin')" style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;-webkit-tap-highlight-color:transparent">Usar PIN numérico</button></div>
       <div style="text-align:center;margin-top:4px"><button id="adminSecretBtn" onclick="quickAdmin()" style="background:none;border:none;font-size:11px;color:transparent;cursor:default;user-select:none">⚡</button></div>
@@ -701,6 +725,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     <div class="emp-top-left"><div class="emp-greeting">👋 Hola, <span id="empFirstName">...</span></div><div class="emp-subdate" id="empSubdate"></div></div>
     <div class="emp-top-right">
       <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
+      <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
       <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
       <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
     </div>
@@ -827,6 +852,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
       <div style="display:flex;align-items:center;gap:8px">
         <div class="sync-dot" id="syncDot"></div>
         <div class="adm-topbtn" id="encBackBtn" onclick="encVolver()" style="display:none;background:var(--accent-dim);border-color:var(--accent-glow)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent3)" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg></div>
+        <button class="theme-toggle-btn" id="admThemeBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+        <div class="adm-topbtn" id="encFicharBtn" onclick="doStart()" style="display:none;background:var(--green-dim);border-color:rgba(16,185,129,.2)" title="Fichar entrada/salida"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green)" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
         <div class="adm-topbtn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotAdm"></span></div>
         <div class="adm-topbtn" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
       </div>
@@ -842,6 +869,13 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         </div>
         <div class="dash-row"><div class="chart-card"><div class="chart-title">Horas esta semana</div><div id="weekChart" style="width:100%;min-height:130px"></div></div><div class="chart-card"><div class="chart-title">Resumen general</div><div class="donut-wrap"><div style="position:relative;flex-shrink:0"><svg id="donutSvg" viewBox="0 0 90 90" width="90" height="90"></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div class="donut-ctr-val" id="donutTotal">—</div><div class="donut-ctr-lbl">Total</div></div></div><div class="donut-legend" id="donutLeg"></div></div></div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div class="chart-card"><div class="chart-title">Fichajes recientes</div><div id="dashActivity"></div></div><div class="chart-card"><div class="chart-title">Próximas vacaciones</div><div id="dashVacaciones"></div></div></div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Empleados activos ahora
+          </div>
+          <div id="dashActiveEmps" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px"><div class="empty">Sin empleados activos</div></div>
+        </div>
       </div>
       <div id="pControl" style="display:none"><div class="card"><h3>Control de jornadas</h3></div><div id="ctrlList"></div></div>
       <div id="pFichajes" style="display:none"><div class="card"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><select id="fEmpFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todos los empleados</option></select><select id="fSemFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todas las semanas</option></select></div><div style="overflow-x:auto"><table class="rec-table"><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody id="fichList"></tbody></table></div></div></div>
@@ -932,6 +966,23 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 
 
 <script>
+
+// ── Theme ──
+function applyTheme(){
+  const t=localStorage.getItem('theme')||'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  const icon=t==='light'?'☀️':'🌙';
+  document.querySelectorAll('.theme-toggle-btn').forEach(b=>{ b.textContent=icon; });
+}
+function toggleTheme(){
+  const isLight=document.documentElement.getAttribute('data-theme')==='light';
+  const next=isLight?'dark':'light';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('theme',next);
+  const icon=next==='light'?'☀️':'🌙';
+  document.querySelectorAll('.theme-toggle-btn').forEach(b=>{ b.textContent=icon; });
+}
+applyTheme();
 
 // ── Firebase Auth — carga diferida (solo cuando el usuario lo pide) ──
 window._fbReady = false;
@@ -1483,25 +1534,29 @@ async function _doBioVerify(emp, errEl){
       }
     }).catch(e => { throw e; });
 
-    // Si llega aquí, el dispositivo verificó la biometría
-    if(result || result === null){
-      // result null significa que el dispositivo verificó pero no hay credencial → OK igualmente
+    // Si llega aquí (result puede ser null o un objeto), el dispositivo verificó la biometría
+    if(result !== undefined){
       SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
       SES.isAdmin = emp.role === 'jefe_obra';
       saveSession(); doEmpLogin();
       toast('✅ Acceso biométrico — ' + emp.name.split(' ')[0]);
     }
   } catch(ex){
-    // NotAllowedError = usuario canceló o no autenticó
-    // InvalidStateError / NotSupportedError = no hay credencial registrada
+    // NotAllowedError = usuario canceló, no autenticó, o iOS Safari sin credencial registrada
+    // InvalidStateError / NotSupportedError = no hay credencial WebAuthn registrada
+    const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
     if(ex.name === 'NotAllowedError'){
-      if(errEl) errEl.textContent = 'Biometría cancelada o no autorizada';
-    } else if(ex.name === 'NotSupportedError' || ex.name === 'InvalidStateError' || ex.name === 'SecurityError'){
-      // El dispositivo tiene biometría pero no hay credencial WebAuthn registrada
-      // En este caso hacemos fallback: si tiene sesión guardada, la restauramos con bio
-      const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
+      // Fallback: si hay sesión previa del mismo empleado, restaurar sin WebAuthn
       if(savedSes && savedSes.empId === emp.id){
-        // Sesión previa del mismo empleado → OK (el sistema operativo ya verificó)
+        SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
+        SES.isAdmin = emp.role === 'jefe_obra';
+        saveSession(); doEmpLogin();
+        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
+      } else {
+        if(errEl) errEl.textContent = 'Biometría no disponible o cancelada. Usa tu PIN.';
+      }
+    } else if(ex.name === 'NotSupportedError' || ex.name === 'InvalidStateError' || ex.name === 'SecurityError'){
+      if(savedSes && savedSes.empId === emp.id){
         SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
         SES.isAdmin = emp.role === 'jefe_obra';
         saveSession(); doEmpLogin();
@@ -1510,7 +1565,7 @@ async function _doBioVerify(emp, errEl){
         if(errEl) errEl.textContent = '⚠️ Primero inicia sesión con PIN o email para activar la biometría';
       }
     } else {
-      if(errEl) errEl.textContent = 'Biometría no disponible: ' + (ex.message || ex.name);
+      if(errEl) errEl.textContent = 'Biometría no disponible. Usa tu PIN.';
       console.warn('[TIMES] Bio error:', ex.name, ex.message);
     }
   }
@@ -2117,7 +2172,34 @@ function renderDashboard(){
   if($('dFich'))$('dFich').textContent=fichHoy.length;
   if($('dActive'))$('dActive').textContent=active.length;
   if($('dHours'))$('dHours').textContent=mhm(hHoy);
-  safeRun(renderWeekChart,'wc');safeRun(()=>renderDonut(emps,active),'dn');safeRun(renderRecentAct,'ra');updateSBBadges();
+  safeRun(renderWeekChart,'wc');safeRun(()=>renderDonut(emps,active),'dn');safeRun(renderRecentAct,'ra');safeRun(renderDashActiveEmps,'dae');updateSBBadges();
+}
+function renderDashActiveEmps(){
+  const el=$('dashActiveEmps');if(!el)return;
+  const active=(DB.records||[]).filter(r=>!r.fin);
+  if(!active.length){el.innerHTML='<div class="empty">Sin empleados activos</div>';return;}
+  el.innerHTML=active.map(r=>{
+    const emp=(DB.employees||[]).find(e=>e.id===r.empId);
+    const col=emp?.color||'var(--accent)';
+    const init=emp?.initials||r.empName?.slice(0,2)||'?';
+    const name=emp?.name||r.empName||'?';
+    const onBreak=r.enDescanso;
+    const mins=Math.floor(calcSecs(r).work/60);
+    const dur=mhm(mins);
+    const photo=emp?.photo;
+    const avatarHtml=photo
+      ? '<img src="'+photo+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+      : '<span style="font-size:13px;font-weight:700;color:#fff">'+init+'</span>';
+    const statusColor=onBreak?'var(--orange)':'var(--green)';
+    const statusTxt=onBreak?'Descanso':'Trabajando';
+    return '<div style="flex-shrink:0;width:80px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;background:var(--bg4);border-radius:var(--r);border:1px solid var(--border)">'
+      +'<div style="position:relative"><div style="width:44px;height:44px;border-radius:50%;background:'+col+';display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid '+statusColor+'">'+avatarHtml+'</div>'
+      +'<span style="position:absolute;bottom:0;right:0;width:10px;height:10px;border-radius:50%;background:'+statusColor+';border:2px solid var(--bg4)"></span></div>'
+      +'<div style="font-size:10px;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">'+name.split(' ')[0]+'</div>'
+      +'<div style="font-size:9px;color:'+statusColor+';font-weight:700;letter-spacing:.3px">'+statusTxt+'</div>'
+      +'<div style="font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums">'+dur+'</div>'
+      +'</div>';
+  }).join('');
 }
 function renderWeekChart(){
   const el=$('weekChart');if(!el)return;
@@ -2666,6 +2748,10 @@ function applyEncPermissions(){
   // Botón retorno a vista empleado (solo encargados y JO)
   const backBtn=$('encBackBtn');
   if(backBtn)backBtn.style.display=(isEnc||isJO)?'flex':'none';
+
+  // Botón fichar (solo encargados y JO que tienen SES.user)
+  const fichBtn=$('encFicharBtn');
+  if(fichBtn)fichBtn.style.display=(isEnc||isJO)&&SES.user?'flex':'none';
 
   // En Obras ocultar añadir/eliminar a encargados
   const addObrasCard=$('cardObrasAdd'),addCentrosCard=$('cardCentrosAdd');
@@ -3517,7 +3603,20 @@ function requestNotifPermission(){
 function sendLocalNotif(title, body, icon){
   if(!('Notification' in window) || Notification.permission !== 'granted') return;
   try{
-    if(window._swReg && window._swReg.showNotification){
+    if(navigator.serviceWorker && navigator.serviceWorker.controller){
+      navigator.serviceWorker.ready.then(function(reg){
+        reg.showNotification(title, {
+          body: body,
+          icon: icon || './icon.svg',
+          badge: './icon.svg',
+          tag: 'times-reminder',
+          renotify: true,
+          requireInteraction: false,
+          vibrate: [200, 100, 200],
+          data: { url: window.location.href }
+        });
+      });
+    } else if(window._swReg && window._swReg.showNotification){
       window._swReg.showNotification(title, {
         body: body,
         icon: icon || './icon.svg',
@@ -3546,6 +3645,8 @@ function openConfiguracion(){
   const cn=$('cfgNotiFichaje'),cg=$('cfgGps');
   if(cn){cn.checked=noti;updateCfgToggle('cfgNotiFichaje',noti);}
   if(cg){cg.checked=gps;updateCfgToggle('cfgGps',gps);}
+  const rt=getCfg('reminderTime','20:00');
+  const crt=$('cfgReminderTime');if(crt)crt.value=rt;
   openModal('mConfiguracion');
 }
 
@@ -3733,12 +3834,13 @@ function exportMesXLSX(ym){
   toast('✅ Excel del mes descargado');
 }
 
-// Recordatorio fin de jornada a las 20:00
+// Recordatorio fin de jornada (hora configurable, por defecto 20:00)
 function scheduleEndOfDayReminder(){
   if(!getCfg('notiFichaje', true)) return;
   const now = new Date();
   const target = new Date(now);
-  target.setHours(20,0,0,0);
+  const rt = getCfg('reminderTime','20:00').split(':');
+  target.setHours(+rt[0], +rt[1], 0, 0);
   if(now >= target) target.setDate(target.getDate()+1);
   const ms = target - now;
   setTimeout(function(){
