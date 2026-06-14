@@ -436,8 +436,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .theme-toggle-btn:active{background:var(--bg4)}
 
 /* ═══ iOS SAFE AREA ═══ */
-.emp-nav{padding-bottom:max(env(safe-area-inset-bottom),8px)}
+.emp-nav{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 .login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
+.ini-wrap{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+#tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
 </style>
 </head>
@@ -628,6 +630,20 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   <button class="btn btn-primary btn-full" onclick="cambiarPin()">Guardar seguridad</button>
 </div></div>
 
+<!-- MODAL VISOR DOCUMENTO -->
+<div id="mDocViewer" style="display:none;position:fixed;inset:0;z-index:9000;background:#0d0d1a;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:rgba(13,13,26,.95);border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0">
+    <button onclick="closeDocViewer()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;font-size:14px;font-weight:700;padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:6px;-webkit-tap-highlight-color:transparent">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>Volver
+    </button>
+    <span id="docViewerTitle" style="font-size:13px;font-weight:600;color:rgba(255,255,255,.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+  </div>
+  <div style="flex:1;position:relative;overflow:hidden">
+    <iframe id="docViewerFrame" src="" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#fff"></iframe>
+    <img id="docViewerImg" src="" style="display:none;max-width:100%;max-height:100%;object-fit:contain;position:absolute;inset:0;margin:auto">
+  </div>
+</div>
+
 <!-- MODAL FIREBASE AUTH -->
 <div class="modal-ov" id="mFbAuth"><div class="modal" style="max-height:95vh">
   <div class="modal-drag"></div>
@@ -739,18 +755,18 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     <!-- INICIO -->
     <div id="tabInicio" class="tab-content" style="display:block;overflow-y:auto">
       <div class="ini-wrap">
-        <!-- Main fichar card (kept) -->
+        <!-- Live clock -->
+        <div style="text-align:center;padding:16px 0 12px">
+          <div id="liveTime" style="font-size:48px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">00:00</div>
+          <div id="liveDateStr" style="font-size:13px;color:var(--text3);margin-top:4px;text-transform:capitalize"></div>
+        </div>
+        <!-- Main fichar card -->
         <div class="jor-main-card">
           <div class="jor-mc-header"><span class="jor-mc-title">Jornada actual</span><span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Libre</span></span></div>
           <div class="jor-timer" id="jorTimer">00:00:00</div>
           <div class="jor-timer-sub">Horas trabajadas</div>
           <div class="jor-circle-wrap"><div class="jor-circle-glow" id="jorCircleGlow"></div><button class="jor-circle-btn" id="jorCircleBtn" onclick="jorBtnTap()"><svg viewBox="0 0 24 24" id="jorCircleIco"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span id="jorCircleLine1">FICHAR</span><span id="jorCircleLine2">ENTRADA</span></button></div>
           <div class="jor-break-row"><button class="jor-break-chip" id="jorBreakChip" onclick="toggleBreak()" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/></svg><span id="jorBreakTxt">Iniciar descanso</span></button></div>
-        </div>
-        <!-- Live clock -->
-        <div style="text-align:center;padding:16px 0 12px">
-          <div id="liveTime" style="font-size:48px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">00:00</div>
-          <div id="liveDateStr" style="font-size:13px;color:var(--text3);margin-top:4px;text-transform:capitalize"></div>
         </div>
         <!-- Status pill -->
         <div style="display:flex;justify-content:center;margin-bottom:16px">
@@ -1750,7 +1766,9 @@ function showEncPanel(){
 
 
 
+let _empCurTab='inicio';
 function empNavTo(tab){
+  _empCurTab=tab;
   const pages=['inicio','jornada','vacaciones','calendario','nomina','perfil'];
   pages.forEach(p=>{
     const el=$('tab'+p.charAt(0).toUpperCase()+p.slice(1));
@@ -2813,8 +2831,6 @@ function exportXLSX(){
 }
 function exportJSON(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='backup_'+today()+'.json';a.click();URL.revokeObjectURL(a.href);toast('💾 Backup descargado');}
 function exportPDF(){
-  var w=window.open('','_blank');
-  if(!w)return;
   var recs=(DB.records||[]).filter(function(r){return r.fin;}).sort(function(a,b){return b.inicio.localeCompare(a.inicio);});
   var rows=recs.slice(0,200).map(function(r){
     var emp=DB.employees.find(function(e){return e.id===r.empId;});
@@ -2838,11 +2854,12 @@ function exportPDF(){
     +'<h2>TIMES INC - '+new Date().toLocaleDateString('es-ES')+'</h2>'
     +'<table><tr><th>Empleado</th><th>Rol</th><th>Centro</th><th>Fecha</th>'
     +'<th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th></tr>'
-    +rows
-    +'</table></body></html>';
-  w.document.write(html);
-  w.document.close();
-  setTimeout(function(){w.print();},500);
+    +rows+'</table></body></html>';
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  openDocViewer(url,'Informe PDF');
+  var frame=$('docViewerFrame');
+  if(frame)frame.onload=function(){URL.revokeObjectURL(url);};
 }
 function restoreJSON(inp){
   const f=inp.files[0];if(!f)return;
@@ -3185,18 +3202,45 @@ function renderDocsPanel(){
     </div>`).join('');
 }
 
+function openDocViewer(data,name){
+  const v=$('mDocViewer');if(!v)return;
+  const frame=$('docViewerFrame'),img=$('docViewerImg'),title=$('docViewerTitle');
+  if(title)title.textContent=name||'Documento';
+  const isPDF=data.includes('application/pdf')||data.startsWith('blob:')||data.endsWith('.pdf');
+  if(isPDF){
+    // Convertir data URL a blob URL para compatibilidad iOS Safari
+    let url=data;
+    if(data.startsWith('data:')){
+      try{
+        const parts=data.split(','),mime=parts[0].split(':')[1].split(';')[0];
+        const bin=atob(parts[1]),bytes=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+        url=URL.createObjectURL(new Blob([bytes],{type:mime}));
+        if(frame)frame.onload=()=>URL.revokeObjectURL(url);
+      }catch(e){}
+    }
+    if(frame){frame.src=url;frame.style.display='';}
+    if(img){img.src='';img.style.display='none';}
+  }else{
+    if(img){img.src=data;img.style.display='';}
+    if(frame){frame.src='';frame.style.display='none';}
+  }
+  // Ocultar botón imprimir si existe (solo visible para PDF de resumen)
+  const pb=$('docViewerPrintBtn');if(pb)pb.style.display='none';
+  v.style.display='flex';
+}
+function closeDocViewer(){
+  const v=$('mDocViewer');if(!v)return;
+  v.style.display='none';
+  const frame=$('docViewerFrame'),img=$('docViewerImg');
+  if(frame)frame.src='';if(img)img.src='';
+}
 function verDocAdmin(docId,empId){
   const emp=DB.employees.find(e=>e.id===empId);if(!emp||!emp.docs)return;
   const allDocs=[emp.docs.contrato,...(emp.docs.nominas||[]),...(emp.docs.otros||[])].filter(Boolean);
   const doc=allDocs.find(d=>d.id===docId);
   if(!doc||!doc.data){toast('Documento no disponible');return;}
-  const w=window.open('','_blank');if(!w)return;
-  const backBtn='<div style="position:fixed;top:12px;left:12px;z-index:9999"><button onclick="window.close()" style="background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;backdrop-filter:blur(8px)">&#8592; Volver</button></div>';
-  if(doc.data.includes('application/pdf')){
-    w.document.write('<html><body style="margin:0;background:#222">'+backBtn+'<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe></body></html>');
-  } else {
-    w.document.write('<html><body style="margin:0;background:#000">'+backBtn+'<img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto;padding-top:50px"></body></html>');
-  }
+  openDocViewer(doc.data,doc.name);
 }
 
 function eliminarDoc(docId,empId){
@@ -3278,13 +3322,7 @@ function verDocEmp(tipo,idx=0){
   const emp=DB.employees.find(e=>e.id===u.id);if(!emp||!emp.docs)return;
   let doc=tipo==='contrato'?emp.docs.contrato:(emp.docs.nominas||[])[idx];
   if(!doc||!doc.data){toast('Documento no disponible');return;}
-  const w=window.open('','_blank');if(!w)return;
-  const backBtn='<div style="position:fixed;top:12px;left:12px;z-index:9999"><button onclick="window.close()" style="background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;backdrop-filter:blur(8px)">&#8592; Volver</button></div>';
-  if(doc.data.includes('application/pdf')){
-    w.document.write('<html><body style="margin:0;background:#222">'+backBtn+'<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe></body></html>');
-  } else {
-    w.document.write('<html><body style="margin:0;background:#000">'+backBtn+'<img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto;padding-top:50px"></body></html>');
-  }
+  openDocViewer(doc.data,doc.name);
 }
 
 function firmarDocEmp(tipo,idx=0){
@@ -3512,7 +3550,11 @@ setInterval(()=>{
   if(bs)bs.textContent=':'+p2(now.getSeconds());
   const bd=$('bigDate');if(bd)bd.textContent=now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   tick();
-  if(SES.user&&(!SES.isAdmin||(SES.isAdmin&&SES.isEnc))){safeRun(updJorCircle,'t');safeRun(renderResumen,'tr');}
+  if(SES.user&&(!SES.isAdmin||SES.isEnc||SES.isJO)){
+    safeRun(updJorCircle,'t');
+    safeRun(renderResumen,'tr');
+    if(_empCurTab==='jornada')safeRun(renderJorTab,'tjt');
+  }
 },1000);
 
 // ── Init ──
@@ -3625,11 +3667,27 @@ function generarResumenMensualPDF(empId, anyo, mes){
     <div class="footer">Documento generado por TIMES INC el ${new Date().toLocaleString('es-ES')} · times-inc.vercel.app</div>
     </body></html>`;
 
-  const w = window.open('','_blank');
-  if(!w){ toast('Activa popups para ver el PDF'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(), 600);
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const v=$('mDocViewer');
+  const title=$('docViewerTitle'),frame=$('docViewerFrame'),img=$('docViewerImg');
+  if(title)title.textContent='Resumen mensual';
+  if(frame){frame.src=url;frame.style.display='';}
+  if(img){img.style.display='none';}
+  if(v)v.style.display='flex';
+  // Añadir botón imprimir en la cabecera
+  const hdr=v?.querySelector('div:first-child');
+  let printBtn=document.getElementById('docViewerPrintBtn');
+  if(!printBtn&&hdr){
+    printBtn=document.createElement('button');
+    printBtn.id='docViewerPrintBtn';
+    printBtn.textContent='🖨️ Imprimir';
+    printBtn.style.cssText='background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;font-size:14px;font-weight:700;padding:8px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-left:auto';
+    printBtn.onclick=()=>{const f=$('docViewerFrame');if(f&&f.contentWindow)f.contentWindow.print();};
+    hdr.appendChild(printBtn);
+  }
+  if(printBtn)printBtn.style.display='';
+  frame.onload=()=>{URL.revokeObjectURL(url);};
 }
 
 function firmarResumenMensual(anyo, mes){
@@ -3884,10 +3942,6 @@ function exportMesXLSX(ym){
   }
   if(!ym){const now=new Date();ym=`${now.getFullYear()}-${p2(now.getMonth()+1)}`;}
   const [anyo,mes]=ym.split('-').map(Number);
-  const emps=sortedEmps().filter(e=>!e.isAdmin);
-  const daysInMonth=new Date(anyo,mes,0).getDate();
-  const dias=[];
-  for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
   const now2=new Date(),curYm=`${now2.getFullYear()}-${p2(now2.getMonth()+1)}`;
   let recs;
   if(ym===curYm){
@@ -3896,70 +3950,72 @@ function exportMesXLSX(ym){
     const snap=DB.monthSnapshots&&DB.monthSnapshots[ym];
     recs=snap?snap.recs:(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
   }
-  const data={};
-  const dataRaw={};
-  emps.forEach(e=>{data[e.id]={};dataRaw[e.id]={};});
+  // Helpers para fechas Excel (serial desde 1/1/1900)
+  const toExcelDate=d=>Math.floor(d.getTime()/86400000)+25569;
+  const toExcelTime=d=>(d.getHours()*3600+d.getMinutes()*60+d.getSeconds())/86400;
+  const cell=(v,t,z)=>({t:t||'s',v,z:z||undefined});
+
+  // ── Hoja 1: CONTROL HORAS GECAMA (formato exacto) ──
+  const wb=XLSX.utils.book_new();
+  const ws={'!ref':'A1:H1'};
+  const headers=['Marca temporal','FECHA','NOMBRE','HORA ENTRADA','HORA SALIDA','PAUSA MEDIODIA','NO PRESENCIA','TOTAL HORAS'];
+  const cols='ABCDEFGH';
+  // Cabecera fila 1
+  headers.forEach((h,i)=>{ws[cols[i]+'1']={t:'s',v:h};});
+  let row=2;
+  recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
+    const emp=DB.employees.find(e=>e.id===r.empId);
+    const dIni=new Date(r.inicio),dFin=r.fin?new Date(r.fin):null;
+    const bm=Math.floor((r.breakSecs||0)/60);
+    const pausa=bm>0?`${Math.floor(bm/60)}h ${p2(bm%60)}m`:'NO';
+    const iC=cols.indexOf;
+    ws['A'+row]={t:'n',v:toExcelDate(dIni)+(toExcelTime(dIni)),z:'dd/mm/yyyy hh:mm:ss'};
+    ws['B'+row]={t:'n',v:toExcelDate(dIni),z:'dd/mm/yyyy'};
+    ws['C'+row]={t:'s',v:emp?emp.name:r.empName||r.empId};
+    ws['D'+row]={t:'n',v:toExcelTime(dIni),z:'hh:mm'};
+    ws['E'+row]=dFin?{t:'n',v:toExcelTime(dFin),z:'hh:mm'}:{t:'s',v:'-'};
+    ws['F'+row]={t:'s',v:pausa};
+    ws['G'+row]={t:'s',v:''};
+    if(dFin){
+      const diffH=dFin.getHours()-dIni.getHours(),diffM=dFin.getMinutes()-dIni.getMinutes();
+      const totalMin=(dFin-dIni)/60000-bm;
+      ws['H'+row]={t:'n',v:parseFloat((totalMin/60).toFixed(2)),f:`HOUR(E${row}-D${row})+MINUTE(E${row}-D${row})/60`};
+    }else{
+      ws['H'+row]={t:'s',v:'-'};
+    }
+    row++;
+  });
+  ws['!ref']=`A1:H${Math.max(row-1,1)}`;
+  ws['!cols']=[{wch:20},{wch:12},{wch:30},{wch:12},{wch:12},{wch:14},{wch:20},{wch:12}];
+  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  XLSX.utils.book_append_sheet(wb,ws,'CONTROL HORAS GECAMA');
+
+  // ── Hoja 2: Resumen mensual por empleado ──
+  const emps=sortedEmps().filter(e=>!e.isAdmin);
+  const daysInMonth=new Date(anyo,mes,0).getDate();
+  const dias=[];for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
+  const data={};emps.forEach(e=>{data[e.id]={};});
   recs.forEach(r=>{
     if(!data[r.empId])return;
     const dk=r.inicio.slice(0,10);
     if(!data[r.empId][dk])data[r.empId][dk]=0;
     data[r.empId][dk]+=calcMin(r);
-    if(!dataRaw[r.empId][dk])dataRaw[r.empId][dk]=r;
   });
-  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-  const fmtH=m=>m>0?`${Math.floor(m/60)}:${p2(m%60)}`:'-';
-  // Cabecera
-  const header=['NOMBRE',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'TOTAL HORAS'];
-  const rows=[
-    [`CONTROL HORAS - ${monthName.toUpperCase()}`],
-    [],
-    header
-  ];
+  const header2=['NOMBRE',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'SUM de TOTAL HORAS'];
+  const rows2=[header2];
   let grandTotal=0;
   emps.forEach(emp=>{
-    const row=[emp.name];
-    let empTotal=0;
-    dias.forEach(d=>{
-      const m=data[emp.id][d]||0;
-      empTotal+=m;
-      row.push(m>0?parseFloat((m/60).toFixed(2)):'-');
-    });
-    row.push(parseFloat((empTotal/60).toFixed(2)));
-    grandTotal+=empTotal;
-    rows.push(row);
+    const row2=[emp.name];let empTotal=0;
+    dias.forEach(d=>{const m=data[emp.id][d]||0;empTotal+=m;row2.push(m>0?parseFloat((m/60).toFixed(2)):0);});
+    row2.push(parseFloat((empTotal/60).toFixed(2)));grandTotal+=empTotal;rows2.push(row2);
   });
-  // Fila total
-  const totRow=['SUMA TOTAL'];
-  dias.forEach(d=>{
-    const m=emps.reduce((s,e)=>s+(data[e.id][d]||0),0);
-    totRow.push(m>0?parseFloat((m/60).toFixed(2)):'-');
-  });
-  totRow.push(parseFloat((grandTotal/60).toFixed(2)));
-  rows.push([]);
-  rows.push(totRow);
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:28},...dias.map(()=>({wch:5})),{wch:12}];
-  XLSX.utils.book_append_sheet(wb,ws,monthName.slice(0,31));
-  // Segunda hoja: detalle por día
-  const rows2=[['NOMBRE','FECHA','HORA ENTRADA','HORA SALIDA','PAUSA MEDIODIA','NO PRESENCIA','TOTAL HORAS']];
-  recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
-    const emp=DB.employees.find(e=>e.id===r.empId);
-    const bm=Math.floor((r.breakSecs||0)/60);
-    rows2.push([
-      emp?emp.name:r.empId,
-      r.inicio.slice(0,10),
-      ftime(r.inicio),
-      r.fin?ftime(r.fin):'-',
-      bm>0?`${Math.floor(bm/60)}:${p2(bm%60)}`:'NO',
-      '',
-      parseFloat((calcMin(r)/60).toFixed(2))
-    ]);
-  });
+  const totRow2=['Suma total',...dias.map(d=>parseFloat((emps.reduce((s,e)=>s+(data[e.id][d]||0),0)/60).toFixed(2))),parseFloat((grandTotal/60).toFixed(2))];
+  rows2.push(totRow2);
   const ws2=XLSX.utils.aoa_to_sheet(rows2);
-  ws2['!cols']=[{wch:28},{wch:12},{wch:12},{wch:12},{wch:14},{wch:20},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,ws2,'Detalle');
-  XLSX.writeFile(wb,`CONTROL_HORAS_${ym}.xlsx`);
+  ws2['!cols']=[{wch:30},...dias.map(()=>({wch:5})),{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen');
+
+  XLSX.writeFile(wb,`CONTROL_HORAS_GECAMA_${ym}.xlsx`);
   toast('✅ Excel del mes descargado');
 }
 

@@ -1,5 +1,5 @@
-// TIMES INC — Service Worker v3
-const CACHE = 'times-v3';
+// TIMES INC — Service Worker v4
+const CACHE = 'times-v4';
 const ASSETS = ['./', './index.html', './style.css', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
