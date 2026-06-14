@@ -1,38 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#c026d3"/>
-      <stop offset="35%" stop-color="#7c3aed"/>
-      <stop offset="70%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+      <stop offset="0%" stop-color="#6d28d9"/>
+      <stop offset="50%" stop-color="#4c1d95"/>
+      <stop offset="100%" stop-color="#1e40af"/>
     </linearGradient>
-    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f0abfc"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+    <linearGradient id="ring1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d946ef" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.3"/>
     </linearGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="rgba(0,0,0,0.4)"/>
-    </filter>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
+    <linearGradient id="tgrad" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <filter id="tshadow">
+      <feDropShadow dx="0" dy="12" stdDeviation="24" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
+    <linearGradient id="textgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+    <linearGradient id="incgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
   </defs>
-  <!-- Background rounded rect -->
-  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
-  <!-- Subtle inner glow overlay -->
-  <rect width="1024" height="1024" rx="230" ry="230" fill="rgba(255,255,255,0.06)"/>
-  <!-- Arc ring (partial circle, pink-to-cyan) -->
-  <circle cx="420" cy="440" r="310" fill="none" stroke="url(#ring)" stroke-width="18" stroke-linecap="round" stroke-dasharray="1100 850" stroke-dashoffset="-580" opacity="0.9" filter="url(#glow)"/>
-  <!-- Big T letter - white with subtle shadow -->
-  <g filter="url(#shadow)">
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <!-- Subtle grid overlay -->
+  <rect width="1024" height="1024" rx="220" fill="rgba(255,255,255,0.03)"/>
+  <!-- Ring arc (like original logo) -->
+  <circle cx="450" cy="500" r="360" fill="none" stroke="url(#ring1)" stroke-width="28" stroke-linecap="round" stroke-dasharray="1350 910" stroke-dashoffset="-680" filter="url(#glow)"/>
+  <!-- Second partial ring (cyan, right side) -->
+  <circle cx="450" cy="500" r="340" fill="none" stroke="#38bdf8" stroke-width="14" stroke-linecap="round" stroke-dasharray="320 1820" stroke-dashoffset="-1260" opacity="0.7" filter="url(#glow)"/>
+  <!-- BIG T letter -->
+  <g filter="url(#tshadow)">
     <!-- T crossbar -->
-    <rect x="155" y="220" width="520" height="130" rx="40" fill="white"/>
+    <rect x="120" y="200" width="600" height="140" rx="55" fill="url(#tgrad)"/>
     <!-- T stem -->
-    <rect x="340" y="220" width="150" height="590" rx="40" fill="white"/>
+    <rect x="345" y="200" width="170" height="640" rx="55" fill="url(#tgrad)"/>
   </g>
-  <!-- "Inc" text in cyan script style -->
-  <text x="490" y="730" font-family="Georgia, serif" font-size="190" font-weight="700" font-style="italic" fill="#22d3ee" filter="url(#glow)" text-anchor="start">Inc</text>
-  <!-- Underline stroke in cyan -->
-  <path d="M 490 755 Q 620 775 760 745" stroke="#22d3ee" stroke-width="18" fill="none" stroke-linecap="round" filter="url(#glow)" opacity="0.9"/>
+  <!-- TIMES text -->
+  <text x="560" y="610" font-family="'Arial Black','Arial',sans-serif" font-size="120" font-weight="900" fill="url(#textgrad)" letter-spacing="4" filter="url(#glow)">TIMES</text>
+  <!-- INC text with gradient -->
+  <text x="560" y="730" font-family="'Arial Black','Arial',sans-serif" font-size="130" font-weight="900" fill="url(#incgrad)" letter-spacing="6" filter="url(#glow)">INC</text>
+  <!-- Underline stroke -->
+  <path d="M 560 752 Q 700 775 870 748" stroke="url(#incgrad)" stroke-width="22" fill="none" stroke-linecap="round" filter="url(#glow)" opacity="0.85"/>
 </svg>
