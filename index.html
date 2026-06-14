@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
@@ -777,13 +780,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     <!-- INICIO -->
     <div id="tabInicio" class="tab-content" style="display:block;overflow-y:auto">
       <div class="ini-wrap">
-        <!-- Main fichar card con reloj integrado -->
+        <!-- Main fichar card -->
         <div class="jor-main-card">
-          <!-- Reloj arriba -->
-          <div style="margin-bottom:14px">
-            <div id="liveTime" class="jor-mc-clock-time">00:00</div>
-            <div id="liveDateStr" class="jor-mc-clock-date"></div>
-          </div>
           <!-- Botón circular fichar -->
           <div class="jor-circle-wrap"><div class="jor-circle-glow" id="jorCircleGlow"></div><button class="jor-circle-btn" id="jorCircleBtn" onclick="jorBtnTap()"><svg viewBox="0 0 24 24" id="jorCircleIco"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span id="jorCircleLine1">FICHAR</span><span id="jorCircleLine2">ENTRADA</span></button></div>
           <!-- Timer horas trabajadas -->
@@ -794,13 +792,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <!-- Estado en la parte inferior -->
           <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;display:flex;justify-content:center">
             <span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Sin jornada</span></span>
-          </div>
-        </div>
-        <!-- Status pill -->
-        <div style="display:flex;justify-content:center;margin-bottom:16px">
-          <div id="statusPill" style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:24px;background:var(--bg3);border:1px solid var(--border);font-size:13px;font-weight:600">
-            <span id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--text3)"></span>
-            <span id="statusTxt">Sin jornada</span>
           </div>
         </div>
         <!-- Circular progress + metrics -->
@@ -865,7 +856,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
       <div class="jor-tab-hdr">
         <div class="jor-tab-hdr-top">
           <span class="jor-tab-h1">Mi Jornada</span>
-          <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()" style="font-size:11px;padding:6px 12px;border-radius:20px;margin:0">✏️ Corrección</button>
         </div>
         <div class="jor-tab-h2" id="jorTabDate"></div>
       </div>
@@ -898,7 +888,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
       </div>
       <!-- Resumen mensual -->
-      <div id="jorResumenMes" style="padding:0 16px calc(16px + env(safe-area-inset-bottom))"></div>
+      <div id="jorResumenMes" style="padding:0 16px 12px"></div>
+      <!-- Corrección de fichaje -->
+      <div style="padding:0 16px calc(16px + env(safe-area-inset-bottom))">
+        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
+      </div>
     </div>
     <!-- VACACIONES -->
     <div id="tabVacaciones" style="display:none;overflow-y:auto">
@@ -1844,21 +1838,24 @@ function renderResumen(){
   const u=SES.user,tod=today();
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   const openRec2=recs.find(r=>!r.fin&&!r.closed);
-  const firstRec=recs[0];
-  // Entrada: mostrar solo cuando hay jornada iniciada
-  if($('resEntrada'))$('resEntrada').textContent=(openRec2||firstRec)?ftime((openRec2||firstRec).inicio):'--:--';
-  // Salida: mostrar solo cuando la jornada ha TERMINADO (no hay registro abierto)
+  // Entrada: primer registro real (excluye micro-registros < 1min de bug anterior)
+  const firstValidRec=openRec2||recs.find(r=>r.fin&&r.closed&&calcMin(r)>0);
+  if($('resEntrada'))$('resEntrada').textContent=firstValidRec?ftime(firstValidRec.inicio):'--:--';
+  // Salida: solo cuando jornada terminada con duración real
   if($('resSalida')){
-    const lastClosed=[...recs].reverse().find(r=>r.fin&&r.closed);
+    const lastClosed=[...recs].reverse().find(r=>r.fin&&r.closed&&calcMin(r)>0);
     $('resSalida').textContent=(!openRec2&&lastClosed)?ftime(lastClosed.fin):'--:--';
   }
   const brk=recs.reduce((a,r)=>a+Math.floor((r.breakSecs||0)/60),0);
-  const completedMin=recs.reduce((a,r)=>a+calcMin(r),0);
-  const tot=completedMin+(TM.state!=='idle'?Math.floor(TM.ws/60):0);
+  // completedMin solo de registros cerrados válidos
+  const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
+  // liveSecs: calcular SIEMPRE desde el registro abierto (no depende de TM.ws)
+  const liveSecs=openRec2?calcSecs(openRec2).work:0;
+  const tot=completedMin+Math.floor(liveSecs/60);
   if($('resDescanso'))$('resDescanso').textContent=brk>0?`${Math.floor(brk/60).toString().padStart(2,'0')}:${p2(brk%60)}`:'00:00';
-  // Total: en vivo HH:MM:SS cuando trabajando, HH:MM cuando parado
+  // Total: HH:MM:SS en vivo si hay jornada abierta
   if($('resTotal')){
-    if(TM.state!=='idle'){$('resTotal').textContent=s2t(completedMin*60+TM.ws);}
+    if(openRec2){$('resTotal').textContent=s2t(completedMin*60+liveSecs);}
     else{$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;}
   }
   // GPS card
@@ -1871,21 +1868,13 @@ function renderResumen(){
   const ring=$('progressRing');
   if(ring){const circ=238.76;ring.style.strokeDashoffset=circ-(circ*pct/100);}
   const rp=$('ringPct');if(rp)rp.textContent=pct+'%';
-  // status pill
-  const open2=DB.records.find(r=>r.empId===u.id&&!r.fin);
-  const dot=$('statusDot'),stxt=$('statusTxt');
-  if(dot&&stxt){
-    if(open2&&open2.enDescanso){dot.style.background='var(--orange)';stxt.textContent='En descanso';}
-    else if(open2){dot.style.background='var(--green)';stxt.textContent='Trabajando';}
-    else{dot.style.background='var(--text3)';stxt.textContent='Sin jornada';}
-  }
 }
 
 function renderJorTab(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
   const tl=$('jorTimeline');if(!tl)return;
-  const td=$('jorTabDate');if(td)td.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  const td=$('jorTabDate');if(td){const _n=new Date();td.innerHTML=_n.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})+' <span style="font-size:10px;color:var(--text3);font-weight:400">'+p2(_n.getHours())+':'+p2(_n.getMinutes())+'</span>';}
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   // Timeline
   if(!recs.length){tl.innerHTML='<div class="empty" style="padding:24px 0;text-align:center;color:var(--text3)">Sin actividad registrada hoy</div>';}
@@ -1911,13 +1900,13 @@ function renderJorTab(){
       </div>
     </div>`).join('');
   }
-  // Stats — en vivo si está trabajando
-  const completedMin=recs.reduce((a,r)=>a+calcMin(r),0);
-  const liveMin=TM.state!=='idle'?Math.floor(TM.ws/60):0;
-  const tot=completedMin+liveMin;
+  // Stats — en vivo calculado desde registro abierto (no depende de TM.ws)
+  const openRec3=recs.find(r=>!r.fin&&!r.closed);
+  const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
+  const liveSecs2=openRec3?calcSecs(openRec3).work:0;
+  const tot=completedMin+Math.floor(liveSecs2/60);
   const norm=Math.min(tot,WD),extra=Math.max(0,tot-WD);
-  const fmt=m=>TM.state!=='idle'&&m===tot?s2t(completedMin*60+TM.ws):`${Math.floor(m/60).toString().padStart(2,'0')}h ${p2(m%60)}m`;
-  if($('jorTotalVal'))$('jorTotalVal').textContent=fmt(tot);
+  if($('jorTotalVal'))$('jorTotalVal').textContent=openRec3?s2t(completedMin*60+liveSecs2):`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;
   if($('jorNorm'))$('jorNorm').textContent=`${Math.floor(norm/60).toString().padStart(2,'0')}h ${p2(norm%60)}m`;
   if($('jorExtra'))$('jorExtra').textContent=`${Math.floor(extra/60).toString().padStart(2,'0')}h ${p2(extra%60)}m`;
   // Resumen mensual + week dots
@@ -2112,13 +2101,17 @@ function updBtns(){
 function setEmpStatus(cls,txt){safeRun(updJorCircle,"ses");}
 
 function updTimer(){
-  const jt=$('jorTimer');if(jt)jt.textContent=s2t(TM.ws);
-  const pct=Math.min(100,(TM.ws/(WD*60))*100);
+  // Siempre calcular desde el registro abierto para evitar bugs de sincronización
+  const _o=openRec();
+  const _ws=_o?calcSecs(_o).work:TM.ws;
+  const _bs=_o?calcSecs(_o).brk:TM.bs;
+  const jt=$('jorTimer');if(jt)jt.textContent=s2t(_ws);
+  const pct=Math.min(100,(_ws/(WD*60))*100);
   const pf=$('progFill');if(pf){pf.style.width=pct.toFixed(1)+'%';}
   if($('progPct'))$('progPct').textContent=pct.toFixed(0)+'%';
-  if($('mWorked'))$('mWorked').textContent=s2t(TM.ws);
-  if($('mBreak'))$('mBreak').textContent=s2t(TM.bs);
-  const ex=Math.max(0,TM.ws/60-WD);
+  if($('mWorked'))$('mWorked').textContent=s2t(_ws);
+  if($('mBreak'))$('mBreak').textContent=s2t(_bs);
+  const ex=Math.max(0,_ws/60-WD);
   if($('mExtra'))$('mExtra').textContent=ex>0?Math.floor(ex/60)+':'+p2(Math.floor(ex%60)):'0:00';
 }
 
@@ -3449,8 +3442,26 @@ function doPwaInstall(){
   if(location.protocol !== 'https:' && location.hostname !== 'localhost') return;
   // Use a named SW file path — works when hosted, silently skips file://
   navigator.serviceWorker.register('./sw.js')
-    .then(function(reg){ console.log('[TIMES] SW registered'); })
+    .then(function(reg){
+      console.log('[TIMES] SW v5 registered');
+      // Forzar actualización inmediata si hay nueva versión
+      reg.addEventListener('updatefound', function(){
+        const nw=reg.installing;
+        if(!nw)return;
+        nw.addEventListener('statechange', function(){
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            // Nuevo SW instalado — recargar para aplicar cambios
+            navigator.serviceWorker.controller.postMessage({type:'SKIP_WAITING'});
+          }
+        });
+      });
+    })
     .catch(function(){ /* silently ignore — app works without SW */ });
+  // Recargar cuando el SW toma control
+  let _swRefreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
+    if(_swRefreshing)return;_swRefreshing=true;location.reload();
+  });
 })();
 
 // ── Firebase Auth ──
@@ -4103,12 +4114,6 @@ function exportMesXLSX(ym){
   toast('✅ Excel del mes descargado');
 }
 
-// Live clock for Inicio tab
-setInterval(function(){
-  const el=$('liveTime'),dl=$('liveDateStr');
-  if(el){const n=new Date();el.textContent=p2(n.getHours())+':'+p2(n.getMinutes());}
-  if(dl){dl.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});}
-},1000);
 
 // Recordatorio fin de jornada (hora configurable, por defecto 20:00)
 function scheduleEndOfDayReminder(){
