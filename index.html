@@ -131,12 +131,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-/* CSS GRID layout: row1=topbar(auto) row2=body(1fr) row3=nav(auto) */
-/* Grid is more reliable than Flex on iOS PWA for header+content+footer */
-#sEmp{overflow:hidden;background:var(--bg)}
-#sEmp.show{display:grid!important;grid-template-rows:auto 1fr auto;height:100%}
+/* Nav is now position:fixed at body level — #sEmp only needs topbar + body */
+#sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border)}
+.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
 .emp-greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .emp-subdate{font-size:12px;color:var(--text3);margin-top:1px;font-weight:400}
@@ -146,14 +144,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
-/* Emp bottom nav */
-.emp-nav{display:flex;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + var(--safe-bot));flex-shrink:0}
+/* Emp bottom nav — position:fixed at BODY level, NOT inside #sEmp */
+/* This avoids the iOS PWA bug where position:fixed inside position:fixed breaks */
+.emp-nav{position:fixed;bottom:0;left:0;right:0;display:none;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:150;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
 .emp-nav-item.on svg{stroke:var(--accent3)}
-/* Emp body — grid child, fills 1fr row */
-.emp-body{overflow:hidden;min-height:0;background:var(--bg);position:relative}
+/* Emp body — flex:1 fills space between topbar and screen bottom */
+.emp-body{flex:1;overflow:hidden;min-height:0;background:var(--bg);position:relative}
 /* Tab pages */
 .emp-tab-page{display:none;flex-direction:column;min-height:0;overflow-y:auto}
 .emp-tab-page.show{display:flex;flex:1;min-height:0}
@@ -506,10 +505,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .theme-toggle-btn:active{background:var(--bg4)}
 
 /* ═══ iOS SAFE AREA ═══ */
-.emp-nav{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 .login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
-.ini-wrap{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
-#tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+/* Tabs: position:absolute fills emp-body; padding-bottom prevents content hiding behind fixed nav */
+#tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+.ini-wrap{padding-bottom:8px}
 /* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
 button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-bnav-item,.sb-nav a,.cal-day,.card{touch-action:manipulation}
 *{-webkit-tap-highlight-color:transparent}
@@ -522,7 +521,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_11';
+  var V='20260614_12';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1072,14 +1071,16 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
       </div>
     </div>
   </div>
-  <!-- Bottom nav -->
-  <div class="emp-nav">
-    <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
-    <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
-    <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
-    <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
-    <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
-  </div>
+
+</div>
+
+<!-- ═══ EMPLOYEE BOTTOM NAV — body level, position:fixed works correctly here ═══ -->
+<div class="emp-nav" id="empBottomNav">
+  <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
+  <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
+  <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
+  <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
+  <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
 </div>
 
 <!-- ═══ ADMIN ═══ -->
@@ -1416,7 +1417,13 @@ function toast(msg,dur=3000){
 }
 
 // ── Screens ──
-function showScr(id){document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));$(id).classList.add('show');}
+function showScr(id){
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
+  $(id).classList.add('show');
+  // Show employee bottom nav only when employee screen is active
+  const nav=$('empBottomNav');
+  if(nav) nav.style.display=(id==='sEmp')?'flex':'none';
+}
 
 // ── Sidebar ──
 function toggleSidebar(){
