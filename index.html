@@ -131,10 +131,12 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-/* FIX 1: eliminado display:flex — respeta .scr/.scr.show */
-#sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
+/* CSS GRID layout: row1=topbar(auto) row2=body(1fr) row3=nav(auto) */
+/* Grid is more reliable than Flex on iOS PWA for header+content+footer */
+#sEmp{overflow:hidden;background:var(--bg)}
+#sEmp.show{display:grid!important;grid-template-rows:auto 1fr auto;height:100%}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border)}
 .emp-top-left{display:flex;flex-direction:column}
 .emp-greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .emp-subdate{font-size:12px;color:var(--text3);margin-top:1px;font-weight:400}
@@ -150,8 +152,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
 .emp-nav-item.on svg{stroke:var(--accent3)}
-/* Emp body */
-.emp-body{flex:1;height:0;overflow:hidden;min-height:0;background:var(--bg);position:relative}
+/* Emp body — grid child, fills 1fr row */
+.emp-body{overflow:hidden;min-height:0;background:var(--bg);position:relative}
 /* Tab pages */
 .emp-tab-page{display:none;flex-direction:column;min-height:0;overflow-y:auto}
 .emp-tab-page.show{display:flex;flex:1;min-height:0}
@@ -508,12 +510,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
 .ini-wrap{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 #tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
-/* ═══ iOS PWA standalone: forzar layout correcto ═══ */
-@media(display-mode:standalone){
-  #sEmp{display:flex!important;flex-direction:column!important}
-  .emp-body{flex:1 1 0!important;height:0!important;min-height:0!important}
-  .emp-nav{flex-shrink:0!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important}
-}
+/* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
+button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-bnav-item,.sb-nav a,.cal-day,.card{touch-action:manipulation}
+*{-webkit-tap-highlight-color:transparent}
+.jor-circle-btn{-webkit-touch-callout:none;user-select:none}
+.emp-nav-item,.adm-bnav-item{user-select:none}
 
 </style>
 </head>
@@ -521,7 +522,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_10';
+  var V='20260614_11';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1495,8 +1496,6 @@ function startPolling(){
 }
 // Sincronizar inmediatamente al recuperar conexión o volver a la app
 window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
-window.addEventListener('resize',_fixEmpHeight);
-window.addEventListener('orientationchange',()=>{setTimeout(_fixEmpHeight,200);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
 
 // ── Session ──
@@ -1906,12 +1905,6 @@ function doAdminLogin(){
   safeRun(applyEncPermissions,'enc');
   setTimeout(checkMonthRollover,2000);
 }
-function _fixEmpHeight(){
-  // iOS PWA: position:fixed;inset:0 doesn't always set flex container height correctly.
-  // Force exact pixel height so the bottom nav lands at the real screen bottom.
-  const el=$('sEmp');if(!el)return;
-  el.style.height=window.innerHeight+'px';
-}
 function doEmpLogin(){
   // FIX 3: guard contra llamadas sin sesión activa (evita null.name)
   if(!SES.user) return;
@@ -1928,7 +1921,6 @@ function doEmpLogin(){
   if((SES.isEnc||SES.isJO)&&$('encBtn'))$('encBtn').style.display='flex';
   if($('encBtn')&&SES.isJO)$('encBtn').textContent='🏗️ Panel';
   showScr('sEmp');
-  _fixEmpHeight();
   // Restore session timer
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
   if(open){
