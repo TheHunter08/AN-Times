@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="apple-touch-fullscreen" content="yes">
@@ -131,7 +131,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-/* FIX 1: eliminado display:flex — respeta .scr/.scr.show */
+/* Nav is now position:fixed at body level — #sEmp only needs topbar + body */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
 .emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -144,13 +144,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
-/* Emp bottom nav */
-.emp-nav{display:flex;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + var(--safe-bot));flex-shrink:0}
+/* Emp bottom nav — position:fixed at BODY level, NOT inside #sEmp */
+/* This avoids the iOS PWA bug where position:fixed inside position:fixed breaks */
+.emp-nav{position:fixed;bottom:0;left:0;right:0;display:none;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:150;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
 .emp-nav-item.on svg{stroke:var(--accent3)}
-/* Emp body */
+/* Emp body — flex:1 fills space between topbar and screen bottom */
 .emp-body{flex:1;overflow:hidden;min-height:0;background:var(--bg);position:relative}
 /* Tab pages */
 .emp-tab-page{display:none;flex-direction:column;min-height:0;overflow-y:auto}
@@ -255,6 +256,43 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px}
 .vac-balance-bar{height:6px;border-radius:3px;background:var(--bg4);overflow:hidden;margin-top:4px}
 .vac-balance-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--teal));transition:width .4s}
+/* ═══ VACATION TAB (SaaS redesign) ═══ */
+.vac-wrap2{padding:0 0 calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:0}
+.vac-hero{background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 50%,#0ea5e9 100%);padding:28px 20px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;position:relative;overflow:hidden}
+.vac-hero::after{content:'';position:absolute;right:-20px;top:-20px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%}
+.vac-hero::before{content:'';position:absolute;right:30px;bottom:-30px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%}
+.vac-hero-badge{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px}
+.vac-hero-title{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.4px;line-height:1.1}
+.vac-hero-sub{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px;font-weight:400}
+.vac-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--border)}
+.vac-stat{display:flex;flex-direction:column;align-items:center;padding:18px 8px 14px;gap:4px;border-right:1px solid var(--border);background:var(--bg2)}
+.vac-stat:last-child{border-right:none}
+.vac-stat-ico{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.vac-stat-val{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.vac-stat-lbl{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.vac-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.vac-prog-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.vac-prog-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.vac-prog-title{font-size:13px;font-weight:700;color:var(--text)}
+.vac-prog-pct{font-size:12px;font-weight:700;color:var(--accent3);background:var(--accent-dim);border:1px solid var(--accent-glow);padding:2px 8px;border-radius:12px}
+.vac-prog-bar{height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;margin-bottom:10px}
+.vac-prog-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#0ea5e9);transition:width .6s ease}
+.vac-prog-meta{font-size:11px;color:var(--text3)}
+.vac-cta{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:var(--r);padding:15px 20px;font-size:14px;font-weight:700;width:100%;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .15s;letter-spacing:.1px;-webkit-tap-highlight-color:transparent}
+.vac-cta:active{opacity:.85}
+.vac-cta svg{width:18px;height:18px;stroke:#fff;stroke-width:2;fill:none;flex-shrink:0}
+.vac-section-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;padding:4px 0 2px}
+.vac-section-title svg{width:14px;height:14px;stroke:var(--text3);stroke-width:2;fill:none}
+.vac-list-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:14px}
+.vac-list-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.vac-list-icon svg{width:20px;height:20px;stroke-width:1.8;fill:none}
+.vac-list-info{flex:1;min-width:0}
+.vac-list-range{font-size:13px;font-weight:700;color:var(--text)}
+.vac-list-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.vac-list-badge{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.vac-badge-ok{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2)}
+.vac-badge-pend{background:rgba(245,158,11,.1);color:var(--orange);border:1px solid rgba(245,158,11,.2)}
+.vac-badge-ko{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
 .cal-day-header{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:4px 0;text-transform:uppercase;letter-spacing:.5px}
 .cal-day{min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s;position:relative;color:var(--text2);padding:4px 2px;gap:2px}
 .cal-day:hover{background:var(--bg4)}
@@ -417,7 +455,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .modal-btns button{flex:1}
 .modal-drag{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
 /* Admin bottom nav (mobile) */
-#admBottomNav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:200;flex-direction:row;justify-content:space-around;align-items:center}
+#admBottomNav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + var(--safe-bot));z-index:200;flex-direction:row;justify-content:space-around;align-items:center}
 .adm-bnav-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;cursor:pointer;padding:2px 8px;color:var(--text4);transition:color .15s;letter-spacing:.3px}
 .adm-bnav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none}
 .adm-bnav-item.on{color:var(--accent3)}
@@ -428,13 +466,17 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   .sidebar.mob-open{left:0}
   .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:299;backdrop-filter:blur(3px);display:none}
   .sb-overlay.show{display:block}
-  .adm-main{width:100%}
+  /* iOS PWA: forzar layout column, nav dentro del flujo (no fixed) */
+  #sAdmin{flex-direction:column!important}
+  .sidebar{top:0;height:100%}
+  .adm-main{width:100%!important;height:100%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
   #admHam{display:flex!important}
-  #admBottomNav{display:flex!important}
-  .adm-content{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  #admBottomNav{display:flex!important;position:static!important;bottom:auto!important;left:auto!important;right:auto!important;flex-shrink:0!important;z-index:1!important;width:100%}
+  .adm-content{flex:1!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;min-height:0!important;padding-bottom:env(safe-area-inset-bottom,4px)!important}
+  .adm-topbar{padding-top:max(12px,env(safe-area-inset-top));height:auto!important;min-height:56px}
   .dash-stats{grid-template-columns:1fr 1fr}
   .dash-row{grid-template-columns:1fr}
-  .rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
+  .rec-table thead th:nth-child(3),.rec-table tbody td:nth-child(3),.rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
 }
 
 .login-field-group{position:relative;display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r)}
@@ -462,36 +504,41 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .theme-toggle-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:background .15s;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .theme-toggle-btn:active{background:var(--bg4)}
 
-/* ═══ iOS PWA SAFE AREA — usar env() directo, no variables CSS ═══ */
-.emp-nav{
-  padding-bottom:calc(8px + env(safe-area-inset-bottom));
-  /* En PWA standalone iOS el home indicator ocupa ~34px */
-  min-height:calc(56px + env(safe-area-inset-bottom));
-}
-.login-wrap{padding-top:max(calc(env(safe-area-inset-top) + 32px),44px)}
-.ini-wrap{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+/* ═══ iOS SAFE AREA ═══ */
+.login-wrap{padding-top:max(calc(var(--safe-top) + 32px),44px)}
+/* Tabs: position:absolute fills emp-body; padding-bottom prevents content hiding behind fixed nav */
+#tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+.ini-wrap{padding-bottom:8px}
+/* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
+html{touch-action:manipulation} /* prevents double-tap zoom globally */
+button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-bnav-item,.sb-nav a,.cal-day,.card{touch-action:manipulation}
+*{-webkit-tap-highlight-color:transparent}
+.jor-circle-btn{-webkit-touch-callout:none;user-select:none}
+.emp-nav-item,.adm-bnav-item{user-select:none}
 
-/* Tabs: absolute fill dentro de emp-body */
-#tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{
-  position:absolute;
-  top:0;left:0;right:0;bottom:0;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  overscroll-behavior-y:contain;
-}
-
-/* PWA standalone: forzar que el nav quede pegado al fondo real */
-@media all and (display-mode: standalone){
-  #admBottomNav{
-    padding-bottom:max(env(safe-area-inset-bottom), 8px) !important;
-    padding-bottom:calc(8px + env(safe-area-inset-bottom)) !important;
+/* ═══ DESKTOP MODE: app as centered phone window ═══ */
+/* body{transform} makes ALL position:fixed children relative to body on desktop */
+@media(min-width:769px){
+  html{
+    background:linear-gradient(135deg,#07071a 0%,#130824 45%,#06101f 100%);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    cursor:pointer; /* indica que click fuera cierra */
   }
-  .emp-nav{
-    padding-bottom:calc(10px + env(safe-area-inset-bottom)) !important;
+  html::before{
+    content:'';position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(99,102,241,.07) 0%,transparent 70%);
   }
-  .adm-content{
-    padding-bottom:calc(80px + env(safe-area-inset-bottom)) !important;
+  body{
+    position:fixed;top:50%;left:50%;
+    width:390px;height:min(844px,96vh);
+    transform:translate(-50%,-50%); /* contains ALL position:fixed children */
+    border-radius:44px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 1px rgba(255,255,255,.1),0 40px 120px rgba(0,0,0,.85),0 0 80px rgba(99,102,241,.15);
   }
+  /* Subtle phone frame top notch line */
+  body::before{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:80px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;z-index:9999;pointer-events:none}
+  /* On desktop scr elements are already absolute — but ensure they don't exceed body */
+  .scr{border-radius:0}
 }
 
 </style>
@@ -500,7 +547,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_8';
+  var V='20260614_14';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -830,7 +877,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         <div class="jor-main-card">
           <!-- Timer horas trabajadas (arriba) -->
           <div class="jor-timer" id="jorTimer" style="margin-top:4px">00:00:00</div>
-          <div class="jor-timer-sub">Horas trabajadas hoy</div>
           <!-- Botón descanso (antes del botón fichar para contexto) -->
           <div class="jor-break-row"><button class="jor-break-chip" id="jorBreakChip" onclick="toggleBreak()" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/></svg><span id="jorBreakTxt">Iniciar descanso</span></button></div>
           <!-- Botón circular fichar (abajo del contador) -->
@@ -839,6 +885,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div style="margin-top:16px;padding-top:14px;display:flex;justify-content:center">
             <span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Sin jornada</span></span>
           </div>
+        </div>
+        <!-- Resumen header -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 4px;margin-bottom:12px;margin-top:4px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Resumen de horas trabajadas</span>
         </div>
         <!-- Circular progress + metrics -->
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:0 4px">
@@ -946,26 +997,63 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
     </div>
     <!-- VACACIONES -->
     <div id="tabVacaciones" style="display:none;overflow-y:auto">
-      <div style="padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))">
-        <div style="margin-bottom:16px"><div style="font-size:22px;font-weight:800">Mis vacaciones</div><div style="font-size:13px;color:var(--text3);margin-top:2px" id="vacFechaHoy"></div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--accent3)" id="vacDisp">—</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Disponibles</div></div>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--green)" id="vacUsadas">—</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Disfrutadas</div></div>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--orange)" id="vacPend">—</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Pendientes</div></div>
+      <div class="vac-wrap2">
+        <!-- Hero -->
+        <div class="vac-hero">
+          <div class="vac-hero-badge">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Mis Vacaciones
+          </div>
+          <div class="vac-hero-title">Balance de días</div>
+          <div class="vac-hero-sub" id="vacFechaHoy">—</div>
         </div>
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:600">Progreso anual</span><span style="font-size:12px;color:var(--text3)" id="vacProgLabel">0/30 días</span></div>
-          <div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden"><div id="vacProgBar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;width:0%;transition:width .6s"></div></div>
-          <div style="font-size:11px;color:var(--text3);margin-top:6px" id="vacGenInfo">Generadas según antigüedad</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-            <span style="font-size:10px;color:var(--text3);white-space:nowrap">Usadas</span>
-            <div class="vac-balance-bar" style="flex:1"><div class="vac-balance-fill" id="vacBalanceFill" style="width:0%"></div></div>
-            <span style="font-size:10px;color:var(--text3);white-space:nowrap">Disponibles</span>
+        <!-- Stats row -->
+        <div class="vac-stats-row">
+          <div class="vac-stat">
+            <div class="vac-stat-ico" style="background:rgba(99,102,241,.15)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#818cf8" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="vac-stat-val" style="color:var(--accent3)" id="vacDisp">—</div>
+            <div class="vac-stat-lbl">Disponibles</div>
+          </div>
+          <div class="vac-stat">
+            <div class="vac-stat-ico" style="background:rgba(16,185,129,.12)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green)" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="vac-stat-val" style="color:var(--green)" id="vacUsadas">—</div>
+            <div class="vac-stat-lbl">Disfrutadas</div>
+          </div>
+          <div class="vac-stat">
+            <div class="vac-stat-ico" style="background:rgba(245,158,11,.1)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="vac-stat-val" style="color:var(--orange)" id="vacPend">—</div>
+            <div class="vac-stat-lbl">Pendientes</div>
           </div>
         </div>
-        <button class="btn btn-primary btn-full" style="margin-bottom:16px;padding:14px" onclick="openModal('mVac')">&#x1F334; Solicitar vacaciones</button>
-        <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Mis solicitudes</div>
-        <div id="vacList" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Sin solicitudes</div></div>
+        <!-- Body -->
+        <div class="vac-body">
+          <!-- Progress card -->
+          <div class="vac-prog-card">
+            <div class="vac-prog-head">
+              <div class="vac-prog-title">Progreso anual</div>
+              <div class="vac-prog-pct" id="vacProgLabel">0 / 0 días</div>
+            </div>
+            <div class="vac-prog-bar"><div class="vac-prog-fill" id="vacProgBar" style="width:0%"></div></div>
+            <div class="vac-prog-meta" id="vacGenInfo">Generadas según antigüedad</div>
+          </div>
+          <!-- CTA -->
+          <button class="vac-cta" onclick="openModal('mVac')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Solicitar vacaciones
+          </button>
+          <!-- List -->
+          <div class="vac-section-title">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Mis solicitudes
+          </div>
+          <div id="vacList" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Sin solicitudes</div></div>
+        </div>
       </div>
     </div>
     <!-- CALENDARIO -->
@@ -1009,14 +1097,16 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
       </div>
     </div>
   </div>
-  <!-- Bottom nav -->
-  <div class="emp-nav">
-    <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
-    <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
-    <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
-    <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
-    <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
-  </div>
+
+</div>
+
+<!-- ═══ EMPLOYEE BOTTOM NAV — body level, position:fixed works correctly here ═══ -->
+<div class="emp-nav" id="empBottomNav">
+  <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
+  <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
+  <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
+  <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
+  <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
 </div>
 
 <!-- ═══ ADMIN ═══ -->
@@ -1060,7 +1150,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div class="dstat"><div class="dstat-ico blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><div class="dstat-lbl">Horas hoy</div><div class="dstat-val" id="dHours">—</div><div class="dstat-sub">Trabajadas</div></div></div>
         </div>
         <div class="dash-row"><div class="chart-card"><div class="chart-title">Horas esta semana</div><div id="weekChart" style="width:100%;min-height:130px"></div></div><div class="chart-card"><div class="chart-title">Resumen general</div><div class="donut-wrap"><div style="position:relative;flex-shrink:0"><svg id="donutSvg" viewBox="0 0 90 90" width="90" height="90"></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div class="donut-ctr-val" id="donutTotal">—</div><div class="donut-ctr-lbl">Total</div></div></div><div class="donut-legend" id="donutLeg"></div></div></div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div class="chart-card"><div class="chart-title">Fichajes recientes</div><div id="dashActivity"></div></div><div class="chart-card"><div class="chart-title">Próximas vacaciones</div><div id="dashVacaciones"></div></div></div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1068,6 +1157,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           </div>
           <div id="dashActiveEmps" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px"><div class="empty">Sin empleados activos</div></div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div class="chart-card"><div class="chart-title">Fichajes recientes</div><div id="dashActivity"></div></div><div class="chart-card"><div class="chart-title">Próximas vacaciones</div><div id="dashVacaciones"></div></div></div>
       </div>
       <div id="pControl" style="display:none"><div class="card"><h3>Control de jornadas</h3></div><div id="ctrlList"></div></div>
       <div id="pFichajes" style="display:none"><div class="card"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><select id="fEmpFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todos los empleados</option></select><select id="fSemFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todas las semanas</option></select></div><div style="overflow-x:auto"><table class="rec-table"><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody id="fichList"></tbody></table></div></div></div>
@@ -1147,15 +1237,13 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Resúmenes mensuales por empleado
           </div>
-        <div id="expResumenList"><div class="empty">Cargando...</div></div>
+          <div id="expResumenList"><div class="empty">Cargando...</div></div>
         </div>
       </div>
     </div>
+    <div id="admBottomNav"><div class="adm-bnav-item on" data-p="dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Inicio</div><div class="adm-bnav-item" data-p="fichajes" onclick="showPage('fichajes')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Fichajes</div><div class="adm-bnav-item" data-p="solicitudes" onclick="showPage('solicitudes')" style="position:relative"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span id="botSolBadge" style="position:absolute;top:0;right:6px;background:var(--red);color:#fff;font-size:7px;width:13px;height:13px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700">0</span>Solicitudes</div><div class="adm-bnav-item" data-p="empleados" onclick="showPage('empleados')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Empleados</div><div class="adm-bnav-item" data-p="docsnominas" onclick="showPage('docsnominas')" id="botDocs"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Contratos</div><div onclick="toggleSidebar()" class="adm-bnav-item"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Más</div></div>
   </main>
 </div>
-
-<!-- admBottomNav FUERA de #sAdmin para que position:fixed se ancle al viewport real -->
-<div id="admBottomNav"><div class="adm-bnav-item on" data-p="dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Inicio</div><div class="adm-bnav-item" data-p="fichajes" onclick="showPage('fichajes')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Fichajes</div><div class="adm-bnav-item" data-p="solicitudes" onclick="showPage('solicitudes')" style="position:relative"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span id="botSolBadge" style="position:absolute;top:0;right:6px;background:var(--red);color:#fff;font-size:7px;width:13px;height:13px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700">0</span>Solicitudes</div><div class="adm-bnav-item" data-p="empleados" onclick="showPage('empleados')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Empleados</div><div class="adm-bnav-item" data-p="docsnominas" onclick="showPage('docsnominas')" id="botDocs"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Contratos</div><div onclick="toggleSidebar()" class="adm-bnav-item"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Más</div></div>
 
 
 
@@ -1284,6 +1372,30 @@ window._fbResetPwd = function(){ return Promise.reject(new Error('Firebase no ca
 
 // ── Config ──
 const DB_URL='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data';
+const _VAPID_PUB='BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ';
+const _FB_BASE='https://times-inc-default-rtdb.europe-west1.firebasedatabase.app';
+function _b64ToUint8(b){const p='='.repeat((4-b.length%4)%4);const s=atob((b+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...s].map(c=>c.charCodeAt(0)));}
+function _buf2b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+async function subscribePush(userId){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')return;
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_b64ToUint8(_VAPID_PUB)});
+    const key=sub.getKey('p256dh'),auth=sub.getKey('auth');
+    await fetch(_FB_BASE+'/pushSubs/'+encodeURIComponent(userId)+'.json',{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({endpoint:sub.endpoint,keys:{p256dh:_buf2b64url(key),auth:_buf2b64url(auth)}})
+    });
+  }catch(e){console.warn('[PUSH] subscribe:',e);}
+}
+function queuePushNotif(userId,title,body,tag){
+  fetch('/api/sendpush',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({userId,title,body:body||'',tag:tag||'times'})
+  }).catch(()=>{});
+}
 const ADMIN_PIN='0824';
 const WK=40*60,WD=8*60,WM=160*60,VPM=2.5;
 
@@ -1355,7 +1467,13 @@ function toast(msg,dur=3000){
 }
 
 // ── Screens ──
-function showScr(id){document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));$(id).classList.add('show');}
+function showScr(id){
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
+  $(id).classList.add('show');
+  // Show employee bottom nav only when employee screen is active
+  const nav=$('empBottomNav');
+  if(nav) nav.style.display=(id==='sEmp')?'flex':'none';
+}
 
 // ── Sidebar ──
 function toggleSidebar(){
@@ -1429,7 +1547,42 @@ function doFetch(){
     setSyncDot(true);
   }).catch(()=>setSyncDot(false));
 }
-function startPolling(){if(_polling)clearInterval(_polling);_polling=setInterval(doFetch,10000);}
+function startPolling(){
+  if(_polling)clearInterval(_polling);
+  _polling=setInterval(doFetch,10000);
+}
+// Sincronizar inmediatamente al recuperar conexión o volver a la app
+window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
+// Block zoom: gesture events (iOS Safari) + pinch + double-tap
+document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gestureend',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',function(e){if(e.touches.length>1)e.preventDefault();},{passive:false});
+var _lastTap=0;
+document.addEventListener('touchend',function(e){
+  var now=Date.now();
+  if(now-_lastTap<300&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))e.preventDefault();
+  _lastTap=now;
+},{passive:false});
+
+function _desktopGoBack(){
+  var openModal=document.querySelector('.modal-wrap.show');
+  if(openModal){openModal.classList.remove('show');return;}
+  var np=$('notisPanel');if(np&&np.classList.contains('show')){closeNotis();return;}
+  var sb=$('adminSidebar');if(sb&&sb.classList.contains('mob-open')){closeSidebar();return;}
+  if($('sEmp')&&$('sEmp').classList.contains('show')){if(typeof empNavTo==='function')empNavTo('inicio');return;}
+  if($('sAdmin')&&$('sAdmin').classList.contains('show')){if(typeof showPage==='function')showPage('dashboard');return;}
+}
+
+// Desktop: click outside the centered body window goes back
+document.addEventListener('click',function(e){
+  if(window.innerWidth<=768)return;
+  const r=document.body.getBoundingClientRect();
+  if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){
+    _desktopGoBack();
+  }
+},true);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
 
 // ── Session ──
 function saveSession(){try{localStorage.setItem('an_times_ses',JSON.stringify(SES.isAdmin&&!SES.isEnc?{isAdmin:true}:{empId:SES.user?.id}));}catch(e){}}
@@ -1722,58 +1875,69 @@ async function doBiometric(){
   await _doBioVerify(emp, errEl);
 }
 
+// Registrar credencial biométrica (llama al crear una nueva)
+async function _bioRegister(emp){
+  const challenge=new Uint8Array(32); crypto.getRandomValues(challenge);
+  const rpId=location.hostname||'localhost';
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge,
+    rp:{name:'TIMES INC',id:rpId},
+    user:{id:new TextEncoder().encode(emp.id),name:emp.email||emp.id,displayName:emp.name},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+    timeout:60000
+  }});
+  if(!cred)throw new Error('No se pudo crear credencial');
+  // Guardar credId en base64
+  const credId=btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+  try{localStorage.setItem('bio_cred_'+emp.id,credId);}catch(e){}
+  return credId;
+}
+
 async function _doBioVerify(emp, errEl){
   if(errEl) errEl.textContent = '';
   try{
-    // Generar challenge aleatorio
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
+    const challenge=new Uint8Array(32); crypto.getRandomValues(challenge);
+    const rpId=location.hostname||'localhost';
+    // Usar credencial registrada si existe
+    const credIdB64=(()=>{try{return localStorage.getItem('bio_cred_'+emp.id);}catch(e){return null;}})();
+    const allowCreds=credIdB64?[{
+      id:Uint8Array.from(atob(credIdB64),c=>c.charCodeAt(0)),
+      type:'public-key',
+      transports:['internal','hybrid']
+    }]:[];
 
-    // Intentar verificación biométrica sin credencial registrada
-    // (userVerification: 'required' activa Face ID / Touch ID en iOS/Android)
-    const result = await navigator.credentials.get({
-      publicKey:{
-        challenge,
-        timeout: 60000,
-        userVerification: 'required',
-        rpId: location.hostname || 'localhost',
-        allowCredentials: [] // sin credenciales registradas → el dispositivo pide bio igualmente
-      }
-    }).catch(e => { throw e; });
+    const result=await navigator.credentials.get({publicKey:{
+      challenge,timeout:60000,
+      userVerification:'required',
+      rpId,
+      allowCredentials:allowCreds
+    }});
 
-    // Si llega aquí (result puede ser null o un objeto), el dispositivo verificó la biometría
-    if(result !== undefined){
-      SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-      SES.isAdmin = emp.role === 'jefe_obra';
-      saveSession(); doEmpLogin();
-      toast('✅ Acceso biométrico — ' + emp.name.split(' ')[0]);
+    if(result){
+      SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+      SES.isAdmin=emp.role==='jefe_obra';
+      saveSession();doEmpLogin();
+      toast('✅ Acceso biométrico — '+emp.name.split(' ')[0]);
     }
-  } catch(ex){
-    // NotAllowedError = usuario canceló, no autenticó, o iOS Safari sin credencial registrada
-    // InvalidStateError / NotSupportedError = no hay credencial WebAuthn registrada
-    const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
-    if(ex.name === 'NotAllowedError'){
-      // Fallback: si hay sesión previa del mismo empleado, restaurar sin WebAuthn
-      if(savedSes && savedSes.empId === emp.id){
-        SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-        SES.isAdmin = emp.role === 'jefe_obra';
-        saveSession(); doEmpLogin();
-        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
-      } else {
-        if(errEl) errEl.textContent = 'Biometría no disponible o cancelada. Usa tu PIN.';
-      }
-    } else if(ex.name === 'NotSupportedError' || ex.name === 'InvalidStateError' || ex.name === 'SecurityError'){
-      if(savedSes && savedSes.empId === emp.id){
-        SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-        SES.isAdmin = emp.role === 'jefe_obra';
-        saveSession(); doEmpLogin();
-        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
-      } else {
-        if(errEl) errEl.textContent = '⚠️ Primero inicia sesión con PIN o email para activar la biometría';
-      }
+  }catch(ex){
+    const savedSes=(()=>{try{return JSON.parse(localStorage.getItem('an_times_ses')||'null');}catch(e){return null;}})();
+    // Sin credencial registrada: intentar registrar ahora
+    if(ex.name==='NotAllowedError'&&!localStorage.getItem('bio_cred_'+emp.id)){
+      try{
+        await _bioRegister(emp);
+        toast('🔐 Biometría registrada. Vuelve a pulsar Face ID.');
+        return;
+      }catch(re){/* no pudo registrar, fallback */}
+    }
+    if(savedSes&&savedSes.empId===emp.id){
+      SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+      SES.isAdmin=emp.role==='jefe_obra';
+      saveSession();doEmpLogin();
+      toast('✅ Sesión restaurada — '+emp.name.split(' ')[0]);
     } else {
-      if(errEl) errEl.textContent = 'Biometría no disponible. Usa tu PIN.';
-      console.warn('[TIMES] Bio error:', ex.name, ex.message);
+      if(errEl)errEl.textContent='Biometría no disponible o cancelada. Usa tu PIN.';
+      console.warn('[TIMES] Bio:',ex.name,ex.message);
     }
   }
 }
@@ -1860,6 +2024,7 @@ function doEmpLogin(){
   // Pedir permisos de notificación y programar recordatorio
   setTimeout(requestNotifPermission, 2000);
   setTimeout(scheduleEndOfDayReminder, 3000);
+  setTimeout(function(){subscribePush('emp:'+SES.user.id);},4000);
 }
 function showEncPanel(){
   // Encargados ven el panel con permisos limitados (solo su obra)
@@ -1908,16 +2073,18 @@ function renderResumen(){
   // Umbral 30s: excluye micro-bugs pero incluye jornadas cortas reales
   const realRecs=recs.filter(r=>!r.fin||recWorkSecs(r)>=30);
 
-  // ENTRADA: primera hora de hoy (cualquier registro con >=30s o abierto)
+  // ENTRADA: primera hora de hoy (primer registro real del día, independiente de si está abierto)
   const entradaEl=$('resEntrada');
   if(entradaEl){
-    const src=openRec2||realRecs[0];
+    const src=realRecs[0];
     if(src){
       const v=ftime(src.inicio);
       entradaEl.textContent=v;
       _saveCache(u.id,'entrada',v);_saveCache(u.id,'date',tod);
     } else {
-      entradaEl.textContent=_loadCache(u.id,'entrada');
+      // Solo usar caché si es del mismo día
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      entradaEl.textContent=(cachedDate===tod)?_loadCache(u.id,'entrada'):'--:--';
     }
   }
 
@@ -1933,7 +2100,8 @@ function renderResumen(){
       salidaEl.textContent=v;
       _saveCache(u.id,'salida',v);
     } else {
-      salidaEl.textContent=_loadCache(u.id,'salida');
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      salidaEl.textContent=(cachedDate===tod)?_loadCache(u.id,'salida'):'--:--';
     }
   }
 
@@ -1953,7 +2121,8 @@ function renderResumen(){
       totalEl.textContent=v;
       _saveCache(u.id,'total',v);
     } else {
-      totalEl.textContent=_loadCache(u.id,'total');
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      totalEl.textContent=(cachedDate===tod)?_loadCache(u.id,'total'):'0h 00m';
     }
   }
   // GPS card
@@ -1984,17 +2153,29 @@ function renderJorTab(){
         if(b.start)items.push({ico:'☕',label:'Pausa',time:ftime(b.start),bg:'rgba(245,158,11,.15)',dot:'var(--orange)'});
         if(b.end)items.push({ico:'▶️',label:'Reanudado',time:ftime(b.end),bg:'var(--accent-dim)',dot:'var(--accent)'});
       });
-      if(r.fin)items.push({ico:'🔴',label:'Salida',time:ftime(r.fin),bg:'rgba(239,68,68,.12)',dot:'var(--red)'});
-      else items.push({ico:'⏳',label:'Trabajando',time:'En curso',bg:'rgba(99,102,241,.12)',dot:'var(--accent)',live:true});
+      if(r.fin){
+        items.push({ico:'🔴',label:'Salida',time:ftime(r.fin),bg:'rgba(239,68,68,.12)',dot:'var(--red)'});
+        // Badge de validación
+        const ap=r.aprobado;
+        const vPor=r.validadoPor||'';
+        const statusIco=ap===true?'✅':ap===false?'❌':'⏳';
+        const statusTxt=ap===true?('Aprobada'+(vPor?' · '+vPor:'')):ap===false?('Rechazada'+(vPor?' · '+vPor:'')):('Pendiente de validar');
+        const statusBg=ap===true?'rgba(16,185,129,.1)':ap===false?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)';
+        const statusColor=ap===true?'var(--green)':ap===false?'var(--red)':'var(--orange)';
+        items.push({ico:statusIco,label:statusTxt,time:'',bg:statusBg,dot:statusColor,statusBadge:true,statusColor});
+      } else {
+        items.push({ico:'⏳',label:'Trabajando',time:'En curso',bg:'rgba(99,102,241,.12)',dot:'var(--accent)',live:true});
+      }
     });
     tl.innerHTML=items.map((it,i)=>`<div class="tl-item">
       <div class="tl-left">
         <div class="tl-ico" style="background:${it.bg}">${it.ico}</div>
         ${i<items.length-1?'<div class="tl-line"></div>':''}
       </div>
-      <div class="tl-right">
-        <span class="tl-label">${it.label}</span>
-        <span class="tl-time"${it.live?' id="jorLiveTime"':''}>${it.time}</span>
+      <div class="tl-right" style="${it.statusBadge?'padding:5px 10px;background:'+it.bg+';border-radius:8px;margin-bottom:4px':''}">
+        <span class="tl-label" style="${it.statusBadge?'color:'+it.statusColor+';font-size:11px':''}">
+          ${it.statusBadge?it.label:it.label}</span>
+        ${it.time?`<span class="tl-time"${it.live?' id="jorLiveTime"':''}>${it.time}</span>`:''}
       </div>
     </div>`).join('');
   }
@@ -2208,8 +2389,8 @@ function setEmpStatus(cls,txt){safeRun(updJorCircle,"ses");}
 function updTimer(){
   // Siempre calcular desde el registro abierto para evitar bugs de sincronización
   const _o=openRec();
-  const _ws=_o?calcSecs(_o).work:TM.ws;
-  const _bs=_o?calcSecs(_o).brk:TM.bs;
+  const _ws=_o?calcSecs(_o).work:0;
+  const _bs=_o?calcSecs(_o).brk:0;
   const jt=$('jorTimer');if(jt)jt.textContent=s2t(_ws);
   const pct=Math.min(100,(_ws/(WD*60))*100);
   const pf=$('progFill');if(pf){pf.style.width=pct.toFixed(1)+'%';}
@@ -2347,17 +2528,29 @@ function renderHist(){
 function renderVacList(){
   const el=$('vacList');if(!SES.user||!el)return;
   const vacs=(DB.vacaciones||[]).filter(v=>v.empId===SES.user.id).sort((a,b)=>b.desde.localeCompare(a.desde));
-  if(!vacs.length){el.innerHTML='<div class="empty">Sin solicitudes</div>';return;}
+  if(!vacs.length){el.innerHTML='<div class="empty">Sin solicitudes aún</div>';return;}
+  const fmtDate=s=>{const d=new Date(s+'T12:00:00');return d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});};
   el.innerHTML=vacs.map(v=>{
-    const bc=v.estado==='aprobada'?'badge-green':v.estado==='denegada'?'badge-red':'badge-orange';
-    const statusTxt=v.estado==='aprobada'?'✅ Aprobada':v.estado==='denegada'?'❌ Denegada':'⏳ Pendiente';
     const dias=v.dias||1;
-    return`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">🌴</span><div><div style="font-size:13px;font-weight:600">${dias} día${dias>1?'s':''}</div><div style="font-size:11px;color:var(--text3);margin-top:1px">${v.desde} → ${v.hasta}</div></div></div>
-        <span class="badge ${bc}">${statusTxt}</span>
+    const isOk=v.estado==='aprobada',isKo=v.estado==='denegada';
+    const badgeCls=isOk?'vac-badge-ok':isKo?'vac-badge-ko':'vac-badge-pend';
+    const badgeTxt=isOk?'Aprobada':isKo?'Denegada':'Pendiente';
+    const icoColor=isOk?'rgba(16,185,129,.12)':isKo?'rgba(239,68,68,.1)':'rgba(245,158,11,.1)';
+    const icoStroke=isOk?'var(--green)':isKo?'var(--red)':'var(--orange)';
+    const icoSvg=isOk
+      ?'<polyline points="20 6 9 17 4 12"/>'
+      :isKo
+      ?'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+      :'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>';
+    return`<div class="vac-list-item">
+      <div class="vac-list-icon" style="background:${icoColor}">
+        <svg viewBox="0 0 24 24" stroke="${icoStroke}" fill="none" stroke-width="2.2" width="20" height="20">${icoSvg}</svg>
       </div>
-      ${v.nota?`<div style="font-size:12px;color:var(--text3);background:var(--bg4);padding:8px;border-radius:8px">${v.nota}</div>`:''}
+      <div class="vac-list-info">
+        <div class="vac-list-range">${fmtDate(v.desde)} → ${fmtDate(v.hasta)}</div>
+        <div class="vac-list-sub">${dias} día${dias>1?'s':''}${v.nota?' · '+v.nota:''}</div>
+      </div>
+      <div class="vac-list-badge ${badgeCls}">${badgeTxt}</div>
     </div>`;
   }).join('');
 }
@@ -2372,9 +2565,8 @@ function renderVacTab(){
   if($('vacPend'))$('vacPend').textContent=vd.pending+'d';
   const pct=vd.generated>0?Math.min(100,Math.round((vd.used/vd.generated)*100)):0;
   if($('vacProgBar'))$('vacProgBar').style.width=pct+'%';
-  if($('vacProgLabel'))$('vacProgLabel').textContent=vd.used+' / '+vd.generated+' días usados';
-  if($('vacGenInfo'))$('vacGenInfo').textContent='Llevas '+vd.months+' meses — '+vd.generated+' días generados ('+VPM+'d/mes)';
-  const bf=$('vacBalanceFill');if(bf)bf.style.width=(vd.generated>0?Math.min(100,Math.round(vd.used/vd.generated*100)):0)+'%';
+  if($('vacProgLabel'))$('vacProgLabel').textContent=vd.used+' / '+vd.generated+' días';
+  if($('vacGenInfo'))$('vacGenInfo').textContent='Llevas '+vd.months+' mes'+(vd.months!==1?'es':'')+' en la empresa · '+vd.generated+' días generados ('+VPM+'/mes)';
   renderVacList();
 }
 
@@ -2445,9 +2637,10 @@ function populateModalEmps(){
 }
 
 // ── Admin pages ──
+const _ADMIN_PAGES=['pDashboard','pControl','pFichajes','pSolicitudes','pEmpleados','pObras','pInformes','pExportar','pDocsnominas'];
 function showPage(p){
-  document.querySelectorAll('.adm-content>[id^="p"]').forEach(el=>el.style.display='none');
-  const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg)pg.style.display='';
+  _ADMIN_PAGES.forEach(id=>{const el=$(id);if(el)el.style.display='none';});
+  const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg){pg.style.display='';pg.scrollTop=0;}
   document.querySelectorAll('.sni').forEach(el=>el.classList.toggle('on',el.dataset.p===p));
   const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar',docsnominas:'Contratos y Nóminas'};
   if($('admTitle'))$('admTitle').textContent=titles[p]||p;
@@ -2658,7 +2851,10 @@ function delRec(id){if(!confirm('¿Eliminar fichaje?'))return;DB.records=DB.reco
 function aprobar(id,aprobado){
   const r=DB.records.find(x=>x.id===id);if(!r)return;
   r.aprobado=aprobado;r.validadoPor=SES.user?.name||'Admin';
-  pushNoti('emp:'+r.empId,'info',aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas',`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`);
+  const _t=aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas';
+  const _b=`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`;
+  pushNoti('emp:'+r.empId,'info',_t,_b);
+  queuePushNotif('emp:'+r.empId,_t,_b,'horas');
   save();renderFichajes();safeRun(renderSolicitudes,'sol');toast(aprobado?'✅ Aprobado':'❌ Rechazado');
 }
 
@@ -2695,7 +2891,10 @@ function aprobarConEdicion(recId,date,aprobado){
   if(inT){const dIn=new Date(date);const[ih,im]=inT.split(':');dIn.setHours(+ih,+im,0,0);r.inicio=dIn.toISOString();}
   if(outT){const dOut=new Date(date);const[oh,om]=outT.split(':');dOut.setHours(+oh,+om,0,0);r.fin=dOut.toISOString();r.workSecs=Math.max(0,Math.floor((dOut-new Date(r.inicio))/1000)-(r.breakSecs||0));}
   r.aprobado=aprobado;r.validadoPor=SES.user?.name||'Encargado';
-  pushNoti('emp:'+r.empId,'info',aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas',`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`);
+  const _t2=aprobado?'✅ Horas aprobadas':'❌ Horas rechazadas';
+  const _b2=`Jornada del ${fdate(r.inicio)} ${aprobado?'aprobada':'rechazada'} por ${r.validadoPor}.`;
+  pushNoti('emp:'+r.empId,'info',_t2,_b2);
+  queuePushNotif('emp:'+r.empId,_t2,_b2,'horas');
   save();renderSolicitudes();toast(aprobado?'✅ Aprobado':'❌ Rechazado');
 }
 function renderVacPend(){
@@ -2707,7 +2906,10 @@ function renderVacPend(){
 function resolveVac(id,estado){
   const v=(DB.vacaciones||[]).find(x=>x.id===id);if(!v)return;
   v.estado=estado;v.validadoPor=SES.user?.name||'Admin';
-  pushNoti('emp:'+v.empId,'vac',estado==='aprobada'?'🌴 Vacaciones aprobadas':'❌ Denegadas',`Solicitud ${v.desde}→${v.hasta} ${estado}.`);
+  const _tv=estado==='aprobada'?'🌴 Vacaciones aprobadas':'❌ Vacaciones denegadas';
+  const _bv=`Solicitud ${v.desde}→${v.hasta} ${estado}.`;
+  pushNoti('emp:'+v.empId,'vac',_tv,_bv);
+  queuePushNotif('emp:'+v.empId,_tv,_bv,'vac');
   save();renderSolicitudes();toast(estado==='aprobada'?'✅ Aprobadas':'❌ Denegadas');
 }
 function renderMedList(){const el=$('medList');if(!el)return;const items=DB.medicos||[];if(!items.length){el.innerHTML='<div class="empty">Sin permisos médicos</div>';return;}el.innerHTML=items.map(m=>{const bc=m.estado==='aprobada'?'badge-green':m.estado==='denegada'?'badge-red':'badge-orange';return`<div class="sol-item"><div class="sol-top"><div class="sol-name">${m.empName||'?'} <span class="badge ${bc}">${m.estado||'pendiente'}</span></div></div><div class="sol-meta">📅 ${m.desde||'?'} → ${m.hasta||'?'}</div>${m.estado==='pendiente'?`<div class="sol-acts"><button class="btn btn-green btn-sm" onclick="resMed('${m.id}','aprobada')">✓ Aprobar</button><button class="btn btn-red btn-sm" onclick="resMed('${m.id}','denegada')">✗ Denegar</button></div>`:''}</div>`;}).join('');}
@@ -3004,14 +3206,57 @@ function renderExpStats(){
 }
 function exportXLSX(){
   if(typeof XLSX==='undefined'){const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=exportXLSX;document.head.appendChild(s);toast('Cargando…');return;}
+  const now=new Date();
   const wb=XLSX.utils.book_new();
-  const rows=[['Nombre','Rol','Obra','Centro','Fecha','Entrada','Salida','Horas','Descanso','Estado','GPS Entrada','GPS Salida']];
-  DB.records.filter(r=>r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).forEach(r=>{
+  // ── Hoja 1: Todos los fichajes ──
+  const meta=[
+    ['TIMES INC — INFORME COMPLETO DE FICHAJES'],
+    ['Exportado el '+now.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})+' a las '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})],
+    ['Total de registros: '+(DB.records||[]).filter(r=>r.fin).length],
+    [],
+    ['EMPLEADO','ROL','EMPRESA','CENTRO DE TRABAJO','FECHA','HORA ENTRADA','HORA SALIDA','HORAS TRABAJADAS','PAUSA (h)','ESTADO','VALIDADO POR','GPS ENTRADA','GPS SALIDA']
+  ];
+  const dataRows=(DB.records||[]).filter(r=>r.fin).sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(r=>{
     const emp=DB.employees.find(x=>x.id===r.empId);
-    rows.push([r.empName,emp?.role||'empleado',r.empresa||'',r.centro||'',new Date(r.inicio).toLocaleDateString('es-ES'),ftime(r.inicio),ftime(r.fin),mhm(calcMin(r)),mhm(Math.floor((r.breakSecs||0)/60)),r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente',r.locInicio?r.locInicio.lat+','+r.locInicio.lng:'',r.locFin?r.locFin.lat+','+r.locFin.lng:'']);
+    const rol=emp?.role==='encargado'?'Encargado':emp?.role==='jefe_obra'?'Jefe de Obra':'Empleado';
+    return [
+      r.empName||'—',rol,r.empresa||'—',r.centro||'—',
+      new Date(r.inicio).toLocaleDateString('es-ES'),
+      ftime(r.inicio),ftime(r.fin),
+      parseFloat((calcMin(r)/60).toFixed(2)),
+      parseFloat((Math.floor((r.breakSecs||0)/60)/60).toFixed(2)),
+      r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente',
+      r.validadoPor||'—',
+      r.locInicio?r.locInicio.lat+','+r.locInicio.lng:'—',
+      r.locFin?r.locFin.lat+','+r.locFin.lng:'—'
+    ];
   });
-  const ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Fichajes');
-  XLSX.writeFile(wb,'TIMES_INC_'+today()+'.xlsx');toast('✅ Excel descargado');
+  const ws=XLSX.utils.aoa_to_sheet([...meta,...dataRows]);
+  ws['!cols']=[{wch:28},{wch:14},{wch:20},{wch:22},{wch:13},{wch:13},{wch:13},{wch:17},{wch:10},{wch:12},{wch:20},{wch:24},{wch:24}];
+  ws['!freeze']={xSplit:0,ySplit:5};
+  XLSX.utils.book_append_sheet(wb,ws,'Fichajes');
+  // ── Hoja 2: Totales por empleado (todos los tiempos) ──
+  const empTotals={};
+  (DB.records||[]).filter(r=>r.fin).forEach(r=>{
+    if(!empTotals[r.empId])empTotals[r.empId]={name:r.empName,mins:0,dias:new Set(),registros:0};
+    empTotals[r.empId].mins+=calcMin(r);
+    empTotals[r.empId].dias.add(r.inicio.slice(0,10));
+    empTotals[r.empId].registros++;
+  });
+  const totRows=[
+    ['TIMES INC — RESUMEN TOTAL POR EMPLEADO'],
+    ['Exportado el '+now.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})],
+    [],
+    ['EMPLEADO','DÍAS TRABAJADOS','REGISTROS','TOTAL HORAS']
+  ];
+  Object.values(empTotals).sort((a,b)=>a.name.localeCompare(b.name)).forEach(e=>{
+    totRows.push([e.name,e.dias.size,e.registros,parseFloat((e.mins/60).toFixed(2))]);
+  });
+  const wsTot=XLSX.utils.aoa_to_sheet(totRows);
+  wsTot['!cols']=[{wch:30},{wch:17},{wch:12},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,wsTot,'Totales por Empleado');
+  XLSX.writeFile(wb,'TIMES_INC_fichajes_'+today()+'.xlsx');
+  toast('✅ Excel descargado');
 }
 function exportJSON(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='backup_'+today()+'.json';a.click();URL.revokeObjectURL(a.href);toast('💾 Backup descargado');}
 function exportPDF(){
@@ -3289,19 +3534,17 @@ function handlePhotoUpload(input){
   input.value='';
 }
 function updateAvatarUI(photo,initials,color){
-  const avs=['prfAv','iprfAv'];
-  avs.forEach(id=>{
+  ['prfAv','iprfAv'].forEach(id=>{
     const el=$(id);if(!el)return;
     if(photo){
-      el.style.backgroundImage='url('+photo+')';
-      el.style.backgroundSize='cover';
-      el.style.backgroundPosition='center';
-      el.style.background='';
+      // Usar shorthand 'background' en una sola declaración evita el bug de iOS Safari
+      // donde background='' resetea backgroundImage recién asignado
+      el.style.cssText+='background:center/cover url("'+photo.replace(/"/g,'\\"')+'") !important;';
       el.textContent='';
     }else{
+      el.style.background=color;
       el.style.backgroundImage='none';
       el.textContent=initials;
-      el.style.background=color;
     }
   });
 }
@@ -4002,6 +4245,7 @@ function requestNotifPermission(){
     if(p === 'granted'){
       toast('🔔 Notificaciones activadas');
       scheduleEndOfDayReminder();
+      if(SES.user)subscribePush('emp:'+SES.user.id);
     }
   });
 }
@@ -4170,47 +4414,56 @@ function exportMesXLSX(ym){
     const snap=DB.monthSnapshots&&DB.monthSnapshots[ym];
     recs=snap?snap.recs:(DB.records||[]).filter(r=>r.fin&&r.inicio.startsWith(ym));
   }
-  // Helpers para fechas Excel (serial desde 1/1/1900)
   const toExcelDate=d=>Math.floor(d.getTime()/86400000)+25569;
   const toExcelTime=d=>(d.getHours()*3600+d.getMinutes()*60+d.getSeconds())/86400;
-  const cell=(v,t,z)=>({t:t||'s',v,z:z||undefined});
-
-  // ── Hoja 1: CONTROL HORAS GECAMA (formato exacto) ──
+  const monthLabel=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const exportDate=now2.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
   const wb=XLSX.utils.book_new();
-  const ws={'!ref':'A1:H1'};
-  const headers=['Marca temporal','FECHA','NOMBRE','HORA ENTRADA','HORA SALIDA','PAUSA MEDIODIA','NO PRESENCIA','TOTAL HORAS'];
-  const cols='ABCDEFGH';
-  // Cabecera fila 1
-  headers.forEach((h,i)=>{ws[cols[i]+'1']={t:'s',v:h};});
-  let row=2;
+
+  // ── Hoja 1: Control de Horas (detalle diario) ──
+  const ws={'!ref':'A1:J1'};
+  const h1Meta=[
+    ['TIMES INC — CONTROL DE HORAS'],
+    ['Período: '+monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1)],
+    ['Exportado: '+exportDate+'  |  Total fichajes: '+recs.length],
+    [],
+    ['FECHA','EMPLEADO','EMPRESA','CENTRO DE TRABAJO','HORA ENTRADA','HORA SALIDA','PAUSA','HORAS TRABAJADAS','ESTADO','VALIDADO POR']
+  ];
+  h1Meta.forEach((rowData,ri)=>{
+    rowData.forEach((v,ci)=>{
+      const addr=XLSX.utils.encode_cell({r:ri,c:ci});
+      ws[addr]={t:'s',v:String(v)};
+    });
+  });
+  let rowIdx=5;
   recs.sort((a,b)=>a.inicio.localeCompare(b.inicio)).forEach(r=>{
     const emp=DB.employees.find(e=>e.id===r.empId);
     const dIni=new Date(r.inicio),dFin=r.fin?new Date(r.fin):null;
     const bm=Math.floor((r.breakSecs||0)/60);
-    const pausa=bm>0?`${Math.floor(bm/60)}h ${p2(bm%60)}m`:'NO';
-    const iC=cols.indexOf;
-    ws['A'+row]={t:'n',v:toExcelDate(dIni)+(toExcelTime(dIni)),z:'dd/mm/yyyy hh:mm:ss'};
-    ws['B'+row]={t:'n',v:toExcelDate(dIni),z:'dd/mm/yyyy'};
-    ws['C'+row]={t:'s',v:emp?emp.name:r.empName||r.empId};
-    ws['D'+row]={t:'n',v:toExcelTime(dIni),z:'hh:mm'};
-    ws['E'+row]=dFin?{t:'n',v:toExcelTime(dFin),z:'hh:mm'}:{t:'s',v:'-'};
-    ws['F'+row]={t:'s',v:pausa};
-    ws['G'+row]={t:'s',v:''};
-    if(dFin){
-      const diffH=dFin.getHours()-dIni.getHours(),diffM=dFin.getMinutes()-dIni.getMinutes();
-      const totalMin=(dFin-dIni)/60000-bm;
-      ws['H'+row]={t:'n',v:parseFloat((totalMin/60).toFixed(2)),f:`HOUR(E${row}-D${row})+MINUTE(E${row}-D${row})/60`};
-    }else{
-      ws['H'+row]={t:'s',v:'-'};
-    }
-    row++;
+    const totalMin=dFin?Math.max(0,(dFin-dIni)/60000-bm):0;
+    const rowData=[
+      {t:'n',v:toExcelDate(dIni),z:'dd/mm/yyyy'},
+      {t:'s',v:emp?emp.name:r.empName||r.empId},
+      {t:'s',v:r.empresa||'—'},
+      {t:'s',v:r.centro||'—'},
+      {t:'n',v:toExcelTime(dIni),z:'hh:mm'},
+      dFin?{t:'n',v:toExcelTime(dFin),z:'hh:mm'}:{t:'s',v:'—'},
+      {t:'s',v:bm>0?`${Math.floor(bm/60)}h ${p2(bm%60)}m`:'—'},
+      {t:'n',v:parseFloat((totalMin/60).toFixed(2))},
+      {t:'s',v:r.aprobado===true?'Aprobado':r.aprobado===false?'Rechazado':'Pendiente'},
+      {t:'s',v:r.validadoPor||'—'}
+    ];
+    rowData.forEach((cell,ci)=>{
+      ws[XLSX.utils.encode_cell({r:rowIdx,c:ci})]=cell;
+    });
+    rowIdx++;
   });
-  ws['!ref']=`A1:H${Math.max(row-1,1)}`;
-  ws['!cols']=[{wch:20},{wch:12},{wch:30},{wch:12},{wch:12},{wch:14},{wch:20},{wch:12}];
-  const monthName=new Date(anyo,mes-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-  XLSX.utils.book_append_sheet(wb,ws,'CONTROL HORAS GECAMA');
+  ws['!ref']=`A1:J${Math.max(rowIdx,6)}`;
+  ws['!cols']=[{wch:13},{wch:28},{wch:18},{wch:22},{wch:13},{wch:13},{wch:10},{wch:17},{wch:12},{wch:20}];
+  ws['!freeze']={xSplit:0,ySplit:5};
+  XLSX.utils.book_append_sheet(wb,ws,'Control de Horas');
 
-  // ── Hoja 2: Resumen mensual por empleado ──
+  // ── Hoja 2: Resumen diario por empleado ──
   const emps=sortedEmps().filter(e=>!e.isAdmin);
   const daysInMonth=new Date(anyo,mes,0).getDate();
   const dias=[];for(let d=1;d<=daysInMonth;d++)dias.push(`${ym}-${p2(d)}`);
@@ -4221,21 +4474,52 @@ function exportMesXLSX(ym){
     if(!data[r.empId][dk])data[r.empId][dk]=0;
     data[r.empId][dk]+=calcMin(r);
   });
-  const header2=['NOMBRE',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'SUM de TOTAL HORAS'];
-  const rows2=[header2];
+  const hdr2=[
+    ['TIMES INC — RESUMEN DIARIO DE HORAS — '+(monthLabel.toUpperCase())],
+    [],
+    ['EMPLEADO',...dias.map(d=>new Date(d+'T12:00:00').getDate()),'TOTAL HORAS MES']
+  ];
+  const rows2=[...hdr2];
   let grandTotal=0;
   emps.forEach(emp=>{
     const row2=[emp.name];let empTotal=0;
     dias.forEach(d=>{const m=data[emp.id][d]||0;empTotal+=m;row2.push(m>0?parseFloat((m/60).toFixed(2)):0);});
-    row2.push(parseFloat((empTotal/60).toFixed(2)));grandTotal+=empTotal;rows2.push(row2);
+    row2.push(parseFloat((empTotal/60).toFixed(2)));
+    grandTotal+=empTotal;rows2.push(row2);
   });
-  const totRow2=['Suma total',...dias.map(d=>parseFloat((emps.reduce((s,e)=>s+(data[e.id][d]||0),0)/60).toFixed(2))),parseFloat((grandTotal/60).toFixed(2))];
+  const totRow2=['TOTAL EQUIPO',...dias.map(d=>parseFloat((emps.reduce((s,e)=>s+(data[e.id][d]||0),0)/60).toFixed(2))),parseFloat((grandTotal/60).toFixed(2))];
   rows2.push(totRow2);
   const ws2=XLSX.utils.aoa_to_sheet(rows2);
-  ws2['!cols']=[{wch:30},...dias.map(()=>({wch:5})),{wch:14}];
-  XLSX.utils.book_append_sheet(wb,ws2,'Resumen');
+  ws2['!cols']=[{wch:28},...dias.map(()=>({wch:5})),{wch:16}];
+  ws2['!freeze']={xSplit:1,ySplit:3};
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen Diario');
 
-  XLSX.writeFile(wb,`CONTROL_HORAS_GECAMA_${ym}.xlsx`);
+  // ── Hoja 3 (NUEVA): Totales por Empleado (normal + extra) ──
+  const LIMITE_NORMAL=160; // horas normales al mes
+  const tot3=[
+    ['TIMES INC — TOTALES POR EMPLEADO — '+(monthLabel.toUpperCase())],
+    ['Límite horas normales: '+LIMITE_NORMAL+'h/mes'],
+    [],
+    ['EMPLEADO','EMPRESA','DÍAS TRABAJADOS','TOTAL HORAS','HORAS NORMALES (≤'+LIMITE_NORMAL+'h)','HORAS EXTRA (>'+LIMITE_NORMAL+'h)','REGISTROS']
+  ];
+  let gDias=0,gTotal=0,gNorm=0,gExtra=0,gRegs=0;
+  emps.forEach(emp=>{
+    const empMins=Object.values(data[emp.id]||{}).reduce((s,m)=>s+m,0);
+    const empH=parseFloat((empMins/60).toFixed(2));
+    const norm=parseFloat(Math.min(empH,LIMITE_NORMAL).toFixed(2));
+    const extra=parseFloat(Math.max(0,empH-LIMITE_NORMAL).toFixed(2));
+    const dias2=Object.keys(data[emp.id]||{}).filter(d=>data[emp.id][d]>0).length;
+    const regs=recs.filter(r=>r.empId===emp.id).length;
+    tot3.push([emp.name,emp.empresa||'—',dias2,empH,norm,extra,regs]);
+    gDias+=dias2;gTotal+=empH;gNorm+=norm;gExtra+=extra;gRegs+=regs;
+  });
+  tot3.push([]);
+  tot3.push(['TOTAL EQUIPO','',gDias,parseFloat(gTotal.toFixed(2)),parseFloat(gNorm.toFixed(2)),parseFloat(gExtra.toFixed(2)),gRegs]);
+  const ws3=XLSX.utils.aoa_to_sheet(tot3);
+  ws3['!cols']=[{wch:28},{wch:18},{wch:16},{wch:14},{wch:22},{wch:22},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Totales por Empleado');
+
+  XLSX.writeFile(wb,`TIMES_INC_${ym}.xlsx`);
   toast('✅ Excel del mes descargado');
 }
 
