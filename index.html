@@ -428,10 +428,10 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   .sidebar.mob-open{left:0}
   .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:299;backdrop-filter:blur(3px);display:none}
   .sb-overlay.show{display:block}
-  .adm-main{width:100%}
+  .adm-main{width:100%;display:flex;flex-direction:column;overflow:hidden}
   #admHam{display:flex!important}
-  #admBottomNav{display:flex!important}
-  .adm-content{padding-bottom:calc(72px + var(--safe-bot))}
+  #admBottomNav{display:flex!important;position:static;flex-shrink:0}
+  .adm-content{flex:1;overflow-y:auto;min-height:0;padding-bottom:4px}
   .dash-stats{grid-template-columns:1fr 1fr}
   .dash-row{grid-template-columns:1fr}
   .rec-table thead th:nth-child(3),.rec-table tbody td:nth-child(3),.rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
@@ -474,7 +474,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_5';
+  var V='20260614_6';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -804,7 +804,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         <div class="jor-main-card">
           <!-- Timer horas trabajadas (arriba) -->
           <div class="jor-timer" id="jorTimer" style="margin-top:4px">00:00:00</div>
-          <div class="jor-timer-sub">Horas trabajadas hoy</div>
           <!-- Botón descanso (antes del botón fichar para contexto) -->
           <div class="jor-break-row"><button class="jor-break-chip" id="jorBreakChip" onclick="toggleBreak()" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/></svg><span id="jorBreakTxt">Iniciar descanso</span></button></div>
           <!-- Botón circular fichar (abajo del contador) -->
@@ -813,6 +812,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div style="margin-top:16px;padding-top:14px;display:flex;justify-content:center">
             <span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Sin jornada</span></span>
           </div>
+        </div>
+        <!-- Resumen header -->
+        <div style="display:flex;align-items:center;gap:8px;padding:0 4px;margin-bottom:12px;margin-top:4px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Resumen de horas trabajadas</span>
         </div>
         <!-- Circular progress + metrics -->
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:0 4px">
@@ -1034,7 +1038,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div class="dstat"><div class="dstat-ico blue"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><div class="dstat-lbl">Horas hoy</div><div class="dstat-val" id="dHours">—</div><div class="dstat-sub">Trabajadas</div></div></div>
         </div>
         <div class="dash-row"><div class="chart-card"><div class="chart-title">Horas esta semana</div><div id="weekChart" style="width:100%;min-height:130px"></div></div><div class="chart-card"><div class="chart-title">Resumen general</div><div class="donut-wrap"><div style="position:relative;flex-shrink:0"><svg id="donutSvg" viewBox="0 0 90 90" width="90" height="90"></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div class="donut-ctr-val" id="donutTotal">—</div><div class="donut-ctr-lbl">Total</div></div></div><div class="donut-legend" id="donutLeg"></div></div></div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div class="chart-card"><div class="chart-title">Fichajes recientes</div><div id="dashActivity"></div></div><div class="chart-card"><div class="chart-title">Próximas vacaciones</div><div id="dashVacaciones"></div></div></div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1042,6 +1045,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           </div>
           <div id="dashActiveEmps" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px"><div class="empty">Sin empleados activos</div></div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div class="chart-card"><div class="chart-title">Fichajes recientes</div><div id="dashActivity"></div></div><div class="chart-card"><div class="chart-title">Próximas vacaciones</div><div id="dashVacaciones"></div></div></div>
       </div>
       <div id="pControl" style="display:none"><div class="card"><h3>Control de jornadas</h3></div><div id="ctrlList"></div></div>
       <div id="pFichajes" style="display:none"><div class="card"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><select id="fEmpFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todos los empleados</option></select><select id="fSemFilter" onchange="renderFichajes()" style="flex:1;min-width:130px"><option value="">Todas las semanas</option></select></div><div style="overflow-x:auto"><table class="rec-table"><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody id="fichList"></tbody></table></div></div></div>
@@ -1401,7 +1405,13 @@ function doFetch(){
     setSyncDot(true);
   }).catch(()=>setSyncDot(false));
 }
-function startPolling(){if(_polling)clearInterval(_polling);_polling=setInterval(doFetch,10000);}
+function startPolling(){
+  if(_polling)clearInterval(_polling);
+  _polling=setInterval(doFetch,10000);
+}
+// Sincronizar inmediatamente al recuperar conexión o volver a la app
+window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
 
 // ── Session ──
 function saveSession(){try{localStorage.setItem('an_times_ses',JSON.stringify(SES.isAdmin&&!SES.isEnc?{isAdmin:true}:{empId:SES.user?.id}));}catch(e){}}
@@ -1880,16 +1890,18 @@ function renderResumen(){
   // Umbral 30s: excluye micro-bugs pero incluye jornadas cortas reales
   const realRecs=recs.filter(r=>!r.fin||recWorkSecs(r)>=30);
 
-  // ENTRADA: primera hora de hoy (cualquier registro con >=30s o abierto)
+  // ENTRADA: primera hora de hoy (primer registro real del día, independiente de si está abierto)
   const entradaEl=$('resEntrada');
   if(entradaEl){
-    const src=openRec2||realRecs[0];
+    const src=realRecs[0];
     if(src){
       const v=ftime(src.inicio);
       entradaEl.textContent=v;
       _saveCache(u.id,'entrada',v);_saveCache(u.id,'date',tod);
     } else {
-      entradaEl.textContent=_loadCache(u.id,'entrada');
+      // Solo usar caché si es del mismo día
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      entradaEl.textContent=(cachedDate===tod)?_loadCache(u.id,'entrada'):'--:--';
     }
   }
 
@@ -1905,7 +1917,8 @@ function renderResumen(){
       salidaEl.textContent=v;
       _saveCache(u.id,'salida',v);
     } else {
-      salidaEl.textContent=_loadCache(u.id,'salida');
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      salidaEl.textContent=(cachedDate===tod)?_loadCache(u.id,'salida'):'--:--';
     }
   }
 
@@ -1925,7 +1938,8 @@ function renderResumen(){
       totalEl.textContent=v;
       _saveCache(u.id,'total',v);
     } else {
-      totalEl.textContent=_loadCache(u.id,'total');
+      const cachedDate=localStorage.getItem(_cacheKey(u.id,'date'));
+      totalEl.textContent=(cachedDate===tod)?_loadCache(u.id,'total'):'0h 00m';
     }
   }
   // GPS card
@@ -2180,8 +2194,8 @@ function setEmpStatus(cls,txt){safeRun(updJorCircle,"ses");}
 function updTimer(){
   // Siempre calcular desde el registro abierto para evitar bugs de sincronización
   const _o=openRec();
-  const _ws=_o?calcSecs(_o).work:TM.ws;
-  const _bs=_o?calcSecs(_o).brk:TM.bs;
+  const _ws=_o?calcSecs(_o).work:0;
+  const _bs=_o?calcSecs(_o).brk:0;
   const jt=$('jorTimer');if(jt)jt.textContent=s2t(_ws);
   const pct=Math.min(100,(_ws/(WD*60))*100);
   const pf=$('progFill');if(pf){pf.style.width=pct.toFixed(1)+'%';}
