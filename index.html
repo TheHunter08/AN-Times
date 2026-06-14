@@ -428,10 +428,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   .sidebar.mob-open{left:0}
   .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:299;backdrop-filter:blur(3px);display:none}
   .sb-overlay.show{display:block}
-  .adm-main{width:100%;display:flex;flex-direction:column;overflow:hidden}
+  /* iOS PWA: forzar layout column, nav dentro del flujo (no fixed) */
+  #sAdmin{flex-direction:column!important}
+  .sidebar{top:0;height:100%}
+  .adm-main{width:100%!important;height:100%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
   #admHam{display:flex!important}
-  #admBottomNav{display:flex!important;position:static!important;bottom:auto!important;left:auto!important;right:auto!important;flex-shrink:0;z-index:auto!important}
-  .adm-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #admBottomNav{display:flex!important;position:static!important;bottom:auto!important;left:auto!important;right:auto!important;flex-shrink:0!important;z-index:1!important;width:100%}
+  .adm-content{flex:1!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;min-height:0!important;padding-bottom:env(safe-area-inset-bottom,4px)!important}
+  .adm-topbar{padding-top:max(12px,env(safe-area-inset-top));height:auto!important;min-height:56px}
   .dash-stats{grid-template-columns:1fr 1fr}
   .dash-row{grid-template-columns:1fr}
   .rec-table thead th:nth-child(3),.rec-table tbody td:nth-child(3),.rec-table thead th:nth-child(6),.rec-table tbody td:nth-child(6){display:none}
@@ -474,7 +478,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_7';
+  var V='20260614_8';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1704,58 +1708,69 @@ async function doBiometric(){
   await _doBioVerify(emp, errEl);
 }
 
+// Registrar credencial biométrica (llama al crear una nueva)
+async function _bioRegister(emp){
+  const challenge=new Uint8Array(32); crypto.getRandomValues(challenge);
+  const rpId=location.hostname||'localhost';
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge,
+    rp:{name:'TIMES INC',id:rpId},
+    user:{id:new TextEncoder().encode(emp.id),name:emp.email||emp.id,displayName:emp.name},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+    timeout:60000
+  }});
+  if(!cred)throw new Error('No se pudo crear credencial');
+  // Guardar credId en base64
+  const credId=btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+  try{localStorage.setItem('bio_cred_'+emp.id,credId);}catch(e){}
+  return credId;
+}
+
 async function _doBioVerify(emp, errEl){
   if(errEl) errEl.textContent = '';
   try{
-    // Generar challenge aleatorio
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
+    const challenge=new Uint8Array(32); crypto.getRandomValues(challenge);
+    const rpId=location.hostname||'localhost';
+    // Usar credencial registrada si existe
+    const credIdB64=(()=>{try{return localStorage.getItem('bio_cred_'+emp.id);}catch(e){return null;}})();
+    const allowCreds=credIdB64?[{
+      id:Uint8Array.from(atob(credIdB64),c=>c.charCodeAt(0)),
+      type:'public-key',
+      transports:['internal','hybrid']
+    }]:[];
 
-    // Intentar verificación biométrica sin credencial registrada
-    // (userVerification: 'required' activa Face ID / Touch ID en iOS/Android)
-    const result = await navigator.credentials.get({
-      publicKey:{
-        challenge,
-        timeout: 60000,
-        userVerification: 'required',
-        rpId: location.hostname || 'localhost',
-        allowCredentials: [] // sin credenciales registradas → el dispositivo pide bio igualmente
-      }
-    }).catch(e => { throw e; });
+    const result=await navigator.credentials.get({publicKey:{
+      challenge,timeout:60000,
+      userVerification:'required',
+      rpId,
+      allowCredentials:allowCreds
+    }});
 
-    // Si llega aquí (result puede ser null o un objeto), el dispositivo verificó la biometría
-    if(result !== undefined){
-      SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-      SES.isAdmin = emp.role === 'jefe_obra';
-      saveSession(); doEmpLogin();
-      toast('✅ Acceso biométrico — ' + emp.name.split(' ')[0]);
+    if(result){
+      SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+      SES.isAdmin=emp.role==='jefe_obra';
+      saveSession();doEmpLogin();
+      toast('✅ Acceso biométrico — '+emp.name.split(' ')[0]);
     }
-  } catch(ex){
-    // NotAllowedError = usuario canceló, no autenticó, o iOS Safari sin credencial registrada
-    // InvalidStateError / NotSupportedError = no hay credencial WebAuthn registrada
-    const savedSes = (() => { try{ return JSON.parse(localStorage.getItem('an_times_ses')||'null'); }catch(e){return null;} })();
-    if(ex.name === 'NotAllowedError'){
-      // Fallback: si hay sesión previa del mismo empleado, restaurar sin WebAuthn
-      if(savedSes && savedSes.empId === emp.id){
-        SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-        SES.isAdmin = emp.role === 'jefe_obra';
-        saveSession(); doEmpLogin();
-        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
-      } else {
-        if(errEl) errEl.textContent = 'Biometría no disponible o cancelada. Usa tu PIN.';
-      }
-    } else if(ex.name === 'NotSupportedError' || ex.name === 'InvalidStateError' || ex.name === 'SecurityError'){
-      if(savedSes && savedSes.empId === emp.id){
-        SES.user = emp; SES.isEnc = emp.role === 'encargado'; SES.isJO = emp.role === 'jefe_obra';
-        SES.isAdmin = emp.role === 'jefe_obra';
-        saveSession(); doEmpLogin();
-        toast('✅ Sesión restaurada — ' + emp.name.split(' ')[0]);
-      } else {
-        if(errEl) errEl.textContent = '⚠️ Primero inicia sesión con PIN o email para activar la biometría';
-      }
+  }catch(ex){
+    const savedSes=(()=>{try{return JSON.parse(localStorage.getItem('an_times_ses')||'null');}catch(e){return null;}})();
+    // Sin credencial registrada: intentar registrar ahora
+    if(ex.name==='NotAllowedError'&&!localStorage.getItem('bio_cred_'+emp.id)){
+      try{
+        await _bioRegister(emp);
+        toast('🔐 Biometría registrada. Vuelve a pulsar Face ID.');
+        return;
+      }catch(re){/* no pudo registrar, fallback */}
+    }
+    if(savedSes&&savedSes.empId===emp.id){
+      SES.user=emp;SES.isEnc=emp.role==='encargado';SES.isJO=emp.role==='jefe_obra';
+      SES.isAdmin=emp.role==='jefe_obra';
+      saveSession();doEmpLogin();
+      toast('✅ Sesión restaurada — '+emp.name.split(' ')[0]);
     } else {
-      if(errEl) errEl.textContent = 'Biometría no disponible. Usa tu PIN.';
-      console.warn('[TIMES] Bio error:', ex.name, ex.message);
+      if(errEl)errEl.textContent='Biometría no disponible o cancelada. Usa tu PIN.';
+      console.warn('[TIMES] Bio:',ex.name,ex.message);
     }
   }
 }
@@ -1970,17 +1985,29 @@ function renderJorTab(){
         if(b.start)items.push({ico:'☕',label:'Pausa',time:ftime(b.start),bg:'rgba(245,158,11,.15)',dot:'var(--orange)'});
         if(b.end)items.push({ico:'▶️',label:'Reanudado',time:ftime(b.end),bg:'var(--accent-dim)',dot:'var(--accent)'});
       });
-      if(r.fin)items.push({ico:'🔴',label:'Salida',time:ftime(r.fin),bg:'rgba(239,68,68,.12)',dot:'var(--red)'});
-      else items.push({ico:'⏳',label:'Trabajando',time:'En curso',bg:'rgba(99,102,241,.12)',dot:'var(--accent)',live:true});
+      if(r.fin){
+        items.push({ico:'🔴',label:'Salida',time:ftime(r.fin),bg:'rgba(239,68,68,.12)',dot:'var(--red)'});
+        // Badge de validación
+        const ap=r.aprobado;
+        const vPor=r.validadoPor||'';
+        const statusIco=ap===true?'✅':ap===false?'❌':'⏳';
+        const statusTxt=ap===true?('Aprobada'+(vPor?' · '+vPor:'')):ap===false?('Rechazada'+(vPor?' · '+vPor:'')):('Pendiente de validar');
+        const statusBg=ap===true?'rgba(16,185,129,.1)':ap===false?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)';
+        const statusColor=ap===true?'var(--green)':ap===false?'var(--red)':'var(--orange)';
+        items.push({ico:statusIco,label:statusTxt,time:'',bg:statusBg,dot:statusColor,statusBadge:true,statusColor});
+      } else {
+        items.push({ico:'⏳',label:'Trabajando',time:'En curso',bg:'rgba(99,102,241,.12)',dot:'var(--accent)',live:true});
+      }
     });
     tl.innerHTML=items.map((it,i)=>`<div class="tl-item">
       <div class="tl-left">
         <div class="tl-ico" style="background:${it.bg}">${it.ico}</div>
         ${i<items.length-1?'<div class="tl-line"></div>':''}
       </div>
-      <div class="tl-right">
-        <span class="tl-label">${it.label}</span>
-        <span class="tl-time"${it.live?' id="jorLiveTime"':''}>${it.time}</span>
+      <div class="tl-right" style="${it.statusBadge?'padding:5px 10px;background:'+it.bg+';border-radius:8px;margin-bottom:4px':''}">
+        <span class="tl-label" style="${it.statusBadge?'color:'+it.statusColor+';font-size:11px':''}">
+          ${it.statusBadge?it.label:it.label}</span>
+        ${it.time?`<span class="tl-time"${it.live?' id="jorLiveTime"':''}>${it.time}</span>`:''}
       </div>
     </div>`).join('');
   }
@@ -3276,19 +3303,17 @@ function handlePhotoUpload(input){
   input.value='';
 }
 function updateAvatarUI(photo,initials,color){
-  const avs=['prfAv','iprfAv'];
-  avs.forEach(id=>{
+  ['prfAv','iprfAv'].forEach(id=>{
     const el=$(id);if(!el)return;
     if(photo){
-      el.style.backgroundImage='url('+photo+')';
-      el.style.backgroundSize='cover';
-      el.style.backgroundPosition='center';
-      el.style.background='';
+      // Usar shorthand 'background' en una sola declaración evita el bug de iOS Safari
+      // donde background='' resetea backgroundImage recién asignado
+      el.style.cssText+='background:center/cover url("'+photo.replace(/"/g,'\\"')+'") !important;';
       el.textContent='';
     }else{
+      el.style.background=color;
       el.style.backgroundImage='none';
       el.textContent=initials;
-      el.style.background=color;
     }
   });
 }
