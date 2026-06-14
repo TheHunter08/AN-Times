@@ -471,6 +471,24 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 </style>
 </head>
 <body>
+<script>
+// ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
+(function(){
+  var V='20260614_5';
+  var k='times_build';
+  var prev=localStorage.getItem(k);
+  if(prev&&prev!==V){
+    localStorage.setItem(k,V);
+    if('caches' in window){
+      caches.keys().then(function(keys){
+        return Promise.all(keys.map(function(k){return caches.delete(k);}));
+      }).then(function(){location.reload(true);});
+    } else { location.reload(true); }
+    return;
+  }
+  localStorage.setItem(k,V);
+})();
+</script>
 <!-- PWA Banner -->
 <div id="pwaInstall" style="display:none;position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:16px;right:16px;background:linear-gradient(135deg,#7c3aed,#6366f1);border-radius:14px;padding:14px 16px;align-items:center;gap:12px;z-index:800;box-shadow:0 8px 32px rgba(99,102,241,.4)">
   <div style="font-size:24px">📲</div>
@@ -1845,55 +1863,65 @@ function _saveCache(id,k,v){try{localStorage.setItem(_cacheKey(id,k),v);}catch(e
 function _loadCache(id,k){return localStorage.getItem(_cacheKey(id,k))||'--:--';}
 function _clearDayCache(id){['entrada','salida','total','date'].forEach(k=>localStorage.removeItem(_cacheKey(id,k)));}
 
+// Segundos reales de un registro (usa timestamps si workSecs es 0)
+function recWorkSecs(r){
+  if(!r)return 0;
+  if(r.workSecs&&r.workSecs>0)return r.workSecs;
+  if(r.fin)return Math.max(0,calcSecs(r).work);
+  return 0;
+}
+
 function renderResumen(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   const openRec2=recs.find(r=>!r.fin&&!r.closed);
-  // Registros válidos: abiertos O cerrados con >1min (excluye micro-bugs)
-  const validRecs=recs.filter(r=>!r.fin||calcMin(r)>0);
-  const firstValidRec=validRecs[0];
 
-  // ENTRADA — guardar en caché cuando se tiene, recuperar si no hay datos hoy
+  // Umbral 30s: excluye micro-bugs pero incluye jornadas cortas reales
+  const realRecs=recs.filter(r=>!r.fin||recWorkSecs(r)>=30);
+
+  // ENTRADA: primera hora de hoy (cualquier registro con >=30s o abierto)
   const entradaEl=$('resEntrada');
   if(entradaEl){
-    if(firstValidRec){
-      const v=ftime(firstValidRec.inicio);
+    const src=openRec2||realRecs[0];
+    if(src){
+      const v=ftime(src.inicio);
       entradaEl.textContent=v;
-      _saveCache(u.id,'entrada',v);
-      _saveCache(u.id,'date',tod);
+      _saveCache(u.id,'entrada',v);_saveCache(u.id,'date',tod);
     } else {
       entradaEl.textContent=_loadCache(u.id,'entrada');
     }
   }
 
-  // SALIDA — mostrar fin del último registro real; si hay jornada abierta, mostrar '--:--' pero conservar la última conocida
-  const lastClosed=[...validRecs].reverse().find(r=>r.fin&&r.closed);
+  // SALIDA: fin del último registro cerrado con >=30s trabajados
   const salidaEl=$('resSalida');
+  const lastReal=[...realRecs].reverse().find(r=>r.fin&&r.closed);
   if(salidaEl){
-    if(lastClosed&&!openRec2){
-      const v=ftime(lastClosed.fin);
+    if(openRec2){
+      // Jornada activa: no mostrar salida aún
+      salidaEl.textContent='--:--';
+    } else if(lastReal){
+      const v=ftime(lastReal.fin);
       salidaEl.textContent=v;
       _saveCache(u.id,'salida',v);
-    } else if(openRec2){
-      salidaEl.textContent='--:--'; // en curso, sin salida aún
     } else {
       salidaEl.textContent=_loadCache(u.id,'salida');
     }
   }
 
-  // TOTAL — en vivo si activo, persistido si terminado, recuperado si sin datos hoy
+  // TOTAL: suma de registros reales + en vivo si trabajando
   const brk=recs.reduce((a,r)=>a+Math.floor((r.breakSecs||0)/60),0);
-  const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
+  const completedSecs=realRecs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+recWorkSecs(r),0);
   const liveSecs=openRec2?calcSecs(openRec2).work:0;
-  const tot=completedMin+Math.floor(liveSecs/60);
+  const totSecs=completedSecs+liveSecs;
+  const totMin=Math.floor(totSecs/60);
   if($('resDescanso'))$('resDescanso').textContent=brk>0?`${Math.floor(brk/60).toString().padStart(2,'0')}:${p2(brk%60)}`:'00:00';
   const totalEl=$('resTotal');
   if(totalEl){
     if(openRec2){
-      totalEl.textContent=s2t(completedMin*60+liveSecs);
-    } else if(tot>0){
-      const v=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;
+      totalEl.textContent=s2t(totSecs);
+    } else if(totMin>0){
+      const v=`${Math.floor(totMin/60).toString().padStart(2,'0')}h ${p2(totMin%60)}m`;
       totalEl.textContent=v;
       _saveCache(u.id,'total',v);
     } else {
@@ -1906,7 +1934,7 @@ function renderResumen(){
   if($('gpsCardName'))$('gpsCardName').textContent=open?.centro||SES.user.centroTrabajo||'Sin centro';
   const gst=$('gpsCardStatus');if(gst){if(open?.locInicio){gst.textContent='GPS verificado';gst.className='gps-status';}else{gst.textContent='Sin GPS';gst.className='gps-status pending';}}
   // update progress ring
-  const pct=Math.min(100,Math.round(tot/WD*100));
+  const pct=Math.min(100,Math.round(totMin/WD*100));
   const ring=$('progressRing');
   if(ring){const circ=238.76;ring.style.strokeDashoffset=circ-(circ*pct/100);}
   const rp=$('ringPct');if(rp)rp.textContent=pct+'%';
