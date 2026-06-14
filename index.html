@@ -226,15 +226,20 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-nav-btn{width:32px;height:32px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px}
+.vac-balance-bar{height:6px;border-radius:3px;background:var(--bg4);overflow:hidden;margin-top:4px}
+.vac-balance-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--teal));transition:width .4s}
 .cal-day-header{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:4px 0;text-transform:uppercase;letter-spacing:.5px}
-.cal-day{height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s;position:relative;color:var(--text2)}
+.cal-day{min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s;position:relative;color:var(--text2);padding:4px 2px;gap:2px}
 .cal-day:hover{background:var(--bg4)}
 .cal-day.other-month{color:var(--text4)}
 .cal-day.today{background:var(--accent);color:#fff;font-weight:700;box-shadow:0 4px 12px var(--accent-glow)}
+.cal-day.has-work::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);position:absolute;bottom:3px}
 .cal-day.worked::after{content:'';position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--green)}
 .cal-day.vacation{background:rgba(59,130,246,.15);color:var(--blue)}
 .cal-day.festivo{background:rgba(245,158,11,.12);color:var(--orange)}
 .cal-day.absent{background:rgba(239,68,68,.1);color:var(--red)}
+.cal-day.weekend{color:var(--text3);opacity:.6}
+.cal-hrs{font-size:9px;color:var(--teal);font-weight:600;line-height:1}
 .cal-day-detail{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .cal-detail-title{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text2)}
 .cal-tl-item{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
@@ -732,8 +737,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
   </div>
   <div class="emp-body">
     <!-- INICIO -->
-    <div id="tabInicio" style="display:block;overflow-y:auto">
+    <div id="tabInicio" class="tab-content" style="display:block;overflow-y:auto">
       <div class="ini-wrap">
+        <!-- Main fichar card (kept) -->
         <div class="jor-main-card">
           <div class="jor-mc-header"><span class="jor-mc-title">Jornada actual</span><span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Libre</span></span></div>
           <div class="jor-timer" id="jorTimer">00:00:00</div>
@@ -741,23 +747,95 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div class="jor-circle-wrap"><div class="jor-circle-glow" id="jorCircleGlow"></div><button class="jor-circle-btn" id="jorCircleBtn" onclick="jorBtnTap()"><svg viewBox="0 0 24 24" id="jorCircleIco"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span id="jorCircleLine1">FICHAR</span><span id="jorCircleLine2">ENTRADA</span></button></div>
           <div class="jor-break-row"><button class="jor-break-chip" id="jorBreakChip" onclick="toggleBreak()" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/></svg><span id="jorBreakTxt">Iniciar descanso</span></button></div>
         </div>
-        <div class="gps-card" id="gpsCard" style="display:none"><div class="gps-ico"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div><div class="gps-name" id="gpsCardName">—</div><div class="gps-status" id="gpsCardStatus">GPS verificado</div></div></div>
-        <div class="resumen-card">
-          <div class="resumen-title">Resumen del día</div>
-          <div class="resumen-row"><span class="resumen-lbl">Entrada</span><span class="resumen-val green" id="resEntrada">--:--</span></div>
-          <div class="resumen-row"><span class="resumen-lbl">Salida</span><span class="resumen-val muted" id="resSalida">--:--</span></div>
-          <div class="resumen-row"><span class="resumen-lbl">Descanso</span><span class="resumen-val" id="resDescanso">00:00</span></div>
-          <div class="resumen-row" style="border-bottom:none"><span class="resumen-lbl" style="font-weight:600;color:var(--text)">Total</span><span class="resumen-total" id="resTotal">00:00</span></div>
+        <!-- Live clock -->
+        <div style="text-align:center;padding:16px 0 12px">
+          <div id="liveTime" style="font-size:48px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">00:00</div>
+          <div id="liveDateStr" style="font-size:13px;color:var(--text3);margin-top:4px;text-transform:capitalize"></div>
         </div>
+        <!-- Status pill -->
+        <div style="display:flex;justify-content:center;margin-bottom:16px">
+          <div id="statusPill" style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:24px;background:var(--bg3);border:1px solid var(--border);font-size:13px;font-weight:600">
+            <span id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--text3)"></span>
+            <span id="statusTxt">Sin jornada</span>
+          </div>
+        </div>
+        <!-- Circular progress + metrics -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:0 4px">
+          <div style="flex-shrink:0;position:relative;width:90px;height:90px">
+            <svg viewBox="0 0 90 90" width="90" height="90" style="transform:rotate(-90deg)">
+              <circle cx="45" cy="45" r="38" fill="none" stroke="var(--bg4)" stroke-width="8"/>
+              <circle id="progressRing" cx="45" cy="45" r="38" fill="none" stroke="url(#ringGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+              <defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"/><stop offset="100%" stop-color="var(--teal)"/></linearGradient></defs>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div id="ringPct" style="font-size:15px;font-weight:800;line-height:1">0%</div>
+              <div style="font-size:8px;color:var(--text3)">jornada</div>
+            </div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Entrada</span>
+              </div>
+              <div id="resEntrada" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Salida</span>
+              </div>
+              <div id="resSalida" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Descanso</span>
+              </div>
+              <div id="resDescanso" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">00:00</div>
+            </div>
+            <div style="background:linear-gradient(135deg,var(--accent-dim),rgba(6,182,212,.08));border:1px solid var(--accent-glow);border-radius:12px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span style="font-size:9px;color:var(--accent3);text-transform:uppercase;letter-spacing:.5px">Total</span>
+              </div>
+              <div id="resTotal" style="font-size:16px;font-weight:800;color:var(--accent3);font-variant-numeric:tabular-nums">0h 0m</div>
+            </div>
+          </div>
+        </div>
+        <!-- GPS card -->
+        <div id="gpsCard" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;align-items:center;gap:12px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600" id="gpsCardName">Centro</div>
+            <div id="gpsCardStatus" class="gps-status pending" style="font-size:11px;margin-top:1px">Sin GPS</div>
+          </div>
+        </div>
+        <!-- Action buttons -->
+        <div id="empActionBtns"></div>
       </div>
     </div>
     <!-- JORNADA -->
     <div id="tabJornada" style="display:none;overflow-y:auto">
       <div class="jor-tab-wrap">
         <div class="jor-tab-title">Jornada actual</div><div class="jor-tab-date" id="jorTabDate"></div>
+        <div id="jorWeekDots" style="display:flex;justify-content:space-around;background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px"></div>
         <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
-        <div class="jor-total-card"><div class="jor-total-lbl">Total trabajado</div><div class="jor-total-val" id="jorTotalVal">00h 00m</div><div class="jor-breakdown"><div class="jor-bd-row"><span class="jor-bd-lbl">Horas normales</span><span class="jor-bd-val" id="jorNorm">00h 00m</span></div><div class="jor-bd-row"><span class="jor-bd-lbl">Horas extra</span><span class="jor-bd-val" id="jorExtra" style="color:var(--orange)">00h 00m</span></div></div></div>
-        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;margin-bottom:12px">
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x23F1; Total</div>
+            <div id="jorTotalVal" style="font-size:15px;font-weight:800;color:var(--accent3)">0h 0m</div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x2705; Normal</div>
+            <div id="jorNorm" style="font-size:15px;font-weight:700">0h 0m</div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">&#x26A1; Extra</div>
+            <div id="jorExtra" style="font-size:15px;font-weight:700;color:var(--orange)">0h 0m</div>
+          </div>
+        </div>
+        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">&#x270F;&#xFE0F; Solicitar corrección de fichaje</button>
       </div>
       <div id="jorResumenMes" style="padding:0 16px 16px"></div>
     </div>
@@ -770,8 +848,17 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--green)" id="vacUsadas">—</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Disfrutadas</div></div>
           <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--orange)" id="vacPend">—</div><div style="font-size:10px;color:var(--text3);margin-top:4px">Pendientes</div></div>
         </div>
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:600">Progreso anual</span><span style="font-size:12px;color:var(--text3)" id="vacProgLabel">0/30 días</span></div><div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden"><div id="vacProgBar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;width:0%;transition:width .6s"></div></div><div style="font-size:11px;color:var(--text3);margin-top:6px" id="vacGenInfo">Generadas según antigüedad</div></div>
-        <button class="btn btn-primary btn-full" style="margin-bottom:16px;padding:14px" onclick="openModal('mVac')">+ Solicitar vacaciones</button>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:600">Progreso anual</span><span style="font-size:12px;color:var(--text3)" id="vacProgLabel">0/30 días</span></div>
+          <div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden"><div id="vacProgBar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;width:0%;transition:width .6s"></div></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px" id="vacGenInfo">Generadas según antigüedad</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <span style="font-size:10px;color:var(--text3);white-space:nowrap">Usadas</span>
+            <div class="vac-balance-bar" style="flex:1"><div class="vac-balance-fill" id="vacBalanceFill" style="width:0%"></div></div>
+            <span style="font-size:10px;color:var(--text3);white-space:nowrap">Disponibles</span>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" style="margin-bottom:16px;padding:14px" onclick="openModal('mVac')">&#x1F334; Solicitar vacaciones</button>
         <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Mis solicitudes</div>
         <div id="vacList" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Sin solicitudes</div></div>
       </div>
@@ -1692,6 +1779,19 @@ function renderResumen(){
   const gc=$('gpsCard');if(gc){gc.style.display=open?'flex':'none';}
   if($('gpsCardName'))$('gpsCardName').textContent=open?.centro||SES.user.centroTrabajo||'Sin centro';
   const gst=$('gpsCardStatus');if(gst){if(open?.locInicio){gst.textContent='GPS verificado';gst.className='gps-status';}else{gst.textContent='Sin GPS';gst.className='gps-status pending';}}
+  // update progress ring
+  const pct=Math.min(100,Math.round(tot/WD*100));
+  const ring=$('progressRing');
+  if(ring){const circ=238.76;ring.style.strokeDashoffset=circ-(circ*pct/100);}
+  const rp=$('ringPct');if(rp)rp.textContent=pct+'%';
+  // status pill
+  const open2=DB.records.find(r=>r.empId===u.id&&!r.fin);
+  const dot=$('statusDot'),stxt=$('statusTxt');
+  if(dot&&stxt){
+    if(open2&&open2.enDescanso){dot.style.background='var(--orange)';stxt.textContent='En descanso';}
+    else if(open2){dot.style.background='var(--green)';stxt.textContent='Trabajando';}
+    else{dot.style.background='var(--text3)';stxt.textContent='Sin jornada';}
+  }
 }
 
 function renderJorTab(){
@@ -1720,6 +1820,28 @@ function renderJorTab(){
   if($('jorExtra'))$('jorExtra').textContent=fmt(extra);
   // Resumen mensual con botón de firma
   safeRun(renderResumenMensualBtn,'rmb');
+  // Weekly dots
+  renderWeekDots();
+}
+
+function renderWeekDots(){
+  const el=$('jorWeekDots');if(!el||!SES.user)return;
+  const now=new Date();
+  const monday=new Date(now);monday.setDate(now.getDate()-((now.getDay()+6)%7));
+  const days=['L','M','X','J','V','S','D'];
+  el.innerHTML=days.map(function(d,i){
+    const day=new Date(monday);day.setDate(monday.getDate()+i);
+    const dk=day.getFullYear()+'-'+p2(day.getMonth()+1)+'-'+p2(day.getDate());
+    const hasRec=(DB.records||[]).some(function(r){return r.empId===SES.user.id&&r.inicio.startsWith(dk)&&r.fin;});
+    const isToday=dk===today();
+    const col=hasRec?'var(--green)':isToday?'var(--accent)':'var(--bg4)';
+    const border=isToday?'2px solid var(--accent)':'2px solid transparent';
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
+      +'<div style="font-size:10px;color:'+(isToday?'var(--accent)':'var(--text3)')+'">'+d+'</div>'
+      +'<div style="width:8px;height:8px;border-radius:50%;background:'+col+';border:'+border+'"></div>'
+      +'<div style="font-size:9px;color:var(--text3)">'+day.getDate()+'</div>'
+      +'</div>';
+  }).join('');
 }
 
 
@@ -1771,10 +1893,14 @@ function renderCalendar(){
     if(isToday)cls+=' today';
     else if(festivo)cls+=' festivo';
     else if(isVac)cls+=' vacation';
-    else if(worked)cls+=' worked';
+    else if(worked)cls+=' worked has-work';
+    const dayOfWeek=new Date(_calYear,_calMonth,d).getDay();
+    if(!isToday&&!festivo&&!isVac&&(dayOfWeek===0||dayOfWeek===6))cls+=' weekend';
     const title=festivoNombre?` title="${festivoNombre}"`:'';
     const dot=festivo?'<span style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--orange);"></span>':'';
-    html+=`<div class="${cls}" style="position:relative"${title} onclick="calSelectDay('${ds}','${d}')">${d}${dot}</div>`;
+    const workedMins=myRecs.reduce((a,r)=>a+calcMin(r),0);
+    const hrsHtml=worked&&!isToday?`<span class="cal-hrs">${Math.floor(workedMins/60)}h${p2(workedMins%60)}</span>`:'';
+    html+=`<div class="${cls}" style="position:relative"${title} onclick="calSelectDay('${ds}','${d}')"><span>${d}</span>${hrsHtml}${dot}</div>`;
   }
   const total=startDow+days;const rem=total%7===0?0:7-total%7;
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month">${i}</div>`;
@@ -2046,6 +2172,7 @@ function renderVacTab(){
   if($('vacProgBar'))$('vacProgBar').style.width=pct+'%';
   if($('vacProgLabel'))$('vacProgLabel').textContent=vd.used+' / '+vd.generated+' días usados';
   if($('vacGenInfo'))$('vacGenInfo').textContent='Llevas '+vd.months+' meses — '+vd.generated+' días generados ('+VPM+'d/mes)';
+  const bf=$('vacBalanceFill');if(bf)bf.style.width=(vd.generated>0?Math.min(100,Math.round(vd.used/vd.generated*100)):0)+'%';
   renderVacList();
 }
 
@@ -3064,10 +3191,11 @@ function verDocAdmin(docId,empId){
   const doc=allDocs.find(d=>d.id===docId);
   if(!doc||!doc.data){toast('Documento no disponible');return;}
   const w=window.open('','_blank');if(!w)return;
+  const backBtn='<div style="position:fixed;top:12px;left:12px;z-index:9999"><button onclick="window.close()" style="background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;backdrop-filter:blur(8px)">&#8592; Volver</button></div>';
   if(doc.data.includes('application/pdf')){
-    w.document.write('<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe>');
+    w.document.write('<html><body style="margin:0;background:#222">'+backBtn+'<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe></body></html>');
   } else {
-    w.document.write('<body style="margin:0;background:#000"><img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto"></body>');
+    w.document.write('<html><body style="margin:0;background:#000">'+backBtn+'<img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto;padding-top:50px"></body></html>');
   }
 }
 
@@ -3151,10 +3279,11 @@ function verDocEmp(tipo,idx=0){
   let doc=tipo==='contrato'?emp.docs.contrato:(emp.docs.nominas||[])[idx];
   if(!doc||!doc.data){toast('Documento no disponible');return;}
   const w=window.open('','_blank');if(!w)return;
+  const backBtn='<div style="position:fixed;top:12px;left:12px;z-index:9999"><button onclick="window.close()" style="background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;backdrop-filter:blur(8px)">&#8592; Volver</button></div>';
   if(doc.data.includes('application/pdf')){
-    w.document.write('<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe>');
+    w.document.write('<html><body style="margin:0;background:#222">'+backBtn+'<iframe src="'+doc.data+'" style="position:fixed;inset:0;width:100%;height:100%;border:none"></iframe></body></html>');
   } else {
-    w.document.write('<body style="margin:0;background:#000"><img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto"></body>');
+    w.document.write('<html><body style="margin:0;background:#000">'+backBtn+'<img src="'+doc.data+'" style="max-width:100%;display:block;margin:auto;padding-top:50px"></body></html>');
   }
 }
 
@@ -3833,6 +3962,13 @@ function exportMesXLSX(ym){
   XLSX.writeFile(wb,`CONTROL_HORAS_${ym}.xlsx`);
   toast('✅ Excel del mes descargado');
 }
+
+// Live clock for Inicio tab
+setInterval(function(){
+  const el=$('liveTime'),dl=$('liveDateStr');
+  if(el){const n=new Date();el.textContent=p2(n.getHours())+':'+p2(n.getMinutes());}
+  if(dl){dl.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});}
+},1000);
 
 // Recordatorio fin de jornada (hora configurable, por defecto 20:00)
 function scheduleEndOfDayReminder(){
