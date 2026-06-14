@@ -2257,7 +2257,7 @@ function renderPendientes(){
   el.innerHTML=pend.sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(r=>{
     const m=calcMin(r),bm=Math.floor((r.breakSecs||0)/60);
     const d=new Date(r.inicio),inDate=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
-    const gps=r.locInicio||r.locFin?`<div style="font-size:10px;color:var(--teal);margin:4px 0">📍 ${r.locInicio?`<a href="https://maps.google.com/?q=${r.locInicio.lat},${r.locInicio.lng}" target="_blank" style="color:var(--teal)">📍 Entrada ↗</a>`:''} ${r.locFin?`<a href="https://maps.google.com/?q=${r.locFin.lat},${r.locFin.lng}" target="_blank" style="color:var(--accent3)">🏁 Salida ↗</a>`:''}</div>`:''${r.locFin?` salida(${r.locFin.lat},${r.locFin.lng})`:''}</div>`:'';
+    const gps=r.locInicio||r.locFin?`<div style="font-size:10px;color:var(--teal);margin:4px 0">📍 ${r.locInicio?`<a href="https://maps.google.com/?q=${r.locInicio.lat},${r.locInicio.lng}" target="_blank" style="color:var(--teal)">📍 Entrada ↗</a>`:''} ${r.locFin?`<a href="https://maps.google.com/?q=${r.locFin.lat},${r.locFin.lng}" target="_blank" style="color:var(--accent3)">🏁 Salida ↗</a>`:''}</div>`:'';
     return`<div class="sol-item">
       <div class="sol-top"><div class="sol-name">${r.empName} <span class="badge badge-gray">Pendiente</span></div></div>
       <div class="sol-meta">📅 ${fdate(r.inicio)}${r.centro?' · 📍 '+r.centro:''} · ${ftime(r.inicio)} → ${ftime(r.fin)} · <b>${mhm(m)}</b> · ☕${mhm(bm)}</div>
