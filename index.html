@@ -792,7 +792,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <!-- Botón circular fichar (abajo del contador) -->
           <div class="jor-circle-wrap" style="margin-top:18px"><div class="jor-circle-glow" id="jorCircleGlow"></div><button class="jor-circle-btn" id="jorCircleBtn" onclick="jorBtnTap()"><svg viewBox="0 0 24 24" id="jorCircleIco"><path d="M12 1C7 1 3 5 3 10c0 3.5 1.5 6.5 4 8.5M12 1c5 0 9 4 9 9 0 3.5-1.5 6.5-4 8.5M8.5 10.5A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 3.5 3.5c0 2-1.5 3.5-3.5 5"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span id="jorCircleLine1">FICHAR</span><span id="jorCircleLine2">ENTRADA</span></button></div>
           <!-- Estado en la parte inferior -->
-          <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;display:flex;justify-content:center">
+          <div style="margin-top:16px;padding-top:14px;display:flex;justify-content:center">
             <span class="jor-mc-status idle" id="jorMcStatus"><span class="sdot"></span><span id="jorMcStatusTxt">Sin jornada</span></span>
           </div>
         </div>
@@ -871,21 +871,15 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         <div class="jor-tl-title">Actividad de hoy</div>
         <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
       </div>
-      <!-- Corrección (encima del resumen mensual) -->
-      <div style="padding:0 16px 12px">
-        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
-      </div>
-      <!-- Firma de jornada mensual -->
-      <div id="jorResumenMes" style="padding:0 16px 12px"></div>
-      <!-- Stats row Total/Normal/Extra (debajo del resumen mensual) -->
+      <!-- Resumen del mes (arriba de firma) -->
       <div style="padding:0 16px 4px">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Resumen del día</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">📅 Resumen del mes</div>
       </div>
       <div class="jor-stats-row" style="padding-top:0">
         <div class="jor-stat-card primary">
           <div class="jor-stat-ico">⏱️</div>
           <div class="jor-stat-val" id="jorTotalVal">0h 0m</div>
-          <div class="jor-stat-lbl">Total</div>
+          <div class="jor-stat-lbl">Total mes</div>
         </div>
         <div class="jor-stat-card">
           <div class="jor-stat-ico">✅</div>
@@ -898,6 +892,12 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div class="jor-stat-lbl">Extra</div>
         </div>
       </div>
+      <!-- Corrección -->
+      <div style="padding:4px 16px 12px">
+        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
+      </div>
+      <!-- Firma de jornada mensual -->
+      <div id="jorResumenMes" style="padding:0 16px 12px"></div>
       <div style="height:calc(16px + env(safe-area-inset-bottom))"></div>
     </div>
     <!-- VACACIONES -->
@@ -1844,25 +1844,25 @@ function renderResumen(){
   const u=SES.user,tod=today();
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   const openRec2=recs.find(r=>!r.fin&&!r.closed);
-  // Entrada: primer registro real (excluye micro-registros < 1min de bug anterior)
-  const firstValidRec=openRec2||recs.find(r=>r.fin&&r.closed&&calcMin(r)>0);
+  // Entrada: primer registro real del día (siempre mostrar aunque no haya jornada activa)
+  const validRecs=recs.filter(r=>!r.fin||calcMin(r)>0);
+  const firstValidRec=validRecs[0];
   if($('resEntrada'))$('resEntrada').textContent=firstValidRec?ftime(firstValidRec.inicio):'--:--';
-  // Salida: solo cuando jornada terminada con duración real
+  // Salida: último registro cerrado con duración real — siempre mostrar si existe
   if($('resSalida')){
-    const lastClosed=[...recs].reverse().find(r=>r.fin&&r.closed&&calcMin(r)>0);
-    $('resSalida').textContent=(!openRec2&&lastClosed)?ftime(lastClosed.fin):'--:--';
+    const lastClosed=[...validRecs].reverse().find(r=>r.fin&&r.closed);
+    $('resSalida').textContent=lastClosed?ftime(lastClosed.fin):'--:--';
   }
   const brk=recs.reduce((a,r)=>a+Math.floor((r.breakSecs||0)/60),0);
-  // completedMin solo de registros cerrados válidos
   const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
-  // liveSecs: calcular SIEMPRE desde el registro abierto (no depende de TM.ws)
   const liveSecs=openRec2?calcSecs(openRec2).work:0;
   const tot=completedMin+Math.floor(liveSecs/60);
   if($('resDescanso'))$('resDescanso').textContent=brk>0?`${Math.floor(brk/60).toString().padStart(2,'0')}:${p2(brk%60)}`:'00:00';
-  // Total: HH:MM:SS en vivo si hay jornada abierta
+  // Total: siempre mostrar las horas del día (en vivo si trabajando, fijo si terminó)
   if($('resTotal')){
     if(openRec2){$('resTotal').textContent=s2t(completedMin*60+liveSecs);}
-    else{$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;}
+    else if(tot>0){$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;}
+    else{$('resTotal').textContent='--:--';}
   }
   // GPS card
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
@@ -1906,15 +1906,24 @@ function renderJorTab(){
       </div>
     </div>`).join('');
   }
-  // Stats — en vivo calculado desde registro abierto (no depende de TM.ws)
+  // Stats del MES (no solo del día)
+  const ym=today().slice(0,7); // "YYYY-MM"
+  const monthRecs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(ym));
   const openRec3=recs.find(r=>!r.fin&&!r.closed);
-  const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
+  const monthClosedMin=monthRecs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
   const liveSecs2=openRec3?calcSecs(openRec3).work:0;
-  const tot=completedMin+Math.floor(liveSecs2/60);
-  const norm=Math.min(tot,WD),extra=Math.max(0,tot-WD);
-  if($('jorTotalVal'))$('jorTotalVal').textContent=openRec3?s2t(completedMin*60+liveSecs2):`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;
-  if($('jorNorm'))$('jorNorm').textContent=`${Math.floor(norm/60).toString().padStart(2,'0')}h ${p2(norm%60)}m`;
-  if($('jorExtra'))$('jorExtra').textContent=`${Math.floor(extra/60).toString().padStart(2,'0')}h ${p2(extra%60)}m`;
+  const monthTot=monthClosedMin+Math.floor(liveSecs2/60);
+  // días hábiles transcurridos este mes × WD = horas normales esperadas
+  const daysInMonth=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+  const todayDay=new Date().getDate();
+  const workDaysRatio=todayDay/daysInMonth;
+  const expectedNorm=Math.round(WD*22*workDaysRatio); // ~22 días hábiles/mes
+  const norm=Math.min(monthTot,expectedNorm);
+  const extra=Math.max(0,monthTot-expectedNorm);
+  const fmtMin=m=>`${Math.floor(m/60).toString().padStart(2,'0')}h ${p2(m%60)}m`;
+  if($('jorTotalVal'))$('jorTotalVal').textContent=openRec3?s2t(monthClosedMin*60+liveSecs2):fmtMin(monthTot);
+  if($('jorNorm'))$('jorNorm').textContent=fmtMin(norm);
+  if($('jorExtra'))$('jorExtra').textContent=fmtMin(extra);
   // Resumen mensual + week dots
   safeRun(renderResumenMensualBtn,'rmb');
   renderWeekDots();
@@ -3159,16 +3168,30 @@ function cambiarPin(){
 // ── Foto de perfil ──
 function handlePhotoUpload(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>2*1024*1024){toast('⚠️ La imagen no puede superar 2MB');return;}
+  if(file.size>3*1024*1024){toast('⚠️ La imagen no puede superar 3MB');return;}
   const reader=new FileReader();
   reader.onload=e=>{
     const dataUrl=e.target.result;
     const u=SES.user;if(!u)return;
-    u.photo=dataUrl;
-    const emp=DB.employees.find(x=>x.id===u.id);if(emp)emp.photo=dataUrl;
-    // Update all avatar elements
-    updateAvatarUI(dataUrl,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
-    save();toast('✅ Foto actualizada');
+    // Comprimir imagen antes de guardar
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=400;
+      let w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=canvas.toDataURL('image/jpeg',0.82);
+      // Guardar en localStorage separado (no en DB Firebase — evita límites de tamaño)
+      try{localStorage.setItem('times_photo_'+u.id,compressed);}catch(er){toast('⚠️ Sin espacio para guardar la foto');}
+      u.photo=compressed;
+      const emp=DB.employees.find(x=>x.id===u.id);
+      if(emp){emp.photo=null;} // no enviar foto a Firebase
+      updateAvatarUI(compressed,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
+      save();toast('✅ Foto actualizada');
+    };
+    img.src=dataUrl;
   };
   reader.readAsDataURL(file);
   input.value='';
@@ -3181,9 +3204,10 @@ function updateAvatarUI(photo,initials,color){
       el.style.backgroundImage='url('+photo+')';
       el.style.backgroundSize='cover';
       el.style.backgroundPosition='center';
+      el.style.background='';
       el.textContent='';
     }else{
-      el.style.backgroundImage='';
+      el.style.backgroundImage='none';
       el.textContent=initials;
       el.style.background=color;
     }
@@ -3191,8 +3215,11 @@ function updateAvatarUI(photo,initials,color){
 }
 function loadUserPhoto(){
   const u=SES.user;if(!u)return;
-  if(u.photo)updateAvatarUI(u.photo,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
-  else updateAvatarUI(null,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
+  // Prioridad: localStorage propio → campo photo del DB → iniciales
+  const localPhoto=localStorage.getItem('times_photo_'+u.id);
+  const photo=localPhoto||u.photo||null;
+  if(photo){u.photo=photo;}
+  updateAvatarUI(photo,u.initials||u.name.slice(0,2).toUpperCase(),u.color||'var(--accent)');
 }
 
 // ══════════════════════════════════════════════
