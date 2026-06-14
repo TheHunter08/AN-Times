@@ -871,7 +871,11 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
         <div class="jor-tl-title">Actividad de hoy</div>
         <div class="timeline" id="jorTimeline"><div class="empty">Sin actividad hoy</div></div>
       </div>
-      <!-- Resumen del mes (arriba de firma) -->
+      <!-- Corrección (ARRIBA del resumen) -->
+      <div style="padding:0 16px 12px">
+        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
+      </div>
+      <!-- Resumen del mes -->
       <div style="padding:0 16px 4px">
         <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">📅 Resumen del mes</div>
       </div>
@@ -891,10 +895,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
           <div class="jor-stat-val" id="jorExtra">0h 0m</div>
           <div class="jor-stat-lbl">Extra</div>
         </div>
-      </div>
-      <!-- Corrección -->
-      <div style="padding:4px 16px 12px">
-        <button class="jor-corregir-btn" onclick="abrirCorreccionFichaje()">✏️ Solicitar corrección de fichaje</button>
       </div>
       <!-- Firma de jornada mensual -->
       <div id="jorResumenMes" style="padding:0 16px 12px"></div>
@@ -1839,30 +1839,66 @@ function empNavTo(tab){
   if(tab==='vacaciones')safeRun(renderVacTab,'vt');
 }
 
+// Clave localStorage para persistir datos del último día trabajado
+function _cacheKey(id,k){return'times_last_'+k+'_'+id;}
+function _saveCache(id,k,v){try{localStorage.setItem(_cacheKey(id,k),v);}catch(e){}}
+function _loadCache(id,k){return localStorage.getItem(_cacheKey(id,k))||'--:--';}
+function _clearDayCache(id){['entrada','salida','total','date'].forEach(k=>localStorage.removeItem(_cacheKey(id,k)));}
+
 function renderResumen(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   const openRec2=recs.find(r=>!r.fin&&!r.closed);
-  // Entrada: primer registro real del día (siempre mostrar aunque no haya jornada activa)
+  // Registros válidos: abiertos O cerrados con >1min (excluye micro-bugs)
   const validRecs=recs.filter(r=>!r.fin||calcMin(r)>0);
   const firstValidRec=validRecs[0];
-  if($('resEntrada'))$('resEntrada').textContent=firstValidRec?ftime(firstValidRec.inicio):'--:--';
-  // Salida: último registro cerrado con duración real — siempre mostrar si existe
-  if($('resSalida')){
-    const lastClosed=[...validRecs].reverse().find(r=>r.fin&&r.closed);
-    $('resSalida').textContent=lastClosed?ftime(lastClosed.fin):'--:--';
+
+  // ENTRADA — guardar en caché cuando se tiene, recuperar si no hay datos hoy
+  const entradaEl=$('resEntrada');
+  if(entradaEl){
+    if(firstValidRec){
+      const v=ftime(firstValidRec.inicio);
+      entradaEl.textContent=v;
+      _saveCache(u.id,'entrada',v);
+      _saveCache(u.id,'date',tod);
+    } else {
+      entradaEl.textContent=_loadCache(u.id,'entrada');
+    }
   }
+
+  // SALIDA — mostrar fin del último registro real; si hay jornada abierta, mostrar '--:--' pero conservar la última conocida
+  const lastClosed=[...validRecs].reverse().find(r=>r.fin&&r.closed);
+  const salidaEl=$('resSalida');
+  if(salidaEl){
+    if(lastClosed&&!openRec2){
+      const v=ftime(lastClosed.fin);
+      salidaEl.textContent=v;
+      _saveCache(u.id,'salida',v);
+    } else if(openRec2){
+      salidaEl.textContent='--:--'; // en curso, sin salida aún
+    } else {
+      salidaEl.textContent=_loadCache(u.id,'salida');
+    }
+  }
+
+  // TOTAL — en vivo si activo, persistido si terminado, recuperado si sin datos hoy
   const brk=recs.reduce((a,r)=>a+Math.floor((r.breakSecs||0)/60),0);
   const completedMin=recs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
   const liveSecs=openRec2?calcSecs(openRec2).work:0;
   const tot=completedMin+Math.floor(liveSecs/60);
   if($('resDescanso'))$('resDescanso').textContent=brk>0?`${Math.floor(brk/60).toString().padStart(2,'0')}:${p2(brk%60)}`:'00:00';
-  // Total: siempre mostrar las horas del día (en vivo si trabajando, fijo si terminó)
-  if($('resTotal')){
-    if(openRec2){$('resTotal').textContent=s2t(completedMin*60+liveSecs);}
-    else if(tot>0){$('resTotal').textContent=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;}
-    else{$('resTotal').textContent='--:--';}
+  const totalEl=$('resTotal');
+  if(totalEl){
+    if(openRec2){
+      totalEl.textContent=s2t(completedMin*60+liveSecs);
+    } else if(tot>0){
+      const v=`${Math.floor(tot/60).toString().padStart(2,'0')}h ${p2(tot%60)}m`;
+      totalEl.textContent=v;
+      _saveCache(u.id,'total',v);
+    } else {
+      totalEl.textContent=_loadCache(u.id,'total');
+    }
   }
   // GPS card
   const open=DB.records.find(r=>r.empId===u.id&&!r.fin);
@@ -1912,18 +1948,16 @@ function renderJorTab(){
   const openRec3=recs.find(r=>!r.fin&&!r.closed);
   const monthClosedMin=monthRecs.filter(r=>r.fin&&r.closed).reduce((a,r)=>a+calcMin(r),0);
   const liveSecs2=openRec3?calcSecs(openRec3).work:0;
-  const monthTot=monthClosedMin+Math.floor(liveSecs2/60);
-  // días hábiles transcurridos este mes × WD = horas normales esperadas
-  const daysInMonth=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
-  const todayDay=new Date().getDate();
-  const workDaysRatio=todayDay/daysInMonth;
-  const expectedNorm=Math.round(WD*22*workDaysRatio); // ~22 días hábiles/mes
-  const norm=Math.min(monthTot,expectedNorm);
-  const extra=Math.max(0,monthTot-expectedNorm);
+  const monthTotMin=monthClosedMin+Math.floor(liveSecs2/60);
+  // Regla laboral: 40h/semana normal, 160h/mes obligatorias
+  // Extras SOLO cuando se supera 160h/mes — cualquier hora extra semanal va a cubrir el mensual primero
+  const MONTHLY_NORM=WM; // 160h en minutos (definido en constantes)
+  const normMin=Math.min(monthTotMin,MONTHLY_NORM);
+  const extraMin=Math.max(0,monthTotMin-MONTHLY_NORM);
   const fmtMin=m=>`${Math.floor(m/60).toString().padStart(2,'0')}h ${p2(m%60)}m`;
-  if($('jorTotalVal'))$('jorTotalVal').textContent=openRec3?s2t(monthClosedMin*60+liveSecs2):fmtMin(monthTot);
-  if($('jorNorm'))$('jorNorm').textContent=fmtMin(norm);
-  if($('jorExtra'))$('jorExtra').textContent=fmtMin(extra);
+  if($('jorTotalVal'))$('jorTotalVal').textContent=openRec3?s2t(monthClosedMin*60+liveSecs2):fmtMin(monthTotMin);
+  if($('jorNorm'))$('jorNorm').textContent=fmtMin(normMin);
+  if($('jorExtra'))$('jorExtra').textContent=extraMin>0?fmtMin(extraMin):'0h 00m';
   // Resumen mensual + week dots
   safeRun(renderResumenMensualBtn,'rmb');
   renderWeekDots();
@@ -2178,6 +2212,8 @@ function confirmarCentroYIniciar(){
     enDescanso:false,bStartTs:null,breaks:[],closed:false};
   if(_pendingGPS)rec.locInicio=_pendingGPS;
   DB.records.push(rec);TM.state='working';TM.ws=0;TM.bs=0;
+  // Limpiar caché del día anterior al iniciar nueva jornada
+  if(SES.user)_clearDayCache(SES.user.id);
   const emp=DB.employees.find(e=>e.id===SES.user.id);
   if(emp){emp.centroTrabajo=centro;SES.user.centroTrabajo=centro;}
   const cp=$('empCentroPill'),ct=$('empCentroTxt');
