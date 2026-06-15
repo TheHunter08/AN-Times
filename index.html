@@ -534,7 +534,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_18';
+  var V='20260615_19';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1551,9 +1551,11 @@ document.addEventListener('touchmove',function(e){if(e.touches.length>1)e.preven
 var _lastTap=0;
 document.addEventListener('touchend',function(e){
   var now=Date.now();
-  if(now-_lastTap<300&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))e.preventDefault();
+  if(now-_lastTap<=350&&!['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))e.preventDefault();
   _lastTap=now;
-},{passive:false});
+},{passive:false,capture:true});
+// iOS 26: refuerzo — bloquea el dblclick sintetico que provoca el zoom
+document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
 
