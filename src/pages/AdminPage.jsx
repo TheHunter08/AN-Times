@@ -38,8 +38,10 @@ function NavIcon({ id, size = 17 }) {
 export default function AdminPage() {
   const { db, session, currentAdminPage, setAdminPage, saveDB, toast, setScreen, logout, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const [sideOpen, setSideOpen] = useState(false)
-  const [mobilePage, setMobilePage] = useState(0)
   const isMobile = window.innerWidth < 768
+
+  const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
+  const adminNotis = (db.notis || []).filter(n => n.empId === '__admin__' && !n.leido)
 
   const doLogout = () => { logout(); try { if (window._fbSignOut) window._fbSignOut() } catch {} }
 
@@ -63,6 +65,16 @@ export default function AdminPage() {
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <SyncBadge />
+          <button title="Notificaciones admin" onClick={() => {
+            nav('documentos')
+            const updated = (db.notis||[]).map(n => n.empId==='__admin__' ? {...n,leido:true} : n)
+            saveDB({ notis: updated })
+          }} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {adminNotis.length > 0 && (
+              <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminNotis.length}</span>
+            )}
+          </button>
           {session.user && (
             <button className="btn btn-secondary btn-sm" onClick={() => setScreen('emp')}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -81,7 +93,10 @@ export default function AdminPage() {
             {PAGES.map(p => (
               <div key={p.id} className={`adm-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => nav(p.id)}>
                 <span className="adm-nav-ico"><NavIcon id={p.id} /></span>
-                <span>{p.label}</span>
+                <span style={{ flex:1 }}>{p.label}</span>
+                {p.id==='documentos' && pendingDocs > 0 && (
+                  <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingDocs}</span>
+                )}
               </div>
             ))}
             <div className="adm-nav-divider" />
@@ -168,7 +183,7 @@ function PanelDashboard({ db }) {
           { label:'Fichados ahora', val: checkedIn, total: emps.length, color:'var(--green)', bg:'var(--green-dim)', ico:'▶️' },
           { label:'Horas esta semana', val: mhm(weekMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:'⏱️' },
           { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(12,200,232,.1)', ico:'📅' },
-          { label:'Solicitudes pendientes', val: vacPend, color:'var(--orange)', bg:'var(--orange-dim)', ico:'📬' },
+          { label:'Docs. pendientes firma', val: (db.documentos||[]).filter(d=>!d.firma).length, color:'var(--orange)', bg:'var(--orange-dim)', ico:'✍️' },
         ].map(({ label, val, total, color, bg, ico }) => (
           <div key={label} className="adm-stat-card">
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
@@ -325,6 +340,7 @@ function PanelControl({ db, toast, saveDB }) {
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
   const [tick, setTick] = useState(0)
+  const [view, setView] = useState('cards')
   useEffect(() => { const iv = setInterval(() => setTick(t => t+1), 5000); return () => clearInterval(iv) }, [])
 
   const force = (rec) => {
@@ -334,8 +350,7 @@ function PanelControl({ db, toast, saveDB }) {
     if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
     const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
     const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-    const records = recs.map(r => r.id === rec.id ? closed : r)
-    saveDB({ records })
+    saveDB({ records: recs.map(r => r.id === rec.id ? closed : r) })
     toast('✅ Jornada cerrada forzosamente')
   }
 
@@ -343,42 +358,94 @@ function PanelControl({ db, toast, saveDB }) {
     <div className="adm-panel">
       <div className="adm-panel-header">
         <h1 className="adm-panel-title">Control en tiempo real</h1>
-        <div className="adm-panel-sub">{liveRecs.length} empleados activos de {emps.length}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div className="adm-panel-sub">{liveRecs.length} activos / {emps.length} totales</div>
+          <div style={{ display:'flex', background:'var(--bg-600)', borderRadius:8, padding:3, gap:2 }}>
+            {[['cards','Cards'],['tabla','Tabla']].map(([v,l]) => (
+              <button key={v} onClick={() => setView(v)}
+                style={{ padding:'5px 12px', borderRadius:6, border:'none', fontSize:11, fontWeight:600, cursor:'pointer',
+                  background: view===v ? 'var(--bg-400)' : 'transparent', color: view===v ? 'var(--text)' : 'var(--text3)' }}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="adm-table-wrap">
-        <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Tiempo</th><th>Estado</th><th></th></tr></thead>
-          <tbody>
-            {emps.map(e => {
-              const live = liveRecs.find(r => r.empId === e.id)
-              const t = live ? calcSecs(live) : null
-              return (
-                <tr key={e.id} style={{ opacity: live ? 1 : 0.4 }}>
-                  <td>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:28, height:28, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
-                        {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                      </div>
-                      {e.name}
+
+      {view === 'cards' && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+          {emps.map(e => {
+            const live = liveRecs.find(r => r.empId === e.id)
+            const t = live ? calcSecs(live) : null
+            const isWorking = live && !live.enDescanso
+            const isBreak = live && live.enDescanso
+            const todayMin = recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(today())).reduce((s,r)=>s+calcMin(r),0)
+            return (
+              <div key={e.id} style={{ background:'var(--bg-700)', border:`1px solid ${isWorking?'rgba(54,178,126,.35)':isBreak?'rgba(255,145,57,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:18, transition:'border-color .2s' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+                  <div style={{ position:'relative' }}>
+                    <div style={{ width:44, height:44, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#fff' }}>
+                      {(e.initials||e.name.slice(0,2)).toUpperCase()}
                     </div>
-                  </td>
-                  <td style={{ color:'var(--text3)', fontSize:12 }}>{live?.centro || e.centroTrabajo || '—'}</td>
-                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{live ? ftime(live.inicio) : '—'}</td>
-                  <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{t ? mhm(Math.floor(t.work/60)) : '—'}</td>
-                  <td>
-                    {live ? (
-                      <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>
-                        {live.enDescanso ? '⏸ Descanso' : '▶ Trabajando'}
-                      </span>
-                    ) : <span className="badge">Libre</span>}
-                  </td>
-                  <td>{live && <button className="btn btn-sm btn-danger" onClick={() => force(live)}>Cerrar</button>}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <div style={{ position:'absolute', bottom:0, right:0, width:12, height:12, borderRadius:'50%', border:'2px solid var(--bg-700)', background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 6px var(--green)':isBreak?'0 0 6px var(--orange)':undefined }} />
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{live?.centro || e.centroTrabajo || '—'}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:'center', marginBottom:12 }}>
+                  <div style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                    {t ? mhm(Math.floor(t.work/60)) : '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                    {isWorking ? `Entrada: ${ftime(live.inicio)}` : isBreak ? 'En descanso' : todayMin>0 ? `Hoy: ${mhm(todayMin)}` : 'Sin jornada hoy'}
+                  </div>
+                </div>
+                {live && (
+                  <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
+                    Forzar cierre de jornada
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {view === 'tabla' && (
+        <div className="adm-table-wrap">
+          <table className="adm-table">
+            <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Tiempo</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {emps.map(e => {
+                const live = liveRecs.find(r => r.empId === e.id)
+                const t = live ? calcSecs(live) : null
+                return (
+                  <tr key={e.id} style={{ opacity: live ? 1 : 0.4 }}>
+                    <td>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <div style={{ width:28, height:28, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
+                          {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                        </div>
+                        {e.name}
+                      </div>
+                    </td>
+                    <td style={{ color:'var(--text3)', fontSize:12 }}>{live?.centro || e.centroTrabajo || '—'}</td>
+                    <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{live ? ftime(live.inicio) : '—'}</td>
+                    <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{t ? mhm(Math.floor(t.work/60)) : '—'}</td>
+                    <td>
+                      {live ? <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>{live.enDescanso?'⏸ Descanso':'▶ Trabajando'}</span>
+                             : <span className="badge">Libre</span>}
+                    </td>
+                    <td>{live && <button className="btn btn-sm btn-danger" onClick={() => force(live)}>Cerrar</button>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -1047,13 +1114,16 @@ function PanelDocumentos({ db, toast, saveDB }) {
     reader.readAsDataURL(f)
   }
 
+  const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada mensual' }
+
   const add = () => {
     if (!form.empId) { toast('Selecciona un empleado'); return }
     if (!form.titulo.trim()) { toast('Escribe un título'); return }
     const emp = emps.find(e => e.id === form.empId)
     const doc = { ...form, id: gid(), empName: emp?.name || '', createdAt: new Date().toISOString(), firma: null }
     if (fileData) { doc.fileData = fileData; doc.fileName = fileName }
-    saveDB({ documentos: [...docs, doc] })
+    const noti = { id: gid(), empId: form.empId, action: `Nuevo documento pendiente de firma`, detail: `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo}`, ts: new Date().toISOString(), leido: false }
+    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti] })
     toast('✅ Documento enviado al empleado')
     setShowForm(false)
     setForm(EMPTY)
@@ -1068,7 +1138,8 @@ function PanelDocumentos({ db, toast, saveDB }) {
     const already = docs.find(d => d.empId === empId && d.tipo === 'jornada' && d.mes === mes)
     if (already) { toast('Ya existe jornada para ese mes'); return }
     const doc = { id: gid(), empId, empName: emp.name, tipo:'jornada', titulo:`Jornada mensual ${mes}`, mes, url:'', createdAt: new Date().toISOString(), firma: null }
-    saveDB({ documentos: [...docs, doc] })
+    const noti = { id: gid(), empId, action: 'Jornada mensual pendiente de firma', detail: `Necesitas firmar la jornada del mes ${mes}`, ts: new Date().toISOString(), leido: false }
+    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti] })
     toast('✅ Jornada enviada para firma')
   }
 
@@ -1083,7 +1154,6 @@ function PanelDocumentos({ db, toast, saveDB }) {
     : tab === 'firmados' ? docs.filter(d => d.firma)
     : docs.filter(d => d.tipo === tab)
 
-  const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada' }
   const TIPO_COLORS = { nomina:'var(--primary-light)', contrato:'var(--teal)', jornada:'var(--orange)' }
 
   return (

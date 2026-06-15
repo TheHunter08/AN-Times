@@ -112,7 +112,7 @@ export default function EmployeePage() {
 
   const initials = u.initials || u.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   const vac = vacData(u.id, db)
-  const unread = (db.notis || []).filter(n => !n.leido).length
+  const unread = (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length
 
   return (
     <div className="screen active" id="sEmp">
@@ -687,7 +687,7 @@ function ModalSelCentro({ visible, data, onConfirm, onClose }) {
 }
 
 function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
-  const notis = (db.notis || []).filter(n => !n.empId || n.empId === u?.id).slice(-20).reverse()
+  const notis = (db.notis || []).filter(n => n.empId === u?.id).slice(-20).reverse()
   if (!visible) return null
   const markRead = () => {
     const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
@@ -1002,10 +1002,10 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
         {field('Email', email, setEmail)}
         {field('Teléfono', tel, setTel)}
         {field('Empresa', emp.empresa || '—', null, true)}
-        {field('Centro', emp.centro || '—', null, true)}
-        {field('Rol', emp.rol || '—', null, true)}
-        {field('Inicio', emp.inicio || '—', null, true)}
-        {field('Vacaciones', String(emp.vacDias ?? 22) + ' días', null, true)}
+        {field('Centro de trabajo', emp.centroTrabajo || '—', null, true)}
+        {field('Rol', emp.role==='encargado'?'Encargado':emp.role==='jefe_obra'?'Jefe de Obra':'Empleado', null, true)}
+        {field('Fecha de alta', emp.fechaAlta || '—', null, true)}
+        {field('Días vacaciones/año', String(vacData(u.id, db).generated || 22) + ' días', null, true)}
         <button className="btn btn-primary" onClick={save} style={{ width:'100%', marginTop:8 }}>Guardar cambios</button>
       </div>
     </div>
@@ -1026,11 +1026,12 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
 
   const firmarDoc = (doc) => {
     if (!myFirma) { toast('Necesitas guardar tu firma primero en Perfil → Firma digital'); return }
+    const firmadoAt = new Date().toISOString()
     const updated = (db.documentos || []).map(d => d.id === doc.id ? {
-      ...d,
-      firma: { firmadoAt: new Date().toISOString(), signatureData: myFirma.data, empName: u.name }
+      ...d, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
     } : d)
-    saveDB({ documentos: updated })
+    const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
+    saveDB({ documentos: updated, notis: [...(db.notis || []), noti] })
     toast('✅ Documento firmado correctamente')
     setSigning(null)
   }
