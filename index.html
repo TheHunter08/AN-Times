@@ -526,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_25';
+  var V='20260615_26';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1747,13 +1747,9 @@ var _logoTaps = 0, _logoTimer = null;
 function logoTap(){
   _logoTaps++;
   clearTimeout(_logoTimer);
-  _logoTimer = setTimeout(function(){ _logoTaps = 0; }, 2000);
-  if(_logoTaps >= 7){
+  _logoTimer = setTimeout(function(){ _logoTaps = 0; }, 800);
+  if(_logoTaps >= 3){
     _logoTaps = 0;
-    var vv=window.visualViewport;
-    alert('DEBUG\ninnerH:'+window.innerHeight+'\nscreenH:'+screen.height+'\nDPR:'+window.devicePixelRatio+(vv?'\nvvH:'+Math.round(vv.height):'')+'\nstandalone:'+(window.navigator.standalone||false));
-  } else if(_logoTaps === 3){
-    // Show admin secret button (no reset — sigue contando hasta 7)
     var btn = document.getElementById('adminSecretBtn');
     if(btn){ btn.style.color = 'var(--accent3)'; btn.style.cursor = 'pointer'; btn.textContent = '⚡ Acceso admin'; }
   }
