@@ -36,7 +36,7 @@ body{height:100%;overflow:hidden;font-family:'Inter',-apple-system,sans-serif;fo
   --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
 }
 .scr{position:fixed;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;background:var(--bg)}
-.scr.show{display:flex;min-height:100vh;min-height:100svh;min-height:100lvh}
+.scr.show{display:flex}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
 .empty{text-align:center;color:var(--text3);padding:28px 0;font-size:13px}
@@ -526,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_27';
+  var V='20260615_29';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1450,10 +1450,12 @@ function showScr(id){
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
   $(id).classList.add('show');
   var nav=$('empBottomNav');
-  if(nav){nav.style.display=(id==='sEmp')?'flex':'none';if(id==='sEmp')setTimeout(_posNav,0);}
-  // iOS 26: colorea el área del sistema (59px fuera del viewport) igual que el fondo de pantalla
+  if(nav){nav.style.display=(id==='sEmp')?'flex':'none';}
+  // iOS 26: el área sistema (59px bajo viewport) muestra el background del body
+  var isEmp=(id==='sEmp');
+  document.body.style.background=isEmp?'#12121f':'#0d0d1a';
   var tc=document.querySelector('meta[name="theme-color"]');
-  if(tc) tc.content=(id==='sEmp')?'#12121f':'#0d0d1a';
+  if(tc) tc.content=isEmp?'#12121f':'#0d0d1a';
 }
 
 // ── Sidebar ──
@@ -1534,30 +1536,7 @@ function startPolling(){
 }
 // Sincronizar inmediatamente al recuperar conexión o volver a la app
 window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
-// iOS 26 PWA: ancla la nav al fondo del visual viewport (fiable en standalone aunque dvh/vh fallen)
-function _posNav(){
-  var nav=document.getElementById('empBottomNav');
-  if(!nav||nav.style.display==='none')return;
-  requestAnimationFrame(function(){
-    // Gap entre viewport web y pantalla física (iOS 26 reserva área sistema)
-    var gap=Math.max(0,screen.height-window.innerHeight);
-    // Extender padding-bottom del nav para que su fondo cubra visualmente el gap
-    nav.style.paddingBottom='calc(8px + '+gap+'px)';
-    var vvH=window.visualViewport?window.visualViewport.height:window.innerHeight;
-    // Reposicionar tras cambio de padding (nueva altura)
-    requestAnimationFrame(function(){
-      var h=nav.offsetHeight||58;
-      nav.style.top=Math.round(vvH-h)+'px';
-      nav.style.bottom='auto';
-    });
-  });
-}
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',_posNav);
-  window.visualViewport.addEventListener('scroll',_posNav);
-}
-window.addEventListener('resize',function(){setTimeout(_posNav,50);});
-window.addEventListener('orientationchange',function(){setTimeout(_posNav,200);});
+function _posNav(){}
 // Block zoom: gesture events (iOS Safari) + pinch + double-tap
 document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
 document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
