@@ -18,6 +18,7 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -520,13 +521,44 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
   .login-wrap{max-width:420px;margin:0 auto}
 }
 
+/* ═══════════════ GLASSMORPHISM ═══════════════ */
+.glass{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
+.glass-card{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+
+/* ═══════════════ MODAL OVERLAY (centrado) ═══════════════ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-box{background:var(--bg2);border-radius:20px;padding:20px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-header h3{font-size:16px;font-weight:700;color:var(--text)}
+.modal-header button{background:none;border:none;color:var(--text4);font-size:20px;cursor:pointer;padding:4px;line-height:1}
+.btn-primary{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:600;cursor:pointer;font-size:13px}
+.btn-secondary{background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-weight:600;cursor:pointer;font-size:13px}
+
+/* ═══════════════ CHART SECTION ═══════════════ */
+.chart-section{padding:16px;margin:0 16px 12px}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text2)}
+
+/* ═══════════════ AI ASSISTANT BUTTON ═══════════════ */
+.ai-btn{width:36px;height:36px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;box-shadow:0 2px 12px rgba(99,102,241,0.4);border:none}
+.ai-msg-user{padding:10px 14px;border-radius:12px;font-size:13px;max-width:85%;background:var(--accent-dim);align-self:flex-end}
+.ai-msg-bot{padding:10px 14px;border-radius:12px;font-size:13px;max-width:85%;background:var(--bg3);align-self:flex-start}
+
+/* ═══════════════ AUDIT LOG ═══════════════ */
+.audit-row{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);font-size:12px}
+.audit-row:last-child{border-bottom:none}
+.audit-action{font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.audit-action.entrada{background:rgba(16,185,129,.12);color:var(--green)}
+.audit-action.salida{background:rgba(239,68,68,.1);color:var(--red)}
+.audit-action.vac{background:rgba(59,130,246,.1);color:var(--blue)}
+.audit-action.other{background:rgba(100,116,139,.1);color:var(--text3)}
+
 </style>
 </head>
 <body>
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_30';
+  var V='20260615_31';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -767,6 +799,38 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
   <div style="text-align:center;font-size:12px;color:var(--text3)">¿No tienes cuenta? Contacta al administrador.</div>
 </div></div>
 
+<!-- ═══ MODAL FIRMA DIGITAL ═══ -->
+<div id="signModal" class="modal-overlay" style="display:none">
+  <div class="modal-box glass-card" style="width:90%;max-width:500px">
+    <div class="modal-header">
+      <h3>✍️ Firma Digital</h3>
+      <button onclick="closeSignModal()">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text4);margin-bottom:10px">Firma con el dedo en el área de abajo</p>
+    <canvas id="signCanvas" width="460" height="200" style="background:rgba(255,255,255,0.05);border-radius:8px;border:1px solid var(--border2);touch-action:none;width:100%;cursor:crosshair;display:block"></canvas>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="clearSign()" class="btn-secondary" style="flex:1">Limpiar</button>
+      <button onclick="saveSign()" class="btn-primary" style="flex:1">Guardar firma</button>
+    </div>
+    <div id="signList" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ASISTENTE IA ═══ -->
+<div id="aiModal" class="modal-overlay" style="display:none">
+  <div class="modal-box glass-card" style="width:90%;max-width:500px;height:70vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;margin:0">
+      <h3>🤖 Asistente IA</h3>
+      <button onclick="closeAiModal()" style="background:none;border:none;color:var(--text4);font-size:20px;cursor:pointer;padding:4px;line-height:1">✕</button>
+    </div>
+    <div id="aiMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+    <div style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex-shrink:0">
+      <input id="aiInput" placeholder="Pregunta sobre tus horas, vacaciones..." style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')sendAiMsg()">
+      <button onclick="sendAiMsg()" class="btn-primary">Enviar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ LOGIN ═══ -->
 <div class="scr show" id="sLogin">
   <div class="login-wrap">
@@ -844,6 +908,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
     <div class="emp-top-right">
       <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
       <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+      <button class="ai-btn" onclick="openAiModal()" title="Asistente IA">🤖</button>
       <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
       <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
     </div>
@@ -884,28 +949,28 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
             </div>
           </div>
           <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+            <div class="glass-card" style="padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Entrada</span>
               </div>
               <div id="resEntrada" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
             </div>
-            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+            <div class="glass-card" style="padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Salida</span>
               </div>
               <div id="resSalida" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
             </div>
-            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px">
+            <div class="glass-card" style="padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
                 <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Descanso</span>
               </div>
               <div id="resDescanso" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">00:00</div>
             </div>
-            <div style="background:linear-gradient(135deg,var(--accent-dim),rgba(6,182,212,.08));border:1px solid var(--accent-glow);border-radius:12px;padding:10px">
+            <div class="glass-card" style="padding:10px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(6,182,212,0.08))">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 <span style="font-size:9px;color:var(--accent3);text-transform:uppercase;letter-spacing:.5px">Total</span>
@@ -913,6 +978,11 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
               <div id="resTotal" style="font-size:16px;font-weight:800;color:var(--accent3);font-variant-numeric:tabular-nums">0h 0m</div>
             </div>
           </div>
+        </div>
+        <!-- Weekly chart -->
+        <div class="chart-section glass-card">
+          <div class="chart-header"><span>Horas esta semana</span><span id="chartWeekTotal" style="color:var(--accent3)">0h</span></div>
+          <canvas id="weekChartEmp" height="120"></canvas>
         </div>
         <!-- GPS card -->
         <div id="gpsCard" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;align-items:center;gap:12px">
@@ -1072,6 +1142,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
         <div class="prf-menu-item" onclick="openPrfPanel('documentos')"><div class="prf-menu-ico"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><span class="prf-menu-lbl">Documentos</span><svg class="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="prf-menu-item" onclick="openPrfPanel('configuracion')"><div class="prf-menu-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><span class="prf-menu-lbl">Configuración</span><svg class="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="prf-menu-item" onclick="openPrfPanel('seguridad')"><div class="prf-menu-ico"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><span class="prf-menu-lbl">Seguridad</span><svg class="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="prf-menu-item" onclick="openSignModal()"><div class="prf-menu-ico" style="background:rgba(124,58,237,.12)"><svg viewBox="0 0 24 24" style="stroke:#a78bfa"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><span class="prf-menu-lbl">Firma digital</span><svg class="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="prf-menu-item danger" onclick="doLogout()"><div class="prf-menu-ico"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><span class="prf-menu-lbl">Cerrar sesión</span><svg class="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
     </div>
@@ -1101,6 +1172,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
       <div class="sni" data-p="informes" onclick="showPage('informes')"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Informes</div>
       <div class="sni" data-p="obras" id="sniObras" onclick="showPage('obras')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Obras</div>
       <div class="sni" data-p="exportar" onclick="showPage('exportar')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar</div>
+      <div class="sni" data-p="auditoria" onclick="showPage('auditoria')"><svg viewBox="0 0 24 24"><path d="M11 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/><polyline points="10 9 16 9"/><polyline points="10 13 16 13"/><polyline points="10 17 13 17"/><path d="M18 3a3 3 0 0 1 3 3v4l-3 3-3-3V6a3 3 0 0 1 3-3z"/></svg>Auditoría</div>
       <div class="sni" data-p="docsnominas" id="sniDocs" onclick="showPage('docsnominas')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Contratos y Nóminas</div>
     </nav>
     <div class="sb-foot"><div class="sb-user"><div class="sb-user-av" id="sbAv">A</div><div class="sb-user-info"><div class="sb-user-name" id="sbName">Admin</div><div class="sb-user-role" id="sbRole">Administrador</div></div><button class="sb-logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div></div>
@@ -1170,6 +1242,22 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
         <div class="card">
           <div class="card-hd"><h3>👥 Estado por empleado</h3></div>
           <div id="docStatusList"><div class="empty">Cargando...</div></div>
+        </div>
+      </div>
+      <div id="pAuditoria" style="display:none">
+        <div style="margin-bottom:14px"><div style="font-size:20px;font-weight:800">🔍 Auditoría</div><div style="font-size:13px;color:var(--text3);margin-top:2px">Registro de acciones del sistema</div></div>
+        <div class="card">
+          <div class="card-hd">
+            <h3>Últimas 50 acciones</h3>
+            <select id="auditFilter" onchange="renderAuditLog()" style="font-size:12px;padding:5px 8px;border-radius:8px;width:160px">
+              <option value="">Todas</option>
+              <option value="FICHAJE_ENTRADA">Entradas</option>
+              <option value="FICHAJE_SALIDA">Salidas</option>
+              <option value="VACACION_APROBADA">Vacaciones aprobadas</option>
+              <option value="VACACION_RECHAZADA">Vacaciones rechazadas</option>
+            </select>
+          </div>
+          <div id="auditLogList"><div class="empty">Cargando...</div></div>
         </div>
       </div>
       <div id="pExportar" style="display:none">
@@ -1985,6 +2073,7 @@ function doEmpLogin(){
   empNavTo('inicio');
   safeRun(updJorCircle,'jc');safeRun(renderResumen,'rs');
   safeRun(loadUserPhoto,'lp');
+  setTimeout(function(){ safeRun(initWeekChart,'wc'); }, 300);
   // Pedir permisos de notificación y programar recordatorio
   setTimeout(scheduleEndOfDayReminder, 2000);
   setTimeout(function(){
@@ -2013,7 +2102,7 @@ function empNavTo(tab){
   });
   if(tab==='jornada')safeRun(renderJorTab,'jt');
   if(tab==='calendario')safeRun(renderCalendar,'cal');
-  if(tab==='inicio')safeRun(renderResumen,'rs');
+  if(tab==='inicio'){safeRun(renderResumen,'rs');safeRun(initWeekChart,'wc');}
   if(tab==='vacaciones')safeRun(renderVacTab,'vt');
 }
 
@@ -2423,6 +2512,7 @@ function confirmarCentroYIniciar(){
   const cp=$('empCentroPill'),ct=$('empCentroTxt');
   if(cp&&ct){cp.style.display='inline-flex';ct.textContent=centro;}
   save();updBtns();toast('✅ Jornada iniciada en '+centro);
+  safeRun(function(){ auditLog('FICHAJE_ENTRADA','Entrada registrada en '+centro,SES.user.id); },'auditIn');
 }
 function doStop(){
   if(_doStopLock)return;const o=openRec();if(!o)return;
@@ -2438,6 +2528,7 @@ function doStop(){
   }
   save();updBtns();updTimer();safeRun(renderResumen,'rs');safeRun(renderJorTab,'jt');
   toast('✅ Jornada finalizada — '+mhm(Math.floor(o.workSecs/60)));
+  safeRun(function(){ auditLog('FICHAJE_SALIDA','Salida registrada. Tiempo: '+mhm(Math.floor(o.workSecs/60)),SES.user?.id); },'auditOut');
   setTimeout(()=>{_doStopLock=false;_doStopInProgress=false;updJorBtn&&safeRun(updJorBtn,"jb");},500);
 }
 function toggleBreak(){
@@ -2604,12 +2695,12 @@ function populateModalEmps(){
 }
 
 // ── Admin pages ──
-const _ADMIN_PAGES=['pDashboard','pControl','pFichajes','pSolicitudes','pEmpleados','pObras','pInformes','pExportar','pDocsnominas'];
+const _ADMIN_PAGES=['pDashboard','pControl','pFichajes','pSolicitudes','pEmpleados','pObras','pInformes','pExportar','pDocsnominas','pAuditoria'];
 function showPage(p){
   _ADMIN_PAGES.forEach(id=>{const el=$(id);if(el)el.style.display='none';});
   const pg=$('p'+p.charAt(0).toUpperCase()+p.slice(1));if(pg){pg.style.display='';pg.scrollTop=0;}
   document.querySelectorAll('.sni').forEach(el=>el.classList.toggle('on',el.dataset.p===p));
-  const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar',docsnominas:'Contratos y Nóminas'};
+  const titles={dashboard:'Dashboard',control:'Control',fichajes:'Fichajes',solicitudes:'Solicitudes',empleados:'Empleados',obras:'Obras',informes:'Informes',exportar:'Exportar',docsnominas:'Contratos y Nóminas',auditoria:'Auditoría'};
   if($('admTitle'))$('admTitle').textContent=titles[p]||p;
   if($('admSubtitle'))$('admSubtitle').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   closeSidebar();
@@ -2625,6 +2716,7 @@ function showPage(p){
   if(p==='informes')safeRun(renderInformes,'inf');
   if(p==='exportar')safeRun(renderExpStats,'exp');
   if(p==='docsnominas'){safeRun(initDocsPanel,'docs');}
+  if(p==='auditoria'){safeRun(renderAuditLog,'audit');}
 }
 function updateSBBadges(){
   const pend=(DB.records||[]).filter(r=>r.fin&&r.aprobado===undefined).length;
@@ -2877,6 +2969,7 @@ function resolveVac(id,estado){
   const _bv=`Solicitud ${v.desde}→${v.hasta} ${estado}.`;
   pushNoti('emp:'+v.empId,'vac',_tv,_bv);
   queuePushNotif('emp:'+v.empId,_tv,_bv,'vac');
+  safeRun(function(){ auditLog(estado==='aprobada'?'VACACION_APROBADA':'VACACION_RECHAZADA','Vacaciones '+v.desde+'→'+v.hasta+' de '+v.empName,SES.user?.id); },'auditVac');
   save();renderSolicitudes();toast(estado==='aprobada'?'✅ Aprobadas':'❌ Denegadas');
 }
 function renderMedList(){const el=$('medList');if(!el)return;const items=DB.medicos||[];if(!items.length){el.innerHTML='<div class="empty">Sin permisos médicos</div>';return;}el.innerHTML=items.map(m=>{const bc=m.estado==='aprobada'?'badge-green':m.estado==='denegada'?'badge-red':'badge-orange';return`<div class="sol-item"><div class="sol-top"><div class="sol-name">${m.empName||'?'} <span class="badge ${bc}">${m.estado||'pendiente'}</span></div></div><div class="sol-meta">📅 ${m.desde||'?'} → ${m.hasta||'?'}</div>${m.estado==='pendiente'?`<div class="sol-acts"><button class="btn btn-green btn-sm" onclick="resMed('${m.id}','aprobada')">✓ Aprobar</button><button class="btn btn-red btn-sm" onclick="resMed('${m.id}','denegada')">✗ Denegar</button></div>`:''}</div>`;}).join('');}
@@ -4490,6 +4583,301 @@ function exportMesXLSX(ym){
   toast('✅ Excel del mes descargado');
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// AUDIT LOG
+// ══════════════════════════════════════════════════════════════
+function auditLog(action, detail, userId) {
+  try {
+    var entry = {
+      action: action,
+      detail: detail,
+      userId: userId || (SES.user ? SES.user.id : 'sistema'),
+      userName: SES.user ? SES.user.name : 'Sistema',
+      ts: Date.now(),
+      date: new Date().toLocaleString('es-ES')
+    };
+    firebase.database().ref('auditLog').push(entry);
+  } catch(e) {
+    // Firebase puede no estar disponible
+  }
+}
+
+function renderAuditLog() {
+  var el = $('auditLogList'); if(!el) return;
+  var filter = ($('auditFilter') ? $('auditFilter').value : '') || '';
+  el.innerHTML = '<div class="empty" style="padding:16px">Cargando auditoría...</div>';
+  try {
+    firebase.database().ref('auditLog').orderByChild('ts').limitToLast(50).once('value').then(function(snap) {
+      var entries = [];
+      snap.forEach(function(child) { entries.push(child.val()); });
+      entries.reverse();
+      if(filter) entries = entries.filter(function(e){ return e.action === filter; });
+      if(!entries.length) { el.innerHTML = '<div class="empty">Sin entradas de auditoría</div>'; return; }
+      el.innerHTML = entries.map(function(e) {
+        var cls = e.action.includes('ENTRADA') ? 'entrada' : e.action.includes('SALIDA') ? 'salida' : e.action.includes('VAC') ? 'vac' : 'other';
+        var label = e.action.replace(/_/g,' ');
+        return '<div class="audit-row">' +
+          '<span class="audit-action ' + cls + '">' + label + '</span>' +
+          '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (e.userName||e.userId||'?') + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">' + (e.detail||'') + '</div></div>' +
+          '<div style="font-size:10px;color:var(--text4);white-space:nowrap">' + (e.date||'') + '</div>' +
+          '</div>';
+      }).join('');
+    }).catch(function(){ el.innerHTML = '<div class="empty">Error al cargar auditoría</div>'; });
+  } catch(e) {
+    el.innerHTML = '<div class="empty">Firebase no disponible</div>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FIRMA DIGITAL
+// ══════════════════════════════════════════════════════════════
+var _signDrawing = false;
+var _signCtx = null;
+
+function openSignModal() {
+  $('signModal').style.display = 'flex';
+  setTimeout(initSignCanvas, 100);
+  loadSignList();
+}
+
+function closeSignModal() {
+  $('signModal').style.display = 'none';
+}
+
+function initSignCanvas() {
+  var canvas = $('signCanvas'); if(!canvas) return;
+  _signCtx = canvas.getContext('2d');
+  // Ajustar resolución al tamaño real
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width || 460;
+  canvas.height = 200;
+  _signCtx.strokeStyle = '#818cf8';
+  _signCtx.lineWidth = 2.5;
+  _signCtx.lineCap = 'round';
+  _signCtx.lineJoin = 'round';
+
+  function getPos(e) {
+    var r = canvas.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * (canvas.width / r.width), y: (src.clientY - r.top) * (canvas.height / r.height) };
+  }
+  function startDraw(e) { e.preventDefault(); _signDrawing = true; var p = getPos(e); _signCtx.beginPath(); _signCtx.moveTo(p.x, p.y); }
+  function moveDraw(e) { e.preventDefault(); if(!_signDrawing) return; var p = getPos(e); _signCtx.lineTo(p.x, p.y); _signCtx.stroke(); }
+  function stopDraw(e) { e.preventDefault(); _signDrawing = false; }
+
+  canvas.removeEventListener('mousedown', canvas._md);
+  canvas.removeEventListener('mousemove', canvas._mm);
+  canvas.removeEventListener('mouseup', canvas._mu);
+  canvas.removeEventListener('touchstart', canvas._td);
+  canvas.removeEventListener('touchmove', canvas._tm);
+  canvas.removeEventListener('touchend', canvas._te);
+  canvas._md = startDraw; canvas._mm = moveDraw; canvas._mu = stopDraw;
+  canvas._td = startDraw; canvas._tm = moveDraw; canvas._te = stopDraw;
+  canvas.addEventListener('mousedown', canvas._md);
+  canvas.addEventListener('mousemove', canvas._mm);
+  canvas.addEventListener('mouseup', canvas._mu);
+  canvas.addEventListener('touchstart', canvas._td, {passive:false});
+  canvas.addEventListener('touchmove', canvas._tm, {passive:false});
+  canvas.addEventListener('touchend', canvas._te, {passive:false});
+}
+
+function clearSign() {
+  var canvas = $('signCanvas'); if(!canvas || !_signCtx) return;
+  _signCtx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function saveSign() {
+  var canvas = $('signCanvas'); if(!canvas) return;
+  var data = canvas.toDataURL('image/png');
+  if(!SES.user) { toast('Debes estar logueado'); return; }
+  var ts = Date.now();
+  try {
+    firebase.database().ref('firmas/' + SES.user.id + '/' + ts).set({
+      data: data, ts: ts, empName: SES.user.name,
+      date: new Date().toLocaleString('es-ES')
+    }).then(function() {
+      toast('✅ Firma guardada');
+      clearSign();
+      loadSignList();
+    });
+  } catch(e) {
+    toast('❌ Error al guardar firma');
+  }
+}
+
+function loadSignList() {
+  var el = $('signList'); if(!el || !SES.user) return;
+  el.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Mis firmas guardadas:</div>';
+  try {
+    firebase.database().ref('firmas/' + SES.user.id).orderByChild('ts').limitToLast(5).once('value').then(function(snap) {
+      var sigs = [];
+      snap.forEach(function(c) { sigs.push(c.val()); });
+      sigs.reverse();
+      if(!sigs.length) { el.innerHTML += '<div class="empty" style="padding:8px 0">Sin firmas guardadas</div>'; return; }
+      sigs.forEach(function(s) {
+        var d = document.createElement('div');
+        d.style.cssText = 'margin-bottom:8px;background:var(--bg3);border-radius:8px;padding:8px;border:1px solid var(--border)';
+        d.innerHTML = '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">' + (s.date||'') + '</div>' +
+          '<img src="' + s.data + '" style="width:100%;border-radius:4px;max-height:80px;object-fit:contain">';
+        el.appendChild(d);
+      });
+    });
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// WEEKLY CHART (Chart.js)
+// ══════════════════════════════════════════════════════════════
+var _weekChartInstance = null;
+
+function initWeekChart() {
+  var canvas = $('weekChartEmp'); if(!canvas || !SES.user) return;
+  if(typeof Chart === 'undefined') return;
+
+  var today2 = new Date();
+  var days = [];
+  var labels = ['L','M','X','J','V','S','D'];
+  var dayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  // Obtener lunes de esta semana
+  var dayOfWeek = today2.getDay(); // 0=Dom
+  var monday = new Date(today2);
+  monday.setDate(today2.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  monday.setHours(0,0,0,0);
+
+  var weekDates = [];
+  var weekLabels = [];
+  for(var i=0; i<7; i++) {
+    var d = new Date(monday); d.setDate(monday.getDate() + i);
+    var ds = d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate());
+    weekDates.push(ds);
+    weekLabels.push(['L','M','X','J','V','S','D'][i]);
+  }
+
+  var mine = (DB.records||[]).filter(function(r){ return r.empId === SES.user.id && r.fin; });
+  var hours = weekDates.map(function(ds) {
+    var recs = mine.filter(function(r){ return r.inicio && r.inicio.startsWith(ds); });
+    var mins = recs.reduce(function(s,r){ return s + calcMin(r); }, 0);
+    return parseFloat((mins/60).toFixed(2));
+  });
+
+  var totalH = hours.reduce(function(s,h){ return s+h; }, 0);
+  if($('chartWeekTotal')) $('chartWeekTotal').textContent = totalH.toFixed(1) + 'h';
+
+  if(_weekChartInstance) { _weekChartInstance.destroy(); _weekChartInstance = null; }
+
+  _weekChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: weekLabels,
+      datasets: [{
+        data: hours,
+        backgroundColor: hours.map(function(h, i) {
+          var isToday = (weekDates[i] === (today2.getFullYear()+'-'+p2(today2.getMonth()+1)+'-'+p2(today2.getDate())));
+          return isToday ? 'rgba(124,58,237,0.9)' : 'rgba(124,58,237,0.45)';
+        }),
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: function(ctx){ return ctx.parsed.y.toFixed(1)+'h'; } }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: function(v){ return v+'h'; } }, beginAtZero: true, max: Math.max(10, Math.ceil(Math.max.apply(null, hours.map(function(h){return h||0;}))+1)) }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// ASISTENTE IA
+// ══════════════════════════════════════════════════════════════
+var _aiInited = false;
+
+function openAiModal() {
+  $('aiModal').style.display = 'flex';
+  if(!_aiInited) {
+    _aiInited = true;
+    addAiMsg('¡Hola! Soy tu asistente de TIMES INC. Puedo ayudarte con tus horas trabajadas, días de vacaciones, resúmenes e informes. ¿En qué puedo ayudarte?', 'bot');
+  }
+}
+
+function closeAiModal() {
+  $('aiModal').style.display = 'none';
+}
+
+function addAiMsg(text, role) {
+  var d = document.createElement('div');
+  d.className = role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
+  d.textContent = text;
+  $('aiMessages').appendChild(d);
+  $('aiMessages').scrollTop = $('aiMessages').scrollHeight;
+}
+
+function sendAiMsg() {
+  var input = $('aiInput'); if(!input) return;
+  var msg = input.value.trim(); if(!msg) return;
+  addAiMsg(msg, 'user');
+  input.value = '';
+  setTimeout(function(){ addAiMsg(aiAnalyze(msg), 'bot'); }, 600);
+}
+
+function aiAnalyze(msg) {
+  if(!SES.user) return 'Por favor, inicia sesión para usar el asistente.';
+  var lower = msg.toLowerCase();
+  var empIdLocal = SES.user.id;
+  var vac = vacData(empIdLocal);
+  var jornadas = (DB.records||[]).filter(function(j){ return j.empId === empIdLocal && j.fin; });
+  var totalH = jornadas.reduce(function(s,j){ return s + (calcMin(j)||0); }, 0) / 60;
+  var now2 = new Date();
+  var mk = now2.getFullYear() + '-' + p2(now2.getMonth()+1);
+  var thisMonth = jornadas.filter(function(j){ return j.inicio && j.inicio.startsWith(mk); });
+  var monthH = thisMonth.reduce(function(s,j){ return s + (calcMin(j)||0); }, 0) / 60;
+
+  if(lower.includes('hola') || lower.includes('ayuda') || lower.includes('qué puedes')) {
+    return 'Hola ' + SES.user.name.split(' ')[0] + '! Puedo ayudarte con: tus horas trabajadas, días de vacaciones disponibles, resúmenes mensuales y más. ¿Qué necesitas?';
+  }
+  if(lower.includes('hora') || lower.includes('trabaj') || lower.includes('jornada')) {
+    return 'Has trabajado ' + totalH.toFixed(1) + 'h en total. Este mes llevas ' + monthH.toFixed(1) + 'h en ' + thisMonth.length + ' jornada' + (thisMonth.length!==1?'s':'') + '.';
+  }
+  if(lower.includes('vacacion') || lower.includes('días libres') || lower.includes('descanso') || lower.includes('dias')) {
+    return 'Tienes ' + vac.available.toFixed(1) + ' días de vacaciones disponibles. Generados: ' + vac.generated.toFixed(1) + ' días, usados: ' + vac.used + ' días.';
+  }
+  if(lower.includes('mes') || lower.includes('resumen') || lower.includes('informe') || lower.includes('reporte')) {
+    return 'RESUMEN DEL MES: ' + thisMonth.length + ' jornadas, ' + monthH.toFixed(1) + 'h trabajadas. Vacaciones disponibles: ' + vac.available.toFixed(1) + ' días.';
+  }
+  if(lower.includes('semana')) {
+    var ws2 = wkStart(new Date());
+    var weekRecs = jornadas.filter(function(r){ return new Date(r.inicio) >= ws2; });
+    var weekH = weekRecs.reduce(function(s,r){ return s + calcMin(r); }, 0) / 60;
+    return 'Esta semana llevas ' + weekH.toFixed(1) + 'h en ' + weekRecs.length + ' jornada' + (weekRecs.length!==1?'s':'') + '.';
+  }
+  if(lower.includes('saldo') || lower.includes('extra') || lower.includes('horas extra')) {
+    var WK_NORM = 40; // horas semana normal
+    var ws3 = wkStart(new Date());
+    var weekRecs2 = jornadas.filter(function(r){ return new Date(r.inicio) >= ws3; });
+    var weekH2 = weekRecs2.reduce(function(s,r){ return s + calcMin(r); }, 0) / 60;
+    var extra = Math.max(0, weekH2 - WK_NORM);
+    return 'Esta semana llevas ' + weekH2.toFixed(1) + 'h. Horas extra: ' + extra.toFixed(1) + 'h (sobre ' + WK_NORM + 'h normales).';
+  }
+  if(lower.includes('estado') || lower.includes('activo') || lower.includes('jornada abierta')) {
+    var open = (DB.records||[]).find(function(r){ return r.empId === empIdLocal && !r.fin; });
+    return open ? 'Tienes una jornada abierta iniciada a las ' + ftime(open.inicio) + '.' : 'No tienes ninguna jornada activa ahora mismo.';
+  }
+  return 'Puedo responder preguntas sobre: horas trabajadas, semana, mes, vacaciones disponibles, resúmenes, estado de jornada. Prueba: "¿Cuántas horas llevo este mes?"';
+}
+
+// Cerrar modales al hacer click en el overlay
+document.addEventListener('click', function(e) {
+  if(e.target.id === 'signModal') closeSignModal();
+  if(e.target.id === 'aiModal') closeAiModal();
+});
 
 // Recordatorio fin de jornada (hora configurable, por defecto 20:00)
 function scheduleEndOfDayReminder(){
