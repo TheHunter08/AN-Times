@@ -177,7 +177,7 @@ export default function EmployeePage() {
       <ModalVacForm visible={activeModal==='vacForm'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} />
+      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} onClose={closeModal} toast={toast} />
     </div>
   )
@@ -604,6 +604,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   const now = new Date()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
 
   return (
     <div className="emp-tab active prf-wrap">
@@ -634,15 +635,16 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
       <div className="prf-menu">
         {[
           { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>openModal('infoPersonal') },
-          { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', onClick:()=>openModal('documentos') },
+          { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', badge: pendingDocs, onClick:()=>openModal('documentos') },
           { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>openModal('configuracion') },
           { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign') },
-        ].map(({ icon, label, color, stroke, onClick }) => (
+        ].map(({ icon, label, color, stroke, onClick, badge }) => (
           <div key={label} className="prf-menu-item" onClick={onClick}>
             <div className="prf-menu-ico" style={color ? { background:color } : {}}>
               <svg viewBox="0 0 24 24" style={stroke ? { stroke } : {}}>{icon}</svg>
             </div>
             <span className="prf-menu-lbl">{label}</span>
+            {badge > 0 && <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', marginRight:4 }}>{badge}</span>}
             <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         ))}
@@ -758,8 +760,26 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
 
 function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
   const canvasRef = useRef(null)
-  const [drawing, setDrawing] = useState(false)
-  const [lastPt, setLastPt] = useState(null)
+  const drawingRef = useRef(false)
+  const lastPtRef = useRef(null)
+  const [mode, setMode] = useState('view') // 'view' | 'draw'
+  const [tick, setTick] = useState(0)
+
+  const existingFirma = db.firmas?.[u?.id]?.main
+
+  useEffect(() => {
+    if (visible) setMode(existingFirma ? 'view' : 'draw')
+  }, [visible])
+
+  useEffect(() => {
+    if (mode === 'draw' && canvasRef.current) {
+      const c = canvasRef.current
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = '#0D1218'
+      ctx.fillRect(0, 0, c.width, c.height)
+    }
+  }, [mode, tick])
+
   if (!visible) return null
 
   const getPos = (e, canvas) => {
@@ -768,53 +788,88 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
     return { x: (src.clientX - rect.left) * (canvas.width / rect.width), y: (src.clientY - rect.top) * (canvas.height / rect.height) }
   }
 
-  const onDown = e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; const pt = getPos(e, c); setLastPt(pt); setDrawing(true) }
+  const onDown = e => {
+    e.preventDefault()
+    const c = canvasRef.current; if (!c) return
+    lastPtRef.current = getPos(e, c)
+    drawingRef.current = true
+  }
   const onMove = e => {
-    if (!drawing) return; e.preventDefault()
+    if (!drawingRef.current) return
+    e.preventDefault()
     const c = canvasRef.current; if (!c) return
     const ctx = c.getContext('2d')
     const pt = getPos(e, c)
-    ctx.beginPath(); ctx.moveTo(lastPt.x, lastPt.y); ctx.lineTo(pt.x, pt.y)
-    ctx.strokeStyle = '#e0e7ff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke()
-    setLastPt(pt)
+    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
+    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
+    lastPtRef.current = pt
   }
-  const onUp = () => { setDrawing(false); setLastPt(null) }
+  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
 
   const clearSign = () => {
     const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d'); ctx.clearRect(0, 0, c.width, c.height)
-    ctx.fillStyle = '#111820'; ctx.fillRect(0, 0, c.width, c.height)
+    const ctx = c.getContext('2d')
+    ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
   }
 
   const save = () => {
     const c = canvasRef.current; if (!c) return
+    const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
+    if (!hasStroke) { toast('Dibuja tu firma antes de guardar'); return }
     const small = document.createElement('canvas'); small.width = 320; small.height = 120
     const ctx2 = small.getContext('2d')
-    ctx2.fillStyle = '#111820'; ctx2.fillRect(0, 0, 320, 120)
+    ctx2.fillStyle = '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
     ctx2.drawImage(c, 0, 0, 320, 120)
-    const data = small.toDataURL('image/jpeg', 0.6)
-    if (data.length > 200000) { toast('❌ Firma muy grande, dibuja menos trazos'); return }
-    const ts = Date.now()
-    const firmas = { ...(db.firmas || {}), [u.id]: { ...(db.firmas?.[u.id] || {}), [ts]: { data, ts, empName: u.name, date: new Date().toLocaleString('es-ES') } } }
+    const data = small.toDataURL('image/jpeg', 0.7)
+    if (data.length > 200000) { toast('Firma muy grande, simplifica los trazos'); return }
+    const firmas = { ...(db.firmas || {}), [u.id]: { ...(db.firmas?.[u.id] || {}), main: { data, updatedAt: new Date().toISOString(), empName: u.name } } }
     saveDB({ firmas })
-    toast('✅ Firma guardada')
+    toast('✅ Firma guardada correctamente')
     onClose()
   }
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
         <div className="modal-drag" />
-        <h2>✍️ Firma digital</h2>
-        <canvas ref={canvasRef} width={600} height={220} style={{ width:'100%', height:160, borderRadius:'var(--r)', background:'var(--bg-600)', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)' }}
-          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
-          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
-        <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginTop:6 }}>Firma aquí dentro del recuadro</div>
-        <div className="modal-btns" style={{ marginTop:14 }}>
-          <button className="btn btn-secondary" onClick={clearSign}>Borrar</button>
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={save}>Guardar</button>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:18 }}>Firma digital</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
         </div>
+
+        {mode === 'view' && existingFirma ? (
+          <>
+            <div style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'6px', marginBottom:14 }}>
+              <img src={existingFirma.data} alt="Firma guardada" style={{ width:'100%', height:120, objectFit:'contain', borderRadius:8, display:'block' }} />
+            </div>
+            <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:16 }}>
+              Firma guardada — {existingFirma.updatedAt ? new Date(existingFirma.updatedAt).toLocaleDateString('es-ES') : ''}
+            </div>
+            <div style={{ background:'var(--green-dim)', border:'1px solid rgba(54,178,126,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:12, color:'var(--green)' }}>
+              Esta firma se aplicará automáticamente al firmar documentos y jornadas mensuales.
+            </div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={() => { setMode('draw'); setTick(t=>t+1) }}>Actualizar firma</button>
+              <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom:8 }}>
+              <canvas ref={canvasRef} width={640} height={200}
+                style={{ width:'100%', height:150, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block' }}
+                onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+                onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
+            </div>
+            <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:16 }}>Dibuja tu firma con el dedo o ratón</div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={clearSign}>Borrar</button>
+              {existingFirma && <button className="btn btn-secondary" onClick={() => setMode('view')}>Cancelar</button>}
+              <button className="btn btn-primary" onClick={save}>Guardar firma</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -957,39 +1012,109 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
   )
 }
 
-function ModalDocumentos({ visible, db, u, onClose }) {
+function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
+  const [signing, setSigning] = useState(null) // doc being signed
   if (!visible) return null
-  const docs = (db.docsnominas || {})[u?.id] || {}
-  const nominas = docs.nominas || []
-  const contrato = docs.contrato
+
+  const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
+  const pendientes = myDocs.filter(d => !d.firma)
+  const firmados = myDocs.filter(d => d.firma)
+  const myFirma = db.firmas?.[u?.id]?.main
+
+  const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada mensual' }
+  const TIPO_COLORS = { nomina:'var(--primary-light)', contrato:'var(--teal)', jornada:'var(--orange)' }
+
+  const firmarDoc = (doc) => {
+    if (!myFirma) { toast('Necesitas guardar tu firma primero en Perfil → Firma digital'); return }
+    const updated = (db.documentos || []).map(d => d.id === doc.id ? {
+      ...d,
+      firma: { firmadoAt: new Date().toISOString(), signatureData: myFirma.data, empName: u.name }
+    } : d)
+    saveDB({ documentos: updated })
+    toast('✅ Documento firmado correctamente')
+    setSigning(null)
+  }
+
+  const DocCard = ({ d }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', marginBottom:8 }}>
+      <div style={{ width:38, height:38, borderRadius:10, background:'var(--bg-500)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={TIPO_COLORS[d.tipo]||'var(--text3)'} strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:700 }}>{d.titulo}</div>
+        <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+          <span style={{ color:TIPO_COLORS[d.tipo]||'var(--text3)', fontWeight:600 }}>{TIPO_LABELS[d.tipo]||d.tipo}</span>
+          {d.mes && ` · ${d.mes}`}
+          {d.firma && <span style={{ color:'var(--green)', marginLeft:6 }}>· Firmado {new Date(d.firma.firmadoAt).toLocaleDateString('es-ES')}</span>}
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+        {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>Ver</a>}
+        {!d.firma && <button className="btn btn-sm btn-primary" onClick={() => setSigning(d)}>Firmar</button>}
+        {d.firma && d.firma.signatureData && <img src={d.firma.signatureData} alt="firma" style={{ height:28, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-500)' }} />}
+      </div>
+    </div>
+  )
 
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:420 }}>
+    <div className="modal-ov" onClick={signing ? undefined : onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
         <div className="modal-drag" />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ margin:0, fontSize:18 }}>Documentos</h2>
+          <h2 style={{ margin:0, fontSize:18 }}>Mis documentos</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
         </div>
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:12, color:'var(--text3)', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Contrato</div>
-          {contrato
-            ? <a href={contrato} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ display:'block', textAlign:'center', textDecoration:'none', padding:'12px 0' }}>📄 Ver contrato</a>
-            : <div style={{ color:'var(--text3)', textAlign:'center', padding:'20px 0', background:'var(--bg-700)', borderRadius:10 }}>Sin contrato</div>
-          }
-        </div>
-        <div>
-          <div style={{ fontSize:12, color:'var(--text3)', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Nóminas</div>
-          {!nominas.length
-            ? <div style={{ color:'var(--text3)', textAlign:'center', padding:'20px 0', background:'var(--bg-700)', borderRadius:10 }}>Sin nóminas</div>
-            : nominas.map((n, i) => (
-              <a key={i} href={n.url} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--bg-700)', borderRadius:10, marginBottom:8, textDecoration:'none', color:'var(--text1)' }}>
-                <span>📑 {n.mes || `Nómina ${i + 1}`}</span>
-                <span style={{ color:'var(--primary-light)', fontSize:12 }}>Ver →</span>
-              </a>
-            ))
-          }
-        </div>
+
+        {/* Confirm signing */}
+        {signing && (
+          <div style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:16, marginBottom:16 }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:8 }}>Confirmar firma: {signing.titulo}</div>
+            {myFirma ? (
+              <>
+                <img src={myFirma.data} alt="tu firma" style={{ width:'100%', height:80, objectFit:'contain', background:'#0D1218', borderRadius:8, border:'1px solid var(--border)', marginBottom:12 }} />
+                <div style={{ fontSize:11, color:'var(--text3)', marginBottom:12 }}>Al confirmar, esta firma se aplicará al documento de forma permanente.</div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className="btn btn-secondary" onClick={() => setSigning(null)}>Cancelar</button>
+                  <button className="btn btn-primary" onClick={() => firmarDoc(signing)}>Confirmar y firmar</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize:12, color:'var(--orange)', marginBottom:12 }}>No tienes una firma guardada. Ve a Perfil → Firma digital para crearla.</div>
+                <button className="btn btn-secondary" onClick={() => setSigning(null)}>Cerrar</button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Pending */}
+        {pendientes.length > 0 && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--orange)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--orange)' }} />
+              Pendientes de firma ({pendientes.length})
+            </div>
+            {pendientes.map(d => <DocCard key={d.id} d={d} />)}
+          </div>
+        )}
+
+        {/* Signed */}
+        {firmados.length > 0 && (
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--green)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--green)' }} />
+              Firmados ({firmados.length})
+            </div>
+            {firmados.map(d => <DocCard key={d.id} d={d} />)}
+          </div>
+        )}
+
+        {!myDocs.length && (
+          <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)' }}>
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ margin:'0 auto 12px', display:'block', opacity:.3 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Sin documentos pendientes
+          </div>
+        )}
       </div>
     </div>
   )
