@@ -526,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_23';
+  var V='20260615_24';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1554,17 +1554,6 @@ if(window.visualViewport){
 }
 window.addEventListener('resize',function(){setTimeout(_posNav,50);});
 window.addEventListener('orientationchange',function(){setTimeout(_posNav,200);});
-// Diagnóstico viewport — pulsa 5 veces el logo para ver valores en iOS 26
-var _dbgTaps=0;
-function _dbgViewport(){
-  _dbgTaps++;
-  if(_dbgTaps<5)return;
-  _dbgTaps=0;
-  var vv=window.visualViewport;
-  var msg='innerH:'+window.innerHeight+'\nscreenH:'+screen.height+'\nscreenW:'+screen.width+'\nDPR:'+window.devicePixelRatio+(vv?'\nvvH:'+Math.round(vv.height)+'\nvvOT:'+Math.round(vv.offsetTop):'');
-  alert(msg);
-}
-document.addEventListener('DOMContentLoaded',function(){var logo=document.querySelector('.login-logo');if(logo)logo.addEventListener('click',_dbgViewport);});
 // Block zoom: gesture events (iOS Safari) + pinch + double-tap
 document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
 document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
@@ -1759,7 +1748,11 @@ function logoTap(){
   _logoTaps++;
   clearTimeout(_logoTimer);
   _logoTimer = setTimeout(function(){ _logoTaps = 0; }, 800);
-  if(_logoTaps >= 3){
+  if(_logoTaps >= 7){
+    _logoTaps = 0;
+    var vv=window.visualViewport;
+    alert('=== VIEWPORT DEBUG ===\ninnerH: '+window.innerHeight+'\nscreenH: '+screen.height+'\nscreenW: '+screen.width+'\nDPR: '+window.devicePixelRatio+(vv?'\nvvH: '+Math.round(vv.height)+'\nvvOT: '+Math.round(vv.offsetTop):'\nno vv')+'\nstandalone: '+(window.navigator.standalone||false));
+  } else if(_logoTaps >= 3){
     _logoTaps = 0;
     // Show admin secret button
     var btn = document.getElementById('adminSecretBtn');
