@@ -35,6 +35,7 @@ body{min-height:100dvh;overflow:hidden;font-family:'Inter',-apple-system,sans-se
   --r:14px;--r-sm:10px;--r-lg:20px;--r-xl:24px;--sidebar:230px;
   --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
   --safe-bottom:env(safe-area-inset-bottom);
+  --safe-left:env(safe-area-inset-left);--safe-right:env(safe-area-inset-right);
 }
 .scr{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg)}
 .scr.show{display:flex}
@@ -135,21 +136,22 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:max(env(safe-area-inset-top),12px) 14px 10px;background:rgba(13,13,26,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
-.emp-top-right{display:flex;align-items:center;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0;max-width:65%}
-.emp-top-right::-webkit-scrollbar{display:none}
+.emp-topbar{display:flex;align-items:center;gap:8px;padding:max(var(--safe-top,env(safe-area-inset-top)),12px) 12px 10px;background:rgba(13,13,26,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.emp-topbar::-webkit-scrollbar{display:none}
+.emp-top-left{flex-shrink:0}
+.emp-top-right{display:flex;align-items:center;gap:7px;flex-shrink:0;margin-left:auto}
 .emp-top-left{display:flex;flex-direction:column}
 .emp-greeting{font-size:15px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
 .emp-subdate{font-size:11px;color:var(--text3);margin-top:1px;font-weight:400}
 .emp-top-right{display:flex;align-items:center;gap:8px}
 .theme-toggle-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
-.emp-noti-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0}
-.emp-noti-btn svg{width:17px;height:17px;stroke:var(--text2);stroke-width:1.8;fill:none}
+.emp-noti-btn{width:32px;height:32px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0}
+.emp-noti-btn svg{width:15px;height:15px;stroke:var(--text2);stroke-width:1.8;fill:none}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
 /* Emp bottom nav — position:fixed al nivel de body (NO dentro de #sEmp que también es fixed) */
-.emp-nav{display:flex;flex-shrink:0;width:100%;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.emp-nav{display:flex;flex-shrink:0;width:100%;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding-top:8px;padding-bottom:max(8px,var(--safe-bottom,env(safe-area-inset-bottom)));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transform:translate3d(0,0,0);will-change:transform}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
@@ -505,7 +507,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 [data-theme="light"] .lh-key:active{background:var(--bg4)}
 
 /* ═══ THEME TOGGLE BUTTON ═══ */
-.theme-toggle-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:background .15s;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.theme-toggle-btn{width:32px;height:32px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:background .15s;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .theme-toggle-btn:active{background:var(--bg4)}
 
 /* ═══ iOS SAFE AREA ═══ */
@@ -600,7 +602,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 
 
 /* ═══════════════ AI ASSISTANT BUTTON ═══════════════ */
-.ai-btn{width:36px;height:36px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;box-shadow:0 2px 12px rgba(99,102,241,0.4);border:none}
+.ai-btn{width:32px;height:32px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;box-shadow:0 2px 12px rgba(99,102,241,0.4);border:none}
 .ai-msg-user{padding:10px 14px;border-radius:12px;font-size:13px;max-width:85%;background:var(--accent-dim);align-self:flex-end}
 .ai-msg-bot{padding:10px 14px;border-radius:12px;font-size:13px;max-width:85%;background:var(--bg3);align-self:flex-start}
 
@@ -619,7 +621,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_35';
+  var V='20260615_36';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1635,14 +1637,31 @@ function iosBack(){
   if(!_iosNavHistory.length)return;
   showScr(_iosNavHistory.pop(),true);
 }
-// ── --vh fix iOS 26 ──
-function _setVh(){
-  var vh=(window.visualViewport?window.visualViewport.height:window.innerHeight)*0.01;
-  document.documentElement.style.setProperty('--vh',vh+'px');
+// ── Viewport Engine iOS 26 (--vh, --vv-offset) ──
+function _vpUpdate(){
+  var vv=window.visualViewport;
+  var h=vv?vv.height:window.innerHeight;
+  var off=vv?vv.offsetTop:0;
+  document.documentElement.style.setProperty('--vh',(h*0.01)+'px');
+  document.documentElement.style.setProperty('--vv-offset',off+'px');
+  document.documentElement.style.setProperty('--vv-height',h+'px');
 }
-_setVh();
-window.visualViewport&&window.visualViewport.addEventListener('resize',_setVh);
-window.addEventListener('resize',_setVh);
+_vpUpdate();
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',_vpUpdate);
+  window.visualViewport.addEventListener('scroll',_vpUpdate);
+}
+window.addEventListener('resize',_vpUpdate);
+window.addEventListener('orientationchange',function(){setTimeout(_vpUpdate,200);});
+// Fix render iOS — doble RAF tras load
+window.addEventListener('load',function(){
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      _vpUpdate();
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+});
 // ── Swipe back gesture ──
 (function(){
   var sx=null,sy=null,hint=document.createElement('div');
