@@ -1,6 +1,4 @@
 {
-  "buildCommand": "npm install && npm run build",
-  "outputDirectory": "dist",
   "version": 2,
   "headers": [
     {
