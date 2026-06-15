@@ -35,8 +35,8 @@ body{height:100%;overflow:hidden;font-family:'Inter',-apple-system,sans-serif;fo
   --r:14px;--r-sm:10px;--r-lg:20px;--r-xl:24px;--sidebar:230px;
   --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
 }
-.scr{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg)}
-.scr.show{display:flex}
+.scr{position:fixed;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;background:var(--bg)}
+.scr.show{display:flex;min-height:100vh;min-height:100svh;min-height:100lvh}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
 .empty{text-align:center;color:var(--text3);padding:28px 0;font-size:13px}
@@ -526,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_22';
+  var V='20260615_23';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1554,6 +1554,17 @@ if(window.visualViewport){
 }
 window.addEventListener('resize',function(){setTimeout(_posNav,50);});
 window.addEventListener('orientationchange',function(){setTimeout(_posNav,200);});
+// Diagnóstico viewport — pulsa 5 veces el logo para ver valores en iOS 26
+var _dbgTaps=0;
+function _dbgViewport(){
+  _dbgTaps++;
+  if(_dbgTaps<5)return;
+  _dbgTaps=0;
+  var vv=window.visualViewport;
+  var msg='innerH:'+window.innerHeight+'\nscreenH:'+screen.height+'\nscreenW:'+screen.width+'\nDPR:'+window.devicePixelRatio+(vv?'\nvvH:'+Math.round(vv.height)+'\nvvOT:'+Math.round(vv.offsetTop):'');
+  alert(msg);
+}
+document.addEventListener('DOMContentLoaded',function(){var logo=document.querySelector('.login-logo');if(logo)logo.addEventListener('click',_dbgViewport);});
 // Block zoom: gesture events (iOS Safari) + pinch + double-tap
 document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
 document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
