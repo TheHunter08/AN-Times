@@ -523,19 +523,9 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 .jor-circle-btn{-webkit-touch-callout:none;user-select:none}
 .emp-nav-item,.adm-bnav-item{user-select:none}
 
-/* ═══ DESKTOP: pantalla completa adaptada ═══ */
+/* ═══ DESKTOP: pantalla completa — el login se centra, el resto ocupa todo ═══ */
 @media(min-width:769px){
-  /* Fondo para el espacio libre */
-  body{background:linear-gradient(135deg,#07071a 0%,#130824 45%,#06101f 100%)}
-  /* Login centrado */
-  #sLogin{align-items:center}
-  .login-wrap{max-width:420px;width:100%}
-  /* Employee: columna centrada con max-width */
-  #sEmp{align-items:center;background:var(--bg)}
-  #sEmp>.noti-banner,#sEmp>.emp-topbar{max-width:520px;width:100%}
-  /* emp-body max-width: los tabs (position:absolute;inset:0) llenan este contenedor */
-  #sEmp>.emp-body{max-width:520px;width:100%}
-  #sEmp>.emp-nav{max-width:520px;width:100%}
+  .login-wrap{max-width:420px;margin:0 auto}
 }
 
 </style>
@@ -544,7 +534,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_16';
+  var V='20260614_17';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
