@@ -144,9 +144,16 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
-/* Emp bottom nav — position:fixed at BODY level, NOT inside #sEmp */
-/* This avoids the iOS PWA bug where position:fixed inside position:fixed breaks */
-.emp-nav{position:fixed;bottom:0;left:0;right:0;display:none;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:150;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+/* Notification permission banner */
+.noti-banner{display:none;align-items:center;gap:10px;background:linear-gradient(90deg,var(--accent2),var(--accent));padding:10px 14px;flex-shrink:0;animation:slideDown .3s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.noti-banner.show{display:flex}
+.noti-banner-text{flex:1;font-size:12px;font-weight:600;color:#fff}
+.noti-banner-sub{font-size:10px;color:rgba(255,255,255,.75);font-weight:400}
+.noti-banner-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.noti-banner-x{background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;line-height:1;padding:0 2px}
+/* Emp bottom nav — flex item inside #sEmp, NOT position:fixed (avoids iOS fixed-in-fixed bug) */
+.emp-nav{flex-shrink:0;display:flex;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
@@ -518,27 +525,15 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 
 /* ═══ DESKTOP MODE: app as centered phone window ═══ */
 /* body{transform} makes ALL position:fixed children relative to body on desktop */
+/* ═══ DESKTOP: full screen, no phone window — adapts to screen ═══ */
 @media(min-width:769px){
-  html{
-    background:linear-gradient(135deg,#07071a 0%,#130824 45%,#06101f 100%);
-    min-height:100vh;display:flex;align-items:center;justify-content:center;
-    cursor:pointer; /* indica que click fuera cierra */
-  }
-  html::before{
-    content:'';position:fixed;inset:0;pointer-events:none;
-    background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(99,102,241,.07) 0%,transparent 70%);
-  }
-  body{
-    position:fixed;top:50%;left:50%;
-    width:390px;height:min(844px,96vh);
-    transform:translate(-50%,-50%); /* contains ALL position:fixed children */
-    border-radius:44px;overflow:hidden;cursor:default;
-    box-shadow:0 0 0 1px rgba(255,255,255,.1),0 40px 120px rgba(0,0,0,.85),0 0 80px rgba(99,102,241,.15);
-  }
-  /* Subtle phone frame top notch line */
-  body::before{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:80px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;z-index:9999;pointer-events:none}
-  /* On desktop scr elements are already absolute — but ensure they don't exceed body */
-  .scr{border-radius:0}
+  /* Employee screen: limit content width, center it */
+  #sEmp .emp-topbar{max-width:700px;margin:0 auto;width:100%}
+  #sEmp .emp-body{display:flex;flex-direction:column;align-items:center}
+  #sEmp .emp-body>*{width:100%;max-width:700px}
+  #sEmp .emp-nav{max-width:700px;margin:0 auto;width:100%;border-top:none;border-radius:16px 16px 0 0}
+  /* Hide bottom nav on desktop — use topbar icons instead */
+  .noti-banner{max-width:700px;margin:0 auto;width:100%}
 }
 
 </style>
@@ -547,7 +542,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_14';
+  var V='20260614_15';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -860,6 +855,13 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 
 <!-- ═══ EMPLOYEE ═══ -->
 <div class="scr" id="sEmp">
+  <!-- Notification permission banner — shown on tap (iOS requires user gesture) -->
+  <div class="noti-banner" id="notiBanner">
+    <span style="font-size:18px">🔔</span>
+    <div class="noti-banner-text">Activar notificaciones<br><span class="noti-banner-sub">Recibe avisos cuando te aprueben la jornada o vacaciones</span></div>
+    <button class="noti-banner-btn" onclick="requestNotifPermission();document.getElementById('notiBanner').style.display='none'">Activar</button>
+    <button class="noti-banner-x" onclick="document.getElementById('notiBanner').style.display='none'">×</button>
+  </div>
   <div class="emp-topbar">
     <div class="emp-top-left"><div class="emp-greeting">👋 Hola, <span id="empFirstName">...</span></div><div class="emp-subdate" id="empSubdate"></div></div>
     <div class="emp-top-right">
@@ -1098,15 +1100,14 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
     </div>
   </div>
 
-</div>
-
-<!-- ═══ EMPLOYEE BOTTOM NAV — body level, position:fixed works correctly here ═══ -->
-<div class="emp-nav" id="empBottomNav">
-  <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
-  <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
-  <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
-  <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
-  <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
+  <!-- ═══ EMPLOYEE BOTTOM NAV — inside #sEmp as flex item, avoids iOS fixed-in-fixed bug ═══ -->
+  <div class="emp-nav" id="empBottomNav">
+    <div class="emp-nav-item on" id="nav-inicio" onclick="empNavTo('inicio')"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Inicio</div>
+    <div class="emp-nav-item" id="nav-jornada" onclick="empNavTo('jornada')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada</div>
+    <div class="emp-nav-item" id="nav-vacaciones" onclick="empNavTo('vacaciones')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></svg>Vacaciones</div>
+    <div class="emp-nav-item" id="nav-calendario" onclick="empNavTo('calendario')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>
+    <div class="emp-nav-item" id="nav-perfil" onclick="empNavTo('perfil')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</div>
+  </div>
 </div>
 
 <!-- ═══ ADMIN ═══ -->
@@ -1470,9 +1471,6 @@ function toast(msg,dur=3000){
 function showScr(id){
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
   $(id).classList.add('show');
-  // Show employee bottom nav only when employee screen is active
-  const nav=$('empBottomNav');
-  if(nav) nav.style.display=(id==='sEmp')?'flex':'none';
 }
 
 // ── Sidebar ──
@@ -1565,23 +1563,6 @@ document.addEventListener('touchend',function(e){
   _lastTap=now;
 },{passive:false});
 
-function _desktopGoBack(){
-  var openModal=document.querySelector('.modal-wrap.show');
-  if(openModal){openModal.classList.remove('show');return;}
-  var np=$('notisPanel');if(np&&np.classList.contains('show')){closeNotis();return;}
-  var sb=$('adminSidebar');if(sb&&sb.classList.contains('mob-open')){closeSidebar();return;}
-  if($('sEmp')&&$('sEmp').classList.contains('show')){if(typeof empNavTo==='function')empNavTo('inicio');return;}
-  if($('sAdmin')&&$('sAdmin').classList.contains('show')){if(typeof showPage==='function')showPage('dashboard');return;}
-}
-
-// Desktop: click outside the centered body window goes back
-document.addEventListener('click',function(e){
-  if(window.innerWidth<=768)return;
-  const r=document.body.getBoundingClientRect();
-  if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){
-    _desktopGoBack();
-  }
-},true);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)doFetch();});
 
 // ── Session ──
@@ -2022,9 +2003,14 @@ function doEmpLogin(){
   safeRun(updJorCircle,'jc');safeRun(renderResumen,'rs');
   safeRun(loadUserPhoto,'lp');
   // Pedir permisos de notificación y programar recordatorio
-  setTimeout(requestNotifPermission, 2000);
-  setTimeout(scheduleEndOfDayReminder, 3000);
-  setTimeout(function(){subscribePush('emp:'+SES.user.id);},4000);
+  setTimeout(scheduleEndOfDayReminder, 2000);
+  setTimeout(function(){
+    if('Notification' in window && Notification.permission==='default'){
+      var b=$('notiBanner');if(b)b.classList.add('show');
+    } else if('Notification' in window && Notification.permission==='granted'){
+      subscribePush('emp:'+SES.user.id);
+    }
+  },3000);
 }
 function showEncPanel(){
   // Encargados ven el panel con permisos limitados (solo su obra)
