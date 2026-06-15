@@ -85,7 +85,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div style={{ display:'flex', flex:1, height:'calc(100vh - 56px)', overflow:'hidden', position:'relative' }}>
+      <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
         {/* Sidebar */}
         <div className={`adm-sidebar${sideOpen ? ' open' : ''}`}>
           <div className="adm-sidebar-inner">

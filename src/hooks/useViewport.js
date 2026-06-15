@@ -2,14 +2,30 @@ import { useEffect } from 'react'
 
 export function useViewport() {
   useEffect(() => {
+    const root = document.documentElement
+
+    // Detect iOS PWA standalone mode
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    const isStandalone = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches
+
+    if (isIOS) root.setAttribute('data-ios', 'true')
+    if (isStandalone) root.setAttribute('data-pwa', 'true')
+
     function update() {
       const vv = window.visualViewport
+      // In iOS 26 PWA, visualViewport.height reflects the actual visible area
       const h = vv ? vv.height : window.innerHeight
       const off = vv ? vv.offsetTop : 0
-      const root = document.documentElement
+
       root.style.setProperty('--vh', (h * 0.01) + 'px')
       root.style.setProperty('--vv-offset', off + 'px')
       root.style.setProperty('--vv-height', h + 'px')
+
+      // Expose safe-area values as px for JS consumers
+      const safeTop = parseInt(getComputedStyle(root).getPropertyValue('--safe-top')) || 0
+      root.style.setProperty('--safe-top-px', safeTop + 'px')
     }
 
     update()
@@ -19,13 +35,15 @@ export function useViewport() {
       window.visualViewport.addEventListener('scroll', update)
     }
     window.addEventListener('resize', update)
-    window.addEventListener('orientationchange', () => setTimeout(update, 200))
+    window.addEventListener('orientationchange', () => setTimeout(update, 300))
 
-    // Double RAF after load for iOS
-    const raf = requestAnimationFrame(() => {
+    // iOS needs multiple RAF passes after load to get correct dimensions
+    const raf1 = requestAnimationFrame(() => {
+      update()
       requestAnimationFrame(() => {
         update()
-        window.dispatchEvent(new Event('resize'))
+        // One final update after fonts/layout settle
+        setTimeout(update, 500)
       })
     })
 
@@ -35,7 +53,7 @@ export function useViewport() {
         window.visualViewport.removeEventListener('scroll', update)
       }
       window.removeEventListener('resize', update)
-      cancelAnimationFrame(raf)
+      cancelAnimationFrame(raf1)
     }
   }, [])
 }

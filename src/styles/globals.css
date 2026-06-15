@@ -72,15 +72,15 @@
   --r-xl: 20px;
 
   /* Safe areas */
-  --safe-top:    env(safe-area-inset-top);
-  --safe-bottom: env(safe-area-inset-bottom);
-  --safe-left:   env(safe-area-inset-left);
-  --safe-right:  env(safe-area-inset-right);
-  --safe-bot:    env(safe-area-inset-bottom);
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --safe-bot:    env(safe-area-inset-bottom, 0px);
 
-  /* Viewport engine */
-  --vh: 1vh;
-  --vv-height: 100vh;
+  /* Viewport engine — JS updates --vh each frame via useViewport */
+  --vh: 1svh;   /* svh = small viewport height, stable on iOS */
+  --vv-height: 100svh;
   --vv-offset: 0px;
 
   /* Sidebar */
@@ -117,6 +117,7 @@
 
 html {
   min-height: 100%;
+  min-height: 100dvh;
   background: var(--bg-800);
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
@@ -124,6 +125,7 @@ html {
 
 body {
   min-height: 100%;
+  min-height: 100dvh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   line-height: 1.5;
@@ -132,6 +134,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  /* iOS 26: prevent rubber-band scroll in standalone */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: none;
 }
 
 #root {
@@ -139,6 +144,8 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* iOS 26 PWA: use dvh so layout respects dynamic island + bottom bar */
+  height: 100dvh;
 }
 
 /* Scrollbar */
@@ -264,6 +271,9 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
   flex-direction: column;
   background: var(--bg-800);
   overflow: hidden;
+  /* iOS 26 dvh fix */
+  height: 100dvh;
+  max-height: 100dvh;
 }
 .screen.active { display: flex; }
 .screen { will-change: transform; }
@@ -299,9 +309,10 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
   width: 100%;
   max-width: 520px;
   border-top: 1px solid var(--border2);
-  max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  /* iOS 26: account for home indicator + extra bottom bar */
+  padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   animation: sheetUp .28s cubic-bezier(.34,1.56,.64,1);
 }
 .modal.center-modal {
@@ -406,9 +417,9 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
 body::after {
   content: "";
   position: fixed; left: 0; right: 0; bottom: 0;
-  height: env(safe-area-inset-bottom);
+  height: env(safe-area-inset-bottom, 0px);
   background: var(--bg-800);
-  z-index: 999999; pointer-events: none;
+  z-index: 1; pointer-events: none;
 }
 
 /* ── Micro-interactions ─────────────────────────────────────── */
@@ -478,13 +489,15 @@ button:active { transform: scale(.96); opacity: .88; }
 /* Bottom nav */
 .emp-nav {
   display: flex; flex-shrink: 0; width: 100%;
-  background: rgba(13,18,24,0.9);
+  background: rgba(13,18,24,0.92);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-top: 1px solid rgba(255,255,255,.07);
-  padding-top: 8px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-top: 10px;
+  /* iOS 26: bottom bar + home indicator safe area */
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
   transform: translate3d(0,0,0); will-change: transform;
+  position: relative; z-index: 10;
 }
 .emp-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -529,9 +542,7 @@ button:active { transform: scale(.96); opacity: .88; }
 .login-field-group input { background: none; border: none; padding: 13px 12px 13px 40px; font-size: 15px; color: var(--text); width: 100%; outline: none; box-shadow: none; }
 .lf-ico { position: absolute; left: 12px; color: var(--text3); display: flex; align-items: center; pointer-events: none; }
 
-/* ── Admin screen ───────────────────────────────────────────── */
-#sAdmin { flex-direction: row; background: var(--bg-800); }
-.sidebar { width: var(--sidebar); background: var(--bg-700); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; padding-top: var(--safe-top); }
+/* ── Admin screen — layout handled by #sAdmin at bottom of file ─ */
 .sb-head { padding: 18px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .sb-logo { display: flex; align-items: center; gap: 10px; }
 .sb-logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg,var(--accent),var(--primary)); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
@@ -798,8 +809,30 @@ button:active { transform: scale(.96); opacity: .88; }
 .theme-toggle-btn { width: 32px; height: 32px; background: var(--bg-500); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: background .15s; flex-shrink: 0; }
 
 /* ── ADMIN v2 NEW LAYOUT ──────────────────────────────────── */
-/* Topbar */
-.adm-topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 18px; height:56px; padding-top:var(--safe-top); border-bottom:1px solid var(--border2); background:var(--bg-700); flex-shrink:0; position:relative; z-index:20; backdrop-filter:blur(12px); }
+/* Topbar — iOS 26 fix: never use fixed height with padding-top safe-area */
+.adm-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 18px;
+  /* Reserve space for Dynamic Island / notch above the 56px content row */
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+  /* Min total height = safe-area + 56px content */
+  min-height: calc(56px + env(safe-area-inset-top, 0px));
+  border-bottom: 1px solid var(--border2);
+  background: rgba(17,23,32,0.95);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* Push children below safe area */
+  padding-bottom: 0;
+  /* iOS 26: align children to bottom of the topbar area */
+  align-items: flex-end;
+  padding-bottom: 10px;
+}
 .adm-menu-btn { width:34px; height:34px; background:var(--bg-500); border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .adm-menu-btn svg { width:16px; height:16px; }
 .adm-logo { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; letter-spacing:-.2px; }
@@ -810,7 +843,7 @@ button:active { transform: scale(.96); opacity: .88; }
 .adm-sidebar { position:fixed; top:0; left:-240px; bottom:0; width:240px; background:var(--bg-700); border-right:1px solid var(--border2); z-index:100; transition:left .25s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; box-shadow:4px 0 24px rgba(0,0,0,.4); }
 .adm-sidebar.open { left:0; }
 @media(min-width:960px) { .adm-sidebar { position:relative; left:0!important; width:var(--sidebar); box-shadow:none; border-right:1px solid var(--border2); } }
-.adm-sidebar-inner { flex:1; overflow-y:auto; padding:16px 10px; display:flex; flex-direction:column; gap:2px; padding-top:max(16px,env(safe-area-inset-top)); }
+.adm-sidebar-inner { flex:1; overflow-y:auto; padding:16px 10px; display:flex; flex-direction:column; gap:2px; padding-top:max(16px, calc(env(safe-area-inset-top, 0px) + 8px)); }
 .adm-sidebar-ov { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:99; backdrop-filter:blur(4px); }
 @media(min-width:960px) { .adm-sidebar-ov { display:none!important; } }
 .adm-nav-section { font-size:9px; font-weight:700; color:var(--text4); text-transform:uppercase; letter-spacing:.8px; padding:10px 8px 6px; }
@@ -823,8 +856,17 @@ button:active { transform: scale(.96); opacity: .88; }
 
 /* Main */
 .adm-main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
-.adm-panel { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:24px; min-height:0; padding-bottom:max(24px,calc(env(safe-area-inset-bottom)+70px)); }
-@media(min-width:960px) { .adm-panel { padding-bottom:24px; } }
+.adm-panel {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  padding: 24px;
+  min-height: 0;
+  /* iOS 26: nav ~54px + safe-area + 24px breathing room */
+  padding-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 80px));
+}
+@media(min-width:960px) { .adm-panel { padding-bottom: 32px; } }
 .adm-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
 .adm-panel-title { font-size:22px; font-weight:800; letter-spacing:-.5px; }
 .adm-panel-sub { font-size:12px; color:var(--text3); font-weight:500; }
@@ -840,7 +882,18 @@ button:active { transform: scale(.96); opacity: .88; }
 .adm-stat-card:hover { border-color:var(--border3); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.35); }
 
 /* Mobile nav */
-.adm-mobile-nav { display:flex; background:var(--bg-700); border-top:1px solid var(--border); padding:6px 0 max(6px,env(safe-area-inset-bottom)); flex-shrink:0; }
+.adm-mobile-nav {
+  display: flex;
+  background: rgba(17,23,32,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+  /* iOS 26 bottom bar safe area */
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+  position: relative; z-index: 10;
+}
 @media(min-width:960px) { .adm-mobile-nav { display:none; } }
 .adm-mobile-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:9px; font-weight:600; color:var(--text4); cursor:pointer; padding:5px 2px; transition:color .15s; text-align:center; line-height:1.2; }
 .adm-mobile-nav-item svg { width:20px; height:20px; }
@@ -942,6 +995,12 @@ button:active { transform: scale(.96); opacity: .88; }
 .gps-status { font-size:11px; color:var(--green); font-weight:500; margin-top:2px; }
 .gps-status.pending { color:var(--text3); }
 
-/* Screen */
-#sAdmin { display:flex; flex-direction:column; height:calc(var(--vh,1vh)*100); overflow:hidden; }
+/* Screen — iOS 26 dvh fix */
+#sAdmin {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  height: calc(var(--vh, 1svh) * 100); /* JS-updated fallback */
+  overflow: hidden;
+}
 
