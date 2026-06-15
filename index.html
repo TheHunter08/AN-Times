@@ -526,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_26';
+  var V='20260615_27';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -1451,6 +1451,9 @@ function showScr(id){
   $(id).classList.add('show');
   var nav=$('empBottomNav');
   if(nav){nav.style.display=(id==='sEmp')?'flex':'none';if(id==='sEmp')setTimeout(_posNav,0);}
+  // iOS 26: colorea el área del sistema (59px fuera del viewport) igual que el fondo de pantalla
+  var tc=document.querySelector('meta[name="theme-color"]');
+  if(tc) tc.content=(id==='sEmp')?'#12121f':'#0d0d1a';
 }
 
 // ── Sidebar ──
@@ -1535,17 +1538,18 @@ window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
 function _posNav(){
   var nav=document.getElementById('empBottomNav');
   if(!nav||nav.style.display==='none')return;
-  // Esperar layout real antes de medir offsetHeight
   requestAnimationFrame(function(){
-    var h=nav.offsetHeight||58;
-    if(window.visualViewport){
-      var vv=window.visualViewport;
-      nav.style.top=Math.round(vv.offsetTop+vv.height-h)+'px';
+    // Gap entre viewport web y pantalla física (iOS 26 reserva área sistema)
+    var gap=Math.max(0,screen.height-window.innerHeight);
+    // Extender padding-bottom del nav para que su fondo cubra visualmente el gap
+    nav.style.paddingBottom='calc(8px + '+gap+'px)';
+    var vvH=window.visualViewport?window.visualViewport.height:window.innerHeight;
+    // Reposicionar tras cambio de padding (nueva altura)
+    requestAnimationFrame(function(){
+      var h=nav.offsetHeight||58;
+      nav.style.top=Math.round(vvH-h)+'px';
       nav.style.bottom='auto';
-    }else{
-      nav.style.top=Math.round(window.innerHeight-h)+'px';
-      nav.style.bottom='auto';
-    }
+    });
   });
 }
 if(window.visualViewport){
