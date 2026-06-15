@@ -122,7 +122,7 @@ export default function EmployeePage() {
           <div className="emp-avatar" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
           <div style={{ minWidth:0 }}>
             <div className="emp-greeting">👋 {u.name.split(' ')[0]}</div>
-            <div className="emp-subdate">{clockDate}</div>
+            <div className="emp-subdate">{clockDate} · <span style={{color:'var(--primary-light)',fontWeight:600}}>{clockTime}</span></div>
           </div>
         </div>
         <div className="emp-top-right">
@@ -211,10 +211,6 @@ function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u 
       <div className="ini-wrap">
         {/* Main fichar card */}
         <div className="jor-main-card">
-          <div className="jor-mc-clock-row">
-            <span className="jor-mc-clock-date">{new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}</span>
-            <span className="jor-mc-clock-time">{clockTime}</span>
-          </div>
           <div style={{ margin:'14px 0' }}>
             <div className={`jor-mc-status${timer.state==='idle'?' idle':timer.state==='break'?' break':''}`}>
               <span className="sdot" />
