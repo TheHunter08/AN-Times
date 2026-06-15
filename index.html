@@ -131,8 +131,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-/* Nav is now position:fixed at body level — #sEmp only needs topbar + body */
-#sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
+/* height:100dvh fuerza el alto real en iOS 26 donde inset:0 no siempre lo define */
+#sEmp{overflow:hidden;background:var(--bg);flex-direction:column;height:100vh;height:100dvh}
 /* Topbar */
 .emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
@@ -534,7 +534,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260614_17';
+  var V='20260615_18';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){

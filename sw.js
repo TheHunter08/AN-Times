@@ -1,5 +1,5 @@
-// TIMES INC — Service Worker v8 — network-first total para HTML
-const CACHE = 'times-v8';
+// TIMES INC — Service Worker v9 — network-first total para HTML
+const CACHE = 'times-v9';
 const STATIC = ['./icon.svg', './manifest.json'];
 
 self.addEventListener('install', e => {
