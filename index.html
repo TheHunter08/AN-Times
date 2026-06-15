@@ -36,7 +36,7 @@ body{min-height:100dvh;overflow:hidden;font-family:'Inter',-apple-system,sans-se
   --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
   --safe-bottom:env(safe-area-inset-bottom);
 }
-.scr{position:absolute;inset:0;width:100%;min-height:100dvh;display:none;flex-direction:column;background:var(--bg)}
+.scr{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg)}
 .scr.show{display:flex}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
@@ -135,11 +135,14 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(20px + env(safe-area-inset-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.emp-topbar{display:flex;flex-direction:column;gap:6px;padding:max(env(safe-area-inset-top),12px) 16px 10px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.emp-topbar-row1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.emp-topbar-row2{display:flex;align-items:center;justify-content:space-between}
 .emp-top-left{display:flex;flex-direction:column}
-.emp-greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
-.emp-subdate{font-size:12px;color:var(--text3);margin-top:1px;font-weight:400}
-.emp-top-right{display:flex;align-items:center;gap:10px}
+.emp-greeting{font-size:15px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
+.emp-subdate{font-size:11px;color:var(--text3);margin-top:1px;font-weight:400}
+.emp-top-right{display:flex;align-items:center;gap:8px}
+.theme-toggle-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
 .emp-noti-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0}
 .emp-noti-btn svg{width:17px;height:17px;stroke:var(--text2);stroke-width:1.8;fill:none}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
@@ -515,7 +518,7 @@ body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
 @media (display-mode:standalone){
   html,body{min-height:100dvh;background:#0d0d1a}
   .emp-nav{padding-bottom:max(8px,env(safe-area-inset-bottom))}
-  .emp-topbar{padding-top:calc(20px + env(safe-area-inset-top))}
+  .emp-topbar{padding-top:max(env(safe-area-inset-top),14px)}
 }
 /* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
 html{touch-action:manipulation} /* prevents double-tap zoom globally */
@@ -586,7 +589,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_33';
+  var V='20260615_34';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -932,13 +935,26 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <!-- ═══ EMPLOYEE ═══ -->
 <div class="scr" id="sEmp">
   <div class="emp-topbar">
-    <div class="emp-top-left"><div class="emp-greeting">👋 Hola, <span id="empFirstName">...</span></div><div class="emp-subdate" id="empSubdate"></div></div>
-    <div class="emp-top-right">
-      <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
-      <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
-      <button class="ai-btn" onclick="openAiModal()" title="Asistente IA">🤖</button>
-      <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
-      <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+    <div class="emp-topbar-row1">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0" id="empAvatar">?</div>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text1);line-height:1.2">👋 Hola, <span id="empFirstName">...</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px" id="empSubdate"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
+        <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
+        <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+      </div>
+    </div>
+    <div class="emp-topbar-row2">
+      <div id="empStatusBadge" style="font-size:11px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text4);display:inline-block" id="empStatusDot"></span><span id="empStatusTxt">Sin jornada activa</span></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Cambiar tema" style="width:30px;height:30px;font-size:14px">🌙</button>
+        <button onclick="openAiModal()" title="Asistente IA" style="width:30px;height:30px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(124,58,237,.2));border:1px solid rgba(99,102,241,.3);border-radius:8px;font-size:14px;cursor:pointer">🤖</button>
+      </div>
     </div>
   </div>
   <div class="emp-body">
@@ -970,48 +986,45 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
           </div>
           <div id="resDateBadge" style="font-size:10px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px"></div>
         </div>
-        <!-- Circular progress + metrics -->
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:0 4px">
-          <div style="flex-shrink:0;position:relative;width:90px;height:90px">
-            <svg viewBox="0 0 90 90" width="90" height="90" style="transform:rotate(-90deg)">
-              <circle cx="45" cy="45" r="38" fill="none" stroke="var(--bg4)" stroke-width="8"/>
-              <circle id="progressRing" cx="45" cy="45" r="38" fill="none" stroke="url(#ringGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+        <!-- Stats row — 4 tarjetas horizontales -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">
+          <div class="stat-card-premium" style="align-items:center;text-align:center;padding:10px 4px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--green);margin:0 auto 5px"></div>
+            <div class="stat-lbl">Entrada</div>
+            <div id="resEntrada" class="stat-val" style="font-size:13px">--:--</div>
+          </div>
+          <div class="stat-card-premium" style="align-items:center;text-align:center;padding:10px 4px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--red);margin:0 auto 5px"></div>
+            <div class="stat-lbl">Salida</div>
+            <div id="resSalida" class="stat-val" style="font-size:13px">--:--</div>
+          </div>
+          <div class="stat-card-premium" style="align-items:center;text-align:center;padding:10px 4px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--orange);margin:0 auto 5px"></div>
+            <div class="stat-lbl">Descanso</div>
+            <div id="resDescanso" class="stat-val" style="font-size:13px">00:00</div>
+          </div>
+          <div class="stat-card-premium" style="align-items:center;text-align:center;padding:10px 4px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(6,182,212,.08));border-color:rgba(99,102,241,.3)">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--accent3);margin:0 auto 5px"></div>
+            <div class="stat-lbl" style="color:var(--accent3)">Total</div>
+            <div id="resTotal" class="stat-val" style="font-size:13px;background:linear-gradient(135deg,var(--accent3),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">0h 0m</div>
+          </div>
+        </div>
+        <!-- Progress ring compacto -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;margin-bottom:4px">
+          <div style="flex-shrink:0;position:relative;width:56px;height:56px">
+            <svg viewBox="0 0 56 56" width="56" height="56" style="transform:rotate(-90deg)">
+              <circle cx="28" cy="28" r="23" fill="none" stroke="var(--bg4)" stroke-width="5"/>
+              <circle id="progressRing" cx="28" cy="28" r="23" fill="none" stroke="url(#ringGrad)" stroke-width="5" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="144.5"/>
               <defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"/><stop offset="100%" stop-color="var(--teal)"/></linearGradient></defs>
             </svg>
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-              <div id="ringPct" style="font-size:15px;font-weight:800;line-height:1">0%</div>
-              <div style="font-size:8px;color:var(--text3)">jornada</div>
+              <div id="ringPct" style="font-size:11px;font-weight:800;line-height:1">0%</div>
             </div>
           </div>
-          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="stat-card-premium">
-              <div class="stat-icon" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <div class="stat-lbl">Entrada</div>
-              <div id="resEntrada" class="stat-val">--:--</div>
-            </div>
-            <div class="stat-card-premium">
-              <div class="stat-icon" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-              </div>
-              <div class="stat-lbl">Salida</div>
-              <div id="resSalida" class="stat-val">--:--</div>
-            </div>
-            <div class="stat-card-premium">
-              <div class="stat-icon" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-              </div>
-              <div class="stat-lbl">Descanso</div>
-              <div id="resDescanso" class="stat-val">00:00</div>
-            </div>
-            <div class="stat-card-premium" style="background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(6,182,212,.08));border-color:rgba(99,102,241,.3)">
-              <div class="stat-icon" style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.3)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              </div>
-              <div class="stat-lbl" style="color:var(--accent3)">Total</div>
-              <div id="resTotal" class="stat-val" style="background:linear-gradient(135deg,var(--accent3),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">0h 0m</div>
-            </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:4px">Progreso de jornada</div>
+            <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden"><div id="jorProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:2px;transition:width .5s ease"></div></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px" id="jorProgressTxt">Sin jornada activa</div>
           </div>
         </div>
         <!-- GPS card -->
@@ -2080,6 +2093,7 @@ function doEmpLogin(){
   // Update topbar
   const fn=$('empFirstName');if(fn)fn.textContent=u.name.split(' ')[0];
   const sd=$('empSubdate');if(sd)sd.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const av=$('empAvatar');if(av){av.textContent=(u.initials||u.name.slice(0,2)).toUpperCase();av.style.background=u.color||'linear-gradient(135deg,#6366f1,#7c3aed)';}
   // Perfil tab
   const pa=$('prfAv');if(pa){pa.textContent=u.initials||u.name.slice(0,2).toUpperCase();pa.style.background=u.color||'var(--accent)';}
   if($('prfName'))$('prfName').textContent=u.name;
@@ -2219,8 +2233,10 @@ function renderResumen(){
   // update progress ring
   const pct=Math.min(100,Math.round(totMin/WD*100));
   const ring=$('progressRing');
-  if(ring){const circ=238.76;ring.style.strokeDashoffset=circ-(circ*pct/100);}
+  if(ring){const circ=144.5;ring.style.strokeDashoffset=circ-(circ*pct/100);}
   const rp=$('ringPct');if(rp)rp.textContent=pct+'%';
+  const pb=$('jorProgressBar');if(pb)pb.style.width=pct+'%';
+  const pt=$('jorProgressTxt');if(pt)pt.textContent=pct===0?'Sin jornada activa':pct+'% completado — '+Math.round(totMin/60*10)/10+'h de jornada';
 }
 
 function renderJorTab(){
