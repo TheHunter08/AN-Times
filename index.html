@@ -21,8 +21,8 @@
 <style>
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{height:100%;background:#0d0d1a}
-body{height:100%;overflow:hidden;font-family:'Inter',-apple-system,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;background:#0d0d1a;color:#f1f5f9}
+html{min-height:100dvh;background:#0d0d1a}
+body{min-height:100dvh;overflow:hidden;font-family:'Inter',-apple-system,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;background:#0d0d1a;color:#f1f5f9}
 :root{
   --bg:#0d0d1a;--bg2:#12121f;--bg3:#1a1a2e;--bg4:#1f1f35;--bg5:#252540;
   --accent:#6366f1;--accent2:#7c3aed;--accent3:#818cf8;--accent-dim:rgba(99,102,241,.15);--accent-glow:rgba(99,102,241,.25);
@@ -34,8 +34,9 @@ body{height:100%;overflow:hidden;font-family:'Inter',-apple-system,sans-serif;fo
   --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.1);--border3:rgba(255,255,255,.15);
   --r:14px;--r-sm:10px;--r-lg:20px;--r-xl:24px;--sidebar:230px;
   --safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
+  --safe-bottom:env(safe-area-inset-bottom);
 }
-.scr{position:fixed;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;background:var(--bg)}
+.scr{position:absolute;inset:0;width:100%;min-height:100dvh;display:none;flex-direction:column;background:var(--bg)}
 .scr.show{display:flex}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
@@ -134,7 +135,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(20px + env(safe-area-inset-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
 .emp-greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .emp-subdate{font-size:12px;color:var(--text3);margin-top:1px;font-weight:400}
@@ -145,7 +146,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
 /* Emp bottom nav — position:fixed al nivel de body (NO dentro de #sEmp que también es fixed) */
-.emp-nav{display:flex;flex-shrink:0;width:100%;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.emp-nav{display:flex;flex-shrink:0;width:100%;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
 .emp-nav-item svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;transition:stroke .15s}
 .emp-nav-item.on{color:var(--accent3)}
@@ -159,8 +160,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* ═══ INICIO TAB (from image 6) ═══ */
 .ini-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:calc(16px + var(--safe-bot))}
 /* Jornada actual card */
-.jor-main-card{background:linear-gradient(160deg,rgba(79,70,229,.12) 0%,var(--bg3) 60%);border:1px solid rgba(99,102,241,.25);border-radius:var(--r-xl);padding:20px 20px 18px;text-align:center;position:relative;overflow:hidden}
-.jor-main-card::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.12) 0%,transparent 70%);pointer-events:none}
+.jor-main-card{background:linear-gradient(160deg,rgba(79,70,229,.18) 0%,rgba(26,26,46,.9) 55%,rgba(18,18,31,.95) 100%);border:1px solid rgba(99,102,241,.3);border-radius:var(--r-xl);padding:20px 20px 18px;text-align:center;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.jor-main-card::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 70%);pointer-events:none}
+.jor-main-card::after{content:'';position:absolute;bottom:-60px;left:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,.1) 0%,transparent 70%);pointer-events:none}
 .jor-mc-clock-time{font-size:46px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
 .jor-mc-clock-date{font-size:12px;color:var(--text3);margin-top:3px;text-transform:capitalize;font-weight:400}
 .jor-mc-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;background:var(--green-dim);color:var(--green)}
@@ -169,7 +171,7 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .jor-mc-status .sdot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:none}
 .jor-mc-status:not(.idle) .sdot{animation:pulse 1.5s infinite}
 /* Big timer */
-.jor-timer{font-size:52px;font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px}
+.jor-timer{font-size:52px;font-weight:800;letter-spacing:-3px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px;background:linear-gradient(135deg,#e0e7ff 0%,#a5b4fc 50%,#67e8f9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:none}
 .jor-timer-sub{font-size:12px;color:var(--text3);margin-bottom:24px;font-weight:400}
 /* Circular button */
 .jor-circle-wrap{display:flex;align-items:center;justify-content:center;margin-bottom:20px;position:relative}
@@ -508,6 +510,13 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* Tabs: position:absolute fills emp-body; padding-bottom prevents content hiding behind fixed nav */
 #tabInicio,#tabJornada,#tabVacaciones,#tabCalendario,#tabPerfil,#tabNomina{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:16px}
 .ini-wrap{padding-bottom:8px}
+/* ═══ iOS 26 PWA SAFE AREA FIX ═══ */
+body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:env(safe-area-inset-bottom);background:#0d0d1a;z-index:999999;pointer-events:none}
+@media (display-mode:standalone){
+  html,body{min-height:100dvh;background:#0d0d1a}
+  .emp-nav{padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .emp-topbar{padding-top:calc(20px + env(safe-area-inset-top))}
+}
 /* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
 html{touch-action:manipulation} /* prevents double-tap zoom globally */
 button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-bnav-item,.sb-nav a,.cal-day,.card{touch-action:manipulation}
@@ -520,9 +529,32 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
   .login-wrap{max-width:420px;margin:0 auto}
 }
 
-/* ═══════════════ GLASSMORPHISM ═══════════════ */
-.glass{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
-.glass-card{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+/* ═══════════════ GLASSMORPHISM PREMIUM ═══════════════ */
+.glass{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
+.glass-card{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.08)}
+/* Blobs decorativos para fondo premium */
+.ini-blob{position:absolute;border-radius:50%;pointer-events:none;filter:blur(60px);opacity:.18;z-index:0}
+.ini-blob-1{width:220px;height:220px;background:radial-gradient(circle,#6366f1,transparent);top:-60px;right:-40px}
+.ini-blob-2{width:180px;height:180px;background:radial-gradient(circle,#7c3aed,transparent);bottom:40px;left:-50px}
+.ini-content{position:relative;z-index:1}
+/* Animaciones premium */
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 20px rgba(99,102,241,.25)}50%{box-shadow:0 0 40px rgba(99,102,241,.5)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+/* Stat cards premium */
+.stat-card-premium{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:linear-gradient(135deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:12px 10px;box-shadow:0 4px 24px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08);transition:transform .2s,box-shadow .2s}
+.stat-card-premium:active{transform:scale(.97)}
+.stat-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+.stat-lbl{font-size:9px;color:var(--text4);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:3px}
+.stat-val{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+/* Modo oscuro premium — enriquecer variables */
+:root{
+  --glow-purple:rgba(99,102,241,0.35);
+  --glow-teal:rgba(6,182,212,0.25);
+  --glow-violet:rgba(124,58,237,0.3);
+  --card-bg:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));
+  --card-border:rgba(255,255,255,0.1);
+  --card-shadow:0 8px 32px rgba(0,0,0,0.5);
+}
 
 /* ═══════════════ MODAL OVERLAY (centrado) ═══════════════ */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
@@ -554,7 +586,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_32';
+  var V='20260615_33';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -912,7 +944,9 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
   <div class="emp-body">
     <!-- INICIO -->
     <div id="tabInicio" class="tab-content" style="display:block;overflow-y:auto">
-      <div class="ini-wrap">
+      <div class="ini-wrap" style="position:relative;overflow:hidden">
+        <div class="ini-blob ini-blob-1"></div>
+        <div class="ini-blob ini-blob-2"></div>
         <!-- Main fichar card -->
         <div class="jor-main-card">
           <!-- Timer horas trabajadas (arriba) -->
@@ -927,9 +961,14 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
           </div>
         </div>
         <!-- Resumen header -->
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0 4px;margin-bottom:12px;margin-top:4px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Resumen de horas trabajadas</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px;margin-bottom:12px;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(6,182,212,.1));border:1px solid rgba(99,102,241,.25);display:flex;align-items:center;justify-content:center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:var(--text1);letter-spacing:.3px">Resumen de hoy</span>
+          </div>
+          <div id="resDateBadge" style="font-size:10px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px"></div>
         </div>
         <!-- Circular progress + metrics -->
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:0 4px">
@@ -945,33 +984,33 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
             </div>
           </div>
           <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="glass-card" style="padding:10px">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Entrada</span>
+            <div class="stat-card-premium">
+              <div class="stat-icon" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </div>
-              <div id="resEntrada" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
+              <div class="stat-lbl">Entrada</div>
+              <div id="resEntrada" class="stat-val">--:--</div>
             </div>
-            <div class="glass-card" style="padding:10px">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Salida</span>
+            <div class="stat-card-premium">
+              <div class="stat-icon" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
               </div>
-              <div id="resSalida" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">--:--</div>
+              <div class="stat-lbl">Salida</div>
+              <div id="resSalida" class="stat-val">--:--</div>
             </div>
-            <div class="glass-card" style="padding:10px">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-                <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Descanso</span>
+            <div class="stat-card-premium">
+              <div class="stat-icon" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
               </div>
-              <div id="resDescanso" style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">00:00</div>
+              <div class="stat-lbl">Descanso</div>
+              <div id="resDescanso" class="stat-val">00:00</div>
             </div>
-            <div class="glass-card" style="padding:10px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(6,182,212,0.08))">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                <span style="font-size:9px;color:var(--accent3);text-transform:uppercase;letter-spacing:.5px">Total</span>
+            <div class="stat-card-premium" style="background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(6,182,212,.08));border-color:rgba(99,102,241,.3)">
+              <div class="stat-icon" style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.3)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               </div>
-              <div id="resTotal" style="font-size:16px;font-weight:800;color:var(--accent3);font-variant-numeric:tabular-nums">0h 0m</div>
+              <div class="stat-lbl" style="color:var(--accent3)">Total</div>
+              <div id="resTotal" class="stat-val" style="background:linear-gradient(135deg,var(--accent3),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">0h 0m</div>
             </div>
           </div>
         </div>
@@ -2113,6 +2152,7 @@ function recWorkSecs(r){
 function renderResumen(){
   if(!SES.user)return;
   const u=SES.user,tod=today();
+  if($('resDateBadge')){const n=new Date();$('resDateBadge').textContent=n.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});}
   const recs=DB.records.filter(r=>r.empId===u.id&&r.inicio.startsWith(tod)).sort((a,b)=>a.inicio.localeCompare(b.inicio));
   const openRec2=recs.find(r=>!r.fin&&!r.closed);
 
