@@ -136,13 +136,12 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;align-items:center;gap:8px;padding:max(var(--safe-top,env(safe-area-inset-top)),12px) 12px 10px;background:rgba(13,13,26,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.emp-topbar::-webkit-scrollbar{display:none}
-.emp-top-left{flex-shrink:0}
-.emp-top-right{display:flex;align-items:center;gap:7px;flex-shrink:0;margin-left:auto}
+.emp-topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:max(var(--safe-top,env(safe-area-inset-top)),12px) 12px 10px;background:rgba(13,13,26,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0;overflow:hidden}
+.emp-top-left{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:1}
+.emp-top-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
-.emp-greeting{font-size:15px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
-.emp-subdate{font-size:11px;color:var(--text3);margin-top:1px;font-weight:400}
+.emp-greeting{font-size:15px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emp-subdate{font-size:10px;color:var(--text3);margin-top:1px;font-weight:400;white-space:nowrap}
 .emp-top-right{display:flex;align-items:center;gap:8px}
 .theme-toggle-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px}
 .emp-noti-btn{width:32px;height:32px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0}
@@ -621,7 +620,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_36';
+  var V='20260615_37';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
