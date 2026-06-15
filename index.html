@@ -18,7 +18,6 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -534,9 +533,6 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:600;cursor:pointer;font-size:13px}
 .btn-secondary{background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-weight:600;cursor:pointer;font-size:13px}
 
-/* ═══════════════ CHART SECTION ═══════════════ */
-.chart-section{padding:16px;margin:0 16px 12px}
-.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text2)}
 
 /* ═══════════════ AI ASSISTANT BUTTON ═══════════════ */
 .ai-btn{width:36px;height:36px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;box-shadow:0 2px 12px rgba(99,102,241,0.4);border:none}
@@ -558,7 +554,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_31';
+  var V='20260615_32';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -978,11 +974,6 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
               <div id="resTotal" style="font-size:16px;font-weight:800;color:var(--accent3);font-variant-numeric:tabular-nums">0h 0m</div>
             </div>
           </div>
-        </div>
-        <!-- Weekly chart -->
-        <div class="chart-section glass-card">
-          <div class="chart-header"><span>Horas esta semana</span><span id="chartWeekTotal" style="color:var(--accent3)">0h</span></div>
-          <canvas id="weekChartEmp" height="120"></canvas>
         </div>
         <!-- GPS card -->
         <div id="gpsCard" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;align-items:center;gap:12px">
@@ -2073,7 +2064,6 @@ function doEmpLogin(){
   empNavTo('inicio');
   safeRun(updJorCircle,'jc');safeRun(renderResumen,'rs');
   safeRun(loadUserPhoto,'lp');
-  setTimeout(function(){ safeRun(initWeekChart,'wc'); }, 300);
   // Pedir permisos de notificación y programar recordatorio
   setTimeout(scheduleEndOfDayReminder, 2000);
   setTimeout(function(){
@@ -2102,7 +2092,7 @@ function empNavTo(tab){
   });
   if(tab==='jornada')safeRun(renderJorTab,'jt');
   if(tab==='calendario')safeRun(renderCalendar,'cal');
-  if(tab==='inicio'){safeRun(renderResumen,'rs');safeRun(initWeekChart,'wc');}
+  if(tab==='inicio')safeRun(renderResumen,'rs');
   if(tab==='vacaciones')safeRun(renderVacTab,'vt');
 }
 
@@ -4728,72 +4718,6 @@ function loadSignList() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// WEEKLY CHART (Chart.js)
-// ══════════════════════════════════════════════════════════════
-var _weekChartInstance = null;
-
-function initWeekChart() {
-  var canvas = $('weekChartEmp'); if(!canvas || !SES.user) return;
-  if(typeof Chart === 'undefined') return;
-
-  var today2 = new Date();
-  var days = [];
-  var labels = ['L','M','X','J','V','S','D'];
-  var dayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  // Obtener lunes de esta semana
-  var dayOfWeek = today2.getDay(); // 0=Dom
-  var monday = new Date(today2);
-  monday.setDate(today2.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-  monday.setHours(0,0,0,0);
-
-  var weekDates = [];
-  var weekLabels = [];
-  for(var i=0; i<7; i++) {
-    var d = new Date(monday); d.setDate(monday.getDate() + i);
-    var ds = d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate());
-    weekDates.push(ds);
-    weekLabels.push(['L','M','X','J','V','S','D'][i]);
-  }
-
-  var mine = (DB.records||[]).filter(function(r){ return r.empId === SES.user.id && r.fin; });
-  var hours = weekDates.map(function(ds) {
-    var recs = mine.filter(function(r){ return r.inicio && r.inicio.startsWith(ds); });
-    var mins = recs.reduce(function(s,r){ return s + calcMin(r); }, 0);
-    return parseFloat((mins/60).toFixed(2));
-  });
-
-  var totalH = hours.reduce(function(s,h){ return s+h; }, 0);
-  if($('chartWeekTotal')) $('chartWeekTotal').textContent = totalH.toFixed(1) + 'h';
-
-  if(_weekChartInstance) { _weekChartInstance.destroy(); _weekChartInstance = null; }
-
-  _weekChartInstance = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: weekLabels,
-      datasets: [{
-        data: hours,
-        backgroundColor: hours.map(function(h, i) {
-          var isToday = (weekDates[i] === (today2.getFullYear()+'-'+p2(today2.getMonth()+1)+'-'+p2(today2.getDate())));
-          return isToday ? 'rgba(124,58,237,0.9)' : 'rgba(124,58,237,0.45)';
-        }),
-        borderRadius: 6,
-        borderSkipped: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: function(ctx){ return ctx.parsed.y.toFixed(1)+'h'; } }
-      }},
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: function(v){ return v+'h'; } }, beginAtZero: true, max: Math.max(10, Math.ceil(Math.max.apply(null, hours.map(function(h){return h||0;}))+1)) }
-      }
-    }
-  });
-}
 
 // ══════════════════════════════════════════════════════════════
 // ASISTENTE IA
