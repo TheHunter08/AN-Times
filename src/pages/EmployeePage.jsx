@@ -176,6 +176,9 @@ export default function EmployeePage() {
       <ModalAI visible={activeModal==='ai'} db={db} u={u} onClose={closeModal} />
       <ModalVacForm visible={activeModal==='vacForm'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} />
+      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} onClose={closeModal} toast={toast} />
     </div>
   )
 }
@@ -630,9 +633,9 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
 
       <div className="prf-menu">
         {[
-          { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>{} },
-          { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', onClick:()=>{} },
-          { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>{} },
+          { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>openModal('infoPersonal') },
+          { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', onClick:()=>openModal('documentos') },
+          { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>openModal('configuracion') },
           { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign') },
         ].map(({ icon, label, color, stroke, onClick }) => (
           <div key={label} className="prf-menu-item" onClick={onClick}>
@@ -867,6 +870,195 @@ function ModalAI({ visible, db, u, onClose }) {
           <input type="text" placeholder="Pregunta algo..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==='Enter'&&send()} />
           <button className="btn btn-primary" onClick={send}>→</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function getCfg(key, def) {
+  try {
+    const v = localStorage.getItem('cfg_' + key)
+    if (v === null) return def
+    if (v === 'true') return true
+    if (v === 'false') return false
+    return v
+  } catch { return def }
+}
+
+function setCfg(key, value) {
+  try { localStorage.setItem('cfg_' + key, String(value)) } catch {}
+}
+
+function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
+  const emp = (db.employees || []).find(e => e.id === u?.id) || u || {}
+  const [nombre, setNombre] = useState(emp.name || '')
+  const [email, setEmail] = useState(emp.email || '')
+  const [tel, setTel] = useState(emp.tel || '')
+
+  useEffect(() => {
+    if (visible) {
+      const e = (db.employees || []).find(e => e.id === u?.id) || u || {}
+      setNombre(e.name || '')
+      setEmail(e.email || '')
+      setTel(e.tel || '')
+    }
+  }, [visible])
+
+  if (!visible) return null
+
+  const save = () => {
+    const updated = db.employees.map(e =>
+      e.id === u.id ? { ...e, name: nombre, email, tel } : e
+    )
+    saveDB({ employees: updated })
+    toast('Datos actualizados')
+    onClose()
+  }
+
+  const field = (label, value, onChange, readonly) => (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>{label}</div>
+      <input
+        value={value} onChange={e => onChange && onChange(e.target.value)}
+        readOnly={readonly}
+        style={{
+          width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border)',
+          background: readonly ? 'var(--bg-700)' : 'var(--bg-800)', color:'var(--text1)',
+          fontSize:14, boxSizing:'border-box', opacity: readonly ? 0.7 : 1
+        }}
+      />
+    </div>
+  )
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:400 }}>
+        <div className="modal-drag" />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:18 }}>Información personal</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+        </div>
+        <div style={{ textAlign:'center', marginBottom:20 }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, margin:'0 auto', color:'#fff', fontWeight:700 }}>
+            {(nombre||'?')[0].toUpperCase()}
+          </div>
+        </div>
+        {field('Nombre', nombre, setNombre)}
+        {field('Email', email, setEmail)}
+        {field('Teléfono', tel, setTel)}
+        {field('Empresa', emp.empresa || '—', null, true)}
+        {field('Centro', emp.centro || '—', null, true)}
+        {field('Rol', emp.rol || '—', null, true)}
+        {field('Inicio', emp.inicio || '—', null, true)}
+        {field('Vacaciones', String(emp.vacDias ?? 22) + ' días', null, true)}
+        <button className="btn btn-primary" onClick={save} style={{ width:'100%', marginTop:8 }}>Guardar cambios</button>
+      </div>
+    </div>
+  )
+}
+
+function ModalDocumentos({ visible, db, u, onClose }) {
+  if (!visible) return null
+  const docs = (db.docsnominas || {})[u?.id] || {}
+  const nominas = docs.nominas || []
+  const contrato = docs.contrato
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:420 }}>
+        <div className="modal-drag" />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:18 }}>Documentos</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:12, color:'var(--text3)', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Contrato</div>
+          {contrato
+            ? <a href={contrato} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ display:'block', textAlign:'center', textDecoration:'none', padding:'12px 0' }}>📄 Ver contrato</a>
+            : <div style={{ color:'var(--text3)', textAlign:'center', padding:'20px 0', background:'var(--bg-700)', borderRadius:10 }}>Sin contrato</div>
+          }
+        </div>
+        <div>
+          <div style={{ fontSize:12, color:'var(--text3)', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Nóminas</div>
+          {!nominas.length
+            ? <div style={{ color:'var(--text3)', textAlign:'center', padding:'20px 0', background:'var(--bg-700)', borderRadius:10 }}>Sin nóminas</div>
+            : nominas.map((n, i) => (
+              <a key={i} href={n.url} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--bg-700)', borderRadius:10, marginBottom:8, textDecoration:'none', color:'var(--text1)' }}>
+                <span>📑 {n.mes || `Nómina ${i + 1}`}</span>
+                <span style={{ color:'var(--primary-light)', fontSize:12 }}>Ver →</span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalConfiguracion({ visible, u, onClose, toast }) {
+  const [notiFichaje, setNotiFichaje] = useState(() => getCfg('notiFichaje', true))
+  const [gpsAuto, setGpsAuto] = useState(() => getCfg('gpsAuto', true))
+  const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
+  const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
+  const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
+
+  if (!visible) return null
+
+  const save = () => {
+    setCfg('notiFichaje', notiFichaje)
+    setCfg('gpsAuto', gpsAuto)
+    setCfg('reminderTime', reminderTime)
+    setCfg('idioma', idioma)
+    setCfg('formato', formato)
+    toast('Configuración guardada')
+    onClose()
+  }
+
+  const toggle = (label, value, onChange) => (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+      <span style={{ fontSize:14, color:'var(--text1)' }}>{label}</span>
+      <div
+        onClick={() => onChange(!value)}
+        style={{ width:44, height:24, borderRadius:12, background: value ? 'var(--primary)' : 'var(--bg-600)', cursor:'pointer', position:'relative', transition:'background .2s' }}
+      >
+        <div style={{ position:'absolute', top:3, left: value ? 23 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:400 }}>
+        <div className="modal-drag" />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:18 }}>Configuración</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+        </div>
+        {toggle('Notificaciones de fichaje', notiFichaje, setNotiFichaje)}
+        {toggle('GPS automático', gpsAuto, setGpsAuto)}
+        <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Recordatorio diario</div>
+          <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14 }} />
+        </div>
+        <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Idioma</div>
+          <select value={idioma} onChange={e => setIdioma(e.target.value)}
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14, width:'100%' }}>
+            <option value="es">Español</option>
+            <option value="en">English</option>
+            <option value="pt">Português</option>
+          </select>
+        </div>
+        <div style={{ padding:'14px 0' }}>
+          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Formato de hora</div>
+          <select value={formato} onChange={e => setFormato(e.target.value)}
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14, width:'100%' }}>
+            <option value="24h">24 horas</option>
+            <option value="12h">12 horas (AM/PM)</option>
+          </select>
+        </div>
+        <button className="btn btn-primary" onClick={save} style={{ width:'100%', marginTop:8 }}>Guardar</button>
       </div>
     </div>
   )
