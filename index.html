@@ -131,8 +131,8 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .lh-dots.shake{animation:shake .38s ease}
 
 /* ═══════════════ EMPLOYEE SCREEN ═══════════════ */
-/* --app-h lo fija JS desde window.innerHeight (iOS 26 dvh/vh no dan el alto visible real) */
-#sEmp{overflow:hidden;background:var(--bg);flex-direction:column;height:100vh;height:100dvh;height:var(--app-h,100dvh)}
+/* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
+#sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
 .emp-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 .emp-top-left{display:flex;flex-direction:column}
@@ -144,14 +144,6 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 .noti-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:var(--red);border-radius:50%;border:2px solid var(--bg);display:none}
 .noti-dot.show{display:block}
 .enc-chip{display:flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--accent3);cursor:pointer}
-/* Notification permission banner */
-.noti-banner{display:none;align-items:center;gap:10px;background:linear-gradient(90deg,var(--accent2),var(--accent));padding:10px 14px;flex-shrink:0;animation:slideDown .3s ease}
-@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.noti-banner.show{display:flex}
-.noti-banner-text{flex:1;font-size:12px;font-weight:600;color:#fff}
-.noti-banner-sub{font-size:10px;color:rgba(255,255,255,.75);font-weight:400}
-.noti-banner-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
-.noti-banner-x{background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;line-height:1;padding:0 2px}
 /* Emp bottom nav — position:fixed al nivel de body (NO dentro de #sEmp que también es fixed) */
 .emp-nav{position:fixed;bottom:0;left:0;right:0;z-index:200;display:none;flex-direction:row;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .emp-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:600;color:var(--text4);cursor:pointer;padding:2px;transition:color .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.3px;position:relative}
@@ -534,7 +526,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_21';
+  var V='20260615_22';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -847,13 +839,6 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 
 <!-- ═══ EMPLOYEE ═══ -->
 <div class="scr" id="sEmp">
-  <!-- Notification permission banner — shown on tap (iOS requires user gesture) -->
-  <div class="noti-banner" id="notiBanner">
-    <span style="font-size:18px">🔔</span>
-    <div class="noti-banner-text">Activar notificaciones<br><span class="noti-banner-sub">Recibe avisos cuando te aprueben la jornada o vacaciones</span></div>
-    <button class="noti-banner-btn" onclick="requestNotifPermission();document.getElementById('notiBanner').style.display='none'">Activar</button>
-    <button class="noti-banner-x" onclick="document.getElementById('notiBanner').style.display='none'">×</button>
-  </div>
   <div class="emp-topbar">
     <div class="emp-top-left"><div class="emp-greeting">👋 Hola, <span id="empFirstName">...</span></div><div class="emp-subdate" id="empSubdate"></div></div>
     <div class="emp-top-right">
@@ -1465,7 +1450,7 @@ function showScr(id){
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
   $(id).classList.add('show');
   var nav=$('empBottomNav');
-  if(nav)nav.style.display=(id==='sEmp')?'flex':'none';
+  if(nav){nav.style.display=(id==='sEmp')?'flex':'none';if(id==='sEmp')setTimeout(_posNav,0);}
 }
 
 // ── Sidebar ──
@@ -1546,12 +1531,29 @@ function startPolling(){
 }
 // Sincronizar inmediatamente al recuperar conexión o volver a la app
 window.addEventListener('online',()=>{setSyncDot(false);doFetch();});
-// iOS 26 PWA: fija el alto real visible (dvh/vh fallan en standalone) para que la nav quede abajo
-function _setAppH(){document.documentElement.style.setProperty('--app-h',window.innerHeight+'px');}
-_setAppH();
-window.addEventListener('resize',_setAppH);
-window.addEventListener('orientationchange',function(){setTimeout(_setAppH,120);});
-window.addEventListener('pageshow',_setAppH);
+// iOS 26 PWA: ancla la nav al fondo del visual viewport (fiable en standalone aunque dvh/vh fallen)
+function _posNav(){
+  var nav=document.getElementById('empBottomNav');
+  if(!nav||nav.style.display==='none')return;
+  // Esperar layout real antes de medir offsetHeight
+  requestAnimationFrame(function(){
+    var h=nav.offsetHeight||58;
+    if(window.visualViewport){
+      var vv=window.visualViewport;
+      nav.style.top=Math.round(vv.offsetTop+vv.height-h)+'px';
+      nav.style.bottom='auto';
+    }else{
+      nav.style.top=Math.round(window.innerHeight-h)+'px';
+      nav.style.bottom='auto';
+    }
+  });
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',_posNav);
+  window.visualViewport.addEventListener('scroll',_posNav);
+}
+window.addEventListener('resize',function(){setTimeout(_posNav,50);});
+window.addEventListener('orientationchange',function(){setTimeout(_posNav,200);});
 // Block zoom: gesture events (iOS Safari) + pinch + double-tap
 document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
 document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
@@ -2008,9 +2010,7 @@ function doEmpLogin(){
   // Pedir permisos de notificación y programar recordatorio
   setTimeout(scheduleEndOfDayReminder, 2000);
   setTimeout(function(){
-    if('Notification' in window && Notification.permission==='default'){
-      var b=$('notiBanner');if(b)b.classList.add('show');
-    } else if('Notification' in window && Notification.permission==='granted'){
+    if('Notification' in window && Notification.permission==='granted'){
       subscribePush('emp:'+SES.user.id);
     }
   },3000);
