@@ -658,8 +658,29 @@ function PanelInformes({ db, toast }) {
     toast('✅ CSV descargado')
   }
 
+  const [y, mo] = filterMonth.split('-').map(Number)
+  const daysInMonth = new Date(y, mo, 0).getDate()
+
+  const exportDetalleCSV = () => {
+    const empRows = sortedEmps(db).filter(e => !e.baja)
+    const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>String(i+1)), 'Total']
+    const csvRows = empRows.map(e => {
+      const dayMap = {}
+      recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => {
+        const day = parseInt(r.inicio.slice(8,10))
+        dayMap[day] = (dayMap[day]||0) + calcMin(r)
+      })
+      const total = Object.values(dayMap).reduce((s,v)=>s+v,0)
+      return [e.name, ...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?`${Math.floor(dayMap[i+1]/60)}:${p2(dayMap[i+1]%60)}`:''), mhm(total)]
+    })
+    const csv = '﻿' + [header,...csvRows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); a.download=`detalle_${filterMonth}.csv`; a.click()
+    toast('✅ CSV descargado')
+  }
+
   const TABS = [
     { id:'resumen',  label:'Resumen mensual' },
+    { id:'detalle',  label:'Detalle diario' },
     { id:'ranking',  label:'Ranking horas' },
     { id:'analitica',label:'Analítica' },
     { id:'exportar', label:'Exportar' },
@@ -718,6 +739,66 @@ function PanelInformes({ db, toast }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Detalle diario tab */}
+      {tab === 'detalle' && (
+        <div>
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}>
+            <button className="btn btn-secondary btn-sm" onClick={exportDetalleCSV}>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar CSV
+            </button>
+          </div>
+          <div style={{ overflowX:'auto' }}>
+            <table className="adm-table" style={{ fontSize:11, minWidth: 120 + daysInMonth*38 }}>
+              <thead>
+                <tr>
+                  <th style={{ minWidth:120, textAlign:'left' }}>Empleado</th>
+                  {Array.from({length:daysInMonth},(_,i) => {
+                    const d = new Date(y, mo-1, i+1)
+                    const isWknd = d.getDay()===0||d.getDay()===6
+                    return <th key={i} style={{ minWidth:36, textAlign:'center', padding:'6px 4px', color: isWknd?'var(--text4)':'var(--text3)', fontWeight: isWknd?400:600 }}>{i+1}</th>
+                  })}
+                  <th style={{ minWidth:60, textAlign:'right' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedEmps(db).filter(e=>!e.baja).map(e => {
+                  const dayMap = {}
+                  recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio.startsWith(filterMonth)).forEach(r=>{
+                    const day = parseInt(r.inicio.slice(8,10))
+                    dayMap[day] = (dayMap[day]||0) + calcMin(r)
+                  })
+                  const totalMin = Object.values(dayMap).reduce((s,v)=>s+v,0)
+                  return (
+                    <tr key={e.id}>
+                      <td style={{ fontWeight:600, whiteSpace:'nowrap' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <div style={{ width:20, height:20, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                            {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                          </div>
+                          {e.name.split(' ')[0]}
+                        </div>
+                      </td>
+                      {Array.from({length:daysInMonth},(_,i) => {
+                        const m2 = dayMap[i+1]
+                        const d = new Date(y, mo-1, i+1)
+                        const isWknd = d.getDay()===0||d.getDay()===6
+                        return (
+                          <td key={i} style={{ textAlign:'center', padding:'5px 2px', background: m2?'rgba(94,106,210,.12)':isWknd?'rgba(255,255,255,.02)':undefined, color: m2?'var(--primary-light)':'var(--text4)', fontWeight:m2?700:400, fontVariantNumeric:'tabular-nums' }}>
+                            {m2 ? `${Math.floor(m2/60)}:${p2(m2%60)}` : isWknd?'·':'—'}
+                          </td>
+                        )
+                      })}
+                      <td style={{ textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums', color:'var(--text)' }}>{mhm(totalMin)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -954,16 +1035,29 @@ function PanelDocumentos({ db, toast, saveDB }) {
   const [tab, setTab] = useState('todos')
   const EMPTY = { empId:'', tipo:'nomina', titulo:'', mes:'', url:'' }
   const [form, setForm] = useState(EMPTY)
+  const [fileData, setFileData] = useState('')
+  const [fileName, setFileName] = useState('')
+
+  const handleFile = (e) => {
+    const f = e.target.files[0]
+    if (!f) return
+    if (f.size > 700000) { toast('Archivo muy grande (máx. 700KB). Comprime el PDF o usa una URL.'); return }
+    const reader = new FileReader()
+    reader.onload = ev => { setFileData(ev.target.result); setFileName(f.name) }
+    reader.readAsDataURL(f)
+  }
 
   const add = () => {
     if (!form.empId) { toast('Selecciona un empleado'); return }
     if (!form.titulo.trim()) { toast('Escribe un título'); return }
     const emp = emps.find(e => e.id === form.empId)
     const doc = { ...form, id: gid(), empName: emp?.name || '', createdAt: new Date().toISOString(), firma: null }
+    if (fileData) { doc.fileData = fileData; doc.fileName = fileName }
     saveDB({ documentos: [...docs, doc] })
     toast('✅ Documento enviado al empleado')
     setShowForm(false)
     setForm(EMPTY)
+    setFileData(''); setFileName('')
   }
 
   const addJornada = (empId) => {
@@ -1030,7 +1124,17 @@ function PanelDocumentos({ db, toast, saveDB }) {
             <div className="field"><label>Título *</label><input value={form.titulo} onChange={e => setForm(f=>({...f,titulo:e.target.value}))} placeholder="Ej: Nómina enero 2026" /></div>
             <div className="field"><label>Mes (YYYY-MM)</label><input type="month" value={form.mes} onChange={e => setForm(f=>({...f,mes:e.target.value}))} /></div>
           </div>
-          <div className="field"><label>URL del documento (opcional)</label><input value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))} placeholder="https://..." /></div>
+          <div className="field-row">
+            <div className="field">
+              <label>Archivo (PDF / imagen, máx 700KB)</label>
+              <label style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--bg-600)', border:`1px dashed ${fileData?'var(--green)':'var(--border2)'}`, borderRadius:8, cursor:'pointer', transition:'border-color .15s' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={fileData?'var(--green)':'var(--text3)'} strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span style={{ fontSize:12, color: fileData?'var(--green)':'var(--text3)' }}>{fileData ? `✓ ${fileName}` : 'Subir archivo…'}</span>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} style={{ display:'none' }} />
+              </label>
+            </div>
+            <div className="field"><label>O enlace URL</label><input value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))} placeholder="https://..." /></div>
+          </div>
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:4 }}>
             <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
             <button className="btn btn-primary" onClick={add}>Enviar documento</button>
@@ -1102,17 +1206,25 @@ function PanelDocumentos({ db, toast, saveDB }) {
                   {d.firma && <span style={{ color:'var(--green)', marginLeft:8, fontWeight:600 }}>✓ Firmado {new Date(d.firma.firmadoAt).toLocaleDateString('es-ES')}</span>}
                 </div>
               </div>
-              {d.firma ? (
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  {d.firma.signatureData && (
-                    <img src={d.firma.signatureData} alt="firma" style={{ height:32, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-600)' }} />
-                  )}
-                  <span className="badge badge-green">Firmado</span>
-                </div>
-              ) : (
-                <span className="badge badge-orange">Pendiente</span>
-              )}
-              <button className="btn btn-sm btn-danger" onClick={() => del(d.id)}>✕</button>
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                {(d.fileData || d.url) && (
+                  <a href={d.fileData || d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Ver
+                  </a>
+                )}
+                {d.firma ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    {d.firma.signatureData && (
+                      <img src={d.firma.signatureData} alt="firma" style={{ height:32, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-600)' }} />
+                    )}
+                    <span className="badge badge-green">Firmado</span>
+                  </div>
+                ) : (
+                  <span className="badge badge-orange">Pendiente</span>
+                )}
+                <button className="btn btn-sm btn-danger" onClick={() => del(d.id)}>✕</button>
+              </div>
             </div>
           )
         })}

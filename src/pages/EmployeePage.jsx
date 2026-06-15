@@ -1049,7 +1049,12 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
         </div>
       </div>
       <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-        {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>Ver</a>}
+        {(d.fileData || d.url) && (
+          <a href={d.fileData || d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:3 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Ver
+          </a>
+        )}
         {!d.firma && <button className="btn btn-sm btn-primary" onClick={() => setSigning(d)}>Firmar</button>}
         {d.firma && d.firma.signatureData && <img src={d.firma.signatureData} alt="firma" style={{ height:28, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-500)' }} />}
       </div>
