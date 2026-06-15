@@ -135,9 +135,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent)}
 /* #sEmp llena pantalla via position:fixed inset:0 — sin height explícito */
 #sEmp{overflow:hidden;background:var(--bg);flex-direction:column}
 /* Topbar */
-.emp-topbar{display:flex;flex-direction:column;gap:6px;padding:max(env(safe-area-inset-top),12px) 16px 10px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
-.emp-topbar-row1{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.emp-topbar-row2{display:flex;align-items:center;justify-content:space-between}
+.emp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:max(env(safe-area-inset-top),12px) 14px 10px;background:rgba(13,13,26,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.emp-top-right{display:flex;align-items:center;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0;max-width:65%}
+.emp-top-right::-webkit-scrollbar{display:none}
 .emp-top-left{display:flex;flex-direction:column}
 .emp-greeting{font-size:15px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
 .emp-subdate{font-size:11px;color:var(--text3);margin-top:1px;font-weight:400}
@@ -520,6 +520,36 @@ body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:env(safe-ar
   .emp-nav{padding-bottom:max(8px,env(safe-area-inset-bottom))}
   .emp-topbar{padding-top:max(env(safe-area-inset-top),14px)}
 }
+/* ═══ iOS NATIVE NAVIGATION SYSTEM ═══ */
+/* --vh fix engine */
+:root{--vh:1vh}
+/* View transitions */
+.scr{will-change:transform;transform:translateX(0)}
+.scr.ios-entering{animation:iosSlideIn .32s cubic-bezier(.25,.46,.45,.94) forwards}
+.scr.ios-leaving{animation:iosSlideOut .32s cubic-bezier(.25,.46,.45,.94) forwards}
+.scr.ios-back-entering{animation:iosBackIn .32s cubic-bezier(.25,.46,.45,.94) forwards}
+.scr.ios-back-leaving{animation:iosBackOut .32s cubic-bezier(.25,.46,.45,.94) forwards}
+@keyframes iosSlideIn{from{transform:translateX(100%);opacity:.7}to{transform:translateX(0);opacity:1}}
+@keyframes iosSlideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(-30%);opacity:.6}}
+@keyframes iosBackIn{from{transform:translateX(-30%);opacity:.6}to{transform:translateX(0);opacity:1}}
+@keyframes iosBackOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:.7}}
+/* Tab bar iOS premium */
+.emp-nav{background:rgba(18,18,31,0.88)!important;-webkit-backdrop-filter:blur(24px) saturate(180%)!important;backdrop-filter:blur(24px) saturate(180%)!important;border-top:1px solid rgba(255,255,255,0.08)!important}
+.emp-nav-item{transition:transform .12s ease,color .15s;-webkit-tap-highlight-color:transparent}
+.emp-nav-item:active{transform:scale(0.88)}
+.emp-nav-item.on .emp-nav-ico{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 6px rgba(99,102,241,.5))}
+/* Micro-interactions */
+button{transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent}
+button:active{transform:scale(0.96);opacity:0.85}
+.jor-circle-btn{transition:transform .15s cubic-bezier(.34,1.56,.64,1),box-shadow .2s!important}
+.jor-circle-btn:active{transform:scale(0.92)!important}
+.stat-card-premium,.glass-card{transition:transform .15s ease,box-shadow .15s ease}
+.stat-card-premium:active,.glass-card:active{transform:scale(0.97)}
+.prf-menu-item{transition:background .15s,transform .12s;-webkit-tap-highlight-color:transparent}
+.prf-menu-item:active{transform:scale(0.98);background:var(--bg4)!important}
+/* Swipe back visual hint */
+.ios-swipe-hint{position:fixed;left:0;top:0;bottom:0;width:4px;background:linear-gradient(90deg,rgba(99,102,241,.4),transparent);z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none}
+.ios-swipe-hint.show{opacity:1}
 /* ═══ PWA / TOUCH OPTIMIZATIONS ═══ */
 html{touch-action:manipulation} /* prevents double-tap zoom globally */
 button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-bnav-item,.sb-nav a,.cal-day,.card{touch-action:manipulation}
@@ -589,7 +619,7 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <script>
 // ── Cache buster: si la versión cambia, limpiar SW caches y recargar ──
 (function(){
-  var V='20260615_34';
+  var V='20260615_35';
   var k='times_build';
   var prev=localStorage.getItem(k);
   if(prev&&prev!==V){
@@ -935,26 +965,21 @@ button,.emp-nav-item,.emp-noti-btn,.prf-menu-item,.jor-circle-btn,.vac-cta,.adm-
 <!-- ═══ EMPLOYEE ═══ -->
 <div class="scr" id="sEmp">
   <div class="emp-topbar">
-    <div class="emp-topbar-row1">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0" id="empAvatar">?</div>
-        <div>
-          <div style="font-size:15px;font-weight:700;color:var(--text1);line-height:1.2">👋 Hola, <span id="empFirstName">...</span></div>
-          <div style="font-size:11px;color:var(--text3);margin-top:1px" id="empSubdate"></div>
+    <div class="emp-top-left" style="flex-shrink:0;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="empAvatar" style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0">?</div>
+        <div style="min-width:0">
+          <div class="emp-greeting">👋 <span id="empFirstName">...</span></div>
+          <div class="emp-subdate" id="empSubdate"></div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
-        <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
-        <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
-      </div>
     </div>
-    <div class="emp-topbar-row2">
-      <div id="empStatusBadge" style="font-size:11px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text4);display:inline-block" id="empStatusDot"></span><span id="empStatusTxt">Sin jornada activa</span></div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Cambiar tema" style="width:30px;height:30px;font-size:14px">🌙</button>
-        <button onclick="openAiModal()" title="Asistente IA" style="width:30px;height:30px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(124,58,237,.2));border:1px solid rgba(99,102,241,.3);border-radius:8px;font-size:14px;cursor:pointer">🤖</button>
-      </div>
+    <div class="emp-top-right">
+      <button id="encBtn" onclick="showEncPanel()" style="display:none" class="enc-chip">⭐ Panel</button>
+      <button class="theme-toggle-btn" id="empThemeBtn" onclick="toggleTheme()" title="Tema">🌙</button>
+      <button class="ai-btn" onclick="openAiModal()" title="IA">🤖</button>
+      <div class="emp-noti-btn" onclick="openNotis()"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="noti-dot" id="notiDotEmp"></span></div>
+      <div class="emp-noti-btn" onclick="doLogout()" style="background:var(--red-dim);border-color:rgba(239,68,68,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--red)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
     </div>
   </div>
   <div class="emp-body">
@@ -1575,15 +1600,71 @@ function toast(msg,dur=3000){
   setTimeout(()=>{d.classList.add('out');setTimeout(()=>d.remove(),300);},dur);
 }
 
-// ── Screens ──
-function showScr(id){
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
-  $(id).classList.add('show');
+// ── iOS Navigation Engine ──
+var _iosNavHistory=[];
+var _iosNavAnimating=false;
+function showScr(id,back){
+  if(_iosNavAnimating)return;
+  var prev=document.querySelector('.scr.show');
+  var next=$(id);
+  if(!next||prev===next)return;
   var isEmp=(id==='sEmp');
   document.body.style.background=isEmp?'#12121f':'#0d0d1a';
   var tc=document.querySelector('meta[name="theme-color"]');
   if(tc) tc.content=isEmp?'#12121f':'#0d0d1a';
+  // Sin animación si no hay previo visible
+  if(!prev||!prev.classList.contains('show')){
+    document.querySelectorAll('.scr').forEach(s=>s.classList.remove('show'));
+    next.classList.add('show');
+    return;
+  }
+  _iosNavAnimating=true;
+  var inClass=back?'ios-back-entering':'ios-entering';
+  var outClass=back?'ios-back-leaving':'ios-leaving';
+  next.classList.add('show',inClass);
+  prev.classList.add(outClass);
+  if(!back)_iosNavHistory.push(prev.id);
+  function cleanup(){
+    _iosNavAnimating=false;
+    prev.classList.remove('show',outClass);
+    next.classList.remove(inClass);
+  }
+  setTimeout(cleanup,340);
 }
+function iosBack(){
+  if(!_iosNavHistory.length)return;
+  showScr(_iosNavHistory.pop(),true);
+}
+// ── --vh fix iOS 26 ──
+function _setVh(){
+  var vh=(window.visualViewport?window.visualViewport.height:window.innerHeight)*0.01;
+  document.documentElement.style.setProperty('--vh',vh+'px');
+}
+_setVh();
+window.visualViewport&&window.visualViewport.addEventListener('resize',_setVh);
+window.addEventListener('resize',_setVh);
+// ── Swipe back gesture ──
+(function(){
+  var sx=null,sy=null,hint=document.createElement('div');
+  hint.className='ios-swipe-hint';document.body.appendChild(hint);
+  document.addEventListener('touchstart',function(e){
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;
+    if(sx<25)hint.classList.add('show');
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(sx===null)return;
+    var dx=e.touches[0].clientX-sx;
+    if(dx>0&&sx<25)hint.style.width=Math.min(dx/3,20)+'px';
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    hint.classList.remove('show');hint.style.width='4px';
+    if(sx===null)return;
+    var dx=e.changedTouches[0].clientX-sx;
+    var dy=Math.abs(e.changedTouches[0].clientY-sy);
+    if(sx<30&&dx>70&&dy<80&&_iosNavHistory.length)iosBack();
+    sx=null;sy=null;
+  },{passive:true});
+})();
 
 // ── Sidebar ──
 function toggleSidebar(){
@@ -4736,21 +4817,26 @@ function clearSign() {
 
 function saveSign() {
   var canvas = $('signCanvas'); if(!canvas) return;
-  var data = canvas.toDataURL('image/png');
+  // Comprimir a JPEG 60% en canvas pequeño para no exceder límite Firebase
+  var small = document.createElement('canvas');
+  small.width = 320; small.height = 120;
+  var ctx2 = small.getContext('2d');
+  ctx2.fillStyle = '#1a1a2e'; ctx2.fillRect(0,0,320,120);
+  ctx2.drawImage(canvas, 0, 0, 320, 120);
+  var data = small.toDataURL('image/jpeg', 0.6);
   if(!SES.user) { toast('Debes estar logueado'); return; }
+  if(data.length > 200000) { toast('❌ Firma muy grande, dibuja menos trazos'); return; }
   var ts = Date.now();
-  try {
-    firebase.database().ref('firmas/' + SES.user.id + '/' + ts).set({
-      data: data, ts: ts, empName: SES.user.name,
-      date: new Date().toLocaleString('es-ES')
-    }).then(function() {
-      toast('✅ Firma guardada');
-      clearSign();
-      loadSignList();
-    });
-  } catch(e) {
-    toast('❌ Error al guardar firma');
-  }
+  firebase.database().ref('firmas/' + SES.user.id + '/' + ts).set({
+    data: data, ts: ts, empName: SES.user.name,
+    date: new Date().toLocaleString('es-ES')
+  }).then(function() {
+    toast('✅ Firma guardada');
+    clearSign();
+    loadSignList();
+  }).catch(function(e) {
+    toast('❌ Error: ' + e.message);
+  });
 }
 
 function loadSignList() {
