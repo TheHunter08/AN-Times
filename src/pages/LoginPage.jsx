@@ -356,14 +356,20 @@ function LogoSVG() {
     <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:44, height:44 }}>
       <defs>
         <linearGradient id="lgLogin" x1="0" y1="0" x2="44" y2="44">
-          <stop offset="0%" stopColor="#c026d3"/>
-          <stop offset="40%" stopColor="#7c3aed"/>
-          <stop offset="100%" stopColor="#06b6d4"/>
+          <stop offset="0%" stopColor="#7C5CFF"/>
+          <stop offset="55%" stopColor="#5E6AD2"/>
+          <stop offset="100%" stopColor="#3B4BD6"/>
+        </linearGradient>
+        <linearGradient id="lgAccent" x1="0" y1="0" x2="44" y2="44">
+          <stop offset="0%" stopColor="#7DF9FF"/>
+          <stop offset="100%" stopColor="#00D2FF"/>
         </linearGradient>
       </defs>
       <rect width="44" height="44" rx="10" fill="url(#lgLogin)"/>
-      <rect x="10" y="10" width="24" height="7" rx="2.5" fill="white"/>
-      <rect x="18.5" y="10" width="7" height="28" rx="2.5" fill="white"/>
+      <rect x="11.5" y="14.5" width="21" height="4.4" rx="2.2" fill="white"/>
+      <rect x="19.8" y="14.5" width="4.4" height="15.5" rx="2.2" fill="white"/>
+      <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#lgAccent)" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="30" cy="19.8" r="1.1" fill="url(#lgAccent)"/>
     </svg>
   )
 }

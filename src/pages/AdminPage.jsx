@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN } from '../config/constants.js'
+import { auditLog } from '../services/dataService.js'
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -15,6 +16,11 @@ const PAGES = [
   { id:'auditoria',   label:'Auditoría' },
 ]
 
+// Un "encargado" no es administrador: solo ve y gestiona la jornada de su obra asignada
+const ENC_PAGES = [
+  { id:'miobra', label:'Mi Obra' },
+]
+
 const NAV_ICONS = {
   dashboard:   <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
   control:     <><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></>,
@@ -25,6 +31,7 @@ const NAV_ICONS = {
   obras:       <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
   documentos:  <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></>,
   auditoria:   <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+  miobra:      <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
 }
 
 function NavIcon({ id, size = 17 }) {
@@ -40,6 +47,14 @@ export default function AdminPage() {
   const [sideOpen, setSideOpen] = useState(false)
   const isMobile = window.innerWidth < 768
 
+  // Un "encargado" no es administrador: acceso restringido solo a su obra asignada
+  const isEncargado = session.isEnc && !session.isJO
+  const pages = isEncargado ? ENC_PAGES : PAGES
+
+  useEffect(() => {
+    if (isEncargado && !pages.find(p => p.id === currentAdminPage)) setAdminPage('miobra')
+  }, [isEncargado])
+
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
   const adminNotis = (db.notis || []).filter(n => n.empId === '__admin__' && !n.leido)
 
@@ -47,7 +62,7 @@ export default function AdminPage() {
 
   const nav = (id) => { setAdminPage(id); setSideOpen(false) }
 
-  const actPanel = PAGES.find(p => p.id === currentAdminPage) || PAGES[0]
+  const actPanel = pages.find(p => p.id === currentAdminPage) || pages[0]
 
   return (
     <div className="screen active" id="sAdmin">
@@ -58,23 +73,39 @@ export default function AdminPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <div className="adm-logo">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><polygon points="12 2 2 7 12 12 22 7" fill="#5e6ad2"/><polyline points="2 17 12 22 22 17" stroke="#5e6ad2" strokeWidth="2" strokeLinejoin="round"/><polyline points="2 12 12 17 22 12" stroke="#8b97e8" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+            <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
+              <defs>
+                <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44">
+                  <stop offset="0%" stopColor="#7C5CFF"/><stop offset="55%" stopColor="#5E6AD2"/><stop offset="100%" stopColor="#3B4BD6"/>
+                </linearGradient>
+                <linearGradient id="admLogoAccent" x1="0" y1="0" x2="44" y2="44">
+                  <stop offset="0%" stopColor="#7DF9FF"/><stop offset="100%" stopColor="#00D2FF"/>
+                </linearGradient>
+              </defs>
+              <rect width="44" height="44" rx="10" fill="url(#admLogoBg)"/>
+              <rect x="11.5" y="14.5" width="21" height="4.4" rx="2.2" fill="white"/>
+              <rect x="19.8" y="14.5" width="4.4" height="15.5" rx="2.2" fill="white"/>
+              <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#admLogoAccent)" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="30" cy="19.8" r="1.1" fill="url(#admLogoAccent)"/>
+            </svg>
             TIMES INC
           </div>
           <div className="adm-page-title">{actPanel.ico} {actPanel.label}</div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <SyncBadge />
-          <button title="Notificaciones admin" onClick={() => {
-            nav('documentos')
-            const updated = (db.notis||[]).map(n => n.empId==='__admin__' ? {...n,leido:true} : n)
-            saveDB({ notis: updated })
-          }} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            {adminNotis.length > 0 && (
-              <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminNotis.length}</span>
-            )}
-          </button>
+          {!isEncargado && (
+            <button title="Notificaciones admin" onClick={() => {
+              nav('documentos')
+              const updated = (db.notis||[]).map(n => n.empId==='__admin__' ? {...n,leido:true} : n)
+              saveDB({ notis: updated })
+            }} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {adminNotis.length > 0 && (
+                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminNotis.length}</span>
+              )}
+            </button>
+          )}
           {session.user && (
             <button className="btn btn-secondary btn-sm" onClick={() => setScreen('emp')}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -90,7 +121,7 @@ export default function AdminPage() {
         <div className={`adm-sidebar${sideOpen ? ' open' : ''}`}>
           <div className="adm-sidebar-inner">
             <div className="adm-nav-section">MENÚ PRINCIPAL</div>
-            {PAGES.map(p => (
+            {pages.map(p => (
               <div key={p.id} className={`adm-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => nav(p.id)}>
                 <span className="adm-nav-ico"><NavIcon id={p.id} /></span>
                 <span style={{ flex:1 }}>{p.label}</span>
@@ -109,30 +140,38 @@ export default function AdminPage() {
 
         {/* Main content */}
         <div className="adm-main">
-          {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} />}
-          {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} />}
-          {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} />}
-          {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
+          {isEncargado ? (
+            currentAdminPage === 'miobra' && <PanelMiObra db={db} toast={toast} saveDB={saveDB} session={session} />
+          ) : (
+            <>
+              {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} />}
+              {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
+              {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} />}
+              {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
+            </>
+          )}
         </div>
       </div>
 
       {/* Mobile bottom nav */}
       <div className="adm-mobile-nav">
-        {PAGES.slice(0,5).map(p => (
+        {pages.slice(0,5).map(p => (
           <div key={p.id} className={`adm-mobile-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => setAdminPage(p.id)}>
             <NavIcon id={p.id} size={20} />
             <span>{p.label.slice(0,8)}</span>
           </div>
         ))}
-        <div className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
-          <span>Más</span>
-        </div>
+        {!isEncargado && (
+          <div className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            <span>Más</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -335,7 +374,7 @@ function Heatmap({ data }) {
 }
 
 // ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
-function PanelControl({ db, toast, saveDB }) {
+function PanelControl({ db, toast, saveDB, session }) {
   const emps = (db.employees || []).filter(e => !e.baja)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
@@ -350,7 +389,8 @@ function PanelControl({ db, toast, saveDB }) {
     if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
     const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
     const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-    saveDB({ records: recs.map(r => r.id === rec.id ? closed : r) })
+    const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
+    saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
     toast('✅ Jornada cerrada forzosamente')
   }
 
@@ -517,14 +557,16 @@ function PanelFichajes({ db, toast, saveDB }) {
 }
 
 // ─── PANEL SOLICITUDES ────────────────────────────────────────────────────────
-function PanelSolicitudes({ db, toast, saveDB }) {
+function PanelSolicitudes({ db, toast, saveDB, session }) {
   const vacs = (db.vacaciones || []).sort((a,b) => b.ts?.localeCompare(a.ts||'')||0)
   const pend = vacs.filter(v => v.estado === 'pendiente')
   const rest = vacs.filter(v => v.estado !== 'pendiente')
 
   const act = (id, estado) => {
+    const v = (db.vacaciones||[]).find(x => x.id === id)
     const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString() } : v)
-    saveDB({ vacaciones: updated })
+    const withAudit = auditLog(db, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
+    saveDB({ vacaciones: updated, audit: withAudit.audit })
     toast(estado === 'aprobada' ? '✅ Solicitud aprobada' : '❌ Solicitud rechazada')
   }
 
@@ -571,16 +613,23 @@ function PanelSolicitudes({ db, toast, saveDB }) {
 }
 
 // ─── PANEL EMPLEADOS ──────────────────────────────────────────────────────────
-function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData }) {
+function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData, session }) {
   const emps = sortedEmps(db)
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
-  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', color:'#5E6AD2', baja:false, fechaAlta: today() }
+  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today() }
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }
-  const openEdit = (e) => { setForm({ ...e }); setShowForm(true); setEditEmp(e.id) }
+  const openEdit = (e) => { setForm({ obrasAsignadas: [], ...e }); setShowForm(true); setEditEmp(e.id) }
+
+  const toggleObra = (centro) => {
+    setForm(f => {
+      const cur = f.obrasAsignadas || []
+      return { ...f, obrasAsignadas: cur.includes(centro) ? cur.filter(c => c !== centro) : [...cur, centro] }
+    })
+  }
 
   const saveEmp = () => {
     if (!form.name.trim()) { toast('Nombre requerido'); return }
@@ -590,15 +639,18 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const emps2 = editEmp
       ? (db.employees||[]).map(e => e.id === editEmp ? form : e)
       : [...(db.employees||[]), form]
-    saveDB({ employees: emps2 })
+    const withAudit = auditLog(db, editEmp ? 'Empleado actualizado' : 'Empleado creado', form.name, session?.user?.name || 'Admin')
+    saveDB({ employees: emps2, audit: withAudit.audit })
     toast(editEmp ? '✅ Empleado actualizado' : '✅ Empleado creado')
     setShowForm(false)
   }
 
   const del = (id) => {
     if (!window.confirm('¿Dar de baja a este empleado?')) return
+    const emp = (db.employees||[]).find(e => e.id === id)
     const emps2 = (db.employees||[]).map(e => e.id === id ? { ...e, baja:true, fechaBaja: today() } : e)
-    saveDB({ employees: emps2 })
+    const withAudit = auditLog(db, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
+    saveDB({ employees: emps2, audit: withAudit.audit })
     toast('Empleado dado de baja')
   }
 
@@ -630,6 +682,23 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
             <div className="field"><label>Empresa</label><input value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))} /></div>
             <div className="field"><label>Centro de trabajo</label><input value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))} /></div>
           </div>
+          {form.role === 'encargado' && (
+            <div className="field" style={{ marginBottom:14 }}>
+              <label>Obras / centros asignados (solo verá y gestionará jornadas de estos)</label>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', paddingTop:4 }}>
+                {(db.centrosTrabajo||[]).map(c => (
+                  <div key={c} onClick={() => toggleObra(c)}
+                    style={{ padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer',
+                      background: (form.obrasAsignadas||[]).includes(c) ? 'var(--primary-dim)' : 'var(--bg-600)',
+                      color: (form.obrasAsignadas||[]).includes(c) ? 'var(--primary-light)' : 'var(--text3)',
+                      border: `1px solid ${(form.obrasAsignadas||[]).includes(c) ? 'var(--primary)' : 'var(--border)'}` }}>
+                    {c}
+                  </div>
+                ))}
+                {!(db.centrosTrabajo||[]).length && <div className="empty" style={{ padding:0 }}>Crea primero un centro de trabajo en Obras</div>}
+              </div>
+            </div>
+          )}
           <div className="field-row">
             <div className="field"><label>Color avatar</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', paddingTop:4 }}>
@@ -974,7 +1043,7 @@ function PanelInformes({ db, toast }) {
 }
 
 // ─── PANEL OBRAS ──────────────────────────────────────────────────────────────
-function PanelObras({ db, toast, saveDB }) {
+function PanelObras({ db, toast, saveDB, session }) {
   const [tab, setTab] = useState('obras')
   const [newObra, setNewObra] = useState('')
   const [newCentro, setNewCentro] = useState('')
@@ -983,20 +1052,24 @@ function PanelObras({ db, toast, saveDB }) {
 
   const obras = db.obras || []
   const centros = db.centrosTrabajo || []
+  const who = session?.user?.name || 'Admin'
 
   const addObra = () => {
     const n = newObra.trim()
     if (!n) { toast('Escribe un nombre'); return }
     if (obras.find(o => o.nombre === n)) { toast('Ya existe'); return }
     const obra = { id: gid(), nombre: n, direccion:'', estado:'activa', createdAt: today() }
-    saveDB({ obras: [...obras, obra] })
+    const withAudit = auditLog(db, 'Obra creada', n, who)
+    saveDB({ obras: [...obras, obra], audit: withAudit.audit })
     setNewObra('')
     toast('✅ Obra creada')
   }
 
   const delObra = (id) => {
     if (!window.confirm('¿Eliminar esta obra?')) return
-    saveDB({ obras: obras.filter(o => o.id !== id) })
+    const o = obras.find(x => x.id === id)
+    const withAudit = auditLog(db, 'Obra eliminada', o?.nombre || '', who)
+    saveDB({ obras: obras.filter(o => o.id !== id), audit: withAudit.audit })
     toast('Obra eliminada')
   }
 
@@ -1004,14 +1077,16 @@ function PanelObras({ db, toast, saveDB }) {
     const n = newCentro.trim()
     if (!n) { toast('Escribe un nombre'); return }
     if (centros.includes(n)) { toast('Ya existe'); return }
-    saveDB({ centrosTrabajo: [...centros, n] })
+    const withAudit = auditLog(db, 'Centro de trabajo añadido', n, who)
+    saveDB({ centrosTrabajo: [...centros, n], audit: withAudit.audit })
     setNewCentro('')
     toast('✅ Centro añadido')
   }
 
   const delCentro = (c) => {
     if (!window.confirm(`¿Eliminar "${c}"?`)) return
-    saveDB({ centrosTrabajo: centros.filter(x => x !== c) })
+    const withAudit = auditLog(db, 'Centro de trabajo eliminado', c, who)
+    saveDB({ centrosTrabajo: centros.filter(x => x !== c), audit: withAudit.audit })
     toast('Centro eliminado')
   }
 
@@ -1095,9 +1170,10 @@ function PanelObras({ db, toast, saveDB }) {
 }
 
 // ─── PANEL DOCUMENTOS ─────────────────────────────────────────────────────────
-function PanelDocumentos({ db, toast, saveDB }) {
+function PanelDocumentos({ db, toast, saveDB, session }) {
   const emps = (db.employees||[]).filter(e => !e.baja)
   const docs = db.documentos || []
+  const who = session?.user?.name || 'Admin'
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState('todos')
   const EMPTY = { empId:'', tipo:'nomina', titulo:'', mes:'', url:'' }
@@ -1123,7 +1199,8 @@ function PanelDocumentos({ db, toast, saveDB }) {
     const doc = { ...form, id: gid(), empName: emp?.name || '', createdAt: new Date().toISOString(), firma: null }
     if (fileData) { doc.fileData = fileData; doc.fileName = fileName }
     const noti = { id: gid(), empId: form.empId, action: `Nuevo documento pendiente de firma`, detail: `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo}`, ts: new Date().toISOString(), leido: false }
-    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti] })
+    const withAudit = auditLog(db, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
+    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
     toast('✅ Documento enviado al empleado')
     setShowForm(false)
     setForm(EMPTY)
@@ -1139,13 +1216,16 @@ function PanelDocumentos({ db, toast, saveDB }) {
     if (already) { toast('Ya existe jornada para ese mes'); return }
     const doc = { id: gid(), empId, empName: emp.name, tipo:'jornada', titulo:`Jornada mensual ${mes}`, mes, url:'', createdAt: new Date().toISOString(), firma: null }
     const noti = { id: gid(), empId, action: 'Jornada mensual pendiente de firma', detail: `Necesitas firmar la jornada del mes ${mes}`, ts: new Date().toISOString(), leido: false }
-    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti] })
+    const withAudit = auditLog(db, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
+    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
     toast('✅ Jornada enviada para firma')
   }
 
   const del = (id) => {
     if (!window.confirm('¿Eliminar este documento?')) return
-    saveDB({ documentos: docs.filter(d => d.id !== id) })
+    const doc = docs.find(d => d.id === id)
+    const withAudit = auditLog(db, 'Documento eliminado', doc?.titulo || '', who)
+    saveDB({ documentos: docs.filter(d => d.id !== id), audit: withAudit.audit })
     toast('Documento eliminado')
   }
 
@@ -1299,6 +1379,127 @@ function PanelDocumentos({ db, toast, saveDB }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─── PANEL MI OBRA (encargado) ─────────────────────────────────────────────────
+function PanelMiObra({ db, toast, saveDB, session }) {
+  const enc = session.user
+  const misCentros = enc?.obrasAsignadas || []
+  const emps = (db.employees || []).filter(e => !e.baja && misCentros.includes(e.centroTrabajo))
+  const recs = db.records || []
+  const liveRecs = recs.filter(r => !r.fin && misCentros.includes(r.centro))
+  const pendRecs = recs.filter(r => r.fin && misCentros.includes(r.centro) && !r.aceptada)
+    .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
+  const [editing, setEditing] = useState(null)
+
+  const aceptar = (rec) => {
+    const updated = recs.map(r => r.id === rec.id ? { ...r, aceptada: true, aceptadaPor: enc.name, aceptadaAt: new Date().toISOString() } : r)
+    const withAudit = auditLog(db, 'Jornada aceptada', `${rec.empName} · ${fds(rec.inicio)}`, enc.name)
+    saveDB({ records: updated, audit: withAudit.audit })
+    toast('✅ Jornada aceptada')
+  }
+
+  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio.slice(0,16), fin: rec.fin ? rec.fin.slice(0,16) : '' })
+
+  const saveEdit = () => {
+    const rec = recs.find(r => r.id === editing.id)
+    const updated = recs.map(r => {
+      if (r.id !== editing.id) return r
+      const closed = { ...r, inicio: new Date(editing.inicio).toISOString(), fin: editing.fin ? new Date(editing.fin).toISOString() : r.fin }
+      const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+      return closed
+    })
+    const withAudit = auditLog(db, 'Jornada modificada', `${rec?.empName || ''} · ${fds(editing.inicio)}`, enc.name)
+    saveDB({ records: updated, audit: withAudit.audit })
+    toast('✅ Jornada modificada')
+    setEditing(null)
+  }
+
+  if (!misCentros.length) {
+    return (
+      <div className="adm-panel">
+        <div className="adm-panel-header"><h1 className="adm-panel-title">Mi obra</h1></div>
+        <div className="empty">No tienes ninguna obra/centro de trabajo asignado. Pide al administrador que te asigne uno en Empleados.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="adm-panel">
+      <div className="adm-panel-header">
+        <h1 className="adm-panel-title">Mi obra</h1>
+        <div className="adm-panel-sub">{misCentros.join(', ')}</div>
+      </div>
+
+      <div className="adm-section-title" style={{ padding:'0 0 12px' }}>En jornada ahora ({liveRecs.length})</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:14, marginBottom:24 }}>
+        {emps.map(e => {
+          const live = liveRecs.find(r => r.empId === e.id)
+          const t = live ? calcSecs(live) : null
+          const isWorking = live && !live.enDescanso
+          const isBreak = live && live.enDescanso
+          return (
+            <div key={e.id} style={{ background:'var(--bg-700)', border:`1px solid ${isWorking?'rgba(54,178,126,.35)':isBreak?'rgba(255,145,57,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                <div style={{ width:38, height:38, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                  {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>{live?.centro || e.centroTrabajo || '—'}</div>
+                </div>
+              </div>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:22, fontWeight:800, color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                  {t ? mhm(Math.floor(t.work/60)) : '—'}
+                </div>
+                <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
+              </div>
+            </div>
+          )
+        })}
+        {!emps.length && <div className="empty">Sin empleados asignados a tu obra</div>}
+      </div>
+
+      <div className="adm-section-title" style={{ padding:'0 0 12px' }}>Jornadas pendientes de aceptar ({pendRecs.length})</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {pendRecs.map(r => (
+          <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-600)', borderRadius:'var(--r)', border:'1px solid var(--border)', flexWrap:'wrap' }}>
+            <div style={{ flex:1, minWidth:160 }}>
+              <div style={{ fontSize:13, fontWeight:700 }}>{r.empName}</div>
+              <div style={{ fontSize:12, color:'var(--text3)' }}>{fds(r.inicio)} · {ftime(r.inicio)} → {ftime(r.fin)} · {mhm(Math.floor(recWorkSecs(r)/60))}</div>
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button className="btn btn-sm btn-secondary" onClick={() => startEdit(r)}>Modificar</button>
+              <button className="btn btn-sm btn-primary" onClick={() => aceptar(r)}>✓ Aceptar</button>
+            </div>
+          </div>
+        ))}
+        {!pendRecs.length && <div className="empty">Sin jornadas pendientes</div>}
+      </div>
+
+      {editing && (
+        <div className="modal-ov" onClick={() => setEditing(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380 }}>
+            <div className="modal-drag" />
+            <h2 style={{ margin:'0 0 16px', fontSize:16 }}>Modificar jornada</h2>
+            <div className="field" style={{ marginBottom:12 }}>
+              <label>Entrada</label>
+              <input type="datetime-local" value={editing.inicio} onChange={e => setEditing(s => ({ ...s, inicio:e.target.value }))} />
+            </div>
+            <div className="field" style={{ marginBottom:16 }}>
+              <label>Salida</label>
+              <input type="datetime-local" value={editing.fin} onChange={e => setEditing(s => ({ ...s, fin:e.target.value }))} />
+            </div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={() => setEditing(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={saveEdit}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

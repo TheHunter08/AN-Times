@@ -42,6 +42,8 @@ export function mergeDB(base, incoming) {
     cierres:         incoming.cierres       || [],
     monthSnapshots:  incoming.monthSnapshots|| {},
     firmas:          incoming.firmas        || {},
+    documentos:      incoming.documentos    || [],
+    audit:           incoming.audit         || [],
     _ts:             incoming._ts           || 0
   }
 }
@@ -134,20 +136,14 @@ export function sendPushNotif(userId, title, body, tag = 'times') {
   }).catch(() => {})
 }
 
-export function auditLog(action, detail, empId, db) {
+export function auditLog(db, action, detail, user) {
   try {
     const entry = {
       id: Date.now().toString(36),
-      action, detail, empId,
+      action, detail,
       ts: new Date().toISOString(),
-      user: empId || 'system'
+      user: user || 'system'
     }
-    const notis = [...(db.notis || []), entry]
-    fetch(FB_BASE + '/auditLog.json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
-    }).catch(() => {})
-    return { ...db, notis }
+    return { ...db, audit: [...(db.audit || []), entry] }
   } catch { return db }
 }

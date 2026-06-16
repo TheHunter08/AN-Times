@@ -655,11 +655,12 @@ button:active { transform: scale(.96); opacity: .88; }
   border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 12px 10px;
   box-shadow: 0 4px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.07);
   transition: transform .2s, box-shadow .2s;
+  min-width: 0; overflow: hidden;
 }
 .stat-card-premium:active { transform: scale(.97); }
 .stat-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
-.stat-lbl { font-size: 9px; color: var(--text4); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; margin-bottom: 3px; }
-.stat-val { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+.stat-lbl { font-size: 9px; color: var(--text4); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-val { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* GPS card */
 .gps-card { background: var(--bg-600); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
@@ -770,7 +771,7 @@ button:active { transform: scale(.96); opacity: .88; }
 
 /* Jornada tab stats */
 .jor-stats-row  { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; padding: 16px; }
-.jor-stat-card  { background: var(--bg-600); border: 1px solid var(--border); border-radius: 14px; padding: 14px 10px; text-align: center; }
+.jor-stat-card  { background: var(--bg-600); border: 1px solid var(--border); border-radius: 14px; padding: 14px 10px; text-align: center; min-width: 0; overflow: hidden; }
 .jor-stat-card.primary { background: linear-gradient(135deg,rgba(94,106,210,.14),rgba(12,200,232,.07)); border-color: rgba(94,106,210,.28); }
 .jor-stat-card.orange  { background: linear-gradient(135deg,rgba(232,149,58,.12),rgba(229,83,75,.06)); border-color: rgba(232,149,58,.22); }
 .jor-stat-ico  { font-size: 18px; margin-bottom: 6px; }
@@ -878,7 +879,7 @@ button:active { transform: scale(.96); opacity: .88; }
 /* Stats grid */
 .adm-stats-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px; }
 @media(min-width:600px) { .adm-stats-grid { grid-template-columns:repeat(4,1fr); } }
-.adm-stat-card { background:var(--bg-600); border:1px solid var(--border2); border-radius:var(--r); padding:16px; transition:border-color .15s,transform .15s,box-shadow .15s; }
+.adm-stat-card { background:var(--bg-600); border:1px solid var(--border2); border-radius:var(--r); padding:16px; transition:border-color .15s,transform .15s,box-shadow .15s; min-width:0; overflow:hidden; }
 .adm-stat-card:hover { border-color:var(--border3); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.35); }
 
 /* Mobile nav */

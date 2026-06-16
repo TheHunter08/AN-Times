@@ -21,7 +21,7 @@ export const useAppStore = create((set, get) => ({
   saveDB: (partial) => {
     const newDB = { ...get().db, ...(partial || {}), _ts: Date.now() }
     saveLocal(newDB)
-    set({ db: newDB })
+    set({ db: newDB, syncStatus: 'syncing' })
     cloudPush(newDB, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
     return newDB
   },
@@ -29,13 +29,14 @@ export const useAppStore = create((set, get) => ({
   fetchDB: async () => {
     const { db } = get()
     const data = await cloudFetch()
-    if (!data) return
+    if (!data) { set({ syncStatus: 'error' }); return }
     const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
     if (shouldMerge) {
       const merged = mergeDB(INITIAL_DB, data)
       saveLocal(merged)
-      set({ db: merged, syncStatus: 'synced' })
+      set({ db: merged })
     }
+    set({ syncStatus: 'synced' })
   },
 
   // ── Session ─────────────────────────────────────────────────────────

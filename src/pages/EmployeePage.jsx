@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, VAPID_PUB } from '../config/constants.js'
-import { pushSubscribe } from '../services/dataService.js'
+import { pushSubscribe, auditLog } from '../services/dataService.js'
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
@@ -1031,7 +1031,8 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
       ...d, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
     } : d)
     const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
-    saveDB({ documentos: updated, notis: [...(db.notis || []), noti] })
+    const withAudit = auditLog(db, 'Documento firmado', `${u.name}: "${doc.titulo}"`, u.name)
+    saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
     toast('✅ Documento firmado correctamente')
     setSigning(null)
   }
