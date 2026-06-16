@@ -271,9 +271,12 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
   flex-direction: column;
   background: var(--bg-800);
   overflow: hidden;
-  /* iOS 26 dvh fix */
+  /* iOS 26 dvh fix — usa la altura real de visualViewport (teclado, barra
+     dinámica de Safari) cuando está disponible, con 100dvh como respaldo */
   height: 100dvh;
   max-height: 100dvh;
+  height: var(--vv-height, 100dvh);
+  max-height: var(--vv-height, 100dvh);
 }
 .screen.active { display: flex; }
 .screen { will-change: transform; }
@@ -454,7 +457,7 @@ button:active { transform: scale(.96); opacity: .88; }
 .emp-top-left  { display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1; }
 .emp-top-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .emp-greeting  { font-size: 15px; font-weight: 700; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.emp-subdate   { font-size: 10px; color: var(--text3); margin-top: 1px; font-weight: 400; white-space: nowrap; }
+.emp-subdate   { font-size: 10px; color: var(--text3); margin-top: 1px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Avatar */
 .emp-avatar { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }

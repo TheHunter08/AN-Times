@@ -3,7 +3,8 @@ import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, VAPID_PUB } from '../config/constants.js'
-import { pushSubscribe, auditLog } from '../services/dataService.js'
+import { pushSubscribe, auditLog, sendPushNotif } from '../services/dataService.js'
+import { DocPreview } from '../components/DocPreview.jsx'
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
@@ -26,11 +27,11 @@ export default function EmployeePage() {
     return () => clearInterval(iv)
   }, [])
 
-  // Push subscription on mount
+  // Push subscription on mount — pide permiso si aún no se ha decidido
   useEffect(() => {
     if (!u) return
     setTimeout(async () => {
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ('Notification' in window && Notification.permission !== 'denied') {
         await pushSubscribe('emp:' + u.id, VAPID_PUB)
       }
     }, 3000)
@@ -120,7 +121,7 @@ export default function EmployeePage() {
       <div className="emp-topbar">
         <div className="emp-top-left">
           <div className="emp-avatar" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
-          <div style={{ minWidth:0 }}>
+          <div style={{ minWidth:0, overflow:'hidden' }}>
             <div className="emp-greeting">👋 {u.name.split(' ')[0]}</div>
             <div className="emp-subdate">{clockDate} · <span style={{color:'var(--primary-light)',fontWeight:600}}>{clockTime}</span></div>
           </div>
@@ -733,7 +734,9 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     const d = new Date(s)
     while (d <= e) { const dow = d.getDay(); if (dow !== 0 && dow !== 6) days++; d.setDate(d.getDate()+1) }
     const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: new Date().toISOString() }
-    saveDB({ vacaciones: [...(db.vacaciones||[]), vac] })
+    const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
+    saveDB({ vacaciones: [...(db.vacaciones||[]), vac], notis: [...(db.notis||[]), noti] })
+    sendPushNotif('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
     toast('✅ Solicitud enviada')
     onClose()
     setFi(''); setFf(''); setMotivo('')
@@ -1014,6 +1017,7 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
 
 function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null) // doc being signed
+  const [viewing, setViewing] = useState(null) // doc being previewed (read-only)
   if (!visible) return null
 
   const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
@@ -1033,6 +1037,7 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
     const withAudit = auditLog(db, 'Documento firmado', `${u.name}: "${doc.titulo}"`, u.name)
     saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
+    sendPushNotif('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
     toast('✅ Documento firmado correctamente')
     setSigning(null)
   }
@@ -1051,12 +1056,10 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
         </div>
       </div>
       <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-        {(d.fileData || d.url) && (
-          <a href={d.fileData || d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:3 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Ver
-          </a>
-        )}
+        <button className="btn btn-sm btn-secondary" onClick={() => setViewing(d)}>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:3 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Ver
+        </button>
         {!d.firma && <button className="btn btn-sm btn-primary" onClick={() => setSigning(d)}>Firmar</button>}
         {d.firma && d.firma.signatureData && <img src={d.firma.signatureData} alt="firma" style={{ height:28, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-500)' }} />}
       </div>
@@ -1064,20 +1067,33 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   )
 
   return (
-    <div className="modal-ov" onClick={signing ? undefined : onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
+    <div className="modal-ov" onClick={(signing || viewing) ? undefined : onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
         <div className="modal-drag" />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ margin:0, fontSize:18 }}>Mis documentos</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+          <h2 style={{ margin:0, fontSize:18 }}>{viewing ? viewing.titulo : signing ? `Confirmar firma` : 'Mis documentos'}</h2>
+          <button onClick={() => { setViewing(null); setSigning(null); onClose() }} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
         </div>
+
+        {/* Read-only viewer */}
+        {viewing && !signing && (
+          <div style={{ marginBottom:16 }}>
+            <DocPreview d={viewing} db={db} empId={u.id} />
+            <div className="modal-btns" style={{ marginTop:12 }}>
+              <button className="btn btn-secondary" onClick={() => setViewing(null)}>Cerrar</button>
+              {!viewing.firma && <button className="btn btn-primary" onClick={() => { setSigning(viewing); setViewing(null) }}>Firmar</button>}
+            </div>
+          </div>
+        )}
 
         {/* Confirm signing */}
         {signing && (
           <div style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:16, marginBottom:16 }}>
-            <div style={{ fontSize:13, fontWeight:700, marginBottom:8 }}>Confirmar firma: {signing.titulo}</div>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:8 }}>{signing.titulo}</div>
+            <div style={{ marginBottom:12 }}><DocPreview d={signing} db={db} empId={u.id} /></div>
             {myFirma ? (
               <>
+                <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6 }}>Tu firma guardada:</div>
                 <img src={myFirma.data} alt="tu firma" style={{ width:'100%', height:80, objectFit:'contain', background:'#0D1218', borderRadius:8, border:'1px solid var(--border)', marginBottom:12 }} />
                 <div style={{ fontSize:11, color:'var(--text3)', marginBottom:12 }}>Al confirmar, esta firma se aplicará al documento de forma permanente.</div>
                 <div style={{ display:'flex', gap:8 }}>
@@ -1094,33 +1110,37 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
           </div>
         )}
 
-        {/* Pending */}
-        {pendientes.length > 0 && (
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--orange)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--orange)' }} />
-              Pendientes de firma ({pendientes.length})
-            </div>
-            {pendientes.map(d => <DocCard key={d.id} d={d} />)}
-          </div>
-        )}
+        {!signing && !viewing && (
+          <>
+            {/* Pending */}
+            {pendientes.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--orange)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--orange)' }} />
+                  Pendientes de firma ({pendientes.length})
+                </div>
+                {pendientes.map(d => <DocCard key={d.id} d={d} />)}
+              </div>
+            )}
 
-        {/* Signed */}
-        {firmados.length > 0 && (
-          <div>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--green)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--green)' }} />
-              Firmados ({firmados.length})
-            </div>
-            {firmados.map(d => <DocCard key={d.id} d={d} />)}
-          </div>
-        )}
+            {/* Signed */}
+            {firmados.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--green)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--green)' }} />
+                  Firmados ({firmados.length})
+                </div>
+                {firmados.map(d => <DocCard key={d.id} d={d} />)}
+              </div>
+            )}
 
-        {!myDocs.length && (
-          <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)' }}>
-            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ margin:'0 auto 12px', display:'block', opacity:.3 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Sin documentos pendientes
-          </div>
+            {!myDocs.length && (
+              <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)' }}>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ margin:'0 auto 12px', display:'block', opacity:.3 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Sin documentos pendientes
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

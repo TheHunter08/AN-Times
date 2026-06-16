@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content" />
   <meta name="color-scheme" content="dark" />
   <meta name="format-detection" content="telephone=no,date=no,email=no,address=no" />
   <meta name="apple-touch-fullscreen" content="yes" />
@@ -34,14 +34,20 @@
     <svg width="52" height="52" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="lg" x1="0" y1="0" x2="44" y2="44">
-          <stop offset="0%" stop-color="#c026d3"/>
-          <stop offset="40%" stop-color="#7c3aed"/>
-          <stop offset="100%" stop-color="#06b6d4"/>
+          <stop offset="0%" stop-color="#7C5CFF"/>
+          <stop offset="55%" stop-color="#5E6AD2"/>
+          <stop offset="100%" stop-color="#3B4BD6"/>
+        </linearGradient>
+        <linearGradient id="lgAcc" x1="0" y1="0" x2="44" y2="44">
+          <stop offset="0%" stop-color="#7DF9FF"/>
+          <stop offset="100%" stop-color="#00D2FF"/>
         </linearGradient>
       </defs>
       <rect width="44" height="44" rx="10" fill="url(#lg)"/>
-      <rect x="10" y="10" width="24" height="7" rx="2.5" fill="white"/>
-      <rect x="18.5" y="10" width="7" height="28" rx="2.5" fill="white"/>
+      <rect x="11.5" y="14.5" width="21" height="4.4" rx="2.2" fill="white"/>
+      <rect x="19.8" y="14.5" width="4.4" height="15.5" rx="2.2" fill="white"/>
+      <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#lgAcc)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="30" cy="19.8" r="1.1" fill="url(#lgAcc)"/>
     </svg>
     <div style="font-family:system-ui,sans-serif;font-size:13px;color:#6A7F96;letter-spacing:.05em">TIMES INC</div>
   </div>

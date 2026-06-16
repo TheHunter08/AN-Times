@@ -1,9 +1,68 @@
-import { DB_URL, FB_BASE, INITIAL_DB, ADMIN_PIN } from '../config/constants.js'
+import { DB_URL, FB_BASE, INITIAL_DB, ADMIN_PIN, FB_CONFIG } from '../config/constants.js'
 
 let _pushFlight = false
 let _saveRetry = 0
 let _saveTimer = null
 let _pollInterval = null
+let _authPromise = null
+
+// ─── Auth anónima de Firebase (REST) ───────────────────────────────────────
+// Las reglas de la Realtime Database exigen un usuario autenticado para leer/
+// escribir. Usamos auth anónima (invisible para el usuario, que sigue
+// entrando con su PIN) para que la base de datos no quede abierta a internet.
+function readCachedAuth() {
+  try { return JSON.parse(localStorage.getItem('an_times_auth') || 'null') } catch { return null }
+}
+function writeCachedAuth(a) {
+  try { localStorage.setItem('an_times_auth', JSON.stringify(a)) } catch {}
+}
+
+async function signInAnon() {
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ returnSecureToken: true })
+  })
+  if (!r.ok) throw new Error('auth signup failed')
+  const d = await r.json()
+  const auth = { idToken: d.idToken, refreshToken: d.refreshToken, expiresAt: Date.now() + Number(d.expiresIn || 3600) * 1000 }
+  writeCachedAuth(auth)
+  return auth
+}
+
+async function refreshAnon(refreshToken) {
+  const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB_CONFIG.apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
+  })
+  if (!r.ok) throw new Error('auth refresh failed')
+  const d = await r.json()
+  const auth = { idToken: d.id_token, refreshToken: d.refresh_token, expiresAt: Date.now() + Number(d.expires_in || 3600) * 1000 }
+  writeCachedAuth(auth)
+  return auth
+}
+
+export async function getAuthToken() {
+  if (_authPromise) return _authPromise
+  _authPromise = (async () => {
+    try {
+      const cached = readCachedAuth()
+      if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.idToken
+      if (cached?.refreshToken) {
+        try { return (await refreshAnon(cached.refreshToken)).idToken } catch {}
+      }
+      return (await signInAnon()).idToken
+    } finally {
+      _authPromise = null
+    }
+  })()
+  return _authPromise
+}
+
+function withAuth(url, token) {
+  return token ? `${url}${url.includes('?') ? '&' : '?'}auth=${token}` : url
+}
 
 export function loadLocal() {
   try {
@@ -50,7 +109,8 @@ export function mergeDB(base, incoming) {
 
 export async function cloudFetch() {
   try {
-    const r = await fetch(DB_URL + '.json', { cache: 'no-store' })
+    const token = await getAuthToken()
+    const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
     if (!r.ok) return null
     return await r.json()
   } catch {
@@ -58,30 +118,30 @@ export async function cloudFetch() {
   }
 }
 
-export function cloudPush(db, onSuccess, onError) {
+export async function cloudPush(db, onSuccess, onError) {
   if (_pushFlight) return
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
-  fetch(DB_URL + '.json', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-    .then(r => {
-      _pushFlight = false
-      if (!r.ok) throw new Error('HTTP ' + r.status)
-      _saveRetry = 0
-      onSuccess?.(payload)
+  try {
+    const token = await getAuthToken()
+    const r = await fetch(withAuth(DB_URL + '.json', token), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     })
-    .catch(() => {
-      _pushFlight = false
-      onError?.()
-      if (_saveRetry < 5) {
-        _saveRetry++
-        setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
-      }
-    })
+    _pushFlight = false
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    _saveRetry = 0
+    onSuccess?.(payload)
+  } catch {
+    _pushFlight = false
+    onError?.()
+    if (_saveRetry < 5) {
+      _saveRetry++
+      setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
+    }
+  }
 }
 
 export function scheduleSave(db, onSuccess, onError, delay = 0) {
@@ -128,11 +188,11 @@ export async function pushSubscribe(userId, vapidPub) {
   } catch(e) { console.warn('[PUSH]', e) }
 }
 
-export function sendPushNotif(userId, title, body, tag = 'times') {
+export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
   fetch('/api/sendpush', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, title, body, tag })
+    body: JSON.stringify({ userId, title, body, tag, url })
   }).catch(() => {})
 }
 

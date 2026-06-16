@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "an_times_data": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "auditLog": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "pushSubs": {
+      ".read": true,
+      ".write": true
+    },
+    "pushQueue": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

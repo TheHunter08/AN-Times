@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, title, body, tag } = req.body || {};
+  const { userId, title, body, tag, url } = req.body || {};
   if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' });
 
   try {
@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
 
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: sub.keys },
-      JSON.stringify({ title, body: body || '', tag: tag || 'times' })
+      JSON.stringify({ title, body: body || '', tag: tag || 'times', url: url || '/' })
     );
 
     return res.status(200).json({ ok: true });

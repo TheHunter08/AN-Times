@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK, ADMIN_PIN } from '../config/constants.js'
-import { auditLog } from '../services/dataService.js'
+import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
+import { auditLog, pushSubscribe, sendPushNotif } from '../services/dataService.js'
+import { DocPreview } from '../components/DocPreview.jsx'
+import * as XLSX from 'xlsx'
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -53,6 +55,16 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isEncargado && !pages.find(p => p.id === currentAdminPage)) setAdminPage('miobra')
+  }, [isEncargado])
+
+  useEffect(() => {
+    if (!isEncargado) {
+      setTimeout(async () => {
+        if ('Notification' in window && Notification.permission !== 'denied') {
+          await pushSubscribe('__admin__', VAPID_PUB)
+        }
+      }, 3000)
+    }
   }, [isEncargado])
 
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
@@ -566,7 +578,9 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     const v = (db.vacaciones||[]).find(x => x.id === id)
     const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString() } : v)
     const withAudit = auditLog(db, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
-    saveDB({ vacaciones: updated, audit: withAudit.audit })
+    const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
+    saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
+    if (v?.empId) sendPushNotif('emp:' + v.empId, noti.action, noti.detail, 'times-vac', '/?go=emp:vacaciones')
     toast(estado === 'aprobada' ? '✅ Solicitud aprobada' : '❌ Solicitud rechazada')
   }
 
@@ -775,32 +789,35 @@ function PanelInformes({ db, toast }) {
     return { e, totalMin, diff, days: eRecs.length, vac }
   })
 
-  const exportCSV = () => {
+  const downloadXLSX = (sheetName, aoa, filename) => {
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    XLSX.writeFile(wb, filename)
+  }
+
+  const exportFichajesXLSX = () => {
     let filtered = recs.filter(r => r.fin)
     if (selEmp) filtered = filtered.filter(r => r.empId === selEmp)
     if (from) filtered = filtered.filter(r => r.inicio.slice(0,10) >= from)
     if (to)   filtered = filtered.filter(r => r.inicio.slice(0,10) <= to)
     if (!filtered.length) { toast('Sin datos para exportar'); return }
     const headers = ['Empleado','Centro','Empresa','Entrada','Salida','Horas trabajo','Horas descanso']
-    const csvRows = filtered.map(r => {
+    const rows = filtered.map(r => {
       const wm = Math.floor(recWorkSecs(r)/60), bm = Math.floor((r.breakSecs||0)/60)
       return [r.empName, r.centro||'', r.empresa||'', new Date(r.inicio).toLocaleString('es-ES'), new Date(r.fin).toLocaleString('es-ES'), `${Math.floor(wm/60)}:${p2(wm%60)}`, `${Math.floor(bm/60)}:${p2(bm%60)}`]
     })
-    const csv = '﻿' + [headers, ...csvRows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }))
-    a.download = `fichajes_${from||'todo'}_${to||'hoy'}.csv`
-    a.click()
-    toast('✅ CSV descargado')
+    downloadXLSX('Fichajes', [headers, ...rows], `fichajes_${from||'todo'}_${to||'hoy'}.xlsx`)
+    toast('✅ Excel descargado')
   }
 
   const [y, mo] = filterMonth.split('-').map(Number)
   const daysInMonth = new Date(y, mo, 0).getDate()
 
-  const exportDetalleCSV = () => {
+  const exportDetalleXLSX = () => {
     const empRows = sortedEmps(db).filter(e => !e.baja)
     const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>String(i+1)), 'Total']
-    const csvRows = empRows.map(e => {
+    const rows = empRows.map(e => {
       const dayMap = {}
       recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => {
         const day = parseInt(r.inicio.slice(8,10))
@@ -809,9 +826,17 @@ function PanelInformes({ db, toast }) {
       const total = Object.values(dayMap).reduce((s,v)=>s+v,0)
       return [e.name, ...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?`${Math.floor(dayMap[i+1]/60)}:${p2(dayMap[i+1]%60)}`:''), mhm(total)]
     })
-    const csv = '﻿' + [header,...csvRows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); a.download=`detalle_${filterMonth}.csv`; a.click()
-    toast('✅ CSV descargado')
+    downloadXLSX('Detalle diario', [header, ...rows], `detalle_${filterMonth}.xlsx`)
+    toast('✅ Excel descargado')
+  }
+
+  const exportResumenXLSX = () => {
+    const header = ['Empleado','Días','Total mes','Esperadas','Diferencia','Vac. disp.']
+    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac }) => [
+      e.name, days, mhm(totalMin), mhm(WK*4), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available
+    ])
+    downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
+    toast('✅ Excel descargado')
   }
 
   const TABS = [
@@ -850,6 +875,13 @@ function PanelInformes({ db, toast }) {
 
       {/* Resumen tab */}
       {tab === 'resumen' && (
+        <div>
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}>
+            <button className="btn btn-secondary btn-sm" onClick={exportResumenXLSX}>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar Excel
+            </button>
+          </div>
         <div className="adm-table-wrap">
           <table className="adm-table">
             <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Esperadas</th><th>Diferencia</th><th>Vac. disp.</th></tr></thead>
@@ -876,15 +908,16 @@ function PanelInformes({ db, toast }) {
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {/* Detalle diario tab */}
       {tab === 'detalle' && (
         <div>
           <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}>
-            <button className="btn btn-secondary btn-sm" onClick={exportDetalleCSV}>
+            <button className="btn btn-secondary btn-sm" onClick={exportDetalleXLSX}>
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Exportar CSV
+              Exportar Excel
             </button>
           </div>
           <div style={{ overflowX:'auto' }}>
@@ -1031,9 +1064,9 @@ function PanelInformes({ db, toast }) {
               <div className="field"><label>Desde</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
               <div className="field"><label>Hasta</label><input type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
             </div>
-            <button className="btn btn-primary" style={{ width:'100%' }} onClick={exportCSV}>
+            <button className="btn btn-primary" style={{ width:'100%' }} onClick={exportFichajesXLSX}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Descargar CSV
+              Descargar Excel
             </button>
           </div>
         </div>
@@ -1176,6 +1209,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
   const who = session?.user?.name || 'Admin'
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState('todos')
+  const [viewing, setViewing] = useState(null)
   const EMPTY = { empId:'', tipo:'nomina', titulo:'', mes:'', url:'' }
   const [form, setForm] = useState(EMPTY)
   const [fileData, setFileData] = useState('')
@@ -1201,6 +1235,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const noti = { id: gid(), empId: form.empId, action: `Nuevo documento pendiente de firma`, detail: `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo}`, ts: new Date().toISOString(), leido: false }
     const withAudit = auditLog(db, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
+    sendPushNotif('emp:' + form.empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('✅ Documento enviado al empleado')
     setShowForm(false)
     setForm(EMPTY)
@@ -1218,6 +1253,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const noti = { id: gid(), empId, action: 'Jornada mensual pendiente de firma', detail: `Necesitas firmar la jornada del mes ${mes}`, ts: new Date().toISOString(), leido: false }
     const withAudit = auditLog(db, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
+    sendPushNotif('emp:' + empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('✅ Jornada enviada para firma')
   }
 
@@ -1357,12 +1393,10 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                {(d.fileData || d.url) && (
-                  <a href={d.fileData || d.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-secondary" style={{ textDecoration:'none' }}>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Ver
-                  </a>
-                )}
+                <button className="btn btn-sm btn-secondary" onClick={() => setViewing(d)}>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Ver
+                </button>
                 {d.firma ? (
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                     {d.firma.signatureData && (
@@ -1379,6 +1413,19 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
           )
         })}
       </div>
+
+      {viewing && (
+        <div className="modal-ov" onClick={() => setViewing(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
+            <div className="modal-drag" />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <h2 style={{ margin:0, fontSize:16 }}>{viewing.titulo}</h2>
+              <button onClick={() => setViewing(null)} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+            </div>
+            <DocPreview d={viewing} db={db} empId={viewing.empId} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
