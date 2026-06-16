@@ -42,6 +42,7 @@ export function mergeDB(base, incoming) {
     cierres:         incoming.cierres       || [],
     monthSnapshots:  incoming.monthSnapshots|| {},
     firmas:          incoming.firmas        || {},
+    documentos:      incoming.documentos    || [],
     _ts:             incoming._ts           || 0
   }
 }

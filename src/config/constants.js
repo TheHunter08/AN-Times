@@ -36,5 +36,6 @@ export const INITIAL_DB = {
   cierres: [],
   monthSnapshots: {},
   firmas: {},
+  documentos: [],
   _ts: 0
 }

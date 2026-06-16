@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN } from '../config/constants.js'
 
-const PAGES = [
+const PAGES_FULL = [
   { id:'dashboard',   label:'Dashboard' },
   { id:'control',     label:'Control Live' },
   { id:'fichajes',    label:'Fichajes' },
@@ -14,6 +14,10 @@ const PAGES = [
   { id:'documentos',  label:'Documentos' },
   { id:'auditoria',   label:'Auditoría' },
 ]
+
+// Un encargado no es administrador: solo puede firmar/cerrar las horas de
+// su(s) obra(s) asignada(s) y ver a los empleados de esas obras.
+const ENCARGADO_PAGE_IDS = ['control', 'fichajes', 'empleados', 'documentos']
 
 const NAV_ICONS = {
   dashboard:   <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
@@ -40,7 +44,15 @@ export default function AdminPage() {
   const [sideOpen, setSideOpen] = useState(false)
   const isMobile = window.innerWidth < 768
 
-  const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
+  const isEncargado = !!session.isEnc && !session.isAdmin
+  const myObras = session.user?.obrasAsignadas || []
+  const PAGES = isEncargado ? PAGES_FULL.filter(p => ENCARGADO_PAGE_IDS.includes(p.id)) : PAGES_FULL
+
+  useEffect(() => {
+    if (isEncargado && !ENCARGADO_PAGE_IDS.includes(currentAdminPage)) setAdminPage('control')
+  }, [isEncargado, currentAdminPage])
+
+  const pendingDocs = (db.documentos || []).filter(d => !d.firma && (!isEncargado || myObras.includes((db.employees||[]).find(e=>e.id===d.empId)?.centroTrabajo))).length
   const adminNotis = (db.notis || []).filter(n => n.empId === '__admin__' && !n.leido)
 
   const doLogout = () => { logout(); try { if (window._fbSignOut) window._fbSignOut() } catch {} }
@@ -109,15 +121,15 @@ export default function AdminPage() {
 
         {/* Main content */}
         <div className="adm-main">
-          {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} />}
-          {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} />}
-          {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} />}
-          {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} />}
-          {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
+          {!isEncargado && currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} />}
+          {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
+          {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
+          {!isEncargado && currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} />}
+          {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
+          {!isEncargado && currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} />}
+          {!isEncargado && currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} />}
+          {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
+          {!isEncargado && currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
         </div>
       </div>
 
@@ -129,10 +141,12 @@ export default function AdminPage() {
             <span>{p.label.slice(0,8)}</span>
           </div>
         ))}
-        <div className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
-          <span>Más</span>
-        </div>
+        {PAGES.length > 5 && (
+          <div className={`adm-mobile-nav-item${PAGES.slice(5).some(p=>p.id===currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            <span>Más</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -335,8 +349,10 @@ function Heatmap({ data }) {
 }
 
 // ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
-function PanelControl({ db, toast, saveDB }) {
-  const emps = (db.employees || []).filter(e => !e.baja)
+function PanelControl({ db, toast, saveDB, session }) {
+  const isEncargado = !!session?.isEnc && !session?.isAdmin
+  const myObras = session?.user?.obrasAsignadas || []
+  const emps = (db.employees || []).filter(e => !e.baja && (!isEncargado || myObras.includes(e.centroTrabajo)))
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
   const [tick, setTick] = useState(0)
@@ -451,12 +467,14 @@ function PanelControl({ db, toast, saveDB }) {
 }
 
 // ─── PANEL FICHAJES ───────────────────────────────────────────────────────────
-function PanelFichajes({ db, toast, saveDB }) {
+function PanelFichajes({ db, toast, saveDB, session }) {
+  const isEncargado = !!session?.isEnc && !session?.isAdmin
+  const myObras = session?.user?.obrasAsignadas || []
   const [search, setSearch] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterEmp, setFilterEmp] = useState('')
-  const emps = db.employees || []
-  const recs = (db.records || []).filter(r => r.fin)
+  const emps = (db.employees || []).filter(e => !isEncargado || myObras.includes(e.centroTrabajo))
+  const recs = (db.records || []).filter(r => r.fin && (!isEncargado || myObras.includes(r.centro)))
 
   const filtered = recs.filter(r => {
     if (filterDate && !r.inicio.startsWith(filterDate)) return false
@@ -490,7 +508,7 @@ function PanelFichajes({ db, toast, saveDB }) {
       </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th><th></th></tr></thead>
+          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th>{!isEncargado && <th></th>}</tr></thead>
           <tbody>
             {filtered.map(r => {
               const wm = Math.floor(recWorkSecs(r)/60)
@@ -504,11 +522,11 @@ function PanelFichajes({ db, toast, saveDB }) {
                   <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{ftime(r.fin)}</td>
                   <td style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{mhm(bm)}</td>
-                  <td><button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button></td>
+                  {!isEncargado && <td><button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button></td>}
                 </tr>
               )
             })}
-            {!filtered.length && <tr><td colSpan={7} className="empty">Sin resultados</td></tr>}
+            {!filtered.length && <tr><td colSpan={isEncargado ? 6 : 7} className="empty">Sin resultados</td></tr>}
           </tbody>
         </table>
       </div>
@@ -571,12 +589,14 @@ function PanelSolicitudes({ db, toast, saveDB }) {
 }
 
 // ─── PANEL EMPLEADOS ──────────────────────────────────────────────────────────
-function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData }) {
-  const emps = sortedEmps(db)
+function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData, session }) {
+  const isEncargado = !!session?.isEnc && !session?.isAdmin
+  const myObras = session?.user?.obrasAsignadas || []
+  const emps = sortedEmps(db).filter(e => !isEncargado || myObras.includes(e.centroTrabajo))
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
-  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', color:'#5E6AD2', baja:false, fechaAlta: today() }
+  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today() }
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }
@@ -606,10 +626,10 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     <div className="adm-panel">
       <div className="adm-panel-header">
         <h1 className="adm-panel-title">Empleados</h1>
-        <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo</button>
+        {!isEncargado && <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo</button>}
       </div>
 
-      {showForm && (
+      {!isEncargado && showForm && (
         <div className="card" style={{ marginBottom:20 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{editEmp ? 'Editar empleado' : 'Nuevo empleado'}</div>
           <div className="field-row">
@@ -630,6 +650,26 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
             <div className="field"><label>Empresa</label><input value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))} /></div>
             <div className="field"><label>Centro de trabajo</label><input value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))} /></div>
           </div>
+          {(form.role==='encargado' || form.role==='jefe_obra') && (
+            <div className="field" style={{ marginBottom:14 }}>
+              <label>Obras asignadas (centros que puede gestionar)</label>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', paddingTop:4 }}>
+                {!(db.centrosTrabajo||[]).length && <div style={{ fontSize:12, color:'var(--text4)' }}>Sin centros de trabajo creados</div>}
+                {(db.centrosTrabajo||[]).map(c => {
+                  const checked = (form.obrasAsignadas||[]).includes(c)
+                  return (
+                    <label key={c} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background: checked?'var(--primary-dim)':'var(--bg-600)', cursor:'pointer', fontSize:12 }}>
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        const cur = form.obrasAsignadas||[]
+                        setForm(f => ({ ...f, obrasAsignadas: checked ? cur.filter(x=>x!==c) : [...cur, c] }))
+                      }} />
+                      {c}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="field-row">
             <div className="field"><label>Color avatar</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', paddingTop:4 }}>
@@ -649,7 +689,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
 
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Empresa</th><th>Alta</th><th></th></tr></thead>
+          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Empresa</th><th>Alta</th>{!isEncargado && <th></th>}</tr></thead>
           <tbody>
             {emps.map(e => (
               <tr key={e.id} style={{ opacity: e.baja ? 0.4 : 1 }}>
@@ -669,12 +709,14 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
                 </td>
                 <td style={{ color:'var(--text3)', fontSize:12 }}>{e.empresa || '—'}</td>
                 <td style={{ color:'var(--text3)', fontSize:12 }}>{e.fechaAlta || '—'}</td>
-                <td>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(e)}>✏️</button>
-                    {!e.baja && <button className="btn btn-sm btn-danger" onClick={() => del(e.id)}>Baja</button>}
-                  </div>
-                </td>
+                {!isEncargado && (
+                  <td>
+                    <div style={{ display:'flex', gap:6 }}>
+                      <button className="btn btn-sm btn-secondary" onClick={() => openEdit(e)}>✏️</button>
+                      {!e.baja && <button className="btn btn-sm btn-danger" onClick={() => del(e.id)}>Baja</button>}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -1095,11 +1137,14 @@ function PanelObras({ db, toast, saveDB }) {
 }
 
 // ─── PANEL DOCUMENTOS ─────────────────────────────────────────────────────────
-function PanelDocumentos({ db, toast, saveDB }) {
-  const emps = (db.employees||[]).filter(e => !e.baja)
-  const docs = db.documentos || []
+function PanelDocumentos({ db, toast, saveDB, session }) {
+  const isEncargado = !!session?.isEnc && !session?.isAdmin
+  const myObras = session?.user?.obrasAsignadas || []
+  const emps = (db.employees||[]).filter(e => !e.baja && (!isEncargado || myObras.includes(e.centroTrabajo)))
+  const empIds = new Set(emps.map(e => e.id))
+  const docs = (db.documentos || []).filter(d => !isEncargado || empIds.has(d.empId))
   const [showForm, setShowForm] = useState(false)
-  const [tab, setTab] = useState('todos')
+  const [tab, setTab] = useState(isEncargado ? 'jornada' : 'todos')
   const EMPTY = { empId:'', tipo:'nomina', titulo:'', mes:'', url:'' }
   const [form, setForm] = useState(EMPTY)
   const [fileData, setFileData] = useState('')
@@ -1149,10 +1194,11 @@ function PanelDocumentos({ db, toast, saveDB }) {
     toast('Documento eliminado')
   }
 
-  const filtered = tab === 'todos' ? docs
-    : tab === 'pendientes' ? docs.filter(d => !d.firma)
-    : tab === 'firmados' ? docs.filter(d => d.firma)
-    : docs.filter(d => d.tipo === tab)
+  const scopedDocs = isEncargado ? docs.filter(d => d.tipo === 'jornada') : docs
+  const filtered = tab === 'todos' ? scopedDocs
+    : tab === 'pendientes' ? scopedDocs.filter(d => !d.firma)
+    : tab === 'firmados' ? scopedDocs.filter(d => d.firma)
+    : scopedDocs.filter(d => d.tipo === tab)
 
   const TIPO_COLORS = { nomina:'var(--primary-light)', contrato:'var(--teal)', jornada:'var(--orange)' }
 
@@ -1161,16 +1207,16 @@ function PanelDocumentos({ db, toast, saveDB }) {
       <div className="adm-panel-header">
         <h1 className="adm-panel-title">Documentos</h1>
         <div style={{ display:'flex', gap:8 }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setTab('todos') }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setTab(isEncargado ? 'jornada' : 'todos') }}>
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="4" x2="7" y2="4"/><line x1="3" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="11" y2="12"/><line x1="7" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/></svg>
             Jornadas mensuales
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(s => !s)}>+ Nuevo documento</button>
+          {!isEncargado && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(s => !s)}>+ Nuevo documento</button>}
         </div>
       </div>
 
       {/* New doc form */}
-      {showForm && (
+      {!isEncargado && showForm && (
         <div style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:20, marginBottom:20 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Enviar documento a empleado</div>
           <div className="field-row">
@@ -1245,7 +1291,10 @@ function PanelDocumentos({ db, toast, saveDB }) {
 
       {/* Filters */}
       <div style={{ display:'flex', gap:6, marginBottom:16 }}>
-        {[['todos','Todos'],['pendientes','Pendientes'],['firmados','Firmados'],['nomina','Nóminas'],['contrato','Contratos'],['jornada','Jornadas']].map(([id,lbl]) => (
+        {(isEncargado
+          ? [['jornada','Jornadas'],['pendientes','Pendientes'],['firmados','Firmados']]
+          : [['todos','Todos'],['pendientes','Pendientes'],['firmados','Firmados'],['nomina','Nóminas'],['contrato','Contratos'],['jornada','Jornadas']]
+        ).map(([id,lbl]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ padding:'5px 12px', borderRadius:20, border:'1px solid', fontSize:11, fontWeight:600, cursor:'pointer',
               background: tab===id ? 'var(--primary)' : 'transparent',
@@ -1293,7 +1342,7 @@ function PanelDocumentos({ db, toast, saveDB }) {
                 ) : (
                   <span className="badge badge-orange">Pendiente</span>
                 )}
-                <button className="btn btn-sm btn-danger" onClick={() => del(d.id)}>✕</button>
+                {!isEncargado && <button className="btn btn-sm btn-danger" onClick={() => del(d.id)}>✕</button>}
               </div>
             </div>
           )
