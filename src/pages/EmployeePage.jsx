@@ -133,16 +133,16 @@ export default function EmployeePage() {
               {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Tema">🌙</button>
-          <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA">
-            <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
+          <button className="theme-toggle-btn" onClick={toggleTheme} title="Tema" aria-label="Cambiar tema claro/oscuro">🌙</button>
+          <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
           </button>
-          <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }}>
-            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ''}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span className={`noti-dot${unread > 0 ? ' show' : ''}`} />
           </button>
-          <button className="icon-btn logout-btn" onClick={doLogout}>
-            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <button className="icon-btn logout-btn" onClick={doLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
@@ -165,10 +165,10 @@ export default function EmployeePage() {
           { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
           { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
         ].map(({ id, label, icon, extra }) => (
-          <div key={id} className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => setEmpTab(id)}>
-            <svg viewBox="0 0 24 24">{icon}{extra}</svg>
+          <button key={id} type="button" className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => setEmpTab(id)} aria-current={currentEmpTab===id} aria-label={label}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">{icon}{extra}</svg>
             {label}
-          </div>
+          </button>
         ))}
       </div>
 
@@ -248,10 +248,10 @@ function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u 
         {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
           {[
-            { lbl:'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '--:--', color:'var(--primary-light)', bg:'rgba(94,106,210,.12)' },
+            { lbl:'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '--:--', color:'var(--primary-light)', bg:'rgba(108,99,255,.12)' },
             { lbl:'Salida',  val: o ? '--:--' : salidaRec ? ftime(salidaRec.fin) : '--:--', color:'var(--green)', bg:'var(--green-dim)' },
             { lbl:'Descanso',val: brkMin > 0 ? `${Math.floor(brkMin/60).toString().padStart(2,'0')}:${p2(brkMin%60)}` : '00:00', color:'var(--orange)', bg:'var(--orange-dim)' },
-            { lbl:'Total',   val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--teal)', bg:'rgba(12,200,232,.1)' },
+            { lbl:'Total',   val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--teal)', bg:'rgba(0,212,255,.1)' },
           ].map(({ lbl, val, color, bg }) => (
             <div key={lbl} className="stat-card-premium" style={{ textAlign:'center' }}>
               <div className="stat-lbl">{lbl}</div>
@@ -321,7 +321,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   return (
     <div className="emp-tab active" style={{ paddingBottom:20 }}>
-      <div style={{ padding:'20px 16px 16px', background:'linear-gradient(160deg,rgba(94,106,210,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
+      <div style={{ padding:'20px 16px 16px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
           <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-.5px' }}>Mi Jornada</div>
           <div style={{ fontSize:10, color:'var(--text3)', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'4px 10px', fontWeight:600, textTransform:'uppercase', letterSpacing:'.4px' }}>
@@ -706,7 +706,7 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
           {!notis.length ? <div className="empty">Sin notificaciones</div> : notis.map(n => (
             <div key={n.id} className="nitem">
-              <div className="nitem-ico" style={{ background:'rgba(94,106,210,.1)' }}>ℹ️</div>
+              <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)' }}>ℹ️</div>
               <div className="nitem-body">
                 <div className="nitem-title">{n.action || n.title || 'Notificación'}</div>
                 <div className="nitem-text">{n.detail || n.body || ''}</div>

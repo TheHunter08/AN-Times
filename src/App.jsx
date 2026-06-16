@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useAppStore } from './store/appStore.js'
-import { useViewport } from './hooks/useViewport.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import EmployeePage from './pages/EmployeePage.jsx'
@@ -29,7 +28,6 @@ function applyDeepLink(url) {
 export default function App() {
   const currentScreen = useAppStore(s => s.currentScreen)
   const fetchDB = useAppStore(s => s.fetchDB)
-  useViewport()
 
   useEffect(() => {
     fetchDB()

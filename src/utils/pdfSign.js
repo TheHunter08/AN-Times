@@ -1,5 +1,3 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-
 function arrayBufferToBase64(buf) {
   let binary = ''
   const bytes = new Uint8Array(buf)
@@ -45,6 +43,7 @@ async function dataUrlToBytes(dataUrl) {
 }
 
 export async function stampSignatureOnPdf(pdfDataUrl, signaturePngDataUrl, label) {
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
   const pdfBytes = await dataUrlToBytes(pdfDataUrl)
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
   const pngBytes = await dataUrlToBytes(signaturePngDataUrl)

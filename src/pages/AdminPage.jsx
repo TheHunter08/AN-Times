@@ -4,7 +4,6 @@ import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, r
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, sendPushNotif } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
-import * as XLSX from 'xlsx'
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -134,18 +133,18 @@ export default function AdminPage() {
           <div className="adm-sidebar-inner">
             <div className="adm-nav-section">MENÚ PRINCIPAL</div>
             {pages.map(p => (
-              <div key={p.id} className={`adm-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => nav(p.id)}>
+              <button key={p.id} type="button" className={`adm-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => nav(p.id)} aria-current={currentAdminPage===p.id}>
                 <span className="adm-nav-ico"><NavIcon id={p.id} /></span>
                 <span style={{ flex:1 }}>{p.label}</span>
                 {p.id==='documentos' && pendingDocs > 0 && (
                   <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingDocs}</span>
                 )}
-              </div>
+              </button>
             ))}
             <div className="adm-nav-divider" />
-            <div className="adm-nav-item" onClick={doLogout} style={{ color:'var(--danger)' }}>
+            <button type="button" className="adm-nav-item" onClick={doLogout} style={{ color:'var(--danger)' }}>
               <span className="adm-nav-ico">🚪</span><span>Cerrar sesión</span>
-            </div>
+            </button>
           </div>
         </div>
         {sideOpen && <div className="adm-sidebar-ov" onClick={() => setSideOpen(false)} />}
@@ -173,16 +172,16 @@ export default function AdminPage() {
       {/* Mobile bottom nav */}
       <div className="adm-mobile-nav">
         {pages.slice(0,5).map(p => (
-          <div key={p.id} className={`adm-mobile-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => setAdminPage(p.id)}>
+          <button key={p.id} type="button" className={`adm-mobile-nav-item${currentAdminPage===p.id?' active':''}`} onClick={() => setAdminPage(p.id)} aria-current={currentAdminPage===p.id}>
             <NavIcon id={p.id} size={20} />
             <span>{p.label.slice(0,8)}</span>
-          </div>
+          </button>
         ))}
         {!isEncargado && (
-          <div className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+          <button type="button" className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)} aria-label="Más opciones">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
             <span>Más</span>
-          </div>
+          </button>
         )}
       </div>
     </div>
@@ -233,7 +232,7 @@ function PanelDashboard({ db }) {
         {[
           { label:'Fichados ahora', val: checkedIn, total: emps.length, color:'var(--green)', bg:'var(--green-dim)', ico:'▶️' },
           { label:'Horas esta semana', val: mhm(weekMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:'⏱️' },
-          { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(12,200,232,.1)', ico:'📅' },
+          { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(0,212,255,.1)', ico:'📅' },
           { label:'Docs. pendientes firma', val: (db.documentos||[]).filter(d=>!d.firma).length, color:'var(--orange)', bg:'var(--orange-dim)', ico:'✍️' },
         ].map(({ label, val, total, color, bg, ico }) => (
           <div key={label} className="adm-stat-card">
@@ -374,8 +373,8 @@ function Heatmap({ data }) {
               return (
                 <div key={date} title={`${date}: ${count} fichajes · ${mhm(Math.floor(min))}`}
                   style={{ width:12, height:12, borderRadius:2, flexShrink:0,
-                    background: alpha < 0.01 ? 'var(--bg-500)' : `rgba(94,106,210,${alpha})`,
-                    border: alpha > 0 ? '1px solid rgba(94,106,210,.2)' : '1px solid var(--border)' }} />
+                    background: alpha < 0.01 ? 'var(--bg-500)' : `rgba(108,99,255,${alpha})`,
+                    border: alpha > 0 ? '1px solid rgba(108,99,255,.2)' : '1px solid var(--border)' }} />
               )
             })}
           </div>
@@ -789,14 +788,15 @@ function PanelInformes({ db, toast }) {
     return { e, totalMin, diff, days: eRecs.length, vac }
   })
 
-  const downloadXLSX = (sheetName, aoa, filename) => {
+  const downloadXLSX = async (sheetName, aoa, filename) => {
+    const XLSX = await import('xlsx')
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
     XLSX.writeFile(wb, filename)
   }
 
-  const exportFichajesXLSX = () => {
+  const exportFichajesXLSX = async () => {
     let filtered = recs.filter(r => r.fin)
     if (selEmp) filtered = filtered.filter(r => r.empId === selEmp)
     if (from) filtered = filtered.filter(r => r.inicio.slice(0,10) >= from)
@@ -807,14 +807,14 @@ function PanelInformes({ db, toast }) {
       const wm = Math.floor(recWorkSecs(r)/60), bm = Math.floor((r.breakSecs||0)/60)
       return [r.empName, r.centro||'', r.empresa||'', new Date(r.inicio).toLocaleString('es-ES'), new Date(r.fin).toLocaleString('es-ES'), `${Math.floor(wm/60)}:${p2(wm%60)}`, `${Math.floor(bm/60)}:${p2(bm%60)}`]
     })
-    downloadXLSX('Fichajes', [headers, ...rows], `fichajes_${from||'todo'}_${to||'hoy'}.xlsx`)
+    await downloadXLSX('Fichajes', [headers, ...rows], `fichajes_${from||'todo'}_${to||'hoy'}.xlsx`)
     toast('✅ Excel descargado')
   }
 
   const [y, mo] = filterMonth.split('-').map(Number)
   const daysInMonth = new Date(y, mo, 0).getDate()
 
-  const exportDetalleXLSX = () => {
+  const exportDetalleXLSX = async () => {
     const empRows = sortedEmps(db).filter(e => !e.baja)
     const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>String(i+1)), 'Total']
     const rows = empRows.map(e => {
@@ -826,16 +826,16 @@ function PanelInformes({ db, toast }) {
       const total = Object.values(dayMap).reduce((s,v)=>s+v,0)
       return [e.name, ...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?`${Math.floor(dayMap[i+1]/60)}:${p2(dayMap[i+1]%60)}`:''), mhm(total)]
     })
-    downloadXLSX('Detalle diario', [header, ...rows], `detalle_${filterMonth}.xlsx`)
+    await downloadXLSX('Detalle diario', [header, ...rows], `detalle_${filterMonth}.xlsx`)
     toast('✅ Excel descargado')
   }
 
-  const exportResumenXLSX = () => {
+  const exportResumenXLSX = async () => {
     const header = ['Empleado','Días','Total mes','Esperadas','Diferencia','Vac. disp.']
     const xlsxRows = rows.map(({ e, totalMin, diff, days, vac }) => [
       e.name, days, mhm(totalMin), mhm(WK*4), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available
     ])
-    downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
+    await downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
     toast('✅ Excel descargado')
   }
 
@@ -956,7 +956,7 @@ function PanelInformes({ db, toast }) {
                         const d = new Date(y, mo-1, i+1)
                         const isWknd = d.getDay()===0||d.getDay()===6
                         return (
-                          <td key={i} style={{ textAlign:'center', padding:'5px 2px', background: m2?'rgba(94,106,210,.12)':isWknd?'rgba(255,255,255,.02)':undefined, color: m2?'var(--primary-light)':'var(--text4)', fontWeight:m2?700:400, fontVariantNumeric:'tabular-nums' }}>
+                          <td key={i} style={{ textAlign:'center', padding:'5px 2px', background: m2?'rgba(108,99,255,.12)':isWknd?'rgba(255,255,255,.02)':undefined, color: m2?'var(--primary-light)':'var(--text4)', fontWeight:m2?700:400, fontVariantNumeric:'tabular-nums' }}>
                             {m2 ? `${Math.floor(m2/60)}:${p2(m2%60)}` : isWknd?'·':'—'}
                           </td>
                         )
@@ -1013,7 +1013,7 @@ function PanelInformes({ db, toast }) {
               const overExpected = rows.filter(r => r.diff > 0).length
               return [
                 { label:'Total horas mes', val: mhm(totalMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:<line x1="18" y1="20" x2="18" y2="10"/> },
-                { label:'Promedio por empleado', val: mhm(avgMin), color:'var(--teal)', bg:'rgba(12,200,232,.1)', ico:<circle cx="12" cy="12" r="10"/> },
+                { label:'Promedio por empleado', val: mhm(avgMin), color:'var(--teal)', bg:'rgba(0,212,255,.1)', ico:<circle cx="12" cy="12" r="10"/> },
                 { label:'Sobre objetivo', val: `${overExpected}/${rows.length}`, color:'var(--green)', bg:'var(--green-dim)', ico:<polyline points="20 6 9 17 4 12"/> },
                 { label:'Lider del mes', val: topEmp?.e.name?.split(' ')[0] || '—', color:'var(--orange)', bg:'var(--orange-dim)', ico:<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></> },
               ].map(({ label, val, color, bg, ico }) => (
@@ -1183,7 +1183,7 @@ function PanelObras({ db, toast, saveDB, session }) {
             {!centros.length && <div className="empty">Sin centros de trabajo</div>}
             {centros.map(c => (
               <div key={c} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
-                <div style={{ width:40, height:40, borderRadius:10, background:'rgba(12,200,232,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <div style={{ width:40, height:40, borderRadius:10, background:'rgba(0,212,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -1329,7 +1329,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
       )}
 
       {/* Jornadas rápidas */}
-      <div style={{ background:'linear-gradient(135deg,var(--primary-dim),rgba(12,200,232,.06))', border:'1px solid rgba(94,106,210,.2)', borderRadius:'var(--r)', padding:'16px 20px', marginBottom:20 }}>
+      <div style={{ background:'linear-gradient(135deg,var(--primary-dim),rgba(0,212,255,.06))', border:'1px solid rgba(108,99,255,.2)', borderRadius:'var(--r)', padding:'16px 20px', marginBottom:20 }}>
         <div style={{ fontSize:13, fontWeight:700, marginBottom:12 }}>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--primary-light)" strokeWidth="2" style={{ marginRight:6, verticalAlign:'middle' }}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           Solicitar firma de jornada mensual
