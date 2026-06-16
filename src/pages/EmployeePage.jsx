@@ -5,6 +5,7 @@ import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkSta
 import { WD, WK, VAPID_PUB } from '../config/constants.js'
 import { pushSubscribe, auditLog, sendPushNotif } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
+import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
@@ -148,7 +149,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body">
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockTime={clockTime} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -1017,6 +1018,7 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
 
 function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null) // doc being signed
+  const [stamping, setStamping] = useState(false)
   const [viewing, setViewing] = useState(null) // doc being previewed (read-only)
   if (!visible) return null
 
@@ -1028,16 +1030,31 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada mensual' }
   const TIPO_COLORS = { nomina:'var(--primary-light)', contrato:'var(--teal)', jornada:'var(--orange)' }
 
-  const firmarDoc = (doc) => {
+  const firmarDoc = async (doc) => {
     if (!myFirma) { toast('Necesitas guardar tu firma primero en Perfil → Firma digital'); return }
+    setStamping(true)
     const firmadoAt = new Date().toISOString()
+    let fileData = doc.fileData
+    try {
+      const printable = await makePrintableSignature(myFirma.data)
+      const label = `Firmado digitalmente por ${u.name} · ${new Date(firmadoAt).toLocaleString('es-ES')}`
+      if (doc.fileData?.startsWith('data:application/pdf')) {
+        fileData = await stampSignatureOnPdf(doc.fileData, printable, label)
+      } else if (doc.fileData?.startsWith('data:image')) {
+        fileData = await stampSignatureOnImage(doc.fileData, printable, label)
+      }
+    } catch (e) {
+      console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
+      toast('⚠️ No se pudo insertar la firma en el archivo, se guardó solo el registro')
+    }
     const updated = (db.documentos || []).map(d => d.id === doc.id ? {
-      ...d, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
+      ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
     } : d)
     const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
     const withAudit = auditLog(db, 'Documento firmado', `${u.name}: "${doc.titulo}"`, u.name)
     saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
     sendPushNotif('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
+    setStamping(false)
     toast('✅ Documento firmado correctamente')
     setSigning(null)
   }
@@ -1095,10 +1112,10 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
               <>
                 <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6 }}>Tu firma guardada:</div>
                 <img src={myFirma.data} alt="tu firma" style={{ width:'100%', height:80, objectFit:'contain', background:'#0D1218', borderRadius:8, border:'1px solid var(--border)', marginBottom:12 }} />
-                <div style={{ fontSize:11, color:'var(--text3)', marginBottom:12 }}>Al confirmar, esta firma se aplicará al documento de forma permanente.</div>
+                <div style={{ fontSize:11, color:'var(--text3)', marginBottom:12 }}>Al confirmar, esta firma se insertará en el documento de forma permanente.</div>
                 <div style={{ display:'flex', gap:8 }}>
-                  <button className="btn btn-secondary" onClick={() => setSigning(null)}>Cancelar</button>
-                  <button className="btn btn-primary" onClick={() => firmarDoc(signing)}>Confirmar y firmar</button>
+                  <button className="btn btn-secondary" disabled={stamping} onClick={() => setSigning(null)}>Cancelar</button>
+                  <button className="btn btn-primary" disabled={stamping} onClick={() => firmarDoc(signing)}>{stamping ? 'Firmando…' : 'Confirmar y firmar'}</button>
                 </div>
               </>
             ) : (
