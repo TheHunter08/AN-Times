@@ -95,6 +95,26 @@ export default function EmployeePage() {
             `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/')
         }
       }
+
+      // 5. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
+      const staleRecs = (db.records || []).filter(r => r.empId === u.id && !r.fin)
+      staleRecs.forEach(stale => {
+        const elapsedStale = (Date.now() - new Date(stale.inicio).getTime()) / 60000
+        if (elapsedStale > 720) {
+          const acKey = 'an_autoclose_' + stale.id
+          if (!localStorage.getItem(acKey)) {
+            localStorage.setItem(acKey, '1')
+            const closeTime = new Date().toISOString()
+            const breaks2 = [...(stale.breaks || [])]
+            const t2 = calcSecs({ ...stale, fin: closeTime, breaks: breaks2 })
+            const closed2 = { ...stale, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
+            const updRecs = dbRef.current.records.map(r => r.id === stale.id ? closed2 : r)
+            saveDB({ records: updRecs })
+            sendPushNotif(u.id, '⏱️ Jornada cerrada automáticamente',
+              `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/')
+          }
+        }
+      })
     }
 
     const iv = setInterval(checkSmartNotis, 60000)
@@ -177,7 +197,7 @@ export default function EmployeePage() {
 
   if (!u) return null
 
-  const initials = u.initials || u.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const initials = u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
   const vac = vacData(u.id, db)
   const unread = (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length
 
@@ -380,10 +400,23 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
 
-  const tlItems = realRecs.map(r => {
-    const isCurrent = !r.fin
-    return { r, isCurrent }
-  })
+  const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
+
+  const exportMonthPDF = () => {
+    const now2 = new Date()
+    const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
+    const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk2)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
+    const totalMin2 = monthRecs.reduce((s,r)=>s+calcMin(r),0)
+    const monthName = now2.toLocaleDateString('es-ES',{month:'long',year:'numeric'})
+    const rowsHtml = monthRecs.map(r => {
+      const wm = Math.floor(recWorkSecs(r)/60)
+      return `<tr><td>${r.inicio.slice(0,10)}</td><td>${ftime(r.inicio)}</td><td>${r.fin ? ftime(r.fin) : '—'}</td><td>${r.centro||'—'}</td><td><strong>${mhm(wm)}</strong></td></tr>`
+    }).join('')
+    const win = window.open('', '_blank')
+    if (!win) { toast('Permite ventanas emergentes para exportar'); return }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${monthName} - ${u.name}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;max-width:800px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}.sub{color:#555;font-size:13px;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5e6ad2;color:#fff;padding:8px 12px;text-align:left;font-size:12px}td{padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}tr:nth-child(even) td{background:#f9fafb}.total{margin-top:16px;padding:14px;background:#f0f4ff;border-radius:8px;font-weight:700;font-size:15px}@media print{.no-print{display:none}}</style></head><body><h1>Informe de Jornada — ${u.name}</h1><div class="sub">Mes: ${monthName} · Empresa: ${u.empresa||'—'} · Centro: ${u.centroTrabajo||'—'} · Generado: ${new Date().toLocaleDateString('es-ES')}</div><button class="no-print" onclick="window.print()" style="padding:8px 18px;background:#5e6ad2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:14px">🖨️ Imprimir / Guardar PDF</button><table><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Centro de trabajo</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="total">Total trabajado: ${mhm(totalMin2)} &nbsp;·&nbsp; ${monthRecs.length} jornadas registradas</div></body></html>`)
+    win.document.close()
+  }
 
   return (
     <div className="emp-tab active" style={{ paddingBottom:20 }}>
@@ -401,10 +434,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
       {/* Stats 3-col */}
       <div className="jor-stats-row">
-        <div className="jor-stat-card primary">
-          <div className="jor-stat-ico">⏱️</div>
+        <div className={`jor-stat-card${weekMin > WK ? ' orange' : ' primary'}`}>
+          <div className="jor-stat-ico">{weekMin > WK ? '🔴' : '⏱️'}</div>
           <div className="jor-stat-val">{mhm(Math.floor(weekMin))}</div>
-          <div className="jor-stat-lbl">Esta semana</div>
+          <div className="jor-stat-lbl">Esta semana{weekMin > WK ? ' ↑' : ''}</div>
         </div>
         <div className="jor-stat-card">
           <div className="jor-stat-ico">✅</div>
@@ -444,6 +477,14 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Monthly PDF export */}
+      <div style={{ padding:'0 16px 6px', display:'flex', justifyContent:'flex-end' }}>
+        <button className="btn btn-secondary btn-sm" onClick={exportMonthPDF}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Informe mensual PDF
+        </button>
       </div>
 
       {/* Timeline */}
@@ -778,7 +819,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
 // ─── TAB PERFIL ────────────────────────────────────────────────────────────────
 function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
-  const initials = u.initials || u.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const initials = u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
   const vac = vacData(u.id, db)
   const now = new Date()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
@@ -867,6 +908,7 @@ function ModalSelCentro({ visible, data, onConfirm, onClose }) {
 
 function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const notis = (db.notis || []).filter(n => n.empId === u?.id).slice(-20).reverse()
+  const mensajes = (db.mensajes || []).filter(m => m.to === 'all' || m.to === u?.id).slice(-10).reverse()
   if (!visible) return null
   const markRead = () => {
     const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
@@ -881,8 +923,20 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
-          {!notis.length ? <div className="empty">Sin notificaciones</div> : notis.map(n => (
-            <div key={n.id} className="nitem">
+          {mensajes.map(m => (
+            <div key={'msg-'+m.id} className="nitem" style={{ borderLeft:'3px solid var(--primary)' }}>
+              <div className="nitem-ico" style={{ background:'var(--primary-dim)' }}>📢</div>
+              <div className="nitem-body">
+                <div className="nitem-title" style={{ color:'var(--primary-light)' }}>{m.title}</div>
+                <div className="nitem-text">{m.body}</div>
+                <div className="nitem-time">Administración · {m.ts ? new Date(m.ts).toLocaleString('es-ES') : ''}</div>
+              </div>
+            </div>
+          ))}
+          {!notis.length && !mensajes.length ? (
+            <div className="empty">Sin notificaciones</div>
+          ) : notis.map(n => (
+            <div key={n.id} className={`nitem${!n.leido ? ' unread' : ''}`}>
               <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)' }}>ℹ️</div>
               <div className="nitem-body">
                 <div className="nitem-title">{n.action || n.title || 'Notificación'}</div>

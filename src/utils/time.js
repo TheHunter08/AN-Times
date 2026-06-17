@@ -66,7 +66,7 @@ export const vacData = (empId, db) => {
   const VPM = 2.5
   const emp = (db.employees || []).find(e => e.id === empId)
   if (!emp) return { months: 0, generated: 0, used: 0, pending: 0, available: 0 }
-  const sd = emp.startDate ? new Date(emp.startDate) : new Date()
+  const sd = new Date(emp.startDate || emp.fechaAlta || new Date().toISOString().slice(0, 10))
   const n = new Date()
   let m = (n.getFullYear() - sd.getFullYear()) * 12 + (n.getMonth() - sd.getMonth())
   if (n.getDate() < sd.getDate()) m--
