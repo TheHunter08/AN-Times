@@ -4,8 +4,8 @@
   "description": "Control horario laboral con GPS, roles y Firebase",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0d0d1a",
-  "theme_color": "#6366f1",
+  "background_color": "#0D1117",
+  "theme_color": "#0D1117",
   "orientation": "portrait-primary",
   "icons": [
     {
