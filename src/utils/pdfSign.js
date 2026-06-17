@@ -37,16 +37,20 @@ export function makePrintableSignature(jpegDataUrl) {
   })
 }
 
-async function dataUrlToBytes(dataUrl) {
-  const r = await fetch(dataUrl)
-  return await r.arrayBuffer()
+function dataUrlToBytes(dataUrl) {
+  const b64 = dataUrl.split(',')[1]
+  if (!b64) throw new Error('Invalid data URL')
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer
 }
 
 export async function stampSignatureOnPdf(pdfDataUrl, signaturePngDataUrl, label) {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
-  const pdfBytes = await dataUrlToBytes(pdfDataUrl)
+  const pdfBytes = dataUrlToBytes(pdfDataUrl)
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
-  const pngBytes = await dataUrlToBytes(signaturePngDataUrl)
+  const pngBytes = dataUrlToBytes(signaturePngDataUrl)
   const pngImage = await pdfDoc.embedPng(pngBytes)
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
 

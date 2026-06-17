@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
@@ -15,6 +15,8 @@ export default function EmployeePage() {
   const [clockTime, setClockTime] = useState('')
   const [clockDate, setClockDate] = useState('')
   const [calMonth, setCalMonth] = useState(new Date())
+  const dbRef = useRef(db)
+  useEffect(() => { dbRef.current = db }, [db])
 
   // Clock tick
   useEffect(() => {
@@ -30,11 +32,75 @@ export default function EmployeePage() {
 
   useEffect(() => {
     if (!u) return
+
+    // Request permission once
     setTimeout(async () => {
       if ('Notification' in window && Notification.permission === 'default') {
         await Notification.requestPermission()
       }
     }, 3000)
+
+    // Smart notifications: check every 60s if any reminder should fire
+    const checkSmartNotis = () => {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+      const now = new Date()
+      const todayStr = now.toISOString().slice(0, 10)
+      const hh = now.getHours()
+      const mm = now.getMinutes()
+      const db = dbRef.current
+
+      // 1. Recordatorio diario de fichaje (hora configurada por el usuario)
+      if (getCfg('notiFichaje', true)) {
+        const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
+        if (hh === rh && mm === rm) {
+          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio.startsWith(todayStr))
+          const lastKey = 'an_rem_' + u.id
+          if (!hasFichado && localStorage.getItem(lastKey) !== todayStr) {
+            localStorage.setItem(lastKey, todayStr)
+            sendPushNotif(u.id, '⏰ Recordatorio de fichaje',
+              '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder', '/')
+          }
+        }
+      }
+
+      // 2. Notificación cuando se acerca el fin de jornada (15 min antes de 8h)
+      const openRec = (db.records || []).find(r => r.empId === u.id && !r.fin)
+      if (openRec) {
+        const elapsed = (Date.now() - new Date(openRec.inicio).getTime()) / 60000
+        const warn14h = 'an_warn_14h_' + openRec.id
+        if (elapsed >= 465 && elapsed < 475 && !localStorage.getItem(warn14h)) {
+          localStorage.setItem(warn14h, '1')
+          sendPushNotif(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
+        }
+      }
+
+      // 3. Notificación de vacaciones aprobadas (una vez por solicitud)
+      const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id && v.estado === 'aprobada')
+      myVacs.forEach(v => {
+        const key = 'an_vac_ok_' + v.id
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, '1')
+          sendPushNotif(u.id, '🎉 Vacaciones aprobadas',
+            `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/')
+        }
+      })
+
+      // 4. Notificación de documentos pendientes de firma (una vez al día)
+      const pendDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
+      if (pendDocs.length > 0) {
+        const key = 'an_docs_' + u.id
+        if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
+          localStorage.setItem(key, todayStr)
+          sendPushNotif(u.id, '📄 Documentos pendientes',
+            `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/')
+        }
+      }
+    }
+
+    const iv = setInterval(checkSmartNotis, 60000)
+    // Check immediately (after 5s to let permission settle)
+    const t = setTimeout(checkSmartNotis, 5000)
+    return () => { clearInterval(iv); clearTimeout(t) }
   }, [u])
 
   const openRec = () => (db.records || []).find(r => r.empId === u?.id && !r.fin)
