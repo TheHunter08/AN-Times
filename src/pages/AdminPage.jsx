@@ -720,7 +720,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
-  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', tel:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today(), tarifaHora: 0 }
+  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today() }
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }
@@ -817,15 +817,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
                 ))}
               </div>
             </div>
-            <div className="field"><label>Fecha alta / inicio contrato</label><input type="date" value={form.fechaAlta||''} onChange={e => setForm(f=>({...f,fechaAlta:e.target.value,startDate:e.target.value}))} /></div>
-          </div>
-          <div className="field-row">
-            <div className="field"><label>Tarifa hora (€/h)</label>
-              <input type="number" min="0" step="0.01" placeholder="0.00" value={form.tarifaHora||''} onChange={e => setForm(f=>({...f,tarifaHora:parseFloat(e.target.value)||0}))} />
-            </div>
-            <div className="field"><label>Teléfono</label>
-              <input type="tel" placeholder="6XX XXX XXX" value={form.tel||''} onChange={e => setForm(f=>({...f,tel:e.target.value}))} />
-            </div>
+            <div className="field"><label>Fecha alta</label><input type="date" value={form.fechaAlta||''} onChange={e => setForm(f=>({...f,fechaAlta:e.target.value,startDate:e.target.value}))} /></div>
           </div>
           <div className="modal-btns">
             <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
@@ -890,8 +882,7 @@ function PanelInformes({ db, toast }) {
     const expected = WK * 4
     const diff = totalMin - expected
     const vac = vacData(e.id, db)
-    const salario = e.tarifaHora ? Math.round((totalMin / 60) * e.tarifaHora) : null
-    return { e, totalMin, diff, days: eRecs.length, vac, salario }
+    return { e, totalMin, diff, days: eRecs.length, vac }
   })
 
   const downloadXLSX = async (sheetName, aoa, filename) => {
@@ -937,9 +928,9 @@ function PanelInformes({ db, toast }) {
   }
 
   const exportResumenXLSX = async () => {
-    const header = ['Empleado','Días','Total mes','Esperadas','Diferencia','Vac. disp.','Salario est. (€)']
-    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac, salario }) => [
-      e.name, days, mhm(totalMin), mhm(WK*4), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available, salario !== null ? salario : ''
+    const header = ['Empleado','Días','Total mes','Esperadas','Diferencia','Vac. disp.']
+    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac }) => [
+      e.name, days, mhm(totalMin), mhm(WK*4), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available
     ])
     await downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
     toast('✅ Excel descargado')
@@ -986,14 +977,14 @@ function PanelInformes({ db, toast }) {
           </div>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Esperadas</th><th>Diferencia</th><th>Vac. disp.</th><th>Salario est.</th></tr></thead>
+            <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Esperadas</th><th>Diferencia</th><th>Vac. disp.</th></tr></thead>
             <tbody>
-              {rows.map(({ e, totalMin, diff, days, vac, salario }) => (
+              {rows.map(({ e, totalMin, diff, days, vac }) => (
                 <tr key={e.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                       <div style={{ width:26, height:26, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                        {(e.initials||e.name.filter?.(Boolean)||e.name.slice(0,2)).toUpperCase()}
+                        {(e.initials||e.name.slice(0,2)).toUpperCase()}
                       </div>
                       {e.name}
                     </div>
@@ -1005,7 +996,6 @@ function PanelInformes({ db, toast }) {
                     {diff >= 0 ? '+' : ''}{mhm(Math.abs(diff))}
                   </td>
                   <td>{vac.available}d</td>
-                  <td style={{ fontWeight:700, color:'var(--green)' }}>{salario !== null ? `${salario} €` : '—'}</td>
                 </tr>
               ))}
             </tbody>

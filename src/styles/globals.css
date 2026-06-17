@@ -103,28 +103,46 @@
 
 /* Light mode */
 [data-theme="light"] {
-  --bg-800: #F2F4F8;
+  /* Backgrounds */
+  --bg-900: #E8EBF0;
+  --bg-800: #F0F2F7;
   --bg-700: #FFFFFF;
-  --bg-600: #ECEEF2;
-  --bg-500: #E4E7ED;
-  --bg-400: #D8DCE5;
-  --bg-300: #CAD0DC;
-  --bg:  #F2F4F8;
+  --bg-600: #ECEEF4;
+  --bg-500: #E3E6EE;
+  --bg-400: #D6DAE5;
+  --bg-300: #C8CDD9;
+  --bg-200: #BAC0CF;
+  /* Legacy */
+  --bg:  #F0F2F7;
   --bg2: #FFFFFF;
-  --bg3: #ECEEF2;
-  --bg4: #E4E7ED;
-  --bg5: #D8DCE5;
-  --text:  #0E1624;
-  --text2: #374456;
-  --text3: #667486;
-  --text4: #9BAAB8;
-  --border:  rgba(0,0,0,0.06);
-  --border2: rgba(0,0,0,0.10);
-  --border3: rgba(0,0,0,0.16);
-  --glass-bg:     rgba(255,255,255,0.7);
-  --glass-border: rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,.08);
-  --shadow-sm: 0 2px 8px rgba(0,0,0,.05);
+  --bg3: #ECEEF4;
+  --bg4: #E3E6EE;
+  --bg5: #D6DAE5;
+  /* Text */
+  --text:  #0D1321;
+  --text2: #2E3A4E;
+  --text3: #5A6880;
+  --text4: #8A97A8;
+  /* Borders */
+  --border:  rgba(0,0,0,0.07);
+  --border2: rgba(0,0,0,0.11);
+  --border3: rgba(0,0,0,0.17);
+  /* Glass — light uses frosted white */
+  --glass-bg:     rgba(255,255,255,0.78);
+  --glass-border: rgba(0,0,0,0.07);
+  /* Shadows — subtle for light */
+  --shadow-sm: 0 1px 4px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.10);
+  --shadow-xl: 0 16px 60px rgba(0,0,0,.12);
+  /* Primary dims — more opaque in light for visibility */
+  --primary-dim:  rgba(108,99,255,0.10);
+  --primary-glow: rgba(108,99,255,0.20);
+  --green-dim:    rgba(16,185,129,0.10);
+  --orange-dim:   rgba(245,158,11,0.12);
+  --red-dim:      rgba(239,68,68,0.10);
+  --danger-dim:   rgba(239,68,68,0.10);
+  --accent-dim:   rgba(139,92,246,0.10);
 }
 
 /* html/body/#root nunca usan vh/dvh: position:fixed+inset:0 ya ancla el
@@ -159,7 +177,8 @@ body {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
 
 /* ── Inputs ─────────────────────────────────────────────────── */
 input, select, textarea {
@@ -232,12 +251,12 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
 
 /* Glass card */
 .glass-card {
-  background: rgba(255,255,255,.04);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-lg);
-  box-shadow: 0 8px 32px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.06);
 }
 
 /* ── Badges ─────────────────────────────────────────────────── */
@@ -465,8 +484,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; flex-shrink: 0; overflow: hidden;
   padding: max(var(--safe-top, env(safe-area-inset-top)), 14px) 16px 12px;
-  background: rgba(11,15,23,0.92);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border);
 }
 .emp-top-left  { display: flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 1; }
@@ -526,7 +545,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
   padding: 8px 6px;
-  box-shadow: 0 12px 36px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.06);
   transform: translate3d(0,0,0); will-change: transform;
   z-index: 50;
 }
@@ -540,13 +559,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: none; border: none; font-family: inherit;
 }
 .emp-nav-item svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; transition: stroke .15s; }
-.emp-nav-item.on { color: #fff; background: linear-gradient(135deg,var(--primary),var(--accent)); box-shadow: 0 4px 16px var(--primary-glow); }
+.emp-nav-item.on { color: #fff !important; background: linear-gradient(135deg,var(--primary),var(--accent)); box-shadow: 0 4px 16px var(--primary-glow); }
 .emp-nav-item.on svg { stroke: #fff; }
 .emp-nav-item:active { transform: scale(.88); }
 
 /* ── Login screen — Premium SaaS ───────────────────────────── */
 #sLogin {
-  background: var(--bg-900);
+  background: var(--bg-800);
   overflow: hidden;
   position: relative;
 }
@@ -611,6 +630,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   min-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
   opacity: 0; transform: translateY(16px) scale(.98);
   transition: opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);
+  color: var(--text);
 }
 .login-wrap.login-mounted { opacity: 1; transform: translateY(0) scale(1); }
 
@@ -660,16 +680,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Glass card ───────────────────────────────────────── */
 .login-card {
   width: 100%;
-  background: rgba(255,255,255,.04);
+  background: rgba(255,255,255,.06);
   backdrop-filter: blur(32px) saturate(160%);
   -webkit-backdrop-filter: blur(32px) saturate(160%);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid var(--border2);
   border-radius: var(--r-2xl);
   padding: 24px 22px;
-  box-shadow:
-    0 24px 64px rgba(0,0,0,.45),
-    inset 0 1px 0 rgba(255,255,255,.07),
-    inset 0 -1px 0 rgba(255,255,255,.02);
+  box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,.07);
   margin-bottom: 16px;
   position: relative;
   overflow: hidden;
@@ -679,9 +696,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background: linear-gradient(90deg, transparent 10%, rgba(108,99,255,.3) 50%, transparent 90%);
 }
 [data-theme="light"] .login-card {
-  background: rgba(255,255,255,.75);
-  border-color: rgba(0,0,0,.06);
-  box-shadow: 0 24px 64px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.9);
+  background: rgba(255,255,255,.88);
+  border-color: rgba(0,0,0,.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.95);
 }
 [data-theme="light"] .login-card::before {
   background: linear-gradient(90deg, transparent 10%, rgba(108,99,255,.15) 50%, transparent 90%);
@@ -690,9 +707,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Login tabs ───────────────────────────────────────── */
 .login-tabs {
   display: flex; gap: 4px; padding: 4px;
-  background: rgba(255,255,255,.04); border-radius: var(--r-sm);
+  background: var(--bg-400); border-radius: var(--r-sm);
   margin-bottom: 22px;
-  border: 1px solid rgba(255,255,255,.04);
+  border: 1px solid var(--border);
 }
 .login-tab {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -722,7 +739,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .login-select {
   width: 100%; padding: 14px 16px 14px 46px;
-  background: rgba(255,255,255,.04); border: 1px solid var(--border2);
+  background: var(--bg-400); border: 1px solid var(--border2);
   border-radius: var(--r); color: var(--text); font-size: 14px;
   font-weight: 500; appearance: none; -webkit-appearance: none;
   outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
@@ -789,7 +806,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .login-key {
   height: 60px; border-radius: var(--r);
-  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
+  background: var(--bg-500); border: 1px solid var(--border);
   color: var(--text); cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 1px; transition: all .12s cubic-bezier(.16,1,.3,1);
@@ -827,13 +844,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .login-email-section { display: flex; flex-direction: column; gap: 16px; }
 
 .login-input-group {
-  background: rgba(255,255,255,.04); border: 1px solid var(--border2);
+  background: var(--bg-500); border: 1px solid var(--border2);
   border-radius: var(--r); overflow: hidden;
   transition: border-color .25s, box-shadow .25s, background .25s;
 }
 .login-input-group:focus-within {
   border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim);
-  background: rgba(108,99,255,.03);
 }
 [data-theme="light"] .login-input-group { background: rgba(0,0,0,.02); }
 [data-theme="light"] .login-input-group:focus-within { background: rgba(108,99,255,.02); }
@@ -904,13 +920,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Google button ────────────────────────────────────── */
 .login-google-btn {
   width: 100%; padding: 13px; border-radius: var(--r);
-  background: rgba(255,255,255,.04); border: 1px solid var(--border2);
+  background: var(--bg-500); border: 1px solid var(--border2);
   color: var(--text); font-size: 13px; font-weight: 600;
   cursor: pointer; display: flex; align-items: center;
   justify-content: center; gap: 10px;
   transition: all .2s cubic-bezier(.16,1,.3,1); font-family: inherit;
 }
-.login-google-btn:hover { background: rgba(255,255,255,.08); border-color: var(--border3); transform: translateY(-1px); }
+.login-google-btn:hover { background: var(--bg-400); border-color: var(--border3); transform: translateY(-1px); }
 [data-theme="light"] .login-google-btn { background: #fff; border-color: rgba(0,0,0,.1); }
 [data-theme="light"] .login-google-btn:hover { background: #f8f9fa; transform: translateY(-1px); }
 
@@ -1204,12 +1220,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   /* Min total height = safe-area + 56px content */
   min-height: calc(56px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border2);
-  background: rgba(17,23,32,0.95);
+  background: var(--glass-bg);
   flex-shrink: 0;
   position: relative;
   z-index: 20;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   /* Push children below safe area */
   padding-bottom: 0;
   /* iOS 26: align children to bottom of the topbar area */
@@ -1640,4 +1656,82 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 [data-theme="light"] .premium-filters input, [data-theme="light"] .premium-filters select { background: #fff; border-color: rgba(0,0,0,.12); }
 [data-theme="light"] .skeleton { background: linear-gradient(90deg, rgba(0,0,0,.05) 25%, rgba(0,0,0,.08) 50%, rgba(0,0,0,.05) 75%); background-size: 200% 100%; }
 
+/* ── Light mode: componentes con valores oscuros hardcodeados ─── */
+/* Tarjeta de fichar principal */
+[data-theme="light"] .jor-main-card {
+  background: linear-gradient(160deg, rgba(108,99,255,.10) 0%, rgba(255,255,255,.97) 55%, #f8f9ff 100%);
+  border-color: rgba(108,99,255,.18);
+  box-shadow: 0 12px 40px rgba(108,99,255,.12), 0 0 0 1px rgba(108,99,255,.08);
+}
+[data-theme="light"] .jor-main-card::before { background: radial-gradient(circle, rgba(108,99,255,.08) 0%, transparent 70%); }
+[data-theme="light"] .jor-main-card::after  { background: radial-gradient(circle, rgba(0,212,255,.05) 0%, transparent 70%); }
 
+/* Nav flotante en light */
+[data-theme="light"] .emp-nav {
+  background: rgba(255,255,255,.82);
+  border-color: rgba(0,0,0,.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.9);
+}
+[data-theme="light"] .emp-nav-item { color: var(--text4); }
+
+/* Sidebar admin en light */
+[data-theme="light"] .adm-sidebar { box-shadow: 4px 0 24px rgba(0,0,0,.08); background: #fff; }
+[data-theme="light"] .adm-sidebar-ov { background: rgba(0,0,0,.25); }
+[data-theme="light"] .adm-nav-item:hover { background: rgba(108,99,255,.06); }
+[data-theme="light"] .adm-nav-item.active { background: rgba(108,99,255,.10); color: var(--primary); border-color: rgba(108,99,255,.18); }
+
+/* Topbar en light */
+[data-theme="light"] .adm-topbar { background: rgba(255,255,255,.92); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); }
+
+/* Scrollbar en light */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); }
+
+/* Modal overlay en light */
+[data-theme="light"] .modal-ov { background: rgba(0,0,0,.35); }
+[data-theme="light"] .modal { background: #fff; border-top-color: rgba(0,0,0,.08); }
+
+/* Botones icon en light */
+[data-theme="light"] .icon-btn { background: rgba(0,0,0,.06); border-color: rgba(0,0,0,.10); }
+[data-theme="light"] .icon-btn svg { stroke: var(--text2); }
+[data-theme="light"] .icon-btn:active { background: rgba(0,0,0,.10); }
+
+/* Chips enc, theme toggle en light */
+[data-theme="light"] .enc-chip { background: rgba(108,99,255,.08); }
+[data-theme="light"] .theme-toggle-btn { background: rgba(0,0,0,.06); border-color: rgba(0,0,0,.10); }
+
+/* Teclado PIN en light — eliminamos el override redundante */
+[data-theme="light"] .login-key { background: #fff; border-color: rgba(0,0,0,.09); }
+[data-theme="light"] .login-key-del:active { background: rgba(0,0,0,.05); }
+
+/* Tabs de login en light */
+[data-theme="light"] .login-tab.active { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+/* Inputs base en light */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: #fff;
+  border-color: rgba(0,0,0,.12);
+  color: var(--text);
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: var(--text4); }
+
+/* Botón secondary en light */
+[data-theme="light"] .btn-secondary { background: rgba(0,0,0,.06); border-color: rgba(0,0,0,.10); color: var(--text2); }
+[data-theme="light"] .btn-secondary:hover { background: rgba(0,0,0,.10); }
+
+/* Stat cards jornada en light */
+[data-theme="light"] .jor-stat-card { background: #fff; border-color: rgba(0,0,0,.08); }
+[data-theme="light"] .stat-card-premium { background: rgba(255,255,255,.9); border-color: rgba(0,0,0,.08); }
+
+/* Timeline en light */
+[data-theme="light"] .tl-ico { background: rgba(108,99,255,.08) !important; }
+[data-theme="light"] .tl-line { background: rgba(0,0,0,.08); }
+
+/* Card base en light */
+[data-theme="light"] .card { background: #fff; border-color: rgba(0,0,0,.08); }
+[data-theme="light"] .adm-table { border-color: rgba(0,0,0,.06); }
+[data-theme="light"] .adm-table th { background: rgba(0,0,0,.03); color: var(--text3); border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .adm-table td { border-bottom-color: rgba(0,0,0,.05); }
+[data-theme="light"] .adm-table tr:hover td { background: rgba(108,99,255,.04); }
