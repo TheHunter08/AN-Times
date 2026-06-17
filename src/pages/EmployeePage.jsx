@@ -607,7 +607,8 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
 
   return (
-    <div className="emp-tab active prf-wrap">
+    <div className="emp-tab active">
+    <div className="prf-wrap">
       <div className="prf-hero">
         <div style={{ position:'relative', marginBottom:14 }}>
           <div className="prf-av" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
@@ -656,6 +657,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
+    </div>
     </div>
   )
 }

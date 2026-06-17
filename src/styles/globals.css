@@ -722,7 +722,7 @@ button:active { transform: scale(.96); opacity: .88; }
 .cal-hrs { font-size: 9px; color: var(--teal); font-weight: 600; line-height: 1; }
 
 /* Profile */
-.prf-wrap  { flex: 1; overflow-y: auto; background: var(--bg-800); }
+.prf-wrap  { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; background: var(--bg-800); }
 .prf-hero  { display: flex; flex-direction: column; align-items: center; padding: 28px 20px 20px; background: linear-gradient(180deg,rgba(94,106,210,.07) 0%,transparent 100%); }
 .prf-av    { width: 88px; height: 88px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: #fff; border: 3px solid var(--primary-glow); }
 .prf-name  { font-size: 21px; font-weight: 700; text-align: center; margin-bottom: 4px; }
