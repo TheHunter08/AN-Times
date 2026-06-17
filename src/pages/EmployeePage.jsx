@@ -918,6 +918,52 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
             </div>
           ))}
         </div>
+
+        {/* Mini activity heatmap — last 8 weeks */}
+        {(() => {
+          const WEEKS = 8
+          const DAYS = WEEKS * 7
+          const cells = Array.from({ length: DAYS }, (_, i) => {
+            const d = new Date(now)
+            d.setDate(d.getDate() - (DAYS - 1 - i))
+            const ds = d.toISOString().slice(0, 10)
+            return { ds, mins: dayMap[ds] || 0, dow: d.getDay() }
+          })
+          const maxCell = Math.max(...cells.map(c => c.mins), 1)
+          const DOW = ['L','M','X','J','V','S','D']
+          return (
+            <div style={{ marginTop:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:'var(--r-lg)', padding:'14px 12px', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:10 }}>Actividad reciente</div>
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${WEEKS},1fr)`, gridTemplateRows:'repeat(7,1fr)', gap:3, direction:'ltr' }}>
+                {cells.map(({ ds, mins, dow }) => {
+                  const intensity = mins > 0 ? Math.max(0.2, mins / maxCell) : 0
+                  const isToday = ds === now.toISOString().slice(0,10)
+                  return (
+                    <div key={ds} title={`${ds}: ${mins ? mhm(mins) : 'Sin datos'}`}
+                      style={{ aspectRatio:'1', borderRadius:3,
+                        background: mins > 0
+                          ? `rgba(108,99,255,${intensity.toFixed(2)})`
+                          : dow === 0 || dow === 6 ? 'rgba(255,255,255,.02)' : 'var(--bg-500)',
+                        outline: isToday ? '1px solid var(--primary)' : 'none',
+                        outlineOffset: '1px',
+                        transition: 'transform .1s',
+                      }} />
+                  )
+                })}
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop:8 }}>
+                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                  <span style={{ fontSize:9, color:'var(--text4)' }}>Menos</span>
+                  {[0,.25,.5,.75,1].map(v => (
+                    <div key={v} style={{ width:10, height:10, borderRadius:2, background: v === 0 ? 'var(--bg-500)' : `rgba(108,99,255,${v})` }} />
+                  ))}
+                  <span style={{ fontSize:9, color:'var(--text4)' }}>Más</span>
+                </div>
+                <span style={{ fontSize:9, color:'var(--text4)' }}>{WEEKS} semanas</span>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Cierres mensuales pendientes de firma */}

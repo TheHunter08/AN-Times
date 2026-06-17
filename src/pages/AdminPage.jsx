@@ -239,6 +239,11 @@ function PanelDashboard({ db, toast, saveDB }) {
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const monthMin = recs.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
 
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
+  const lastMonthMin = recs.filter(r => r.fin && r.inicio.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0)
+  const monthTrend = lastMonthMin > 0 ? Math.round((monthMin - lastMonthMin) / lastMonthMin * 100) : null
+
   const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
   const vacHoy = (db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).length
 
@@ -374,6 +379,55 @@ function PanelDashboard({ db, toast, saveDB }) {
           <div className="dash-widget-title">Actividad (últimas 12 semanas)</div>
         </div>
         <Heatmap data={heat} />
+      </div>
+
+      {/* Month vs last month comparison */}
+      {lastMonthMin > 0 && (
+        <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">Comparativa mensual</div>
+            {monthTrend !== null && (
+              <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                background: monthTrend >= 0 ? 'var(--green-dim)' : 'var(--red-dim)',
+                color: monthTrend >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {monthTrend >= 0 ? '+' : ''}{monthTrend}% vs mes anterior
+              </span>
+            )}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            {[
+              { label: prevDate.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: lastMonthMin, color:'var(--text3)', bar:'var(--bg-400)' },
+              { label: now.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: monthMin, color:'var(--primary-light)', bar:'linear-gradient(90deg,var(--primary),var(--accent))' },
+            ].map(({ label, val, color, bar }) => {
+              const pct = Math.round(val / Math.max(monthMin, lastMonthMin) * 100)
+              return (
+                <div key={label}>
+                  <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', marginBottom:4 }}>{label}</div>
+                  <div style={{ fontSize:20, fontWeight:800, color, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>{mhm(val)}</div>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width: pct + '%', background: bar }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
+        {[
+          { label:'Nuevo fichaje', ico:'⏱️', page:'fichajes', color:'var(--primary-dim)', accent:'var(--primary-light)' },
+          { label:'Ver solicitudes', ico:'🌴', page:'solicitudes', color:'var(--orange-dim)', accent:'var(--orange)' },
+          { label:'Generar informe', ico:'📊', page:'informes', color:'var(--green-dim)', accent:'var(--green)' },
+        ].map(({ label, ico, page, color, accent }) => (
+          <button key={page} onClick={() => setAdminPage(page)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:'14px 8px', background:color, border:`1px solid ${accent}22`, borderRadius:'var(--r-lg)', cursor:'pointer', transition:'transform .15s, box-shadow .15s', WebkitTapHighlightColor:'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow=`0 6px 16px ${accent}33` }}
+            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='' }}>
+            <span style={{ fontSize:22 }}>{ico}</span>
+            <span style={{ fontSize:11, fontWeight:700, color: accent, textAlign:'center', lineHeight:1.2 }}>{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Recent audit */}
@@ -1045,6 +1099,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     { id:'detalle',  label:'Detalle diario' },
     { id:'ranking',  label:'Ranking' },
     { id:'analitica',label:'Analítica' },
+    { id:'obras',    label:'Por Obra' },
     { id:'exportar', label:'Exportar' },
   ]
 
@@ -1308,6 +1363,102 @@ function PanelInformes({ db, toast, saveDB, session }) {
           </div>
         </div>
       )}
+
+      {/* Por Obra tab */}
+      {tab === 'obras' && (() => {
+        const obras = db.obras || []
+        const allEmps = sortedEmps(db).filter(e => !e.baja)
+        const obraRows = obras.map(obra => {
+          const assigned = allEmps.filter(e => (e.obrasAsignadas || []).includes(obra))
+          const empData = assigned.map(e => {
+            const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+            const mins = eRecs.reduce((s, r) => s + calcMin(r), 0)
+            return { e, mins, days: eRecs.length }
+          }).filter(d => d.mins > 0 || assigned.length > 0)
+          const totalMins = empData.reduce((s, d) => s + d.mins, 0)
+          return { obra, empData, totalMins, assignedCount: assigned.length }
+        })
+        // Employees with no obra assigned
+        const unassinged = allEmps.filter(e => !(e.obrasAsignadas || []).length)
+        const unassignedData = unassinged.map(e => {
+          const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+          const mins = eRecs.reduce((s, r) => s + calcMin(r), 0)
+          return { e, mins, days: eRecs.length }
+        }).filter(d => d.mins > 0)
+        const maxObraMin = Math.max(...obraRows.map(r => r.totalMins), 1)
+        return (
+          <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {!obras.length && (
+              <div className="empty-premium">
+                <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+                <div className="empty-premium-title">Sin obras configuradas</div>
+                <div className="empty-premium-sub">Ve a Obras para crear proyectos y asignarlos a tus empleados.</div>
+              </div>
+            )}
+            {obraRows.map(({ obra, empData, totalMins, assignedCount }) => {
+              const pct = Math.round(totalMins / maxObraMin * 100)
+              return (
+                <div key={obra} className="card-lift" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'16px 18px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div style={{ width:38, height:38, borderRadius:10, background:'var(--primary-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:15, fontWeight:700, marginBottom:1 }}>{obra}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{assignedCount} empleado{assignedCount!==1?'s':''} asignado{assignedCount!==1?'s':''}</div>
+                    </div>
+                    <div style={{ fontSize:22, fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>{mhm(totalMins)}</div>
+                  </div>
+                  <div className="progress-track" style={{ marginBottom:12 }}>
+                    <div className="progress-fill" style={{ width: pct + '%', background:'linear-gradient(90deg,var(--primary),var(--accent))' }} />
+                  </div>
+                  {empData.length > 0 && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, borderTop:'1px solid var(--border)', paddingTop:10 }}>
+                      {empData.map(({ e, mins, days }) => (
+                        <div key={e.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                          <div style={{ width:22, height:22, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                            {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                          </div>
+                          <div style={{ flex:1, fontSize:12, color:'var(--text2)' }}>{e.name}</div>
+                          <div style={{ fontSize:11, color:'var(--text3)' }}>{days}d</div>
+                          <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', fontVariantNumeric:'tabular-nums', minWidth:52, textAlign:'right' }}>{mhm(mins)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {empData.length === 0 && <div style={{ fontSize:12, color:'var(--text4)' }}>Sin horas registradas este mes</div>}
+                </div>
+              )
+            })}
+            {unassignedData.length > 0 && (
+              <div className="card-lift" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'16px 18px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                  <div style={{ width:38, height:38, borderRadius:10, background:'rgba(96,116,138,.12)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15, fontWeight:700, marginBottom:1 }}>Sin obra asignada</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>Empleados sin proyecto</div>
+                  </div>
+                  <div style={{ fontSize:22, fontWeight:800, color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{mhm(unassignedData.reduce((s,d)=>s+d.mins,0))}</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6, borderTop:'1px solid var(--border)', paddingTop:10 }}>
+                  {unassignedData.map(({ e, mins, days }) => (
+                    <div key={e.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ width:22, height:22, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                        {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, fontSize:12, color:'var(--text2)' }}>{e.name}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{days}d</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', fontVariantNumeric:'tabular-nums', minWidth:52, textAlign:'right' }}>{mhm(mins)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Exportar tab */}
       {tab === 'exportar' && (
