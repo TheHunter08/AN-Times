@@ -288,6 +288,10 @@ export default function EmployeePage() {
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} onClose={closeModal} toast={toast} />
+      <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+
+      {/* Onboarding: primer login */}
+      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
     </div>
   )
 }
@@ -873,6 +877,22 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           </div>
         ))}
       </div>
+
+      {/* Cierres mensuales pendientes de firma */}
+      {(() => {
+        const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
+        if (!pendingCierres.length) return null
+        return (
+          <div onClick={() => openModal('cierreSign')} style={{ margin:'0 0 14px', padding:'12px 16px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r-lg)', cursor:'pointer', display:'flex', alignItems:'center', gap:12 }}>
+            <span style={{ fontSize:22 }}>📋</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--orange)' }}>Cierre mensual pendiente de firma</div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{pendingCierres.map(c => c.mes).join(', ')} · Toca para revisar y firmar</div>
+            </div>
+            <span style={{ minWidth:20, height:20, borderRadius:10, background:'var(--orange)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', flexShrink:0 }}>{pendingCierres.length}</span>
+          </div>
+        )
+      })()}
 
       <div className="prf-menu">
         {[
@@ -1525,4 +1545,263 @@ function toggleTheme() {
   else document.documentElement.setAttribute('data-theme', 'light')
   try { localStorage.setItem('theme', next) } catch {}
   document.querySelectorAll('.theme-toggle-btn').forEach(b => { b.textContent = next === 'light' ? '🌙' : '☀️' })
+}
+
+// ─── FIRMA DE CIERRE MENSUAL (empleado) ────────────────────────────────────────
+function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
+  const canvasRef = useRef(null)
+  const drawingRef = useRef(false)
+  const lastPtRef = useRef(null)
+  const [selIdx, setSelIdx] = useState(0)
+  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente')
+  const selCierre = pendingCierres[selIdx] || null
+
+  useEffect(() => {
+    if (visible && canvasRef.current && selCierre) {
+      const c = canvasRef.current
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
+    }
+  }, [visible, selCierre])
+
+  if (!visible || !selCierre) return null
+
+  const getPos = (e, c) => {
+    const rect = c.getBoundingClientRect(); const src = e.touches ? e.touches[0] : e
+    return { x: (src.clientX - rect.left) * (c.width / rect.width), y: (src.clientY - rect.top) * (c.height / rect.height) }
+  }
+  const onDown = e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; lastPtRef.current = getPos(e, c); drawingRef.current = true }
+  const onMove = e => {
+    if (!drawingRef.current) return; e.preventDefault()
+    const c = canvasRef.current; if (!c) return
+    const ctx = c.getContext('2d'); const pt = getPos(e, c)
+    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
+    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
+    lastPtRef.current = pt
+  }
+  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
+  const clearSign = () => {
+    const c = canvasRef.current; if (!c) return
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
+  }
+
+  const firmar = () => {
+    const c = canvasRef.current; if (!c) return
+    const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
+    if (!hasStroke) { toast('Dibuja tu firma antes de confirmar'); return }
+    const small = document.createElement('canvas'); small.width = 320; small.height = 120
+    small.getContext('2d').drawImage(c, 0, 0, 320, 120)
+    const signatureData = small.toDataURL('image/jpeg', 0.7)
+    const firmadoAt = new Date().toISOString()
+    const updatedCierres = (db.cierres || []).map(ci => ci.id === selCierre.id
+      ? { ...ci, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } } : ci)
+    const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
+    saveDB({ cierres: updatedCierres, notis:[...(db.notis||[]), noti] })
+    sendPushNotif('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
+    toast('✅ Cierre mensual firmado correctamente')
+    onClose()
+  }
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-drag" />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+          <h2 style={{ margin:0, fontSize:16 }}>📋 Cierre mensual · {selCierre.mes}</h2>
+          {pendingCierres.length > 1 && (
+            <div style={{ display:'flex', gap:4 }}>
+              {pendingCierres.map((_, i) => (
+                <button key={i} onClick={() => setSelIdx(i)} style={{ width:8, height:8, borderRadius:'50%', border:'none', cursor:'pointer', background: i===selIdx?'var(--primary)':'var(--bg-400)', padding:0 }} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12 }}>
+          Generado por {selCierre.generadoPor} · {selCierre.dias} días trabajados · {mhm(selCierre.totalMin)}
+        </div>
+
+        {/* Records snapshot */}
+        <div style={{ background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 12px', marginBottom:14, maxHeight:160, overflowY:'auto' }}>
+          {(selCierre.records_snapshot || []).map((r, i) => {
+            const d = new Date(r.inicio)
+            return (
+              <div key={i} style={{ display:'flex', gap:8, fontSize:12, color:'var(--text2)', padding:'3px 0', borderBottom:'1px solid var(--border)' }}>
+                <span style={{ width:90, flexShrink:0, color:'var(--text3)' }}>{d.toLocaleDateString('es-ES',{day:'numeric',month:'short',weekday:'short'})}</span>
+                <span style={{ flex:1, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.centro||'—'}</span>
+                <span style={{ fontWeight:700, color:'var(--primary-light)', flexShrink:0 }}>{mhm(Math.floor((r.workSecs||0)/60))}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:'var(--text2)' }}>Firma digital</div>
+        <canvas ref={canvasRef} width={640} height={180}
+          style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:6 }}
+          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
+        <button className="btn btn-secondary btn-sm" onClick={clearSign} style={{ marginBottom:14 }}>Borrar</button>
+        <div className="modal-btns">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={firmar}>✅ Firmar y enviar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── ONBOARDING (primer login empleado) ────────────────────────────────────────
+function OnboardingModal({ visible, u, db, saveDB, toast }) {
+  const [step, setStep] = useState(0)
+  const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
+  const [reminderTime, setReminderTime] = useState('08:00')
+  const canvasRef = useRef(null)
+  const drawingRef = useRef(false)
+  const lastPtRef = useRef(null)
+
+  useEffect(() => {
+    if (step === 1 && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d')
+      ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+    }
+  }, [step])
+
+  if (!visible) return null
+
+  const requestNotif = async () => {
+    if (!('Notification' in window)) return
+    const perm = await Notification.requestPermission()
+    setNotifGranted(perm === 'granted')
+  }
+
+  const getPos = (e, c) => {
+    const rect = c.getBoundingClientRect(); const src = e.touches ? e.touches[0] : e
+    return { x: (src.clientX - rect.left) * (c.width / rect.width), y: (src.clientY - rect.top) * (c.height / rect.height) }
+  }
+  const onDown = e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; lastPtRef.current = getPos(e, c); drawingRef.current = true }
+  const onMove = e => {
+    if (!drawingRef.current) return; e.preventDefault()
+    const c = canvasRef.current; if (!c) return
+    const ctx = c.getContext('2d'); const pt = getPos(e, c)
+    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
+    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
+    lastPtRef.current = pt
+  }
+  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
+  const clearSign = () => {
+    const c = canvasRef.current; if (!c) return
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
+  }
+
+  const finish = () => {
+    let firma = null
+    if (canvasRef.current) {
+      const c = canvasRef.current
+      const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+      const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
+      if (hasStroke) {
+        const small = document.createElement('canvas'); small.width = 320; small.height = 120
+        small.getContext('2d').drawImage(c, 0, 0, 320, 120)
+        firma = { data: small.toDataURL('image/jpeg', 0.7), ts: new Date().toISOString() }
+      }
+    }
+    const updatedEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e)
+    const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
+    saveDB({ employees: updatedEmps, firmas: updatedFirmas })
+    toast('✅ ¡Configuración lista! Ya puedes usar la app.')
+  }
+
+  const STEPS = ['Notificaciones', 'Tu firma', 'Recordatorio']
+
+  return (
+    <div className="modal-ov center" style={{ zIndex:1100 }}>
+      <div className="modal center-modal" style={{ maxWidth:400, width:'calc(100% - 32px)' }}>
+        {/* Header */}
+        <div style={{ textAlign:'center', marginBottom:20 }}>
+          <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
+          <div style={{ fontSize:17, fontWeight:800, color:'var(--text)' }}>Bienvenido, {u.name.split(' ')[0]}</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginTop:3 }}>Configura tu cuenta en {STEPS.length} pasos rápidos</div>
+        </div>
+
+        {/* Step indicator */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0, marginBottom:24 }}>
+          {STEPS.map((s, i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center' }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, transition:'all .25s',
+                  background: i < step ? 'var(--green)' : i === step ? 'var(--primary)' : 'var(--bg-500)',
+                  color: i <= step ? '#fff' : 'var(--text4)', boxShadow: i === step ? '0 0 0 3px var(--primary-glow)' : 'none' }}>
+                  {i < step ? '✓' : i + 1}
+                </div>
+                <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color: i===step?'var(--primary-light)':'var(--text4)', whiteSpace:'nowrap' }}>{s}</div>
+              </div>
+              {i < STEPS.length - 1 && <div style={{ width:28, height:2, background: i < step ? 'var(--green)' : 'var(--bg-400)', margin:'0 4px', transition:'all .25s', marginBottom:16 }} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 0: Notifications */}
+        {step === 0 && (
+          <div>
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:40, marginBottom:10 }}>🔔</div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Activar notificaciones</div>
+              <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.7 }}>Recibe alertas de jornadas largas, vacaciones aprobadas y comunicados del administrador.</div>
+            </div>
+            {notifGranted ? (
+              <div style={{ background:'var(--green-dim)', border:'1px solid rgba(16,185,129,.2)', borderRadius:'var(--r)', padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+                <span style={{ fontSize:20 }}>✅</span>
+                <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>Notificaciones activadas</span>
+              </div>
+            ) : (
+              <button className="btn btn-primary" style={{ width:'100%', marginBottom:10 }} onClick={requestNotif}>
+                🔔 Activar notificaciones
+              </button>
+            )}
+            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => setStep(1)}>
+              {notifGranted ? 'Continuar →' : 'Omitir por ahora →'}
+            </button>
+          </div>
+        )}
+
+        {/* Step 1: Signature */}
+        {step === 1 && (
+          <div>
+            <div style={{ textAlign:'center', marginBottom:14 }}>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Dibuja tu firma</div>
+              <div style={{ fontSize:12, color:'var(--text3)' }}>Se usará para firmar documentos y cierres mensuales</div>
+            </div>
+            <canvas ref={canvasRef} width={640} height={180}
+              style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:8 }}
+              onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+              onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
+            <div style={{ display:'flex', gap:8, marginBottom:4 }}>
+              <button className="btn btn-secondary btn-sm" onClick={clearSign}>Borrar</button>
+              <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setStep(2)}>Omitir →</button>
+              <button className="btn btn-primary" onClick={() => setStep(2)}>Guardar →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Reminder */}
+        {step === 2 && (
+          <div>
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:40, marginBottom:10 }}>⏰</div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Recordatorio diario</div>
+              <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.7 }}>Te avisaremos a esta hora si no has fichado entrada hoy. Podrás cambiarlo desde Configuración.</div>
+            </div>
+            <div className="field" style={{ marginBottom:20 }}>
+              <label>Hora del recordatorio</label>
+              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
+                style={{ fontSize:20, fontWeight:700, textAlign:'center', letterSpacing:2 }} />
+            </div>
+            <button className="btn btn-primary" style={{ width:'100%' }} onClick={finish}>
+              ✅ Finalizar — Empezar a usar la app
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

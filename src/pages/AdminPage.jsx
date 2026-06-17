@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN } from '../config/constants.js'
@@ -46,6 +46,8 @@ function NavIcon({ id, size = 17 }) {
 export default function AdminPage() {
   const { db, session, currentAdminPage, setAdminPage, saveDB, toast, setScreen, logout, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const [sideOpen, setSideOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQ, setSearchQ] = useState('')
   const isMobile = window.innerWidth < 768
 
   // Un "encargado" no es administrador: acceso restringido solo a su obra asignada
@@ -65,6 +67,16 @@ export default function AdminPage() {
       }, 3000)
     }
   }, [isEncargado])
+
+  // Buscador global: Cmd+K / Ctrl+K
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(s => !s); setSearchQ('') }
+      if (e.key === 'Escape') setSearchOpen(false)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
   const adminNotis = (db.notis || []).filter(n => n.empId === '__admin__' && !n.leido)
@@ -105,6 +117,13 @@ export default function AdminPage() {
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <SyncBadge />
+          {!isEncargado && (
+            <button onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:8, display:'flex', alignItems:'center', gap:6, padding:'5px 10px', cursor:'pointer', color:'var(--text3)', fontSize:12 }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span style={{ display:'none', '@media(min-width:640px)': { display:'inline' } }}>Buscar</span>
+              <kbd style={{ fontSize:9, padding:'1px 5px', background:'var(--bg-400)', border:'1px solid var(--border)', borderRadius:3, fontFamily:'monospace' }}>⌘K</kbd>
+            </button>
+          )}
           {!isEncargado && (
             <button title="Notificaciones admin" onClick={() => {
               nav('documentos')
@@ -160,7 +179,7 @@ export default function AdminPage() {
               {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} />}
               {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
-              {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} />}
+              {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
@@ -184,6 +203,9 @@ export default function AdminPage() {
           </button>
         )}
       </div>
+
+      {/* Buscador global */}
+      <SearchModal db={db} open={searchOpen} q={searchQ} setQ={setSearchQ} onClose={() => setSearchOpen(false)} onNav={(panel) => { nav(panel); setSearchOpen(false) }} />
     </div>
   )
 }
@@ -864,7 +886,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
 }
 
 // ─── PANEL INFORMES ───────────────────────────────────────────────────────────
-function PanelInformes({ db, toast }) {
+function PanelInformes({ db, toast, saveDB, session }) {
   const [tab, setTab] = useState('resumen')
   const [selEmp, setSelEmp] = useState('')
   const [selMonth, setSelMonth] = useState('')
@@ -936,10 +958,49 @@ function PanelInformes({ db, toast }) {
     toast('✅ Excel descargado')
   }
 
+  const generarCierre = (e, totalMin, days) => {
+    const mes = filterMonth
+    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
+    const cierre = {
+      id: gid(), empId: e.id, empName: e.name, mes,
+      generadoPor: session?.user?.name || 'Admin',
+      generadoAt: new Date().toISOString(),
+      totalMin, dias: days, estado: 'pendiente', firma: null,
+      records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
+    }
+    saveDB({ cierres: [...(db.cierres||[]), cierre] })
+    sendPushNotif(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mes} está listo para firmar.`, 'cierre', '/?tab=perfil')
+    toast(`✅ Cierre enviado a ${e.name}`)
+  }
+
+  const downloadCierrePDF = (cierre, emp) => {
+    const mes = new Date(cierre.mes + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+    const rowsHtml = (cierre.records_snapshot || []).map(r => {
+      const m = Math.floor((r.workSecs||0)/60)
+      const d = new Date(r.inicio)
+      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${r.centro||'—'}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
+    }).join('')
+    const win = window.open('', '_blank')
+    if (!win) { toast('Permite ventanas emergentes'); return }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${cierre.empName}</title>
+    <style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{button{display:none}}</style>
+    </head><body>
+    <h1>Cierre de jornada mensual · ${mes}</h1>
+    <h2>${cierre.empName} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
+    <table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+    <div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
+    ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${cierre.empName} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
+    <div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma empresa</div></div>
+    <br><button onclick="window.print()">Imprimir / Guardar PDF</button>
+    </body></html>`)
+    win.document.close()
+  }
+
   const TABS = [
-    { id:'resumen',  label:'Resumen mensual' },
+    { id:'resumen',  label:'Resumen' },
+    { id:'cierre',   label:'📋 Cierre mensual' },
     { id:'detalle',  label:'Detalle diario' },
-    { id:'ranking',  label:'Ranking horas' },
+    { id:'ranking',  label:'Ranking' },
     { id:'analitica',label:'Analítica' },
     { id:'exportar', label:'Exportar' },
   ]
@@ -965,6 +1026,70 @@ function PanelInformes({ db, toast }) {
         <input type="month" value={filterMonth} onChange={e => setSelMonth(e.target.value)}
           style={{ width:'auto', padding:'7px 12px', fontSize:13, borderRadius:8 }} />
       </div>
+
+      {/* Cierre mensual tab */}
+      {tab === 'cierre' && (
+        <div className="stagger-in">
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
+            📋 <strong>Cierre mensual</strong> — Genera el resumen y envíalo al empleado para firma digital. Cumple con la Ley de Control Horario (RDL 8/2019). El empleado recibirá una notificación para firmar.
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {rows.map(({ e, totalMin, days, diff }) => {
+              const cierre = (db.cierres || []).find(c => c.empId === e.id && c.mes === filterMonth)
+              return (
+                <div key={e.id} className="card" style={{ display:'flex', alignItems:'center', gap:14 }}>
+                  <div style={{ width:40, height:40, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700 }}>{e.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                      {days} días · {mhm(totalMin)} · <span style={{ color: diff>=0?'var(--green)':'var(--red)' }}>{diff>=0?'+':''}{mhm(Math.abs(diff))}</span>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
+                    {cierre ? (
+                      <>
+                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
+                          {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente firma'}
+                        </span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre, e)}>PDF</button>
+                      </>
+                    ) : (
+                      <button className="btn btn-primary btn-sm" onClick={() => generarCierre(e, totalMin, days)} disabled={!days}>
+                        Enviar cierre
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {!rows.length && <div className="empty">Sin empleados activos</div>}
+          </div>
+
+          {/* Historial de cierres firmados */}
+          {(db.cierres||[]).filter(c => c.estado==='firmado').length > 0 && (
+            <div style={{ marginTop:28 }}>
+              <div className="adm-section-title" style={{ marginBottom:12 }}>Cierres firmados</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {(db.cierres||[]).filter(c => c.estado==='firmado').sort((a,b) => b.mes.localeCompare(a.mes)).slice(0,20).map(c => {
+                  const emp = (db.employees||[]).find(e => e.id === c.empId)
+                  return (
+                    <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
+                      <div style={{ fontSize:18 }}>✅</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:600 }}>{c.empName} · {c.mes}</div>
+                        <div style={{ fontSize:11, color:'var(--text3)' }}>Firmado {new Date(c.firma?.firmadoAt).toLocaleDateString('es-ES')} · {mhm(c.totalMin)}</div>
+                      </div>
+                      <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c, emp)}>PDF</button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Resumen tab */}
       {tab === 'resumen' && (
@@ -1694,6 +1819,71 @@ function PanelAuditoria({ db }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── BUSCADOR GLOBAL ──────────────────────────────────────────────────────────
+function SearchModal({ db, open, q, setQ, onClose, onNav }) {
+  const inputRef = useRef(null)
+
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 50) }, [open])
+
+  const results = useMemo(() => {
+    if (!q || q.length < 1) return []
+    const lq = q.toLowerCase()
+    const emps = (db.employees || []).filter(e => !e.baja && e.name.toLowerCase().includes(lq)).slice(0, 4)
+      .map(e => ({ type:'emp', label:e.name, sub:e.role==='encargado'?'Encargado':e.role==='jefe_obra'?'Jefe de Obra':'Empleado', panel:'empleados', color:e.color }))
+    const recs = (db.records || []).filter(r => r.fin && (r.empName?.toLowerCase().includes(lq) || r.centro?.toLowerCase().includes(lq))).slice(0, 4)
+      .map(r => ({ type:'rec', label:r.empName, sub:(r.centro||'')+ ' · '+r.inicio.slice(0,10), panel:'fichajes' }))
+    const obras = (db.obras || []).filter(o => o.nombre?.toLowerCase().includes(lq)).slice(0, 3)
+      .map(o => ({ type:'obra', label:o.nombre, sub:o.estado||'activa', panel:'obras' }))
+    const centros = (db.centrosTrabajo || []).filter(c => c.toLowerCase().includes(lq)).slice(0, 2)
+      .map(c => ({ type:'centro', label:c, sub:'Centro de trabajo', panel:'obras' }))
+    return [...emps, ...recs, ...obras, ...centros]
+  }, [q, db])
+
+  if (!open) return null
+  return (
+    <div className="modal-ov center" onClick={onClose} style={{ zIndex:1200 }}>
+      <div className="modal center-modal" onClick={e => e.stopPropagation()}
+        style={{ maxWidth:520, width:'calc(100% - 24px)', padding:0, overflow:'hidden' }}>
+        {/* Search input */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderBottom:'1px solid var(--border)' }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--text4)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Buscar empleados, fichajes, obras…"
+            style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:15, color:'var(--text)', fontFamily:'inherit' }} />
+          <kbd style={{ fontSize:10, padding:'2px 7px', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:5, color:'var(--text4)', fontFamily:'monospace', flexShrink:0 }}>ESC</kbd>
+        </div>
+        {/* Results */}
+        <div style={{ maxHeight:380, overflowY:'auto' }}>
+          {!q && (
+            <div style={{ padding:'28px 16px', textAlign:'center', color:'var(--text4)', fontSize:13 }}>
+              Escribe para buscar empleados, fichajes y obras
+              <div style={{ marginTop:8, fontSize:11 }}>Atajo: <kbd style={{ padding:'2px 6px', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:4, fontFamily:'monospace' }}>⌘K</kbd> · <kbd style={{ padding:'2px 6px', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:4, fontFamily:'monospace' }}>Ctrl+K</kbd></div>
+            </div>
+          )}
+          {q && !results.length && (
+            <div style={{ padding:'28px 16px', textAlign:'center', color:'var(--text4)', fontSize:13 }}>Sin resultados para "{q}"</div>
+          )}
+          {results.map((r, i) => (
+            <div key={i} onClick={() => onNav(r.panel)} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 16px', cursor:'pointer', transition:'background .1s', borderBottom:'1px solid var(--border)' }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--bg-600)'}
+              onMouseLeave={e => e.currentTarget.style.background=''}>
+              <div style={{ width:34, height:34, borderRadius:9, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:r.type==='emp'?13:16, fontWeight:700, color:'#fff',
+                background: r.type==='emp'?(r.color||'var(--primary)'):r.type==='rec'?'var(--primary-dim)':r.type==='obra'?'rgba(0,212,255,.1)':'var(--green-dim)' }}>
+                {r.type==='emp' ? (r.label||'?').slice(0,2).toUpperCase() : r.type==='rec' ? '⏱' : r.type==='obra' ? '🏗' : '📍'}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.label}</div>
+                <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{r.sub}</div>
+              </div>
+              <div style={{ fontSize:10, color:'var(--text4)', fontWeight:700, letterSpacing:'.8px', textTransform:'uppercase', flexShrink:0 }}>{r.panel}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
