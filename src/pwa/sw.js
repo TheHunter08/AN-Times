@@ -3,6 +3,12 @@ import { registerRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
+// Force immediate activation of new SW versions (no waiting for tab close)
+self.skipWaiting()
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 

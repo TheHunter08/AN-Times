@@ -19,3 +19,13 @@ createRoot(document.getElementById('root')).render(
 )
 
 requestAnimationFrame(removeSplash)
+
+// Auto-reload when a new SW takes control (PWA update without manual refresh)
+if ('serviceWorker' in navigator) {
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return
+    refreshing = true
+    window.location.reload()
+  })
+}
