@@ -20,7 +20,7 @@ export default defineConfig({
         name: 'TIMES INC',
         short_name: 'TIMES',
         description: 'Control de jornada laboral',
-        theme_color: '#0F172A',
+        theme_color: '#6C63FF',
         background_color: '#0F172A',
         display: 'standalone',
         orientation: 'portrait',
@@ -28,6 +28,29 @@ export default defineConfig({
         start_url: '/',
         icons: [
           { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }
+        ],
+        shortcuts: [
+          {
+            name: 'Fichar entrada',
+            short_name: 'Fichar',
+            description: 'Registrar entrada de jornada',
+            url: '/?tab=inicio',
+            icons: [{ src: '/icon.svg', sizes: 'any' }]
+          },
+          {
+            name: 'Mi jornada',
+            short_name: 'Jornada',
+            description: 'Ver horas trabajadas hoy',
+            url: '/?tab=jornada',
+            icons: [{ src: '/icon.svg', sizes: 'any' }]
+          },
+          {
+            name: 'Vacaciones',
+            short_name: 'Vacaciones',
+            description: 'Ver y solicitar vacaciones',
+            url: '/?tab=vacaciones',
+            icons: [{ src: '/icon.svg', sizes: 'any' }]
+          }
         ]
       }
     })

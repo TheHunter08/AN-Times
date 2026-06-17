@@ -1633,16 +1633,15 @@ function PanelMiObra({ db, toast, saveDB, session }) {
       </div>
 
       {editing && (
-        <div className="modal-ov" onClick={() => setEditing(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380 }}>
-            <div className="modal-drag" />
+        <div className="modal-ov center" onClick={() => setEditing(null)}>
+          <div className="modal center-modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380, width:'calc(100% - 32px)' }}>
             <h2 style={{ margin:'0 0 16px', fontSize:16 }}>Modificar jornada</h2>
             <div className="field" style={{ marginBottom:12 }}>
-              <label>Entrada</label>
+              <label>ENTRADA</label>
               <input type="datetime-local" value={editing.inicio} onChange={e => setEditing(s => ({ ...s, inicio:e.target.value }))} />
             </div>
             <div className="field" style={{ marginBottom:16 }}>
-              <label>Salida</label>
+              <label>SALIDA</label>
               <input type="datetime-local" value={editing.fin} onChange={e => setEditing(s => ({ ...s, fin:e.target.value }))} />
             </div>
             <div className="modal-btns">

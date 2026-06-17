@@ -1,0 +1,339 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1200" width="1800" height="1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="0.48" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="18%" cy="8%" r="62%">
+      <stop offset="0" stop-color="#6C63FF" stop-opacity=".38"/>
+      <stop offset=".42" stop-color="#6C63FF" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#6C63FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="86%" cy="16%" r="58%">
+      <stop offset="0" stop-color="#00D4FF" stop-opacity=".28"/>
+      <stop offset=".45" stop-color="#00D4FF" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#00D4FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="58%" cy="96%" r="56%">
+      <stop offset="0" stop-color="#10B981" stop-opacity=".13"/>
+      <stop offset=".42" stop-color="#10B981" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#10B981" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="primary" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6C63FF"/>
+      <stop offset=".55" stop-color="#7C5CFF"/>
+      <stop offset="1" stop-color="#00D4FF"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827" stop-opacity=".96"/>
+      <stop offset="1" stop-color="#0F172A" stop-opacity=".90"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="fitnessRing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6C63FF"/>
+      <stop offset=".5" stop-color="#00D4FF"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="30" stdDeviation="34" flood-color="#000000" flood-opacity=".50"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000000" flood-opacity=".30"/>
+    </filter>
+    <filter id="buttonGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      .title{font:900 30px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .hero{font:900 50px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .h1{font:850 31px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .h2{font:800 19px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .h3{font:800 15px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .body{font:500 13px Inter, SF Pro Text, Segoe UI, Arial, sans-serif;fill:#94A3B8;letter-spacing:0}
+      .small{font:650 12px Inter, SF Pro Text, Segoe UI, Arial, sans-serif;fill:#CBD5E1;letter-spacing:0}
+      .tiny{font:750 10px Inter, SF Pro Text, Segoe UI, Arial, sans-serif;fill:#94A3B8;letter-spacing:.05em}
+      .num{font:900 31px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .numXL{font:900 54px Inter, SF Pro Display, Segoe UI, Arial, sans-serif;fill:#FFFFFF;letter-spacing:0}
+      .line{stroke:#263247;stroke-width:1}
+      .stroke{stroke:#334155;stroke-width:1}
+    </style>
+  </defs>
+
+  <rect width="1800" height="1200" fill="url(#bg)"/>
+  <rect width="1800" height="1200" fill="url(#glowA)"/>
+  <rect width="1800" height="1200" fill="url(#glowB)"/>
+  <rect width="1800" height="1200" fill="url(#glowC)"/>
+
+  <g transform="translate(46 42)">
+    <rect x="0" y="0" width="50" height="50" rx="16" fill="url(#primary)" filter="url(#buttonGlow)"/>
+    <rect x="14" y="14" width="22" height="6" rx="3" fill="#fff"/>
+    <rect x="22" y="14" width="6" height="24" rx="3" fill="#fff"/>
+    <circle cx="37" cy="37" r="7" fill="#00D4FF"/>
+    <path d="M37 33v5l4 2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <text x="66" y="32" class="title">TIMES INC</text>
+    <text x="66" y="54" class="body">Apple x Stripe x Linear direction - mobile first, PWA native, glass navigation</text>
+  </g>
+
+  <g transform="translate(48 126)">
+    <text x="0" y="0" class="hero">Redesign vision</text>
+    <text x="0" y="36" class="body">Una experiencia premium de fichaje horario con documentos, informes, auditoria, notificaciones y equipos en tiempo real.</text>
+  </g>
+
+  <!-- Primary mobile app -->
+  <g transform="translate(48 208)" filter="url(#shadow)">
+    <rect x="0" y="0" width="356" height="778" rx="48" fill="#050815" stroke="#334155" stroke-width="3"/>
+    <rect x="14" y="14" width="328" height="750" rx="38" fill="#090F1D"/>
+    <rect x="128" y="26" width="98" height="25" rx="13" fill="#050815"/>
+    <text x="36" y="50" font-family="Inter,Arial" font-size="13" font-weight="850" fill="#fff">9:41</text>
+    <g transform="translate(32 84)">
+      <text x="0" y="0" class="small">Hola Ismael</text>
+      <text x="0" y="38" font-family="Inter,Arial" font-size="31" font-weight="900" fill="#fff">Buen dia</text>
+      <text x="0" y="65" class="body">16 Junio 2026</text>
+      <rect x="258" y="-16" width="42" height="42" rx="21" fill="#111827" stroke="#334155"/>
+      <path d="M279 -1c-8 0-12 6-12 13v10h24V12c0-7-4-13-12-13z" fill="none" stroke="#CBD5E1" stroke-width="2"/>
+      <circle cx="291" cy="-5" r="5" fill="#EF4444"/>
+    </g>
+
+    <g transform="translate(28 184)">
+      <rect x="0" y="0" width="140" height="104" rx="24" fill="url(#card)" stroke="#263247"/>
+      <text x="18" y="29" class="tiny">HORAS HOY</text>
+      <text x="18" y="67" class="num">08:32</text>
+      <text x="18" y="91" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#10B981">+12% vs ayer</text>
+      <circle cx="115" cy="75" r="15" fill="#6C63FF"/>
+      <path d="M115 66v10l7 4" fill="none" stroke="#fff" stroke-width="2"/>
+    </g>
+    <g transform="translate(184 184)">
+      <rect x="0" y="0" width="140" height="104" rx="24" fill="url(#card)" stroke="#263247"/>
+      <text x="18" y="29" class="tiny">SEMANA</text>
+      <text x="18" y="67" class="num">38:45</text>
+      <text x="18" y="91" class="tiny">OBJETIVO 40H</text>
+      <circle cx="115" cy="75" r="15" fill="#00D4FF"/>
+      <rect x="108" y="68" width="14" height="14" rx="3" fill="none" stroke="#fff" stroke-width="2"/>
+    </g>
+    <g transform="translate(28 304)">
+      <rect x="0" y="0" width="140" height="104" rx="24" fill="url(#card)" stroke="#263247"/>
+      <text x="18" y="29" class="tiny">COSTE</text>
+      <text x="18" y="67" class="num">562EUR</text>
+      <text x="18" y="91" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#10B981">+8% semana</text>
+      <circle cx="115" cy="75" r="15" fill="#10B981"/>
+    </g>
+    <g transform="translate(184 304)">
+      <rect x="0" y="0" width="140" height="104" rx="24" fill="url(#card)" stroke="#263247"/>
+      <text x="18" y="29" class="tiny">PRODUCTIVIDAD</text>
+      <text x="18" y="67" class="num">97%</text>
+      <text x="18" y="91" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#FBBF24">Excelente</text>
+      <circle cx="115" cy="75" r="15" fill="#F59E0B"/>
+    </g>
+
+    <g transform="translate(28 438)">
+      <rect x="0" y="0" width="296" height="118" rx="28" fill="url(#primary)" filter="url(#buttonGlow)"/>
+      <rect x="1" y="1" width="294" height="116" rx="27" fill="url(#glass)" opacity=".65"/>
+      <circle cx="70" cy="59" r="34" fill="#FFFFFF" opacity=".18"/>
+      <circle cx="70" cy="59" r="23" fill="#FFFFFF" opacity=".16"/>
+      <path d="M70 45v17l11 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <text x="124" y="52" class="h2">INICIAR</text>
+      <text x="124" y="78" class="h2">JORNADA</text>
+      <text x="124" y="100" class="body" fill="#fff">Entrada: --:--</text>
+    </g>
+
+    <g transform="translate(28 584)">
+      <rect x="0" y="0" width="296" height="76" rx="24" fill="#111827" stroke="#263247"/>
+      <text x="18" y="28" class="h3">Documentos pendientes</text>
+      <text x="18" y="52" class="body">Nomina y jornada listas para firmar.</text>
+      <rect x="210" y="20" width="66" height="36" rx="18" fill="#6C63FF"/>
+      <text x="228" y="43" font-family="Inter,Arial" font-size="12" font-weight="900" fill="#fff">Abrir</text>
+    </g>
+
+    <g transform="translate(42 688)">
+      <rect x="0" y="0" width="268" height="58" rx="29" fill="#111827" stroke="#334155" opacity=".92"/>
+      <circle cx="32" cy="29" r="12" fill="#6C63FF"/>
+      <circle cx="86" cy="29" r="10" fill="#1F2937"/>
+      <circle cx="134" cy="29" r="27" fill="url(#primary)" filter="url(#buttonGlow)"/>
+      <path d="M134 18v22M123 29h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="184" cy="29" r="10" fill="#1F2937"/>
+      <circle cx="236" cy="29" r="10" fill="#1F2937"/>
+    </g>
+  </g>
+
+  <!-- Dynamic island modal phone -->
+  <g transform="translate(430 244)" filter="url(#shadow)">
+    <rect x="0" y="0" width="328" height="704" rx="46" fill="#050815" stroke="#334155" stroke-width="3"/>
+    <rect x="14" y="14" width="300" height="676" rx="36" fill="#080E1C"/>
+    <rect x="109" y="27" width="110" height="28" rx="14" fill="#050815"/>
+    <circle cx="164" cy="292" r="104" fill="none" stroke="#1F2937" stroke-width="18"/>
+    <circle cx="164" cy="292" r="92" fill="none" stroke="#6C63FF" stroke-width="12" stroke-dasharray="420 160" stroke-linecap="round" transform="rotate(-84 164 292)"/>
+    <circle cx="164" cy="292" r="72" fill="none" stroke="#00D4FF" stroke-width="8" stroke-dasharray="260 190" stroke-linecap="round" transform="rotate(52 164 292)"/>
+    <text x="99" y="302" class="numXL">08:42</text>
+    <text x="119" y="333" class="body">Hora actual</text>
+    <text x="104" y="122" class="h2">Fichar entrada</text>
+    <text x="91" y="150" class="body">Martes, 16 de Junio</text>
+    <g transform="translate(22 504)">
+      <rect x="0" y="0" width="284" height="162" rx="34" fill="#111827" stroke="#334155"/>
+      <circle cx="142" cy="54" r="32" fill="#0B3B2D" stroke="#10B981" stroke-width="2"/>
+      <path d="M128 53l12 12 24-29" fill="none" stroke="#10B981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="82" y="105" class="h2">Entrada registrada</text>
+      <text x="118" y="134" class="h2">08:42:31</text>
+    </g>
+  </g>
+
+  <!-- Desktop dashboard -->
+  <g transform="translate(790 126)" filter="url(#shadow)">
+    <rect x="0" y="0" width="952" height="664" rx="24" fill="#0B1020" stroke="#334155" stroke-width="2"/>
+    <rect x="0" y="0" width="210" height="664" rx="24" fill="#080E1C"/>
+    <path d="M210 0v664" class="line"/>
+    <g transform="translate(30 28)">
+      <rect x="0" y="0" width="30" height="30" rx="10" fill="url(#primary)"/>
+      <rect x="8" y="8" width="14" height="4" rx="2" fill="#fff"/>
+      <rect x="13" y="8" width="4" height="16" rx="2" fill="#fff"/>
+      <text x="42" y="22" class="h2">TIMES INC</text>
+    </g>
+    <g transform="translate(28 88)">
+      <rect x="0" y="0" width="156" height="38" rx="12" fill="#31256E"/>
+      <text x="48" y="25" class="small" fill="#fff">Dashboard</text>
+      <circle cx="24" cy="19" r="8" fill="#6C63FF"/>
+      <g transform="translate(0 58)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Jornadas</text></g>
+      <g transform="translate(0 104)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Calendario</text></g>
+      <g transform="translate(0 150)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Equipos</text></g>
+      <g transform="translate(0 196)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Informes</text></g>
+      <g transform="translate(0 242)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Auditoria</text></g>
+      <g transform="translate(0 288)"><circle cx="24" cy="0" r="7" fill="#334155"/><text x="48" y="5" class="small">Ajustes</text></g>
+    </g>
+
+    <g transform="translate(240 26)">
+      <rect x="0" y="0" width="270" height="40" rx="14" fill="#111827" stroke="#263247"/>
+      <text x="42" y="25" class="tiny">BUSCAR...</text>
+      <circle cx="25" cy="20" r="7" fill="none" stroke="#94A3B8"/>
+      <rect x="600" y="0" width="128" height="40" rx="14" fill="#111827" stroke="#263247"/>
+      <text x="625" y="25" class="small">16 Junio 2026</text>
+    </g>
+
+    <g transform="translate(240 94)">
+      <text x="0" y="0" class="h1">Dashboard</text>
+      <text x="0" y="28" class="body">Resumen general de la empresa</text>
+    </g>
+
+    <g transform="translate(240 154)">
+      <g>
+        <rect x="0" y="0" width="170" height="92" rx="16" fill="url(#card)" stroke="#263247"/>
+        <circle cx="34" cy="46" r="20" fill="#6C63FF"/>
+        <text x="68" y="34" class="body">Horas hoy</text>
+        <text x="68" y="63" class="num">42h</text>
+        <text x="68" y="81" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#10B981">+9%</text>
+      </g>
+      <g transform="translate(188 0)">
+        <rect x="0" y="0" width="170" height="92" rx="16" fill="url(#card)" stroke="#263247"/>
+        <circle cx="34" cy="46" r="20" fill="#00D4FF"/>
+        <text x="68" y="34" class="body">Activos</text>
+        <text x="68" y="63" class="num">12</text>
+        <text x="68" y="81" class="tiny">DE 15</text>
+      </g>
+      <g transform="translate(376 0)">
+        <rect x="0" y="0" width="170" height="92" rx="16" fill="url(#card)" stroke="#263247"/>
+        <circle cx="34" cy="46" r="20" fill="#EF4444"/>
+        <text x="68" y="34" class="body">Ausencias</text>
+        <text x="68" y="63" class="num">2</text>
+        <text x="68" y="81" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#EF4444">+1 vs ayer</text>
+      </g>
+      <g transform="translate(564 0)">
+        <rect x="0" y="0" width="170" height="92" rx="16" fill="url(#card)" stroke="#263247"/>
+        <circle cx="34" cy="46" r="20" fill="#10B981"/>
+        <text x="68" y="34" class="body">Productividad</text>
+        <text x="68" y="63" class="num">97%</text>
+        <text x="68" y="81" font-family="Inter,Arial" font-size="10" font-weight="850" fill="#10B981">Excelente</text>
+      </g>
+    </g>
+
+    <g transform="translate(240 268)">
+      <rect x="0" y="0" width="410" height="224" rx="18" fill="url(#card)" stroke="#263247"/>
+      <text x="22" y="34" class="h3">Horas trabajadas</text>
+      <g opacity=".42">
+        <line x1="24" y1="72" x2="380" y2="72" class="line"/>
+        <line x1="24" y1="112" x2="380" y2="112" class="line"/>
+        <line x1="24" y1="152" x2="380" y2="152" class="line"/>
+        <line x1="24" y1="192" x2="380" y2="192" class="line"/>
+      </g>
+      <path d="M32 184 L82 136 L132 112 L180 146 L232 136 L282 98 L333 116 L378 86" fill="none" stroke="#6C63FF" stroke-width="4" stroke-linecap="round"/>
+      <path d="M32 184 L82 136 L132 112 L180 146 L232 136 L282 98 L333 116 L378 86 L378 202 L32 202z" fill="#6C63FF" opacity=".16"/>
+      <circle cx="132" cy="112" r="5" fill="#fff"/>
+      <rect x="140" y="70" width="82" height="42" rx="12" fill="#1F2937" stroke="#334155"/>
+      <text x="163" y="88" class="tiny">MAR 16</text>
+      <text x="154" y="106" class="h3">42h 18m</text>
+    </g>
+    <g transform="translate(674 268)">
+      <rect x="0" y="0" width="300" height="224" rx="18" fill="url(#card)" stroke="#263247"/>
+      <text x="22" y="34" class="h3">Distribucion</text>
+      <circle cx="110" cy="126" r="62" fill="none" stroke="#6C63FF" stroke-width="30" stroke-dasharray="270 120" transform="rotate(-90 110 126)"/>
+      <circle cx="110" cy="126" r="62" fill="none" stroke="#10B981" stroke-width="30" stroke-dasharray="70 320" transform="rotate(165 110 126)"/>
+      <circle cx="110" cy="126" r="62" fill="none" stroke="#EF4444" stroke-width="30" stroke-dasharray="45 345" transform="rotate(226 110 126)"/>
+      <circle cx="110" cy="126" r="34" fill="#111827"/>
+      <text x="82" y="126" class="num">168h</text>
+      <text x="96" y="146" class="body">Total</text>
+      <g transform="translate(200 78)">
+        <circle cx="0" cy="0" r="5" fill="#6C63FF"/><text x="15" y="4" class="small">Jornadas</text>
+        <circle cx="0" cy="35" r="5" fill="#10B981"/><text x="15" y="39" class="small">Extras</text>
+        <circle cx="0" cy="70" r="5" fill="#EF4444"/><text x="15" y="74" class="small">Ausencias</text>
+      </g>
+    </g>
+
+    <g transform="translate(240 516)">
+      <rect x="0" y="0" width="410" height="112" rx="18" fill="url(#card)" stroke="#263247"/>
+      <text x="22" y="32" class="h3">Actividad reciente</text>
+      <text x="22" y="63" class="small">Ana Lopez ha firmado nomina</text><text x="348" y="63" class="body">08:15</text>
+      <line x1="22" y1="78" x2="386" y2="78" class="line"/>
+      <text x="22" y="101" class="small">Pedro inicia descanso</text><text x="348" y="101" class="body">13:30</text>
+    </g>
+    <g transform="translate(674 516)">
+      <rect x="0" y="0" width="300" height="112" rx="18" fill="url(#card)" stroke="#263247"/>
+      <text x="22" y="32" class="h3">Empleados activos</text>
+      <circle cx="32" cy="65" r="7" fill="#10B981"/><text x="48" y="69" class="small">Franklin trabajando</text>
+      <circle cx="32" cy="94" r="7" fill="#F59E0B"/><text x="48" y="98" class="small">Pedro descanso</text>
+    </g>
+  </g>
+
+  <!-- Mini screens -->
+  <g transform="translate(48 1018)">
+    <rect x="0" y="0" width="1540" height="112" rx="28" fill="#0B1020" stroke="#334155"/>
+    <g transform="translate(38 28)">
+      <rect x="0" y="0" width="58" height="58" rx="18" fill="#111827"/>
+      <text x="78" y="23" class="h3">PWA perfecta</text>
+      <text x="78" y="46" class="body">Safe Area real, Home Indicator, Dynamic Island, teclado iOS y scroll bounce bajo control.</text>
+    </g>
+    <g transform="translate(360 28)">
+      <rect x="0" y="0" width="58" height="58" rx="18" fill="#111827"/>
+      <text x="78" y="23" class="h3">Firebase compatible</text>
+      <text x="78" y="46" class="body">Misma logica actual, datos seguros, sync optimizado y notificaciones con deep-link.</text>
+    </g>
+    <g transform="translate(722 28)">
+      <rect x="0" y="0" width="58" height="58" rx="18" fill="#111827"/>
+      <text x="78" y="23" class="h3">Informes Excel/PDF</text>
+      <text x="78" y="46" class="body">Resumen, fichajes, detalle diario, auditoria y costes exportables.</text>
+    </g>
+    <g transform="translate(1080 28)">
+      <rect x="0" y="0" width="58" height="58" rx="18" fill="#111827"/>
+      <text x="78" y="23" class="h3">Premium ready</text>
+      <text x="78" y="46" class="body">IA de anomalías, predicciones, widgets, Watch y recordatorios inteligentes.</text>
+    </g>
+  </g>
+
+  <!-- Feature module strip -->
+  <g transform="translate(1202 820)">
+    <rect x="0" y="0" width="540" height="166" rx="28" fill="#0B1020" stroke="#334155" filter="url(#softShadow)"/>
+    <text x="28" y="42" class="h2">Funciones premium</text>
+    <g transform="translate(28 68)">
+      <rect x="0" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="37" cy="27" r="15" fill="#3B2D80"/><text x="18" y="59" class="tiny">IA</text>
+      <rect x="88" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="125" cy="27" r="15" fill="#10384A"/><text x="103" y="59" class="tiny">PREDICT</text>
+      <rect x="176" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="213" cy="27" r="15" fill="#3A2D18"/><text x="196" y="59" class="tiny">EXCEL</text>
+      <rect x="264" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="301" cy="27" r="15" fill="#153D31"/><text x="280" y="59" class="tiny">GEO</text>
+      <rect x="352" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="389" cy="27" r="15" fill="#3B2D80"/><text x="371" y="59" class="tiny">WATCH</text>
+      <rect x="440" y="0" width="74" height="74" rx="18" fill="#111827" stroke="#263247"/><circle cx="477" cy="27" r="15" fill="#10384A"/><text x="457" y="59" class="tiny">WIDGET</text>
+    </g>
+  </g>
+</svg>

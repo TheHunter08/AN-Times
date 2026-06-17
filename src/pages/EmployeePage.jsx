@@ -18,6 +18,15 @@ export default function EmployeePage() {
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
 
+  // Manejar shortcuts del manifest PWA (?tab=inicio|jornada|vacaciones|calendario|perfil)
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    if (tab && ['inicio','jornada','vacaciones','calendario','perfil'].includes(tab)) {
+      setEmpTab(tab)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   // Clock tick
   useEffect(() => {
     const tick = () => {
@@ -123,6 +132,17 @@ export default function EmployeePage() {
     return () => { clearInterval(iv); clearTimeout(t) }
   }, [u])
 
+  // App Badge API — muestra el contador de no leídas en el icono de la app instalada
+  useEffect(() => {
+    if (!u || !('setAppBadge' in navigator)) return
+    const cnt = (db.notis || []).filter(n => n.empId === u.id && !n.leido).length
+    const total = cnt
+    try {
+      if (total > 0) navigator.setAppBadge(total)
+      else navigator.clearAppBadge()
+    } catch {}
+  }, [db.notis, u])
+
   const openRec = () => (db.records || []).find(r => r.empId === u?.id && !r.fin)
 
   // === TIMER ACTIONS ===
@@ -224,7 +244,9 @@ export default function EmployeePage() {
           </button>
           <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ''}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span className={`noti-dot${unread > 0 ? ' show' : ''}`} />
+            {unread > 0 && (
+              <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1, pointerEvents:'none' }} aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
+            )}
           </button>
           <button className="icon-btn logout-btn" onClick={doLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -913,6 +935,7 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const markRead = () => {
     const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
     saveDB({ notis: updated })
+    try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   return (
     <div className="modal-ov" onClick={onClose}>

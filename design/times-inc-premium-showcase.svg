@@ -1,0 +1,477 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1180" width="1800" height="1180">
+  <defs>
+    <radialGradient id="pageGlowA" cx="24%" cy="10%" r="58%">
+      <stop offset="0" stop-color="#7C5CFF" stop-opacity=".22"/>
+      <stop offset=".48" stop-color="#5E6AD2" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#090C14" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pageGlowB" cx="88%" cy="32%" r="52%">
+      <stop offset="0" stop-color="#14D0E8" stop-opacity=".14"/>
+      <stop offset=".46" stop-color="#5E6AD2" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#090C14" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090C14"/>
+      <stop offset=".55" stop-color="#0D1117"/>
+      <stop offset="1" stop-color="#111720"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C5CFF"/>
+      <stop offset=".52" stop-color="#5E6AD2"/>
+      <stop offset="1" stop-color="#14D0E8"/>
+    </linearGradient>
+    <linearGradient id="brandHot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E040FB"/>
+      <stop offset=".55" stop-color="#7C5CFF"/>
+      <stop offset="1" stop-color="#0EA5FF"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#161D2A"/>
+      <stop offset="1" stop-color="#0D1117"/>
+    </linearGradient>
+    <linearGradient id="panel2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111720"/>
+      <stop offset="1" stop-color="#090C14"/>
+    </linearGradient>
+    <linearGradient id="phoneGlass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090C14"/>
+      <stop offset=".7" stop-color="#0D1117"/>
+      <stop offset="1" stop-color="#121826"/>
+    </linearGradient>
+    <linearGradient id="purpleCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C5CFF" stop-opacity=".45"/>
+      <stop offset=".48" stop-color="#5E6AD2" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#14D0E8" stop-opacity=".42"/>
+    </linearGradient>
+    <filter id="deepShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="30" stdDeviation="36" flood-color="#000000" flood-opacity=".45"/>
+    </filter>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      .pageTitle{font:900 24px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4}
+      .h1{font:850 31px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4;letter-spacing:0}
+      .h2{font:800 17px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4;letter-spacing:0}
+      .h3{font:800 14px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4;letter-spacing:0}
+      .body{font:500 13px Inter,Segoe UI,Arial,sans-serif;fill:#A8BAC8;letter-spacing:0}
+      .small{font:650 12px Inter,Segoe UI,Arial,sans-serif;fill:#A8BAC8;letter-spacing:0}
+      .tiny{font:750 10px Inter,Segoe UI,Arial,sans-serif;fill:#6A7F96;letter-spacing:.05em}
+      .num{font:900 28px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4;letter-spacing:0}
+      .numBig{font:900 45px Inter,Segoe UI,Arial,sans-serif;fill:#E2EAF4;letter-spacing:0}
+      .line{stroke:#293750;stroke-width:1}
+      .deviceStroke{stroke:#293750;stroke-width:2}
+      .muted{fill:#6A7F96}
+      .text{fill:#E2EAF4}
+    </style>
+  </defs>
+
+  <rect width="1800" height="1180" fill="url(#pageBg)"/>
+  <rect width="1800" height="1180" fill="url(#pageGlowA)"/>
+  <rect width="1800" height="1180" fill="url(#pageGlowB)"/>
+
+  <!-- Large phone home -->
+  <g transform="translate(18 18)" filter="url(#deepShadow)">
+    <rect x="0" y="0" width="325" height="690" rx="38" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="14" y="14" width="297" height="662" rx="30" fill="url(#phoneGlass)"/>
+    <text x="38" y="48" font-family="Inter,Segoe UI,Arial" font-size="13" font-weight="800" fill="#E2EAF4">9:41</text>
+    <g transform="translate(38 80)">
+      <text x="0" y="0" class="small">Buenos dias,</text>
+      <text x="0" y="31" font-family="Inter,Segoe UI,Arial" font-size="28" font-weight="900" fill="#E2EAF4">Ismael</text>
+      <text x="0" y="55" class="body">Martes, 16 de Junio de 2026</text>
+      <circle cx="270" cy="6" r="19" fill="#161D2A"/>
+      <path d="M270 -4c-7 0-10 5-10 11v9h20V7c0-6-3-11-10-11z" fill="none" stroke="#A8BAC8" stroke-width="2"/>
+      <circle cx="280" cy="-6" r="5" fill="#F0544C"/>
+    </g>
+    <g transform="translate(30 164)">
+      <text x="0" y="0" font-family="Inter,Segoe UI,Arial" font-size="12" font-weight="900" fill="#E2EAF4">Resumen de hoy</text>
+      <g transform="translate(0 20)">
+        <rect x="0" y="0" width="137" height="101" rx="12" fill="#111720" stroke="#293750"/>
+        <text x="14" y="28" class="small">Horas trabajadas</text>
+        <text x="14" y="59" class="num">07h 32m</text>
+        <text x="14" y="83" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#3DC988">+12% vs ayer</text>
+        <circle cx="120" cy="74" r="12" fill="#7C5CFF"/>
+      </g>
+      <g transform="translate(149 20)">
+        <rect x="0" y="0" width="137" height="101" rx="12" fill="#111720" stroke="#293750"/>
+        <text x="14" y="28" class="small">Horas semanales</text>
+        <text x="14" y="59" class="num">38h 45m</text>
+        <text x="14" y="83" class="tiny">Objetivo: 40h</text>
+        <circle cx="120" cy="74" r="12" fill="#14D0E8"/>
+      </g>
+      <g transform="translate(0 116)">
+        <rect x="0" y="0" width="137" height="101" rx="12" fill="#111720" stroke="#293750"/>
+        <text x="14" y="28" class="small">Documentos</text>
+        <text x="14" y="59" class="num">3</text>
+        <text x="14" y="83" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#F0974A">Pendientes firma</text>
+        <circle cx="120" cy="74" r="12" fill="#F0974A"/>
+      </g>
+      <g transform="translate(149 116)">
+        <rect x="0" y="0" width="137" height="101" rx="12" fill="#111720" stroke="#293750"/>
+        <text x="14" y="28" class="small">Productividad</text>
+        <text x="14" y="59" class="num">97%</text>
+        <text x="14" y="83" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#3DC988">Excelente</text>
+        <circle cx="120" cy="74" r="12" fill="#3DC988"/>
+      </g>
+    </g>
+    <g transform="translate(30 422)">
+      <rect x="0" y="0" width="286" height="90" rx="14" fill="url(#purpleCard)" stroke="#7C5CFF"/>
+      <circle cx="68" cy="45" r="26" fill="#7C5CFF" filter="url(#softGlow)"/>
+      <path d="M68 31v16l10 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <text x="112" y="41" class="h3">INICIAR JORNADA</text>
+      <text x="112" y="66" class="body">Entrada: --:--</text>
+    </g>
+    <g transform="translate(30 540)">
+      <text x="0" y="0" class="h3">Proximos eventos</text>
+      <rect x="0" y="24" width="286" height="62" rx="14" fill="#111720" stroke="#293750"/>
+      <circle cx="22" cy="55" r="12" fill="#3a291b"/>
+      <text x="48" y="52" class="small">Descanso</text>
+      <text x="48" y="70" class="body">13:30 - 14:00</text>
+      <circle cx="262" cy="55" r="17" fill="#222E42"/>
+    </g>
+    <g transform="translate(30 628)">
+      <rect x="0" y="0" width="286" height="48" rx="20" fill="#111720" stroke="#293750"/>
+      <circle cx="32" cy="24" r="11" fill="#5E6AD2"/>
+      <circle cx="100" cy="24" r="10" fill="#304060"/>
+      <circle cx="143" cy="24" r="29" fill="url(#brand)" filter="url(#softGlow)"/>
+      <text x="135" y="34" font-family="Inter,Segoe UI,Arial" font-size="30" font-weight="300" fill="#fff">+</text>
+      <circle cx="205" cy="24" r="10" fill="#304060"/>
+      <circle cx="264" cy="24" r="10" fill="#304060"/>
+    </g>
+  </g>
+
+  <!-- Punch clock phone -->
+  <g transform="translate(365 18)" filter="url(#deepShadow)">
+    <rect x="0" y="0" width="320" height="690" rx="38" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="14" y="14" width="292" height="662" rx="30" fill="url(#phoneGlass)"/>
+    <text x="38" y="48" font-family="Inter,Segoe UI,Arial" font-size="13" font-weight="800" fill="#E2EAF4">9:41</text>
+    <circle cx="38" cy="77" r="16" fill="#111720"/>
+    <text x="34" y="83" font-family="Inter,Segoe UI,Arial" font-size="18" font-weight="400" fill="#fff">×</text>
+    <text x="106" y="110" class="h2">Fichar entrada</text>
+    <text x="91" y="137" class="body">Martes, 16 de Junio de 2026</text>
+    <g transform="translate(54 170)">
+      <circle cx="105" cy="105" r="95" fill="none" stroke="#222E42" stroke-width="18"/>
+      <circle cx="105" cy="105" r="87" fill="none" stroke="#5E6AD2" stroke-width="10" stroke-dasharray="420 130" stroke-linecap="round" transform="rotate(-80 105 105)"/>
+      <circle cx="105" cy="105" r="69" fill="none" stroke="#7C5CFF" stroke-width="7" stroke-dasharray="280 160" stroke-linecap="round" transform="rotate(120 105 105)"/>
+      <text x="53" y="112" class="numBig">08:42</text>
+      <text x="72" y="138" class="body">Hora actual</text>
+    </g>
+    <text x="103" y="404" class="body">Manten pulsado para fichar</text>
+    <circle cx="160" cy="455" r="35" fill="url(#brand)" filter="url(#softGlow)"/>
+    <path d="M160 438v20l13 8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <g transform="translate(0 500)">
+      <rect x="18" y="0" width="284" height="176" rx="30" fill="#111720" stroke="#304060"/>
+      <circle cx="142" cy="60" r="32" fill="#123426" stroke="#3DC988" stroke-width="2"/>
+      <path d="M127 59l12 12 24-28" fill="none" stroke="#3DC988" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="88" y="111" class="h2">Entrada registrada</text>
+      <text x="121" y="139" class="h2">08:42:31</text>
+      <text x="82" y="163" class="body">Martes, 16 de Junio de 2026</text>
+    </g>
+  </g>
+
+  <!-- Desktop admin -->
+  <g transform="translate(705 16)" filter="url(#deepShadow)">
+    <rect x="0" y="0" width="1078" height="704" rx="18" fill="#0D1117" stroke="#304060" stroke-width="2"/>
+    <rect x="0" y="0" width="218" height="704" rx="18" fill="#090C14"/>
+    <path d="M218 0h1v704" class="line"/>
+    <g transform="translate(32 36)">
+      <rect x="0" y="0" width="25" height="25" rx="8" fill="url(#brand)"/>
+      <rect x="7" y="7" width="12" height="4" rx="2" fill="#fff"/>
+      <rect x="11" y="7" width="4" height="13" rx="2" fill="#fff"/>
+      <text x="35" y="19" class="pageTitle">TIMES INC</text>
+    </g>
+    <g transform="translate(32 92)">
+      <rect x="0" y="0" width="154" height="35" rx="8" fill="#32217d"/>
+      <text x="45" y="23" font-family="Inter,Segoe UI,Arial" font-size="13" font-weight="800" fill="#fff">Dashboard</text>
+      <circle cx="22" cy="17" r="8" fill="#7C5CFF"/>
+      <g transform="translate(0 58)">
+        <text x="45" y="0" class="small">Jornadas</text><circle cx="22" cy="-4" r="6" fill="#304060"/>
+      </g>
+      <g transform="translate(0 100)">
+        <text x="45" y="0" class="small">Documentos</text><circle cx="22" cy="-4" r="6" fill="#304060"/>
+      </g>
+      <g transform="translate(0 142)">
+        <text x="45" y="0" class="small">Informes Excel</text><circle cx="22" cy="-4" r="6" fill="#304060"/>
+      </g>
+      <g transform="translate(0 184)">
+        <text x="45" y="0" class="small">Auditoria</text><circle cx="22" cy="-4" r="6" fill="#304060"/>
+      </g>
+      <g transform="translate(0 226)">
+        <text x="45" y="0" class="small">Ajustes PWA</text><circle cx="22" cy="-4" r="6" fill="#304060"/>
+      </g>
+    </g>
+    <g transform="translate(30 638)">
+      <rect x="0" y="0" width="160" height="44" rx="10" fill="#111720" stroke="#293750"/>
+      <circle cx="24" cy="22" r="14" fill="#F0974A"/>
+      <text x="46" y="19" class="small" fill="#E2EAF4">Ismael</text>
+      <text x="46" y="34" class="tiny">Administrador</text>
+    </g>
+    <g transform="translate(218 0)">
+      <rect x="0" y="0" width="860" height="58" fill="#111720"/>
+      <rect x="28" y="16" width="260" height="32" rx="12" fill="#0D1117" stroke="#293750"/>
+      <text x="56" y="37" class="tiny">BUSCAR...</text>
+      <circle cx="780" cy="30" r="7" fill="#304060"/>
+      <circle cx="812" cy="30" r="7" fill="#F0544C"/>
+      <circle cx="848" cy="30" r="15" fill="#F0974A"/>
+    </g>
+    <g transform="translate(250 92)">
+      <text x="0" y="0" class="h1">Dashboard</text>
+      <text x="0" y="28" class="body">Resumen general de la empresa</text>
+      <rect x="570" y="-18" width="150" height="34" rx="9" fill="#111720" stroke="#293750"/>
+      <text x="595" y="4" class="small">16 Junio 2026</text>
+      <rect x="735" y="-18" width="86" height="34" rx="9" fill="#111720" stroke="#293750"/>
+      <text x="759" y="4" class="small">Filtros</text>
+    </g>
+    <g transform="translate(250 154)">
+      <g>
+        <rect x="0" y="0" width="194" height="92" rx="10" fill="url(#panel)" stroke="#293750"/>
+        <circle cx="34" cy="44" r="19" fill="#7C5CFF"/>
+        <text x="68" y="33" class="body">Horas hoy</text>
+        <text x="68" y="61" class="num">42h 18m</text>
+        <text x="68" y="80" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#3DC988">+9% vs ayer</text>
+      </g>
+      <g transform="translate(210 0)">
+        <rect x="0" y="0" width="194" height="92" rx="10" fill="url(#panel)" stroke="#293750"/>
+        <circle cx="34" cy="44" r="19" fill="#5E6AD2"/>
+        <text x="68" y="33" class="body">Empleados activos</text>
+        <text x="68" y="61" class="num">12</text>
+        <text x="68" y="80" class="tiny">DE 15 EMPLEADOS</text>
+      </g>
+      <g transform="translate(420 0)">
+        <rect x="0" y="0" width="194" height="92" rx="10" fill="url(#panel)" stroke="#293750"/>
+        <circle cx="34" cy="44" r="19" fill="#F0974A"/>
+        <text x="68" y="33" class="body">Docs pendientes</text>
+        <text x="68" y="61" class="num">3</text>
+        <text x="68" y="80" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#F0974A">firma requerida</text>
+      </g>
+      <g transform="translate(630 0)">
+        <rect x="0" y="0" width="194" height="92" rx="10" fill="url(#panel)" stroke="#293750"/>
+        <circle cx="34" cy="44" r="19" fill="#3DC988"/>
+        <text x="68" y="33" class="body">Productividad</text>
+        <text x="68" y="61" class="num">97%</text>
+        <text x="68" y="80" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#3DC988">Excelente</text>
+      </g>
+    </g>
+    <g transform="translate(250 262)">
+      <rect x="0" y="0" width="400" height="225" rx="10" fill="url(#panel)" stroke="#293750"/>
+      <text x="20" y="33" class="h3">Horas trabajadas</text>
+      <rect x="278" y="19" width="88" height="28" rx="8" fill="#161D2A" stroke="#293750"/>
+      <text x="300" y="38" class="tiny">ESTA SEMANA</text>
+      <g opacity=".38">
+        <line x1="22" y1="75" x2="374" y2="75" class="line"/>
+        <line x1="22" y1="112" x2="374" y2="112" class="line"/>
+        <line x1="22" y1="149" x2="374" y2="149" class="line"/>
+        <line x1="22" y1="186" x2="374" y2="186" class="line"/>
+      </g>
+      <path d="M30 184 L78 142 L128 118 L178 150 L230 140 L280 103 L332 118 L374 88" fill="none" stroke="#7C5CFF" stroke-width="3"/>
+      <path d="M30 184 L78 142 L128 118 L178 150 L230 140 L280 103 L332 118 L374 88 L374 205 L30 205z" fill="#7C5CFF" opacity=".14"/>
+      <circle cx="128" cy="118" r="5" fill="#A89BFA"/>
+      <rect x="134" y="77" width="72" height="42" rx="8" fill="#1C2535" stroke="#304060"/>
+      <text x="156" y="93" class="tiny">MAR 16</text>
+      <text x="149" y="110" class="h3">42h 18m</text>
+    </g>
+    <g transform="translate(666 262)">
+      <rect x="0" y="0" width="410" height="225" rx="10" fill="url(#panel)" stroke="#293750"/>
+      <text x="20" y="33" class="h3">Distribucion de horas</text>
+      <circle cx="120" cy="120" r="66" fill="none" stroke="#5E6AD2" stroke-width="34" stroke-dasharray="290 120" transform="rotate(-90 120 120)"/>
+      <circle cx="120" cy="120" r="66" fill="none" stroke="#3DC988" stroke-width="34" stroke-dasharray="70 340" transform="rotate(170 120 120)"/>
+      <circle cx="120" cy="120" r="66" fill="none" stroke="#F0974A" stroke-width="34" stroke-dasharray="46 364" transform="rotate(218 120 120)"/>
+      <circle cx="120" cy="120" r="66" fill="none" stroke="#F0544C" stroke-width="34" stroke-dasharray="28 382" transform="rotate(252 120 120)"/>
+      <circle cx="120" cy="120" r="39" fill="#111720"/>
+      <text x="92" y="118" class="num">168h</text>
+      <text x="104" y="139" class="body">Total</text>
+      <g transform="translate(245 75)">
+        <circle cx="0" cy="0" r="6" fill="#5E6AD2"/><text x="18" y="4" class="small">Jornada 70%</text>
+        <circle cx="0" cy="34" r="6" fill="#3DC988"/><text x="18" y="38" class="small">Extras 15%</text>
+        <circle cx="0" cy="68" r="6" fill="#F0974A"/><text x="18" y="72" class="small">Ausencias 10%</text>
+        <circle cx="0" cy="102" r="6" fill="#F0544C"/><text x="18" y="106" class="small">Vacaciones 5%</text>
+      </g>
+    </g>
+    <g transform="translate(250 502)">
+      <rect x="0" y="0" width="400" height="156" rx="10" fill="url(#panel)" stroke="#293750"/>
+      <text x="20" y="31" class="h3">Actividad reciente</text>
+      <g transform="translate(22 60)">
+        <circle cx="12" cy="0" r="10" fill="#F0974A"/><text x="34" y="4" class="small">Juan Garcia ha fichado entrada</text><text x="340" y="4" class="body">08:42</text>
+        <line x1="0" y1="24" x2="356" y2="24" class="line"/>
+        <circle cx="12" cy="44" r="10" fill="#F0974A"/><text x="34" y="48" class="small">Ana Lopez ha firmado nomina</text><text x="340" y="48" class="body">08:15</text>
+        <line x1="0" y1="68" x2="356" y2="68" class="line"/>
+        <circle cx="12" cy="88" r="10" fill="#F0974A"/><text x="34" y="92" class="small">Pedro inicia descanso</text><text x="340" y="92" class="body">13:30</text>
+      </g>
+    </g>
+    <g transform="translate(666 502)">
+      <rect x="0" y="0" width="410" height="156" rx="10" fill="url(#panel)" stroke="#293750"/>
+      <text x="20" y="31" class="h3">Empleados activos</text>
+      <text x="336" y="31" font-family="Inter,Segoe UI,Arial" font-size="11" font-weight="800" fill="#7B87E8">Ver todos</text>
+      <g transform="translate(20 60)">
+        <circle cx="12" cy="0" r="10" fill="#F0974A"/><text x="34" y="4" class="small">Juan Garcia</text><circle cx="198" cy="0" r="4" fill="#3DC988"/><text x="210" y="4" class="small" fill="#3DC988">Trabajando</text><text x="345" y="4" class="body">08:02</text>
+        <line x1="0" y1="24" x2="366" y2="24" class="line"/>
+        <circle cx="12" cy="44" r="10" fill="#F0974A"/><text x="34" y="48" class="small">Ana Lopez</text><circle cx="198" cy="44" r="4" fill="#3DC988"/><text x="210" y="48" class="small" fill="#3DC988">Trabajando</text><text x="345" y="48" class="body">08:15</text>
+        <line x1="0" y1="68" x2="366" y2="68" class="line"/>
+        <circle cx="12" cy="88" r="10" fill="#F0974A"/><text x="34" y="92" class="small">Pedro Sanchez</text><circle cx="198" cy="88" r="4" fill="#F0974A"/><text x="210" y="92" class="small" fill="#F0974A">Descanso</text><text x="345" y="92" class="body">13:30</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Small bottom phones -->
+  <g transform="translate(18 732)" filter="url(#deepShadow)">
+    <rect width="205" height="345" rx="28" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="10" y="12" width="185" height="321" rx="22" fill="#0D1117"/>
+    <text x="25" y="43" class="h3">Calendario</text>
+    <text x="72" y="78" class="small">Junio 2026</text>
+    <g transform="translate(28 100)" font-family="Inter,Segoe UI,Arial" font-size="9" font-weight="800" fill="#A8BAC8">
+      <text x="0" y="0">L</text><text x="28" y="0">M</text><text x="56" y="0">X</text><text x="84" y="0">J</text><text x="112" y="0">V</text><text x="140" y="0">S</text>
+    </g>
+    <g transform="translate(27 124)" fill="#E2EAF4" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="750">
+      <text x="0" y="0">1</text><text x="28" y="0">2</text><text x="56" y="0">3</text><text x="84" y="0">4</text><text x="112" y="0">5</text><text x="140" y="0">6</text>
+      <text x="0" y="28">8</text><text x="28" y="28">9</text><text x="53" y="28">10</text><text x="81" y="28">11</text><text x="109" y="28">12</text><text x="137" y="28">13</text>
+      <text x="0" y="56">15</text><rect x="24" y="39" width="24" height="24" rx="8" fill="#5E6AD2"/><text x="30" y="56">16</text><text x="56" y="56">17</text><text x="84" y="56">18</text><text x="112" y="56">19</text><text x="140" y="56">20</text>
+    </g>
+    <g transform="translate(25 235)">
+      <text x="0" y="0" class="small">Martes, 16 de Junio</text>
+      <line x1="0" y1="22" x2="155" y2="22" class="line"/>
+      <text x="0" y="48" class="body">Entrada</text><text x="124" y="48" class="body">08:00</text>
+      <text x="0" y="78" class="body">Salida</text><text x="128" y="78" class="body">16:00</text>
+    </g>
+  </g>
+
+  <g transform="translate(238 732)" filter="url(#deepShadow)">
+    <rect width="205" height="345" rx="28" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="10" y="12" width="185" height="321" rx="22" fill="#0D1117"/>
+    <text x="25" y="43" class="h3">Estadisticas</text>
+    <rect x="25" y="68" width="155" height="26" rx="8" fill="#111720" stroke="#293750"/>
+    <text x="48" y="85" class="tiny">ESTA SEMANA</text>
+    <text x="25" y="130" class="h3">Productividad</text>
+    <text x="25" y="168" class="numBig">97%</text>
+    <path d="M25 248 L52 218 L77 230 L105 196 L132 206 L160 168" fill="none" stroke="#3DC988" stroke-width="3"/>
+    <path d="M25 248 L52 218 L77 230 L105 196 L132 206 L160 168 L160 265 L25 265z" fill="#3DC988" opacity=".13"/>
+    <rect x="25" y="286" width="155" height="34" rx="8" fill="#111720"/>
+    <text x="38" y="308" class="small">Horas totales</text><text x="130" y="308" class="small">38h45m</text>
+  </g>
+
+  <g transform="translate(458 732)" filter="url(#deepShadow)">
+    <rect width="205" height="345" rx="28" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="10" y="12" width="185" height="321" rx="22" fill="#0D1117"/>
+    <text x="25" y="43" class="h3">Equipo</text>
+    <g transform="translate(25 76)">
+      <circle cx="14" cy="0" r="13" fill="#F0974A"/><text x="38" y="0" class="small">Juan Garcia</text><text x="38" y="16" font-family="Inter,Segoe UI,Arial" font-size="9" font-weight="800" fill="#3DC988">Trabajando</text><text x="136" y="5" class="body">08:02</text>
+      <circle cx="14" cy="54" r="13" fill="#F0974A"/><text x="38" y="54" class="small">Ana Lopez</text><text x="38" y="70" font-family="Inter,Segoe UI,Arial" font-size="9" font-weight="800" fill="#3DC988">Trabajando</text><text x="136" y="59" class="body">08:15</text>
+      <circle cx="14" cy="108" r="13" fill="#F0974A"/><text x="38" y="108" class="small">Pedro Sanchez</text><text x="38" y="124" font-family="Inter,Segoe UI,Arial" font-size="9" font-weight="800" fill="#F0974A">Descanso</text><text x="136" y="113" class="body">13:30</text>
+    </g>
+    <rect x="25" y="294" width="155" height="34" rx="8" fill="#10233f"/>
+    <text x="61" y="316" font-family="Inter,Segoe UI,Arial" font-size="11" font-weight="900" fill="#7B87E8">+ Invitar empleado</text>
+  </g>
+
+  <g transform="translate(678 732)" filter="url(#deepShadow)">
+    <rect width="205" height="345" rx="28" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="10" y="12" width="185" height="321" rx="22" fill="#0D1117"/>
+    <text x="25" y="43" class="h3">Perfil</text>
+    <rect x="25" y="68" width="155" height="49" rx="10" fill="#111720" stroke="#293750"/>
+    <circle cx="48" cy="92" r="15" fill="#F0974A"/><text x="75" y="89" class="small">Ismael</text><text x="75" y="105" class="tiny">ADMINISTRADOR</text>
+    <g transform="translate(25 140)">
+      <rect x="0" y="0" width="155" height="36" rx="8" fill="#111720"/><text x="35" y="23" class="small">Mi cuenta</text>
+      <rect x="0" y="45" width="155" height="36" rx="8" fill="#111720"/><text x="35" y="68" class="small">Notificaciones</text>
+      <rect x="0" y="90" width="155" height="36" rx="8" fill="#111720"/><text x="35" y="113" class="small">Seguridad</text>
+      <rect x="0" y="135" width="155" height="36" rx="8" fill="#111720"/><text x="35" y="158" class="small">Exportar datos</text>
+    </g>
+    <rect x="25" y="294" width="155" height="34" rx="8" fill="#2d1719"/>
+    <text x="76" y="316" font-family="Inter,Segoe UI,Arial" font-size="11" font-weight="900" fill="#F0544C">Cerrar sesion</text>
+  </g>
+
+  <g transform="translate(898 732)" filter="url(#deepShadow)">
+    <rect width="205" height="345" rx="28" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="10" y="12" width="185" height="321" rx="22" fill="#160f35"/>
+    <circle cx="100" cy="170" r="130" fill="#5E6AD2" opacity=".22"/>
+    <circle cx="175" cy="85" r="100" fill="#7C5CFF" opacity=".22"/>
+    <text x="57" y="88" font-family="Inter,Segoe UI,Arial" font-size="47" font-weight="300" fill="#fff">9:41</text>
+    <text x="54" y="120" class="body" fill="#fff">Martes, 16 de Junio</text>
+    <rect x="25" y="170" width="155" height="82" rx="14" fill="#111720" stroke="#293750"/>
+    <text x="43" y="194" class="tiny">TIMES INC</text>
+    <text x="43" y="222" class="num">07h 32m</text>
+    <text x="43" y="242" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="800" fill="#3DC988">+12% vs ayer</text>
+    <rect x="122" y="206" width="8" height="30" rx="4" fill="#7C5CFF"/>
+    <rect x="136" y="194" width="8" height="42" rx="4" fill="#7C5CFF"/>
+    <rect x="150" y="215" width="8" height="21" rx="4" fill="#7C5CFF"/>
+  </g>
+
+  <!-- Feature grid -->
+  <g transform="translate(1060 738)" filter="url(#deepShadow)">
+    <rect x="0" y="0" width="456" height="326" rx="20" fill="#0D1117" stroke="#304060"/>
+    <text x="22" y="37" class="h2">Funciones premium</text>
+    <g transform="translate(22 66)">
+      <g>
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#442051"/><text x="40" y="39" font-family="Inter,Segoe UI,Arial" font-size="24" font-weight="900" fill="#E040FB">✦</text>
+        <text x="22" y="65" class="small">IA Anomalias</text><text x="20" y="82" class="tiny">detecta patrones</text>
+      </g>
+      <g transform="translate(108 0)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#172f67"/><text x="37" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#5E6AD2">⌁</text>
+        <text x="23" y="65" class="small">Prediccion</text><text x="21" y="82" class="tiny">cargas de trabajo</text>
+      </g>
+      <g transform="translate(216 0)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#463612"/><text x="37" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#F0974A">▦</text>
+        <text x="16" y="65" class="small">Informes auto</text><text x="18" y="82" class="tiny">Excel por obra</text>
+      </g>
+      <g transform="translate(324 0)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#27204e"/><text x="38" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#A89BFA">✍</text>
+        <text x="22" y="65" class="small">Firma digital</text><text x="16" y="82" class="tiny">documentos validos</text>
+      </g>
+      <g transform="translate(0 116)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#153627"/><text x="39" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#3DC988">⌖</text>
+        <text x="21" y="65" class="small">Geolocalizacion</text><text x="20" y="82" class="tiny">control ubicacion</text>
+      </g>
+      <g transform="translate(108 116)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#463612"/><text x="38" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#F0974A">●</text>
+        <text x="22" y="65" class="small">Recordatorios</text><text x="20" y="82" class="tiny">avisos moviles</text>
+      </g>
+      <g transform="translate(216 116)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#172f67"/><text x="37" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#5E6AD2">▦</text>
+        <text x="25" y="65" class="small">Widget iOS</text><text x="20" y="82" class="tiny">acceso rapido</text>
+      </g>
+      <g transform="translate(324 116)">
+        <rect width="92" height="96" rx="10" fill="#111720" stroke="#293750"/>
+        <circle cx="46" cy="31" r="19" fill="#1C2535"/><text x="37" y="39" font-family="Inter,Segoe UI,Arial" font-size="23" font-weight="900" fill="#A8BAC8">⌚</text>
+        <text x="22" y="65" class="small">Modo Watch</text><text x="16" y="82" class="tiny">Apple Watch</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Watches -->
+  <g transform="translate(1554 745)" filter="url(#deepShadow)">
+    <rect x="36" y="-20" width="72" height="170" rx="28" fill="#111720"/>
+    <rect x="0" y="0" width="144" height="118" rx="42" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="13" y="11" width="118" height="96" rx="32" fill="#0D1117"/>
+    <text x="29" y="34" font-family="Inter,Segoe UI,Arial" font-size="8" font-weight="900" fill="#7B87E8">TIMES INC</text>
+    <text x="31" y="61" class="tiny">Jornada activa</text>
+    <text x="31" y="82" font-family="Inter,Segoe UI,Arial" font-size="20" font-weight="900" fill="#3DC988">07h 32m</text>
+    <rect x="31" y="91" width="76" height="26" rx="9" fill="url(#brand)"/>
+    <text x="52" y="108" font-family="Inter,Segoe UI,Arial" font-size="10" font-weight="900" fill="#fff">Salir</text>
+  </g>
+  <g transform="translate(1554 927)" filter="url(#deepShadow)">
+    <rect x="36" y="-20" width="72" height="170" rx="28" fill="#111720"/>
+    <rect x="0" y="0" width="144" height="118" rx="42" fill="#080B12" stroke="#304060" stroke-width="3"/>
+    <rect x="13" y="11" width="118" height="96" rx="32" fill="#0D1117"/>
+    <text x="29" y="34" font-family="Inter,Segoe UI,Arial" font-size="8" font-weight="900" fill="#7B87E8">TIMES INC</text>
+    <text x="31" y="61" class="tiny">Resumen hoy</text>
+    <circle cx="35" cy="80" r="9" fill="#143426"/><text x="50" y="84" class="small">07h 32m</text>
+    <circle cx="35" cy="104" r="9" fill="#24284a"/><text x="50" y="108" class="small">97%</text>
+  </g>
+
+  <!-- Bottom value strip -->
+  <g transform="translate(18 1094)">
+    <rect x="0" y="0" width="1498" height="68" rx="14" fill="#0D1117" stroke="#304060"/>
+    <g transform="translate(42 20)">
+      <rect x="0" y="0" width="34" height="34" rx="10" fill="#111720"/><text x="50" y="13" class="h3">100% PWA</text><text x="50" y="31" class="body">Funciona offline</text>
+      <g transform="translate(234 0)"><rect x="0" y="0" width="34" height="34" rx="10" fill="#111720"/><text x="50" y="13" class="h3">Sincronizacion</text><text x="50" y="31" class="body">Tiempo real con Firebase</text></g>
+      <g transform="translate(512 0)"><rect x="0" y="0" width="34" height="34" rx="10" fill="#111720"/><text x="50" y="13" class="h3">Multi-dispositivo</text><text x="50" y="31" class="body">Movil, tablet, desktop</text></g>
+      <g transform="translate(802 0)"><rect x="0" y="0" width="34" height="34" rx="10" fill="#111720"/><text x="50" y="13" class="h3">Segura</text><text x="50" y="31" class="body">Reglas y auth anonima</text></g>
+      <g transform="translate(1046 0)"><rect x="0" y="0" width="34" height="34" rx="10" fill="#111720"/><text x="50" y="13" class="h3">Moderna</text><text x="50" y="31" class="body">Estilo premium actual</text></g>
+    </g>
+  </g>
+</svg>

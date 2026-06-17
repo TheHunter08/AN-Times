@@ -204,7 +204,7 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
       const n = new Notification(title, {
-        body, tag, icon: '/icon-192.png', badge: '/icon-192.png',
+        body, tag, icon: '/icon.svg', badge: '/icon.svg',
         data: { url }, vibrate: [100, 50, 100]
       })
       n.onclick = () => { window.focus(); n.close() }
@@ -212,7 +212,7 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(reg => {
           reg.showNotification(title, {
-            body, tag, icon: '/icon-192.png', badge: '/icon-192.png',
+            body, tag, icon: '/icon.svg', badge: '/icon.svg',
             data: { url }, vibrate: [100, 50, 100]
           }).catch(() => {})
         }).catch(() => {})
