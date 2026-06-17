@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK, VAPID_PUB } from '../config/constants.js'
-import { pushSubscribe, auditLog, sendPushNotif } from '../services/dataService.js'
+import { WD, WK } from '../config/constants.js'
+import { auditLog, sendPushNotif } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 
@@ -28,12 +28,11 @@ export default function EmployeePage() {
     return () => clearInterval(iv)
   }, [])
 
-  // Push subscription on mount — pide permiso si aún no se ha decidido
   useEffect(() => {
     if (!u) return
     setTimeout(async () => {
-      if ('Notification' in window && Notification.permission !== 'denied') {
-        await pushSubscribe('emp:' + u.id, VAPID_PUB)
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission()
       }
     }, 3000)
   }, [u])
@@ -186,7 +185,7 @@ export default function EmployeePage() {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate }) {
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -216,12 +215,6 @@ function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u 
       <div className="ini-wrap">
         {/* Main fichar card */}
         <div className="jor-main-card">
-          <div style={{ margin:'14px 0' }}>
-            <div className={`jor-mc-status${timer.state==='idle'?' idle':timer.state==='break'?' break':''}`}>
-              <span className="sdot" />
-              {timer.state==='idle' ? 'Sin jornada activa' : timer.state==='break' ? 'En descanso' : 'Trabajando'}
-            </div>
-          </div>
           <div className="jor-timer">{s2t(timer.ws)}</div>
           <div className="jor-timer-sub">
             {timer.state === 'idle' ? 'Pulsa para iniciar jornada' : `Descanso: ${s2t(timer.bs)}`}
@@ -243,13 +236,19 @@ function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u 
               </button>
             </div>
           )}
+          <div style={{ marginTop:12 }}>
+            <div className={`jor-mc-status${timer.state==='idle'?' idle':timer.state==='break'?' break':''}`}>
+              <span className="sdot" />
+              {timer.state==='idle' ? 'Sin jornada activa' : timer.state==='break' ? 'En descanso' : 'Trabajando'}
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
           {[
-            { lbl:'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '--:--', color:'var(--primary-light)', bg:'rgba(108,99,255,.12)' },
-            { lbl:'Salida',  val: o ? '--:--' : salidaRec ? ftime(salidaRec.fin) : '--:--', color:'var(--green)', bg:'var(--green-dim)' },
+            { lbl:'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color:'var(--primary-light)', bg:'rgba(108,99,255,.12)' },
+            { lbl:'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color:'var(--green)', bg:'var(--green-dim)' },
             { lbl:'Descanso',val: brkMin > 0 ? `${Math.floor(brkMin/60).toString().padStart(2,'0')}:${p2(brkMin%60)}` : '00:00', color:'var(--orange)', bg:'var(--orange-dim)' },
             { lbl:'Total',   val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--teal)', bg:'rgba(0,212,255,.1)' },
           ].map(({ lbl, val, color, bg }) => (
@@ -286,6 +285,7 @@ function TabInicio({ timer, clockTime, doStart, doStop, doBreak, openRec, db, u 
             </div>
           </div>
         )}
+
       </div>
     </div>
   )
@@ -321,9 +321,9 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   return (
     <div className="emp-tab active" style={{ paddingBottom:20 }}>
-      <div style={{ padding:'20px 16px 16px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
+      <div style={{ padding:'14px 16px 14px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
-          <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-.5px' }}>Mi Jornada</div>
+          <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mi Jornada</div>
           <div style={{ fontSize:10, color:'var(--text3)', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'4px 10px', fontWeight:600, textTransform:'uppercase', letterSpacing:'.4px' }}>
             Hoy
           </div>
@@ -352,11 +352,20 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         </div>
       </div>
 
-      {/* Total card */}
+      {/* Total card + Weekly chart */}
       <div style={{ padding:'0 16px 12px' }}>
         <div className="card" style={{ marginBottom:0 }}>
-          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, fontWeight:500 }}>Total trabajado hoy</div>
-          <div style={{ fontSize:36, fontWeight:800, letterSpacing:'-1.5px', marginBottom:12 }}>{mhm(totMin)}</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+            <div style={{ fontSize:11, color:'var(--text3)', fontWeight:500 }}>Total trabajado hoy</div>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--primary-light)', background:'var(--primary-dim)', padding:'2px 8px', borderRadius:12 }}>
+              {Math.round(totMin / (WD || 480) * 100)}%
+            </div>
+          </div>
+          <div className="gradient-text" style={{ fontSize:36, fontWeight:800, letterSpacing:'-1.5px', marginBottom:12 }}>{mhm(totMin)}</div>
+
+          {/* Weekly mini bar chart */}
+          <WeeklyBars db={db} u={u} timer={timer} />
+
           <div style={{ display:'flex', flexDirection:'column', gap:6, paddingTop:10, borderTop:'1px solid var(--border)' }}>
             {[
               { lbl:'Descansos', val: mhm(brkMin), color:'var(--orange)' },
@@ -377,7 +386,13 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           Actividad de hoy
         </div>
         {!tlItems.length ? (
-          <div className="empty">Sin actividad registrada hoy</div>
+          <div className="empty-premium">
+            <div className="empty-premium-icon">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div className="empty-premium-title">Sin actividad hoy</div>
+            <div className="empty-premium-sub">Inicia tu jornada desde la pestaña Inicio para ver tu actividad aquí</div>
+          </div>
         ) : (
           <div className="timeline">
             {tlItems.map(({ r, isCurrent }) => {
@@ -422,7 +437,7 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
   return (
     <div className="emp-tab active">
       <div className="vac-wrap2">
-        <div className="vac-hero">
+        <div className="vac-hero" style={{ paddingTop:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.2)', borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.4px', textTransform:'uppercase', marginBottom:8, width:'fit-content' }}>
             Mis Vacaciones
           </div>
@@ -460,12 +475,12 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
             Solicitar vacaciones
           </button>
 
-          {myVacs.length > 0 && (
+          {myVacs.length > 0 ? (
             <>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', paddingTop:4 }}>Mis solicitudes</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div className="section-header">Mis solicitudes</div>
+              <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {myVacs.map(v => (
-                  <div key={v.id} className="vac-list-item">
+                  <div key={v.id} className="vac-list-item card-lift">
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:700 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)}</div>
                       <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{v.dias} días · {v.motivo || 'Vacaciones'}</div>
@@ -477,6 +492,14 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
                 ))}
               </div>
             </>
+          ) : (
+            <div className="empty-premium">
+              <div className="empty-premium-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/></svg>
+              </div>
+              <div className="empty-premium-title">Sin solicitudes</div>
+              <div className="empty-premium-sub">Pulsa el botón de arriba para solicitar tus vacaciones</div>
+            </div>
           )}
         </div>
       </div>
@@ -501,10 +524,12 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const todayStr = today()
   const monthStr = `${y}-${p2(m+1)}`
 
-  const workedDays = new Set(
-    (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(monthStr))
-      .map(r => r.inicio.slice(0, 10))
-  )
+  const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(monthStr))
+  const workedMap = {}
+  monthRecs.forEach(r => {
+    const ds = r.inicio.slice(0, 10)
+    workedMap[ds] = (workedMap[ds] || 0) + calcMin(r)
+  })
 
   const vacDays = new Set(
     (db.vacaciones || []).filter(v => v.empId === u.id && v.estado === 'aprobada').flatMap(v => {
@@ -516,8 +541,50 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
     })
   )
 
+  const absDays = new Set(
+    (db.ausencias || []).filter(a => a.empId === u.id).flatMap(a => {
+      const days = []
+      const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
+      const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
+      const d = new Date(s)
+      while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
+      return days
+    })
+  )
+
+  const medDays = new Set(
+    (db.medicos || []).filter(a => a.empId === u.id).flatMap(a => {
+      const days = []
+      const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
+      const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
+      const d = new Date(s)
+      while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
+      return days
+    })
+  )
+
   const getDayRecs = dateStr =>
     (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(dateStr) && r.fin)
+
+  const getDayStatus = (ds, date) => {
+    const dow = date.getDay()
+    if (dow === 0 || dow === 6) return 'weekend'
+    if (vacDays.has(ds)) return 'vacation'
+    if (absDays.has(ds) || medDays.has(ds)) return 'absence'
+    const mins = workedMap[ds] || 0
+    if (mins >= WD * 0.9) return 'complete'
+    if (mins > 0) return 'pending'
+    if (ds < todayStr) return 'missing'
+    return 'future'
+  }
+
+  const monthStats = { complete: 0, pending: 0, absence: 0, vacation: 0, missing: 0 }
+  cells.forEach(date => {
+    if (!date) return
+    const ds = date.toISOString().slice(0, 10)
+    const st = getDayStatus(ds, date)
+    if (st in monthStats) monthStats[st]++
+  })
 
   return (
     <div className="emp-tab active">
@@ -537,24 +604,45 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           </div>
         </div>
 
+        {/* Month summary chips */}
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:4 }}>
+          {[
+            { n: monthStats.complete, label:'Completos', color:'var(--green)', bg:'var(--green-dim)' },
+            { n: monthStats.pending,  label:'Parciales', color:'var(--orange)', bg:'rgba(245,158,11,.1)' },
+            { n: monthStats.absence,  label:'Ausencias', color:'var(--red)', bg:'var(--red-dim)' },
+            { n: monthStats.vacation, label:'Vacaciones', color:'var(--blue)', bg:'rgba(68,147,248,.1)' },
+          ].filter(c => c.n > 0).map(c => (
+            <div key={c.label} style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, color:c.color, background:c.bg, border:`1px solid ${c.color}22` }}>
+              <span>{c.n}</span><span style={{ fontWeight:500 }}>{c.label}</span>
+            </div>
+          ))}
+        </div>
+
         <div className="cal-grid">
           {DAYS_ES.map(d => <div key={d} className="cal-day-header">{d}</div>)}
           {cells.map((date, i) => {
             if (!date) return <div key={i} />
             const ds = date.toISOString().slice(0, 10)
             const isToday = ds === todayStr
-            const isWorked = workedDays.has(ds)
-            const isVac = vacDays.has(ds)
-            const dow = date.getDay()
-            const isWeekend = dow === 0 || dow === 6
-            const cls = ['cal-day', isToday ? 'today' : '', isWorked && !isToday ? 'worked' : '', isVac && !isToday ? 'vacation' : '', isWeekend && !isToday ? 'weekend' : ''].filter(Boolean).join(' ')
-            const recs = getDayRecs(ds)
-            const hrs = recs.reduce((s, r) => s + calcMin(r), 0)
+            const status = getDayStatus(ds, date)
+            const mins = workedMap[ds] || 0
+            const cls = ['cal-day',
+              isToday ? 'today' : '',
+              !isToday && status === 'complete' ? 'cal-complete' : '',
+              !isToday && status === 'pending' ? 'cal-pending' : '',
+              !isToday && status === 'absence' ? 'cal-absence' : '',
+              !isToday && status === 'vacation' ? 'vacation' : '',
+              !isToday && status === 'weekend' ? 'weekend' : '',
+              !isToday && status === 'missing' ? 'cal-missing' : '',
+              selDay === ds ? 'cal-selected' : '',
+            ].filter(Boolean).join(' ')
 
             return (
               <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)}>
                 {date.getDate()}
-                {hrs > 0 && !isToday && <div className="cal-hrs">{Math.floor(hrs/60)}h</div>}
+                {mins > 0 && !isToday && <div className="cal-hrs">{Math.floor(mins/60)}h</div>}
+                {status === 'absence' && !isToday && <div className="cal-hrs">✕</div>}
+                {status === 'vacation' && !isToday && <div className="cal-hrs">🌴</div>}
               </div>
             )
           })}
@@ -564,18 +652,41 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
         {selDay && (() => {
           const recs = getDayRecs(selDay)
           const totMin = recs.reduce((s, r) => s + calcMin(r), 0)
+          const selDate = new Date(selDay + 'T00:00:00')
+          const status = getDayStatus(selDay, selDate)
+          const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', future:'' }
+          const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', future:'var(--text4)' }
           return (
-            <div className="card">
-              <div style={{ fontSize:14, fontWeight:600, marginBottom:12, color:'var(--text2)' }}>
-                {new Date(selDay + 'T00:00:00').toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}
+            <div className="card" style={{ borderLeft:`3px solid ${statusColors[status] || 'var(--border)'}` }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                <div style={{ fontSize:14, fontWeight:600, color:'var(--text2)', textTransform:'capitalize' }}>
+                  {selDate.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}
+                </div>
+                {statusLabels[status] && (
+                  <div style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:12, color:statusColors[status], background:`${statusColors[status]}18`, textTransform:'uppercase', letterSpacing:'.5px' }}>
+                    {statusLabels[status]}
+                  </div>
+                )}
               </div>
               {recs.length ? recs.map(r => (
-                <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 0', borderBottom:'1px solid var(--border)' }}>
-                  <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, background:'var(--bg-500)', flexShrink:0 }}>⏱️</div>
-                  <div style={{ flex:1, fontSize:13, color:'var(--text2)' }}>{r.centro || 'Trabajo'}</div>
-                  <div style={{ fontSize:14, fontWeight:600, fontVariantNumeric:'tabular-nums' }}>{ftime(r.inicio)} → {ftime(r.fin)}</div>
+                <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+                  <div style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, background:'var(--primary-dim)', flexShrink:0 }}>⏱️</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text2)' }}>{r.centro || 'Trabajo'}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{mhm(calcMin(r))} trabajadas</div>
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:700, fontVariantNumeric:'tabular-nums', color:'var(--primary-light)' }}>{ftime(r.inicio)} → {ftime(r.fin)}</div>
                 </div>
-              )) : <div className="empty" style={{ padding:'16px 0' }}>Sin registros</div>}
+              )) : (
+                <div className="empty-premium" style={{ padding:'20px 0' }}>
+                  <div className="empty-premium-icon" style={{ width:44, height:44, borderRadius:12 }}>
+                    <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--text4)' }}>
+                    {status === 'absence' ? 'Día de ausencia registrado' : status === 'vacation' ? 'Día de vacaciones' : 'Sin registros este día'}
+                  </div>
+                </div>
+              )}
               {totMin > 0 && (
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:12, borderTop:'1px solid var(--border)', marginTop:4 }}>
                   <span style={{ fontSize:13, color:'var(--text3)' }}>Total trabajado</span>
@@ -588,7 +699,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
         {/* Legend */}
         <div style={{ display:'flex', flexWrap:'wrap', gap:14, padding:'12px 0' }}>
-          {[['var(--green)','Trabajado'],['var(--blue)','Vacaciones'],['var(--orange)','Festivo'],['var(--red)','Ausencia']].map(([c,l]) => (
+          {[['var(--green)','Completo'],['var(--orange)','Parcial'],['var(--red)','Ausencia'],['var(--blue)','Vacaciones']].map(([c,l]) => (
             <div key={l} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--text2)' }}>
               <div style={{ width:10, height:10, borderRadius:3, background:c, flexShrink:0 }} />{l}
             </div>
@@ -621,15 +732,15 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:0, margin:'0 16px 16px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:0, margin:'12px 16px 16px', background:'var(--glass-bg)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', border:'1px solid var(--glass-border)', borderRadius:'var(--r-lg)', flexShrink:0 }}>
         {[
-          { val: mhm(monthMin), lbl:'Mes actual' },
-          { val: vac.available, lbl:'Días vac.' },
-          { val: vac.months, lbl:'Antigüedad (meses)' },
-        ].map(({ val, lbl }, i) => (
-          <div key={lbl} style={{ padding:'14px 8px', textAlign:'center', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-.4px' }}>{val}</div>
-            <div style={{ fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.4px', fontWeight:600, marginTop:3 }}>{lbl}</div>
+          { val: mhm(monthMin), lbl:'Mes actual', color:'var(--primary-light)' },
+          { val: vac.available, lbl:'Días vac.', color:'var(--green)' },
+          { val: vac.months, lbl:'Antigüedad', color:'var(--teal)' },
+        ].map(({ val, lbl, color }, i) => (
+          <div key={lbl} style={{ padding:'16px 8px', textAlign:'center', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
+            <div className="counter-val" style={{ fontSize:20, fontWeight:800, letterSpacing:'-.4px', color }}>{val}</div>
+            <div style={{ fontSize:9, color:'var(--text4)', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:700, marginTop:4 }}>{lbl}</div>
           </div>
         ))}
       </div>
@@ -1229,6 +1340,37 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
         </div>
         <button className="btn btn-primary" onClick={save} style={{ width:'100%', marginTop:8 }}>Guardar</button>
       </div>
+    </div>
+  )
+}
+
+function WeeklyBars({ db, u, timer }) {
+  const DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+  const now = new Date()
+  const dow = (now.getDay() + 6) % 7
+  const ws = wkStart(now)
+  const bars = DAYS.map((label, i) => {
+    const d = new Date(ws)
+    d.setDate(d.getDate() + i)
+    const ds = d.toISOString().slice(0, 10)
+    let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(ds))
+      .reduce((s, r) => s + calcMin(r), 0)
+    if (i === dow && timer.state !== 'idle') min += Math.floor(timer.ws / 60)
+    return { label, min, isToday: i === dow }
+  })
+  const maxMin = Math.max(1, ...bars.map(b => b.min))
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="week-bars">
+        {bars.map(({ label, min, isToday }) => (
+          <div key={label} className={`week-bar${isToday ? ' today-bar' : ''}`}
+            style={{ height: min > 0 ? Math.max(6, min / maxMin * 100) + '%' : '3px', opacity: min > 0 ? 1 : 0.3 }}>
+            <span className="week-bar-label">{label}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ height: 22 }} />
     </div>
   )
 }

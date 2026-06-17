@@ -126,7 +126,7 @@ export async function cloudPush(db, onSuccess, onError) {
   try {
     const token = await getAuthToken()
     const r = await fetch(withAuth(DB_URL + '.json', token), {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
@@ -142,6 +142,18 @@ export async function cloudPush(db, onSuccess, onError) {
       setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
     }
   }
+}
+
+export async function cloudPatchPath(path, value) {
+  try {
+    const token = await getAuthToken()
+    const r = await fetch(withAuth(DB_URL + '/' + path + '.json', token), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value)
+    })
+    return r.ok
+  } catch { return false }
 }
 
 export function scheduleSave(db, onSuccess, onError, delay = 0) {
@@ -189,11 +201,24 @@ export async function pushSubscribe(userId, vapidPub) {
 }
 
 export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
-  fetch('/api/sendpush', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, title, body, tag, url })
-  }).catch(() => {})
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, {
+        body, tag, icon: '/icon-192.png', badge: '/icon-192.png',
+        data: { url }, vibrate: [100, 50, 100]
+      })
+      n.onclick = () => { window.focus(); n.close() }
+    } catch {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title, {
+            body, tag, icon: '/icon-192.png', badge: '/icon-192.png',
+            data: { url }, vibrate: [100, 50, 100]
+          }).catch(() => {})
+        }).catch(() => {})
+      }
+    }
+  }
 }
 
 export function auditLog(db, action, detail, user) {

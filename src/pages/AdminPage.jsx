@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
-import { auditLog, pushSubscribe, sendPushNotif } from '../services/dataService.js'
+import { WD, WK, ADMIN_PIN } from '../config/constants.js'
+import { auditLog, sendPushNotif } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 
 const PAGES = [
@@ -59,8 +59,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isEncargado) {
       setTimeout(async () => {
-        if ('Notification' in window && Notification.permission !== 'denied') {
-          await pushSubscribe('__admin__', VAPID_PUB)
+        if ('Notification' in window && Notification.permission === 'default') {
+          await Notification.requestPermission()
         }
       }, 3000)
     }
@@ -224,23 +224,28 @@ function PanelDashboard({ db }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Dashboard</h1>
-        <div className="adm-panel-sub">{now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Dashboard</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2, textTransform:'capitalize' }}>{now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <SyncBadge />
+        </div>
       </div>
 
-      <div className="adm-stats-grid">
+      <div className="adm-stats-grid stagger-in">
         {[
-          { label:'Fichados ahora', val: checkedIn, total: emps.length, color:'var(--green)', bg:'var(--green-dim)', ico:'▶️' },
-          { label:'Horas esta semana', val: mhm(weekMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:'⏱️' },
-          { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(0,212,255,.1)', ico:'📅' },
-          { label:'Docs. pendientes firma', val: (db.documentos||[]).filter(d=>!d.firma).length, color:'var(--orange)', bg:'var(--orange-dim)', ico:'✍️' },
-        ].map(({ label, val, total, color, bg, ico }) => (
-          <div key={label} className="adm-stat-card">
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-              <div style={{ width:34, height:34, background:bg, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
-              <div style={{ fontSize:12, fontWeight:600, color:'var(--text3)' }}>{label}</div>
+          { label:'Fichados ahora', val: checkedIn, total: emps.length, color:'var(--green)', bg:'var(--green-dim)', ico:'▶️', glow:'rgba(16,185,129,.15)' },
+          { label:'Horas esta semana', val: mhm(weekMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:'⏱️', glow:'rgba(108,99,255,.15)' },
+          { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(0,212,255,.1)', ico:'📅', glow:'rgba(0,212,255,.12)' },
+          { label:'Docs. pendientes', val: (db.documentos||[]).filter(d=>!d.firma).length, color:'var(--orange)', bg:'var(--orange-dim)', ico:'✍️', glow:'rgba(245,158,11,.12)' },
+        ].map(({ label, val, total, color, bg, ico, glow }) => (
+          <div key={label} className="adm-stat-card card-lift" style={{ borderColor: glow }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+              <div style={{ width:36, height:36, background:bg, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</div>
             </div>
-            <div style={{ fontSize:28, fontWeight:800, letterSpacing:'-1px', color }}>
+            <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color }}>
               {val}{total !== undefined ? <span style={{ fontSize:14, color:'var(--text3)', fontWeight:400 }}>/{total}</span> : ''}
             </div>
           </div>
@@ -248,15 +253,23 @@ function PanelDashboard({ db }) {
       </div>
 
       {/* Live workers + Today activity */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:20 }} className="stagger-in">
         {/* Working now */}
-        <div className="adm-section" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'16px', margin:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px' }}>Trabajando ahora</div>
-            <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, background:'var(--green-dim)', color:'var(--green)' }}>{liveRecs.length}</span>
+        <div className="dash-widget card-lift">
+          <div className="dash-widget-header">
+            <div className="dash-widget-title" style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span className="live-indicator" />
+              Trabajando ahora
+            </div>
+            <span className="dash-widget-badge" style={{ background:'var(--green-dim)', color:'var(--green)' }}>{liveRecs.length}</span>
           </div>
           {!liveRecs.length ? (
-            <div style={{ fontSize:12, color:'var(--text4)', textAlign:'center', padding:'16px 0' }}>Nadie trabajando</div>
+            <div className="empty-premium" style={{ padding:'20px 0' }}>
+              <div className="empty-premium-icon" style={{ width:44, height:44, borderRadius:12 }}>
+                <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              </div>
+              <div style={{ fontSize:12, color:'var(--text4)' }}>Nadie trabajando ahora</div>
+            </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {liveRecs.slice(0,6).map(r => {
@@ -280,13 +293,18 @@ function PanelDashboard({ db }) {
         </div>
 
         {/* Recent fichajes */}
-        <div className="adm-section" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'16px', margin:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px' }}>Fichajes de hoy</div>
-            <span style={{ fontSize:11, fontWeight:600, color:'var(--text4)' }}>{todayRecs.length}</span>
+        <div className="dash-widget card-lift">
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">Fichajes de hoy</div>
+            <span className="dash-widget-badge" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{todayRecs.length}</span>
           </div>
           {!todayRecs.length ? (
-            <div style={{ fontSize:12, color:'var(--text4)', textAlign:'center', padding:'16px 0' }}>Sin fichajes hoy</div>
+            <div className="empty-premium" style={{ padding:'20px 0' }}>
+              <div className="empty-premium-icon" style={{ width:44, height:44, borderRadius:12 }}>
+                <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+              </div>
+              <div style={{ fontSize:12, color:'var(--text4)' }}>Sin fichajes hoy</div>
+            </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0,6).map(r => {
@@ -316,15 +334,19 @@ function PanelDashboard({ db }) {
       </div>
 
       {/* Heatmap */}
-      <div className="adm-section">
-        <div className="adm-section-title">📆 Actividad (últimas 12 semanas)</div>
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">Actividad (últimas 12 semanas)</div>
+        </div>
         <Heatmap data={heat} />
       </div>
 
       {/* Recent audit */}
       {recentAudit.length > 0 && (
-        <div className="adm-section">
-          <div className="adm-section-title">🔍 Actividad reciente</div>
+        <div className="dash-widget card-lift">
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">Actividad reciente</div>
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {recentAudit.map((a, i) => (
               <div key={i} className="audit-row">
@@ -408,23 +430,22 @@ function PanelControl({ db, toast, saveDB, session }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Control en tiempo real</h1>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div className="adm-panel-sub">{liveRecs.length} activos / {emps.length} totales</div>
-          <div style={{ display:'flex', background:'var(--bg-600)', borderRadius:8, padding:3, gap:2 }}>
-            {[['cards','Cards'],['tabla','Tabla']].map(([v,l]) => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ padding:'5px 12px', borderRadius:6, border:'none', fontSize:11, fontWeight:600, cursor:'pointer',
-                  background: view===v ? 'var(--bg-400)' : 'transparent', color: view===v ? 'var(--text)' : 'var(--text3)' }}>
-                {l}
-              </button>
-            ))}
+        <div>
+          <h1 className="adm-panel-title gradient-text">Control en tiempo real</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>
+            <span className="live-indicator" style={{ display:'inline-block', verticalAlign:'middle', marginRight:6 }} />
+            {liveRecs.length} activos / {emps.length} totales
           </div>
+        </div>
+        <div className="pill-tabs">
+          {[['cards','Cards'],['tabla','Tabla']].map(([v,l]) => (
+            <button key={v} className={`pill-tab${view===v?' active':''}`} onClick={() => setView(v)}>{l}</button>
+          ))}
         </div>
       </div>
 
       {view === 'cards' && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+        <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
           {emps.map(e => {
             const live = liveRecs.find(r => r.empId === e.id)
             const t = live ? calcSecs(live) : null
@@ -432,13 +453,11 @@ function PanelControl({ db, toast, saveDB, session }) {
             const isBreak = live && live.enDescanso
             const todayMin = recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(today())).reduce((s,r)=>s+calcMin(r),0)
             return (
-              <div key={e.id} style={{ background:'var(--bg-700)', border:`1px solid ${isWorking?'rgba(54,178,126,.35)':isBreak?'rgba(255,145,57,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:18, transition:'border-color .2s' }}>
+              <div key={e.id} className={`ctrl-card${isWorking?' working':isBreak?' on-break':''}`}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-                  <div style={{ position:'relative' }}>
-                    <div style={{ width:44, height:44, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#fff' }}>
-                      {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                    </div>
-                    <div style={{ position:'absolute', bottom:0, right:0, width:12, height:12, borderRadius:'50%', border:'2px solid var(--bg-700)', background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 6px var(--green)':isBreak?'0 0 6px var(--orange)':undefined }} />
+                  <div className="ctrl-avatar" style={{ background:e.color||'var(--primary)' }}>
+                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                    <div className="ctrl-dot" style={{ background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 8px var(--green)':isBreak?'0 0 8px var(--orange)':'none' }} />
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
@@ -446,7 +465,7 @@ function PanelControl({ db, toast, saveDB, session }) {
                   </div>
                 </div>
                 <div style={{ textAlign:'center', marginBottom:12 }}>
-                  <div style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                  <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)' }}>
                     {t ? mhm(Math.floor(t.work/60)) : '—'}
                   </div>
                   <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
@@ -455,7 +474,7 @@ function PanelControl({ db, toast, saveDB, session }) {
                 </div>
                 {live && (
                   <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
-                    Forzar cierre de jornada
+                    Forzar cierre
                   </button>
                 )}
               </div>
@@ -528,11 +547,13 @@ function PanelFichajes({ db, toast, saveDB }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Fichajes</h1>
-        <div className="adm-panel-sub">{recs.length} registros totales</div>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Fichajes</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{recs.length} registros totales</div>
+        </div>
       </div>
-      <div className="adm-filters">
-        <input placeholder="Buscar empleado o centro…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="premium-filters">
+        <input placeholder="Buscar empleado o centro…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex:1, minWidth:180 }} />
         <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
         <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}>
           <option value="">Todos los empleados</option>
@@ -584,14 +605,17 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   }
 
   const VacRow = ({ v }) => (
-    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-600)', borderRadius:'var(--r)', border:'1px solid var(--border)', marginBottom:8 }}>
+    <div className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`} style={{ marginBottom:8 }}>
+      <div style={{ width:40, height:40, borderRadius:12, background: v.estado==='pendiente'?'var(--orange-dim)':v.estado==='aprobada'?'var(--green-dim)':'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
+        {v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✓':'✗'}
+      </div>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:13, fontWeight:700 }}>{v.empName}</div>
         <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)} · {v.dias} días</div>
-        {v.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:2 }}>{v.motivo}</div>}
+        {v.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3 }}>{v.motivo}</div>}
       </div>
       <div className={`badge${v.estado==='aprobada'?' badge-green':v.estado==='rechazada'?' badge-red':' badge-orange'}`}>
-        {v.estado==='aprobada'?'✓ Aprobada':v.estado==='rechazada'?'✗ Rechazada':'⏳ Pendiente'}
+        {v.estado==='aprobada'?'Aprobada':v.estado==='rechazada'?'Rechazada':'Pendiente'}
       </div>
       {v.estado === 'pendiente' && (
         <div style={{ display:'flex', gap:6 }}>
@@ -605,22 +629,34 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Solicitudes</h1>
-        <div className="adm-panel-sub">{pend.length} pendientes</div>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Solicitudes</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{pend.length} pendientes · {rest.length} resueltas</div>
+        </div>
       </div>
       {pend.length > 0 && (
         <>
-          <div className="adm-section-title" style={{ padding:'0 0 12px' }}>⏳ Pendientes de revisión</div>
-          {pend.map(v => <VacRow key={v.id} v={v} />)}
+          <div className="section-header">Pendientes de revisión</div>
+          <div className="stagger-in">
+            {pend.map(v => <VacRow key={v.id} v={v} />)}
+          </div>
         </>
       )}
       {rest.length > 0 && (
         <>
-          <div className="adm-section-title" style={{ padding:'16px 0 12px' }}>Historial</div>
+          <div className="section-header" style={{ marginTop:20 }}>Historial</div>
           {rest.slice(0, 30).map(v => <VacRow key={v.id} v={v} />)}
         </>
       )}
-      {!vacs.length && <div className="empty">Sin solicitudes</div>}
+      {!vacs.length && (
+        <div className="empty-premium">
+          <div className="empty-premium-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div className="empty-premium-title">Sin solicitudes</div>
+          <div className="empty-premium-sub">Las solicitudes de vacaciones de los empleados aparecerán aquí</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -670,8 +706,11 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Empleados</h1>
-        <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo</button>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Empleados</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{emps.length} empleados activos</div>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo empleado</button>
       </div>
 
       {showForm && (
@@ -850,20 +889,16 @@ function PanelInformes({ db, toast }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Informes</h1>
-        <div className="adm-panel-sub">{new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</div>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Informes</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2, textTransform:'capitalize' }}>{new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</div>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:4, background:'var(--bg-600)', borderRadius:'var(--r-sm)', padding:4, marginBottom:20, width:'fit-content' }}>
+      <div className="pill-tabs" style={{ marginBottom:20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding:'7px 14px', borderRadius:6, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', transition:'all .15s',
-              background: tab===t.id ? 'var(--bg-400)' : 'transparent',
-              color: tab===t.id ? 'var(--text)' : 'var(--text3)',
-              boxShadow: tab===t.id ? 'var(--shadow-sm)' : 'none' }}>
-            {t.label}
-          </button>
+          <button key={t.id} className={`pill-tab${tab===t.id?' active':''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
 
@@ -973,13 +1008,13 @@ function PanelInformes({ db, toast }) {
 
       {/* Ranking tab */}
       {tab === 'ranking' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {[...rows].sort((a,b) => b.totalMin - a.totalMin).map(({ e, totalMin, days }, idx) => {
             const maxMin = Math.max(...rows.map(r => r.totalMin), 1)
             const pct = Math.round(totalMin / maxMin * 100)
             const medals = ['🥇','🥈','🥉']
             return (
-              <div key={e.id} style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'14px 18px' }}>
+              <div key={e.id} className="card-lift" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'14px 18px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
                   <div style={{ fontSize:20, width:28, textAlign:'center' }}>{medals[idx] || `${idx+1}`}</div>
                   <div style={{ width:36, height:36, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#fff', flexShrink:0 }}>
@@ -1005,7 +1040,7 @@ function PanelInformes({ db, toast }) {
       {/* Analítica tab */}
       {tab === 'analitica' && (
         <div>
-          <div className="adm-stats-grid" style={{ marginBottom:20 }}>
+          <div className="adm-stats-grid stagger-in" style={{ marginBottom:20 }}>
             {(() => {
               const totalMin = rows.reduce((s, r) => s + r.totalMin, 0)
               const avgMin = rows.length ? Math.round(totalMin / rows.length) : 0
@@ -1051,8 +1086,8 @@ function PanelInformes({ db, toast }) {
       {/* Exportar tab */}
       {tab === 'exportar' && (
         <div style={{ maxWidth:500 }}>
-          <div style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:20, display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Exportar fichajes a CSV</div>
+          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Exportar fichajes a Excel</div>
             <div className="field">
               <label>Empleado</label>
               <select value={selEmp} onChange={e => setSelEmp(e.target.value)}>
@@ -1128,19 +1163,12 @@ function PanelObras({ db, toast, saveDB, session }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">{tab === 'obras' ? 'Obras' : 'Centros de trabajo'}</h1>
+        <h1 className="adm-panel-title gradient-text">{tab === 'obras' ? 'Obras' : 'Centros de trabajo'}</h1>
       </div>
 
-      {/* Subtabs */}
-      <div style={{ display:'flex', gap:4, background:'var(--bg-600)', borderRadius:'var(--r-sm)', padding:4, marginBottom:20, width:'fit-content' }}>
+      <div className="pill-tabs" style={{ marginBottom:20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding:'7px 16px', borderRadius:6, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', transition:'all .15s',
-              background: tab===t.id ? 'var(--bg-400)' : 'transparent',
-              color: tab===t.id ? 'var(--text)' : 'var(--text3)',
-              boxShadow: tab===t.id ? 'var(--shadow-sm)' : 'none' }}>
-            {t.label}
-          </button>
+          <button key={t.id} className={`pill-tab${tab===t.id?' active':''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
 
@@ -1151,10 +1179,16 @@ function PanelObras({ db, toast, saveDB, session }) {
             <input style={{ flex:1 }} placeholder="Nombre de la obra…" value={newObra} onChange={e => setNewObra(e.target.value)} onKeyDown={e => e.key==='Enter'&&addObra()} />
             <button className="btn btn-primary" onClick={addObra}>+ Crear</button>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {!obras.length && <div className="empty">Sin obras creadas</div>}
+          <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {!obras.length && (
+              <div className="empty-premium">
+                <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+                <div className="empty-premium-title">Sin obras creadas</div>
+                <div className="empty-premium-sub">Crea tu primera obra para organizar los fichajes por proyecto</div>
+              </div>
+            )}
             {obras.map(o => (
-              <div key={o.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:'1px solid var(--border)', transition:'border-color .15s' }}>
+              <div key={o.id} className="card-lift" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', borderRadius:'var(--r-lg)', border:'1px solid var(--border)' }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:'var(--primary-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 </div>
@@ -1179,10 +1213,16 @@ function PanelObras({ db, toast, saveDB, session }) {
             <input style={{ flex:1 }} placeholder="Nombre del centro de trabajo…" value={newCentro} onChange={e => setNewCentro(e.target.value)} onKeyDown={e => e.key==='Enter'&&addCentro()} />
             <button className="btn btn-primary" onClick={addCentro}>+ Añadir</button>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {!centros.length && <div className="empty">Sin centros de trabajo</div>}
+          <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {!centros.length && (
+              <div className="empty-premium">
+                <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                <div className="empty-premium-title">Sin centros de trabajo</div>
+                <div className="empty-premium-sub">Añade centros de trabajo para asignarlos a empleados</div>
+              </div>
+            )}
             {centros.map(c => (
-              <div key={c} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
+              <div key={c} className="card-lift" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg-700)', borderRadius:'var(--r-lg)', border:'1px solid var(--border)' }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:'rgba(0,212,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
@@ -1275,7 +1315,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Documentos</h1>
+        <h1 className="adm-panel-title gradient-text">Documentos</h1>
         <div style={{ display:'flex', gap:8 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setTab('todos') }}>
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="4" x2="7" y2="4"/><line x1="3" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="11" y2="12"/><line x1="7" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/></svg>
@@ -1373,12 +1413,18 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
       </div>
 
       {/* Documents list */}
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {!filtered.length && <div className="empty">Sin documentos</div>}
+      <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {!filtered.length && (
+          <div className="empty-premium">
+            <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <div className="empty-premium-title">Sin documentos</div>
+            <div className="empty-premium-sub">Los documentos enviados a los empleados aparecerán aquí</div>
+          </div>
+        )}
         {[...filtered].sort((a,b) => b.createdAt?.localeCompare(a.createdAt||'')||0).map(d => {
           const emp = emps.find(e => e.id === d.empId)
           return (
-            <div key={d.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
+            <div key={d.id} className="card-lift" style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
               <div style={{ width:40, height:40, borderRadius:10, background:'var(--bg-500)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={TIPO_COLORS[d.tipo]||'var(--text3)'} strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               </div>
@@ -1554,21 +1600,39 @@ function PanelMiObra({ db, toast, saveDB, session }) {
 // ─── PANEL AUDITORÍA ──────────────────────────────────────────────────────────
 function PanelAuditoria({ db }) {
   const audit = (db.audit || []).slice().reverse()
+  const ACTION_COLORS = {
+    'Jornada': 'var(--green)', 'Empleado': 'var(--primary-light)', 'Obra': 'var(--teal)',
+    'Documento': 'var(--orange)', 'Solicitud': 'var(--accent)', 'Centro': 'var(--secondary)',
+  }
+  const getColor = (action) => {
+    for (const [k, v] of Object.entries(ACTION_COLORS)) if (action?.includes(k)) return v
+    return 'var(--text3)'
+  }
   return (
     <div className="adm-panel">
-      <div className="adm-panel-header"><h1 className="adm-panel-title">Auditoría</h1></div>
-      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-        {!audit.length && <div className="empty">Sin registros de auditoría</div>}
+      <div className="adm-panel-header">
+        <div>
+          <h1 className="adm-panel-title gradient-text">Auditoría</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{audit.length} registros</div>
+        </div>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+        {!audit.length && (
+          <div className="empty-premium">
+            <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <div className="empty-premium-title">Sin registros</div>
+            <div className="empty-premium-sub">Las acciones del sistema se registrarán aquí automáticamente</div>
+          </div>
+        )}
         {audit.map((a, i) => (
-          <div key={i} className="audit-row">
-            <div className="audit-ico">📝</div>
+          <div key={i} className="audit-row-premium">
+            <div className="audit-dot" style={{ background: getColor(a.action) }} />
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:12, fontWeight:700 }}>{a.action}</div>
-              <div style={{ fontSize:11, color:'var(--text3)' }}>{a.user}</div>
-              {a.detail && <div style={{ fontSize:11, color:'var(--text4)', marginTop:2 }}>{a.detail}</div>}
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{a.user}{a.detail ? ` · ${a.detail}` : ''}</div>
             </div>
-            <div style={{ fontSize:10, color:'var(--text4)', textAlign:'right', flexShrink:0 }}>
-              {a.ts ? new Date(a.ts).toLocaleString('es-ES') : ''}
+            <div style={{ fontSize:10, color:'var(--text4)', textAlign:'right', flexShrink:0, whiteSpace:'nowrap' }}>
+              {a.ts ? new Date(a.ts).toLocaleString('es-ES', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'short' }) : ''}
             </div>
           </div>
         ))}

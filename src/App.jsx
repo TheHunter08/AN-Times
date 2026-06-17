@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
-import EmployeePage from './pages/EmployeePage.jsx'
-import AdminPage from './pages/AdminPage.jsx'
 
-// Deep-link de notificaciones push: "/?go=admin:documentos" o "/?go=emp:vacaciones"
+const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
+const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
+
 function applyDeepLink(url) {
   try {
     const u = new URL(url, window.location.origin)
@@ -23,6 +23,17 @@ function applyDeepLink(url) {
     }
     window.history.replaceState({}, '', window.location.pathname)
   } catch {}
+}
+
+function ScreenLoader() {
+  return (
+    <div style={{ position:'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg-800)', flexDirection:'column', gap:20 }}>
+      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(135deg,var(--primary-dim),rgba(0,212,255,.08))', border:'1px solid rgba(108,99,255,.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div className="login-spinner" style={{ width:22, height:22, borderWidth:2.5, borderColor:'rgba(108,99,255,.15)', borderTopColor:'var(--primary-light)' }} />
+      </div>
+      <div style={{ fontSize:13, color:'var(--text3)', fontWeight:600, letterSpacing:'.3px' }}>Cargando</div>
+    </div>
+  )
 }
 
 export default function App() {
@@ -46,16 +57,23 @@ export default function App() {
 
   useEffect(() => {
     try {
-      const t = localStorage.getItem('theme')
-      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light')
+      const saved = localStorage.getItem('theme')
+      if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light')
+      } else if (!saved) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (!prefersDark) document.documentElement.setAttribute('data-theme', 'light')
+      }
     } catch {}
   }, [])
 
   return (
     <>
       {currentScreen === 'login' && <LoginPage />}
-      {currentScreen === 'emp'   && <EmployeePage />}
-      {currentScreen === 'admin' && <AdminPage />}
+      <Suspense fallback={<ScreenLoader />}>
+        {currentScreen === 'emp' && <EmployeePage />}
+        {currentScreen === 'admin' && <AdminPage />}
+      </Suspense>
       <ToastContainer />
     </>
   )
