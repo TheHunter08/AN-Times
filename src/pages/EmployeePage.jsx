@@ -852,6 +852,27 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
 
+  // Personal stats
+  const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
+  const yearStr = `${now.getFullYear()}-`
+  const yearRecs = myRecs.filter(r => r.inicio.startsWith(yearStr))
+  const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
+  const yearDays = new Set(yearRecs.map(r => r.inicio.slice(0, 10))).size
+  const dayMap = {}
+  myRecs.forEach(r => { const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
+  const recordMin = Math.max(0, ...Object.values(dayMap).filter(Boolean))
+  let streak = 0
+  const sd = new Date(now)
+  for (let i = 0; i < 90; i++) {
+    const ds = sd.toISOString().slice(0,10)
+    const isWeekend = sd.getDay() === 0 || sd.getDay() === 6
+    if (!isWeekend) {
+      if (dayMap[ds]) streak++
+      else if (i > 0) break
+    }
+    sd.setDate(sd.getDate() - 1)
+  }
+
   return (
     <div className="emp-tab active" style={{ background:'var(--bg-800)' }}>
       <div className="prf-hero">
@@ -876,6 +897,27 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
             <div style={{ fontSize:9, color:'var(--text4)', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:700, marginTop:4 }}>{lbl}</div>
           </div>
         ))}
+      </div>
+
+      {/* Personal stats */}
+      <div style={{ margin:'0 16px 16px' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mis estadísticas</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
+          {[
+            { val:`${yearDays}`, unit:'días', lbl:'Trabajados (año)', ico:'📅', color:'var(--primary-light)', bg:'var(--primary-dim)' },
+            { val:mhm(yearMin), unit:'', lbl:'Horas totales (año)', ico:'⏱️', color:'var(--teal)', bg:'rgba(0,212,255,.1)' },
+            { val:`${streak}`, unit:'días', lbl:'Racha actual', ico:'🔥', color:'var(--orange)', bg:'var(--orange-dim)' },
+            { val:recordMin > 0 ? mhm(recordMin) : '—', unit:'', lbl:'Récord diario', ico:'🏆', color:'var(--green)', bg:'var(--green-dim)' },
+          ].map(({ val, unit, lbl, ico, color, bg }) => (
+            <div key={lbl} style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:'var(--r-lg)', padding:'14px 12px', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                <div style={{ width:28, height:28, borderRadius:8, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>{ico}</div>
+                <div style={{ fontSize:10, color:'var(--text3)', fontWeight:600, lineHeight:1.2 }}>{lbl}</div>
+              </div>
+              <div style={{ fontSize:22, fontWeight:800, color, letterSpacing:'-.5px' }}>{val}<span style={{ fontSize:12, fontWeight:500, opacity:.7, marginLeft:2 }}>{unit}</span></div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Cierres mensuales pendientes de firma */}

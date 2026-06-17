@@ -222,6 +222,7 @@ function SyncBadge() {
 
 // ─── PANEL DASHBOARD ──────────────────────────────────────────────────────────
 function PanelDashboard({ db, toast, saveDB }) {
+  const { setAdminPage } = useAppStore()
   const now = new Date()
   const todayStr = today()
   const emps = (db.employees || []).filter(e => !e.baja)
@@ -239,6 +240,7 @@ function PanelDashboard({ db, toast, saveDB }) {
   const monthMin = recs.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
 
   const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
+  const vacHoy = (db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).length
 
   const heat = buildHeatmap(recs, emps.length)
   const recentAudit = (db.audit || []).slice(-5).reverse()
@@ -254,6 +256,14 @@ function PanelDashboard({ db, toast, saveDB }) {
           <SyncBadge />
         </div>
       </div>
+
+      {vacPend > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)', marginBottom:16, cursor:'pointer' }} onClick={() => setAdminPage('solicitudes')}>
+          <span style={{ fontSize:18 }}>🌴</span>
+          <span style={{ fontSize:13, fontWeight:600, color:'var(--orange)' }}>{vacPend} solicitud{vacPend>1?'es':''} de vacaciones pendiente{vacPend>1?'s':''} de revisión</span>
+          <span style={{ marginLeft:'auto', fontSize:11, color:'var(--text3)', fontWeight:600 }}>→ Solicitudes</span>
+        </div>
+      )}
 
       <div className="adm-stats-grid stagger-in">
         {[
@@ -283,7 +293,10 @@ function PanelDashboard({ db, toast, saveDB }) {
               <span className="live-indicator" />
               Trabajando ahora
             </div>
-            <span className="dash-widget-badge" style={{ background:'var(--green-dim)', color:'var(--green)' }}>{liveRecs.length}</span>
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              {vacHoy > 0 && <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, background:'rgba(0,212,255,.1)', color:'var(--teal)' }}>🌴 {vacHoy} vac.</span>}
+              <span className="dash-widget-badge" style={{ background:'var(--green-dim)', color:'var(--green)' }}>{liveRecs.length}</span>
+            </div>
           </div>
           {!liveRecs.length ? (
             <div className="empty-premium" style={{ padding:'20px 0' }}>
@@ -546,6 +559,24 @@ function PanelControl({ db, toast, saveDB, session }) {
                   <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
                     {isWorking ? `Entrada: ${ftime(live.inicio)}` : isBreak ? 'En descanso' : todayMin>0 ? `Hoy: ${mhm(todayMin)}` : 'Sin jornada hoy'}
                   </div>
+                  {(() => {
+                    const dailyTarget = (e.horasSemanales || WK) / 5 * 60
+                    const workedMin = t ? Math.floor(t.work/60) : todayMin
+                    if (!workedMin) return null
+                    const pct = Math.min(100, Math.round(workedMin / dailyTarget * 100))
+                    const over = workedMin > dailyTarget
+                    return (
+                      <div style={{ marginTop:8 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text4)', marginBottom:3 }}>
+                          <span>Jornada diaria</span>
+                          <span style={{ color: over ? 'var(--orange)' : 'var(--text3)', fontWeight:700 }}>{pct}%{over ? ' ↑extra' : ''}</span>
+                        </div>
+                        <div style={{ height:4, background:'var(--bg-400)', borderRadius:2 }}>
+                          <div style={{ height:'100%', borderRadius:2, background: over ? 'var(--orange)' : 'var(--green)', width: pct + '%', transition:'width .6s' }} />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
                 {live && (
                   <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
@@ -742,7 +773,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
-  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today() }
+  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today(), horasSemanales: 40 }
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }
@@ -841,6 +872,17 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
             </div>
             <div className="field"><label>Fecha alta</label><input type="date" value={form.fechaAlta||''} onChange={e => setForm(f=>({...f,fechaAlta:e.target.value,startDate:e.target.value}))} /></div>
           </div>
+          <div className="field-row">
+            <div className="field">
+              <label>Horas contratadas / semana</label>
+              <input type="number" min={1} max={60} value={form.horasSemanales||40} onChange={e => setForm(f=>({...f,horasSemanales:parseInt(e.target.value)||40}))} placeholder="40" />
+            </div>
+            <div className="field" style={{ display:'flex', alignItems:'flex-end' }}>
+              <div style={{ fontSize:11, color:'var(--text3)', lineHeight:1.5, paddingBottom:6 }}>
+                Usado para calcular horas extra y desvío en informes.<br/>Por defecto: 40h/semana.
+              </div>
+            </div>
+          </div>
           <div className="modal-btns">
             <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
             <button className="btn btn-primary" onClick={saveEmp}>Guardar</button>
@@ -901,10 +943,11 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const rows = sortedEmps(db).filter(e => !e.baja).map(e => {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const expected = WK * 4
+    const weeklyH = e.horasSemanales || WK
+    const expected = weeklyH * 4
     const diff = totalMin - expected
     const vac = vacData(e.id, db)
-    return { e, totalMin, diff, days: eRecs.length, vac }
+    return { e, totalMin, diff, days: eRecs.length, vac, expected, weeklyH }
   })
 
   const downloadXLSX = async (sheetName, aoa, filename) => {
@@ -950,9 +993,9 @@ function PanelInformes({ db, toast, saveDB, session }) {
   }
 
   const exportResumenXLSX = async () => {
-    const header = ['Empleado','Días','Total mes','Esperadas','Diferencia','Vac. disp.']
-    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac }) => [
-      e.name, days, mhm(totalMin), mhm(WK*4), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available
+    const header = ['Empleado','Días','Total mes','Contratadas','Diferencia','Vac. disp.','H/semana']
+    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac, expected, weeklyH }) => [
+      e.name, days, mhm(totalMin), mhm(expected), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available, weeklyH
     ])
     await downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
     toast('✅ Excel descargado')
@@ -1034,7 +1077,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
             📋 <strong>Cierre mensual</strong> — Genera el resumen y envíalo al empleado para firma digital. Cumple con la Ley de Control Horario (RDL 8/2019). El empleado recibirá una notificación para firmar.
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {rows.map(({ e, totalMin, days, diff }) => {
+            {rows.map(({ e, totalMin, days, diff, weeklyH }) => {
               const cierre = (db.cierres || []).find(c => c.empId === e.id && c.mes === filterMonth)
               return (
                 <div key={e.id} className="card" style={{ display:'flex', alignItems:'center', gap:14 }}>
@@ -1102,9 +1145,9 @@ function PanelInformes({ db, toast, saveDB, session }) {
           </div>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Esperadas</th><th>Diferencia</th><th>Vac. disp.</th></tr></thead>
+            <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Contratadas</th><th>Diferencia</th><th>Vac. disp.</th></tr></thead>
             <tbody>
-              {rows.map(({ e, totalMin, diff, days, vac }) => (
+              {rows.map(({ e, totalMin, diff, days, vac, expected, weeklyH }) => (
                 <tr key={e.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -1116,7 +1159,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
                   </td>
                   <td>{days}</td>
                   <td style={{ fontWeight:700 }}>{mhm(totalMin)}</td>
-                  <td style={{ color:'var(--text3)' }}>{mhm(WK * 4)}</td>
+                  <td style={{ color:'var(--text3)' }}>{mhm(expected)}<span style={{ fontSize:10, marginLeft:4, opacity:.7 }}>({weeklyH}h/sem)</span></td>
                   <td style={{ fontWeight:700, color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>
                     {diff >= 0 ? '+' : ''}{mhm(Math.abs(diff))}
                   </td>
