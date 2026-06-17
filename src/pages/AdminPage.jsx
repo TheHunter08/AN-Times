@@ -732,11 +732,16 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
           </div>
           <div className="field-row">
             <div className="field"><label>Empresa</label><input value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))} /></div>
-            <div className="field"><label>Centro de trabajo</label><input value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))} /></div>
+            <div className="field"><label>Centro de trabajo</label>
+              <select value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))}>
+                <option value="">— Sin asignar —</option>
+                {(db.centrosTrabajo||[]).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
-          {form.role === 'encargado' && (
+          {(form.role === 'encargado' || form.role === 'jefe_obra') && (
             <div className="field" style={{ marginBottom:14 }}>
-              <label>Obras / centros asignados (solo verá y gestionará jornadas de estos)</label>
+              <label>Obras asignadas para gestión (verá y aceptará jornadas de estas obras)</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', paddingTop:4 }}>
                 {(db.centrosTrabajo||[]).map(c => (
                   <div key={c} onClick={() => toggleObra(c)}
@@ -1480,10 +1485,11 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
 function PanelMiObra({ db, toast, saveDB, session }) {
   const enc = session.user
   const misCentros = enc?.obrasAsignadas || []
-  const emps = (db.employees || []).filter(e => !e.baja && misCentros.includes(e.centroTrabajo))
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && (misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+  const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
-  const liveRecs = recs.filter(r => !r.fin && misCentros.includes(r.centro))
-  const pendRecs = recs.filter(r => r.fin && misCentros.includes(r.centro) && !r.aceptada)
+  const liveRecs = recs.filter(r => !r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)))
+  const pendRecs = recs.filter(r => r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)) && !r.aceptada)
     .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
   const [editing, setEditing] = useState(null)
 
