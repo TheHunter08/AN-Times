@@ -72,8 +72,15 @@ export const vacData = (empId, db) => {
   if (n.getDate() < sd.getDate()) m--
   m = Math.max(0, m)
   const gen = parseFloat((m * VPM).toFixed(1))
-  const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada').reduce((s, v) => s + v.dias, 0)
-  const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente').reduce((s, v) => s + v.dias, 0)
+  const countDays = v => {
+    if (v.fechaInicio && v.fechaFin) {
+      const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
+      return Math.round((e - s) / 86400000) + 1
+    }
+    return v.dias || 0
+  }
+  const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada').reduce((s, v) => s + countDays(v), 0)
+  const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente').reduce((s, v) => s + countDays(v), 0)
   return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used).toFixed(1))) }
 }
 

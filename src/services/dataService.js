@@ -139,7 +139,7 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
     onError?.()
     if (_saveRetry < 5) {
       _saveRetry++
-      setTimeout(() => cloudPush(db, onSuccess, onError, onFinalError), 600 * _saveRetry)
+      setTimeout(() => cloudPush(loadLocal(), onSuccess, onError, onFinalError), 600 * _saveRetry)
     } else {
       _saveRetry = 0
       onFinalError?.()

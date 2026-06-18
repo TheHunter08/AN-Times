@@ -858,10 +858,14 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const todayStr = today()
   const monthStr = `${y}-${p2(m+1)}`
 
+  // Fecha local YYYY-MM-DD sin conversión UTC (evita el desfase de +1/-1 día en Madrid)
+  const lds = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`
+
   const workedMap = useMemo(() => {
     const map = {}
-    ;(db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(monthStr)).forEach(r => {
-      const ds = r.inicio.slice(0, 10)
+    ;(db.records || []).filter(r => r.empId === u.id && r.fin).forEach(r => {
+      const ds = lds(new Date(r.inicio))
+      if (!ds.startsWith(monthStr)) return
       map[ds] = (map[ds] || 0) + calcMin(r)
     })
     return map
@@ -872,7 +876,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       const days = []
       const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
       const d = new Date(s)
-      while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
+      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate()+1) }
       return days
     })
   ), [db.vacaciones, u.id])
@@ -883,7 +887,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
       const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
       const d = new Date(s)
-      while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
+      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate()+1) }
       return days
     })
   ), [db.ausencias, u.id])
@@ -894,7 +898,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
       const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
       const d = new Date(s)
-      while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
+      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate()+1) }
       return days
     })
   ), [db.medicos, u.id])
@@ -905,8 +909,8 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const getDayStatus = (ds, date) => {
     const dow = date.getDay()
     if (dow === 0 || dow === 6) return 'weekend'
-    if (FESTIVOS_MADRID_2026[ds]) return 'festivo'
     if (vacDays.has(ds)) return 'vacation'
+    if (FESTIVOS_MADRID_2026[ds]) return 'festivo'
     if (absDays.has(ds) || medDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
     if (mins >= WD * 0.9) return 'complete'
@@ -918,7 +922,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const monthStats = { complete: 0, pending: 0, absence: 0, vacation: 0, missing: 0, festivo: 0 }
   cells.forEach(date => {
     if (!date) return
-    const ds = date.toISOString().slice(0, 10)
+    const ds = lds(date)
     const st = getDayStatus(ds, date)
     if (st in monthStats) monthStats[st]++
   })
@@ -960,7 +964,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           {DAYS_ES.map(d => <div key={d} className="cal-day-header">{d}</div>)}
           {cells.map((date, i) => {
             if (!date) return <div key={i} />
-            const ds = date.toISOString().slice(0, 10)
+            const ds = lds(date)
             const isToday = ds === todayStr
             const status = getDayStatus(ds, date)
             const mins = workedMap[ds] || 0

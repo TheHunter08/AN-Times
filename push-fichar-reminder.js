@@ -66,13 +66,14 @@ function fbPost(path, data, token) {
 }
 
 async function run() {
-  // Hora actual en Madrid (UTC+1 invierno / UTC+2 verano)
-  const now      = new Date()
-  const madridH  = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }))
-  const todayStr = madridH.toISOString().slice(0, 10)
-  const hh       = madridH.getHours()
+  // Hora actual en Madrid usando Intl (evita desfases UTC en toISOString)
+  const now          = new Date()
+  const madridFmt    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit' })
+  const madridHHFmt  = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', hour:'numeric', hour12: false })
+  const todayStr     = madridFmt.format(now)           // "2026-07-15" en hora Madrid
+  const hh           = parseInt(madridHHFmt.format(now))
 
-  console.log(`🕐 Madrid: ${madridH.toLocaleTimeString('es-ES')} | Fecha: ${todayStr}`)
+  console.log(`Madrid: ${now.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} | Fecha: ${todayStr}`)
 
   // Solo lanzar si es entre 7:00 y 10:00 hora Madrid (el cron puede variar ±1h)
   if (hh < 7 || hh >= 10) {
@@ -95,11 +96,12 @@ async function run() {
   console.log(`Empleados sin fichar hoy (${todayStr}): ${sinFichar.length}/${employees.length}`)
   if (!sinFichar.length) return
 
-  // Evitar duplicados: comprobar si ya se mandó recordatorio hoy
+  // Evitar duplicados: comprobar si ya se mandó recordatorio hoy (comparando en hora Madrid)
   const queue = db.pushQueue ? Object.values(db.pushQueue) : []
-  const yaEnviado = queue.some(q =>
-    q.tag === 'reminder-fichar' && q.ts && q.ts > new Date(todayStr).getTime()
-  )
+  const yaEnviado = queue.some(q => {
+    if (q.tag !== 'reminder-fichar' || !q.ts) return false
+    return madridFmt.format(new Date(q.ts)) === todayStr
+  })
   if (yaEnviado) { console.log('Recordatorio ya enviado hoy.'); return }
 
   // Escribir en la cola — push-server-once.js lo entregará
