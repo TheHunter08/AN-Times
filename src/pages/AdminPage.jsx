@@ -685,18 +685,32 @@ function PanelFichajes({ db, toast, saveDB }) {
   const [search, setSearch] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterEmp, setFilterEmp] = useState('')
+  const [quickFilter, setQuickFilter] = useState('')
   const emps = db.employees || []
   const recs = (db.records || []).filter(r => r.fin)
+  const now = new Date()
+  const todayStr = today()
+  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+
+  const qs = {
+    hoy:    r => r.inicio.startsWith(todayStr),
+    semana: r => new Date(r.inicio) >= wkStart(now),
+    mes:    r => r.inicio.startsWith(mk),
+  }
 
   const filtered = recs.filter(r => {
-    if (filterDate && !r.inicio.startsWith(filterDate)) return false
+    if (quickFilter && qs[quickFilter] && !qs[quickFilter](r)) return false
+    if (!quickFilter && filterDate && !r.inicio.startsWith(filterDate)) return false
     if (filterEmp && r.empId !== filterEmp) return false
     if (search) {
       const q = search.toLowerCase()
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 200)
+  }).sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 300)
+
+  const totalWork = filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0)
+  const totalBreak = filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0)
 
   const del = (id) => {
     if (!window.confirm('¿Eliminar este fichaje?')) return
@@ -709,12 +723,26 @@ function PanelFichajes({ db, toast, saveDB }) {
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Fichajes</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2 }}>{recs.length} registros totales</div>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{filtered.length} registros · {mhm(totalWork)} trabajo</div>
         </div>
       </div>
+
+      {/* Quick filters */}
+      <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+        {[['','Todos'],['hoy','Hoy'],['semana','Esta semana'],['mes','Este mes']].map(([v,l]) => (
+          <button key={v} onClick={() => { setQuickFilter(v); if(v) setFilterDate('') }}
+            style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', border:'1px solid', transition:'all .15s',
+              background: quickFilter===v ? 'var(--primary)' : 'var(--bg-600)',
+              color: quickFilter===v ? '#fff' : 'var(--text3)',
+              borderColor: quickFilter===v ? 'var(--primary)' : 'var(--border)' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       <div className="premium-filters">
         <input placeholder="Buscar empleado o centro…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex:1, minWidth:180 }} />
-        <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
+        <input type="date" value={filterDate} onChange={e => { setFilterDate(e.target.value); setQuickFilter('') }} />
         <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}>
           <option value="">Todos los empleados</option>
           {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -742,6 +770,18 @@ function PanelFichajes({ db, toast, saveDB }) {
             })}
             {!filtered.length && <tr><td colSpan={7} className="empty">Sin resultados</td></tr>}
           </tbody>
+          {filtered.length > 0 && (
+            <tfoot>
+              <tr style={{ background:'var(--bg-500)' }}>
+                <td colSpan={4} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
+                  Total ({filtered.length} registros)
+                </td>
+                <td style={{ fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalWork)}</td>
+                <td style={{ fontWeight:700, color:'var(--text3)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>{mhm(totalBreak)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
@@ -750,9 +790,13 @@ function PanelFichajes({ db, toast, saveDB }) {
 
 // ─── PANEL SOLICITUDES ────────────────────────────────────────────────────────
 function PanelSolicitudes({ db, toast, saveDB, session }) {
+  const [solTab, setSolTab] = useState('vacaciones')
+  const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
+
   const vacs = (db.vacaciones || []).sort((a,b) => b.ts?.localeCompare(a.ts||'')||0)
   const pend = vacs.filter(v => v.estado === 'pendiente')
   const rest = vacs.filter(v => v.estado !== 'pendiente')
+  const emps = (db.employees || []).filter(e => !e.baja)
 
   const act = (id, estado) => {
     const v = (db.vacaciones||[]).find(x => x.id === id)
@@ -762,6 +806,27 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
     if (v?.empId) sendPushNotif('emp:' + v.empId, noti.action, noti.detail, 'times-vac', '/?go=emp:vacaciones')
     toast(estado === 'aprobada' ? '✅ Solicitud aprobada' : '❌ Solicitud rechazada')
+  }
+
+  const allAus = [
+    ...(db.medicos||[]).map(a => ({ ...a, tipo:'medico' })),
+    ...(db.ausencias||[]).map(a => ({ ...a, tipo:'ausencia' })),
+  ].sort((a,b) => (b.fechaInicio||b.fecha||'').localeCompare(a.fechaInicio||a.fecha||''))
+
+  const addAus = () => {
+    if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
+    const emp = emps.find(e => e.id === ausForm.empId)
+    const key = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
+    const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString() }
+    saveDB({ [key]: [...(db[key]||[]), item] })
+    setAusForm(f => ({ ...f, empId:'', motivo:'' }))
+    toast('✅ Ausencia registrada')
+  }
+
+  const delAus = (id, tipo) => {
+    const key = tipo === 'medico' ? 'medicos' : 'ausencias'
+    saveDB({ [key]: (db[key]||[]).filter(a => a.id !== id) })
+    toast('Ausencia eliminada')
   }
 
   const VacRow = ({ v }) => (
@@ -791,31 +856,112 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Solicitudes</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2 }}>{pend.length} pendientes · {rest.length} resueltas</div>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{pend.length} pendientes de revisión</div>
         </div>
       </div>
-      {pend.length > 0 && (
+
+      <div className="pill-tabs" style={{ marginBottom:20 }}>
+        {[['vacaciones','🌴 Vacaciones'],['ausencias','🏥 Ausencias médicas']].map(([v,l]) => (
+          <button key={v} className={`pill-tab${solTab===v?' active':''}`} onClick={() => setSolTab(v)}>{l}</button>
+        ))}
+      </div>
+
+      {solTab === 'vacaciones' && (
         <>
-          <div className="section-header">Pendientes de revisión</div>
-          <div className="stagger-in">
-            {pend.map(v => <VacRow key={v.id} v={v} />)}
-          </div>
+          {pend.length > 0 && (
+            <>
+              <div className="section-header">Pendientes de revisión</div>
+              <div className="stagger-in">
+                {pend.map(v => <VacRow key={v.id} v={v} />)}
+              </div>
+            </>
+          )}
+          {rest.length > 0 && (
+            <>
+              <div className="section-header" style={{ marginTop:20 }}>Historial</div>
+              {rest.slice(0, 30).map(v => <VacRow key={v.id} v={v} />)}
+            </>
+          )}
+          {!vacs.length && (
+            <div className="empty-premium">
+              <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+              <div className="empty-premium-title">Sin solicitudes</div>
+              <div className="empty-premium-sub">Las solicitudes de vacaciones de los empleados aparecerán aquí</div>
+            </div>
+          )}
         </>
       )}
-      {rest.length > 0 && (
+
+      {solTab === 'ausencias' && (
         <>
-          <div className="section-header" style={{ marginTop:20 }}>Historial</div>
-          {rest.slice(0, 30).map(v => <VacRow key={v.id} v={v} />)}
-        </>
-      )}
-      {!vacs.length && (
-        <div className="empty-premium">
-          <div className="empty-premium-icon">
-            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          {/* Formulario alta */}
+          <div className="dash-widget" style={{ marginBottom:20 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Registrar ausencia / baja médica</div>
+            <div className="field-row">
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Empleado</label>
+                <select value={ausForm.empId} onChange={e => setAusForm(f => ({ ...f, empId:e.target.value }))}>
+                  <option value="">Selecciona empleado</option>
+                  {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Tipo</label>
+                <select value={ausForm.tipo} onChange={e => setAusForm(f => ({ ...f, tipo:e.target.value }))}>
+                  <option value="medico">🏥 Baja médica</option>
+                  <option value="ausencia">📋 Ausencia justificada</option>
+                </select>
+              </div>
+            </div>
+            <div className="field-row" style={{ marginTop:10 }}>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha inicio</label>
+                <input type="date" value={ausForm.fechaInicio} onChange={e => setAusForm(f => ({ ...f, fechaInicio:e.target.value }))} />
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha fin</label>
+                <input type="date" value={ausForm.fechaFin} min={ausForm.fechaInicio} onChange={e => setAusForm(f => ({ ...f, fechaFin:e.target.value }))} />
+              </div>
+            </div>
+            <div className="field" style={{ marginTop:10, marginBottom:14 }}>
+              <label>Motivo (opcional)</label>
+              <input value={ausForm.motivo} onChange={e => setAusForm(f => ({ ...f, motivo:e.target.value }))} placeholder="Descripción breve de la ausencia" />
+            </div>
+            <button className="btn btn-primary" onClick={addAus} style={{ width:'100%' }}>+ Registrar ausencia</button>
           </div>
-          <div className="empty-premium-title">Sin solicitudes</div>
-          <div className="empty-premium-sub">Las solicitudes de vacaciones de los empleados aparecerán aquí</div>
-        </div>
+
+          {/* Listado */}
+          <div className="section-header">Historial de ausencias</div>
+          <div className="stagger-in" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {allAus.map(a => {
+              const start = new Date(a.fechaInicio + 'T00:00:00'), end = new Date(a.fechaFin + 'T00:00:00')
+              const dias = Math.round((end - start) / 86400000) + 1
+              return (
+                <div key={a.id} className="card" style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18,
+                    background: a.tipo==='medico' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)' }}>
+                    {a.tipo==='medico'?'🏥':'📋'}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{a.empName}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                      {fds(a.fechaInicio)} → {fds(a.fechaFin)} · {dias}d · <span style={{ color: a.tipo==='medico'?'var(--red)':'var(--orange)' }}>{a.tipo==='medico'?'Baja médica':'Ausencia'}</span>
+                    </div>
+                    {a.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:1 }}>{a.motivo}</div>}
+                  </div>
+                  <button className="btn btn-sm btn-danger" onClick={() => delAus(a.id, a.tipo)}>✕</button>
+                </div>
+              )
+            })}
+          </div>
+          {!allAus.length && (
+            <div className="empty-premium">
+              <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+              <div className="empty-premium-title">Sin ausencias registradas</div>
+              <div className="empty-premium-sub">Las bajas médicas y ausencias aparecerán aquí. También se muestran en el calendario de cada empleado.</div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

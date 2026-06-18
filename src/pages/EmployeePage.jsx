@@ -556,7 +556,65 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         )}
       </div>
 
+      {/* Historial últimos 7 días */}
+      {(() => {
+        const histDays = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(now)
+          d.setDate(d.getDate() - i - 1)
+          return d.toISOString().slice(0, 10)
+        })
+        const histWithRecs = histDays.map(ds => ({
+          ds,
+          recs: (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(ds) && r.fin),
+        })).filter(h => h.recs.length > 0)
+        if (!histWithRecs.length) return null
+        return (
+          <HistorialReciente histWithRecs={histWithRecs} />
+        )
+      })()}
+
       <div style={{ height: 20 }} />
+    </div>
+  )
+}
+
+function HistorialReciente({ histWithRecs }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ padding:'0 16px 12px' }}>
+      <button onClick={() => setOpen(o => !o)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 14px', cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent', transition:'background .15s' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:14 }}>📅</span>
+          <span style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>Historial reciente</span>
+          <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:10, background:'var(--primary-dim)', color:'var(--primary-light)' }}>{histWithRecs.length} días</span>
+        </div>
+        <span style={{ fontSize:14, color:'var(--text3)', transition:'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
+          {histWithRecs.map(({ ds, recs }) => {
+            const totalMin = recs.reduce((s, r) => s + calcMin(r), 0)
+            const label = new Date(ds + 'T12:00:00').toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })
+            return (
+              <div key={ds} style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 14px' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: recs.length > 1 ? 8 : 0 }}>
+                  <div style={{ fontSize:12, fontWeight:700, textTransform:'capitalize' }}>{label}</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalMin)}</div>
+                </div>
+                {recs.length > 1 && recs.map(r => {
+                  const wm = Math.floor(recWorkSecs(r) / 60)
+                  return (
+                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)' }}>
+                      <span>{ftime(r.inicio)} → {ftime(r.fin)}</span>
+                      <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -565,6 +623,12 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const { openModal } = useAppStore()
   const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id).sort((a,b) => b.fechaInicio.localeCompare(a.fechaInicio))
+
+  const cancelVac = (id) => {
+    if (!window.confirm('¿Cancelar esta solicitud de vacaciones?')) return
+    saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id) })
+    toast('Solicitud cancelada')
+  }
   const pct = vac.generated > 0 ? Math.round((vac.used / vac.generated) * 100) : 0
 
   return (
@@ -621,6 +685,14 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
                     <div className={`badge${v.estado==='aprobada' ? ' badge-green' : v.estado==='rechazada' ? ' badge-red' : ' badge-orange'}`}>
                       {v.estado === 'aprobada' ? '✓ Aprobada' : v.estado === 'rechazada' ? '✗ Rechazada' : '⏳ Pendiente'}
                     </div>
+                    {v.estado === 'pendiente' && (
+                      <button onClick={() => cancelVac(v.id)} title="Cancelar solicitud"
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', padding:'4px 6px', borderRadius:6, fontSize:14, lineHeight:1, transition:'color .15s', fontFamily:'inherit' }}
+                        onMouseEnter={e => e.currentTarget.style.color='var(--red)'}
+                        onMouseLeave={e => e.currentTarget.style.color='var(--text4)'}>
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
