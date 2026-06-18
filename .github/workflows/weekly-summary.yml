@@ -1,0 +1,25 @@
+name: Resumen Semanal
+
+on:
+  schedule:
+    # Viernes 17:00 Madrid (15:00 UTC verano CEST, 16:00 UTC invierno CET)
+    # Doble disparo para cubrir el cambio horario
+    - cron: '0 15 * * 5'
+    - cron: '0 16 * * 5'
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install web-push --no-save
+      - name: Resumen semanal de horas
+        run: node push-weekly-summary.js
+        env:
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}

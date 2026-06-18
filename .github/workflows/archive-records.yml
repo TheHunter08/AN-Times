@@ -1,0 +1,19 @@
+name: Archivado mensual de registros
+
+on:
+  schedule:
+    # El 1º de cada mes a las 03:00 UTC (madrugada, mínimo impacto)
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Archivar registros antiguos
+        run: node archive-records.js

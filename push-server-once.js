@@ -65,6 +65,16 @@ function fbPatch(path, data, token) {
   })
 }
 
+function fbDelete(path, token) {
+  return new Promise(resolve => {
+    const u   = new URL(`${FB_BASE}/${path}.json?auth=${token}`)
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'DELETE' },
+      res => { res.resume(); res.on('end', resolve) })
+    req.on('error', () => resolve())
+    req.end()
+  })
+}
+
 // ─── Main ──────────────────────────────────────────────────────────────────
 async function run() {
   console.log('🔔 TIMES INC Push — autenticando…')
@@ -80,13 +90,15 @@ async function run() {
   console.log(`Procesando ${pending.length} notificación(es)…`)
 
   for (const [id, entry] of pending) {
-    let subs = []
+    let subsWithKeys = []
     if (entry.to === '__all__') {
       const all = await fbGet('pushSubs', token)
-      if (all && typeof all === 'object') subs = Object.values(all)
+      if (all && typeof all === 'object') {
+        subsWithKeys = Object.entries(all).map(([uid, sub]) => ({ uid, sub }))
+      }
     } else {
       const sub = await fbGet(`pushSubs/${encodeURIComponent(entry.to)}`, token)
-      if (sub?.endpoint) subs = [sub]
+      if (sub?.endpoint) subsWithKeys = [{ uid: entry.to, sub }]
     }
 
     const payload = JSON.stringify({
@@ -96,14 +108,32 @@ async function run() {
       url:   entry.url   || '/'
     })
 
-    let sent = 0
+    let sent = 0, expired = 0
     await Promise.allSettled(
-      subs.map(sub => webpush.sendNotification(sub, payload).then(() => sent++).catch(() => {}))
+      subsWithKeys.map(async ({ uid, sub }) => {
+        try {
+          await webpush.sendNotification(sub, payload)
+          sent++
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await fbDelete(`pushSubs/${encodeURIComponent(uid)}`, token)
+            expired++
+          }
+        }
+      })
     )
 
-    await fbPatch(`pushQueue/${id}`, { processed: true }, token)
+    await fbPatch(`pushQueue/${id}`, { processed: true, processedAt: Date.now() }, token)
     const dest = entry.to === '__all__' ? 'todos' : entry.to
-    console.log(`✓ "${entry.title}" → ${dest} (${sent}/${subs.length} entregadas)`)
+    console.log(`✓ "${entry.title}" → ${dest} (${sent}/${subsWithKeys.length} entregadas${expired ? `, ${expired} subs expiradas borradas` : ''})`)
+  }
+
+  // Limpiar entradas procesadas con más de 24h de antigüedad
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000
+  const toClean = Object.entries(queue).filter(([, e]) => e?.processed && e?.processedAt && e.processedAt < cutoff)
+  if (toClean.length) {
+    await Promise.all(toClean.map(([id]) => fbDelete(`pushQueue/${id}`, token)))
+    console.log(`Limpiados ${toClean.length} mensajes procesados`)
   }
 }
 

@@ -70,6 +70,23 @@ export default function App() {
     return () => clearInterval(iv)
   }, [])
 
+  // Auto-logout tras 30 min de inactividad
+  useEffect(() => {
+    const TIMEOUT = 30 * 60 * 1000
+    let timer = null
+    const reset = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const { currentScreen: sc, logout } = useAppStore.getState()
+        if (sc !== 'login') logout()
+      }, TIMEOUT)
+    }
+    const events = ['mousemove', 'touchstart', 'keydown', 'click', 'scroll']
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+    reset()
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)) }
+  }, [])
+
   useEffect(() => {
     applyDeepLink(window.location.href)
     const onMsg = (event) => {
