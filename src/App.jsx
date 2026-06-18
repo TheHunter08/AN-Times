@@ -66,7 +66,7 @@ export default function App() {
 
   useEffect(() => {
     fetchDB()
-    const iv = setInterval(fetchDB, 60000)
+    const iv = setInterval(fetchDB, 25000)
     return () => clearInterval(iv)
   }, [])
 

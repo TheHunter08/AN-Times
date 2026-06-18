@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK, ADMIN_PIN } from '../config/constants.js'
-import { auditLog, sendPushNotif } from '../services/dataService.js'
+import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
+import { auditLog, sendPushNotif, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 
 const PAGES = [
@@ -451,6 +451,62 @@ function PanelDashboard({ db, toast, saveDB }) {
       )}
 
       <ComunicadoWidget db={db} toast={toast} saveDB={saveDB} />
+      <PushNotifWidget db={db} toast={toast} />
+    </div>
+  )
+}
+
+function PushNotifWidget({ db, toast }) {
+  const [open, setOpen]     = useState(false)
+  const [target, setTarget] = useState('__all__')
+  const [title, setTitle]   = useState('')
+  const [body, setBody]     = useState('')
+  const [sending, setSending] = useState(false)
+
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+
+  const send = async () => {
+    if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
+    setSending(true)
+    const tag = 'push-' + Date.now()
+    const url = '/'
+    await queuePush(target, title.trim(), body.trim(), tag, url)
+    if (target === '__all__') {
+      emps.forEach(e => sendPushNotif(e.id, title.trim(), body.trim(), tag, url))
+    } else {
+      sendPushNotif(target, title.trim(), body.trim(), tag, url)
+    }
+    toast('🔔 Notificación enviada')
+    setSending(false)
+    setTitle(''); setBody(''); setOpen(false)
+  }
+
+  return (
+    <div className="dash-widget card-lift" style={{ marginTop:12 }}>
+      <div className="dash-widget-header">
+        <div className="dash-widget-title">🔔 Notificaciones Push</div>
+        <button className="btn btn-primary btn-sm" onClick={() => setOpen(o => !o)}>
+          {open ? 'Cancelar' : '+ Enviar'}
+        </button>
+      </div>
+      {!open && <div style={{ fontSize:11, color:'var(--text4)', marginTop:4 }}>Llegan al móvil aunque esté bloqueado</div>}
+      {open && (
+        <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
+          <select value={target} onChange={e => setTarget(e.target.value)}
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13 }}>
+            <option value="__all__">Todos los empleados</option>
+            {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+          <input placeholder="Título de la notificación..." value={title} onChange={e => setTitle(e.target.value)}
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13 }} />
+          <textarea placeholder="Mensaje..." value={body} onChange={e => setBody(e.target.value)} rows={2}
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
+          <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : '🔔 Enviar notificación'}</button>
+          <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
+            Las notificaciones llegan en tiempo real a usuarios con la app abierta. Para entregarlas con el móvil bloqueado, inicia el servidor push (<code>node push-server.js</code>).
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2038,9 +2094,11 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
         <div className="modal-ov" onClick={() => setViewing(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
             <div className="modal-drag" />
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <h2 style={{ margin:0, fontSize:16 }}>{viewing.titulo}</h2>
-              <button onClick={() => setViewing(null)} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+              <button onClick={() => setViewing(null)} style={{ background:'var(--bg-500)', border:'1px solid var(--border)', color:'var(--text2)', width:32, height:32, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <h2 style={{ margin:0, fontSize:16, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{viewing.titulo}</h2>
             </div>
             <DocPreview d={viewing} db={db} empId={viewing.empId} />
           </div>

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK, FESTIVOS_MADRID_2026 } from '../config/constants.js'
-import { auditLog, sendPushNotif } from '../services/dataService.js'
+import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
+import { auditLog, sendPushNotif, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 
@@ -17,6 +17,9 @@ export default function EmployeePage() {
   const [calMonth, setCalMonth] = useState(new Date())
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
+
+  // Auto-subscribe to push notifications on login
+  useEffect(() => { if (u?.id) pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
@@ -1606,9 +1609,14 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     <div className="modal-ov" onClick={(signing || viewing) ? undefined : onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
         <div className="modal-drag" />
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ margin:0, fontSize:18 }}>{viewing ? viewing.titulo : signing ? `Confirmar firma` : 'Mis documentos'}</h2>
-          <button onClick={() => { setViewing(null); setSigning(null); onClose() }} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+          {(viewing || signing) && (
+            <button onClick={() => { setViewing(null); setSigning(null) }} style={{ background:'var(--bg-500)', border:'1px solid var(--border)', color:'var(--text2)', width:32, height:32, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+          )}
+          <h2 style={{ margin:0, fontSize:18, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{viewing ? viewing.titulo : signing ? signing.titulo : 'Mis documentos'}</h2>
+          <button onClick={() => { setViewing(null); setSigning(null); onClose() }} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', flexShrink:0 }}>×</button>
         </div>
 
         {/* Read-only viewer */}
@@ -1616,7 +1624,6 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
           <div style={{ marginBottom:16 }}>
             <DocPreview d={viewing} db={db} empId={u.id} />
             <div className="modal-btns" style={{ marginTop:12 }}>
-              <button className="btn btn-secondary" onClick={() => setViewing(null)}>Cerrar</button>
               {!viewing.firma && <button className="btn btn-primary" onClick={() => { setSigning(viewing); setViewing(null) }}>Firmar</button>}
             </div>
           </div>

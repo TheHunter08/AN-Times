@@ -1,7 +1,7 @@
 export const DB_URL = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data'
 export const FB_BASE = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app'
 export const ADMIN_PIN = '0824'
-export const VAPID_PUB = 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
+export const VAPID_PUB = 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4'
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm

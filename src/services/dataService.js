@@ -224,6 +224,18 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
   }
 }
 
+export async function queuePush(to, title, body, tag = 'times', url = '/') {
+  try {
+    const token = await getAuthToken()
+    const entry = { to, title, body, tag, url, ts: Date.now() }
+    await fetch(withAuth(FB_BASE + '/pushQueue.json', token), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    })
+  } catch {}
+}
+
 export function auditLog(db, action, detail, user) {
   try {
     const entry = {
