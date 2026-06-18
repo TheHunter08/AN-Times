@@ -18,6 +18,18 @@ export default function EmployeePage() {
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
 
+  const empBodyRef = useRef(null)
+  const prevTabRef = useRef(currentEmpTab)
+  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'perfil']
+  useEffect(() => {
+    const prev = prevTabRef.current
+    if (prev !== currentEmpTab && empBodyRef.current) {
+      const pi = TAB_ORDER.indexOf(prev), ci = TAB_ORDER.indexOf(currentEmpTab)
+      empBodyRef.current.dataset.dir = ci >= pi ? 'right' : 'left'
+    }
+    prevTabRef.current = currentEmpTab
+  }, [currentEmpTab])
+
   // Manejar shortcuts del manifest PWA (?tab=inicio|jornada|vacaciones|calendario|perfil)
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab')
@@ -266,7 +278,7 @@ export default function EmployeePage() {
       </div>
 
       {/* Body */}
-      <div className="emp-body">
+      <div className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
@@ -1827,6 +1839,7 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
 // ─── ONBOARDING (primer login empleado) ────────────────────────────────────────
 function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const [step, setStep] = useState(0)
+  const [done, setDone] = useState(false)
   const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
   const [reminderTime, setReminderTime] = useState('08:00')
   const canvasRef = useRef(null)
@@ -1840,7 +1853,7 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     }
   }, [step])
 
-  if (!visible) return null
+  if (!visible || done) return null
 
   const requestNotif = async () => {
     if (!('Notification' in window)) return
@@ -1882,6 +1895,7 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     const updatedEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e)
     const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
     saveDB({ employees: updatedEmps, firmas: updatedFirmas })
+    setDone(true)
     toast('✅ ¡Configuración lista! Ya puedes usar la app.')
   }
 
