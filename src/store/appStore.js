@@ -22,7 +22,12 @@ export const useAppStore = create((set, get) => ({
     const newDB = { ...get().db, ...(partial || {}), _ts: Date.now() }
     saveLocal(newDB)
     set({ db: newDB, syncStatus: 'syncing' })
-    cloudPush(newDB, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
+    cloudPush(
+      newDB,
+      () => set({ syncStatus: 'synced' }),
+      () => set({ syncStatus: 'error' }),
+      () => { set({ syncStatus: 'error' }); get().toast('⚠️ Sin conexión — datos guardados localmente') }
+    )
     return newDB
   },
 
@@ -109,4 +114,9 @@ export const useAppStore = create((set, get) => ({
     set(s => ({ toasts: [...s.toasts, { id, msg, dur }] }))
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), dur + 400)
   },
+
+  // ── Confirm dialog (reemplaza window.confirm para mobile) ────────────
+  confirmDialog: null,
+  showConfirm: (msg, onConfirm) => set({ confirmDialog: { msg, onConfirm } }),
+  closeConfirm: () => set({ confirmDialog: null }),
 }))

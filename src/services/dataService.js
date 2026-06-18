@@ -118,7 +118,7 @@ export async function cloudFetch() {
   }
 }
 
-export async function cloudPush(db, onSuccess, onError) {
+export async function cloudPush(db, onSuccess, onError, onFinalError) {
   if (_pushFlight) return
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
@@ -139,7 +139,10 @@ export async function cloudPush(db, onSuccess, onError) {
     onError?.()
     if (_saveRetry < 5) {
       _saveRetry++
-      setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
+      setTimeout(() => cloudPush(db, onSuccess, onError, onFinalError), 600 * _saveRetry)
+    } else {
+      _saveRetry = 0
+      onFinalError?.()
     }
   }
 }

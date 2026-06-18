@@ -36,6 +36,30 @@ function ScreenLoader() {
   )
 }
 
+function GlobalConfirm() {
+  const confirmDialog = useAppStore(s => s.confirmDialog)
+  const closeConfirm  = useAppStore(s => s.closeConfirm)
+  if (!confirmDialog) return null
+  return (
+    <div onClick={closeConfirm} style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,.45)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width:'100%', maxWidth:480, padding:`24px 20px max(32px,env(safe-area-inset-bottom,0px))`,
+          background:'var(--bg-700)', borderRadius:'20px 20px 0 0',
+          border:'1px solid var(--border2)', boxShadow:'0 -8px 40px rgba(0,0,0,.5)',
+          animation:'slideUp .2s cubic-bezier(.16,1,.3,1)' }}>
+        <div style={{ width:36, height:4, borderRadius:2, background:'var(--border3)', margin:'0 auto 20px' }} />
+        <div style={{ fontSize:15, fontWeight:600, color:'var(--text)', marginBottom:24, textAlign:'center', lineHeight:1.5 }}>
+          {confirmDialog.msg}
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button className="btn btn-secondary" style={{ flex:1, padding:'13px' }} onClick={closeConfirm}>Cancelar</button>
+          <button className="btn btn-danger"    style={{ flex:1, padding:'13px' }} onClick={() => { confirmDialog.onConfirm(); closeConfirm() }}>Confirmar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const currentScreen = useAppStore(s => s.currentScreen)
   const fetchDB = useAppStore(s => s.fetchDB)
@@ -75,6 +99,7 @@ export default function App() {
         {currentScreen === 'admin' && <AdminPage />}
       </Suspense>
       <ToastContainer />
+      <GlobalConfirm />
     </>
   )
 }

@@ -105,7 +105,18 @@ export default function EmployeePage() {
         }
       }
 
-      // 5. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
+      // 5. Recordatorio de cierre mensual pendiente de firma (una vez al día a las 9h)
+      const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
+      if (pendCierres.length > 0) {
+        const key = 'an_cierre_' + u.id
+        if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
+          localStorage.setItem(key, todayStr)
+          sendPushNotif(u.id, '📋 Cierre mensual pendiente',
+            `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
+        }
+      }
+
+      // 6. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
       const staleRecs = (db.records || []).filter(r => r.empId === u.id && !r.fin)
       staleRecs.forEach(stale => {
         const elapsedStale = (Date.now() - new Date(stale.inicio).getTime()) / 60000
@@ -621,13 +632,14 @@ function HistorialReciente({ histWithRecs }) {
 
 // ─── TAB VACACIONES ────────────────────────────────────────────────────────────
 function TabVacaciones({ db, u, vac, toast, saveDB }) {
-  const { openModal } = useAppStore()
+  const { openModal, showConfirm } = useAppStore()
   const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id).sort((a,b) => b.fechaInicio.localeCompare(a.fechaInicio))
 
   const cancelVac = (id) => {
-    if (!window.confirm('¿Cancelar esta solicitud de vacaciones?')) return
-    saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id) })
-    toast('Solicitud cancelada')
+    showConfirm('¿Cancelar esta solicitud de vacaciones?', () => {
+      saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id) })
+      toast('Solicitud cancelada')
+    })
   }
   const pct = vac.generated > 0 ? Math.round((vac.used / vac.generated) * 100) : 0
 
@@ -729,14 +741,16 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const todayStr = today()
   const monthStr = `${y}-${p2(m+1)}`
 
-  const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(monthStr))
-  const workedMap = {}
-  monthRecs.forEach(r => {
-    const ds = r.inicio.slice(0, 10)
-    workedMap[ds] = (workedMap[ds] || 0) + calcMin(r)
-  })
+  const workedMap = useMemo(() => {
+    const map = {}
+    ;(db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(monthStr)).forEach(r => {
+      const ds = r.inicio.slice(0, 10)
+      map[ds] = (map[ds] || 0) + calcMin(r)
+    })
+    return map
+  }, [db.records, u.id, monthStr])
 
-  const vacDays = new Set(
+  const vacDays = useMemo(() => new Set(
     (db.vacaciones || []).filter(v => v.empId === u.id && v.estado === 'aprobada').flatMap(v => {
       const days = []
       const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
@@ -744,9 +758,9 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
       return days
     })
-  )
+  ), [db.vacaciones, u.id])
 
-  const absDays = new Set(
+  const absDays = useMemo(() => new Set(
     (db.ausencias || []).filter(a => a.empId === u.id).flatMap(a => {
       const days = []
       const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
@@ -755,9 +769,9 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
       return days
     })
-  )
+  ), [db.ausencias, u.id])
 
-  const medDays = new Set(
+  const medDays = useMemo(() => new Set(
     (db.medicos || []).filter(a => a.empId === u.id).flatMap(a => {
       const days = []
       const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
@@ -766,7 +780,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
       while (d <= e) { days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1) }
       return days
     })
-  )
+  ), [db.medicos, u.id])
 
   const getDayRecs = dateStr =>
     (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(dateStr) && r.fin)

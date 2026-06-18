@@ -247,8 +247,8 @@ function PanelDashboard({ db, toast, saveDB }) {
   const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
   const vacHoy = (db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).length
 
-  const heat = buildHeatmap(recs, emps.length)
-  const recentAudit = (db.audit || []).slice(-5).reverse()
+  const heat = useMemo(() => buildHeatmap(recs, emps.length), [recs, emps.length])
+  const recentAudit = useMemo(() => (db.audit || []).slice(-5).reverse(), [db.audit])
 
   return (
     <div className="adm-panel">
@@ -550,6 +550,7 @@ function Heatmap({ data }) {
 
 // ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
 function PanelControl({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const emps = (db.employees || []).filter(e => !e.baja)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
@@ -557,16 +558,27 @@ function PanelControl({ db, toast, saveDB, session }) {
   const [view, setView] = useState('cards')
   useEffect(() => { const iv = setInterval(() => setTick(t => t+1), 5000); return () => clearInterval(iv) }, [])
 
+  // Pre-compute todayMin per employee (avoids O(n²) filter inside render)
+  const todayMinMap = useMemo(() => {
+    const tod = today()
+    const map = {}
+    recs.filter(r => r.fin && r.inicio.startsWith(tod)).forEach(r => {
+      map[r.empId] = (map[r.empId] || 0) + calcMin(r)
+    })
+    return map
+  }, [recs])
+
   const force = (rec) => {
-    if (!window.confirm(`¿Forzar cierre de jornada de ${rec.empName}?`)) return
-    const now = new Date().toISOString()
-    const breaks = [...(rec.breaks || [])]
-    if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
-    const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
-    const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-    const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
-    saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
-    toast('✅ Jornada cerrada forzosamente')
+    showConfirm(`¿Forzar cierre de jornada de ${rec.empName}?`, () => {
+      const now = new Date().toISOString()
+      const breaks = [...(rec.breaks || [])]
+      if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
+      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+      const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+      const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
+      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      toast('✅ Jornada cerrada forzosamente')
+    })
   }
 
   return (
@@ -593,7 +605,7 @@ function PanelControl({ db, toast, saveDB, session }) {
             const t = live ? calcSecs(live) : null
             const isWorking = live && !live.enDescanso
             const isBreak = live && live.enDescanso
-            const todayMin = recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(today())).reduce((s,r)=>s+calcMin(r),0)
+            const todayMin = todayMinMap[e.id] || 0
             return (
               <div key={e.id} className={`ctrl-card${isWorking?' working':isBreak?' on-break':''}`}>
                 <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
@@ -698,7 +710,7 @@ function PanelFichajes({ db, toast, saveDB }) {
     mes:    r => r.inicio.startsWith(mk),
   }
 
-  const filtered = recs.filter(r => {
+  const filtered = useMemo(() => recs.filter(r => {
     if (quickFilter && qs[quickFilter] && !qs[quickFilter](r)) return false
     if (!quickFilter && filterDate && !r.inicio.startsWith(filterDate)) return false
     if (filterEmp && r.empId !== filterEmp) return false
@@ -707,15 +719,17 @@ function PanelFichajes({ db, toast, saveDB }) {
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 300)
+  }).sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 300), [recs, quickFilter, filterDate, filterEmp, search])
 
-  const totalWork = filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0)
-  const totalBreak = filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0)
+  const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
+  const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
 
+  const { showConfirm } = useAppStore()
   const del = (id) => {
-    if (!window.confirm('¿Eliminar este fichaje?')) return
-    saveDB({ records: (db.records||[]).filter(r => r.id !== id) })
-    toast('Fichaje eliminado')
+    showConfirm('¿Eliminar este fichaje?', () => {
+      saveDB({ records: (db.records||[]).filter(r => r.id !== id) })
+      toast('Fichaje eliminado')
+    })
   }
 
   return (
@@ -1000,13 +1014,15 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     setShowForm(false)
   }
 
+  const { showConfirm } = useAppStore()
   const del = (id) => {
-    if (!window.confirm('¿Dar de baja a este empleado?')) return
-    const emp = (db.employees||[]).find(e => e.id === id)
-    const emps2 = (db.employees||[]).map(e => e.id === id ? { ...e, baja:true, fechaBaja: today() } : e)
-    const withAudit = auditLog(db, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
-    saveDB({ employees: emps2, audit: withAudit.audit })
-    toast('Empleado dado de baja')
+    showConfirm('¿Dar de baja a este empleado? Esta acción se puede revertir desde el perfil.', () => {
+      const emp = (db.employees||[]).find(e => e.id === id)
+      const emps2 = (db.employees||[]).map(e => e.id === id ? { ...e, baja:true, fechaBaja: today() } : e)
+      const withAudit = auditLog(db, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
+      saveDB({ employees: emps2, audit: withAudit.audit })
+      toast('Empleado dado de baja')
+    })
   }
 
   return (
@@ -1635,6 +1651,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
 
 // ─── PANEL OBRAS ──────────────────────────────────────────────────────────────
 function PanelObras({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const [tab, setTab] = useState('obras')
   const [newObra, setNewObra] = useState('')
   const [newCentro, setNewCentro] = useState('')
@@ -1657,11 +1674,12 @@ function PanelObras({ db, toast, saveDB, session }) {
   }
 
   const delObra = (id) => {
-    if (!window.confirm('¿Eliminar esta obra?')) return
-    const o = obras.find(x => x.id === id)
-    const withAudit = auditLog(db, 'Obra eliminada', o?.nombre || '', who)
-    saveDB({ obras: obras.filter(o => o.id !== id), audit: withAudit.audit })
-    toast('Obra eliminada')
+    showConfirm('¿Eliminar esta obra?', () => {
+      const o = obras.find(x => x.id === id)
+      const withAudit = auditLog(db, 'Obra eliminada', o?.nombre || '', who)
+      saveDB({ obras: obras.filter(o => o.id !== id), audit: withAudit.audit })
+      toast('Obra eliminada')
+    })
   }
 
   const addCentro = () => {
@@ -1675,10 +1693,11 @@ function PanelObras({ db, toast, saveDB, session }) {
   }
 
   const delCentro = (c) => {
-    if (!window.confirm(`¿Eliminar "${c}"?`)) return
-    const withAudit = auditLog(db, 'Centro de trabajo eliminado', c, who)
-    saveDB({ centrosTrabajo: centros.filter(x => x !== c), audit: withAudit.audit })
-    toast('Centro eliminado')
+    showConfirm(`¿Eliminar "${c}"?`, () => {
+      const withAudit = auditLog(db, 'Centro de trabajo eliminado', c, who)
+      saveDB({ centrosTrabajo: centros.filter(x => x !== c), audit: withAudit.audit })
+      toast('Centro eliminado')
+    })
   }
 
   const TABS = [{ id:'obras', label:'Obras' }, { id:'centros', label:'Centros de trabajo' }]
@@ -1767,6 +1786,7 @@ function PanelObras({ db, toast, saveDB, session }) {
 
 // ─── PANEL DOCUMENTOS ─────────────────────────────────────────────────────────
 function PanelDocumentos({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const emps = (db.employees||[]).filter(e => !e.baja)
   const docs = db.documentos || []
   const who = session?.user?.name || 'Admin'
@@ -1821,11 +1841,12 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
   }
 
   const del = (id) => {
-    if (!window.confirm('¿Eliminar este documento?')) return
-    const doc = docs.find(d => d.id === id)
-    const withAudit = auditLog(db, 'Documento eliminado', doc?.titulo || '', who)
-    saveDB({ documentos: docs.filter(d => d.id !== id), audit: withAudit.audit })
-    toast('Documento eliminado')
+    showConfirm('¿Eliminar este documento?', () => {
+      const doc = docs.find(d => d.id === id)
+      const withAudit = auditLog(db, 'Documento eliminado', doc?.titulo || '', who)
+      saveDB({ documentos: docs.filter(d => d.id !== id), audit: withAudit.audit })
+      toast('Documento eliminado')
+    })
   }
 
   const filtered = tab === 'todos' ? docs
