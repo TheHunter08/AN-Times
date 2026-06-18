@@ -195,7 +195,8 @@ export async function pushSubscribe(userId, vapidPub) {
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    await fetch(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', {
+    const token = await getAuthToken()
+    await fetch(withAuth(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', token), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: buf2b64(key), auth: buf2b64(auth) } })

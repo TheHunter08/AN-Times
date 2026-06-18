@@ -1,0 +1,25 @@
+name: Recordatorio Fichar
+
+on:
+  schedule:
+    # 08:00 Madrid (07:00 UTC en invierno, 06:00 UTC en verano)
+    # Lunes a viernes — doble disparo para cubrir cambio horario
+    - cron: '0 6 * * 1-5'
+    - cron: '0 7 * * 1-5'
+    # Segunda oportunidad a las 09:00 Madrid
+    - cron: '0 7,8 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install web-push --no-save
+      - name: Recordatorio de fichaje
+        run: node push-fichar-reminder.js

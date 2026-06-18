@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
-import { auditLog, sendPushNotif, pushSubscribe } from '../services/dataService.js'
+import { auditLog, sendPushNotif, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 
@@ -104,8 +104,10 @@ export default function EmployeePage() {
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && localStorage.getItem(lastKey) !== todayStr) {
             localStorage.setItem(lastKey, todayStr)
-            sendPushNotif(u.id, '⏰ Recordatorio de fichaje',
-              '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder', '/')
+            const rTitle = '⏰ Recordatorio de fichaje'
+            const rBody  = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
+            sendPushNotif(u.id, rTitle, rBody, 'reminder-fichar', '/?tab=inicio')
+            queuePush(u.id, rTitle, rBody, 'reminder-fichar', '/?tab=inicio')
           }
         }
       }
@@ -117,7 +119,10 @@ export default function EmployeePage() {
         const warn14h = 'an_warn_14h_' + openRec.id
         if (elapsed >= 465 && elapsed < 475 && !localStorage.getItem(warn14h)) {
           localStorage.setItem(warn14h, '1')
-          sendPushNotif(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
+          const jTitle = '⏳ Jornada larga'
+          const jBody  = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
+          sendPushNotif(u.id, jTitle, jBody, 'jornada', '/')
+          queuePush(u.id, jTitle, jBody, 'jornada', '/')
         }
       }
 
