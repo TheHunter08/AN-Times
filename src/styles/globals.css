@@ -1385,6 +1385,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .cal-day.cal-complete { background:var(--green-dim); color:var(--green); font-weight:600; border:1px solid rgba(54,178,126,.25); }
 .cal-day.cal-pending { background:rgba(245,158,11,.1); color:var(--orange); font-weight:600; border:1px solid rgba(245,158,11,.2); }
 .cal-day.cal-absence { background:var(--red-dim); color:var(--red); font-weight:600; border:1px solid rgba(239,68,68,.2); }
+.cal-day.cal-festivo { background:rgba(232,121,249,.12); color:#e879f9; font-weight:600; border:1px solid rgba(232,121,249,.25); }
 .cal-day.cal-missing { color:var(--text4); opacity:.5; }
 .cal-day.vacation { background:rgba(68,147,248,.12); color:var(--blue); font-weight:600; border:1px solid rgba(68,147,248,.2); }
 .cal-day.weekend { color:var(--text4); }

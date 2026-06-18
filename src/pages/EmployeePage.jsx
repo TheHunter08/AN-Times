@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
-import { WD, WK } from '../config/constants.js'
+import { WD, WK, FESTIVOS_MADRID_2026 } from '../config/constants.js'
 import { auditLog, sendPushNotif } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
@@ -897,6 +897,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const getDayStatus = (ds, date) => {
     const dow = date.getDay()
     if (dow === 0 || dow === 6) return 'weekend'
+    if (FESTIVOS_MADRID_2026[ds]) return 'festivo'
     if (vacDays.has(ds)) return 'vacation'
     if (absDays.has(ds) || medDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
@@ -906,7 +907,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
     return 'future'
   }
 
-  const monthStats = { complete: 0, pending: 0, absence: 0, vacation: 0, missing: 0 }
+  const monthStats = { complete: 0, pending: 0, absence: 0, vacation: 0, missing: 0, festivo: 0 }
   cells.forEach(date => {
     if (!date) return
     const ds = date.toISOString().slice(0, 10)
@@ -939,6 +940,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
             { n: monthStats.pending,  label:'Parciales', color:'var(--orange)', bg:'rgba(245,158,11,.1)' },
             { n: monthStats.absence,  label:'Ausencias', color:'var(--red)', bg:'var(--red-dim)' },
             { n: monthStats.vacation, label:'Vacaciones', color:'var(--blue)', bg:'rgba(68,147,248,.1)' },
+            { n: monthStats.festivo,  label:'Festivos', color:'#e879f9', bg:'rgba(232,121,249,.1)' },
           ].filter(c => c.n > 0).map(c => (
             <div key={c.label} style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, color:c.color, background:c.bg, border:`1px solid ${c.color}22` }}>
               <span>{c.n}</span><span style={{ fontWeight:500 }}>{c.label}</span>
@@ -962,15 +964,17 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
               !isToday && status === 'vacation' ? 'vacation' : '',
               !isToday && status === 'weekend' ? 'weekend' : '',
               !isToday && status === 'missing' ? 'cal-missing' : '',
+              !isToday && status === 'festivo' ? 'cal-festivo' : '',
               selDay === ds ? 'cal-selected' : '',
             ].filter(Boolean).join(' ')
 
             return (
-              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)}>
+              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)} title={FESTIVOS_MADRID_2026[ds] || undefined}>
                 {date.getDate()}
                 {mins > 0 && !isToday && <div className="cal-hrs">{Math.floor(mins/60)}h</div>}
                 {status === 'absence' && !isToday && <div className="cal-hrs">✕</div>}
                 {status === 'vacation' && !isToday && <div className="cal-hrs">🌴</div>}
+                {status === 'festivo' && !isToday && <div className="cal-hrs">★</div>}
               </div>
             )
           })}
@@ -982,8 +986,8 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           const totMin = recs.reduce((s, r) => s + calcMin(r), 0)
           const selDate = new Date(selDay + 'T00:00:00')
           const status = getDayStatus(selDay, selDate)
-          const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', future:'' }
-          const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', future:'var(--text4)' }
+          const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', festivo: FESTIVOS_MADRID_2026[selDay] || 'Festivo', future:'' }
+          const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', festivo:'#e879f9', future:'var(--text4)' }
           return (
             <div className="card" style={{ borderLeft:`3px solid ${statusColors[status] || 'var(--border)'}` }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
@@ -1114,51 +1118,6 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           ))}
         </div>
 
-        {/* Mini activity heatmap — last 8 weeks */}
-        {(() => {
-          const WEEKS = 8
-          const DAYS = WEEKS * 7
-          const cells = Array.from({ length: DAYS }, (_, i) => {
-            const d = new Date(now)
-            d.setDate(d.getDate() - (DAYS - 1 - i))
-            const ds = d.toISOString().slice(0, 10)
-            return { ds, mins: dayMap[ds] || 0, dow: d.getDay() }
-          })
-          const maxCell = Math.max(...cells.map(c => c.mins), 1)
-          const DOW = ['L','M','X','J','V','S','D']
-          return (
-            <div style={{ marginTop:16, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:'var(--r-lg)', padding:'14px 12px', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:10 }}>Actividad reciente</div>
-              <div style={{ display:'grid', gridTemplateColumns:`repeat(${WEEKS},1fr)`, gridTemplateRows:'repeat(7,1fr)', gap:3, direction:'ltr' }}>
-                {cells.map(({ ds, mins, dow }) => {
-                  const intensity = mins > 0 ? Math.max(0.2, mins / maxCell) : 0
-                  const isToday = ds === now.toISOString().slice(0,10)
-                  return (
-                    <div key={ds} title={`${ds}: ${mins ? mhm(mins) : 'Sin datos'}`}
-                      style={{ aspectRatio:'1', borderRadius:3,
-                        background: mins > 0
-                          ? `rgba(108,99,255,${intensity.toFixed(2)})`
-                          : dow === 0 || dow === 6 ? 'rgba(255,255,255,.02)' : 'var(--bg-500)',
-                        outline: isToday ? '1px solid var(--primary)' : 'none',
-                        outlineOffset: '1px',
-                        transition: 'transform .1s',
-                      }} />
-                  )
-                })}
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', marginTop:8 }}>
-                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                  <span style={{ fontSize:9, color:'var(--text4)' }}>Menos</span>
-                  {[0,.25,.5,.75,1].map(v => (
-                    <div key={v} style={{ width:10, height:10, borderRadius:2, background: v === 0 ? 'var(--bg-500)' : `rgba(108,99,255,${v})` }} />
-                  ))}
-                  <span style={{ fontSize:9, color:'var(--text4)' }}>Más</span>
-                </div>
-                <span style={{ fontSize:9, color:'var(--text4)' }}>{WEEKS} semanas</span>
-              </div>
-            </div>
-          )
-        })()}
       </div>
 
       {/* Cierres mensuales pendientes de firma */}
@@ -1288,9 +1247,7 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     if (!fi || !ff) { toast('Selecciona fechas'); return }
     const s = new Date(fi + 'T00:00:00'), e = new Date(ff + 'T00:00:00')
     if (s > e) { toast('Fecha fin debe ser posterior'); return }
-    let days = 0
-    const d = new Date(s)
-    while (d <= e) { const dow = d.getDay(); if (dow !== 0 && dow !== 6) days++; d.setDate(d.getDate()+1) }
+    const days = Math.round((e - s) / 86400000) + 1  // días naturales (inclusivo)
     const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: new Date().toISOString() }
     const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
     saveDB({ vacaciones: [...(db.vacaciones||[]), vac], notis: [...(db.notis||[]), noti] })
@@ -1309,6 +1266,11 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
           <div className="field"><label>Desde</label><input type="date" value={fi} onChange={e => setFi(e.target.value)} /></div>
           <div className="field"><label>Hasta</label><input type="date" value={ff} onChange={e => setFf(e.target.value)} /></div>
         </div>
+        {fi && ff && new Date(fi+'T00:00:00') <= new Date(ff+'T00:00:00') && (
+          <div style={{ background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', padding:'10px 14px', fontSize:13, fontWeight:600, color:'var(--primary-light)', marginBottom:4 }}>
+            🗓 {Math.round((new Date(ff+'T00:00:00') - new Date(fi+'T00:00:00')) / 86400000) + 1} días naturales
+          </div>
+        )}
         <div className="field"><label>Motivo (opcional)</label><input type="text" placeholder="Vacaciones, viaje..." value={motivo} onChange={e => setMotivo(e.target.value)} /></div>
         <div className="modal-btns">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>

@@ -18,6 +18,24 @@ export const FB_CONFIG = {
   appId:             '1:366356529016:web:ffe5ba97c214c21fc9928d'
 }
 
+// Festivos oficiales Comunidad de Madrid 2026 (14 días: 8 nacionales + 2 autonómicos + 2 locales Madrid capital)
+export const FESTIVOS_MADRID_2026 = {
+  '2026-01-01': 'Año Nuevo',
+  '2026-01-06': 'Reyes Magos',
+  '2026-04-02': 'Jueves Santo',
+  '2026-04-03': 'Viernes Santo',
+  '2026-05-01': 'Día del Trabajo',
+  '2026-05-02': 'Comunidad de Madrid',
+  '2026-05-15': 'San Isidro',
+  '2026-08-15': 'Asunción de la Virgen',
+  '2026-10-12': 'Fiesta Nacional de España',
+  '2026-11-02': 'Todos los Santos',
+  '2026-11-09': 'La Almudena',
+  '2026-12-07': 'Día de la Constitución',
+  '2026-12-08': 'Inmaculada Concepción',
+  '2026-12-25': 'Navidad',
+}
+
 export const INITIAL_DB = {
   empresas: ['Soluciones Mata'],
   obras: ['Soluciones Mata'],
