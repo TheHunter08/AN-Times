@@ -1,0 +1,27 @@
+name: Push Notifications Server
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Cada 5 minutos, 24h al día
+  workflow_dispatch:          # Permite lanzarlo manualmente desde GitHub
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar web-push
+        run: npm install web-push --no-save
+
+      - name: Entregar notificaciones pendientes
+        env:
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+        run: node push-server-once.js
