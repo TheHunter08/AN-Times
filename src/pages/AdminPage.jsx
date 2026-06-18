@@ -983,7 +983,13 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
 
 // ─── PANEL EMPLEADOS ──────────────────────────────────────────────────────────
 function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData, session }) {
-  const emps = sortedEmps(db)
+  const allEmps = sortedEmps(db)
+  const [empSearch, setEmpSearch] = useState('')
+  const emps = useMemo(() => {
+    if (!empSearch.trim()) return allEmps
+    const q = empSearch.toLowerCase()
+    return allEmps.filter(e => e.name?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q) || e.empresa?.toLowerCase().includes(q) || e.centroTrabajo?.toLowerCase().includes(q))
+  }, [allEmps, empSearch])
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
@@ -1025,14 +1031,38 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     })
   }
 
+  const exportEmpleadosXLSX = async () => {
+    const now2 = new Date()
+    const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
+    const XLSX = await import('xlsx')
+    const headers = ['Nombre','PIN','Email','Rol','Empresa','Centro trabajo','Alta','H. contratadas/sem','H. trabajadas (mes actual)','Estado']
+    const rows = allEmps.map(e => {
+      const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
+      return [e.name, e.pin, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, Math.round(monthMin/60*10)/10, e.baja?'Baja':'Activo']
+    })
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Empleados')
+    XLSX.writeFile(wb, `empleados_${mk2}.xlsx`)
+  }
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Empleados</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2 }}>{emps.length} empleados activos</div>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{emps.length} empleado{emps.length!==1?'s':''} {empSearch ? 'encontrados' : 'activos'}</div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo empleado</button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="btn btn-secondary btn-sm" onClick={exportEmpleadosXLSX} title="Exportar Excel">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Excel
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={openNew}>+ Nuevo</button>
+        </div>
+      </div>
+
+      <div className="premium-filters" style={{ marginBottom:16 }}>
+        <input placeholder="Buscar empleado, empresa, centro…" value={empSearch} onChange={e => setEmpSearch(e.target.value)} style={{ flex:1 }} />
       </div>
 
       {showForm && (

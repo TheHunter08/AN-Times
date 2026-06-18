@@ -20,6 +20,7 @@ export default function EmployeePage() {
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
+  const currentTabRef = useRef(currentEmpTab)
   const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'perfil']
   useEffect(() => {
     const prev = prevTabRef.current
@@ -28,7 +29,29 @@ export default function EmployeePage() {
       empBodyRef.current.dataset.dir = ci >= pi ? 'right' : 'left'
     }
     prevTabRef.current = currentEmpTab
+    currentTabRef.current = currentEmpTab
   }, [currentEmpTab])
+
+  useEffect(() => {
+    const el = empBodyRef.current
+    if (!el) return
+    let sx = 0, sy = 0
+    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY }
+    const onEnd = e => {
+      const dx = e.changedTouches[0].clientX - sx
+      const dy = e.changedTouches[0].clientY - sy
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+      const ci = TAB_ORDER.indexOf(currentTabRef.current)
+      if (dx < 0 && ci < TAB_ORDER.length - 1) setEmpTab(TAB_ORDER[ci + 1])
+      else if (dx > 0 && ci > 0) setEmpTab(TAB_ORDER[ci - 1])
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [setEmpTab])
 
   // Manejar shortcuts del manifest PWA (?tab=inicio|jornada|vacaciones|calendario|perfil)
   useEffect(() => {
@@ -197,6 +220,7 @@ export default function EmployeePage() {
     // Update employee's centroTrabajo
     const emps = newDB.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
     saveDB({ records: newDB.records, employees: emps })
+    try { navigator.vibrate(15) } catch {}
     toast('✅ Jornada iniciada en ' + centro)
   }, [u, db, pendingGPS, closeModal, saveDB, toast])
 
@@ -213,6 +237,7 @@ export default function EmployeePage() {
     closed.workSecs = t.work; closed.breakSecs = t.brk
     const records = db.records.map(r => r.id === o.id ? closed : r)
     saveDB({ records })
+    try { navigator.vibrate(15) } catch {}
     toast('✅ Jornada finalizada — ' + mhm(Math.floor(t.work / 60)))
   }, [db, openRec, saveDB, toast])
 
@@ -224,9 +249,11 @@ export default function EmployeePage() {
     if (o.enDescanso) {
       const breaks = [...(o.breaks || []), { start: o.bStartTs, end: now }]
       updated = { ...o, breaks, breakSecs: calcSecs({ ...o, breaks }).brk, enDescanso: false, bStartTs: null }
+      try { navigator.vibrate(10) } catch {}
       toast('▶️ Descanso finalizado')
     } else {
       updated = { ...o, enDescanso: true, bStartTs: now }
+      try { navigator.vibrate(10) } catch {}
       toast('⏸️ Descanso iniciado')
     }
     const records = db.records.map(r => r.id === o.id ? updated : r)
@@ -277,6 +304,8 @@ export default function EmployeePage() {
         </div>
       </div>
 
+      <OfflineBanner />
+
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
@@ -319,6 +348,66 @@ export default function EmployeePage() {
   )
 }
 
+// ─── OFFLINE BANNER ────────────────────────────────────────────────────────────
+function OfflineBanner() {
+  const syncStatus = useAppStore(s => s.syncStatus)
+  if (syncStatus !== 'error') return null
+  return (
+    <div style={{ background:'linear-gradient(90deg,#ef4444,#dc2626)', color:'#fff', fontSize:12, fontWeight:700, textAlign:'center', padding:'7px 16px', letterSpacing:'.3px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Sin conexión — datos guardados localmente
+    </div>
+  )
+}
+
+// ─── PULL TO REFRESH ────────────────────────────────────────────────────────────
+function PullToRefresh({ children }) {
+  const fetchDB = useAppStore(s => s.fetchDB)
+  const tabRef = useRef(null)
+  const [pullState, setPullState] = useState({ dist: 0, refreshing: false })
+  const ptr = useRef({ startY: 0, active: false, dist: 0, refreshing: false })
+
+  useEffect(() => {
+    const el = tabRef.current
+    if (!el) return
+    const onStart = e => {
+      if (el.scrollTop === 0) { ptr.current.startY = e.touches[0].clientY; ptr.current.active = true }
+    }
+    const onMove = e => {
+      if (!ptr.current.active) return
+      const d = e.touches[0].clientY - ptr.current.startY
+      if (d > 0) { ptr.current.dist = Math.min(d * 0.45, 60); setPullState(s => ({ ...s, dist: ptr.current.dist })) }
+      else { ptr.current.active = false }
+    }
+    const onEnd = async () => {
+      if (!ptr.current.active) return
+      ptr.current.active = false
+      if (ptr.current.dist > 48 && !ptr.current.refreshing) {
+        ptr.current.refreshing = true
+        setPullState({ dist: 0, refreshing: true })
+        try { await fetchDB() } finally { ptr.current.refreshing = false; setPullState({ dist: 0, refreshing: false }) }
+      } else { ptr.current.dist = 0; setPullState({ dist: 0, refreshing: false }) }
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd) }
+  }, [fetchDB])
+
+  const { dist, refreshing } = pullState
+  return (
+    <div ref={tabRef} className="emp-tab active">
+      <div style={{ textAlign:'center', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', gap:5,
+        height: refreshing ? 40 : dist > 0 ? Math.round(dist * 0.7) : 0,
+        transition: dist === 0 && !refreshing ? 'height .3s' : 'none',
+        color:'var(--text3)', fontSize:11, fontWeight:600, flexShrink:0 }}>
+        {(refreshing || dist > 0) && (refreshing ? '↻ Actualizando…' : dist > 48 ? '↑ Suelta para actualizar' : '↓ Bajar para actualizar')}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
 function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate }) {
   const todayStr = today()
@@ -346,7 +435,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate 
   }
 
   return (
-    <div className="emp-tab active">
+    <PullToRefresh>
       <div className="ini-wrap">
         {/* Main fichar card */}
         <div className="jor-main-card">
@@ -422,7 +511,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate 
         )}
 
       </div>
-    </div>
+    </PullToRefresh>
   )
 }
 
@@ -468,7 +557,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   }
 
   return (
-    <div className="emp-tab active" style={{ paddingBottom:20 }}>
+    <PullToRefresh>
       <div style={{ padding:'14px 16px 14px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
           <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mi Jornada</div>
@@ -597,7 +686,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       })()}
 
       <div style={{ height: 20 }} />
-    </div>
+    </PullToRefresh>
   )
 }
 
@@ -654,6 +743,8 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
     })
   }
   const pct = vac.generated > 0 ? Math.round((vac.used / vac.generated) * 100) : 0
+  const todayVacStr = today()
+  const daysFrom = (ds) => Math.ceil((new Date(ds + 'T00:00:00') - new Date(todayVacStr + 'T00:00:00')) / 86400000)
 
   return (
     <div className="emp-tab active">
@@ -705,6 +796,12 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:700 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)}</div>
                       <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{v.dias} días · {v.motivo || 'Vacaciones'}</div>
+                      {v.estado === 'aprobada' && (() => {
+                        const until = daysFrom(v.fechaInicio), remaining = daysFrom(v.fechaFin)
+                        if (until > 0) return <div style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', marginTop:3 }}>🗓 En {until} día{until>1?'s':''}</div>
+                        if (remaining >= 0) return <div style={{ fontSize:10, fontWeight:700, color:'var(--green)', marginTop:3 }}>🌴 ¡Disfrutando! {remaining} día{remaining!==1?'s':''} restante{remaining!==1?'s':''}</div>
+                        return null
+                      })()}
                     </div>
                     <div className={`badge${v.estado==='aprobada' ? ' badge-green' : v.estado==='rechazada' ? ' badge-red' : ' badge-orange'}`}>
                       {v.estado === 'aprobada' ? '✓ Aprobada' : v.estado === 'rechazada' ? '✗ Rechazada' : '⏳ Pendiente'}
