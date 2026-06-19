@@ -567,6 +567,12 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
 
+  const [informeUrl, setInformeUrl] = useState(null)
+
+  const closeInforme = () => {
+    if (informeUrl) { URL.revokeObjectURL(informeUrl); setInformeUrl(null) }
+  }
+
   const exportMonthPDF = () => {
     const now2 = new Date()
     const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
@@ -577,13 +583,13 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const wm = Math.floor(recWorkSecs(r)/60)
       return `<tr><td>${r.inicio.slice(0,10)}</td><td>${ftime(r.inicio)}</td><td>${r.fin ? ftime(r.fin) : '—'}</td><td>${r.centro||'—'}</td><td><strong>${mhm(wm)}</strong></td></tr>`
     }).join('')
-    const win = window.open('', '_blank')
-    if (!win) { toast('Permite ventanas emergentes para exportar'); return }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${monthName} - ${u.name}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;max-width:800px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}.sub{color:#555;font-size:13px;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5e6ad2;color:#fff;padding:8px 12px;text-align:left;font-size:12px}td{padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}tr:nth-child(even) td{background:#f9fafb}.total{margin-top:16px;padding:14px;background:#f0f4ff;border-radius:8px;font-weight:700;font-size:15px}@media print{.no-print{display:none}}</style></head><body><h1>Informe de Jornada — ${u.name}</h1><div class="sub">Mes: ${monthName} · Empresa: ${u.empresa||'—'} · Centro: ${u.centroTrabajo||'—'} · Generado: ${new Date().toLocaleDateString('es-ES')}</div><button class="no-print" onclick="window.print()" style="padding:8px 18px;background:#5e6ad2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:14px">🖨️ Imprimir / Guardar PDF</button><table><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Centro de trabajo</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="total">Total trabajado: ${mhm(totalMin2)} &nbsp;·&nbsp; ${monthRecs.length} jornadas registradas</div></body></html>`)
-    win.document.close()
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe ${monthName} - ${u.name}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;max-width:800px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}.sub{color:#555;font-size:13px;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5e6ad2;color:#fff;padding:8px 12px;text-align:left;font-size:12px}td{padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}tr:nth-child(even) td{background:#f9fafb}.total{margin-top:16px;padding:14px;background:#f0f4ff;border-radius:8px;font-weight:700;font-size:15px}@media print{.no-print{display:none}}</style></head><body><h1>Informe de Jornada — ${u.name}</h1><div class="sub">Mes: ${monthName} · Empresa: ${u.empresa||'—'} · Centro: ${u.centroTrabajo||'—'} · Generado: ${new Date().toLocaleDateString('es-ES')}</div><button class="no-print" onclick="window.print()" style="padding:8px 18px;background:#5e6ad2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:14px">🖨️ Imprimir / Guardar PDF</button><table><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Centro de trabajo</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="total">Total trabajado: ${mhm(totalMin2)} &nbsp;·&nbsp; ${monthRecs.length} jornadas registradas</div></body></html>`
+    const blob = new Blob([html], { type: 'text/html' })
+    setInformeUrl(URL.createObjectURL(blob))
   }
 
   return (
+    <>
     <PullToRefresh>
       <div style={{ padding:'14px 16px 14px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
@@ -714,6 +720,26 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
       <div style={{ height: 20 }} />
     </PullToRefresh>
+
+    {/* Informe in-app fullscreen overlay */}
+    {informeUrl && (
+      <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          <button
+            onClick={closeInforme}
+            style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:'var(--text2)', WebkitTapHighlightColor:'transparent' }}>
+            ← Volver
+          </button>
+          <span style={{ fontSize:13, fontWeight:700, flex:1 }}>Informe mensual</span>
+        </div>
+        <iframe
+          src={informeUrl}
+          title="Informe mensual"
+          style={{ flex:1, border:'none', width:'100%', background:'#fff' }}
+        />
+      </div>
+    )}
+    </>
   )
 }
 
