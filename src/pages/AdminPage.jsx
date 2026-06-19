@@ -21,7 +21,8 @@ const PAGES = [
 
 // Un "encargado" no es administrador: solo ve y gestiona la jornada de su obra asignada
 const ENC_PAGES = [
-  { id:'miobra', label:'Mi Obra' },
+  { id:'miobra',   label:'Mi Obra' },
+  { id:'mensajes', label:'Mensajes' },
 ]
 
 const NAV_ICONS = {
@@ -173,7 +174,10 @@ export default function AdminPage() {
         {/* Main content */}
         <div className="adm-main">
           {isEncargado ? (
-            currentAdminPage === 'miobra' && <PanelMiObra db={db} toast={toast} saveDB={saveDB} session={session} />
+            <>
+              {currentAdminPage === 'miobra'    && <PanelMiObra  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'mensajes'  && <PanelMensajes db={db} toast={toast} saveDB={saveDB} session={session} />}
+            </>
           ) : (
             <>
               {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} saveDB={saveDB} />}
@@ -2356,6 +2360,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
 
 // ─── PANEL MI OBRA (encargado) ─────────────────────────────────────────────────
 function PanelMiObra({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const enc = session.user
   const misCentros = enc?.obrasAsignadas || []
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && (misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
@@ -2364,7 +2369,16 @@ function PanelMiObra({ db, toast, saveDB, session }) {
   const liveRecs = recs.filter(r => !r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)))
   const pendRecs = recs.filter(r => r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)) && !r.aceptada)
     .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
+  const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
+  const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
+  const teamAus = [
+    ...(db.medicos  || []).map(a => ({ ...a, tipoAus:'medico'   })),
+    ...(db.ausencias|| []).map(a => ({ ...a, tipoAus:'ausencia' })),
+  ].filter(a => empIds.has(a.empId)).sort((a,b) => (b.fechaInicio||'').localeCompare(a.fechaInicio||'')).slice(0, 30)
+
+  const [tab, setTab]       = useState('live')
   const [editing, setEditing] = useState(null)
+  const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
 
   const aceptar = (rec) => {
     const updated = recs.map(r => r.id === rec.id ? { ...r, aceptada: true, aceptadaPor: enc.name, aceptadaAt: new Date().toISOString() } : r)
@@ -2389,6 +2403,39 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     setEditing(null)
   }
 
+  const addAus = () => {
+    if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
+    const emp = emps.find(e => e.id === ausForm.empId)
+    const key  = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
+    const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString(), registradoPor: enc.name }
+    saveDB({ [key]: [...(db[key] || []), item] })
+    setAusForm(f => ({ ...f, empId:'', motivo:'' }))
+    toast('✅ Ausencia registrada')
+  }
+
+  const delAus = (id, tipo) => {
+    const key = tipo === 'medico' ? 'medicos' : 'ausencias'
+    showConfirm('¿Eliminar esta ausencia?', () => {
+      saveDB({ [key]: (db[key] || []).filter(a => a.id !== id) })
+      toast('Ausencia eliminada')
+    })
+  }
+
+  const actCorr = (id, estado) => {
+    const corr = (db.correccionesFichaje || []).find(c => c.id === id)
+    if (!corr) return
+    let newRecords = db.records || []
+    if (estado === 'aprobada') {
+      newRecords = newRecords.map(r => r.id === corr.recId
+        ? { ...r, inicio: corr.propInicio, fin: corr.propFin, workSecs: 0 } : r)
+    }
+    const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: enc.name } : c)
+    const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
+    saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis || []), noti] })
+    queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
+    toast(estado === 'aprobada' ? '✅ Corrección aplicada' : '❌ Corrección rechazada')
+  }
+
   if (!misCentros.length) {
     return (
       <div className="adm-panel">
@@ -2398,59 +2445,191 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     )
   }
 
+  const Badge = ({ n }) => n > 0 ? <span style={{ minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'0 4px', marginLeft:5 }}>{n}</span> : null
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
-        <h1 className="adm-panel-title">Mi obra</h1>
-        <div className="adm-panel-sub">{misCentros.join(', ')}</div>
+        <div>
+          <h1 className="adm-panel-title gradient-text">Mi obra</h1>
+          <div className="adm-panel-sub">{misCentros.join(', ')} · {emps.length} empleado{emps.length !== 1 ? 's' : ''}</div>
+        </div>
+        {(pendRecs.length + correcsPend.length) > 0 && (
+          <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.25)' }}>
+            {pendRecs.length + correcsPend.length} pendientes
+          </span>
+        )}
       </div>
 
-      <div className="adm-section-title" style={{ padding:'0 0 12px' }}>En jornada ahora ({liveRecs.length})</div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:14, marginBottom:24 }}>
-        {emps.map(e => {
-          const live = liveRecs.find(r => r.empId === e.id)
-          const t = live ? calcSecs(live) : null
-          const isWorking = live && !live.enDescanso
-          const isBreak = live && live.enDescanso
-          return (
-            <div key={e.id} style={{ background:'var(--bg-700)', border:`1px solid ${isWorking?'rgba(54,178,126,.35)':isBreak?'rgba(255,145,57,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <div style={{ width:38, height:38, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                  {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
-                  <div style={{ fontSize:11, color:'var(--text3)' }}>{live?.centro || e.centroTrabajo || '—'}</div>
-                </div>
-              </div>
-              <div style={{ textAlign:'center' }}>
-                <div style={{ fontSize:22, fontWeight:800, color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
-                  {t ? mhm(Math.floor(t.work/60)) : '—'}
-                </div>
-                <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
-              </div>
-            </div>
-          )
-        })}
-        {!emps.length && <div className="empty">Sin empleados asignados a tu obra</div>}
-      </div>
-
-      <div className="adm-section-title" style={{ padding:'0 0 12px' }}>Jornadas pendientes de aceptar ({pendRecs.length})</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-        {pendRecs.map(r => (
-          <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-600)', borderRadius:'var(--r)', border:'1px solid var(--border)', flexWrap:'wrap' }}>
-            <div style={{ flex:1, minWidth:160 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{r.empName}</div>
-              <div style={{ fontSize:12, color:'var(--text3)' }}>{fds(r.inicio)} · {ftime(r.inicio)} → {ftime(r.fin)} · {mhm(Math.floor(recWorkSecs(r)/60))}</div>
-            </div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button className="btn btn-sm btn-secondary" onClick={() => startEdit(r)}>Modificar</button>
-              <button className="btn btn-sm btn-primary" onClick={() => aceptar(r)}>✓ Aceptar</button>
-            </div>
-          </div>
+      <div className="pill-tabs" style={{ marginBottom:20 }}>
+        {[
+          ['live',        '🔴 En vivo',     liveRecs.length],
+          ['jornadas',    '📋 Jornadas',    pendRecs.length],
+          ['ausencias',   '🏥 Ausencias',   0],
+          ['correcciones','✏️ Correcciones', correcsPend.length],
+        ].map(([id, label, badge]) => (
+          <button key={id} className={`pill-tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>
+            {label}<Badge n={badge} />
+          </button>
         ))}
-        {!pendRecs.length && <div className="empty">Sin jornadas pendientes</div>}
       </div>
+
+      {/* ── Tab: En vivo ─────────────────────────────────────────────────── */}
+      {tab === 'live' && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:14 }}>
+          {emps.map(e => {
+            const live = liveRecs.find(r => r.empId === e.id)
+            const t = live ? calcSecs(live) : null
+            const isWorking = live && !live.enDescanso
+            const isBreak   = live && live.enDescanso
+            return (
+              <div key={e.id} style={{ background:'var(--bg-700)', border:`1px solid ${isWorking?'rgba(54,178,126,.35)':isBreak?'rgba(255,145,57,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <div style={{ width:38, height:38, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>{live?.centro || e.centroTrabajo || '—'}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ fontSize:22, fontWeight:800, color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                    {t ? mhm(Math.floor(t.work/60)) : '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
+                </div>
+              </div>
+            )
+          })}
+          {!emps.length && <div className="empty">Sin empleados asignados a tu obra</div>}
+        </div>
+      )}
+
+      {/* ── Tab: Jornadas ────────────────────────────────────────────────── */}
+      {tab === 'jornadas' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {pendRecs.map(r => (
+            <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-600)', borderRadius:'var(--r)', border:'1px solid var(--border)', flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:160 }}>
+                <div style={{ fontSize:13, fontWeight:700 }}>{r.empName}</div>
+                <div style={{ fontSize:12, color:'var(--text3)' }}>{fds(r.inicio)} · {ftime(r.inicio)} → {ftime(r.fin)} · {mhm(Math.floor(recWorkSecs(r)/60))}</div>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(r)}>Modificar</button>
+                <button className="btn btn-sm btn-primary"   onClick={() => aceptar(r)}>✓ Aceptar</button>
+              </div>
+            </div>
+          ))}
+          {!pendRecs.length && <div className="empty">Sin jornadas pendientes de aceptar</div>}
+        </div>
+      )}
+
+      {/* ── Tab: Ausencias ───────────────────────────────────────────────── */}
+      {tab === 'ausencias' && (
+        <div>
+          <div className="dash-widget" style={{ marginBottom:20 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Registrar ausencia</div>
+            <div className="field-row">
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Empleado</label>
+                <select value={ausForm.empId} onChange={e => setAusForm(f => ({ ...f, empId:e.target.value }))}>
+                  <option value="">Selecciona…</option>
+                  {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Tipo</label>
+                <select value={ausForm.tipo} onChange={e => setAusForm(f => ({ ...f, tipo:e.target.value }))}>
+                  <option value="medico">🏥 Baja médica</option>
+                  <option value="ausencia">📋 Ausencia justificada</option>
+                </select>
+              </div>
+            </div>
+            <div className="field-row" style={{ marginTop:10 }}>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha inicio</label>
+                <input type="date" value={ausForm.fechaInicio} onChange={e => setAusForm(f => ({ ...f, fechaInicio:e.target.value }))} />
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha fin</label>
+                <input type="date" value={ausForm.fechaFin} min={ausForm.fechaInicio} onChange={e => setAusForm(f => ({ ...f, fechaFin:e.target.value }))} />
+              </div>
+            </div>
+            <div className="field" style={{ marginTop:10, marginBottom:14 }}>
+              <label>Motivo (opcional)</label>
+              <input value={ausForm.motivo} onChange={e => setAusForm(f => ({ ...f, motivo:e.target.value }))} placeholder="Breve descripción" />
+            </div>
+            <button className="btn btn-primary" onClick={addAus} style={{ width:'100%' }}>+ Registrar ausencia</button>
+          </div>
+
+          <div className="adm-section-title" style={{ padding:'0 0 12px' }}>Historial de mi equipo</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {teamAus.map(a => {
+              const dias = Math.round((new Date(a.fechaFin+'T00:00:00') - new Date(a.fechaInicio+'T00:00:00')) / 86400000) + 1
+              return (
+                <div key={a.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--bg-700)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
+                  <span style={{ fontSize:20 }}>{a.tipoAus === 'medico' ? '🏥' : '📋'}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{a.empName}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{fds(a.fechaInicio)} → {fds(a.fechaFin)} · {dias}d · {a.tipoAus === 'medico' ? 'Baja médica' : 'Ausencia'}</div>
+                    {a.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:1 }}>{a.motivo}</div>}
+                  </div>
+                  <button className="btn btn-sm btn-danger" onClick={() => delAus(a.id, a.tipoAus)}>✕</button>
+                </div>
+              )
+            })}
+            {!teamAus.length && <div className="empty">Sin ausencias registradas en tu equipo</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Correcciones ────────────────────────────────────────────── */}
+      {tab === 'correcciones' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {correcsPend.length > 0 && (
+            <>
+              <div className="adm-section-title" style={{ padding:'0 0 10px' }}>Pendientes de revisar ({correcsPend.length})</div>
+              {correcsPend.map(c => (
+                <div key={c.id} style={{ padding:'14px 16px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)' }}>
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:180 }}>
+                      <div style={{ fontSize:13, fontWeight:700 }}>{c.empName}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:3 }}>
+                        Original: {ftime(c.recInicio)} → {c.recFin ? ftime(c.recFin) : '—'}
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--primary-light)', marginTop:2 }}>
+                        Propuesto: {ftime(c.propInicio)} → {ftime(c.propFin)}
+                      </div>
+                      {c.motivo && <div style={{ fontSize:11, color:'var(--text3)', marginTop:4, fontStyle:'italic' }}>"{c.motivo}"</div>}
+                    </div>
+                    <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                      <button className="btn btn-sm btn-primary" onClick={() => actCorr(c.id, 'aprobada')}>✓ Aprobar</button>
+                      <button className="btn btn-sm btn-danger"  onClick={() => actCorr(c.id, 'rechazada')}>✗ Rechazar</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {correcsHist.length > 0 && (
+            <>
+              <div className="adm-section-title" style={{ padding:'16px 0 10px' }}>Historial</div>
+              {correcsHist.map(c => (
+                <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg-700)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
+                  <span style={{ fontSize:16 }}>{c.estado === 'aprobada' ? '✅' : '❌'}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:700 }}>{c.empName}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>{fds(c.propInicio)} · {ftime(c.propInicio)} → {ftime(c.propFin)}</div>
+                  </div>
+                  <span className={`badge ${c.estado === 'aprobada' ? 'badge-green' : 'badge-red'}`}>{c.estado}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {!correcsPend.length && !correcsHist.length && <div className="empty">Sin correcciones de tu equipo</div>}
+        </div>
+      )}
 
       {editing && (
         <div className="modal-ov center" onClick={() => setEditing(null)}>
@@ -2466,7 +2645,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
             </div>
             <div className="modal-btns">
               <button className="btn btn-secondary" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={saveEdit}>Guardar</button>
+              <button className="btn btn-primary"   onClick={saveEdit}>Guardar</button>
             </div>
           </div>
         </div>
