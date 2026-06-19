@@ -1,5 +1,5 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
@@ -11,6 +11,20 @@ self.addEventListener('activate', (event) => {
 
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
+
+// HTML/navegación: NetworkFirst para que SIEMPRE se sirva el index.html más
+// reciente cuando hay red. Esto evita que un HTML cacheado apunte a hashes de
+// assets antiguos y la PWA se quede "pegada" en una versión vieja. Si no hay
+// red, cae al index.html precacheado (offline).
+registerRoute(
+  new NavigationRoute(
+    new NetworkFirst({
+      cacheName: 'html-pages',
+      networkTimeoutSeconds: 4,
+      plugins: [new ExpirationPlugin({ maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 })]
+    })
+  )
+)
 
 // Cache Google Fonts
 registerRoute(
