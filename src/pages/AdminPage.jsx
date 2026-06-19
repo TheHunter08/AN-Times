@@ -80,16 +80,19 @@ export default function AdminPage() {
   useEffect(() => {
     const el = admMainRef.current
     if (!el) return
-    let sx = 0, sy = 0
-    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY }
+    let sx = 0, sy = 0, st = 0
+    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now() }
     const onEnd = e => {
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
-      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+      const dt = Date.now() - st
+      const vx = Math.abs(dx) / dt
+      const isSwipe = Math.abs(dx) > 30 && (Math.abs(dx) > 45 || vx > 0.3) && Math.abs(dx) > Math.abs(dy) * 1.2
+      if (!isSwipe) return
       const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
       const ci = order.indexOf(currentPageRef.current)
-      if (dx < 0 && ci < order.length - 1) setAdminPage(order[ci + 1])
-      else if (dx > 0 && ci > 0) setAdminPage(order[ci - 1])
+      if (dx < 0 && ci < order.length - 1) { try { navigator.vibrate(8) } catch {} ; setAdminPage(order[ci + 1]) }
+      else if (dx > 0 && ci > 0) { try { navigator.vibrate(8) } catch {} ; setAdminPage(order[ci - 1]) }
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })

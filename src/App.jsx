@@ -1,8 +1,28 @@
 import { useEffect, lazy, Suspense } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAppStore } from './store/appStore.js'
 import { initStorage, flushOfflineQueue } from './services/dataService.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+
+function UpdateBanner() {
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
+    onRegisteredSW(swUrl, r) {
+      // Chequea actualizaciones cada 5 min mientras la app está abierta
+      setInterval(() => r && !r.installing && r.update(), 5 * 60 * 1000)
+    }
+  })
+  if (!needRefresh) return null
+  return (
+    <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, padding:'10px 16px', background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff', display:'flex', alignItems:'center', gap:12, fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(108,99,255,.4)', backdropFilter:'blur(8px)' }}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span style={{ flex:1 }}>Nueva versión disponible</span>
+      <button onClick={() => updateServiceWorker(true)} style={{ background:'rgba(255,255,255,.2)', border:'1px solid rgba(255,255,255,.3)', borderRadius:20, padding:'5px 14px', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent' }}>
+        Actualizar ahora
+      </button>
+    </div>
+  )
+}
 
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
@@ -131,6 +151,7 @@ export default function App() {
 
   return (
     <>
+      <UpdateBanner />
       {currentScreen === 'login' && <LoginPage />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp' && <EmployeePage />}

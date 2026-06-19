@@ -38,15 +38,18 @@ export default function EmployeePage() {
   useEffect(() => {
     const el = empBodyRef.current
     if (!el) return
-    let sx = 0, sy = 0
-    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY }
+    let sx = 0, sy = 0, st = 0
+    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now() }
     const onEnd = e => {
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
-      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+      const dt = Date.now() - st
+      const vx = Math.abs(dx) / dt
+      const isSwipe = Math.abs(dx) > 30 && (Math.abs(dx) > 50 || vx > 0.3) && Math.abs(dx) > Math.abs(dy) * 1.2
+      if (!isSwipe) return
       const ci = TAB_ORDER.indexOf(currentTabRef.current)
-      if (dx < 0 && ci < TAB_ORDER.length - 1) setEmpTab(TAB_ORDER[ci + 1])
-      else if (dx > 0 && ci > 0) setEmpTab(TAB_ORDER[ci - 1])
+      if (dx < 0 && ci < TAB_ORDER.length - 1) { try { navigator.vibrate(8) } catch {} ; setEmpTab(TAB_ORDER[ci + 1]) }
+      else if (dx > 0 && ci > 0) { try { navigator.vibrate(8) } catch {} ; setEmpTab(TAB_ORDER[ci - 1]) }
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })
