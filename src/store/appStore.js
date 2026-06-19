@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetchSmart } from '../services/dataService.js'
+import { loadLocal, loadLocalAsync, mergeDB, saveLocal, cloudPush, cloudFetchSmart, initStorage, flushOfflineQueue } from '../services/dataService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -29,6 +29,14 @@ export const useAppStore = create((set, get) => ({
       () => { set({ syncStatus: 'error' }); get().toast('⚠️ Sin conexión — datos guardados localmente') }
     )
     return newDB
+  },
+
+  hydrateIDB: async () => {
+    // Lee desde IndexedDB (más capacidad que localStorage) y actualiza el store
+    const data = await loadLocalAsync()
+    if (data && data._ts && data._ts > (get().db._ts || 0)) {
+      set({ db: data })
+    }
   },
 
   fetchDB: async () => {

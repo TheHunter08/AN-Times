@@ -1,4 +1,5 @@
 import { DB_URL, FB_BASE, INITIAL_DB, ADMIN_PIN, FB_CONFIG } from '../config/constants.js'
+import { idbSave, idbLoad, idbQueuePush, idbGetPendingPushes, idbClearPendingPushes, migrateFromLocalStorage } from './idbService.js'
 
 let _pushFlight = false
 let _saveRetry = 0
@@ -65,18 +66,42 @@ function withAuth(url, token) {
 }
 
 export function loadLocal() {
+  // Lectura síncrona desde localStorage para startup sin bloquear
   try {
     const raw = localStorage.getItem('an_times_v1')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      return mergeDB(INITIAL_DB, parsed)
-    }
+    if (raw) return mergeDB(INITIAL_DB, JSON.parse(raw))
   } catch {}
   return { ...INITIAL_DB }
 }
 
+export async function loadLocalAsync() {
+  // Lectura async desde IndexedDB — más capacidad, sin límite de 5MB
+  try {
+    const data = await idbLoad()
+    if (data) return mergeDB(INITIAL_DB, data)
+  } catch {}
+  return loadLocal()
+}
+
 export function saveLocal(db) {
+  // Escribe en localStorage (sync, para lectura rápida) y en IDB (async, sin límite)
   try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch {}
+  idbSave(db) // fire-and-forget
+}
+
+export async function initStorage() {
+  // Migra datos de localStorage a IDB en el primer arranque
+  await migrateFromLocalStorage(mergeDB, INITIAL_DB)
+}
+
+// Vacía la cola offline y empuja cada snapshot pendiente
+export async function flushOfflineQueue(onSuccess, onError) {
+  const pending = await idbGetPendingPushes()
+  if (!pending.length) return
+  // El último snapshot tiene el estado más reciente — el resto se pueden descartar
+  const latest = pending[pending.length - 1]
+  await idbClearPendingPushes()
+  await cloudPush(latest.snapshot, onSuccess, onError, () => {})
 }
 
 export function mergeDB(base, incoming) {
@@ -199,6 +224,8 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
       setTimeout(() => cloudPush(loadLocal(), onSuccess, onError, onFinalError), 600 * _saveRetry)
     } else {
       _saveRetry = 0
+      // Sin conexión definitiva: encolar en IDB para reintentar cuando vuelva la red
+      idbQueuePush(loadLocal())
       onFinalError?.()
     }
   }
