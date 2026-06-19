@@ -5,6 +5,7 @@ import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, r
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
+import { useModalBack } from '../hooks/useModalBack.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 
 const PAGES = [
@@ -1228,10 +1229,10 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const now2 = new Date()
     const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
     const XLSX = await import('xlsx')
-    const headers = ['Nombre','PIN','Email','Rol','Empresa','Centro trabajo','Alta','H. contratadas/sem','H. trabajadas (mes actual)','Estado']
+    const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H. contratadas/sem','H. trabajadas (mes actual)','Estado']
     const rows = allEmps.map(e => {
       const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
-      return [e.name, e.pin, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, Math.round(monthMin/60*10)/10, e.baja?'Baja':'Activo']
+      return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, Math.round(monthMin/60*10)/10, e.baja?'Baja':'Activo']
     })
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Empleados')
@@ -1263,7 +1264,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
           <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{editEmp ? 'Editar empleado' : 'Nuevo empleado'}</div>
           <div className="field-row">
             <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} /></div>
-            <div className="field"><label>PIN (4-6 dígitos) *</label><input value={form.pin} maxLength={6} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/,'')}))} /></div>
+            <div className="field"><label>PIN (4-6 dígitos) *</label><input value={form.pin} maxLength={6} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/g,'')}))} /></div>
           </div>
           <div className="field-row">
             <div className="field"><label>Email</label><input type="email" value={form.email||''} onChange={e => setForm(f=>({...f,email:e.target.value}))} /></div>
@@ -2179,6 +2180,18 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState('todos')
   const [viewing, setViewing] = useState(null)
+  const viewingPushed = useRef(false)
+  useEffect(() => {
+    if (!viewing) {
+      if (viewingPushed.current) { viewingPushed.current = false; window.history.back() }
+      return
+    }
+    window.history.pushState({ timesModal: true }, '')
+    viewingPushed.current = true
+    const onPop = () => { if (!viewingPushed.current) return; viewingPushed.current = false; setViewing(null) }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [viewing])
   const EMPTY = { empId:'', tipo:'nomina', titulo:'', mes:'', url:'' }
   const [form, setForm] = useState(EMPTY)
   const [fileData, setFileData] = useState('')
@@ -2428,6 +2441,18 @@ function PanelMiObra({ db, toast, saveDB, session }) {
 
   const [tab, setTab]       = useState('live')
   const [editing, setEditing] = useState(null)
+  const editingPushed = useRef(false)
+  useEffect(() => {
+    if (!editing) {
+      if (editingPushed.current) { editingPushed.current = false; window.history.back() }
+      return
+    }
+    window.history.pushState({ timesModal: true }, '')
+    editingPushed.current = true
+    const onPop = () => { if (!editingPushed.current) return; editingPushed.current = false; setEditing(null) }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [editing])
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
 
   const aceptar = (rec) => {
@@ -2893,6 +2918,7 @@ function SearchModal({ db, open, q, setQ, onClose, onNav }) {
   const inputRef = useRef(null)
 
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 50) }, [open])
+  useModalBack(open, onClose)
 
   const results = useMemo(() => {
     if (!q || q.length < 1) return []

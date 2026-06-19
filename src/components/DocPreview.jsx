@@ -82,7 +82,32 @@ export function DocPreview({ d, db, empId }) {
         ? <PdfViewer blobUrl={blobUrl} title={d.titulo} />
         : <div style={{ width:'100%', height:'50vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg-600)', borderRadius:8, border:'1px solid var(--border)', color:'var(--text3)', fontSize:13 }}>Cargando documento…</div>
     }
-    return <img src={d.fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius:8, border:'1px solid var(--border)', background:'#fff' }} />
+    // Imagen — mostrar previsualización + botón de descarga
+    const mime = d.fileData.split(';')[0].split(':')[1] || 'image/jpeg'
+    const ext = mime === 'image/png' ? '.png' : mime === 'image/gif' ? '.gif' : '.jpg'
+    const imgName = ((d.fileName || d.titulo || 'imagen').replace(/\.[^.]+$/, '')) + ext
+    const downloadImg = () => {
+      const a = document.createElement('a')
+      a.href = d.fileData
+      a.download = imgName
+      a.click()
+    }
+    return (
+      <div>
+        <img src={d.fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius:8, border:'1px solid var(--border)', background:'#fff', display:'block' }} />
+        <div style={{ display:'flex', gap:8, marginTop:10 }}>
+          <button onClick={() => window.open(d.fileData, '_blank')}
+            style={{ flex:1, padding:'9px 12px', fontSize:12, fontWeight:700, background:'var(--bg-400)', color:'var(--text2)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit' }}>
+            ↗ Abrir
+          </button>
+          <button onClick={downloadImg}
+            style={{ flex:1, padding:'9px 12px', fontSize:12, fontWeight:700, background:'var(--primary)', color:'#fff', border:'none', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar
+          </button>
+        </div>
+      </div>
+    )
   }
   if (d.url) {
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)

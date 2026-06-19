@@ -7,6 +7,7 @@ import { auditLog, sendPushNotif, pushSubscribe, queuePush } from '../services/d
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
+import { useModalBack } from '../hooks/useModalBack.js'
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
@@ -1589,6 +1590,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
 function ModalSelCentro({ visible, data, onConfirm, onClose }) {
   const [sel, setSel] = useState('')
   useEffect(() => { if (data?.current) setSel(data.current) }, [data])
+  useModalBack(visible, onClose)
   if (!visible) return null
   return (
     <div className="modal-ov" onClick={onClose}>
@@ -1614,6 +1616,7 @@ function ModalSelCentro({ visible, data, onConfirm, onClose }) {
 function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const notis = (db.notis || []).filter(n => n.empId === u?.id).slice(-20).reverse()
   const mensajes = (db.mensajes || []).filter(m => m.to === 'all' || m.to === u?.id).slice(-10).reverse()
+  useModalBack(visible, onClose)
   if (!visible) return null
   const markRead = () => {
     const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
@@ -1673,6 +1676,7 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
   const [fi, setFi] = useState('')
   const [ff, setFf] = useState('')
   const [motivo, setMotivo] = useState('')
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const submit = () => {
@@ -1735,6 +1739,7 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
     }
   }, [mode, tick])
 
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const getPos = (e, canvas) => {
@@ -1923,6 +1928,7 @@ function ModalAI({ visible, db, u, onClose }) {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [msgs, thinking])
 
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const ask = (q) => {
@@ -2022,6 +2028,7 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
     }
   }, [visible])
 
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const save = () => {
@@ -2079,6 +2086,7 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null) // doc being signed
   const [stamping, setStamping] = useState(false)
   const [viewing, setViewing] = useState(null) // doc being previewed (read-only)
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
@@ -2234,6 +2242,7 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
   const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
   const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
 
+  useModalBack(visible, onClose)
   if (!visible) return null
 
   const save = () => {
@@ -2353,6 +2362,7 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     }
   }, [visible, selCierre])
 
+  useModalBack(visible, onClose)
   if (!visible || !selCierre) return null
 
   const getPos = (e, c) => {
@@ -2617,6 +2627,7 @@ function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 80)
   }, [visible, chats.length])
 
+  useModalBack(visible, onClose)
   if (!visible || !u) return null
 
   const send = () => {
@@ -2702,6 +2713,7 @@ function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
     }
   }, [visible, rec])
 
+  useModalBack(visible, onClose)
   if (!visible || !rec) return null
 
   const send = () => {
