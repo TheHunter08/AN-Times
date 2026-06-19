@@ -100,16 +100,35 @@ export function mergeDB(base, incoming) {
     notis:           incoming.notis         || [],
     cierres:         incoming.cierres       || [],
     monthSnapshots:  incoming.monthSnapshots|| {},
-    firmas:          incoming.firmas        || {},
-    documentos:      incoming.documentos    || [],
-    audit:           incoming.audit         || [],
-    _ts:             incoming._ts           || 0
+    firmas:          incoming.firmas              || {},
+    documentos:      incoming.documentos          || [],
+    audit:           incoming.audit               || [],
+    correccionesFichaje: incoming.correccionesFichaje || [],
+    chats:           incoming.chats               || [],
+    _ts:             incoming._ts                 || 0
   }
 }
 
 export async function cloudFetch() {
   try {
     const token = await getAuthToken()
+    const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
+    if (!r.ok) return null
+    return await r.json()
+  } catch {
+    return null
+  }
+}
+
+// Comprueba _ts primero (~15 bytes) antes de descargar la DB completa.
+// Devuelve null (error), 'no-change' (sin cambios), o los datos completos.
+export async function cloudFetchSmart(localTS) {
+  try {
+    const token = await getAuthToken()
+    const tsResp = await fetch(withAuth(DB_URL + '/_ts.json', token), { cache: 'no-store' })
+    if (!tsResp.ok) return null
+    const remoteTS = await tsResp.json()
+    if (remoteTS && localTS && remoteTS <= localTS) return 'no-change'
     const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
     if (!r.ok) return null
     return await r.json()

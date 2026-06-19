@@ -12,6 +12,7 @@ const PAGES = [
   { id:'solicitudes', label:'Solicitudes' },
   { id:'empleados',   label:'Empleados' },
   { id:'informes',    label:'Informes' },
+  { id:'mensajes',    label:'Mensajes' },
   { id:'obras',       label:'Obras' },
   { id:'documentos',  label:'Documentos' },
   { id:'auditoria',   label:'Auditoría' },
@@ -180,6 +181,7 @@ export default function AdminPage() {
               {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
               {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'mensajes'    && <PanelMensajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
@@ -934,7 +936,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
       </div>
 
       <div className="pill-tabs" style={{ marginBottom:20 }}>
-        {[['vacaciones','🌴 Vacaciones'],['ausencias','🏥 Ausencias médicas']].map(([v,l]) => (
+        {[['vacaciones','🌴 Vacaciones'],['ausencias','🏥 Ausencias médicas'],['correcciones','✏️ Correcciones']].map(([v,l]) => (
           <button key={v} className={`pill-tab${solTab===v?' active':''}`} onClick={() => setSolTab(v)}>{l}</button>
         ))}
       </div>
@@ -1036,6 +1038,83 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
           )}
         </>
       )}
+
+      {solTab === 'correcciones' && (() => {
+        const corrPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente').sort((a,b) => b.ts - a.ts)
+        const corrRest = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente').sort((a,b) => b.ts - a.ts).slice(0, 20)
+
+        const actCorr = (id, estado) => {
+          const corr = (db.correccionesFichaje || []).find(c => c.id === id)
+          if (!corr) return
+          let newRecords = db.records || []
+          if (estado === 'aprobada') {
+            newRecords = newRecords.map(r => r.id === corr.recId
+              ? { ...r, inicio: corr.propInicio, fin: corr.propFin, workSecs: 0 }
+              : r
+            )
+          }
+          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString() } : c)
+          const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
+          saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis||[]), noti] })
+          queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
+          toast(estado === 'aprobada' ? '✅ Corrección aplicada' : '❌ Corrección rechazada')
+        }
+
+        return (
+          <>
+            {corrPend.length > 0 && (
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:10 }}>Pendientes · {corrPend.length}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {corrPend.map(c => (
+                    <div key={c.id} className="card" style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                      <div style={{ width:38, height:38, borderRadius:10, background:'var(--orange-dim)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✏️</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700 }}>{c.empName}</div>
+                        <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                          Original: {ftime(c.recInicio)} → {c.recFin ? ftime(c.recFin) : '—'}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--primary-light)', marginTop:2 }}>
+                          Propuesto: {ftime(c.propInicio)} → {c.propFin ? ftime(c.propFin) : '—'}
+                        </div>
+                        {c.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3, fontStyle:'italic' }}>"{c.motivo}"</div>}
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                        <button className="btn btn-sm btn-primary" onClick={() => actCorr(c.id, 'aprobada')}>✓</button>
+                        <button className="btn btn-sm btn-danger"  onClick={() => actCorr(c.id, 'rechazada')}>✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!corrPend.length && (
+              <div className="empty-premium">
+                <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+                <div className="empty-premium-title">Sin correcciones pendientes</div>
+                <div className="empty-premium-sub">Cuando un empleado solicite corregir un fichaje aparecerá aquí</div>
+              </div>
+            )}
+            {corrRest.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:10 }}>Historial</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {corrRest.map(c => (
+                    <div key={c.id} style={{ display:'flex', gap:10, padding:'9px 12px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', alignItems:'center' }}>
+                      <div style={{ fontSize:15 }}>{c.estado==='aprobada'?'✅':'❌'}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, fontWeight:600 }}>{c.empName}</div>
+                        <div style={{ fontSize:11, color:'var(--text3)' }}>{c.motivo || 'Sin motivo'}</div>
+                      </div>
+                      <div className={`badge ${c.estado==='aprobada'?'badge-green':'badge-red'}`}>{c.estado}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }
@@ -1772,7 +1851,77 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
 
       {/* Exportar tab */}
       {tab === 'exportar' && (
-        <div style={{ maxWidth:500 }}>
+        <div style={{ maxWidth:500, display:'flex', flexDirection:'column', gap:16 }}>
+          {/* Informe oficial inspección de trabajo */}
+          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ fontSize:14, fontWeight:700 }}>Registro de jornada — Inspección de Trabajo</div>
+            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+              Formato oficial requerido por el RDL 8/2019. Incluye todos los empleados con entrada/salida diaria.
+            </div>
+            <button className="btn btn-primary" style={{ width:'100%' }} onClick={() => {
+              const [y2, mo2] = filterMonth.split('-').map(Number)
+              const mesNombre = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+              const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
+              const empresa = (db.empresas || [])[0] || '—'
+
+              // Construir filas por empleado y día
+              let rowsHtml = ''
+              empsActivos.forEach(e => {
+                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+                  .sort((a, b) => a.inicio.localeCompare(b.inicio))
+                if (!eRecs.length) {
+                  rowsHtml += `<tr><td>${e.name}</td><td colspan="4" style="color:#999;text-align:center">Sin registros este mes</td></tr>`
+                  return
+                }
+                eRecs.forEach((r, i) => {
+                  const wm = Math.floor((r.workSecs > 0 ? r.workSecs : Math.max(0, (new Date(r.fin) - new Date(r.inicio))/1000 - (r.breakSecs||0))) / 60)
+                  const d   = new Date(r.inicio)
+                  rowsHtml += `<tr>
+                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${e.name}</td>` : ''}
+                    <td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td>
+                    <td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td>${new Date(r.fin).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td style="font-weight:600">${Math.floor(wm/60)}h ${p2(wm%60)}m</td>
+                  </tr>`
+                })
+              })
+
+              const win = window.open('', '_blank')
+              if (!win) { toast('Activa las ventanas emergentes'); return }
+              win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Registro de jornada ${mesNombre} · ${empresa}</title>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
+.meta{display:flex;gap:24px;background:#f8f8f8;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12px}
+.meta div span{display:block;color:#888;font-size:11px}
+table{width:100%;border-collapse:collapse}th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover td{background:#f9fafb}
+.sign{margin-top:48px;display:flex;gap:64px}.sign-box{flex:1;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#666}
+footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
+@media print{button{display:none}}</style></head><body>
+<h1>Registro de control de jornada laboral</h1>
+<h2>${empresa} · ${mesNombre}</h2>
+<div class="meta">
+  <div><span>Empresa</span>${empresa}</div>
+  <div><span>Período</span>${mesNombre}</div>
+  <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
+  <div><span>Empleados</span>${empsActivos.length}</div>
+</div>
+<button onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Imprimir / Guardar PDF</button>
+<table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th></tr></thead>
+<tbody>${rowsHtml}</tbody></table>
+<div class="sign">
+  <div class="sign-box">Representante legal de la empresa<br><br><br>________________________</div>
+  <div class="sign-box">Sello empresa<br><br><br>________________________</div>
+</div>
+<footer><span>Documento generado por TIMES INC · Control horario RDL 8/2019</span><span>Página 1</span></footer>
+</body></html>`)
+              win.document.close()
+            }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Descargar registro oficial PDF
+            </button>
+          </div>
           <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Exportar fichajes a Excel</div>
             <div className="field">
@@ -2287,6 +2436,142 @@ function PanelMiObra({ db, toast, saveDB, session }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── PANEL MENSAJES ───────────────────────────────────────────────────────────
+function PanelMensajes({ db, toast, saveDB, session }) {
+  const [selEmpId, setSelEmpId] = useState(null)
+  const [text, setText] = useState('')
+  const bottomRef = useRef(null)
+
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+  const chats = db.chats || []
+  const adminId = 'admin'
+
+  const getConv = empId => chats
+    .filter(m => (m.from === empId && m.to === adminId) || (m.from === adminId && m.to === empId))
+    .sort((a, b) => a.ts - b.ts)
+
+  const unreadFor = empId => chats.filter(m => m.from === empId && m.to === adminId && !m.leido).length
+
+  const selEmp = emps.find(e => e.id === selEmpId)
+  const conv = selEmpId ? getConv(selEmpId) : []
+
+  useEffect(() => {
+    if (!selEmpId) return
+    // Marcar mensajes del empleado como leídos
+    const hasUnread = chats.some(m => m.from === selEmpId && m.to === adminId && !m.leido)
+    if (hasUnread) {
+      saveDB({ chats: chats.map(m => m.from === selEmpId && m.to === adminId ? { ...m, leido: true } : m) })
+    }
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
+  }, [selEmpId, chats.length])
+
+  const send = () => {
+    const t = text.trim()
+    if (!t || !selEmpId) return
+    const msg = { id: gid(), from: adminId, to: selEmpId, text: t, ts: Date.now(), leido: false }
+    saveDB({ chats: [...chats, msg] })
+    queuePush(selEmpId, `Mensaje de ${session?.user?.name || 'Admin'}`, t, 'chat', '/?tab=mensajes')
+    setText('')
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
+  }
+
+  const totalUnread = emps.reduce((s, e) => s + unreadFor(e.id), 0)
+
+  return (
+    <div className="adm-panel">
+      <div className="adm-panel-header">
+        <div>
+          <h1 className="adm-panel-title gradient-text">Mensajes</h1>
+          <div className="adm-panel-sub">{totalUnread > 0 ? `${totalUnread} sin leer` : 'Chat interno con empleados'}</div>
+        </div>
+      </div>
+
+      <div style={{ display:'flex', gap:14, height:'calc(100vh - 200px)', minHeight:400 }}>
+        {/* Lista empleados */}
+        <div style={{ width:200, flexShrink:0, display:'flex', flexDirection:'column', gap:6 }}>
+          {emps.map(e => {
+            const conv2 = getConv(e.id)
+            const last  = conv2[conv2.length - 1]
+            const unr   = unreadFor(e.id)
+            return (
+              <button key={e.id} onClick={() => setSelEmpId(e.id)}
+                style={{ display:'flex', gap:10, alignItems:'center', padding:'10px 12px',
+                  background: selEmpId === e.id ? 'var(--primary-dim)' : 'var(--bg-700)',
+                  border: `1px solid ${selEmpId === e.id ? 'var(--primary-glow)' : 'var(--border)'}`,
+                  borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left', width:'100%' }}>
+                <div style={{ width:32, height:32, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0, position:'relative' }}>
+                  {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                  {unr > 0 && <span style={{ position:'absolute', top:-4, right:-4, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px' }}>{unr}</span>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name.split(' ')[0]}</div>
+                  {last && <div style={{ fontSize:10, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{last.from === adminId ? 'Tú: ' : ''}{last.text}</div>}
+                </div>
+              </button>
+            )
+          })}
+          {!emps.length && <div style={{ fontSize:12, color:'var(--text3)', padding:12 }}>Sin empleados</div>}
+        </div>
+
+        {/* Conversación */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:14, overflow:'hidden' }}>
+          {!selEmpId ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, color:'var(--text3)' }}>
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <div style={{ fontSize:13 }}>Selecciona un empleado</div>
+            </div>
+          ) : (
+            <>
+              {/* Cabecera */}
+              <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:32, height:32, borderRadius:'50%', background: selEmp?.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>
+                  {(selEmp?.initials||selEmp?.name.slice(0,2)||'?').toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700 }}>{selEmp?.name}</div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>{selEmp?.empresa}</div>
+                </div>
+              </div>
+
+              {/* Mensajes */}
+              <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:8 }}>
+                {!conv.length && <div style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:40 }}>Sin mensajes. Escribe el primero.</div>}
+                {conv.map(m => {
+                  const isAdmin = m.from === adminId
+                  return (
+                    <div key={m.id} style={{ display:'flex', justifyContent: isAdmin ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth:'75%', padding:'8px 12px', borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                        background: isAdmin ? 'var(--primary)' : 'var(--bg-500)',
+                        border: isAdmin ? 'none' : '1px solid var(--border)',
+                        fontSize:13, color: isAdmin ? '#fff' : 'var(--text)' }}>
+                        {m.text}
+                        <div style={{ fontSize:10, marginTop:4, opacity:.65, textAlign:'right' }}>{new Date(m.ts).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Input */}
+              <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', display:'flex', gap:8 }}>
+                <input value={text} onChange={e => setText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
+                  placeholder="Escribe un mensaje…"
+                  style={{ flex:1, padding:'10px 14px', borderRadius:22, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text)', fontSize:13, fontFamily:'inherit' }} />
+                <button onClick={send} disabled={!text.trim()}
+                  style={{ width:40, height:40, borderRadius:'50%', background:'var(--primary)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, opacity: text.trim() ? 1 : .4 }}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -56,5 +56,7 @@ export const INITIAL_DB = {
   firmas: {},
   documentos: [],
   audit: [],
+  correccionesFichaje: [],
+  chats: [],
   _ts: 0
 }

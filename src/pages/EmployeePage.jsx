@@ -300,6 +300,10 @@ export default function EmployeePage() {
           <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
           </button>
+          <button className="icon-btn" onClick={() => openModal('chat')} style={{ position:'relative' }} aria-label="Chat con administrador">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            {(() => { const un = (db.chats||[]).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length; return un > 0 ? <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', pointerEvents:'none' }} aria-hidden="true">{un > 9 ? '9+' : un}</span> : null })()}
+          </button>
           <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ''}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             {unread > 0 && (
@@ -317,7 +321,7 @@ export default function EmployeePage() {
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
-        {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} />}
+        {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
         {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
@@ -349,6 +353,8 @@ export default function EmployeePage() {
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} onClose={closeModal} toast={toast} />
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
+      <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
 
       {/* Onboarding: primer login */}
       <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
@@ -689,7 +695,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         })).filter(h => h.recs.length > 0)
         if (!histWithRecs.length) return null
         return (
-          <HistorialReciente histWithRecs={histWithRecs} />
+          <HistorialReciente histWithRecs={histWithRecs} openModal={openModal} u={u} />
         )
       })()}
 
@@ -698,7 +704,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   )
 }
 
-function HistorialReciente({ histWithRecs }) {
+function HistorialReciente({ histWithRecs, openModal, u }) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ padding:'0 16px 12px' }}>
@@ -717,16 +723,25 @@ function HistorialReciente({ histWithRecs }) {
             const label = new Date(ds + 'T12:00:00').toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })
             return (
               <div key={ds} style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 14px' }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: recs.length > 1 ? 8 : 0 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                   <div style={{ fontSize:12, fontWeight:700, textTransform:'capitalize' }}>{label}</div>
                   <div style={{ fontSize:13, fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalMin)}</div>
                 </div>
-                {recs.length > 1 && recs.map(r => {
+                {recs.map(r => {
                   const wm = Math.floor(recWorkSecs(r) / 60)
+                  const yaCorrected = false
                   return (
-                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)' }}>
-                      <span>{ftime(r.inicio)} → {ftime(r.fin)}</span>
-                      <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
+                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)', gap:8 }}>
+                      <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
+                        <button
+                          onClick={() => openModal('correccion', { rec: r, empName: u?.name })}
+                          title="Solicitar corrección"
+                          style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 7px', cursor:'pointer', fontSize:10, color:'var(--text3)', fontFamily:'inherit', lineHeight:1.5 }}>
+                          ✏️
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -2064,6 +2079,166 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
             </button>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── MODAL CHAT ────────────────────────────────────────────────────────────────
+function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
+  const [text, setText] = useState('')
+  const bottomRef = useRef(null)
+  if (!visible || !u) return null
+
+  const chats   = db.chats || []
+  const adminId = 'admin'
+  const conv    = chats
+    .filter(m => (m.from === u.id && m.to === adminId) || (m.from === adminId && m.to === u.id))
+    .sort((a, b) => a.ts - b.ts)
+
+  // Marcar mensajes de admin como leídos al abrir
+  useEffect(() => {
+    if (!visible) return
+    const hasUnread = chats.some(m => m.from === adminId && m.to === u.id && !m.leido)
+    if (hasUnread) saveDB({ chats: chats.map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) })
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 80)
+  }, [visible, chats.length])
+
+  const send = () => {
+    const t = text.trim()
+    if (!t) return
+    const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
+    saveDB({ chats: [...chats, msg] })
+    setText('')
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:120, background:'rgba(0,0,0,.5)', display:'flex', flexDirection:'column' }}>
+      <div style={{ background:'var(--bg-700)', flex:1, display:'flex', flexDirection:'column', maxHeight:'100%' }}>
+        {/* Cabecera */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
+          <button onClick={onClose} style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:10, width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div>
+            <div style={{ fontSize:15, fontWeight:700 }}>Chat con Administración</div>
+            <div style={{ fontSize:11, color:'var(--text3)' }}>Responden en horario de oficina</div>
+          </div>
+        </div>
+
+        {/* Mensajes */}
+        <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:10 }}>
+          {!conv.length && (
+            <div style={{ textAlign:'center', color:'var(--text3)', fontSize:13, marginTop:60 }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
+              Sin mensajes. Escribe tu primera consulta al administrador.
+            </div>
+          )}
+          {conv.map(m => {
+            const isMe = m.from === u.id
+            return (
+              <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth:'80%', padding:'10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                  background: isMe ? 'var(--primary)' : 'var(--bg-500)',
+                  border: isMe ? 'none' : '1px solid var(--border)',
+                  fontSize:14, color: isMe ? '#fff' : 'var(--text)' }}>
+                  {!isMe && <div style={{ fontSize:10, fontWeight:700, marginBottom:4, opacity:.7 }}>Admin</div>}
+                  {m.text}
+                  <div style={{ fontSize:10, marginTop:5, opacity:.6, textAlign:'right' }}>
+                    {new Date(m.ts).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', display:'flex', gap:8, paddingBottom:`max(16px,env(safe-area-inset-bottom,0px))` }}>
+          <input value={text} onChange={e => setText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
+            placeholder="Escribe un mensaje…"
+            style={{ flex:1, padding:'11px 16px', borderRadius:24, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text)', fontSize:14, fontFamily:'inherit' }} />
+          <button onClick={send} disabled={!text.trim()}
+            style={{ width:44, height:44, borderRadius:'50%', background:'var(--primary)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, opacity: text.trim() ? 1 : .4 }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── MODAL CORRECCIÓN ──────────────────────────────────────────────────────────
+function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
+  const rec = data?.rec
+  const [inicio, setInicio]   = useState('')
+  const [fin, setFin]         = useState('')
+  const [motivo, setMotivo]   = useState('')
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    if (visible && rec) {
+      setInicio(rec.inicio ? rec.inicio.slice(0, 16) : '')
+      setFin(rec.fin ? rec.fin.slice(0, 16) : '')
+      setMotivo('')
+    }
+  }, [visible, rec])
+
+  if (!visible || !rec) return null
+
+  const send = () => {
+    if (!motivo.trim()) { toast('Añade un motivo para la corrección'); return }
+    setSending(true)
+    const corr = {
+      id: gid(),
+      empId: u.id, empName: u.name,
+      recId: rec.id,
+      recInicio: rec.inicio, recFin: rec.fin || null,
+      propInicio: new Date(inicio).toISOString(),
+      propFin: fin ? new Date(fin).toISOString() : null,
+      motivo: motivo.trim(),
+      estado: 'pendiente',
+      ts: Date.now()
+    }
+    saveDB({ correccionesFichaje: [...(db.correccionesFichaje || []), corr] })
+    toast('✅ Solicitud enviada al administrador')
+    setSending(false)
+    onClose()
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:130, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width:'100%', maxWidth:480, background:'var(--bg-700)', borderRadius:'20px 20px 0 0', padding:`24px 20px max(28px,env(safe-area-inset-bottom,0px))`, border:'1px solid var(--border2)', animation:'slideUp .22s ease' }}>
+        <div style={{ width:36, height:4, borderRadius:2, background:'var(--border3)', margin:'0 auto 20px' }} />
+        <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>Solicitar corrección de fichaje</div>
+        <div style={{ fontSize:12, color:'var(--text3)', marginBottom:20 }}>
+          Original: {ftime(rec.inicio)} → {rec.fin ? ftime(rec.fin) : '—'}
+        </div>
+
+        <div className="field" style={{ marginBottom:12 }}>
+          <label>Nueva hora de entrada</label>
+          <input type="datetime-local" value={inicio} onChange={e => setInicio(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom:12 }}>
+          <label>Nueva hora de salida</label>
+          <input type="datetime-local" value={fin} onChange={e => setFin(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom:20 }}>
+          <label>Motivo de la corrección *</label>
+          <input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej: Me olvidé de fichar la salida..." />
+        </div>
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button className="btn btn-secondary" style={{ flex:1 }} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" style={{ flex:1 }} onClick={send} disabled={sending}>
+            {sending ? 'Enviando…' : 'Enviar solicitud'}
+          </button>
+        </div>
       </div>
     </div>
   )

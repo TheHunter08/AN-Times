@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetchSmart } from '../services/dataService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -33,8 +33,9 @@ export const useAppStore = create((set, get) => ({
 
   fetchDB: async () => {
     const { db } = get()
-    const data = await cloudFetch()
+    const data = await cloudFetchSmart(db._ts)
     if (!data) { set({ syncStatus: 'error' }); return }
+    if (data === 'no-change') { set({ syncStatus: 'synced' }); return }
     const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
     if (shouldMerge) {
       const merged = mergeDB(INITIAL_DB, data)
