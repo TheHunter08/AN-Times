@@ -247,6 +247,19 @@ export default function EmployeePage() {
     saveDB({ records })
     try { navigator.vibrate(15) } catch {}
     toast('✅ Jornada finalizada — ' + mhm(Math.floor(t.work / 60)))
+    // Capturar GPS en background y actualizar el registro cuando resuelva
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
+          const fresh = dbRef.current
+          const updated = fresh.records.map(r => r.id === closed.id ? { ...r, locFin } : r)
+          saveDB({ records: updated })
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    }
   }, [db, openRec, saveDB, toast])
 
   const doBreak = useCallback(() => {
@@ -765,6 +778,29 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
       toast('Solicitud cancelada')
     })
   }
+
+  const downloadVacICS = (v) => {
+    const dtFin = new Date(v.fechaFin + 'T00:00:00')
+    dtFin.setDate(dtFin.getDate() + 1)
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TIMES INC//ES', 'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:vac-${v.id}@times-inc`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`,
+      `DTSTART;VALUE=DATE:${v.fechaInicio.replace(/-/g,'')}`,
+      `DTEND;VALUE=DATE:${dtFin.toISOString().slice(0,10).replace(/-/g,'')}`,
+      `SUMMARY:Vacaciones ${u.name.split(' ')[0]}`,
+      `DESCRIPTION:${v.dias} días de vacaciones aprobadas`,
+      'BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', 'DESCRIPTION:Vacaciones mañana', 'END:VALARM',
+      'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n')
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `vacaciones-${v.fechaInicio}.ics`; a.click()
+    URL.revokeObjectURL(url)
+    toast('📅 Archivo .ics descargado — ábrelo para añadir al calendario')
+  }
   const pct = vac.generated > 0 ? Math.round((vac.used / vac.generated) * 100) : 0
   const todayVacStr = today()
   const daysFrom = (ds) => Math.ceil((new Date(ds + 'T00:00:00') - new Date(todayVacStr + 'T00:00:00')) / 86400000)
@@ -829,6 +865,12 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
                     <div className={`badge${v.estado==='aprobada' ? ' badge-green' : v.estado==='rechazada' ? ' badge-red' : ' badge-orange'}`}>
                       {v.estado === 'aprobada' ? '✓ Aprobada' : v.estado === 'rechazada' ? '✗ Rechazada' : '⏳ Pendiente'}
                     </div>
+                    {v.estado === 'aprobada' && (
+                      <button onClick={() => downloadVacICS(v)} title="Añadir al calendario"
+                        style={{ background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', cursor:'pointer', color:'var(--primary-light)', padding:'4px 7px', borderRadius:6, fontSize:13, lineHeight:1, fontFamily:'inherit' }}>
+                        📅
+                      </button>
+                    )}
                     {v.estado === 'pendiente' && (
                       <button onClick={() => cancelVac(v.id)} title="Cancelar solicitud"
                         style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', padding:'4px 6px', borderRadius:6, fontSize:14, lineHeight:1, transition:'color .15s', fontFamily:'inherit' }}

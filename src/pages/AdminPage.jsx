@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
@@ -1750,6 +1751,40 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
               )
             })}
           </div>
+          {/* Tendencia 6 meses */}
+          {(() => {
+            const months = []
+            const now2 = new Date()
+            for (let i = 5; i >= 0; i--) {
+              const d = new Date(now2.getFullYear(), now2.getMonth() - i, 1)
+              const mk = `${d.getFullYear()}-${p2(d.getMonth()+1)}`
+              const label = d.toLocaleDateString('es-ES', { month:'short', year:'2-digit' })
+              const entry = { mes: label }
+              sortedEmps(db).filter(e => !e.baja).forEach(e => {
+                entry[e.name.split(' ')[0]] = Math.round(recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk)).reduce((s,r)=>s+calcMin(r),0) / 60 * 10) / 10
+              })
+              months.push(entry)
+            }
+            const empColors = ['#7c5cff','#10b981','#f59e0b','#ef4444','#00d4ff','#a78bfa']
+            const empNames = sortedEmps(db).filter(e=>!e.baja).map(e=>e.name.split(' ')[0])
+            return (
+              <div className="adm-section" style={{ marginTop:20 }}>
+                <div className="adm-section-title">Tendencia 6 meses (horas/empleado)</div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={months} margin={{ top:4, right:8, left:-10, bottom:0 }} barCategoryGap="25%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fontSize:11, fill:'var(--text3)' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize:10, fill:'var(--text3)' }} axisLine={false} tickLine={false} unit="h" />
+                    <Tooltip contentStyle={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:8, fontSize:12 }} labelStyle={{ color:'var(--text)', fontWeight:700 }} formatter={(v)=>[`${v}h`,'']} />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize:11 }} />
+                    {empNames.map((name, i) => (
+                      <Bar key={name} dataKey={name} fill={empColors[i % empColors.length]} radius={[3,3,0,0]} maxBarSize={28} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )
+          })()}
         </div>
       )}
 

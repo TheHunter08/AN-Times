@@ -137,13 +137,51 @@ export async function cloudFetchSmart(localTS) {
   }
 }
 
+function mergeArraysById(local, remote) {
+  const map = new Map()
+  ;(remote || []).forEach(item => item?.id && map.set(item.id, item))
+  ;(local  || []).forEach(item => item?.id && map.set(item.id, item)) // local wins same id
+  return [...map.values()]
+}
+
 export async function cloudPush(db, onSuccess, onError, onFinalError) {
   if (_pushFlight) return
   _pushFlight = true
-  const payload = { ...db, _ts: Date.now() }
-  saveLocal(payload)
   try {
     const token = await getAuthToken()
+    // Optimistic locking: check remote _ts first to detect concurrent edits
+    let localBase = db
+    try {
+      const tsResp = await fetch(withAuth(DB_URL + '/_ts.json', token), { cache: 'no-store' })
+      if (tsResp.ok) {
+        const remoteTS = await tsResp.json()
+        if (remoteTS && db._ts && remoteTS > db._ts) {
+          // Conflict: remote changed after our last sync — merge arrays to avoid data loss
+          const remoteResp = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
+          if (remoteResp.ok) {
+            const remote = await remoteResp.json()
+            if (remote) {
+              localBase = {
+                ...db,
+                records:             mergeArraysById(db.records,             remote.records),
+                vacaciones:          mergeArraysById(db.vacaciones,          remote.vacaciones),
+                medicos:             mergeArraysById(db.medicos,             remote.medicos),
+                ausencias:           mergeArraysById(db.ausencias,           remote.ausencias),
+                mensajes:            mergeArraysById(db.mensajes,            remote.mensajes),
+                notis:               mergeArraysById(db.notis,               remote.notis),
+                cierres:             mergeArraysById(db.cierres,             remote.cierres),
+                chats:               mergeArraysById(db.chats,               remote.chats),
+                correccionesFichaje: mergeArraysById(db.correccionesFichaje, remote.correccionesFichaje),
+                documentos:          mergeArraysById(db.documentos,          remote.documentos),
+                audit:               mergeArraysById(db.audit,               remote.audit),
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+    const payload = { ...localBase, _ts: Date.now() }
+    saveLocal(payload)
     const r = await fetch(withAuth(DB_URL + '.json', token), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
