@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
-import { auditLog, sendPushNotif, queuePush, pushSubscribe } from '../services/dataService.js'
+import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 
 const PAGES = [
@@ -109,7 +109,7 @@ export default function AdminPage() {
   }, [])
 
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
-  const adminNotis = (db.notis || []).filter(n => n.empId === '__admin__' && !n.leido)
+  const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
 
   const doLogout = () => { logout(); try { if (window._fbSignOut) window._fbSignOut() } catch {} }
 
@@ -155,14 +155,10 @@ export default function AdminPage() {
             </button>
           )}
           {!isEncargado && (
-            <button title="Notificaciones admin" onClick={() => {
-              nav('documentos')
-              const updated = (db.notis||[]).map(n => n.empId==='__admin__' ? {...n,leido:true} : n)
-              saveDB({ notis: updated })
-            }} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              {adminNotis.length > 0 && (
-                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminNotis.length}</span>
+            <button title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              {adminUnreadChats > 0 && (
+                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminUnreadChats > 9 ? '9+' : adminUnreadChats}</span>
               )}
             </button>
           )}
@@ -503,13 +499,7 @@ function PushNotifWidget({ db, toast }) {
     if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
     setSending(true)
     const tag = 'push-' + Date.now()
-    const url = '/'
-    await queuePush(target, title.trim(), body.trim(), tag, url)
-    if (target === '__all__') {
-      emps.forEach(e => sendPushNotif(e.id, title.trim(), body.trim(), tag, url))
-    } else {
-      sendPushNotif(target, title.trim(), body.trim(), tag, url)
-    }
+    await queuePush(target, title.trim(), body.trim(), tag, '/')
     toast('🔔 Notificación enviada')
     setSending(false)
     setTitle(''); setBody(''); setOpen(false)
@@ -537,7 +527,7 @@ function PushNotifWidget({ db, toast }) {
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
           <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : '🔔 Enviar notificación'}</button>
           <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
-            Las notificaciones llegan en tiempo real a usuarios con la app abierta. Para entregarlas con el móvil bloqueado, inicia el servidor push (<code>node push-server.js</code>).
+            Se envían vía VAPID incluso con el móvil bloqueado (GitHub Actions corre cada 5 min).
           </div>
         </div>
       )}
@@ -550,11 +540,11 @@ function ComunicadoWidget({ db, toast, saveDB }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
 
-  const send = () => {
+  const send = async () => {
     if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
     const msg = { id: gid(), from: 'admin', title: title.trim(), body: body.trim(), to: 'all', ts: new Date().toISOString() }
     saveDB({ mensajes: [...(db.mensajes||[]), msg] })
-    sendPushNotif('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/')
+    await queuePush('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/?tab=inicio')
     toast('✅ Comunicado enviado a todos los empleados')
     setTitle(''); setBody(''); setOpen(false)
   }
@@ -909,7 +899,6 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
     saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
     if (v?.empId) {
-      sendPushNotif('emp:' + v.empId, noti.action, noti.detail, 'times-vac', '/?go=emp:vacaciones')
       queuePush(v.empId, noti.action, noti.detail, 'vacaciones', '/?go=emp:vacaciones')
     }
     toast(estado === 'aprobada' ? '✅ Solicitud aprobada' : '❌ Solicitud rechazada')
@@ -1481,7 +1470,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
       records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
     }
     saveDB({ cierres: [...(db.cierres||[]), cierre] })
-    sendPushNotif(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mes} está listo para firmar.`, 'cierre', '/?tab=perfil')
+    queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mes} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
     toast(`✅ Cierre enviado a ${e.name}`)
   }
 
@@ -2181,7 +2170,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const noti = { id: gid(), empId: form.empId, action: `Nuevo documento pendiente de firma`, detail: `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo}`, ts: new Date().toISOString(), leido: false }
     const withAudit = auditLog(db, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
-    sendPushNotif('emp:' + form.empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
+    queuePush(form.empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('✅ Documento enviado al empleado')
     setShowForm(false)
     setForm(EMPTY)
@@ -2199,7 +2188,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const noti = { id: gid(), empId, action: 'Jornada mensual pendiente de firma', detail: `Necesitas firmar la jornada del mes ${mes}`, ts: new Date().toISOString(), leido: false }
     const withAudit = auditLog(db, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
-    sendPushNotif('emp:' + empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
+    queuePush(empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('✅ Jornada enviada para firma')
   }
 
