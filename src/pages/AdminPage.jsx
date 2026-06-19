@@ -60,10 +60,22 @@ export default function AdminPage() {
   // Swipe touch navigation — mirror del sistema en EmployeePage
   const admMainRef = useRef(null)
   const currentPageRef = useRef(currentAdminPage)
+  const prevPageRef = useRef(currentAdminPage)
   const isEncargadoRef = useRef(isEncargado)
 
-  useEffect(() => { currentPageRef.current = currentAdminPage }, [currentAdminPage])
   useEffect(() => { isEncargadoRef.current = isEncargado }, [isEncargado])
+
+  // Animación de dirección al cambiar página (igual que emp-body[data-dir])
+  useEffect(() => {
+    const prev = prevPageRef.current
+    if (prev !== currentAdminPage && admMainRef.current) {
+      const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
+      const pi = order.indexOf(prev), ci = order.indexOf(currentAdminPage)
+      admMainRef.current.dataset.dir = ci >= pi ? 'right' : 'left'
+    }
+    prevPageRef.current = currentAdminPage
+    currentPageRef.current = currentAdminPage
+  }, [currentAdminPage])
 
   useEffect(() => {
     const el = admMainRef.current
@@ -73,7 +85,7 @@ export default function AdminPage() {
     const onEnd = e => {
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
-      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) return
       const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
       const ci = order.indexOf(currentPageRef.current)
       if (dx < 0 && ci < order.length - 1) setAdminPage(order[ci + 1])

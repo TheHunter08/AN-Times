@@ -85,6 +85,24 @@ export function DocPreview({ d, db, empId }) {
     return <img src={d.fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius:8, border:'1px solid var(--border)', background:'#fff' }} />
   }
   if (d.url) {
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    const isPdfUrl = d.url.toLowerCase().includes('.pdf') || d.url.includes('application%2Fpdf')
+    if (isIOS || isPdfUrl) {
+      return (
+        <div style={{ width:'100%', padding:'24px 16px', display:'flex', flexDirection:'column', alignItems:'center', gap:12, background:'var(--bg-600)', borderRadius:8, border:'1px solid var(--border)' }}>
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--primary-light)" strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text2)', textAlign:'center' }}>{d.titulo || 'Documento'}</div>
+          <div style={{ display:'flex', gap:8, width:'100%', maxWidth:280 }}>
+            <a href={d.url} target="_blank" rel="noreferrer" style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'10px 12px', fontSize:12, fontWeight:700, background:'var(--primary)', color:'#fff', borderRadius:'var(--r)', textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
+              Abrir
+            </a>
+            <a href={d.url} download={d.titulo || 'documento'} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'10px 12px', fontSize:12, fontWeight:700, background:'var(--bg-400)', color:'var(--text2)', border:'1px solid var(--border)', borderRadius:'var(--r)', textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
+              Descargar
+            </a>
+          </div>
+        </div>
+      )
+    }
     return <iframe src={d.url} title={d.titulo} style={{ width:'100%', height:'50vh', border:'1px solid var(--border)', borderRadius:8, background:'#fff' }} />
   }
   if (d.tipo === 'jornada' && d.mes) {

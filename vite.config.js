@@ -17,18 +17,24 @@ export default defineConfig({
       srcDir: 'src/pwa',
       filename: 'sw.js',
       manifest: {
+        id: '/',
         name: 'TIMES INC',
         short_name: 'TIMES',
-        description: 'Control de jornada laboral',
+        description: 'Control de jornada laboral — fichajes, vacaciones y comunicación de equipo',
+        lang: 'es',
+        dir: 'ltr',
         theme_color: '#0B1020',
         background_color: '#0B1020',
         display: 'standalone',
-        orientation: 'portrait',
+        display_override: ['standalone', 'minimal-ui'],
+        orientation: 'portrait-primary',
         scope: '/',
-        start_url: '/',
+        start_url: '/?source=pwa',
+        categories: ['business', 'productivity', 'utilities'],
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: '/icon.svg',     sizes: 'any',      type: 'image/svg+xml' }
         ],
         shortcuts: [
@@ -47,11 +53,27 @@ export default defineConfig({
             icons: [{ src: '/icon.svg', sizes: 'any' }]
           },
           {
-            name: 'Vacaciones',
+            name: 'Solicitar vacaciones',
             short_name: 'Vacaciones',
             description: 'Ver y solicitar vacaciones',
             url: '/?tab=vacaciones',
             icons: [{ src: '/icon.svg', sizes: 'any' }]
+          },
+          {
+            name: 'Mis mensajes',
+            short_name: 'Mensajes',
+            description: 'Chat con el administrador',
+            url: '/?tab=mensajes',
+            icons: [{ src: '/icon.svg', sizes: 'any' }]
+          }
+        ],
+        screenshots: [
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'TIMES INC — Control de jornada'
           }
         ]
       }

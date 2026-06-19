@@ -17,16 +17,29 @@ export function makePrintableSignature(jpegDataUrl) {
     const img = new Image()
     img.onload = () => {
       try {
+        // 2× resolución para calidad retina en PDF e impresión
+        const scale = 2
         const c = document.createElement('canvas')
-        c.width = img.width; c.height = img.height
-        const ctx = c.getContext('2d')
+        c.width = img.width * scale
+        c.height = img.height * scale
+        const ctx = c.getContext('2d', { willReadFrequently: true })
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        ctx.scale(scale, scale)
         ctx.drawImage(img, 0, 0)
         const id = ctx.getImageData(0, 0, c.width, c.height)
         const d = id.data
         for (let i = 0; i < d.length; i += 4) {
-          const isBg = d[i] < 40 && d[i+1] < 45 && d[i+2] < 50
-          if (isBg) { d[i+3] = 0 }
-          else { d[i] = 17; d[i+1] = 17; d[i+2] = 17; d[i+3] = 255 }
+          // Luminosidad del pixel
+          const lum = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114
+          if (lum < 50) {
+            // Fondo oscuro → transparente
+            d[i+3] = 0
+          } else {
+            // Tinta: negro con alpha proporcional (preserva anti-aliasing en los bordes)
+            const alpha = Math.min(255, Math.round((lum - 50) * 1.22))
+            d[i] = 17; d[i+1] = 17; d[i+2] = 17; d[i+3] = alpha
+          }
         }
         ctx.putImageData(id, 0, 0)
         resolve(c.toDataURL('image/png'))

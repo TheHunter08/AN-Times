@@ -91,7 +91,8 @@ export default function EmployeePage() {
     const checkSmartNotis = () => {
       if (!('Notification' in window) || Notification.permission !== 'granted') return
       const now = new Date()
-      const todayStr = now.toISOString().slice(0, 10)
+      // Usar fecha local (no UTC) para evitar desfase de zona horaria
+      const todayStr = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`
       const hh = now.getHours()
       const mm = now.getMinutes()
       const db = dbRef.current
@@ -99,7 +100,9 @@ export default function EmployeePage() {
       // 1. Recordatorio diario de fichaje (hora configurada por el usuario)
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
-        if (hh === rh && mm === rm) {
+        // Ventana de 5 minutos: si han pasado entre 0 y 4 minutos desde la hora configurada
+        const minsPast = (hh - rh) * 60 + (mm - rm)
+        if (minsPast >= 0 && minsPast < 5) {
           const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio.startsWith(todayStr))
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && localStorage.getItem(lastKey) !== todayStr) {
@@ -878,22 +881,43 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
     </PullToRefresh>
 
     {/* Informe in-app fullscreen overlay */}
-    {informeUrl && (
-      <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-          <button onClick={closeInforme} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:'var(--text2)', WebkitTapHighlightColor:'transparent' }}>
-            ← Volver
-          </button>
-          <span style={{ fontSize:13, fontWeight:700, flex:1 }}>Registro de jornada</span>
-          <a href={informeUrl} download={`jornada-${new Date().toISOString().slice(0,7)}.pdf`}
-            style={{ display:'flex', alignItems:'center', gap:5, background:'var(--primary)', border:'none', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:'#fff', textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Descargar
-          </a>
+    {informeUrl && (() => {
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      const dlName = `jornada-${new Date().toISOString().slice(0,7)}.pdf`
+      return (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+            <button onClick={closeInforme} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:'var(--text2)', WebkitTapHighlightColor:'transparent' }}>
+              ← Volver
+            </button>
+            <span style={{ fontSize:13, fontWeight:700, flex:1 }}>Registro de jornada</span>
+            <a href={informeUrl} download={dlName}
+              style={{ display:'flex', alignItems:'center', gap:5, background:'var(--primary)', border:'none', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:'#fff', textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Descargar
+            </a>
+          </div>
+          {isIOS ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:18, padding:24 }}>
+              <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="var(--primary-light)" strokeWidth="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <div style={{ fontSize:14, fontWeight:600, color:'var(--text2)', textAlign:'center', lineHeight:1.5 }}>Tu informe de jornada está listo.<br/>Descárgalo o ábrelo en el navegador.</div>
+              <div style={{ display:'flex', gap:10, width:'100%', maxWidth:320 }}>
+                <a href={informeUrl} download={dlName} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'13px', background:'var(--primary)', color:'#fff', borderRadius:'var(--r)', fontWeight:700, fontSize:13, textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Descargar PDF
+                </a>
+                <button onClick={() => window.open(informeUrl, '_blank')} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'13px', background:'var(--bg-500)', color:'var(--text2)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent' }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Abrir
+                </button>
+              </div>
+            </div>
+          ) : (
+            <iframe src={informeUrl} title="Registro de jornada" style={{ flex:1, border:'none', width:'100%', background:'#fff' }} />
+          )}
         </div>
-        <iframe src={informeUrl} title="Registro de jornada" style={{ flex:1, border:'none', width:'100%', background:'#fff' }} />
-      </div>
-    )}
+      )
+    })()}
     </>
   )
 }
@@ -1540,13 +1564,23 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
     saveDB({ notis: updated })
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
+  const delNoti = (id) => {
+    saveDB({ notis: (db.notis || []).filter(n => n.id !== id) })
+  }
+  const clearAll = () => {
+    saveDB({ notis: (db.notis || []).filter(n => n.empId !== u?.id) })
+    try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
+  }
   return (
     <div className="modal-ov" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-drag" />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
           <h2 style={{ margin:0 }}>🔔 Notificaciones</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            {notis.length > 0 && <button onClick={clearAll} style={{ background:'none', border:'none', color:'var(--danger)', fontSize:11, fontWeight:600, cursor:'pointer', padding:'2px 6px' }}>Borrar todo</button>}
+            <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
+          </div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
           {mensajes.map(m => (
@@ -1562,13 +1596,14 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
           {!notis.length && !mensajes.length ? (
             <div className="empty">Sin notificaciones</div>
           ) : notis.map(n => (
-            <div key={n.id} className={`nitem${!n.leido ? ' unread' : ''}`}>
+            <div key={n.id} className={`nitem${!n.leido ? ' unread' : ''}`} style={{ position:'relative' }}>
               <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)' }}>ℹ️</div>
               <div className="nitem-body">
                 <div className="nitem-title">{n.action || n.title || 'Notificación'}</div>
                 <div className="nitem-text">{n.detail || n.body || ''}</div>
                 <div className="nitem-time">{n.ts ? new Date(n.ts).toLocaleString('es-ES') : ''}</div>
               </div>
+              <button onClick={() => delNoti(n.id)} style={{ position:'absolute', top:6, right:6, background:'none', border:'none', color:'var(--text4)', fontSize:16, cursor:'pointer', lineHeight:1, padding:'2px 5px', borderRadius:4 }} title="Eliminar">×</button>
             </div>
           ))}
         </div>
