@@ -40,6 +40,7 @@ const NAV_ICONS = {
   obras:       <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
   documentos:  <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></>,
   auditoria:   <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+  mensajes:    <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
   miobra:      <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
 }
 
@@ -168,7 +169,7 @@ export default function AdminPage() {
             </svg>
             TIMES INC
           </div>
-          <div className="adm-page-title">{actPanel.ico} {actPanel.label}</div>
+          <div className="adm-page-title">{actPanel.label}</div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <SyncBadge />
@@ -554,14 +555,14 @@ function PushNotifWidget({ db, toast }) {
       {open && (
         <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           <select value={target} onChange={e => setTarget(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13 }}>
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }}>
             <option value="__all__">Todos los empleados</option>
             {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
           <input placeholder="Título de la notificación..." value={title} onChange={e => setTitle(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13 }} />
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
           <textarea placeholder="Mensaje..." value={body} onChange={e => setBody(e.target.value)} rows={2}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
           <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : '🔔 Enviar notificación'}</button>
           <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
             Se envían vía VAPID incluso con el móvil bloqueado (GitHub Actions corre cada 5 min).
@@ -599,9 +600,9 @@ function ComunicadoWidget({ db, toast, saveDB }) {
       {open && (
         <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           <input placeholder="Título del comunicado..." value={title} onChange={e => setTitle(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13 }} />
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
           <textarea placeholder="Mensaje para todos los empleados..." value={body} onChange={e => setBody(e.target.value)} rows={3}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text1)', padding:'8px 12px', fontSize:13, resize:'vertical', fontFamily:'inherit' }} />
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'vertical', fontFamily:'inherit' }} />
           <button className="btn btn-primary btn-sm" onClick={send}>Enviar a todos</button>
         </div>
       )}
@@ -1367,7 +1368,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
                     <span>{e.name}</span>
                   </div>
                 </td>
-                <td style={{ fontFamily:'monospace', letterSpacing:2 }}>{'•'.repeat(e.pin?.length||4)}</td>
+                <td style={{ fontFamily:'monospace', letterSpacing:2 }}>{'•'.repeat(e.pinLen || (e.pin?.length <= 6 ? e.pin?.length : 4) || 4)}</td>
                 <td>
                   <span className={`badge${e.role==='encargado'?' badge-purple':e.role==='jefe_obra'?' badge-blue':''}`}>
                     {e.role==='encargado'?'⭐ Enc.':e.role==='jefe_obra'?'🏗️ JO':'👷 Emp'}

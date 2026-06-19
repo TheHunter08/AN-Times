@@ -2082,7 +2082,7 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
         readOnly={readonly}
         style={{
           width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border)',
-          background: readonly ? 'var(--bg-700)' : 'var(--bg-800)', color:'var(--text1)',
+          background: readonly ? 'var(--bg-700)' : 'var(--bg-800)', color:'var(--text)',
           fontSize:14, boxSizing:'border-box', opacity: readonly ? 0.7 : 1
         }}
       />
@@ -2295,7 +2295,7 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
 
   const toggle = (label, value, onChange) => (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-      <span style={{ fontSize:14, color:'var(--text1)' }}>{label}</span>
+      <span style={{ fontSize:14, color:'var(--text)' }}>{label}</span>
       <div
         onClick={() => onChange(!value)}
         style={{ width:44, height:24, borderRadius:12, background: value ? 'var(--primary)' : 'var(--bg-600)', cursor:'pointer', position:'relative', transition:'background .2s' }}
@@ -2317,30 +2317,30 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
         {toggle('Recordatorio de salida', notiSalida, setNotiSalida)}
         {toggle('GPS automático', gpsAuto, setGpsAuto)}
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:4 }}>Recordatorio de entrada</div>
+          <div style={{ fontSize:14, color:'var(--text)', marginBottom:4 }}>Recordatorio de entrada</div>
           <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si no has fichado a esta hora</div>
           <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
-            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14 }} />
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text)', fontSize:14 }} />
         </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:4 }}>Recordatorio de salida</div>
+          <div style={{ fontSize:14, color:'var(--text)', marginBottom:4 }}>Recordatorio de salida</div>
           <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si tienes jornada abierta a esta hora</div>
           <input type="time" value={salidaTime} onChange={e => setSalidaTime(e.target.value)}
-            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14 }} />
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text)', fontSize:14 }} />
         </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Idioma</div>
+          <div style={{ fontSize:14, color:'var(--text)', marginBottom:8 }}>Idioma</div>
           <select value={idioma} onChange={e => setIdioma(e.target.value)}
-            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14, width:'100%' }}>
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text)', fontSize:14, width:'100%' }}>
             <option value="es">Español</option>
             <option value="en">English</option>
             <option value="pt">Português</option>
           </select>
         </div>
         <div style={{ padding:'14px 0' }}>
-          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Formato de hora</div>
+          <div style={{ fontSize:14, color:'var(--text)', marginBottom:8 }}>Formato de hora</div>
           <select value={formato} onChange={e => setFormato(e.target.value)}
-            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14, width:'100%' }}>
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text)', fontSize:14, width:'100%' }}>
             <option value="24h">24 horas</option>
             <option value="12h">12 horas (AM/PM)</option>
           </select>
