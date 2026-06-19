@@ -24,7 +24,7 @@ export default function EmployeePage() {
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
   const currentTabRef = useRef(currentEmpTab)
-  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'perfil']
+  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil']
   useEffect(() => {
     const prev = prevTabRef.current
     if (prev !== currentEmpTab && empBodyRef.current) {
@@ -59,7 +59,7 @@ export default function EmployeePage() {
   // Manejar shortcuts del manifest PWA (?tab=inicio|jornada|vacaciones|calendario|perfil)
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab')
-    if (tab && ['inicio','jornada','vacaciones','calendario','perfil'].includes(tab)) {
+    if (tab && ['inicio','jornada','vacaciones','calendario','mensajes','perfil'].includes(tab)) {
       setEmpTab(tab)
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -126,14 +126,16 @@ export default function EmployeePage() {
         }
       }
 
-      // 3. Notificación de vacaciones aprobadas (una vez por solicitud)
-      const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id && v.estado === 'aprobada')
-      myVacs.forEach(v => {
-        const key = 'an_vac_ok_' + v.id
+      // 3. Notificación de vacaciones aprobadas/rechazadas (una vez por solicitud)
+      ;(db.vacaciones || []).filter(v => v.empId === u.id && (v.estado === 'aprobada' || v.estado === 'rechazada')).forEach(v => {
+        const key = 'an_vac_res_' + v.id
         if (!localStorage.getItem(key)) {
           localStorage.setItem(key, '1')
-          sendPushNotif(u.id, '🎉 Vacaciones aprobadas',
-            `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/')
+          if (v.estado === 'aprobada') {
+            sendPushNotif(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/')
+          } else {
+            sendPushNotif(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.`, 'vacaciones', '/')
+          }
         }
       })
 
@@ -337,24 +339,34 @@ export default function EmployeePage() {
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+        {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
       </div>
 
       {/* Bottom nav */}
+      {(() => {
+        const chatUnread = (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length
+        return (
       <div className="emp-nav">
         {[
           { id:'inicio',     label:'Inicio',     icon:<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>, extra:<polyline points="9 22 9 12 15 12 15 22"/> },
           { id:'jornada',    label:'Jornada',    icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></> },
-          { id:'vacaciones', label:'Vacaciones', icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
+          { id:'vacaciones', label:'Vac.',        icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
           { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
+          { id:'mensajes',   label:'Mensajes',   icon:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>, badge: chatUnread },
           { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
-        ].map(({ id, label, icon, extra }) => (
+        ].map(({ id, label, icon, extra, badge }) => (
           <button key={id} type="button" className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => setEmpTab(id)} aria-current={currentEmpTab===id} aria-label={label}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">{icon}{extra}</svg>
+            <span style={{ position:'relative', display:'inline-flex' }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">{icon}{extra}</svg>
+              {badge > 0 && <span style={{ position:'absolute', top:-4, right:-6, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px' }}>{badge}</span>}
+            </span>
             {label}
           </button>
         ))}
       </div>
+        )
+      })()}
 
       {/* Modals */}
       <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={closeModal} />
@@ -701,6 +713,21 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         )}
       </div>
 
+      {/* Banner jornadas pendientes de validar */}
+      {(() => {
+        const pendVal = (db.records || []).filter(r => r.empId === u.id && r.fin && !r.aceptada)
+        if (!pendVal.length) return null
+        return (
+          <div style={{ margin:'0 16px 4px', padding:'10px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:16 }}>⏳</span>
+            <div style={{ flex:1, fontSize:12 }}>
+              <span style={{ fontWeight:700, color:'var(--orange)' }}>{pendVal.length} jornada{pendVal.length !== 1 ? 's' : ''} pendiente{pendVal.length !== 1 ? 's' : ''} de validación</span>
+              <span style={{ color:'var(--text3)', marginLeft:4 }}>por el encargado</span>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Historial últimos 7 días */}
       {(() => {
         const histDays = Array.from({ length: 7 }, (_, i) => {
@@ -768,10 +795,13 @@ function HistorialReciente({ histWithRecs, openModal, u }) {
                 </div>
                 {recs.map(r => {
                   const wm = Math.floor(recWorkSecs(r) / 60)
-                  const yaCorrected = false
                   return (
-                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)', gap:8 }}>
-                      <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
+                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)', gap:8, flexWrap:'wrap' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
+                        {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
+                        {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(54,178,126,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                      </div>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
                         <button
@@ -789,6 +819,94 @@ function HistorialReciente({ histWithRecs, openModal, u }) {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── TAB MENSAJES ──────────────────────────────────────────────────────────────
+function TabMensajes({ db, u, toast, saveDB }) {
+  const chats = db.chats || []
+  const adminId = 'admin'
+  const [text, setText] = useState('')
+  const bottomRef = useRef(null)
+
+  const conv = chats
+    .filter(m => (m.from === u.id && m.to === adminId) || (m.from === adminId && m.to === u.id))
+    .sort((a, b) => a.ts - b.ts)
+
+  useEffect(() => {
+    const hasUnread = chats.some(m => m.from === adminId && m.to === u.id && !m.leido)
+    if (hasUnread) {
+      saveDB({ chats: chats.map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) })
+    }
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
+  }, [conv.length])
+
+  const send = () => {
+    const t = text.trim()
+    if (!t) return
+    const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
+    saveDB({ chats: [...chats, msg] })
+    queuePush(adminId, `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
+    setText('')
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
+  }
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+        <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mensajes</div>
+        <div style={{ fontSize:13, color:'var(--text3)' }}>Chat con administración</div>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+        {!conv.length && (
+          <div className="empty-premium" style={{ marginTop:50 }}>
+            <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div className="empty-premium-title">Sin mensajes aún</div>
+            <div className="empty-premium-sub">Escríbele a la administración y responderá lo antes posible</div>
+          </div>
+        )}
+        {conv.map(m => {
+          const isMe = m.from === u.id
+          const hora = new Date(m.ts).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })
+          const dia  = new Date(m.ts).toLocaleDateString('es-ES', { day:'numeric', month:'short' })
+          return (
+            <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth:'78%', padding:'9px 13px',
+                borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                background: isMe ? 'var(--primary)' : 'var(--bg-600)',
+                border: isMe ? 'none' : '1px solid var(--border)',
+                fontSize:13, color: isMe ? '#fff' : 'var(--text)', lineHeight:1.45
+              }}>
+                {!isMe && <div style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', marginBottom:3 }}>Administración</div>}
+                {m.text}
+                <div style={{ fontSize:10, color: isMe ? 'rgba(255,255,255,.55)' : 'var(--text4)', marginTop:3, textAlign:'right' }}>
+                  {dia} · {hora}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ padding:'10px 12px', borderTop:'1px solid var(--border)', display:'flex', gap:8, background:'var(--bg-700)', paddingBottom:'max(10px,env(safe-area-inset-bottom,0px))', flexShrink:0 }}>
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+          placeholder="Escribe un mensaje…"
+          style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:22, padding:'10px 16px', fontSize:14, color:'var(--text)', fontFamily:'inherit', outline:'none' }}
+        />
+        <button
+          onClick={send}
+          disabled={!text.trim()}
+          style={{ width:42, height:42, borderRadius:'50%', background:'var(--primary)', border:'none', cursor:text.trim()?'pointer':'default', opacity:text.trim()?1:.4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'opacity .15s' }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
     </div>
   )
 }
