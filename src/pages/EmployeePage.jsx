@@ -341,7 +341,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} clockTime={clockTime} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -454,7 +454,7 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate, clockTime }) {
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -465,86 +465,123 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate 
   const totSecs = completedSecs + liveSecs
   const totMin = Math.floor(totSecs / 60)
   const pct = Math.min(100, Math.round(totMin / WD * 100))
+  const remainMin = Math.max(0, WD - totMin)
+  const extraMin = Math.max(0, totMin - WD)
 
   const entradaRec = realRecs[0]
   const salidaRec = [...realRecs].reverse().find(r => r.fin && r.closed)
-
   const brkMin = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
 
-  const circleState = timer.state === 'idle' ? 'idle' : timer.state === 'break' ? 'break' : 'working'
-  const circleClass = `jor-circle-btn${circleState !== 'idle' ? ' ' + circleState : ''}`
+  // SVG arc
+  const ARC_R = 50
+  const ARC_C = 2 * Math.PI * ARC_R
+  const arcOffset = ARC_C * (1 - pct / 100)
 
-  const handleCircle = () => {
+  const handleMainBtn = () => {
     if (timer.state === 'idle') doStart()
     else doStop()
   }
 
+  const statusClass = timer.state === 'idle' ? 'idle' : timer.state === 'break' ? 'break' : ''
+
   return (
     <PullToRefresh>
       <div className="ini-wrap">
-        {/* Main fichar card */}
-        <div className="jor-main-card">
-          <div className="jor-timer">{s2t(timer.ws)}</div>
-          <div className="jor-timer-sub">
-            {timer.state === 'idle' ? 'Pulsa para iniciar jornada' : `Descanso: ${s2t(timer.bs)}`}
+
+        {/* Hero clock card */}
+        <div className="hero-clock-card">
+          <div className="hero-clock-display">{clockTime || '--:--:--'}</div>
+          <div className="hero-clock-date">{clockDate}</div>
+
+          <div className={`hero-status-badge${statusClass ? ' ' + statusClass : ''}`}>
+            <span className="hero-badge-dot" />
+            {timer.state === 'idle' ? 'Sin jornada activa' : timer.state === 'break' ? 'En descanso' : 'Jornada activa'}
           </div>
-          <div className="jor-circle-wrap">
-            <div className="jor-circle-glow" />
-            <button className={circleClass} onClick={handleCircle}>
-              {timer.state === 'idle' ? (
-                <><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>INICIAR</span></>
-              ) : (
-                <><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>PARAR</span></>
+
+          <div className="hero-hours-row">
+            <div className="hero-hour-pill">
+              <div className="hero-hour-label">Trabajado</div>
+              <div className="hero-hour-value">
+                {Math.floor(totMin / 60)}h <span>{p2(totMin % 60)}m</span>
+              </div>
+            </div>
+            <div className="hero-hour-pill">
+              <div className="hero-hour-label">Restante</div>
+              <div className="hero-hour-value">
+                {Math.floor(remainMin / 60)}h <span>{p2(remainMin % 60)}m</span>
+              </div>
+            </div>
+            <div className="hero-hour-pill">
+              <div className="hero-hour-label">Extra</div>
+              <div className="hero-hour-value" style={{ color: 'var(--accent3)' }}>
+                {Math.floor(extraMin / 60)}h <span>{p2(extraMin % 60)}m</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-arc-row">
+            <svg className="hero-arc-svg" viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="heroArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#2563EB" />
+                  <stop offset="100%" stopColor="#8B5CF6" />
+                </linearGradient>
+              </defs>
+              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="9" />
+              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="url(#heroArcGrad)" strokeWidth="9"
+                strokeLinecap="round"
+                strokeDasharray={ARC_C} strokeDashoffset={arcOffset}
+                transform="rotate(-90 60 60)" />
+            </svg>
+            <div>
+              <div className="hero-arc-pct">{pct}%</div>
+              <div className="hero-arc-sub">jornada completada</div>
+              {timer.state !== 'idle' && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>
+                  {s2t(timer.ws)} activo
+                </div>
               )}
-            </button>
+            </div>
           </div>
+
+          <button className={`hero-fichar-btn${timer.state !== 'idle' ? ' active' : ''}`} onClick={handleMainBtn}>
+            {timer.state === 'idle'
+              ? '▶  Iniciar jornada'
+              : timer.state === 'break'
+                ? '⏹  Terminar jornada'
+                : '⏹  Registrar salida'}
+          </button>
+
           {timer.state !== 'idle' && (
-            <div className="jor-break-row">
-              <button className={`jor-break-chip${timer.state==='break'?' active':''}`} onClick={doBreak}>
-                {timer.state === 'break' ? '▶️ Reanudar trabajo' : '⏸️ Iniciar descanso'}
-              </button>
-            </div>
+            <button
+              className={`jor-break-chip${timer.state === 'break' ? ' active' : ''}`}
+              onClick={doBreak}
+              style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>
+              {timer.state === 'break' ? '▶️ Reanudar trabajo' : '⏸️ Iniciar descanso'}
+            </button>
           )}
-          <div style={{ marginTop:12 }}>
-            <div className={`jor-mc-status${timer.state==='idle'?' idle':timer.state==='break'?' break':''}`}>
-              <span className="sdot" />
-              {timer.state==='idle' ? 'Sin jornada activa' : timer.state==='break' ? 'En descanso' : 'Trabajando'}
-            </div>
-          </div>
         </div>
 
-        {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+        {/* Stats grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
           {[
-            { lbl:'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color:'var(--primary-light)', bg:'rgba(108,99,255,.12)' },
-            { lbl:'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color:'var(--green)', bg:'var(--green-dim)' },
-            { lbl:'Descanso',val: brkMin > 0 ? `${Math.floor(brkMin/60).toString().padStart(2,'0')}:${p2(brkMin%60)}` : '00:00', color:'var(--orange)', bg:'var(--orange-dim)' },
-            { lbl:'Total',   val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--teal)', bg:'rgba(0,212,255,.1)' },
+            { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color: 'var(--primary-light)', bg: 'rgba(37,99,235,.12)' },
+            { lbl: 'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color: 'var(--green)', bg: 'var(--green-dim)' },
+            { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin / 60).toString().padStart(2, '0')}:${p2(brkMin % 60)}` : '00:00', color: 'var(--orange)', bg: 'var(--orange-dim)' },
+            { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m` : '0h 00m', color: 'var(--secondary)', bg: 'rgba(6,182,212,.1)' },
           ].map(({ lbl, val, color, bg }) => (
-            <div key={lbl} className="stat-card-premium" style={{ textAlign:'center' }}>
+            <div key={lbl} className="stat-card-premium" style={{ textAlign: 'center' }}>
               <div className="stat-lbl">{lbl}</div>
-              <div className="stat-val" style={{ color, fontSize:16 }}>{val}</div>
+              <div className="stat-val" style={{ color, fontSize: 14 }}>{val}</div>
             </div>
           ))}
         </div>
-
-        {/* Progress */}
-        {o && (
-          <div className="jor-progress-wrap">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:12, fontWeight:600, color:'var(--text2)' }}>Progreso de jornada</span>
-              <span style={{ fontSize:12, fontWeight:700, color:'var(--primary-light)' }}>{pct}%</span>
-            </div>
-            <div className="jor-progress-bar"><div className="jor-progress-fill" style={{ width: pct + '%' }} /></div>
-            <div className="jor-progress-txt">{pct === 0 ? 'Sin jornada activa' : `${pct}% completado — ${Math.round(totMin/60*10)/10}h de jornada`}</div>
-          </div>
-        )}
 
         {/* GPS card */}
         {o && (
           <div className="gps-card">
             <div className="gps-ico">
-              <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
             </div>
             <div>
               <div className="gps-name">{o.centro || u.centroTrabajo || 'Sin centro'}</div>
@@ -805,45 +842,53 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         </button>
       </div>
 
-      {/* Timeline */}
-      <div style={{ padding:'0 16px 12px' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>
+      {/* Premium social-feed timeline */}
+      <div style={{ padding: '0 16px 12px' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 14 }}>
           Actividad de hoy
         </div>
         {!tlItems.length ? (
           <div className="empty-premium">
             <div className="empty-premium-icon">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             </div>
             <div className="empty-premium-title">Sin actividad hoy</div>
-            <div className="empty-premium-sub">Inicia tu jornada desde la pestaña Inicio para ver tu actividad aquí</div>
+            <div className="empty-premium-sub">Inicia tu jornada desde Inicio para ver tu actividad aquí</div>
           </div>
         ) : (
-          <div className="timeline">
+          <div className="tl-premium">
             {tlItems.map(({ r, isCurrent }) => {
               const ws2 = isCurrent ? timer.ws : recWorkSecs(r)
               const bk = isCurrent ? timer.bs : (r.breakSecs || 0)
+              const iconClass = isCurrent ? 'live' : r.fin ? 'salida' : 'pausa'
+              const icon = isCurrent ? '▶️' : r.fin ? '✅' : '⏸️'
               return (
-                <div key={r.id} className="tl-item">
-                  <div className="tl-left">
-                    <div className="tl-ico" style={{ background: isCurrent ? 'var(--primary-dim)' : r.fin ? 'var(--green-dim)' : 'var(--bg-500)', fontSize:18 }}>
-                      {isCurrent ? '▶️' : r.fin ? '✅' : '⏸️'}
-                    </div>
-                    <div className="tl-line" />
-                  </div>
-                  <div className="tl-right">
-                    <div>
-                      <div className="tl-label">{isCurrent ? 'En progreso' : 'Completado'}</div>
-                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
-                        {ftime(r.inicio)} → {r.fin ? ftime(r.fin) : 'ahora'} · {r.centro}
-                      </div>
-                      {bk > 30 && <div style={{ fontSize:10, color:'var(--orange)', marginTop:2 }}>Descanso: {mhm(Math.floor(bk/60))}</div>}
-                    </div>
-                    <div className="tl-time">{isCurrent ? s2t(ws2) : mhm(Math.floor(ws2/60))}</div>
+                <div key={r.id} className="tl-prem-item">
+                  <div className={`tl-prem-icon ${iconClass}`}>{icon}</div>
+                  <div className="tl-prem-body">
+                    <div className="tl-prem-time">{ftime(r.inicio)}{r.fin ? ` → ${ftime(r.fin)}` : ' → ahora'}</div>
+                    <div className="tl-prem-title">{isCurrent ? 'En progreso' : 'Completado'}</div>
+                    <div className="tl-prem-sub">{r.centro || u.centroTrabajo || 'Sin centro'}{bk > 30 ? ` · Pausa: ${mhm(Math.floor(bk / 60))}` : ''}</div>
+                    <span className="tl-prem-duration">{isCurrent ? s2t(ws2) : mhm(Math.floor(ws2 / 60))}</span>
                   </div>
                 </div>
               )
             })}
+            {/* Estimated end */}
+            {o && (() => {
+              const estEnd = new Date(new Date(o.inicio).getTime() + WD * 60000)
+              const estHH = p2(estEnd.getHours()), estMM = p2(estEnd.getMinutes())
+              return (
+                <div className="tl-prem-item" style={{ opacity: .4 }}>
+                  <div className="tl-prem-icon salida" style={{ borderStyle: 'dashed' }}>🔴</div>
+                  <div className="tl-prem-body">
+                    <div className="tl-prem-time">{estHH}:{estMM} est.</div>
+                    <div className="tl-prem-title">Salida estimada</div>
+                    <div className="tl-prem-sub">Según horario configurado</div>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
       </div>

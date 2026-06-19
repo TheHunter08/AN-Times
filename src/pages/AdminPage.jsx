@@ -315,21 +315,19 @@ function PanelDashboard({ db, toast, saveDB }) {
         </div>
       )}
 
-      <div className="adm-stats-grid stagger-in">
+      <div className="adm-kpi-grid stagger-in">
         {[
-          { label:'Fichados ahora', val: checkedIn, total: emps.length, color:'var(--green)', bg:'var(--green-dim)', ico:'▶️', glow:'rgba(16,185,129,.15)' },
-          { label:'Horas esta semana', val: mhm(weekMin), color:'var(--primary-light)', bg:'var(--primary-dim)', ico:'⏱️', glow:'rgba(108,99,255,.15)' },
-          { label:'Horas este mes', val: mhm(monthMin), color:'var(--teal)', bg:'rgba(0,212,255,.1)', ico:'📅', glow:'rgba(0,212,255,.12)' },
-          { label:'Docs. pendientes', val: (db.documentos||[]).filter(d=>!d.firma).length, color:'var(--orange)', bg:'var(--orange-dim)', ico:'✍️', glow:'rgba(245,158,11,.12)' },
-        ].map(({ label, val, total, color, bg, ico, glow }) => (
-          <div key={label} className="adm-stat-card card-lift" style={{ borderColor: glow }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-              <div style={{ width:36, height:36, background:bg, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{ico}</div>
-              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</div>
-            </div>
-            <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color }}>
-              {val}{total !== undefined ? <span style={{ fontSize:14, color:'var(--text3)', fontWeight:400 }}>/{total}</span> : ''}
-            </div>
+          { label:'Fichados ahora',    val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} activos` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
+          { label:'Horas esta semana', val: mhm(weekMin),                  ico:'⏱️', glowColor:'#60a5fa', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Sin datos previos', trendDir: monthTrend >= 0 ? 'up' : 'down' },
+          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: 'Mes en curso',       trendDir: 'neu' },
+          { label:'Docs. pendientes',  val: String((db.documentos||[]).filter(d=>!d.firma).length), ico:'✍️', glowColor:'#a78bfa', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : 'Sin pendientes', trendDir: (db.documentos||[]).filter(d=>!d.firma).length > 0 ? 'down' : 'up' },
+        ].map(({ label, val, ico, glowColor, trend, trendDir }) => (
+          <div key={label} className="adm-kpi-card">
+            <div className="adm-kpi-glow" style={{ background: glowColor }} />
+            <div className="adm-kpi-icon">{ico}</div>
+            <div className="adm-kpi-val">{val}</div>
+            <div className="adm-kpi-label">{label}</div>
+            <div className={`adm-kpi-trend ${trendDir}`}>{trend}</div>
           </div>
         ))}
       </div>
