@@ -3,9 +3,10 @@ import { useAppStore } from '../store/appStore.js'
 import { loadFirebase, signInEmail, signInGoogle, resetPassword, isFirebaseReady, AUTH_ERRORS } from '../services/authService.js'
 import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
+import { hashPin, isPinHashed, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
 
 export default function LoginPage() {
-  const { db, setSession, setScreen, toast, fetchDB } = useAppStore()
+  const { db, setSession, setScreen, toast, fetchDB, saveDB } = useAppStore()
   const [mode, setMode] = useState('pin')
   const [pin, setPin] = useState('')
   const [selectedEmpId, setSelectedEmpId] = useState('')
@@ -34,6 +35,17 @@ export default function LoginPage() {
 
   useEffect(() => { requestAnimationFrame(() => setMounted(true)) }, [])
 
+  // Mostrar bloqueo si el empleado ya está en lockout
+  useEffect(() => {
+    if (!selectedEmpId) { setErr(''); return }
+    const emp = (db.employees || []).find(e => e.id === selectedEmpId)
+    if (!emp) return
+    const lk = getLockoutState(emp.id)
+    if (lk.locked) setErr(`Bloqueado ${lk.remainingMin} min por exceso de intentos`)
+    else setErr('')
+  }, [selectedEmpId, db])
+
+  const verifyingRef = useRef(false)
 
   const doLogin = useCallback((emp) => {
     const ses = {
@@ -55,21 +67,66 @@ export default function LoginPage() {
     toast('Modo admin activado')
   }, [setSession, setScreen, toast])
 
-  const handlePin = useCallback((k) => {
-    if (pin.length >= 6) return
+  const findEmployeeByEmail = async (fbEmail) => {
+    const normalized = fbEmail?.toLowerCase()
+    if (!normalized) return null
+    await fetchDB()
+    const freshDB = useAppStore.getState().db
+    return (freshDB.employees || []).find(e => e.email?.toLowerCase() === normalized) || null
+  }
+
+  const handlePin = useCallback(async (k) => {
+    if (pin.length >= 6 || verifyingRef.current) return
     const newPin = pin + k
     setPin(newPin)
     setErr('')
-    if (newPin.length >= 4) {
-      if (!selectedEmpId && newPin === ADMIN_PIN) { doAdminLogin(); setPin(''); return }
-      const emp = db.employees.find(e => e.id === selectedEmpId)
-      if (emp && emp.pin === newPin) { doLogin(emp); setPin(''); return }
-      if (newPin.length >= 4 && newPin.length === (emp?.pin?.length || 4)) {
-        setShaking(true)
-        setErr('PIN incorrecto')
+    if (newPin.length < 4) return
+
+    // Admin PIN — env var, comparación directa
+    if (!selectedEmpId) {
+      if (newPin === ADMIN_PIN) { doAdminLogin(); setPin(''); return }
+      if (newPin.length >= ADMIN_PIN.length) {
+        setShaking(true); setErr('PIN incorrecto')
         if (navigator.vibrate) navigator.vibrate(200)
         setTimeout(() => { setShaking(false); setPin('') }, 450)
       }
+      return
+    }
+
+    const emp = (db.employees || []).find(e => e.id === selectedEmpId)
+    if (!emp) return
+
+    const lkState = getLockoutState(emp.id)
+    if (lkState.locked) {
+      setErr(`Bloqueado ${lkState.remainingMin} min por exceso de intentos`)
+      setPin(''); return
+    }
+
+    // Disparar verificación al llegar a la longitud correcta
+    const expectedLen = isPinHashed(emp.pin) ? (emp.pinLen || 4) : (emp.pin?.length || 4)
+    if (newPin.length < expectedLen) return
+
+    verifyingRef.current = true
+    const ok = await verifyPin(newPin, emp.pin, emp.id)
+    verifyingRef.current = false
+
+    if (ok) {
+      clearLockout(emp.id)
+      // Migrar PIN en texto plano → hash automáticamente
+      if (!isPinHashed(emp.pin)) {
+        const hashed = await hashPin(newPin, emp.id)
+        const emps2 = (db.employees || []).map(e => e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e)
+        useAppStore.getState().saveDB({ employees: emps2 })
+      }
+      doLogin(emp)
+      setPin('')
+    } else {
+      const lk = recordFailedAttempt(emp.id)
+      setShaking(true)
+      if (lk.locked) setErr(`Demasiados intentos. Bloqueado ${lk.remainingMin} min.`)
+      else setErr(`PIN incorrecto (${lk.remaining} intentos restantes)`)
+      if (navigator.vibrate) navigator.vibrate(200)
+      setTimeout(() => { setShaking(false); setPin('') }, 450)
     }
   }, [pin, selectedEmpId, db, doLogin, doAdminLogin])
 
@@ -86,7 +143,7 @@ export default function LoginPage() {
     try {
       const result = await signInEmail(email, pass)
       const fbUser = result.user
-      const emp = db.employees.find(e => e.email?.toLowerCase() === fbUser.email?.toLowerCase())
+      const emp = await findEmployeeByEmail(fbUser.email)
       if (emp) doLogin(emp)
       else if (['admin@times-inc.com', 'admin@timesync.app'].includes(fbUser.email?.toLowerCase())) doAdminLogin()
       else setErr('Tu cuenta no está registrada. Contacta al administrador.')
@@ -106,7 +163,7 @@ export default function LoginPage() {
     try {
       const result = await signInGoogle()
       const fbUser = result.user
-      const emp = db.employees.find(e => e.email?.toLowerCase() === fbUser.email?.toLowerCase())
+      const emp = await findEmployeeByEmail(fbUser.email)
       if (emp) doLogin(emp)
       else setErr('Cuenta no registrada. Contacta al administrador.')
     } catch (ex) {

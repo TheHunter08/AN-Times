@@ -2,15 +2,15 @@
   "rules": {
     "an_times_data": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (!newData.hasChild('_ts') || newData.child('_ts').isNumber())"
     },
     "auditLog": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
     "pushSubs": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
     "pushQueue": {
       ".read": "auth != null",

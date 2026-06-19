@@ -7,6 +7,9 @@ import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
+import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
+
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -683,7 +686,9 @@ function PanelControl({ db, toast, saveDB, session }) {
   }, [recs])
 
   const force = (rec) => {
-    showConfirm(`¿Forzar cierre de jornada de ${rec.empName}?`, () => {
+    const workedMin = Math.floor((Date.now() - new Date(rec.inicio).getTime()) / 60000)
+    const warnMsg = workedMin < 5 ? ` ⚠️ Solo lleva ${workedMin} min trabajando.` : ''
+    showConfirm(`¿Forzar cierre de jornada de ${rec.empName}?${warnMsg}`, () => {
       const now = new Date().toISOString()
       const breaks = [...(rec.breaks || [])]
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
@@ -1191,7 +1196,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }
-  const openEdit = (e) => { setForm({ obrasAsignadas: [], ...e }); setShowForm(true); setEditEmp(e.id) }
+  const openEdit = (e) => { setForm({ obrasAsignadas: [], ...e, pin: '' }); setShowForm(true); setEditEmp(e.id) }
 
   const toggleObra = (centro) => {
     setForm(f => {
@@ -1200,14 +1205,32 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     })
   }
 
-  const saveEmp = () => {
+  const saveEmp = async () => {
     if (!form.name.trim()) { toast('Nombre requerido'); return }
-    if (!form.pin || form.pin.length < 4) { toast('PIN de mínimo 4 dígitos'); return }
-    const exists = (db.employees||[]).find(e => e.pin === form.pin && e.id !== form.id)
-    if (exists) { toast('PIN ya está en uso'); return }
+    const isNewPin = form.pin && form.pin.length >= 4
+    if (!editEmp && !isNewPin) { toast('PIN de mínimo 4 dígitos'); return }
+    if (form.pin && form.pin.length > 0 && form.pin.length < 4) { toast('PIN de mínimo 4 dígitos'); return }
+    if (isNewPin) {
+      for (const e of (db.employees||[])) {
+        if (e.id === form.id) continue
+        const dup = isPinHashed(e.pin) ? (await hashPin(form.pin, e.id)) === e.pin : e.pin === form.pin
+        if (dup) { toast('PIN ya está en uso'); return }
+      }
+    }
+    let finalPin = form.pin
+    let pinLen
+    if (isNewPin) {
+      pinLen = form.pin.length
+      finalPin = await hashPin(form.pin, form.id)
+    } else if (editEmp) {
+      const existing = (db.employees||[]).find(e => e.id === editEmp)
+      finalPin = existing?.pin || ''
+      pinLen = existing?.pinLen
+    }
+    const updatedForm = { ...form, pin: finalPin, ...(pinLen !== undefined ? { pinLen } : {}) }
     const emps2 = editEmp
-      ? (db.employees||[]).map(e => e.id === editEmp ? form : e)
-      : [...(db.employees||[]), form]
+      ? (db.employees||[]).map(e => e.id === editEmp ? updatedForm : e)
+      : [...(db.employees||[]), updatedForm]
     const withAudit = auditLog(db, editEmp ? 'Empleado actualizado' : 'Empleado creado', form.name, session?.user?.name || 'Admin')
     saveDB({ employees: emps2, audit: withAudit.audit })
     toast(editEmp ? '✅ Empleado actualizado' : '✅ Empleado creado')
@@ -1264,7 +1287,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
           <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{editEmp ? 'Editar empleado' : 'Nuevo empleado'}</div>
           <div className="field-row">
             <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} /></div>
-            <div className="field"><label>PIN (4-6 dígitos) *</label><input value={form.pin} maxLength={6} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/g,'')}))} /></div>
+            <div className="field"><label>PIN (4-6 dígitos){editEmp ? '' : ' *'}</label><input type="password" value={form.pin} maxLength={6} placeholder={editEmp ? 'Vacío = sin cambios' : ''} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/g,'')}))} /></div>
           </div>
           <div className="field-row">
             <div className="field"><label>Email</label><input type="email" value={form.email||''} onChange={e => setForm(f=>({...f,email:e.target.value}))} /></div>
@@ -1454,11 +1477,11 @@ function PanelInformes({ db, toast, saveDB, session }) {
     const rowsHtml = eRecs.map(r => {
       const wm = Math.floor(recWorkSecs(r) / 60)
       const d = new Date(r.inicio), fin = new Date(r.fin)
-      return `<tr><td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${r.centro||'—'}</td><td>${mhm(wm)}</td></tr>`
+      return `<tr><td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${esc(r.centro||'—')}</td><td>${mhm(wm)}</td></tr>`
     }).join('')
     const win = window.open('', '_blank')
     if (!win) { toast('Activa las ventanas emergentes en el navegador'); return }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${mes} · ${e.name}</title>
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${mes} · ${esc(e.name)}</title>
 <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:750px;margin:0 auto}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;color:#666;font-weight:400;margin:0 0 24px}
 .meta{display:flex;gap:32px;margin-bottom:24px;padding:14px 18px;background:#f8f8f8;border-radius:8px;font-size:13px}
@@ -1472,11 +1495,11 @@ td{padding:8px 12px;border-bottom:1px solid #eee}tr:last-child td{border-bottom:
 .b-ok{background:#dcfce7;color:#166534}.b-warn{background:#fef9c3;color:#854d0e}
 footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}
 @media print{button{display:none}}</style></head><body>
-<h1>${e.name} <span class="badge ${totalMin >= (e.horasSemanales||WK)*4*0.9 ? 'b-ok':'b-warn'}">${mhm(totalMin)}</span></h1>
+<h1>${esc(e.name)} <span class="badge ${totalMin >= (e.horasSemanales||WK)*4*0.9 ? 'b-ok':'b-warn'}">${mhm(totalMin)}</span></h1>
 <h2>Nómina de horas · ${mes}</h2>
 <div class="meta">
-  <div><span>Empresa</span><strong>${e.empresa||'—'}</strong></div>
-  <div><span>Centro</span><strong>${e.centroTrabajo||'—'}</strong></div>
+  <div><span>Empresa</span><strong>${esc(e.empresa||'—')}</strong></div>
+  <div><span>Centro</span><strong>${esc(e.centroTrabajo||'—')}</strong></div>
   <div><span>Jornada</span><strong>${e.horasSemanales||WK}h/sem</strong></div>
   <div><span>Días trabajados</span><strong>${days}</strong></div>
 </div>
@@ -1487,11 +1510,37 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
   <div><span>Vacaciones aprobadas</span><strong>${vacDiasTotal} días</strong></div>
   <div><span>Ausencias/bajas</span><strong>${ausEmp.length} registro${ausEmp.length!==1?'s':''}</strong></div>
 </div>
-<div class="sign"><div class="sign-box">Firma empleado<br><br><br>_________________________<br>${e.name}</div>
+<div class="sign"><div class="sign-box">Firma empleado<br><br><br>_________________________<br>${esc(e.name)}</div>
 <div class="sign-box">Firma empresa<br><br><br>_________________________<br>Representante</div></div>
 <footer><span>Generado: ${new Date().toLocaleString('es-ES')}</span><span>TIMES INC · Registro de jornada laboral</span></footer>
 <script>window.print()</script></body></html>`)
     win.document.close()
+  }
+
+  const generarTodosCierres = () => {
+    const mes = filterMonth
+    const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
+    const nuevos = []
+    empsActivos.forEach(e => {
+      if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === mes)) return
+      const eRecs = (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
+      if (!eRecs.length) return
+      const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
+      nuevos.push({
+        id: gid(), empId: e.id, empName: e.name, mes,
+        generadoPor: session?.user?.name || 'Admin',
+        generadoAt: new Date().toISOString(),
+        totalMin, dias: eRecs.length, estado: 'pendiente', firma: null,
+        records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
+      })
+    })
+    if (!nuevos.length) { toast('Todos los empleados ya tienen cierre o sin registros'); return }
+    saveDB({ cierres: [...(db.cierres||[]), ...nuevos] })
+    nuevos.forEach(c => {
+      const mesLabel = new Date(c.mes+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
+      queuePush(c.empId, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
+    })
+    toast(`✅ ${nuevos.length} cierre${nuevos.length!==1?'s':''} generado${nuevos.length!==1?'s':''}`)
   }
 
   const generarCierre = (e, totalMin, days) => {
@@ -1514,18 +1563,18 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     const rowsHtml = (cierre.records_snapshot || []).map(r => {
       const m = Math.floor((r.workSecs||0)/60)
       const d = new Date(r.inicio)
-      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${r.centro||'—'}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
+      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
     }).join('')
     const win = window.open('', '_blank')
     if (!win) { toast('Permite ventanas emergentes'); return }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${cierre.empName}</title>
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
     <style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{button{display:none}}</style>
     </head><body>
     <h1>Cierre de jornada mensual · ${mes}</h1>
-    <h2>${cierre.empName} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
+    <h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
     <table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
     <div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
-    ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${cierre.empName} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
+    ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
     <div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma empresa</div></div>
     <br><button onclick="window.print()">Imprimir / Guardar PDF</button>
     </body></html>`)
@@ -1567,9 +1616,13 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
       {/* Cierre mensual tab */}
       {tab === 'cierre' && (
         <div className="stagger-in">
-          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
             📋 <strong>Cierre mensual</strong> — Genera el resumen y envíalo al empleado para firma digital. Cumple con la Ley de Control Horario (RDL 8/2019). El empleado recibirá una notificación para firmar.
           </div>
+          <button className="btn btn-primary" style={{ width:'100%', marginBottom:16 }} onClick={generarTodosCierres}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Generar cierres para todos ({rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===filterMonth) && r.days>0).length} pendientes)
+          </button>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {rows.map(({ e, totalMin, days, diff, weeklyH }) => {
               const cierre = (db.cierres || []).find(c => c.empId === e.id && c.mes === filterMonth)
@@ -1967,7 +2020,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                   const wm = Math.floor((r.workSecs > 0 ? r.workSecs : Math.max(0, (new Date(r.fin) - new Date(r.inicio))/1000 - (r.breakSecs||0))) / 60)
                   const d   = new Date(r.inicio)
                   rowsHtml += `<tr>
-                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${e.name}</td>` : ''}
+                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${esc(e.name)}</td>` : ''}
                     <td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td>
                     <td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
                     <td>${new Date(r.fin).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
@@ -1979,7 +2032,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
               const win = window.open('', '_blank')
               if (!win) { toast('Activa las ventanas emergentes'); return }
               win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Registro de jornada ${mesNombre} · ${empresa}</title>
+<title>Registro de jornada ${mesNombre} · ${esc(empresa)}</title>
 <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
 h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
 .meta{display:flex;gap:24px;background:#f8f8f8;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12px}
@@ -1990,9 +2043,9 @@ td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover td{background:#f9fafb}
 footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
 @media print{button{display:none}}</style></head><body>
 <h1>Registro de control de jornada laboral</h1>
-<h2>${empresa} · ${mesNombre}</h2>
+<h2>${esc(empresa)} · ${mesNombre}</h2>
 <div class="meta">
-  <div><span>Empresa</span>${empresa}</div>
+  <div><span>Empresa</span>${esc(empresa)}</div>
   <div><span>Período</span>${mesNombre}</div>
   <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
   <div><span>Empleados</span>${empsActivos.length}</div>

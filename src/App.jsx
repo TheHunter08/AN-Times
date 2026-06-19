@@ -10,6 +10,7 @@ function UpdateBanner() {
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
+    let updateInterval = null
     // Auto-reload when the SW controller changes (new version took over via skipWaiting)
     const onControllerChange = () => {
       if (reloading.current) return
@@ -28,10 +29,12 @@ function UpdateBanner() {
       if (reg.installing) check(reg.installing)
       reg.addEventListener('updatefound', () => check(reg.installing))
       // Poll for updates every 5 min while app stays open
-      const iv = setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000)
-      return () => clearInterval(iv)
+      updateInterval = setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000)
     }).catch(() => {})
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+      if (updateInterval) clearInterval(updateInterval)
+    }
   }, [])
 
   if (!show) return null

@@ -9,6 +9,58 @@ import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } fr
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
 
+// ─── HOOK REUTILIZABLE: canvas de firma ───────────────────────────────────────
+function useSignatureCanvas() {
+  const canvasRef  = useRef(null)
+  const drawingRef = useRef(false)
+  const lastPtRef  = useRef(null)
+
+  const getPos = useCallback((e, canvas) => {
+    const rect = canvas.getBoundingClientRect()
+    const src  = e.touches ? e.touches[0] : e
+    return { x: (src.clientX - rect.left) * (canvas.width / rect.width), y: (src.clientY - rect.top) * (canvas.height / rect.height) }
+  }, [])
+
+  const handlers = {
+    onMouseDown:  useCallback(e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; lastPtRef.current = getPos(e, c); drawingRef.current = true }, [getPos]),
+    onMouseMove:  useCallback(e => {
+      if (!drawingRef.current) return; e.preventDefault()
+      const c = canvasRef.current; if (!c) return
+      const ctx = c.getContext('2d'); const pt = getPos(e, c)
+      ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
+      ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
+      lastPtRef.current = pt
+    }, [getPos]),
+    onMouseUp:    useCallback(() => { drawingRef.current = false; lastPtRef.current = null }, []),
+    onMouseLeave: useCallback(() => { drawingRef.current = false; lastPtRef.current = null }, []),
+    onTouchStart: null, onTouchMove: null, onTouchEnd: null,
+  }
+  handlers.onTouchStart = handlers.onMouseDown
+  handlers.onTouchMove  = handlers.onMouseMove
+  handlers.onTouchEnd   = handlers.onMouseUp
+
+  const clearCanvas = useCallback(() => {
+    const c = canvasRef.current; if (!c) return
+    c.getContext('2d').fillStyle = '#0D1218'
+    c.getContext('2d').fillRect(0, 0, c.width, c.height)
+  }, [])
+
+  const initCanvas = useCallback(() => clearCanvas(), [clearCanvas])
+
+  const getSignatureData = useCallback(() => {
+    const c = canvasRef.current; if (!c) return null
+    const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    if (!Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)) return null
+    const small = document.createElement('canvas'); small.width = 320; small.height = 120
+    const ctx2 = small.getContext('2d')
+    ctx2.fillStyle = '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
+    ctx2.drawImage(c, 0, 0, 320, 120)
+    return small.toDataURL('image/jpeg', 0.7)
+  }, [])
+
+  return { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData }
+}
+
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
   const timer = useTimer()
@@ -141,7 +193,24 @@ export default function EmployeePage() {
         }
       }
 
-      // 3. Notificación de vacaciones aprobadas/rechazadas (una vez por solicitud)
+      // 3. Recordatorio "¿Olvidaste fichar la salida?" a la hora de salida configurada
+      if (getCfg('notiSalida', true) && openRec) {
+        const [sh, sm] = (getCfg('salidaTime', '21:00')).split(':').map(Number)
+        const salidaMinsPast = (hh - sh) * 60 + (mm - sm)
+        if (salidaMinsPast >= 0 && salidaMinsPast < 5) {
+          const sKey = 'an_salida_' + openRec.id
+          if (!localStorage.getItem(sKey)) {
+            localStorage.setItem(sKey, '1')
+            const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
+            const sTitle = '🔔 ¿Olvidaste fichar la salida?'
+            const sBody  = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
+            sendPushNotif(u.id, sTitle, sBody, 'jornada', '/?tab=inicio')
+            queuePush(u.id, sTitle, sBody, 'jornada', '/?tab=inicio')
+          }
+        }
+      }
+
+      // 4. Notificación de vacaciones aprobadas/rechazadas (una vez por solicitud)
       ;(db.vacaciones || []).filter(v => v.empId === u.id && (v.estado === 'aprobada' || v.estado === 'rechazada')).forEach(v => {
         const key = 'an_vac_res_' + v.id
         if (!localStorage.getItem(key)) {
@@ -634,9 +703,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const [informeUrl, setInformeUrl]     = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
-  const closeInforme = () => {
-    if (informeUrl) { URL.revokeObjectURL(informeUrl); setInformeUrl(null) }
-  }
+  const closeInforme = useCallback(() => {
+    setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }, [])
+
+  useModalBack(!!informeUrl, closeInforme)
 
   const exportMonthPDF = async () => {
     setGeneratingPdf(true)
@@ -939,7 +1010,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
     {/* Informe in-app fullscreen overlay */}
     {informeUrl && (() => {
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
       const dlName = `jornada-${new Date().toISOString().slice(0,7)}.pdf`
       return (
         <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
@@ -954,7 +1025,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
               Descargar
             </a>
           </div>
-          {isIOS ? (
+          {isMobile ? (
             <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:18, padding:24 }}>
               <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="var(--primary-light)" strokeWidth="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               <div style={{ fontSize:14, fontWeight:600, color:'var(--text2)', textAlign:'center', lineHeight:1.5 }}>Tu informe de jornada está listo.<br/>Descárgalo o ábrelo en el navegador.</div>
@@ -1064,8 +1135,15 @@ function TabMensajes({ db, u, toast, saveDB }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-        <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mensajes</div>
-        <div style={{ fontSize:13, color:'var(--text3)' }}>Chat con administración</div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mensajes</div>
+            <div style={{ fontSize:13, color:'var(--text3)' }}>Chat con administración</div>
+          </div>
+        </div>
       </div>
 
       <div style={{ flex:1, overflowY:'auto', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
@@ -1081,7 +1159,12 @@ function TabMensajes({ db, u, toast, saveDB }) {
           const hora = new Date(m.ts).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })
           const dia  = new Date(m.ts).toLocaleDateString('es-ES', { day:'numeric', month:'short' })
           return (
-            <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+            <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems:'flex-end', gap:7 }}>
+              {!isMe && (
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginBottom:2 }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--primary-light)" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+              )}
               <div style={{
                 maxWidth:'78%', padding:'9px 13px',
                 borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
@@ -1656,7 +1739,9 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
             <div className="empty">Sin notificaciones</div>
           ) : notis.map(n => (
             <div key={n.id} className={`nitem${!n.leido ? ' unread' : ''}`} style={{ position:'relative' }}>
-              <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)' }}>ℹ️</div>
+              <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              </div>
               <div className="nitem-body">
                 <div className="nitem-title">{n.action || n.title || 'Notificación'}</div>
                 <div className="nitem-text">{n.detail || n.body || ''}</div>
@@ -1718,70 +1803,20 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
 }
 
 function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
-  const canvasRef = useRef(null)
-  const drawingRef = useRef(false)
-  const lastPtRef = useRef(null)
-  const [mode, setMode] = useState('view') // 'view' | 'draw'
-  const [tick, setTick] = useState(0)
+  const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
+  const [mode, setMode] = useState('view')
 
   const existingFirma = db.firmas?.[u?.id]?.main
 
-  useEffect(() => {
-    if (visible) setMode(existingFirma ? 'view' : 'draw')
-  }, [visible])
-
-  useEffect(() => {
-    if (mode === 'draw' && canvasRef.current) {
-      const c = canvasRef.current
-      const ctx = c.getContext('2d')
-      ctx.fillStyle = '#0D1218'
-      ctx.fillRect(0, 0, c.width, c.height)
-    }
-  }, [mode, tick])
+  useEffect(() => { if (visible) setMode(existingFirma ? 'view' : 'draw') }, [visible])
+  useEffect(() => { if (mode === 'draw') initCanvas() }, [mode])
 
   useModalBack(visible, onClose)
   if (!visible) return null
 
-  const getPos = (e, canvas) => {
-    const rect = canvas.getBoundingClientRect()
-    const src = e.touches ? e.touches[0] : e
-    return { x: (src.clientX - rect.left) * (canvas.width / rect.width), y: (src.clientY - rect.top) * (canvas.height / rect.height) }
-  }
-
-  const onDown = e => {
-    e.preventDefault()
-    const c = canvasRef.current; if (!c) return
-    lastPtRef.current = getPos(e, c)
-    drawingRef.current = true
-  }
-  const onMove = e => {
-    if (!drawingRef.current) return
-    e.preventDefault()
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d')
-    const pt = getPos(e, c)
-    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
-    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
-    lastPtRef.current = pt
-  }
-  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
-
-  const clearSign = () => {
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d')
-    ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
-  }
-
   const save = () => {
-    const c = canvasRef.current; if (!c) return
-    const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
-    const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
-    if (!hasStroke) { toast('Dibuja tu firma antes de guardar'); return }
-    const small = document.createElement('canvas'); small.width = 320; small.height = 120
-    const ctx2 = small.getContext('2d')
-    ctx2.fillStyle = '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
-    ctx2.drawImage(c, 0, 0, 320, 120)
-    const data = small.toDataURL('image/jpeg', 0.7)
+    const data = getSignatureData()
+    if (!data) { toast('Dibuja tu firma antes de guardar'); return }
     if (data.length > 200000) { toast('Firma muy grande, simplifica los trazos'); return }
     const firmas = { ...(db.firmas || {}), [u.id]: { ...(db.firmas?.[u.id] || {}), main: { data, updatedAt: new Date().toISOString(), empName: u.name } } }
     saveDB({ firmas })
@@ -1810,7 +1845,7 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
               Esta firma se aplicará automáticamente al firmar documentos y jornadas mensuales.
             </div>
             <div className="modal-btns">
-              <button className="btn btn-secondary" onClick={() => { setMode('draw'); setTick(t=>t+1) }}>Actualizar firma</button>
+              <button className="btn btn-secondary" onClick={() => setMode('draw')}>Actualizar firma</button>
               <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
             </div>
           </>
@@ -1819,12 +1854,11 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
             <div style={{ marginBottom:8 }}>
               <canvas ref={canvasRef} width={640} height={200}
                 style={{ width:'100%', height:150, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block' }}
-                onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-                onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
+                {...handlers} />
             </div>
             <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:16 }}>Dibuja tu firma con el dedo o ratón</div>
             <div className="modal-btns">
-              <button className="btn btn-secondary" onClick={clearSign}>Borrar</button>
+              <button className="btn btn-secondary" onClick={clearCanvas}>Borrar</button>
               {existingFirma && <button className="btn btn-secondary" onClick={() => setMode('view')}>Cancelar</button>}
               <button className="btn btn-primary" onClick={save}>Guardar firma</button>
             </div>
@@ -2237,8 +2271,10 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
 
 function ModalConfiguracion({ visible, u, onClose, toast }) {
   const [notiFichaje, setNotiFichaje] = useState(() => getCfg('notiFichaje', true))
+  const [notiSalida, setNotiSalida] = useState(() => getCfg('notiSalida', true))
   const [gpsAuto, setGpsAuto] = useState(() => getCfg('gpsAuto', true))
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
+  const [salidaTime, setSalidaTime] = useState(() => getCfg('salidaTime', '21:00'))
   const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
   const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
 
@@ -2247,8 +2283,10 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
 
   const save = () => {
     setCfg('notiFichaje', notiFichaje)
+    setCfg('notiSalida', notiSalida)
     setCfg('gpsAuto', gpsAuto)
     setCfg('reminderTime', reminderTime)
+    setCfg('salidaTime', salidaTime)
     setCfg('idioma', idioma)
     setCfg('formato', formato)
     toast('Configuración guardada')
@@ -2276,10 +2314,18 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
         </div>
         {toggle('Notificaciones de fichaje', notiFichaje, setNotiFichaje)}
+        {toggle('Recordatorio de salida', notiSalida, setNotiSalida)}
         {toggle('GPS automático', gpsAuto, setGpsAuto)}
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:8 }}>Recordatorio diario</div>
+          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:4 }}>Recordatorio de entrada</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si no has fichado a esta hora</div>
           <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
+            style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14 }} />
+        </div>
+        <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:14, color:'var(--text1)', marginBottom:4 }}>Recordatorio de salida</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si tienes jornada abierta a esta hora</div>
+          <input type="time" value={salidaTime} onChange={e => setSalidaTime(e.target.value)}
             style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text1)', fontSize:14 }} />
         </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
@@ -2347,51 +2393,19 @@ function toggleTheme() {
 
 // ─── FIRMA DE CIERRE MENSUAL (empleado) ────────────────────────────────────────
 function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
-  const canvasRef = useRef(null)
-  const drawingRef = useRef(false)
-  const lastPtRef = useRef(null)
+  const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente')
   const selCierre = pendingCierres[selIdx] || null
 
-  useEffect(() => {
-    if (visible && canvasRef.current && selCierre) {
-      const c = canvasRef.current
-      const ctx = c.getContext('2d')
-      ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
-    }
-  }, [visible, selCierre])
+  useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
 
   useModalBack(visible, onClose)
   if (!visible || !selCierre) return null
 
-  const getPos = (e, c) => {
-    const rect = c.getBoundingClientRect(); const src = e.touches ? e.touches[0] : e
-    return { x: (src.clientX - rect.left) * (c.width / rect.width), y: (src.clientY - rect.top) * (c.height / rect.height) }
-  }
-  const onDown = e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; lastPtRef.current = getPos(e, c); drawingRef.current = true }
-  const onMove = e => {
-    if (!drawingRef.current) return; e.preventDefault()
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d'); const pt = getPos(e, c)
-    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
-    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
-    lastPtRef.current = pt
-  }
-  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
-  const clearSign = () => {
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d'); ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
-  }
-
   const firmar = () => {
-    const c = canvasRef.current; if (!c) return
-    const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
-    const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
-    if (!hasStroke) { toast('Dibuja tu firma antes de confirmar'); return }
-    const small = document.createElement('canvas'); small.width = 320; small.height = 120
-    small.getContext('2d').drawImage(c, 0, 0, 320, 120)
-    const signatureData = small.toDataURL('image/jpeg', 0.7)
+    const signatureData = getSignatureData()
+    if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     const firmadoAt = new Date().toISOString()
     const updatedCierres = (db.cierres || []).map(ci => ci.id === selCierre.id
       ? { ...ci, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } } : ci)
@@ -2437,9 +2451,8 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
         <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:'var(--text2)' }}>Firma digital</div>
         <canvas ref={canvasRef} width={640} height={180}
           style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:6 }}
-          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
-        <button className="btn btn-secondary btn-sm" onClick={clearSign} style={{ marginBottom:14 }}>Borrar</button>
+          {...handlers} />
+        <button className="btn btn-secondary btn-sm" onClick={clearCanvas} style={{ marginBottom:14 }}>Borrar</button>
         <div className="modal-btns">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={firmar}>✅ Firmar y enviar</button>
@@ -2451,20 +2464,13 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
 
 // ─── ONBOARDING (primer login empleado) ────────────────────────────────────────
 function OnboardingModal({ visible, u, db, saveDB, toast }) {
+  const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
   const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
   const [reminderTime, setReminderTime] = useState('08:00')
-  const canvasRef = useRef(null)
-  const drawingRef = useRef(false)
-  const lastPtRef = useRef(null)
 
-  useEffect(() => {
-    if (step === 1 && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d')
-      ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-    }
-  }, [step])
+  useEffect(() => { if (step === 1) initCanvas() }, [step])
 
   if (!visible || done) return null
 
@@ -2474,37 +2480,9 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     setNotifGranted(perm === 'granted')
   }
 
-  const getPos = (e, c) => {
-    const rect = c.getBoundingClientRect(); const src = e.touches ? e.touches[0] : e
-    return { x: (src.clientX - rect.left) * (c.width / rect.width), y: (src.clientY - rect.top) * (c.height / rect.height) }
-  }
-  const onDown = e => { e.preventDefault(); const c = canvasRef.current; if (!c) return; lastPtRef.current = getPos(e, c); drawingRef.current = true }
-  const onMove = e => {
-    if (!drawingRef.current) return; e.preventDefault()
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d'); const pt = getPos(e, c)
-    ctx.beginPath(); ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y); ctx.lineTo(pt.x, pt.y)
-    ctx.strokeStyle = '#c7d2fe'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
-    lastPtRef.current = pt
-  }
-  const onUp = () => { drawingRef.current = false; lastPtRef.current = null }
-  const clearSign = () => {
-    const c = canvasRef.current; if (!c) return
-    const ctx = c.getContext('2d'); ctx.fillStyle = '#0D1218'; ctx.fillRect(0, 0, c.width, c.height)
-  }
-
   const finish = () => {
-    let firma = null
-    if (canvasRef.current) {
-      const c = canvasRef.current
-      const pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
-      const hasStroke = Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)
-      if (hasStroke) {
-        const small = document.createElement('canvas'); small.width = 320; small.height = 120
-        small.getContext('2d').drawImage(c, 0, 0, 320, 120)
-        firma = { data: small.toDataURL('image/jpeg', 0.7), ts: new Date().toISOString() }
-      }
-    }
+    const signatureData = getSignatureData()
+    const firma = signatureData ? { data: signatureData, ts: new Date().toISOString() } : null
     const updatedEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e)
     const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
     saveDB({ employees: updatedEmps, firmas: updatedFirmas })
@@ -2574,10 +2552,9 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
             </div>
             <canvas ref={canvasRef} width={640} height={180}
               style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:8 }}
-              onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-              onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
+              {...handlers} />
             <div style={{ display:'flex', gap:8, marginBottom:4 }}>
-              <button className="btn btn-secondary btn-sm" onClick={clearSign}>Borrar</button>
+              <button className="btn btn-secondary btn-sm" onClick={clearCanvas}>Borrar</button>
               <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setStep(2)}>Omitir →</button>
               <button className="btn btn-primary" onClick={() => setStep(2)}>Guardar →</button>
             </div>
@@ -2664,12 +2641,17 @@ function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
           {conv.map(m => {
             const isMe = m.from === u.id
             return (
-              <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+              <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems:'flex-end', gap:8 }}>
+                {!isMe && (
+                  <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginBottom:2 }}>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--primary-light)" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                )}
                 <div style={{ maxWidth:'80%', padding:'10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   background: isMe ? 'var(--primary)' : 'var(--bg-500)',
                   border: isMe ? 'none' : '1px solid var(--border)',
                   fontSize:14, color: isMe ? '#fff' : 'var(--text)' }}>
-                  {!isMe && <div style={{ fontSize:10, fontWeight:700, marginBottom:4, opacity:.7 }}>Admin</div>}
+                  {!isMe && <div style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', marginBottom:4 }}>Administración</div>}
                   {m.text}
                   <div style={{ fontSize:10, marginTop:5, opacity:.6, textAlign:'right' }}>
                     {new Date(m.ts).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}

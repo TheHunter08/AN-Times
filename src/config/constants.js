@@ -1,7 +1,7 @@
-export const DB_URL = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data'
-export const FB_BASE = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app'
-export const ADMIN_PIN = '0824'
-export const VAPID_PUB = 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4'
+export const DB_URL = `${import.meta.env.VITE_FB_DATABASE_URL}/an_times_data`
+export const FB_BASE = import.meta.env.VITE_FB_DATABASE_URL
+export const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN
+export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm
@@ -9,13 +9,13 @@ export const WM = 160 * 60  // monthly minutes norm
 export const VPM = 2.5      // vacation days per month
 
 export const FB_CONFIG = {
-  apiKey:            'AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ',
-  authDomain:        'times-inc.firebaseapp.com',
-  databaseURL:       'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app',
-  projectId:         'times-inc',
-  storageBucket:     'times-inc.firebasestorage.app',
-  messagingSenderId: '366356529016',
-  appId:             '1:366356529016:web:ffe5ba97c214c21fc9928d'
+  apiKey:            import.meta.env.VITE_FB_API_KEY,
+  authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN,
+  databaseURL:       import.meta.env.VITE_FB_DATABASE_URL,
+  projectId:         import.meta.env.VITE_FB_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FB_APP_ID,
 }
 
 // Festivos oficiales Comunidad de Madrid 2026 (14 días: 8 nacionales + 2 autonómicos + 2 locales Madrid capital)

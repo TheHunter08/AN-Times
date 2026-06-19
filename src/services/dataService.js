@@ -100,8 +100,11 @@ export async function flushOfflineQueue(onSuccess, onError) {
   if (!pending.length) return
   // El último snapshot tiene el estado más reciente — el resto se pueden descartar
   const latest = pending[pending.length - 1]
-  await idbClearPendingPushes()
-  await cloudPush(latest.snapshot, onSuccess, onError, () => {})
+  // Borra la cola DESPUÉS de que el push tenga éxito, no antes
+  await cloudPush(latest.snapshot, async (pushed) => {
+    await idbClearPendingPushes()
+    onSuccess?.(pushed)
+  }, onError, () => {})
 }
 
 export function mergeDB(base, incoming) {
@@ -169,6 +172,39 @@ function mergeArraysById(local, remote) {
   return [...map.values()]
 }
 
+function mergeStringArrays(local, remote) {
+  return [...new Set([...(remote || []), ...(local || [])].filter(Boolean))]
+}
+
+function mergeObjects(local, remote) {
+  return { ...(remote || {}), ...(local || {}) }
+}
+
+function mergeForPush(local, remote) {
+  if (!remote) return local
+  return {
+    ...remote,
+    ...local,
+    empresas:        mergeStringArrays(local.empresas,       remote.empresas),
+    obras:           mergeStringArrays(local.obras,          remote.obras),
+    centrosTrabajo:  mergeStringArrays(local.centrosTrabajo, remote.centrosTrabajo),
+    employees:       mergeArraysById(local.employees,        remote.employees),
+    records:         mergeArraysById(local.records,          remote.records),
+    vacaciones:      mergeArraysById(local.vacaciones,       remote.vacaciones),
+    medicos:         mergeArraysById(local.medicos,          remote.medicos),
+    ausencias:       mergeArraysById(local.ausencias,        remote.ausencias),
+    mensajes:        mergeArraysById(local.mensajes,         remote.mensajes),
+    notis:           mergeArraysById(local.notis,            remote.notis),
+    cierres:         mergeArraysById(local.cierres,          remote.cierres),
+    chats:           mergeArraysById(local.chats,            remote.chats),
+    correccionesFichaje: mergeArraysById(local.correccionesFichaje, remote.correccionesFichaje),
+    documentos:      mergeArraysById(local.documentos,       remote.documentos),
+    audit:           mergeArraysById(local.audit,            remote.audit),
+    firmas:          mergeObjects(local.firmas,              remote.firmas),
+    monthSnapshots:  mergeObjects(local.monthSnapshots,      remote.monthSnapshots),
+  }
+}
+
 export async function cloudPush(db, onSuccess, onError, onFinalError) {
   if (_pushFlight) return
   _pushFlight = true
@@ -181,26 +217,10 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
       if (tsResp.ok) {
         const remoteTS = await tsResp.json()
         if (remoteTS && db._ts && remoteTS > db._ts) {
-          // Conflict: remote changed after our last sync — merge arrays to avoid data loss
           const remoteResp = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
           if (remoteResp.ok) {
             const remote = await remoteResp.json()
-            if (remote) {
-              localBase = {
-                ...db,
-                records:             mergeArraysById(db.records,             remote.records),
-                vacaciones:          mergeArraysById(db.vacaciones,          remote.vacaciones),
-                medicos:             mergeArraysById(db.medicos,             remote.medicos),
-                ausencias:           mergeArraysById(db.ausencias,           remote.ausencias),
-                mensajes:            mergeArraysById(db.mensajes,            remote.mensajes),
-                notis:               mergeArraysById(db.notis,               remote.notis),
-                cierres:             mergeArraysById(db.cierres,             remote.cierres),
-                chats:               mergeArraysById(db.chats,               remote.chats),
-                correccionesFichaje: mergeArraysById(db.correccionesFichaje, remote.correccionesFichaje),
-                documentos:          mergeArraysById(db.documentos,          remote.documentos),
-                audit:               mergeArraysById(db.audit,               remote.audit),
-              }
-            }
+            if (remote) localBase = mergeForPush(db, remote)
           }
         }
       }
@@ -312,7 +332,7 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   try {
     const token = await getAuthToken()
-    const entry = { to, title, body, tag, url, ts: Date.now() }
+    const entry = { userId: to, title, body, tag, url, ts: Date.now() }
     await fetch(withAuth(FB_BASE + '/pushQueue.json', token), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

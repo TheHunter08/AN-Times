@@ -23,11 +23,12 @@ export function useTimer() {
 
       // Persist every 30 ticks (~30s)
       if ((++tickRef.current) % 30 === 0) {
-        openRec.workSecs = t.work
-        openRec.breakSecs = t.brk
+        const records = db.records.map(r =>
+          r.id === openRec.id ? { ...r, workSecs: t.work, breakSecs: t.brk } : r
+        )
         clearTimeout(saveTickRef.current)
         saveTickRef.current = setTimeout(() => {
-          saveDB({ records: [...db.records] })
+          saveDB({ records })
         }, 5000)
       }
     }, 1000)
