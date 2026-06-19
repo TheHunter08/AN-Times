@@ -579,25 +579,152 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
 
-  const [informeUrl, setInformeUrl] = useState(null)
+  const [informeUrl, setInformeUrl]     = useState(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const closeInforme = () => {
     if (informeUrl) { URL.revokeObjectURL(informeUrl); setInformeUrl(null) }
   }
 
-  const exportMonthPDF = () => {
-    const now2 = new Date()
-    const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
-    const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk2)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
-    const totalMin2 = monthRecs.reduce((s,r)=>s+calcMin(r),0)
-    const monthName = now2.toLocaleDateString('es-ES',{month:'long',year:'numeric'})
-    const rowsHtml = monthRecs.map(r => {
-      const wm = Math.floor(recWorkSecs(r)/60)
-      return `<tr><td>${r.inicio.slice(0,10)}</td><td>${ftime(r.inicio)}</td><td>${r.fin ? ftime(r.fin) : '—'}</td><td>${r.centro||'—'}</td><td><strong>${mhm(wm)}</strong></td></tr>`
-    }).join('')
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe ${monthName} - ${u.name}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;max-width:800px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}.sub{color:#555;font-size:13px;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#5e6ad2;color:#fff;padding:8px 12px;text-align:left;font-size:12px}td{padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}tr:nth-child(even) td{background:#f9fafb}.total{margin-top:16px;padding:14px;background:#f0f4ff;border-radius:8px;font-weight:700;font-size:15px}@media print{.no-print{display:none}}</style></head><body><h1>Informe de Jornada — ${u.name}</h1><div class="sub">Mes: ${monthName} · Empresa: ${u.empresa||'—'} · Centro: ${u.centroTrabajo||'—'} · Generado: ${new Date().toLocaleDateString('es-ES')}</div><button class="no-print" onclick="window.print()" style="padding:8px 18px;background:#5e6ad2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:14px">🖨️ Imprimir / Guardar PDF</button><table><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Centro de trabajo</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="total">Total trabajado: ${mhm(totalMin2)} &nbsp;·&nbsp; ${monthRecs.length} jornadas registradas</div></body></html>`
-    const blob = new Blob([html], { type: 'text/html' })
-    setInformeUrl(URL.createObjectURL(blob))
+  const exportMonthPDF = async () => {
+    setGeneratingPdf(true)
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      const now2 = new Date()
+      const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
+      const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
+      const totalMin2 = monthRecs.reduce((s,r) => s + calcMin(r), 0)
+      const monthName = now2.toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+
+      const pdfDoc  = await PDFDocument.create()
+      const fontR   = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const fontB   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+      // ─ Layout constants ────────────────────────────────────────────
+      const PW = 595, PH = 842       // A4 portrait
+      const ML = 35, MR = 35        // margins left/right
+      const CW = PW - ML - MR       // 525 content width
+      const COLS = [
+        { label:'Fecha',              w: 72 },
+        { label:'Entrada',            w: 52 },
+        { label:'Salida',             w: 52 },
+        { label:'Centro / Obra',      w: 279 },
+        { label:'Horas netas',        w: 70 },
+      ]
+      const ROW_H = 15, HEAD_H = 17, SIG_AREA = 110
+
+      // ─ Colors ──────────────────────────────────────────────────────
+      const cPri    = rgb(0.36,0.38,0.82)
+      const cPriLt  = rgb(0.94,0.93,1.0)
+      const cDark   = rgb(0.10,0.10,0.15)
+      const cGray   = rgb(0.55,0.55,0.60)
+      const cLtGray = rgb(0.96,0.96,0.98)
+      const cBorder = rgb(0.82,0.82,0.88)
+      const cWhite  = rgb(1,1,1)
+      const cGreen  = rgb(0.10,0.62,0.46)
+
+      // ─ Page helpers ────────────────────────────────────────────────
+      let page, y, pageNum = 0
+
+      const newPage = () => {
+        page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
+        // header strip
+        page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
+        page.drawText(u.empresa || 'Empresa', { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText('REGISTRO DE JORNADA LABORAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
+        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—')
+        page.drawText(`Trabajador: ${u.name}   ·   Mes: ${monthName}   ·   Obras: ${obras}`, { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
+        page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
+        y -= 74
+      }
+
+      const tableHeader = () => {
+        let xc = ML
+        page.drawRectangle({ x:ML, y:y-HEAD_H, width:CW, height:HEAD_H, color:cPri })
+        COLS.forEach(c => {
+          page.drawText(c.label, { x:xc+4, y:y-HEAD_H+5, size:7.5, font:fontB, color:cWhite, maxWidth:c.w-6 })
+          xc += c.w
+        })
+        y -= HEAD_H
+      }
+
+      // ─ Start first page ────────────────────────────────────────────
+      newPage(); tableHeader()
+
+      // ─ Data rows ──────────────────────────────────────────────────
+      monthRecs.forEach((r, i) => {
+        if (y - ROW_H < 35 + SIG_AREA) { newPage(); tableHeader() }
+        const wm = Math.floor(recWorkSecs(r) / 60)
+        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '—'
+        const vals = [ r.inicio.slice(0,10), ftime(r.inicio), r.fin ? ftime(r.fin) : '—', centroObra, mhm(wm) ]
+
+        page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
+        page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
+
+        let xc = ML
+        vals.forEach((v, ci) => {
+          const isHours = ci === 4
+          page.drawText(String(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
+          xc += COLS[ci].w
+        })
+        // vertical separators
+        let xs = ML
+        COLS.forEach((c,ci) => { if(ci<COLS.length-1) { page.drawLine({ start:{x:xs+c.w,y:y}, end:{x:xs+c.w,y:y-ROW_H}, thickness:0.3, color:cBorder }); xs+=c.w } })
+        y -= ROW_H
+      })
+
+      // ─ Total row ──────────────────────────────────────────────────
+      if (y - 20 < 35 + SIG_AREA) { newPage() }
+      page.drawRectangle({ x:ML, y:y-20, width:CW, height:20, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length!==1?'s':''} registrada${monthRecs.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
+      y -= 28
+
+      // ─ Signature block ────────────────────────────────────────────
+      if (y - SIG_AREA < 30) { newPage() }
+      y -= 10
+      page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:6.5, font:fontB, color:cGray })
+
+      const firma = db.firmas?.[u?.id]?.main
+      if (firma?.data) {
+        try {
+          const printable = await makePrintableSignature(firma.data)
+          const b64 = printable.split(',')[1]
+          const bin = atob(b64)
+          const bytes = new Uint8Array(bin.length)
+          for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i)
+          const sigImg = await pdfDoc.embedPng(bytes.buffer)
+          const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
+          page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
+          page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
+          page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
+          // green tick
+          page.drawText('✓ Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
+        } catch {
+          page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
+          page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
+        }
+      } else {
+        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:cBorder, borderWidth:0.5 })
+        page.drawText('Sin firma digital registrada', { x:ML+10, y:y-55, size:7, font:fontR, color:cGray })
+        page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
+        page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+      }
+
+      // ─ Legal footer ───────────────────────────────────────────────
+      page.drawText(
+        'Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.',
+        { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW }
+      )
+
+      // ─ Save & show ────────────────────────────────────────────────
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([pdfBytes], { type:'application/pdf' })
+      setInformeUrl(URL.createObjectURL(blob))
+    } catch(e) {
+      toast('Error al generar el PDF: ' + (e?.message || e))
+    } finally {
+      setGeneratingPdf(false)
+    }
   }
 
   return (
@@ -664,9 +791,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
       {/* Monthly PDF export */}
       <div style={{ padding:'0 16px 6px', display:'flex', justifyContent:'flex-end' }}>
-        <button className="btn btn-secondary btn-sm" onClick={exportMonthPDF}>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Informe mensual PDF
+        <button className="btn btn-secondary btn-sm" onClick={exportMonthPDF} disabled={generatingPdf} style={{ opacity: generatingPdf ? 0.7 : 1 }}>
+          {generatingPdf
+            ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
+            : <><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Informe firmado PDF</>
+          }
         </button>
       </div>
 
@@ -751,19 +880,18 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
     {/* Informe in-app fullscreen overlay */}
     {informeUrl && (
       <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-          <button
-            onClick={closeInforme}
-            style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:'var(--text2)', WebkitTapHighlightColor:'transparent' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          <button onClick={closeInforme} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:'var(--text2)', WebkitTapHighlightColor:'transparent' }}>
             ← Volver
           </button>
-          <span style={{ fontSize:13, fontWeight:700, flex:1 }}>Informe mensual</span>
+          <span style={{ fontSize:13, fontWeight:700, flex:1 }}>Registro de jornada</span>
+          <a href={informeUrl} download={`jornada-${new Date().toISOString().slice(0,7)}.pdf`}
+            style={{ display:'flex', alignItems:'center', gap:5, background:'var(--primary)', border:'none', borderRadius:20, padding:'6px 14px', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:'#fff', textDecoration:'none', WebkitTapHighlightColor:'transparent' }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar
+          </a>
         </div>
-        <iframe
-          src={informeUrl}
-          title="Informe mensual"
-          style={{ flex:1, border:'none', width:'100%', background:'#fff' }}
-        />
+        <iframe src={informeUrl} title="Registro de jornada" style={{ flex:1, border:'none', width:'100%', background:'#fff' }} />
       </div>
     )}
     </>

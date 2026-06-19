@@ -112,7 +112,10 @@ async function run() {
     await Promise.allSettled(
       subsWithKeys.map(async ({ uid, sub }) => {
         try {
-          await webpush.sendNotification(sub, payload)
+          await webpush.sendNotification(sub, payload, {
+            urgency: 'high',   // bypasses Android Doze + iOS background restrictions
+            TTL: 300,          // expire after 5 minutes if not delivered
+          })
           sent++
         } catch (err) {
           if (err.statusCode === 410 || err.statusCode === 404) {
