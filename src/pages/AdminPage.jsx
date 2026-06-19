@@ -165,7 +165,7 @@ export default function AdminPage() {
           {!isEncargado && (
             <button onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:8, display:'flex', alignItems:'center', gap:6, padding:'5px 10px', cursor:'pointer', color:'var(--text3)', fontSize:12 }}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <span style={{ display:'none', '@media(min-width:640px)': { display:'inline' } }}>Buscar</span>
+              <span className="adm-search-label">Buscar</span>
               <kbd style={{ fontSize:9, padding:'1px 5px', background:'var(--bg-400)', border:'1px solid var(--border)', borderRadius:3, fontFamily:'monospace' }}>⌘K</kbd>
             </button>
           )}
@@ -316,12 +316,26 @@ function PanelDashboard({ db, toast, saveDB }) {
       )}
 
       <div className="adm-kpi-grid stagger-in">
-        {[
-          { label:'Fichados ahora',    val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} activos` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
-          { label:'Horas esta semana', val: mhm(weekMin),                  ico:'⏱️', glowColor:'#60a5fa', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Sin datos previos', trendDir: monthTrend >= 0 ? 'up' : 'down' },
-          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: 'Mes en curso',       trendDir: 'neu' },
-          { label:'Docs. pendientes',  val: String((db.documentos||[]).filter(d=>!d.firma).length), ico:'✍️', glowColor:'#a78bfa', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : 'Sin pendientes', trendDir: (db.documentos||[]).filter(d=>!d.firma).length > 0 ? 'down' : 'up' },
-        ].map(({ label, val, ico, glowColor, trend, trendDir }) => (
+        {(() => {
+          // Absentismo hoy: % de empleados (no de baja, no de vacaciones) sin fichaje hoy
+          const enVacacionesHoy = new Set((db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).map(v => v.empId))
+          const esperados = emps.filter(e => !enVacacionesHoy.has(e.id))
+          const ficharonHoy = new Set(todayRecs.map(r => r.empId))
+          const ausentes = esperados.filter(e => !ficharonHoy.has(e.id)).length
+          const absentismo = esperados.length ? Math.round(ausentes / esperados.length * 100) : 0
+          // Productividad: horas reales del mes vs objetivo (WD * 20 días por empleado activo)
+          const objetivoMes = emps.length * WD * 20
+          const productividad = objetivoMes ? Math.min(120, Math.round(monthMin / objetivoMes * 100)) : 0
+          const docsPend = (db.documentos || []).filter(d => !d.firma).length
+          return [
+          { label:'Activos ahora',     val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} trabajando` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
+          { label:'Horas hoy',         val: mhm(todayRecs.reduce((s,r)=>s+(r.fin?calcMin(r):calcSecs(r).work/60),0)|0), ico:'⏱️', glowColor:'#60a5fa', trend: `${todayRecs.length} fichaje${todayRecs.length!==1?'s':''}`, trendDir:'neu' },
+          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Mes en curso', trendDir: monthTrend >= 0 ? 'up' : 'down' },
+          { label:'Absentismo hoy',    val: `${absentismo}%`,              ico:'📉', glowColor:'#f87171', trend: ausentes > 0 ? `${ausentes} sin fichar` : 'Todos presentes', trendDir: absentismo > 0 ? 'down' : 'up' },
+          { label:'Productividad',     val: `${productividad}%`,           ico:'⚡', glowColor:'#a78bfa', trend: productividad >= 90 ? 'En objetivo' : 'Bajo objetivo', trendDir: productividad >= 90 ? 'up' : 'down' },
+          { label:'Docs. pendientes',  val: String(docsPend),              ico:'✍️', glowColor:'#22d3ee', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : (docsPend > 0 ? 'Por firmar' : 'Al día'), trendDir: docsPend > 0 ? 'down' : 'up' },
+          ]
+        })().map(({ label, val, ico, glowColor, trend, trendDir }) => (
           <div key={label} className="adm-kpi-card">
             <div className="adm-kpi-glow" style={{ background: glowColor }} />
             <div className="adm-kpi-icon">{ico}</div>

@@ -1822,55 +1822,163 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
   )
 }
 
+// Motor de respuestas IA con datos reales (Firebase RTDB).
+// Centraliza el análisis para que sea fácil de extender.
+function aiAnswer(q, db, u) {
+  const ql = q.toLowerCase()
+  const now = new Date()
+  const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`
+  const mine = (db.records || []).filter(r => r.empId === u?.id)
+  const fin = mine.filter(r => r.fin)
+
+  // Semana actual y anterior
+  const ws = wkStart(now)
+  const prevWs = new Date(ws); prevWs.setDate(prevWs.getDate() - 7)
+  const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
+  const prevWeekMin = fin.filter(r => { const d = new Date(r.inicio); return d >= prevWs && d < ws }).reduce((s, r) => s + calcMin(r), 0)
+
+  const monthMin = fin.filter(r => r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const extraMonth = Math.max(0, monthMin - WD * 20)
+  const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
+
+  // ¿Por qué trabajé menos esta semana?
+  if ((ql.includes('menos') || ql.includes('por qu') || ql.includes('porqu')) && ql.includes('semana')) {
+    if (prevWeekMin === 0) return `📊 Esta semana llevas **${mhm(weekMin)}**. No tengo datos de la semana anterior para comparar todavía.`
+    const diff = weekMin - prevWeekMin
+    const pct = Math.round(Math.abs(diff) / prevWeekMin * 100)
+    if (diff >= 0) return `📈 En realidad has trabajado **${mhm(weekMin)}** esta semana, ${pct}% **más** que la anterior (${mhm(prevWeekMin)}). ¡Buen ritmo!`
+    return `📉 Esta semana acumulas **${mhm(weekMin)}**, un ${pct}% menos que la semana pasada (${mhm(prevWeekMin)}). La diferencia son ${mhm(Math.abs(diff))} — revisa si algún día saliste antes o faltó un fichaje.`
+  }
+
+  // ¿Cuántas horas extra tengo?
+  if (ql.includes('extra')) {
+    if (extraMonth === 0) return `⚡ Este mes no tienes horas extra acumuladas. Llevas **${mhm(monthMin)}** sobre las ${mhm(WD * 20)} de referencia mensual.`
+    return `⚡ Tienes **${mhm(extraMonth)}** de horas extra este mes (${mhm(monthMin)} trabajados sobre ${mhm(WD * 20)} de referencia).`
+  }
+
+  // ¿Quién olvidó fichar? (visión de equipo si eres admin/encargado)
+  if (ql.includes('olvid') || ql.includes('quién') || ql.includes('quien') || ql.includes('sin fichar')) {
+    const todayStr = today()
+    const emps = (db.employees || []).filter(e => !e.baja)
+    const ficharon = new Set((db.records || []).filter(r => r.inicio.startsWith(todayStr)).map(r => r.empId))
+    const sinFichar = emps.filter(e => !ficharon.has(e.id))
+    if (!sinFichar.length) return `✅ Hoy todo el equipo ha fichado (${emps.length} personas).`
+    return `⚠️ Hoy aún no han fichado ${sinFichar.length} de ${emps.length}:\n${sinFichar.slice(0, 8).map(e => `• ${e.name}`).join('\n')}`
+  }
+
+  // Resumen semanal
+  if (ql.includes('resumen') || (ql.includes('semana') && (ql.includes('cómo') || ql.includes('como') || ql.includes('va')))) {
+    const dias = fin.filter(r => new Date(r.inicio) >= ws).length
+    const trend = prevWeekMin > 0 ? (weekMin >= prevWeekMin ? '↑' : '↓') : ''
+    return `📋 **Resumen de tu semana**\n• Trabajado: ${mhm(weekMin)} ${trend}\n• Jornadas: ${dias} día(s)\n• Media diaria: ${dias ? mhm(Math.round(weekMin / dias)) : '0h'}\n• Objetivo semanal: ${mhm(WK)}`
+  }
+
+  // Horas / trabajado
+  if (ql.includes('hora') || ql.includes('trabaj')) {
+    return `📊 Este mes llevas **${mhm(monthMin)}** trabajados (referencia: ${mhm(WD * 20)}). Esta semana: ${mhm(weekMin)}.`
+  }
+
+  // Vacaciones / cuándo cobro
+  if (ql.includes('vac') || ql.includes('cobr')) {
+    return `🌴 Tienes **${vac.available} días** de vacaciones disponibles (${vac.generated} generados, ${vac.used} usados este año).`
+  }
+
+  // Historial
+  if (ql.includes('historial') || ql.includes('registro') || ql.includes('último') || ql.includes('ultimo')) {
+    const last = fin.slice(-3).reverse()
+    if (last.length) return `📋 Tus últimos registros:\n${last.map(r => `• ${r.inicio.slice(0, 10)}: ${mhm(calcMin(r))}`).join('\n')}`
+    return '📋 Aún no tienes registros completados.'
+  }
+
+  if (ql.includes('hola') || ql.includes('puedes') || ql.includes('ayuda')) {
+    return `👋 ¡Hola ${u?.name.split(' ')[0]}! Soy Times AI. Puedo analizar tu jornada en tiempo real:\n• Horas trabajadas y extra\n• Comparar semanas\n• Balance de vacaciones\n• Quién olvidó fichar hoy`
+  }
+
+  return '🤖 Puedo ayudarte con tus horas, horas extra, comparar semanas, vacaciones, historial o quién olvidó fichar. ¿Qué necesitas?'
+}
+
+const AI_CHIPS = [
+  '¿Por qué trabajé menos esta semana?',
+  '¿Cuántas horas extra tengo?',
+  '¿Quién olvidó fichar?',
+  'Resumen semanal',
+  '¿Cuándo cobro vacaciones?',
+]
+
 function ModalAI({ visible, db, u, onClose }) {
   const [msgs, setMsgs] = useState([])
   const [input, setInput] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const chatRef = useRef(null)
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
+  }, [msgs, thinking])
+
   if (!visible) return null
 
-  const send = () => {
-    if (!input.trim()) return
-    const q = input.trim(); setInput('')
-    setMsgs(m => [...m, { role:'user', text:q }])
-
-    const now = new Date()
-    const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-    const mine = (db.records || []).filter(r => r.empId === u?.id)
-    const monthMin = mine.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-    const vac = u ? vacData(u.id, db) : { available: 0 }
-    const ql = q.toLowerCase()
-
-    let ans = '🤖 No tengo datos suficientes para responder eso. Prueba con: horas, vacaciones, historial.'
-    if (ql.includes('hora') || ql.includes('trabaj')) {
-      ans = `📊 Este mes llevas **${mhm(monthMin)}** trabajados. La norma es ${mhm(WD * 20)} mensuales.`
-    } else if (ql.includes('vac')) {
-      ans = `🌴 Tienes **${vac.available} días** de vacaciones disponibles (de ${vac.generated} generados, usaste ${vac.used}).`
-    } else if (ql.includes('historial') || ql.includes('registro')) {
-      const last = mine.filter(r=>r.fin).slice(-3).reverse()
-      if (last.length) {
-        ans = `📋 Últimos registros:\n${last.map(r=>`• ${r.inicio.slice(0,10)}: ${mhm(calcMin(r))}`).join('\n')}`
-      } else ans = '📋 No hay registros recientes.'
-    } else if (ql.includes('hola') || ql.includes('que puedes')) {
-      ans = `👋 ¡Hola ${u?.name.split(' ')[0]}! Puedo ayudarte con:\n• Tus horas trabajadas\n• Balance de vacaciones\n• Historial de registros`
-    }
-
-    setTimeout(() => setMsgs(m => [...m, { role:'bot', text:ans }]), 400)
+  const ask = (q) => {
+    const text = (q || input).trim()
+    if (!text || thinking) return
+    setInput('')
+    setMsgs(m => [...m, { role: 'user', text }])
+    setThinking(true)
+    setTimeout(() => {
+      const ans = aiAnswer(text, db, u)
+      setThinking(false)
+      setMsgs(m => [...m, { role: 'bot', text: ans }])
+      try { navigator.vibrate(6) } catch {}
+    }, 520)
   }
+
+  // Renderiza **negritas** simples
+  const fmt = (t) => t.split('**').map((part, i) => i % 2 === 1
+    ? <strong key={i} style={{ color: 'var(--primary-light)' }}>{part}</strong>
+    : <span key={i}>{part}</span>)
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
         <div className="modal-drag" />
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-          <h2 style={{ margin:0 }}>🤖 Asistente IA</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
+
+        {/* Header estilo asistente */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 14, background: 'linear-gradient(135deg,#2563EB,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 4px 14px rgba(37,99,235,.4)' }}>✨</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-.3px' }}>Times AI</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Asistente de jornada · datos en vivo</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }} aria-label="Cerrar">×</button>
         </div>
-        <div className="ai-chat">
-          {!msgs.length && <div className="ai-msg-bot">👋 ¡Hola! Pregúntame sobre tus horas, vacaciones o registros.</div>}
-          {msgs.map((m, i) => <div key={i} className={m.role==='user'?'ai-msg-user':'ai-msg-bot'} style={{ whiteSpace:'pre-line' }}>{m.text}</div>)}
+
+        {/* Chat */}
+        <div className="ai-chat" ref={chatRef} style={{ maxHeight: '42vh' }}>
+          {!msgs.length && (
+            <div className="ai-msg-bot" style={{ whiteSpace: 'pre-line' }}>
+              {fmt(`👋 ¡Hola ${u?.name.split(' ')[0] || ''}! Soy **Times AI**. Pregúntame lo que quieras sobre tu jornada o usa una sugerencia.`)}
+            </div>
+          )}
+          {msgs.map((m, i) => (
+            <div key={i} className={m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot'} style={{ whiteSpace: 'pre-line' }}>
+              {m.role === 'user' ? m.text : fmt(m.text)}
+            </div>
+          ))}
+          {thinking && (
+            <div className="ai-msg-bot ai-typing"><span /><span /><span /></div>
+          )}
         </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <input type="text" placeholder="Pregunta algo..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==='Enter'&&send()} />
-          <button className="btn btn-primary" onClick={send}>→</button>
+
+        {/* Chips sugerencias */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '4px 0 12px' }}>
+          {AI_CHIPS.map(c => (
+            <button key={c} onClick={() => ask(c)} className="ai-chip-btn">{c}</button>
+          ))}
+        </div>
+
+        {/* Input */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="text" placeholder="Pregúntame sobre tu jornada…" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && ask()} />
+          <button className="btn btn-primary" onClick={() => ask()} style={{ minWidth: 44 }} aria-label="Enviar">↑</button>
         </div>
       </div>
     </div>
