@@ -6,6 +6,7 @@ import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
 import { auditLog, sendPushNotif, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
+import { startedInHorizontalScroller } from '../utils/gesture.js'
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
@@ -38,14 +39,21 @@ export default function EmployeePage() {
   useEffect(() => {
     const el = empBodyRef.current
     if (!el) return
-    let sx = 0, sy = 0, st = 0
-    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now() }
+    let sx = 0, sy = 0, st = 0, locked = false
+    const onStart = e => {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now()
+      // Si el gesto nace dentro de un scroller horizontal, no cambiamos de pantalla
+      locked = startedInHorizontalScroller(e.target, el)
+    }
     const onEnd = e => {
+      if (locked) return
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
       const dt = Date.now() - st
       const vx = Math.abs(dx) / dt
-      const isSwipe = Math.abs(dx) > 30 && (Math.abs(dx) > 50 || vx > 0.3) && Math.abs(dx) > Math.abs(dy) * 1.2
+      // Gesto de cambio de pantalla: claramente horizontal (no un scroll lateral
+      // accidental ni un scroll vertical). Exigimos dominancia horizontal 2:1.
+      const isSwipe = Math.abs(dx) > 45 && (Math.abs(dx) > 70 || vx > 0.45) && Math.abs(dx) > Math.abs(dy) * 2
       if (!isSwipe) return
       const ci = TAB_ORDER.indexOf(currentTabRef.current)
       if (dx < 0 && ci < TAB_ORDER.length - 1) { try { navigator.vibrate(8) } catch {} ; setEmpTab(TAB_ORDER[ci + 1]) }
@@ -2593,21 +2601,23 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
 function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   const [text, setText] = useState('')
   const bottomRef = useRef(null)
-  if (!visible || !u) return null
 
   const chats   = db.chats || []
   const adminId = 'admin'
-  const conv    = chats
+  const conv    = u ? chats
     .filter(m => (m.from === u.id && m.to === adminId) || (m.from === adminId && m.to === u.id))
-    .sort((a, b) => a.ts - b.ts)
+    .sort((a, b) => a.ts - b.ts) : []
 
-  // Marcar mensajes de admin como leídos al abrir
+  // Marcar mensajes de admin como leídos al abrir.
+  // El return temprano va DESPUÉS de todos los hooks (Rules of Hooks).
   useEffect(() => {
-    if (!visible) return
+    if (!visible || !u) return
     const hasUnread = chats.some(m => m.from === adminId && m.to === u.id && !m.leido)
     if (hasUnread) saveDB({ chats: chats.map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) })
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 80)
   }, [visible, chats.length])
+
+  if (!visible || !u) return null
 
   const send = () => {
     const t = text.trim()

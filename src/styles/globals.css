@@ -563,6 +563,19 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-nav-item.on svg { stroke: #fff; }
 .emp-nav-item:active { transform: scale(.88); }
 
+/* ── Layout uniforme: en web/tablet la app se muestra como una columna
+   centrada idéntica a móvil/PWA, para que las tarjetas tengan el mismo
+   tamaño en todas las plataformas ─────────────────────────────────────── */
+@media (min-width: 600px) {
+  #sEmp .emp-topbar,
+  #sEmp .emp-body { width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
+  #sEmp .emp-nav  { left: 50%; right: auto; transform: translate3d(-50%, 0, 0); width: 100%; max-width: 568px; }
+}
+/* El panel admin no se estira sin límite en monitores grandes */
+@media (min-width: 1100px) {
+  .adm-panel > * { max-width: 1080px; margin-left: auto; margin-right: auto; }
+}
+
 /* ── Login screen — Premium SaaS ───────────────────────────── */
 #sLogin {
   background: var(--bg-800);

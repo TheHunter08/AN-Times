@@ -5,6 +5,7 @@ import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, r
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
+import { startedInHorizontalScroller } from '../utils/gesture.js'
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -80,14 +81,19 @@ export default function AdminPage() {
   useEffect(() => {
     const el = admMainRef.current
     if (!el) return
-    let sx = 0, sy = 0, st = 0
-    const onStart = e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now() }
+    let sx = 0, sy = 0, st = 0, locked = false
+    const onStart = e => {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now()
+      // No cambiar de panel si el gesto nace en una tabla/scroller horizontal
+      locked = startedInHorizontalScroller(e.target, el)
+    }
     const onEnd = e => {
+      if (locked) return
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
       const dt = Date.now() - st
       const vx = Math.abs(dx) / dt
-      const isSwipe = Math.abs(dx) > 30 && (Math.abs(dx) > 45 || vx > 0.3) && Math.abs(dx) > Math.abs(dy) * 1.2
+      const isSwipe = Math.abs(dx) > 45 && (Math.abs(dx) > 70 || vx > 0.45) && Math.abs(dx) > Math.abs(dy) * 2
       if (!isSwipe) return
       const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
       const ci = order.indexOf(currentPageRef.current)
@@ -684,6 +690,7 @@ function PanelControl({ db, toast, saveDB, session }) {
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
       const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
       saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      queuePush(rec.empId, '⏱️ Jornada cerrada', `Administración ha cerrado tu jornada abierta (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
       toast('✅ Jornada cerrada forzosamente')
     })
   }
@@ -2427,6 +2434,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const updated = recs.map(r => r.id === rec.id ? { ...r, aceptada: true, aceptadaPor: enc.name, aceptadaAt: new Date().toISOString() } : r)
     const withAudit = auditLog(db, 'Jornada aceptada', `${rec.empName} · ${fds(rec.inicio)}`, enc.name)
     saveDB({ records: updated, audit: withAudit.audit })
+    queuePush(rec.empId, '✅ Jornada validada', `Tu jornada del ${fds(rec.inicio)} ha sido validada por ${enc.name}.`, 'jornada', '/?tab=jornada')
     toast('✅ Jornada aceptada')
   }
 
@@ -2442,6 +2450,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     })
     const withAudit = auditLog(db, 'Jornada modificada', `${rec?.empName || ''} · ${fds(editing.inicio)}`, enc.name)
     saveDB({ records: updated, audit: withAudit.audit })
+    if (rec) queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} ha modificado tu jornada del ${fds(editing.inicio)}.`, 'jornada', '/?tab=jornada')
     toast('✅ Jornada modificada')
     setEditing(null)
   }
@@ -2452,6 +2461,8 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const key  = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString(), registradoPor: enc.name }
     saveDB({ [key]: [...(db[key] || []), item] })
+    const tipoLbl = ausForm.tipo === 'medico' ? 'Ausencia médica' : 'Ausencia'
+    queuePush(ausForm.empId, `🗓️ ${tipoLbl} registrada`, `${enc.name} registró una ${tipoLbl.toLowerCase()} el ${ausForm.fechaInicio}.`, 'ausencia', '/?tab=calendario')
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
     toast('✅ Ausencia registrada')
   }
