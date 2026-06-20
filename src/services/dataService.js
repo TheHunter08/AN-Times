@@ -137,9 +137,13 @@ export function mergeDB(base, incoming) {
   }
 }
 
+async function safeToken() {
+  try { return await getAuthToken() } catch { return null }
+}
+
 export async function cloudFetch() {
   try {
-    const token = await getAuthToken()
+    const token = await safeToken()
     const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
     if (!r.ok) return null
     return await r.json()
@@ -152,7 +156,7 @@ export async function cloudFetch() {
 // Devuelve null (error), 'no-change' (sin cambios), o los datos completos.
 export async function cloudFetchSmart(localTS) {
   try {
-    const token = await getAuthToken()
+    const token = await safeToken()
     const tsResp = await fetch(withAuth(DB_URL + '/_ts.json', token), { cache: 'no-store' })
     if (!tsResp.ok) return null
     const remoteTS = await tsResp.json()
@@ -209,7 +213,7 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
   if (_pushFlight) return
   _pushFlight = true
   try {
-    const token = await getAuthToken()
+    const token = await safeToken()
     // Optimistic locking: check remote _ts first to detect concurrent edits
     let localBase = db
     try {
@@ -253,7 +257,7 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
 
 export async function cloudPatchPath(path, value) {
   try {
-    const token = await getAuthToken()
+    const token = await safeToken()
     const r = await fetch(withAuth(DB_URL + '/' + path + '.json', token), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -299,7 +303,7 @@ export async function pushSubscribe(userId, vapidPub) {
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    const token = await getAuthToken()
+    const token = await safeToken()
     await fetch(withAuth(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', token), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -331,7 +335,7 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   try {
-    const token = await getAuthToken()
+    const token = await safeToken()
     const entry = { userId: to, title, body, tag, url, ts: Date.now() }
     await fetch(withAuth(FB_BASE + '/pushQueue.json', token), {
       method: 'POST',

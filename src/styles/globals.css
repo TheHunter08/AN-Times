@@ -11,22 +11,22 @@
 }
 
 :root {
-  /* ── Backgrounds — neutral dark (Linear/Vercel style, no blue tint) */
-  --bg-900: #08080b;
-  --bg-800: #0e0e12;
-  --bg-700: #131318;
-  --bg-600: #18181f;
-  --bg-500: #1e1e27;
-  --bg-400: #26262f;
-  --bg-300: #2e2e38;
-  --bg-200: #383844;
+  /* ── Backgrounds — deep navy dark */
+  --bg-900: #090912;
+  --bg-800: #0d0d18;
+  --bg-700: #111120;
+  --bg-600: #161624;
+  --bg-500: #1c1c2e;
+  --bg-400: #222238;
+  --bg-300: #2C3B5E;
+  --bg-200: #34456E;
 
   /* Legacy compat */
-  --bg:  #0e0e12;
-  --bg2: #131318;
-  --bg3: #18181f;
-  --bg4: #1e1e27;
-  --bg5: #26262f;
+  --bg:  #0d0d18;
+  --bg2: #111120;
+  --bg3: #161624;
+  --bg4: #1c1c2e;
+  --bg5: #222238;
 
   /* ── Primary — Electric Blue #2563EB (pops against neutral dark) */
   --primary:       #2563EB;
@@ -731,11 +731,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Glass card ───────────────────────────────────────── */
 .login-card {
   width: 100%;
-  background: var(--bg-700);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 26px 22px 22px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-2xl);
+  padding: 24px 22px;
+  box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,.07);
   margin-bottom: 16px;
   position: relative;
   overflow: hidden;
@@ -811,14 +813,14 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── PIN dots ─────────────────────────────────────────── */
 .login-dots { display: flex; gap: 16px; justify-content: center; margin-bottom: 22px; }
 .login-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  border: 1.5px solid var(--border2); transition: all .18s cubic-bezier(.16,1,.3,1);
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--border3); transition: all .2s cubic-bezier(.16,1,.3,1);
   position: relative;
 }
 .login-dot.filled {
   background: var(--primary); border-color: var(--primary);
-  transform: scale(1.2);
-  box-shadow: 0 0 8px rgba(37,99,235,.4);
+  transform: scale(1.25);
+  box-shadow: 0 0 12px var(--primary-glow), 0 0 24px rgba(37,99,235,.15);
 }
 .login-dot.filled::after {
   content: ''; position: absolute; inset: -4px; border-radius: 50%;
@@ -854,8 +856,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   gap: 10px; width: 100%; max-width: 280px; margin: 0 auto 14px;
 }
 .login-key {
-  height: 56px; border-radius: var(--r-sm);
-  background: var(--bg-600); border: 1px solid var(--border);
+  height: 60px; border-radius: var(--r);
+  background: var(--bg-500); border: 1px solid var(--border);
   color: var(--text); cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 1px; transition: background .1s, transform .1s cubic-bezier(.16,1,.3,1), border-color .1s;
@@ -870,7 +872,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .login-key:active { transform: scale(.92); }
 .login-key:active::after { opacity: 1; }
-.login-key-num { font-size: 22px; font-weight: 500; line-height: 1; position: relative; z-index: 1; letter-spacing: -.5px; }
+.login-key-num { font-size: 24px; font-weight: 600; line-height: 1; position: relative; z-index: 1; }
 .login-key-letters { font-size: 8px; font-weight: 600; color: var(--text4); letter-spacing: 1.5px; margin-top: 2px; position: relative; z-index: 1; }
 .login-key-del { background: transparent; border-color: transparent; color: var(--text3); }
 .login-key-del::after { display: none; }
