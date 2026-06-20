@@ -76,6 +76,19 @@ function withAuth(url, token) {
   return token ? `${url}${url.includes('?') ? '&' : '?'}auth=${token}` : url
 }
 
+// Fetch autenticado: si Firebase devuelve 401/403 limpia la caché y reintenta con token nuevo
+async function authedFetch(url, opts = {}) {
+  let token = await safeToken()
+  let resp = await fetch(withAuth(url, token), { cache: 'no-store', ...opts })
+  if (resp.status === 401 || resp.status === 403) {
+    console.warn('[Times] Token rechazado (' + resp.status + '), renovando...')
+    writeCachedAuth(null)
+    token = await safeToken()
+    resp = await fetch(withAuth(url, token), { cache: 'no-store', ...opts })
+  }
+  return resp
+}
+
 export function loadLocal() {
   // Lectura síncrona desde localStorage para startup sin bloquear
   try {
@@ -157,8 +170,7 @@ async function safeToken() {
 
 export async function cloudFetch() {
   try {
-    const token = await safeToken()
-    const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
+    const r = await authedFetch(DB_URL + '.json')
     if (!r.ok) return null
     return await r.json()
   } catch {
@@ -170,12 +182,11 @@ export async function cloudFetch() {
 // Devuelve null (error), 'no-change' (sin cambios), o los datos completos.
 export async function cloudFetchSmart(localTS) {
   try {
-    const token = await safeToken()
-    const tsResp = await fetch(withAuth(DB_URL + '/_ts.json', token), { cache: 'no-store' })
+    const tsResp = await authedFetch(DB_URL + '/_ts.json')
     if (!tsResp.ok) return null
     const remoteTS = await tsResp.json()
     if (remoteTS && localTS && remoteTS <= localTS) return 'no-change'
-    const r = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
+    const r = await authedFetch(DB_URL + '.json')
     if (!r.ok) return null
     return await r.json()
   } catch {
@@ -227,15 +238,14 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
   if (_pushFlight) return
   _pushFlight = true
   try {
-    const token = await safeToken()
     // Optimistic locking: check remote _ts first to detect concurrent edits
     let localBase = db
     try {
-      const tsResp = await fetch(withAuth(DB_URL + '/_ts.json', token), { cache: 'no-store' })
+      const tsResp = await authedFetch(DB_URL + '/_ts.json')
       if (tsResp.ok) {
         const remoteTS = await tsResp.json()
         if (remoteTS && db._ts && remoteTS > db._ts) {
-          const remoteResp = await fetch(withAuth(DB_URL + '.json', token), { cache: 'no-store' })
+          const remoteResp = await authedFetch(DB_URL + '.json')
           if (remoteResp.ok) {
             const remote = await remoteResp.json()
             if (remote) localBase = mergeForPush(db, remote)
@@ -245,7 +255,7 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
     } catch {}
     const payload = { ...localBase, _ts: Date.now() }
     saveLocal(payload)
-    const r = await fetch(withAuth(DB_URL + '.json', token), {
+    const r = await authedFetch(DB_URL + '.json', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -271,8 +281,7 @@ export async function cloudPush(db, onSuccess, onError, onFinalError) {
 
 export async function cloudPatchPath(path, value) {
   try {
-    const token = await safeToken()
-    const r = await fetch(withAuth(DB_URL + '/' + path + '.json', token), {
+    const r = await authedFetch(DB_URL + '/' + path + '.json', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(value)
@@ -317,8 +326,7 @@ export async function pushSubscribe(userId, vapidPub) {
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    const token = await safeToken()
-    await fetch(withAuth(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', token), {
+    await authedFetch(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: buf2b64(key), auth: buf2b64(auth) } })
@@ -349,9 +357,8 @@ export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   try {
-    const token = await safeToken()
     const entry = { userId: to, title, body, tag, url, ts: Date.now() }
-    await fetch(withAuth(FB_BASE + '/pushQueue.json', token), {
+    await authedFetch(FB_BASE + '/pushQueue.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry)

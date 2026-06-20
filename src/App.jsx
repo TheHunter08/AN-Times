@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
 import { initStorage, flushOfflineQueue } from './services/dataService.js'
 import { ToastContainer } from './components/Toast.jsx'
@@ -42,6 +42,50 @@ function UpdateBanner() {
     <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, padding:'10px 16px', background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff', display:'flex', alignItems:'center', gap:12, fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(108,99,255,.4)' }}>
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       <span style={{ flex:1 }}>Actualizando…</span>
+    </div>
+  )
+}
+
+function SyncBanner() {
+  const syncStatus    = useAppStore(s => s.syncStatus)
+  const lastSyncTime  = useAppStore(s => s.lastSyncTime)
+  const fetchDB       = useAppStore(s => s.fetchDB)
+  const currentScreen = useAppStore(s => s.currentScreen)
+  const [retrying, setRetrying] = useState(false)
+
+  const handleRetry = useCallback(async () => {
+    setRetrying(true)
+    await fetchDB()
+    setRetrying(false)
+  }, [fetchDB])
+
+  if (syncStatus !== 'error' || currentScreen === 'login') return null
+
+  const sinceText = lastSyncTime
+    ? (() => {
+        const mins = Math.floor((Date.now() - lastSyncTime) / 60000)
+        return mins < 1 ? 'hace un momento' : `hace ${mins} min`
+      })()
+    : null
+
+  return (
+    <div className="sync-banner" role="alert">
+      <span className="sync-banner-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 6.58A11 11 0 0 0 3.8 8m3.6-4.43A11 11 0 0 1 12 3c5.5 0 10 3.86 10 8.64 0 1.26-.28 2.46-.78 3.54M2 2l20 20M8.85 15.1A3 3 0 0 0 12 18a3 3 0 0 0 2.96-2.54"/>
+        </svg>
+      </span>
+      <span className="sync-banner-text">
+        Sin conexión{sinceText ? ` · ${sinceText}` : ''}
+      </span>
+      <button className="sync-banner-btn" onClick={handleRetry} disabled={retrying}>
+        {retrying
+          ? <span className="sync-banner-spin" />
+          : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        }
+        {retrying ? 'Reintentando…' : 'Reintentar'}
+      </button>
     </div>
   )
 }
@@ -174,6 +218,7 @@ export default function App() {
   return (
     <>
       <UpdateBanner />
+      <SyncBanner />
       {currentScreen === 'login' && <LoginPage />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp' && <EmployeePage />}

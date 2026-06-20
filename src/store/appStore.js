@@ -43,14 +43,14 @@ export const useAppStore = create((set, get) => ({
     const { db } = get()
     const data = await cloudFetchSmart(db._ts)
     if (!data) { set({ syncStatus: 'error' }); return }
-    if (data === 'no-change') { set({ syncStatus: 'synced' }); return }
+    if (data === 'no-change') { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
     const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
     if (shouldMerge) {
       const merged = mergeDB(INITIAL_DB, data)
       saveLocal(merged)
       set({ db: merged })
     }
-    set({ syncStatus: 'synced' })
+    set({ syncStatus: 'synced', lastSyncTime: Date.now() })
   },
 
   // ── Session ─────────────────────────────────────────────────────────
@@ -108,6 +108,7 @@ export const useAppStore = create((set, get) => ({
   // ── UI State ─────────────────────────────────────────────────────────
   isLoading: true,
   syncStatus: 'idle',
+  lastSyncTime: null,
   activeModal: null,
   modalData: null,
 
