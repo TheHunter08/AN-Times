@@ -28,8 +28,10 @@ export const useAppStore = create((set, get) => ({
 
   fetchDB: async () => {
     const { db } = get()
-    const data = await cloudFetch()
-    if (!data) { set({ syncStatus: 'error' }); return }
+    const { ok, data, status } = await cloudFetch()
+    if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
+    set({ syncError: null })
+    if (!data) return // DB accesible pero vacía — no es error
     const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
     if (shouldMerge) {
       const merged = mergeDB(INITIAL_DB, data)
@@ -93,6 +95,7 @@ export const useAppStore = create((set, get) => ({
   // ── UI State ─────────────────────────────────────────────────────────
   isLoading: true,
   syncStatus: 'idle',
+  syncError: null,
   activeModal: null,
   modalData: null,
 

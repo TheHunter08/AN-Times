@@ -50,14 +50,11 @@ export function mergeDB(base, incoming) {
 export async function cloudFetch() {
   try {
     const r = await fetch(DB_URL + '.json', { cache: 'no-store' })
-    if (!r.ok) {
-      console.warn('[DB] cloudFetch HTTP', r.status, r.statusText)
-      return null
-    }
-    return await r.json()
+    if (!r.ok) return { ok: false, data: null, status: r.status }
+    const data = await r.json()
+    return { ok: true, data, status: 200 }
   } catch(e) {
-    console.warn('[DB] cloudFetch error:', e?.message)
-    return null
+    return { ok: false, data: null, status: 'red' }
   }
 }
 
@@ -96,8 +93,8 @@ export function scheduleSave(db, onSuccess, onError, delay = 0) {
 export function startPolling(currentDB, onUpdate, interval = 30000) {
   stopPolling()
   _pollInterval = setInterval(async () => {
-    const data = await cloudFetch()
-    if (!data) return
+    const { ok, data } = await cloudFetch()
+    if (!ok || !data) return
     const shouldMerge = !currentDB._ts || data._ts > currentDB._ts ||
       (data.employees || []).length !== (currentDB.employees || []).length
     if (shouldMerge) onUpdate?.(data)

@@ -154,10 +154,26 @@ export default function AdminPage() {
 
 function SyncBadge() {
   const syncStatus = useAppStore(s => s.syncStatus)
+  const syncError  = useAppStore(s => s.syncError)
+  const fetchDB    = useAppStore(s => s.fetchDB)
+
+  if (syncStatus === 'error') {
+    const label = syncError === 401 ? 'BD: sin acceso (401)' :
+                  syncError === 403 ? 'BD: reglas bloqueadas (403)' :
+                  syncError === 'red' ? 'BD: sin red' :
+                  syncError ? `BD: error ${syncError}` : 'Sin conexión BD'
+    return (
+      <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(229,83,75,.12)', border:'1px solid rgba(229,83,75,.25)', borderRadius:8, padding:'4px 10px' }}>
+        <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--danger)', flexShrink:0 }} />
+        <span style={{ fontSize:10, fontWeight:700, color:'var(--danger)' }}>{label}</span>
+        <button onClick={fetchDB} style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', background:'none', border:'none', cursor:'pointer', padding:0, marginLeft:2 }}>Reintentar</button>
+      </div>
+    )
+  }
   return (
-    <div style={{ fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:4, color: syncStatus==='synced'?'var(--green)':syncStatus==='syncing'?'var(--orange)':'var(--danger)' }}>
+    <div style={{ fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:4, color: syncStatus==='synced'?'var(--green)':'var(--orange)' }}>
       <span style={{ width:6, height:6, borderRadius:'50%', background:'currentColor', flexShrink:0 }} />
-      {syncStatus==='synced'?'Sincronizado':syncStatus==='syncing'?'Guardando…':'Sin conexión'}
+      {syncStatus==='synced'?'Sincronizado':'Guardando…'}
     </div>
   )
 }
