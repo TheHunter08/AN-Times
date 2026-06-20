@@ -21,13 +21,6 @@ export default function LoginPage() {
   const [logoTaps, setLogoTaps] = useState(0)
   const [showAdminBtn, setShowAdminBtn] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [clock, setClock] = useState(() => {
-    const n = new Date()
-    return {
-      time: n.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      date: n.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
-    }
-  })
 
   const emps = sortedEmps(db)
 
@@ -41,18 +34,6 @@ export default function LoginPage() {
   useEffect(() => { fetchDB() }, [])
 
   useEffect(() => { requestAnimationFrame(() => setMounted(true)) }, [])
-
-  useEffect(() => {
-    const tick = () => {
-      const n = new Date()
-      setClock({
-        time: n.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        date: n.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
-      })
-    }
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [])
 
   // Mostrar bloqueo si el empleado ya está en lockout
   useEffect(() => {
@@ -239,12 +220,6 @@ export default function LoginPage() {
             <div className="login-logo-name">TIMES <span>INC</span></div>
             <div className="login-logo-sub">Control de jornada laboral</div>
           </div>
-        </div>
-
-        {/* Clock hero */}
-        <div className="login-clock-hero">
-          <div className="login-clock-time">{clock.time}</div>
-          <div className="login-clock-date">{clock.date}</div>
         </div>
 
         {/* Glass card */}

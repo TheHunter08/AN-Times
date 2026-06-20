@@ -19,12 +19,20 @@ function writeCachedAuth(a) {
 }
 
 async function signInAnon() {
+  if (!FB_CONFIG.apiKey) {
+    console.error('[Times] VITE_FB_API_KEY no configurado')
+    throw new Error('Firebase API key missing')
+  }
   const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ returnSecureToken: true })
   })
-  if (!r.ok) throw new Error('auth signup failed')
+  if (!r.ok) {
+    const body = await r.text().catch(() => '')
+    console.error('[Times] signInAnon falló:', r.status, body)
+    throw new Error('auth signup failed: ' + r.status)
+  }
   const d = await r.json()
   const auth = { idToken: d.idToken, refreshToken: d.refreshToken, expiresAt: Date.now() + Number(d.expiresIn || 3600) * 1000 }
   writeCachedAuth(auth)
@@ -54,6 +62,9 @@ export async function getAuthToken() {
         try { return (await refreshAnon(cached.refreshToken)).idToken } catch {}
       }
       return (await signInAnon()).idToken
+    } catch (e) {
+      writeCachedAuth(null) // limpia caché corrupta para que el próximo intento parta de cero
+      throw e
     } finally {
       _authPromise = null
     }
@@ -138,7 +149,10 @@ export function mergeDB(base, incoming) {
 }
 
 async function safeToken() {
-  try { return await getAuthToken() } catch { return null }
+  try { return await getAuthToken() } catch(e) {
+    console.warn('[Times] Auth anónima falló, intentando sin token:', e?.message || e)
+    return null
+  }
 }
 
 export async function cloudFetch() {
