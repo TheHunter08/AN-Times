@@ -677,7 +677,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   position: relative; z-index: 1;
   display: flex; flex-direction: column; align-items: center;
   width: 100%; max-width: 400px; margin: 0 auto;
-  padding: calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 20px);
+  padding: calc(var(--safe-top) + 10px) 18px calc(var(--safe-bottom) + 10px);
   min-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
   opacity: 0; transform: translateY(16px) scale(.98);
   transition: opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);
@@ -706,10 +706,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Logo row ─────────────────────────────────────────── */
 .login-logo-row {
   display: flex; flex-direction: column; align-items: center;
-  gap: 12px; margin-bottom: 28px; text-align: center;
+  gap: 10px; margin-bottom: 18px; text-align: center;
 }
 .login-logo-icon {
-  width: 64px; height: 64px; flex-shrink: 0;
+  width: 52px; height: 52px; flex-shrink: 0;
   filter: drop-shadow(0 6px 24px rgba(139,92,246,.55));
   animation: logoPulse 4s ease-in-out infinite;
 }
@@ -719,7 +719,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .login-logo-text { text-align: center; }
 .login-logo-name {
-  font-size: 26px; font-weight: 900; letter-spacing: -.6px; line-height: 1.1;
+  font-size: 22px; font-weight: 900; letter-spacing: -.5px; line-height: 1.1;
 }
 .login-logo-name span {
   background: linear-gradient(135deg, #a78bfa, #60a5fa, #34d399);
@@ -727,7 +727,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   background-clip: text;
 }
 .login-logo-sub {
-  font-size: 12px; color: var(--text4); margin-top: 4px; letter-spacing: .3px;
+  font-size: 11px; color: var(--text4); margin-top: 3px; letter-spacing: .3px;
 }
 
 /* ── Glass card ───────────────────────────────────────── */
@@ -738,9 +738,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   -webkit-backdrop-filter: blur(40px) saturate(180%);
   border: 1px solid rgba(255,255,255,.1);
   border-radius: 28px;
-  padding: 26px 22px;
+  padding: 20px 18px 18px;
   box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,.09);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   position: relative;
   overflow: hidden;
 }
@@ -761,7 +761,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .login-tabs {
   display: flex; gap: 4px; padding: 4px;
   background: rgba(255,255,255,.05); border-radius: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
   border: 1px solid rgba(255,255,255,.07);
 }
 .login-tab {
@@ -784,7 +784,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ── Select ───────────────────────────────────────────── */
 .login-select-wrap {
-  position: relative; margin-bottom: 18px;
+  position: relative; margin-bottom: 12px;
 }
 .login-select-ico {
   position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
@@ -807,7 +807,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ── PIN label ────────────────────────────────────────── */
 .login-pin-label {
-  font-size: 11px; margin-bottom: 20px;
+  font-size: 11px; margin-bottom: 14px;
   font-weight: 700; text-align: center; letter-spacing: 1.5px;
   text-transform: uppercase;
   background: linear-gradient(135deg, var(--text3), var(--primary-light));
@@ -816,7 +816,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 
 /* ── PIN dots ─────────────────────────────────────────── */
-.login-dots { display: flex; gap: 20px; justify-content: center; margin-bottom: 24px; }
+.login-dots { display: flex; gap: 18px; justify-content: center; margin-bottom: 18px; }
 .login-dot {
   width: 18px; height: 18px; border-radius: 50%;
   border: 2px solid rgba(255,255,255,.2); transition: all .25s cubic-bezier(.16,1,.3,1);
@@ -859,10 +859,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ── Numpad ────────────────────────────────────────────── */
 .login-numpad {
   display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 10px; width: 100%; max-width: 290px; margin: 0 auto 14px;
+  gap: 8px; width: 100%; max-width: 290px; margin: 0 auto 10px;
 }
 .login-key {
-  height: 64px; border-radius: 20px;
+  height: 56px; border-radius: 18px;
   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
   color: var(--text); cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -878,7 +878,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .login-key:active { transform: scale(.88); background: rgba(139,92,246,.15); }
 .login-key:active::after { opacity: 1; }
-.login-key-num { font-size: 26px; font-weight: 700; line-height: 1; position: relative; z-index: 1; }
+.login-key-num { font-size: 24px; font-weight: 700; line-height: 1; position: relative; z-index: 1; }
 .login-key-letters { font-size: 8px; font-weight: 700; color: var(--text4); letter-spacing: 1.5px; margin-top: 2px; position: relative; z-index: 1; }
 .login-key-del { background: transparent; border-color: transparent; color: var(--text3); }
 .login-key-del::after { display: none; }
@@ -1029,14 +1029,24 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ── Responsive ───────────────────────────────────────── */
 @media (max-height: 700px) {
-  .login-clock-time { font-size: 48px; letter-spacing: -3px; }
-  .login-clock-hero { margin-bottom: 14px; }
-  .login-logo-row { margin-bottom: 18px; }
-  .login-key { height: 52px; }
-  .login-key-num { font-size: 21px; }
+  .login-logo-row { margin-bottom: 12px; }
+  .login-logo-icon { width: 44px; height: 44px; }
+  .login-logo-name { font-size: 19px; }
+  .login-key { height: 50px; border-radius: 15px; }
+  .login-key-num { font-size: 22px; }
+  .login-numpad { gap: 7px; }
+  .login-dots { gap: 14px; margin-bottom: 14px; }
+  .login-dot { width: 15px; height: 15px; }
+  .login-pin-label { margin-bottom: 10px; }
+  .login-card { padding: 16px 16px 14px; }
+  .login-tabs { margin-bottom: 12px; }
+  .login-select-wrap { margin-bottom: 10px; }
 }
-@media (max-height: 600px) {
-  .login-clock-hero { display: none; }
+@media (max-height: 580px) {
+  .login-logo-row { margin-bottom: 8px; }
+  .login-logo-sub { display: none; }
+  .login-key { height: 46px; }
+  .login-numpad { gap: 6px; }
 }
 
 /* ── Admin screen — layout handled by #sAdmin at bottom of file ─ */
