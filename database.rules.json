@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "an_times_data": {
+      ".read": true,
+      ".write": true
+    },
+    "pushSubs": {
+      ".read": true,
+      ".write": true
+    },
+    "auditLog": {
+      ".read": false,
+      ".write": true
+    },
+    "pushQueue": {
+      ".read": false,
+      ".write": true
+    }
+  }
+}

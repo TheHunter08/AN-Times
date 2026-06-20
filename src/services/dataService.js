@@ -50,9 +50,13 @@ export function mergeDB(base, incoming) {
 export async function cloudFetch() {
   try {
     const r = await fetch(DB_URL + '.json', { cache: 'no-store' })
-    if (!r.ok) return null
+    if (!r.ok) {
+      console.warn('[DB] cloudFetch HTTP', r.status, r.statusText)
+      return null
+    }
     return await r.json()
-  } catch {
+  } catch(e) {
+    console.warn('[DB] cloudFetch error:', e?.message)
     return null
   }
 }
