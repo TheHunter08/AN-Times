@@ -47,6 +47,18 @@ export function mergeDB(base, incoming) {
   }
 }
 
+// Fetch solo el _ts primero (~20 bytes). Si no cambió, no descargamos los 500KB+
+export async function cloudFetchTs() {
+  try {
+    const r = await fetch(DB_URL + '/_ts.json', { cache: 'no-store' })
+    if (!r.ok) return { ok: false, ts: null, status: r.status }
+    const ts = await r.json()
+    return { ok: true, ts: ts || 0 }
+  } catch {
+    return { ok: false, ts: null, status: 'red' }
+  }
+}
+
 export async function cloudFetch() {
   try {
     const r = await fetch(DB_URL + '.json', { cache: 'no-store' })

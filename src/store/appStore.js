@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs } from '../services/dataService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -28,16 +28,18 @@ export const useAppStore = create((set, get) => ({
 
   fetchDB: async () => {
     const { db } = get()
+    // 1. Comprueba solo _ts (~20 bytes) — evita descargar 500KB+ si no cambió nada
+    const tsResult = await cloudFetchTs()
+    if (!tsResult.ok) { set({ syncStatus: 'error', syncError: tsResult.status }); return }
+    set({ syncError: null })
+    if (tsResult.ts && db._ts && tsResult.ts <= db._ts) return // sin cambios, no descarga
+    // 2. Solo si cambió, descarga completo
     const { ok, data, status } = await cloudFetch()
     if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
-    set({ syncError: null })
-    if (!data) return // DB accesible pero vacía — no es error
-    const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
-    if (shouldMerge) {
-      const merged = mergeDB(INITIAL_DB, data)
-      saveLocal(merged)
-      set({ db: merged, syncStatus: 'synced' })
-    }
+    if (!data) return
+    const merged = mergeDB(INITIAL_DB, data)
+    saveLocal(merged)
+    set({ db: merged, syncStatus: 'synced' })
   },
 
   // ── Session ─────────────────────────────────────────────────────────

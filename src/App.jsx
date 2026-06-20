@@ -13,8 +13,12 @@ export default function App() {
 
   useEffect(() => {
     fetchDB()
-    const iv = setInterval(fetchDB, 60000)
-    return () => clearInterval(iv)
+    // Poll every 5 min (was 60s — reducido 5x para no agotar cuota Firebase)
+    const iv = setInterval(fetchDB, 5 * 60 * 1000)
+    // Parar cuando la app va a segundo plano, reanudar al volver
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVisible) }
   }, [])
 
   useEffect(() => {
