@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime } from '../services/dataService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -28,12 +28,15 @@ export const useAppStore = create((set, get) => ({
 
   fetchDB: async () => {
     const { db } = get()
-    // 1. Comprueba solo _ts (~20 bytes) — evita descargar 500KB+ si no cambió nada
+    // Comprueba solo updated_at primero (mínimo tráfico)
     const tsResult = await cloudFetchTs()
-    if (!tsResult.ok) { set({ syncStatus: 'error', syncError: tsResult.status }); return }
+    if (!tsResult.ok) {
+      set({ syncStatus: 'error', syncError: tsResult.status })
+      return
+    }
     set({ syncError: null })
-    if (tsResult.ts && db._ts && tsResult.ts <= db._ts) return // sin cambios, no descarga
-    // 2. Solo si cambió, descarga completo
+    if (tsResult.ts && db._ts && tsResult.ts <= db._ts) return // sin cambios
+    // Descarga completo solo si cambió
     const { ok, data, status } = await cloudFetch()
     if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
     if (!data) return
@@ -41,6 +44,19 @@ export const useAppStore = create((set, get) => ({
     saveLocal(merged)
     set({ db: merged, syncStatus: 'synced' })
   },
+
+  // ── Realtime Supabase ────────────────────────────────────────────────
+  initRealtime: () => {
+    startRealtime(
+      () => get().db,
+      (incoming) => {
+        const merged = mergeDB(INITIAL_DB, incoming)
+        saveLocal(merged)
+        set({ db: merged, syncStatus: 'synced' })
+      }
+    )
+  },
+  stopRealtime,
 
   // ── Session ─────────────────────────────────────────────────────────
   session: storedSes || { user: null, isAdmin: false, isEnc: false, isJO: false },

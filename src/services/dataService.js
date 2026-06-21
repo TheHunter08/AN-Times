@@ -1,17 +1,20 @@
-import { DB_URL, FB_BASE, INITIAL_DB, ADMIN_PIN } from '../config/constants.js'
+import { createClient } from '@supabase/supabase-js'
+import { SB_URL, SB_ANON, INITIAL_DB, ADMIN_PIN } from '../config/constants.js'
 
-let _pushFlight = false
-let _saveRetry = 0
-let _saveTimer = null
-let _pollInterval = null
+// ── Cliente Supabase ──────────────────────────────────────────────────────────
+export const supabase = (SB_URL && SB_ANON)
+  ? createClient(SB_URL, SB_ANON)
+  : null
 
+const TABLE      = 'app_data'
+const PUSH_TABLE = 'push_subs'
+const ROW_ID     = 1
+
+// ── Local storage ─────────────────────────────────────────────────────────────
 export function loadLocal() {
   try {
     const raw = localStorage.getItem('an_times_v1')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      return mergeDB(INITIAL_DB, parsed)
-    }
+    if (raw) return mergeDB(INITIAL_DB, JSON.parse(raw))
   } catch {}
   return { ...INITIAL_DB }
 }
@@ -20,6 +23,7 @@ export function saveLocal(db) {
   try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch {}
 }
 
+// ── mergeDB ───────────────────────────────────────────────────────────────────
 export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
   const adm = base.employees?.find(e => e.isAdmin) || {
@@ -29,60 +33,74 @@ export function mergeDB(base, incoming) {
   }
   const inc = incoming.employees?.length ? incoming.employees : base.employees
   return {
-    empresas:        (incoming.empresas?.length)        ? incoming.empresas        : base.empresas,
-    obras:           (incoming.obras?.length)           ? incoming.obras           : base.obras,
-    centrosTrabajo:  (incoming.centrosTrabajo?.length)  ? incoming.centrosTrabajo  : base.centrosTrabajo,
-    employees:       inc.some(e => e.isAdmin)           ? inc                      : [...inc, adm],
-    records:         incoming.records       || [],
-    vacaciones:      incoming.vacaciones    || [],
-    medicos:         incoming.medicos       || [],
-    ausencias:       incoming.ausencias     || [],
-    mensajes:        incoming.mensajes      || [],
-    notis:           incoming.notis         || [],
-    cierres:         incoming.cierres       || [],
-    monthSnapshots:  incoming.monthSnapshots|| {},
-    firmas:          incoming.firmas        || {},
-    documentos:      incoming.documentos    || [],
-    _ts:             incoming._ts           || 0
+    empresas:       (incoming.empresas?.length)       ? incoming.empresas       : base.empresas,
+    obras:          (incoming.obras?.length)          ? incoming.obras          : base.obras,
+    centrosTrabajo: (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
+    employees:      inc.some(e => e.isAdmin)          ? inc                     : [...inc, adm],
+    records:        incoming.records        || [],
+    vacaciones:     incoming.vacaciones     || [],
+    medicos:        incoming.medicos        || [],
+    ausencias:      incoming.ausencias      || [],
+    mensajes:       incoming.mensajes       || [],
+    notis:          incoming.notis          || [],
+    cierres:        incoming.cierres        || [],
+    monthSnapshots: incoming.monthSnapshots || {},
+    firmas:         incoming.firmas         || {},
+    documentos:     incoming.documentos     || [],
+    _ts:            incoming._ts            || 0
   }
 }
 
-// Fetch solo el _ts primero (~20 bytes). Si no cambió, no descargamos los 500KB+
-export async function cloudFetchTs() {
+// ── Supabase fetch (descarga datos completos) ─────────────────────────────────
+export async function cloudFetch() {
+  if (!supabase) return { ok: false, data: null, status: 'no_config' }
   try {
-    const r = await fetch(DB_URL + '/_ts.json', { cache: 'no-store' })
-    if (!r.ok) return { ok: false, ts: null, status: r.status }
-    const ts = await r.json()
-    return { ok: true, ts: ts || 0 }
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('data, updated_at')
+      .eq('id', ROW_ID)
+      .maybeSingle()
+    if (error) return { ok: false, data: null, status: error.code || 'sb_error' }
+    return { ok: true, data: data?.data || null, updatedAt: data?.updated_at || null }
+  } catch (e) {
+    return { ok: false, data: null, status: 'red' }
+  }
+}
+
+// ── Supabase fetch ligero: solo updated_at (~50 bytes) ───────────────────────
+export async function cloudFetchTs() {
+  if (!supabase) return { ok: false, ts: null, status: 'no_config' }
+  try {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('updated_at')
+      .eq('id', ROW_ID)
+      .maybeSingle()
+    if (error) return { ok: false, ts: null, status: error.code || 'sb_error' }
+    return { ok: true, ts: data?.updated_at ? new Date(data.updated_at).getTime() : 0 }
   } catch {
     return { ok: false, ts: null, status: 'red' }
   }
 }
 
-export async function cloudFetch() {
-  try {
-    const r = await fetch(DB_URL + '.json', { cache: 'no-store' })
-    if (!r.ok) return { ok: false, data: null, status: r.status }
-    const data = await r.json()
-    return { ok: true, data, status: 200 }
-  } catch(e) {
-    return { ok: false, data: null, status: 'red' }
-  }
-}
+// ── Supabase push (guarda datos) ──────────────────────────────────────────────
+let _pushFlight = false
+let _saveRetry  = 0
+let _saveTimer  = null
 
 export function cloudPush(db, onSuccess, onError) {
+  if (!supabase) { onError?.(); return }
   if (_pushFlight) return
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
-  fetch(DB_URL + '.json', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-    .then(r => {
+
+  supabase
+    .from(TABLE)
+    .upsert({ id: ROW_ID, data: payload, updated_at: new Date().toISOString() })
+    .then(({ error }) => {
       _pushFlight = false
-      if (!r.ok) throw new Error('HTTP ' + r.status)
+      if (error) throw error
       _saveRetry = 0
       onSuccess?.(payload)
     })
@@ -102,22 +120,34 @@ export function scheduleSave(db, onSuccess, onError, delay = 0) {
   _saveTimer = setTimeout(() => cloudPush(db, onSuccess, onError), delay)
 }
 
-export function startPolling(currentDB, onUpdate, interval = 30000) {
-  stopPolling()
-  _pollInterval = setInterval(async () => {
-    const { ok, data } = await cloudFetch()
-    if (!ok || !data) return
-    const shouldMerge = !currentDB._ts || data._ts > currentDB._ts ||
-      (data.employees || []).length !== (currentDB.employees || []).length
-    if (shouldMerge) onUpdate?.(data)
-  }, interval)
+// ── Supabase Realtime ─────────────────────────────────────────────────────────
+let _realtimeChannel = null
+
+export function startRealtime(currentGetDB, onUpdate) {
+  if (!supabase) return
+  stopRealtime()
+  _realtimeChannel = supabase
+    .channel('app_data_rt')
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` },
+      (payload) => {
+        const incoming = payload.new?.data
+        if (!incoming) return
+        const local = currentGetDB()
+        if (incoming._ts && local._ts && incoming._ts <= local._ts) return
+        onUpdate?.(incoming)
+      }
+    )
+    .subscribe()
 }
 
-export function stopPolling() {
-  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null }
+export function stopRealtime() {
+  if (_realtimeChannel) { supabase?.removeChannel(_realtimeChannel); _realtimeChannel = null }
 }
 
+// ── Push notifications ────────────────────────────────────────────────────────
 export async function pushSubscribe(userId, vapidPub) {
+  if (!supabase) return
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     const perm = await Notification.requestPermission()
@@ -132,10 +162,12 @@ export async function pushSubscribe(userId, vapidPub) {
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    await fetch(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: buf2b64(key), auth: buf2b64(auth) } })
+    await supabase.from(PUSH_TABLE).upsert({
+      user_id: userId,
+      endpoint: sub.endpoint,
+      p256dh: buf2b64(key),
+      auth: buf2b64(auth),
+      updated_at: new Date().toISOString()
     })
   } catch(e) { console.warn('[PUSH]', e) }
 }
@@ -157,11 +189,6 @@ export function auditLog(action, detail, empId, db) {
       user: empId || 'system'
     }
     const notis = [...(db.notis || []), entry]
-    fetch(FB_BASE + '/auditLog.json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
-    }).catch(() => {})
     return { ...db, notis }
   } catch { return db }
 }

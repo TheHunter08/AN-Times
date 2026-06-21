@@ -8,17 +8,26 @@ import AdminPage from './pages/AdminPage.jsx'
 
 export default function App() {
   const currentScreen = useAppStore(s => s.currentScreen)
-  const fetchDB = useAppStore(s => s.fetchDB)
+  const fetchDB       = useAppStore(s => s.fetchDB)
+  const initRealtime  = useAppStore(s => s.initRealtime)
+  const stopRealtime  = useAppStore(s => s.stopRealtime)
   useViewport()
 
   useEffect(() => {
+    // Carga inicial
     fetchDB()
-    // Poll every 5 min (was 60s — reducido 5x para no agotar cuota Firebase)
+    // Realtime: recibe cambios al instante sin polling
+    initRealtime()
+    // Fallback: sync cada 5 min si Realtime cae o no está configurado
     const iv = setInterval(fetchDB, 5 * 60 * 1000)
-    // Parar cuando la app va a segundo plano, reanudar al volver
+    // Sync al volver de segundo plano
     const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
     document.addEventListener('visibilitychange', onVisible)
-    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVisible) }
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVisible)
+      stopRealtime()
+    }
   }, [])
 
   useEffect(() => {

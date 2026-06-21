@@ -1,5 +1,8 @@
-export const DB_URL = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app/an_times_data'
-export const FB_BASE = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app'
+// ── Supabase (base de datos principal) ──────────────────────────────────────
+export const SB_URL  = import.meta.env.VITE_SB_URL  || ''
+export const SB_ANON = import.meta.env.VITE_SB_ANON || ''
+
+// ── Firebase Auth (solo para login Google/email — no toca la BD) ─────────────
 export const ADMIN_PIN = '0824'
 export const VAPID_PUB = 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
 
@@ -11,7 +14,6 @@ export const VPM = 2.5      // vacation days per month
 export const FB_CONFIG = {
   apiKey:            'AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ',
   authDomain:        'times-inc.firebaseapp.com',
-  databaseURL:       'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app',
   projectId:         'times-inc',
   storageBucket:     'times-inc.firebasestorage.app',
   messagingSenderId: '366356529016',
