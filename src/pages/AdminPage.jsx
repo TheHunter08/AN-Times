@@ -727,7 +727,15 @@ function CtrlCard({ e, live, todayMin, force }) {
         </div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{live?.centro || e.centroTrabajo || '—'}</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:1, display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{live?.centro || e.centroTrabajo || '—'}</span>
+            {live?.locInicio && (
+              <span title={`GPS: ${live.locInicio.lat?.toFixed(4)}, ${live.locInicio.lng?.toFixed(4)}`}
+                style={{ flexShrink:0, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:8, background:'rgba(6,182,212,.12)', color:'var(--teal)', border:'1px solid rgba(6,182,212,.25)' }}>
+                GPS ✓
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div style={{ textAlign:'center', marginBottom:12 }}>
@@ -808,6 +816,16 @@ function PanelControl({ db, toast, saveDB, session }) {
           ))}
         </div>
       </div>
+
+      {!liveRecs.length && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'rgba(96,116,138,.08)', border:'1px solid var(--border)', borderRadius:'var(--r)', marginBottom:16 }}>
+          <span style={{ fontSize:16 }}>😴</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text2)' }}>Nadie activo ahora mismo</div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>Los fichajes aparecerán aquí en tiempo real cuando los empleados inicien jornada</div>
+          </div>
+        </div>
+      )}
 
       {view === 'cards' && (
         <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
@@ -899,6 +917,26 @@ function PanelFichajes({ db, toast, saveDB }) {
     })
   }
 
+  const downloadCSV = () => {
+    const headers = ['Empleado','Centro','Fecha','Entrada','Salida','Trabajo (min)','Descanso (min)']
+    const rows = filtered.map(r => [
+      r.empName || '',
+      r.centro || '',
+      r.inicio.slice(0,10),
+      r.inicio.slice(11,16),
+      r.fin?.slice(11,16) || '',
+      Math.floor(recWorkSecs(r)/60),
+      Math.floor((r.breakSecs||0)/60)
+    ])
+    const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `fichajes-${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -906,6 +944,10 @@ function PanelFichajes({ db, toast, saveDB }) {
           <h1 className="adm-panel-title gradient-text">Fichajes</h1>
           <div className="adm-panel-sub" style={{ marginTop:2 }}>{filtered.length} registros · {mhm(totalWork)} trabajo</div>
         </div>
+        <button onClick={downloadCSV} className="btn btn-secondary" style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar CSV
+        </button>
       </div>
 
       {/* Quick filters */}
@@ -1191,10 +1233,12 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
           if (!corr) return
           let newRecords = db.records || []
           if (estado === 'aprobada') {
-            newRecords = newRecords.map(r => r.id === corr.recId
-              ? { ...r, inicio: corr.propInicio, fin: corr.propFin, workSecs: 0 }
-              : r
-            )
+            newRecords = newRecords.map(r => {
+              if (r.id !== corr.recId) return r
+              const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin }
+              const t = calcSecs(updated)
+              return { ...updated, workSecs: t.work, breakSecs: t.brk }
+            })
           }
           const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin' } : c)
           const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
@@ -1314,7 +1358,10 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const emps2 = editEmp
       ? (db.employees||[]).map(e => e.id === editEmp ? updatedForm : e)
       : [...(db.employees||[]), updatedForm]
-    const withAudit = auditLog(db, editEmp ? 'Empleado actualizado' : 'Empleado creado', form.name, session?.user?.name || 'Admin')
+    const auditAction = editEmp
+      ? (isNewPin ? 'Empleado actualizado (PIN cambiado)' : 'Empleado actualizado')
+      : 'Empleado creado'
+    const withAudit = auditLog(db, auditAction, form.name, session?.user?.name || 'Admin')
     saveDB({ employees: emps2, audit: withAudit.audit })
     toast(editEmp ? '✅ Empleado actualizado' : '✅ Empleado creado')
     setShowForm(false)
@@ -3092,32 +3139,54 @@ function PanelMensajes({ db, toast, saveDB, session }) {
 
 // ─── PANEL AUDITORÍA ──────────────────────────────────────────────────────────
 function PanelAuditoria({ db }) {
+  const [auditQ, setAuditQ] = useState('')
+  const [auditUser, setAuditUser] = useState('')
   const audit = (db.audit || []).slice().reverse()
+  const users = [...new Set(audit.map(a => a.user).filter(Boolean))]
   const ACTION_COLORS = {
     'Jornada': 'var(--green)', 'Empleado': 'var(--primary-light)', 'Obra': 'var(--teal)',
     'Documento': 'var(--orange)', 'Solicitud': 'var(--accent)', 'Centro': 'var(--secondary)',
+    'PIN': 'var(--red)', 'correccion': 'var(--yellow)',
   }
   const getColor = (action) => {
-    for (const [k, v] of Object.entries(ACTION_COLORS)) if (action?.includes(k)) return v
+    for (const [k, v] of Object.entries(ACTION_COLORS)) if (action?.toLowerCase().includes(k.toLowerCase())) return v
     return 'var(--text3)'
   }
+  const filtered = audit.filter(a => {
+    if (auditQ) {
+      const q = auditQ.toLowerCase()
+      if (!a.action?.toLowerCase().includes(q) && !a.detail?.toLowerCase().includes(q)) return false
+    }
+    if (auditUser && a.user !== auditUser) return false
+    return true
+  })
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Auditoría</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2 }}>{audit.length} registros</div>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{filtered.length} de {audit.length} registros</div>
         </div>
       </div>
+      <div className="premium-filters" style={{ marginBottom:16 }}>
+        <input placeholder="Buscar acción o detalle…" value={auditQ} onChange={e => setAuditQ(e.target.value)} style={{ flex:1, minWidth:160 }} />
+        <select value={auditUser} onChange={e => setAuditUser(e.target.value)}>
+          <option value="">Todos los usuarios</option>
+          {users.map(u => <option key={u} value={u}>{u}</option>)}
+        </select>
+        {(auditQ || auditUser) && (
+          <button onClick={() => { setAuditQ(''); setAuditUser('') }} className="btn btn-secondary" style={{ fontSize:12 }}>Limpiar</button>
+        )}
+      </div>
       <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-        {!audit.length && (
+        {!filtered.length && (
           <div className="empty-premium">
             <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
-            <div className="empty-premium-title">Sin registros</div>
-            <div className="empty-premium-sub">Las acciones del sistema se registrarán aquí automáticamente</div>
+            <div className="empty-premium-title">{audit.length ? 'Sin resultados' : 'Sin registros'}</div>
+            <div className="empty-premium-sub">{audit.length ? 'Prueba con otros filtros' : 'Las acciones del sistema se registrarán aquí automáticamente'}</div>
           </div>
         )}
-        {audit.map((a, i) => (
+        {filtered.map((a, i) => (
           <div key={i} className="audit-row-premium">
             <div className="audit-dot" style={{ background: getColor(a.action) }} />
             <div style={{ flex:1, minWidth:0 }}>

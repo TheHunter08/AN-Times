@@ -22,7 +22,7 @@ export const useAppStore = create((set, get) => ({
     const merged = { ...get().db, ...(partial || {}), _ts: Date.now() }
     if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
     saveLocal(merged)
-    set({ db: merged })
+    set({ db: merged, syncStatus: 'syncing' })
     cloudPush(merged, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
     return merged
   },
