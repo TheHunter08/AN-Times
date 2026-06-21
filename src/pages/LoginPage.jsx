@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
-import { loadFirebase, signInEmail, signInGoogle, resetPassword, isFirebaseReady, AUTH_ERRORS } from '../services/authService.js'
+import { signInEmail, signInGoogle, resetPassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
 import { hashPin, isPinHashed, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
@@ -132,59 +132,69 @@ export default function LoginPage() {
 
   const handlePinDel = () => { setPin(p => p.slice(0, -1)); setErr('') }
 
+  // Manejar callback de Google OAuth (redirect de vuelta desde Supabase)
+  useEffect(() => {
+    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user?.email) {
+        const userEmail = session.user.email.toLowerCase()
+        const emp = await findEmployeeByEmail(userEmail)
+        // Limpiamos la sesión Supabase — la app gestiona su propia sesión por PIN
+        await authSignOut()
+        if (emp) doLogin(emp)
+        else if (['admin@times-inc.com', 'admin@timesync.app'].includes(userEmail)) doAdminLogin()
+        else setErr('Cuenta no registrada. Contacta al administrador.')
+        // Limpiar ?auth=google de la URL
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   const doEmailLogin = async () => {
     setErr('')
     if (!email || !pass) { setErr('Introduce tu email y contraseña'); return }
+    if (!isAuthReady()) { setErr('Sin conexión con el servidor. Usa el PIN.'); return }
     setLoading(true)
-    if (!isFirebaseReady()) {
-      await new Promise(res => { const t = setTimeout(res, 10000); loadFirebase(() => { clearTimeout(t); res() }) })
-    }
-    if (!isFirebaseReady()) { setErr('Sin conexión con Firebase. Usa el PIN.'); setLoading(false); return }
     try {
       const result = await signInEmail(email, pass)
-      const fbUser = result.user
-      const emp = await findEmployeeByEmail(fbUser.email)
+      const userEmail = result.user?.email
+      const emp = await findEmployeeByEmail(userEmail)
+      await authSignOut()
       if (emp) doLogin(emp)
-      else if (['admin@times-inc.com', 'admin@timesync.app'].includes(fbUser.email?.toLowerCase())) doAdminLogin()
+      else if (['admin@times-inc.com', 'admin@timesync.app'].includes(userEmail?.toLowerCase())) doAdminLogin()
       else setErr('Tu cuenta no está registrada. Contacta al administrador.')
     } catch (ex) {
-      setErr(AUTH_ERRORS[ex.code] || ex.message || 'Error al iniciar sesión')
+      setErr(ex.message || 'Error al iniciar sesión')
     }
     setLoading(false)
   }
 
   const doGoogleLogin = async () => {
     setErr('')
+    if (!isAuthReady()) { setErr('Sin conexión con el servidor.'); return }
     setLoading(true)
-    if (!isFirebaseReady()) {
-      await new Promise(res => { const t = setTimeout(res, 10000); loadFirebase(() => { clearTimeout(t); res() }) })
-    }
-    if (!isFirebaseReady()) { setErr('Sin conexión.'); setLoading(false); return }
     try {
-      const result = await signInGoogle()
-      const fbUser = result.user
-      const emp = await findEmployeeByEmail(fbUser.email)
-      if (emp) doLogin(emp)
-      else setErr('Cuenta no registrada. Contacta al administrador.')
+      // signInGoogle redirige al usuario a Google — el callback se maneja en onAuthStateChange
+      await signInGoogle()
+      // Si llegamos aquí significa que la redirección no se produjo (error)
+      setLoading(false)
     } catch (ex) {
-      if (AUTH_ERRORS[ex.code] !== null) setErr(AUTH_ERRORS[ex.code] || 'Error Google: ' + (ex.message || ex.code))
+      if (ex.message) setErr(ex.message)
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const doForgot = async () => {
     setErr(''); setForgotSent(false)
     if (!forgotEmail) { setErr('Introduce tu email'); return }
+    if (!isAuthReady()) { setErr('Sin conexión con el servidor.'); return }
     setLoading(true)
-    if (!isFirebaseReady()) {
-      await new Promise(res => { const t = setTimeout(res, 10000); loadFirebase(() => { clearTimeout(t); res() }) })
-    }
     try {
       await resetPassword(forgotEmail)
       setForgotSent(true)
       setTimeout(() => setMode('email'), 4000)
     } catch (ex) {
-      setErr(AUTH_ERRORS[ex.code] || 'Error al enviar. Intenta de nuevo.')
+      setErr(ex.message || 'Error al enviar. Intenta de nuevo.')
     }
     setLoading(false)
   }

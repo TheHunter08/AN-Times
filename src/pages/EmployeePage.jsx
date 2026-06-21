@@ -367,10 +367,7 @@ export default function EmployeePage() {
     saveDB({ records })
   }, [db, openRec, saveDB, toast])
 
-  const doLogout = () => {
-    logout()
-    try { if (window._fbSignOut) window._fbSignOut() } catch {}
-  }
+  const doLogout = () => { logout() }
 
   if (!u) return null
 

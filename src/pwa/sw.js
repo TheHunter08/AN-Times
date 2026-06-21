@@ -32,16 +32,10 @@ registerRoute(
   new CacheFirst({ cacheName: 'google-fonts', plugins: [new ExpirationPlugin({ maxAgeSeconds: 60*60*24*365 })] })
 )
 
-// Cache Firebase CDN
+// Network-first for Supabase API
 registerRoute(
-  ({ url }) => url.hostname === 'www.gstatic.com' && url.pathname.includes('firebase'),
-  new CacheFirst({ cacheName: 'firebase-cdn', plugins: [new ExpirationPlugin({ maxAgeSeconds: 60*60*24*30 })] })
-)
-
-// Network-first for Firebase DB
-registerRoute(
-  ({ url }) => url.hostname.includes('firebasedatabase.app'),
-  new NetworkFirst({ cacheName: 'firebase-db', networkTimeoutSeconds: 10 })
+  ({ url }) => url.hostname.includes('supabase.co'),
+  new NetworkFirst({ cacheName: 'supabase-api', networkTimeoutSeconds: 10 })
 )
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────

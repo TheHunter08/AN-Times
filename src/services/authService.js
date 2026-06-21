@@ -1,72 +1,62 @@
-import { FB_CONFIG } from '../config/constants.js'
-
-let _fbReady = false
-let _fbLoading = false
-let _auth = null
-
-export function loadFirebase(callback) {
-  if (_fbReady) { callback?.(); return }
-  if (_fbLoading) {
-    const check = setInterval(() => { if (_fbReady) { clearInterval(check); callback?.() } }, 100)
-    return
-  }
-  _fbLoading = true
-
-  const s1 = document.createElement('script')
-  s1.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js'
-  s1.onerror = () => { _fbLoading = false; console.warn('[TIMES] Firebase no disponible') }
-  s1.onload = () => {
-    const s2 = document.createElement('script')
-    s2.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'
-    s2.onerror = () => { _fbLoading = false }
-    s2.onload = () => {
-      try {
-        if (!window.firebase.apps.length) window.firebase.initializeApp(FB_CONFIG)
-        _auth = window.firebase.auth()
-        const gProv = new window.firebase.auth.GoogleAuthProvider()
-        gProv.setCustomParameters({ prompt: 'select_account' })
-        window._fbGoogleProv = gProv
-        _fbReady = true
-        _fbLoading = false
-        callback?.()
-      } catch(err) {
-        _fbLoading = false
-        console.warn('[TIMES] Firebase init:', err.message)
-      }
-    }
-    document.head.appendChild(s2)
-  }
-  document.head.appendChild(s1)
-}
-
-export const signInEmail = (email, pass) => {
-  if (!_auth) return Promise.reject(new Error('Firebase no cargado'))
-  return _auth.signInWithEmailAndPassword(email, pass)
-}
-
-export const signInGoogle = () => {
-  if (!_auth) return Promise.reject(new Error('Firebase no cargado'))
-  return _auth.signInWithPopup(window._fbGoogleProv)
-}
-
-export const signOut = () => _auth ? _auth.signOut() : Promise.resolve()
-
-export const resetPassword = email => {
-  if (!_auth) return Promise.reject(new Error('Firebase no cargado'))
-  return _auth.sendPasswordResetEmail(email)
-}
-
-export const isFirebaseReady = () => _fbReady
+import { supabase } from './dataService.js'
 
 export const AUTH_ERRORS = {
-  'auth/invalid-email':          'Email no válido',
-  'auth/wrong-password':         'Contraseña incorrecta',
-  'auth/invalid-credential':     'Email o contraseña incorrectos',
-  'auth/user-not-found':         'No existe cuenta con ese email',
-  'auth/too-many-requests':      'Demasiados intentos. Espera unos minutos.',
-  'auth/network-request-failed': 'Sin conexión. Verifica tu internet.',
-  'auth/user-disabled':          'Esta cuenta ha sido desactivada.',
-  'auth/popup-blocked':          'Permite popups en tu navegador',
-  'auth/popup-closed-by-user':   null,
-  'auth/cancelled-popup-request': null
+  'Invalid login credentials':      'Email o contraseña incorrectos',
+  'Email not confirmed':            'Confirma tu email antes de entrar',
+  'User not found':                 'No existe cuenta con ese email',
+  'Too many requests':              'Demasiados intentos. Espera unos minutos.',
+  'Network request failed':         'Sin conexión. Verifica tu internet.',
+  'popup_closed_by_user':          null,
+  'access_denied':                  null,
+}
+
+function mapError(err) {
+  const msg = err?.message || ''
+  for (const [key, val] of Object.entries(AUTH_ERRORS)) {
+    if (msg.toLowerCase().includes(key.toLowerCase())) return val
+  }
+  return msg || 'Error al iniciar sesión'
+}
+
+export async function signInEmail(email, pass) {
+  if (!supabase) throw new Error('Sin conexión con el servidor')
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass })
+  if (error) {
+    const mapped = mapError(error)
+    throw { code: error.message, message: mapped }
+  }
+  return data
+}
+
+export async function signInGoogle() {
+  if (!supabase) throw new Error('Sin conexión con el servidor')
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/?auth=google' }
+  })
+  if (error) {
+    const mapped = mapError(error)
+    throw { code: error.message, message: mapped }
+  }
+}
+
+export async function resetPassword(email) {
+  if (!supabase) throw new Error('Sin conexión con el servidor')
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/?reset=1`
+  })
+  if (error) throw { code: error.message, message: mapError(error) }
+}
+
+export async function signOut() {
+  try { await supabase?.auth.signOut() } catch {}
+}
+
+export function isAuthReady() {
+  return !!supabase
+}
+
+export function onAuthStateChange(cb) {
+  if (!supabase) return { data: { subscription: { unsubscribe: () => {} } } }
+  return supabase.auth.onAuthStateChange(cb)
 }

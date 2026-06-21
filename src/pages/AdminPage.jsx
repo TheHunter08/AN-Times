@@ -137,7 +137,7 @@ export default function AdminPage() {
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
   const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
 
-  const doLogout = () => { logout(); try { if (window._fbSignOut) window._fbSignOut() } catch {} }
+  const doLogout = () => { logout() }
 
   const nav = (id) => { setAdminPage(id); if (window.innerWidth < 960) setSideOpen(false) }
 
