@@ -46,6 +46,7 @@ export default function LoginPage() {
   }, [selectedEmpId, db])
 
   const verifyingRef = useRef(false)
+  const opIdRef = useRef(0)
 
   const doLogin = useCallback((emp) => {
     const ses = {
@@ -95,6 +96,7 @@ export default function LoginPage() {
       if (newPin.length < adminPinLen) return
 
       verifyingRef.current = true
+      const opId = ++opIdRef.current
       const storedAdminHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
       let adminOk = false
       if (storedAdminHash && isPinHashed(storedAdminHash)) {
@@ -108,6 +110,7 @@ export default function LoginPage() {
         }
       }
       verifyingRef.current = false
+      if (opId !== opIdRef.current) return  // resultado obsoleto, descartar
 
       if (adminOk) {
         clearLockout('__admin__')
@@ -136,8 +139,10 @@ export default function LoginPage() {
     if (newPin.length < expectedLen) return
 
     verifyingRef.current = true
+    const opId2 = ++opIdRef.current
     const ok = await verifyPin(newPin, emp.pin, emp.id)
     verifyingRef.current = false
+    if (opId2 !== opIdRef.current) return  // resultado obsoleto, descartar
 
     if (ok) {
       clearLockout(emp.id)
@@ -234,6 +239,18 @@ export default function LoginPage() {
     setTimeout(() => setLogoTaps(0), 800)
     if (next >= 3) { setLogoTaps(0); setShowAdminBtn(true) }
   }
+
+  // Soporte de teclado físico para el numpad
+  useEffect(() => {
+    if (mode !== 'pin') return
+    const handler = (e) => {
+      if (verifyingRef.current) return
+      if (e.key >= '0' && e.key <= '9') handlePin(e.key)
+      else if (e.key === 'Backspace') handlePinDel()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [mode, handlePin, handlePinDel])
 
   const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
   const KEY_LABELS = { '1':'','2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','':'','0':'+','⌫':'' }

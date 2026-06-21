@@ -10,8 +10,9 @@ export const WD = 8 * 60    // daily minutes norm
 export const WM = 160 * 60  // monthly minutes norm
 export const VPM = 2.5      // vacation days per month
 
-// Festivos oficiales Comunidad de Madrid 2026 (14 días: 8 nacionales + 2 autonómicos + 2 locales Madrid capital)
-export const FESTIVOS_MADRID_2026 = {
+// Festivos Comunidad de Madrid — 2026 + 2027
+export const FESTIVOS_MADRID = {
+  // 2026
   '2026-01-01': 'Año Nuevo',
   '2026-01-06': 'Reyes Magos',
   '2026-04-02': 'Jueves Santo',
@@ -26,7 +27,24 @@ export const FESTIVOS_MADRID_2026 = {
   '2026-12-07': 'Día de la Constitución',
   '2026-12-08': 'Inmaculada Concepción',
   '2026-12-25': 'Navidad',
+  // 2027
+  '2027-01-01': 'Año Nuevo',
+  '2027-01-06': 'Reyes Magos',
+  '2027-03-25': 'Jueves Santo',
+  '2027-03-26': 'Viernes Santo',
+  '2027-05-01': 'Día del Trabajo',
+  '2027-05-03': 'Comunidad de Madrid',
+  '2027-05-14': 'San Isidro',
+  '2027-08-16': 'Asunción de la Virgen',
+  '2027-10-12': 'Fiesta Nacional de España',
+  '2027-11-01': 'Todos los Santos',
+  '2027-11-09': 'La Almudena',
+  '2027-12-06': 'Día de la Constitución',
+  '2027-12-08': 'Inmaculada Concepción',
+  '2027-12-25': 'Navidad',
 }
+// Alias para compatibilidad con importaciones existentes
+export const FESTIVOS_MADRID_2026 = FESTIVOS_MADRID
 
 export const INITIAL_DB = {
   empresas: ['Soluciones Mata'],

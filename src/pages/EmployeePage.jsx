@@ -89,7 +89,7 @@ function useSignatureCanvas() {
 }
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
   const timer = useTimer()
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -269,6 +269,9 @@ export default function EmployeePage() {
         if (elapsedStale > 720) {
           const acKey = 'an_autoclose_' + stale.id
           if (!localStorage.getItem(acKey)) {
+            // Verificar que el registro sigue abierto en la BD más reciente (evita cierre doble entre clientes)
+            const freshRec = dbRef.current.records.find(r => r.id === stale.id)
+            if (!freshRec || freshRec.fin) return
             localStorage.setItem(acKey, '1')
             const closeTime = new Date().toISOString()
             const breaks2 = [...(stale.breaks || [])]
@@ -345,32 +348,34 @@ export default function EmployeePage() {
   const doStop = useCallback(() => {
     const o = openRec()
     if (!o) return
-    const now = new Date().toISOString()
-    const breaks = [...(o.breaks || [])]
-    let enDescanso = o.enDescanso
-    let bStartTs = o.bStartTs
-    if (enDescanso && bStartTs) { breaks.push({ start: bStartTs, end: now }); enDescanso = false; bStartTs = null }
-    const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true }
-    const t = calcSecs(closed)
-    closed.workSecs = t.work; closed.breakSecs = t.brk
-    const records = db.records.map(r => r.id === o.id ? closed : r)
-    saveDB({ records })
-    try { navigator.vibrate(15) } catch {}
-    toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
-    // Capturar GPS en background y actualizar el registro cuando resuelva
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
-          const fresh = dbRef.current
-          const updated = fresh.records.map(r => r.id === closed.id ? { ...r, locFin } : r)
-          saveDB({ records: updated })
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      )
-    }
-  }, [db, openRec, saveDB, toast])
+    showConfirm('¿Terminar la jornada ahora?', () => {
+      const now = new Date().toISOString()
+      const breaks = [...(o.breaks || [])]
+      let enDescanso = o.enDescanso
+      let bStartTs = o.bStartTs
+      if (enDescanso && bStartTs) { breaks.push({ start: bStartTs, end: now }); enDescanso = false; bStartTs = null }
+      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true }
+      const t = calcSecs(closed)
+      closed.workSecs = t.work; closed.breakSecs = t.brk
+      const records = db.records.map(r => r.id === o.id ? closed : r)
+      saveDB({ records })
+      try { navigator.vibrate(15) } catch {}
+      toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
+      // Capturar GPS en background y actualizar el registro cuando resuelva
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
+            const fresh = dbRef.current
+            const updated = fresh.records.map(r => r.id === closed.id ? { ...r, locFin } : r)
+            saveDB({ records: updated })
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        )
+      }
+    })
+  }, [db, openRec, saveDB, toast, showConfirm])
 
   const doBreak = useCallback(() => {
     const o = openRec()
@@ -1346,6 +1351,9 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:700 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)}</div>
                       <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{v.dias} días · {v.motivo || 'Vacaciones'}</div>
+                      {v.estado === 'rechazada' && v.motivoRechazo && (
+                        <div style={{ fontSize:11, color:'var(--danger)', marginTop:3, fontStyle:'italic' }}>Motivo: {v.motivoRechazo}</div>
+                      )}
                       {v.estado === 'aprobada' && (() => {
                         const until = daysFrom(v.fechaInicio), remaining = daysFrom(v.fechaFin)
                         if (until > 0) return <div style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', marginTop:3 }}>🗓 En {until} día{until>1?'s':''}</div>

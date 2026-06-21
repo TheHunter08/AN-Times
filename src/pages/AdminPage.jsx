@@ -690,15 +690,81 @@ function Heatmap({ data }) {
   )
 }
 
+// Celda de tiempo con tick propio (tabla de control live)
+function LiveTimerCell({ rec }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!rec) return
+    const iv = setInterval(() => setTick(t => t + 1), 5000)
+    return () => clearInterval(iv)
+  }, [rec?.id])
+  if (!rec) return <>—</>
+  const t = calcSecs(rec)
+  return <>{mhm(Math.floor(t.work / 60))}</>
+}
+
+// Componente de tarjeta con su propio tick — evita re-render de toda la grid cada 5s
+function CtrlCard({ e, live, todayMin, force }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 5000)
+    return () => clearInterval(iv)
+  }, [])
+  const t = live ? calcSecs(live) : null
+  const isWorking = live && !live.enDescanso
+  const isBreak = live && live.enDescanso
+  const dailyTarget = (e.horasSemanales || WK) / 5 * 60
+  const workedMin = t ? Math.floor(t.work / 60) : todayMin
+  const pct = workedMin ? Math.min(100, Math.round(workedMin / dailyTarget * 100)) : 0
+  const over = workedMin > dailyTarget
+
+  return (
+    <div className={`ctrl-card${isWorking ? ' working' : isBreak ? ' on-break' : ''}`}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+        <div className="ctrl-avatar" style={{ background:e.color||'var(--primary)' }}>
+          {(e.initials||e.name.slice(0,2)).toUpperCase()}
+          <div className="ctrl-dot" style={{ background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 8px var(--green)':isBreak?'0 0 8px var(--orange)':'none' }} />
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{live?.centro || e.centroTrabajo || '—'}</div>
+        </div>
+      </div>
+      <div style={{ textAlign:'center', marginBottom:12 }}>
+        <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)' }}>
+          {t ? mhm(Math.floor(t.work/60)) : '—'}
+        </div>
+        <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+          {isWorking ? `Entrada: ${ftime(live.inicio)}` : isBreak ? 'En descanso' : todayMin>0 ? `Hoy: ${mhm(todayMin)}` : 'Sin jornada hoy'}
+        </div>
+        {workedMin > 0 && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text4)', marginBottom:3 }}>
+              <span>Jornada diaria</span>
+              <span style={{ color: over ? 'var(--orange)' : 'var(--text3)', fontWeight:700 }}>{pct}%{over ? ' ↑extra' : ''}</span>
+            </div>
+            <div style={{ height:4, background:'var(--bg-400)', borderRadius:2 }}>
+              <div style={{ height:'100%', borderRadius:2, background: over ? 'var(--orange)' : 'var(--green)', width: pct + '%', transition:'width .6s' }} />
+            </div>
+          </div>
+        )}
+      </div>
+      {live && (
+        <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
+          Forzar cierre
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
 function PanelControl({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
   const emps = (db.employees || []).filter(e => !e.baja)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
-  const [tick, setTick] = useState(0)
   const [view, setView] = useState('cards')
-  useEffect(() => { const iv = setInterval(() => setTick(t => t+1), 5000); return () => clearInterval(iv) }, [])
 
   // Pre-compute todayMin per employee (avoids O(n²) filter inside render)
   const todayMinMap = useMemo(() => {
@@ -745,58 +811,15 @@ function PanelControl({ db, toast, saveDB, session }) {
 
       {view === 'cards' && (
         <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
-          {emps.map(e => {
-            const live = liveRecs.find(r => r.empId === e.id)
-            const t = live ? calcSecs(live) : null
-            const isWorking = live && !live.enDescanso
-            const isBreak = live && live.enDescanso
-            const todayMin = todayMinMap[e.id] || 0
-            return (
-              <div key={e.id} className={`ctrl-card${isWorking?' working':isBreak?' on-break':''}`}>
-                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-                  <div className="ctrl-avatar" style={{ background:e.color||'var(--primary)' }}>
-                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                    <div className="ctrl-dot" style={{ background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 8px var(--green)':isBreak?'0 0 8px var(--orange)':'none' }} />
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
-                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{live?.centro || e.centroTrabajo || '—'}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign:'center', marginBottom:12 }}>
-                  <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)' }}>
-                    {t ? mhm(Math.floor(t.work/60)) : '—'}
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
-                    {isWorking ? `Entrada: ${ftime(live.inicio)}` : isBreak ? 'En descanso' : todayMin>0 ? `Hoy: ${mhm(todayMin)}` : 'Sin jornada hoy'}
-                  </div>
-                  {(() => {
-                    const dailyTarget = (e.horasSemanales || WK) / 5 * 60
-                    const workedMin = t ? Math.floor(t.work/60) : todayMin
-                    if (!workedMin) return null
-                    const pct = Math.min(100, Math.round(workedMin / dailyTarget * 100))
-                    const over = workedMin > dailyTarget
-                    return (
-                      <div style={{ marginTop:8 }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text4)', marginBottom:3 }}>
-                          <span>Jornada diaria</span>
-                          <span style={{ color: over ? 'var(--orange)' : 'var(--text3)', fontWeight:700 }}>{pct}%{over ? ' ↑extra' : ''}</span>
-                        </div>
-                        <div style={{ height:4, background:'var(--bg-400)', borderRadius:2 }}>
-                          <div style={{ height:'100%', borderRadius:2, background: over ? 'var(--orange)' : 'var(--green)', width: pct + '%', transition:'width .6s' }} />
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-                {live && (
-                  <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
-                    Forzar cierre
-                  </button>
-                )}
-              </div>
-            )
-          })}
+          {emps.map(e => (
+            <CtrlCard
+              key={e.id}
+              e={e}
+              live={liveRecs.find(r => r.empId === e.id)}
+              todayMin={todayMinMap[e.id] || 0}
+              force={force}
+            />
+          ))}
         </div>
       )}
 
@@ -807,7 +830,6 @@ function PanelControl({ db, toast, saveDB, session }) {
             <tbody>
               {emps.map(e => {
                 const live = liveRecs.find(r => r.empId === e.id)
-                const t = live ? calcSecs(live) : null
                 return (
                   <tr key={e.id} style={{ opacity: live ? 1 : 0.4 }}>
                     <td>
@@ -820,7 +842,7 @@ function PanelControl({ db, toast, saveDB, session }) {
                     </td>
                     <td style={{ color:'var(--text3)', fontSize:12 }}>{live?.centro || e.centroTrabajo || '—'}</td>
                     <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{live ? ftime(live.inicio) : '—'}</td>
-                    <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{t ? mhm(Math.floor(t.work/60)) : '—'}</td>
+                    <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}><LiveTimerCell rec={live} /></td>
                     <td>
                       {live ? <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>{live.enDescanso?'⏸ Descanso':'▶ Trabajando'}</span>
                              : <span className="badge">Libre</span>}
@@ -962,22 +984,26 @@ function PanelFichajes({ db, toast, saveDB }) {
 function PanelSolicitudes({ db, toast, saveDB, session }) {
   const [solTab, setSolTab] = useState('vacaciones')
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
+  const [rejecting, setRejecting] = useState(null)  // id de vacación pendiente de rechazar
+  const [rejMotivo, setRejMotivo] = useState('')
 
   const vacs = (db.vacaciones || []).sort((a,b) => b.ts?.localeCompare(a.ts||'')||0)
   const pend = vacs.filter(v => v.estado === 'pendiente')
   const rest = vacs.filter(v => v.estado !== 'pendiente')
   const emps = (db.employees || []).filter(e => !e.baja)
 
-  const act = (id, estado) => {
+  const act = (id, estado, motivoRechazo) => {
     const v = (db.vacaciones||[]).find(x => x.id === id)
-    const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString() } : v)
+    const extra = estado === 'rechazada' && motivoRechazo ? { motivoRechazo } : {}
+    const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString(), ...extra } : v)
     const withAudit = auditLog(db, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
     const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
     saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
     if (v?.empId) {
-      queuePush(v.empId, noti.action, noti.detail, 'vacaciones', '/?go=emp:vacaciones')
+      const pushBody = estado === 'rechazada' && motivoRechazo ? `${noti.detail} · ${motivoRechazo}` : noti.detail
+      queuePush(v.empId, noti.action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
     }
-    toast(estado === 'aprobada' ? '✅ Solicitud aprobada' : '❌ Solicitud rechazada')
+    toast(estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
 
   const allAus = [
@@ -1002,7 +1028,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   }
 
   const VacRow = ({ v }) => (
-    <div className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`} style={{ marginBottom:8 }}>
+    <div className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`} style={{ marginBottom:8, flexWrap:'wrap' }}>
       <div style={{ width:40, height:40, borderRadius:12, background: v.estado==='pendiente'?'var(--orange-dim)':v.estado==='aprobada'?'var(--green-dim)':'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
         {v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✓':'✗'}
       </div>
@@ -1010,14 +1036,34 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
         <div style={{ fontSize:13, fontWeight:700 }}>{v.empName}</div>
         <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)} · {v.dias} días</div>
         {v.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3 }}>{v.motivo}</div>}
+        {v.estado === 'rechazada' && v.motivoRechazo && (
+          <div style={{ fontSize:11, color:'var(--danger)', marginTop:3, fontStyle:'italic' }}>Motivo: {v.motivoRechazo}</div>
+        )}
       </div>
       <div className={`badge${v.estado==='aprobada'?' badge-green':v.estado==='rechazada'?' badge-red':' badge-orange'}`}>
         {v.estado==='aprobada'?'Aprobada':v.estado==='rechazada'?'Rechazada':'Pendiente'}
       </div>
-      {v.estado === 'pendiente' && (
+      {v.estado === 'pendiente' && rejecting !== v.id && (
         <div style={{ display:'flex', gap:6 }}>
           <button className="btn btn-sm btn-primary" onClick={() => act(v.id, 'aprobada')}>✓</button>
-          <button className="btn btn-sm btn-danger" onClick={() => act(v.id, 'rechazada')}>✗</button>
+          <button className="btn btn-sm btn-danger" onClick={() => { setRejecting(v.id); setRejMotivo('') }}>✗</button>
+        </div>
+      )}
+      {rejecting === v.id && (
+        <div style={{ width:'100%', marginTop:10, display:'flex', gap:8, alignItems:'center' }}>
+          <input
+            autoFocus
+            style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
+            placeholder="Motivo del rechazo (opcional)"
+            value={rejMotivo}
+            onChange={e => setRejMotivo(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }
+              if (e.key === 'Escape') setRejecting(null)
+            }}
+          />
+          <button className="btn btn-sm btn-danger" onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
         </div>
       )}
     </div>
