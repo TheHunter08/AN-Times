@@ -98,8 +98,8 @@ export default function EmployeePage() {
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
 
-  // Auto-subscribe to push notifications on login (PWA only)
-  useEffect(() => { if (u?.id && isPWA) pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
+  // Fast-path: if permission already granted from a previous session, register immediately
+  useEffect(() => { if (u?.id && 'Notification' in window && Notification.permission === 'granted') pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
 
   // In browser/web mode, silently mark onboarding done so the wizard never shows
   useEffect(() => {
@@ -165,10 +165,12 @@ export default function EmployeePage() {
   useEffect(() => {
     if (!u) return
 
-    // Solicitar permiso de notificaciones: nativo (Capacitor) o PWA web
+    // Solicitar permiso de notificaciones y registrar suscripción push
     setTimeout(async () => {
       const native = await isNativePlatform()
-      if (native || isPWA) await requestPushPermission()
+      if (native) { await requestPushPermission(); return }
+      const result = await requestPushPermission()
+      if (result) pushSubscribe(u.id, VAPID_PUB)
     }, 3000)
 
     // Smart notifications: check every 60s if any reminder should fire
@@ -1190,7 +1192,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0, overflow:'hidden' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>

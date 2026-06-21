@@ -475,14 +475,10 @@ input[type=date], input[type=time] { -webkit-appearance: none; appearance: none;
 }
 .ios-swipe-hint.show { opacity: 1; }
 
-/* ── Safe area body fill ────────────────────────────────────── */
-body::after {
-  content: "";
-  position: fixed; left: 0; right: 0; bottom: 0;
-  height: env(safe-area-inset-bottom, 0px);
-  background: var(--bg-800);
-  z-index: 1; pointer-events: none;
-}
+/* Safe area: html/body background (--bg-800) already fills the bottom strip,
+   so no pseudo-element needed here. Removing body::after eliminates the
+   colour-tone mismatch visible in iOS PWA between the nav bar glass and the
+   solid fill that was appearing beneath it. */
 
 /* ── Micro-interactions ─────────────────────────────────────── */
 button { -webkit-tap-highlight-color: transparent; transition: transform .1s ease, opacity .1s ease; font-family: inherit; }
@@ -593,15 +589,17 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
   font-size: 9px; font-weight: 600; color: var(--text4);
-  cursor: pointer; padding: 6px 2px; border-radius: var(--r-pill);
-  transition: color .2s, transform .15s cubic-bezier(.34,1.56,.64,1), background .2s;
+  cursor: pointer; padding: 6px 2px 8px; border-radius: var(--r-pill);
+  transition: color .2s, transform .15s cubic-bezier(.34,1.56,.64,1);
   -webkit-tap-highlight-color: transparent; letter-spacing: .3px;
   user-select: none; -webkit-user-select: none;
   background: none; border: none; font-family: inherit;
+  position: relative;
 }
 .emp-nav-item svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; transition: stroke .2s; }
-.emp-nav-item.on { color: var(--primary-light) !important; background: var(--primary-dim); box-shadow: none; border-radius: 10px; transform: translateY(-1px); }
-.emp-nav-item.on svg { stroke: var(--primary-light); stroke-width: 2.2; }
+.emp-nav-item.on { color: var(--primary-light) !important; background: none; box-shadow: none; transform: translateY(-2px); }
+.emp-nav-item.on svg { stroke: var(--primary-light); stroke-width: 2.4; }
+.emp-nav-item.on::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--primary-light); }
 .emp-nav-item:active { transform: scale(.88); }
 
 /* ── Layout uniforme: en web/tablet la app se muestra como una columna
@@ -2378,16 +2376,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   filter: drop-shadow(0 2px 16px rgba(99,102,241,.25));
 }
 
-/* ── Employee bottom nav: active item pill indicator ─────── */
-.emp-nav-item.on {
-  background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(124,58,237,.1));
-  box-shadow: 0 0 12px rgba(37,99,235,.15);
-}
-
-/* ── Admin mobile nav: active item same treatment ────────── */
+/* ── Admin mobile nav: active item ────────── */
 .adm-mobile-nav-item.active {
-  background: linear-gradient(135deg, rgba(37,99,235,.2), rgba(124,58,237,.1));
-  box-shadow: 0 0 10px rgba(37,99,235,.12);
+  color: var(--primary-light);
 }
 
 /* ── Vacaciones hero: deeper gradient + more opacity orbs ── */
