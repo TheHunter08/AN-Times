@@ -120,7 +120,16 @@ export default function AdminPage() {
     if (!isEncargado) {
       setTimeout(async () => {
         const native = await isNativePlatform()
-        if (native || isPWA) await requestPushPermission()
+        if (native || isPWA) {
+          await requestPushPermission()
+          // Registrar suscripción bajo el ID real del admin y bajo '__admin__'
+          // para recibir notificaciones enviadas desde los empleados
+          const uid = useAppStore.getState().session?.user?.id
+          if (uid) {
+            pushSubscribe(uid, VAPID_PUB)
+            pushSubscribe('__admin__', VAPID_PUB)
+          }
+        }
       }, 3000)
     }
   }, [isEncargado])

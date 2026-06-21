@@ -4,7 +4,7 @@ import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
 import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
-import { auditLog, sendPushNotif, pushSubscribe, queuePush } from '../services/dataService.js'
+import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
@@ -181,7 +181,6 @@ export default function EmployeePage() {
             localStorage.setItem(lastKey, todayStr)
             const rTitle = '⏰ Recordatorio de fichaje'
             const rBody  = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
-            sendPushNotif(u.id, rTitle, rBody, 'reminder-fichar', '/?tab=inicio')
             queuePush(u.id, rTitle, rBody, 'reminder-fichar', '/?tab=inicio')
           }
         }
@@ -196,7 +195,6 @@ export default function EmployeePage() {
           localStorage.setItem(warn14h, '1')
           const jTitle = '⏳ Jornada larga'
           const jBody  = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
-          sendPushNotif(u.id, jTitle, jBody, 'jornada', '/')
           queuePush(u.id, jTitle, jBody, 'jornada', '/')
         }
       }
@@ -212,7 +210,6 @@ export default function EmployeePage() {
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
             const sTitle = '🔔 ¿Olvidaste fichar la salida?'
             const sBody  = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
-            sendPushNotif(u.id, sTitle, sBody, 'jornada', '/?tab=inicio')
             queuePush(u.id, sTitle, sBody, 'jornada', '/?tab=inicio')
           }
         }
@@ -224,9 +221,9 @@ export default function EmployeePage() {
         if (!localStorage.getItem(key)) {
           localStorage.setItem(key, '1')
           if (v.estado === 'aprobada') {
-            sendPushNotif(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/')
+            queuePush(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/?go=emp:vacaciones')
           } else {
-            sendPushNotif(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.`, 'vacaciones', '/')
+            queuePush(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.`, 'vacaciones', '/?go=emp:vacaciones')
           }
         }
       })
@@ -237,8 +234,8 @@ export default function EmployeePage() {
         const key = 'an_docs_' + u.id
         if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
           localStorage.setItem(key, todayStr)
-          sendPushNotif(u.id, '📄 Documentos pendientes',
-            `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/')
+          queuePush(u.id, '📄 Documentos pendientes',
+            `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/?go=emp:documentos')
         }
       }
 
@@ -248,7 +245,7 @@ export default function EmployeePage() {
         const key = 'an_cierre_' + u.id
         if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
           localStorage.setItem(key, todayStr)
-          sendPushNotif(u.id, '📋 Cierre mensual pendiente',
+          queuePush(u.id, '📋 Cierre mensual pendiente',
             `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
         }
       }
@@ -267,8 +264,8 @@ export default function EmployeePage() {
             const closed2 = { ...stale, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
             const updRecs = dbRef.current.records.map(r => r.id === stale.id ? closed2 : r)
             saveDB({ records: updRecs })
-            sendPushNotif(u.id, '⏱️ Jornada cerrada automáticamente',
-              `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/')
+            queuePush(u.id, '⏱️ Jornada cerrada automáticamente',
+              `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
           }
         }
       })
@@ -1777,7 +1774,7 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: new Date().toISOString() }
     const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
     saveDB({ vacaciones: [...(db.vacaciones||[]), vac], notis: [...(db.notis||[]), noti] })
-    sendPushNotif('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
+    queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
     toast('✅ Solicitud enviada')
     onClose()
     setFi(''); setFf(''); setMotivo('')
@@ -2165,7 +2162,7 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
     const withAudit = auditLog(db, 'Documento firmado', `${u.name}: "${doc.titulo}"`, u.name)
     saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
-    sendPushNotif('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
+    queuePush('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
     setStamping(false)
     toast('✅ Documento firmado correctamente')
     setSigning(null)
@@ -2432,7 +2429,7 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
       ? { ...ci, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } } : ci)
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
     saveDB({ cierres: updatedCierres, notis:[...(db.notis||[]), noti] })
-    sendPushNotif('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
+    queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
     toast('✅ Cierre mensual firmado correctamente')
     onClose()
   }
