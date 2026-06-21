@@ -1,6 +1,6 @@
 const webpush = require('web-push');
 
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BNzMmzkGkkcwbsG_x3sEQo-aGM63sOwrOo2bpmRSG9QLBbfGmFIFGd8Hvo-jc5i0vFUAn5vK5IQa9kQdfnVreQc';
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BHkLMm4jcnQUppuN6UNx7b3gK073ZB0l7LHABbT74GrBxt-BeYWyi0LEadsf21Vpx9gO71Mc3TVRy2yTh_MaOsw';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
 const SB_URL        = process.env.VITE_SB_URL   || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
 const SB_ANON       = process.env.VITE_SB_ANON  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
@@ -45,10 +45,14 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Verificar origen: si PUSH_ALLOWED_ORIGIN está configurado, solo acepta ese dominio
+  // Verificar origen: comparación exacta del origin header
   if (allowedOrigin) {
-    const origin = req.headers.origin || req.headers.referer || '';
-    if (!origin.startsWith(allowedOrigin)) {
+    const origin = req.headers.origin || '';
+    let originHost = '';
+    try { originHost = new URL(origin).origin; } catch {}
+    let allowedHost = '';
+    try { allowedHost = new URL(allowedOrigin).origin; } catch { allowedHost = allowedOrigin; }
+    if (!origin || originHost !== allowedHost) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
