@@ -23,3 +23,5 @@ jobs:
       - run: npm install web-push --no-save
       - name: Recordatorio de fichaje
         run: node push-fichar-reminder.js
+        env:
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}

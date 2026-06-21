@@ -1374,10 +1374,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-sidebar.open { left: 0; }
 @media(min-width:960px) {
   .adm-sidebar {
-    position: relative; left: 0 !important;
+    position: relative; left: 0 !important; top: auto; bottom: auto;
     width: var(--sidebar); box-shadow: none;
     border-right: 1px solid var(--border);
+    transition: none;
   }
+  .adm-menu-btn { display: none; }
 }
 .adm-sidebar-inner {
   flex: 1; overflow-y: auto;

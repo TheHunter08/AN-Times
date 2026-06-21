@@ -4,88 +4,63 @@
  * Corre cada noche a las 23h Madrid via GitHub Actions.
  */
 
-import https   from 'https'
 import webpush from 'web-push'
 
-const VAPID_PUBLIC  = 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4'
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE || '0P7eNL8RBQfc5fy41k63OQuiT73_IKPgbM35I76rSvU'
-const FB_BASE       = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app'
-const DB_PATH       = 'an_times_data'
-const FB_API_KEY    = 'AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ'
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4'
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE
+const SB_URL        = process.env.VITE_SB_URL   || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const SB_ANON       = process.env.VITE_SB_ANON  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const ALERT_HOURS   = 10
 
+if (!VAPID_PRIVATE) { console.error('Falta VAPID_PRIVATE'); process.exit(1) }
 webpush.setVapidDetails('mailto:admin@times.inc', VAPID_PUBLIC, VAPID_PRIVATE)
 
-function post(url, body) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body)
-    const u    = new URL(url)
-    const req  = https.request({
-      hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-    }, res => {
-      let buf = ''
-      res.on('data', d => buf += d)
-      res.on('end', () => { try { resolve(JSON.parse(buf)) } catch { resolve(null) } })
-    })
-    req.on('error', reject)
-    req.write(data); req.end()
-  })
+const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+
+async function sbReadData() {
+  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_HEADERS })
+  const rows = await res.json()
+  return rows?.[0]?.data || null
 }
 
-async function getToken() {
-  const d = await post(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_API_KEY}`,
-    { returnSecureToken: true }
-  )
-  if (!d?.idToken) throw new Error('Auth Firebase fallida')
-  return d.idToken
+async function sbReadPushSubs() {
+  const res = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_HEADERS })
+  return (await res.json()) || []
 }
 
-function fbGet(path, token) {
-  return new Promise((resolve, reject) => {
-    const url = `${FB_BASE}/${path}.json?auth=${token}`
-    https.get(url, res => {
-      let buf = ''
-      res.on('data', d => buf += d)
-      res.on('end', () => { try { resolve(JSON.parse(buf)) } catch { resolve(null) } })
-    }).on('error', reject)
-  })
+async function sbDeletePushSub(userId) {
+  await fetch(`${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
+    method: 'DELETE', headers: SB_HEADERS
+  }).catch(() => {})
 }
 
-async function sendPush(sub, payload, uid, token) {
+async function sendPush(sub, payload, userId) {
   try {
-    await webpush.sendNotification(sub, JSON.stringify(payload))
-    console.log(`Push enviado a ${uid}`)
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify(payload)
+    )
+    console.log(`Push enviado a ${userId}`)
   } catch (err) {
     if (err.statusCode === 410 || err.statusCode === 404) {
-      // Suscripción expirada — eliminar de Firebase
-      await new Promise(resolve => {
-        const u = new URL(`${FB_BASE}/pushSubs/${encodeURIComponent(uid)}.json?auth=${token}`)
-        const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'DELETE' }, resolve)
-        req.on('error', resolve); req.end()
-      })
-      console.log(`Sub expirada eliminada: ${uid}`)
+      await sbDeletePushSub(userId)
+      console.log(`Sub expirada eliminada: ${userId}`)
     } else {
-      console.warn(`Push fallido para ${uid}:`, err.statusCode || err.message)
+      console.warn(`Push fallido para ${userId}:`, err.statusCode || err.message)
     }
   }
 }
 
 async function main() {
   console.log('=== Anomaly Detector iniciado ===')
-  const token = await getToken()
 
-  const [db, pushSubs] = await Promise.all([
-    fbGet(DB_PATH, token),
-    fbGet('pushSubs', token),
-  ])
-
+  const [db, pushSubs] = await Promise.all([sbReadData(), sbReadPushSubs()])
   if (!db?.records) { console.log('Sin records en DB'); return }
 
-  const now = Date.now()
+  const subsMap      = Object.fromEntries(pushSubs.map(s => [s.user_id, s]))
+  const now          = Date.now()
   const THRESHOLD_MS = ALERT_HOURS * 60 * 60 * 1000
-  const madridTime = new Intl.DateTimeFormat('es-ES', {
+  const madridTime   = new Intl.DateTimeFormat('es-ES', {
     timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit'
   }).format(new Date())
 
@@ -95,12 +70,10 @@ async function main() {
 
   console.log(`Jornadas abiertas >10h: ${stale.length}`)
 
-  const subs = pushSubs || {}
   const notifiedEmps = new Set()
-
   for (const rec of stale) {
     const hoursOpen = Math.floor((now - new Date(rec.inicio).getTime()) / 3600000)
-    const sub = subs[rec.empId]
+    const sub = subsMap[rec.empId]
     if (!sub || notifiedEmps.has(rec.empId)) continue
     notifiedEmps.add(rec.empId)
 
@@ -109,20 +82,19 @@ async function main() {
       body: `Llevas ${hoursOpen}h sin fichar la salida. Son las ${madridTime}. ¿Olvidaste fichar?`,
       tag: 'anomaly-open-shift',
       url: '/?tab=inicio'
-    }, rec.empId, token)
+    }, rec.empId)
   }
 
-  // Aviso al admin si hay jornadas abiertas
   if (stale.length > 0) {
-    const adminSub = subs['admin']
+    const adminSub = subsMap['admin']
     if (adminSub) {
       const names = [...new Set(stale.map(r => r.empName?.split(' ')[0] || r.empId))].join(', ')
       await sendPush(adminSub, {
         title: `⚠️ ${stale.length} jornada${stale.length > 1 ? 's' : ''} sin cerrar`,
         body: `${names} — llevan >10h con jornada activa`,
         tag: 'anomaly-admin',
-        url: '/admin'
-      }, 'admin', token)
+        url: '/?go=admin:control'
+      }, 'admin')
     }
   }
 

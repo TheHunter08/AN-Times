@@ -1,76 +1,40 @@
 /**
  * TIMES INC – Archivado mensual de registros antiguos
- * Mueve registros con más de 3 meses de antigüedad a /an_times_data/recordsArchive.
+ * Mueve registros con más de 90 días a monthSnapshots en Supabase.
  * Corre el 1º de cada mes vía GitHub Actions.
  * Mantiene la base de datos principal ligera.
  */
 
-import https from 'https'
+const SB_URL  = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const SB_ANON = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 
-const FB_BASE    = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app'
-const FB_API_KEY = 'AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ'
+const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
-function post(url, body) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body)
-    const u    = new URL(url)
-    const req  = https.request({
-      hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-    }, res => {
-      let buf = ''
-      res.on('data', d => buf += d)
-      res.on('end', () => { try { resolve(JSON.parse(buf)) } catch { resolve(null) } })
-    })
-    req.on('error', reject)
-    req.write(data); req.end()
-  })
+async function sbReadData() {
+  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_HEADERS })
+  const rows = await res.json()
+  return rows?.[0]?.data || null
 }
 
-async function getToken() {
-  const d = await post(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_API_KEY}`,
-    { returnSecureToken: true }
-  )
-  if (!d?.idToken) throw new Error('Firebase auth failed')
-  return d.idToken
-}
-
-function fbGet(path, token) {
-  return new Promise((resolve, reject) => {
-    https.get(`${FB_BASE}/${path}.json?auth=${token}`, res => {
-      let buf = ''
-      res.on('data', d => buf += d)
-      res.on('end', () => { try { resolve(JSON.parse(buf)) } catch { resolve(null) } })
-    }).on('error', reject)
+async function sbWriteData(data) {
+  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method: 'PATCH',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ data: { ...data, _ts: Date.now() }, updated_at: new Date().toISOString() })
   })
-}
-
-function fbPut(path, data, token) {
-  return new Promise(resolve => {
-    const body = JSON.stringify(data)
-    const u    = new URL(`${FB_BASE}/${path}.json?auth=${token}`)
-    const req  = https.request({
-      hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, res => { res.resume(); res.on('end', resolve) })
-    req.on('error', () => resolve())
-    req.write(body); req.end()
-  })
+  return res.ok
 }
 
 async function run() {
   const now    = new Date()
-  // Fecha límite: hoy - 90 días
   const cutoff = new Date(now)
   cutoff.setDate(cutoff.getDate() - 90)
   const cutoffStr = cutoff.toISOString().slice(0, 10)
 
   console.log(`Archivando registros anteriores a ${cutoffStr}...`)
 
-  const token = await getToken()
-  const db    = await fbGet('an_times_data', token)
-  if (!db) { console.log('No se pudo leer Firebase.'); return }
+  const db = await sbReadData()
+  if (!db) { console.log('No se pudo leer Supabase.'); return }
 
   const records = db.records || []
   if (!records.length) { console.log('No hay registros.'); return }
@@ -83,18 +47,26 @@ async function run() {
     return
   }
 
-  // Combinar con el archivo existente
-  const existing = db.recordsArchive || []
-  const archive  = [...existing, ...toArchive]
+  // Almacenar registros archivados en monthSnapshots keyed by YYYY-MM
+  const existingSnapshots = db.monthSnapshots || {}
+  const newSnapshots = { ...existingSnapshots }
+  for (const rec of toArchive) {
+    const monthKey = rec.inicio.slice(0, 7) // "YYYY-MM"
+    if (!newSnapshots[monthKey]) newSnapshots[monthKey] = { records: [] }
+    newSnapshots[monthKey].records = [...(newSnapshots[monthKey].records || []), rec]
+  }
 
   console.log(`Archivando ${toArchive.length} registros, manteniendo ${toKeep.length}...`)
 
-  // Primero escribir el archivo (evitar pérdida de datos si falla)
-  await fbPut('an_times_data/recordsArchive', archive, token)
-  // Luego reducir los registros activos
-  await fbPut('an_times_data/records', toKeep, token)
+  const updated = { ...db, records: toKeep, monthSnapshots: newSnapshots }
+  const ok = await sbWriteData(updated)
 
-  console.log(`✓ Archivados ${toArchive.length} registros. Archivo total: ${archive.length}.`)
+  if (ok) {
+    console.log(`✓ Archivados ${toArchive.length} registros. Activos: ${toKeep.length}.`)
+  } else {
+    console.error('✗ Error al escribir en Supabase')
+    process.exit(1)
+  }
 }
 
 run().catch(e => { console.error('Error:', e.message); process.exit(1) })

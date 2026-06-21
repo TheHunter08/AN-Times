@@ -139,7 +139,7 @@ export default function AdminPage() {
 
   const doLogout = () => { logout(); try { if (window._fbSignOut) window._fbSignOut() } catch {} }
 
-  const nav = (id) => { setAdminPage(id); setSideOpen(false) }
+  const nav = (id) => { setAdminPage(id); if (window.innerWidth < 960) setSideOpen(false) }
 
   const actPanel = pages.find(p => p.id === currentAdminPage) || pages[0]
 
