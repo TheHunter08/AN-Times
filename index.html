@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
   <meta name="format-detection" content="telephone=no,date=no,email=no,address=no" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -17,10 +17,13 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://times-inc-default-rtdb.europe-west1.firebasedatabase.app" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet" />
+  <script>
+    (function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light');document.querySelector('meta[name="theme-color"]').content='#ffffff';document.querySelector('meta[name="color-scheme"]').content='light dark';}}catch(e){}}())
+  </script>
   <style>
     html, body { margin: 0; padding: 0; background: #0d0d18; position: fixed; inset: 0; }
+    [data-theme="light"] html, [data-theme="light"] body { background: #ffffff; }
     #root { position: fixed; inset: 0; }
     #splash {
       position: fixed; inset: 0; background: #0d0d18;

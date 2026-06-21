@@ -2321,6 +2321,15 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
         {toggle('Notificaciones de fichaje', notiFichaje, setNotiFichaje)}
         {toggle('Recordatorio de salida', notiSalida, setNotiSalida)}
         {toggle('GPS automático', gpsAuto, setGpsAuto)}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+          <span style={{ fontSize:14, color:'var(--text)' }}>Modo claro</span>
+          <div
+            onClick={() => { toggleTheme(); toast(document.documentElement.getAttribute('data-theme')==='light' ? 'Modo claro activado' : 'Modo oscuro activado') }}
+            style={{ width:44, height:24, borderRadius:12, background: document.documentElement.getAttribute('data-theme')==='light' ? 'var(--primary)' : 'var(--bg-600)', cursor:'pointer', position:'relative', transition:'background .2s' }}
+          >
+            <div style={{ position:'absolute', top:3, left: document.documentElement.getAttribute('data-theme')==='light' ? 23 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+          </div>
+        </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
           <div style={{ fontSize:14, color:'var(--text)', marginBottom:4 }}>Recordatorio de entrada</div>
           <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si no has fichado a esta hora</div>

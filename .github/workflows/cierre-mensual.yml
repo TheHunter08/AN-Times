@@ -1,0 +1,22 @@
+name: Cierre mensual automático
+
+on:
+  schedule:
+    # Día 1 de cada mes a las 08:00 UTC
+    - cron: '0 8 1 * *'
+  workflow_dispatch:
+
+jobs:
+  generar-cierres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generar cierres del mes anterior
+        env:
+          VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
+          VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
+          PUSH_URL: ${{ secrets.PUSH_URL }}
+        run: node auto-cierre-mensual.js

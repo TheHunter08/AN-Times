@@ -195,6 +195,7 @@ export default function AdminPage() {
               Panel Emp.
             </button>
           )}
+          <button className="theme-toggle-btn" onClick={toggleTheme} title="Cambiar tema" style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, lineHeight:1, padding:'4px 6px', borderRadius:8, color:'var(--text3)' }}>🌙</button>
           <button className="btn btn-secondary btn-sm" onClick={doLogout}>Salir</button>
         </div>
       </div>
@@ -275,6 +276,14 @@ function SyncBadge() {
       {syncStatus==='synced'?'Sincronizado':syncStatus==='syncing'?'Guardando…':'Sin conexión'}
     </div>
   )
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
+  if (next === 'dark') document.documentElement.removeAttribute('data-theme')
+  else document.documentElement.setAttribute('data-theme', 'light')
+  try { localStorage.setItem('theme', next) } catch {}
+  document.querySelectorAll('.theme-toggle-btn').forEach(b => { b.textContent = next === 'light' ? '🌙' : '☀️' })
 }
 
 // ─── PANEL DASHBOARD ──────────────────────────────────────────────────────────
@@ -886,12 +895,13 @@ function PanelFichajes({ db, toast, saveDB }) {
       </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th><th></th></tr></thead>
+          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th><th>GPS</th><th></th></tr></thead>
           <tbody>
             {filtered.map(r => {
               const wm = Math.floor(recWorkSecs(r)/60)
               const bm = Math.floor((r.breakSecs||0)/60)
               const over = wm > WD
+              const loc = r.locInicio
               return (
                 <tr key={r.id}>
                   <td>{r.empName}</td>
@@ -900,6 +910,16 @@ function PanelFichajes({ db, toast, saveDB }) {
                   <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{ftime(r.fin)}</td>
                   <td style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{mhm(bm)}</td>
+                  <td>
+                    {loc ? (
+                      <a href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}&zoom=17#map=17/${loc.lat}/${loc.lng}`}
+                        target="_blank" rel="noopener noreferrer"
+                        title={`Ver en mapa (${loc.lat}, ${loc.lng})`}
+                        style={{ color:'var(--primary-light)', fontSize:16, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:3 }}>
+                        📍
+                      </a>
+                    ) : <span style={{ color:'var(--text4)', fontSize:11 }}>—</span>}
+                  </td>
                   <td><button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button></td>
                 </tr>
               )
@@ -1588,6 +1608,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     { id:'cierre',   label:'📋 Cierre mensual' },
     { id:'detalle',  label:'Detalle diario' },
     { id:'ranking',  label:'Ranking' },
+    { id:'extras',   label:'⚡ Horas extra' },
     { id:'analitica',label:'Analítica' },
     { id:'obras',    label:'Por Obra' },
     { id:'exportar', label:'Exportar' },
@@ -1817,6 +1838,89 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
           })}
         </div>
       )}
+
+      {/* Horas Extra tab */}
+      {tab === 'extras' && (() => {
+        const allRecs = db.records || []
+        const extRows = sortedEmps(db).filter(e => !e.baja && !e.isAdmin).map(e => {
+          const eRecs = allRecs.filter(r => r.empId === e.id && r.fin)
+          const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
+          const weeklyH = e.horasSemanales || WK
+          // Estimate expected: weeks since startDate × weekly hours
+          const start = e.startDate ? new Date(e.startDate) : new Date()
+          const msWorked = Date.now() - start.getTime()
+          const weeks = Math.max(0, msWorked / (7 * 24 * 3600 * 1000))
+          const expectedMin = Math.round(weeks * weeklyH * 60)
+          const diff = totalMin - expectedMin
+          // Current month stats
+          const mRecs = eRecs.filter(r => r.inicio.startsWith(filterMonth))
+          const mMin = mRecs.reduce((s, r) => s + calcMin(r), 0)
+          const mExpected = (weeklyH / 5) * 4 * 60 // ~4 weeks
+          const mDiff = mMin - mExpected
+          return { e, totalMin, expectedMin, diff, mMin, mExpected, mDiff, weeklyH }
+        })
+        const totalExtra = extRows.reduce((s, r) => s + Math.max(0, r.mDiff), 0)
+        const totalDeficit = extRows.reduce((s, r) => s + Math.max(0, -r.mDiff), 0)
+        return (
+          <div className="stagger-in">
+            <div className="adm-stats-grid" style={{ marginBottom:20 }}>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background:'var(--orange-dim)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--orange)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                <div className="stat-value" style={{ color:'var(--orange)' }}>+{mhm(totalExtra)}</div>
+                <div className="stat-label">H. extra este mes</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background:'var(--red-dim)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--red)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+                <div className="stat-value" style={{ color:'var(--red)' }}>-{mhm(totalDeficit)}</div>
+                <div className="stat-label">Déficit este mes</div>
+              </div>
+            </div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:10 }}>
+              Mes seleccionado: <strong style={{ color:'var(--text)' }}>{new Date(filterMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</strong>
+            </div>
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead><tr><th>Empleado</th><th>H/sem</th><th>Trabajadas</th><th>Esperadas</th><th>Diferencia mes</th><th>Balance histórico</th></tr></thead>
+                <tbody>
+                  {extRows.map(({ e, mMin, mExpected, mDiff, diff }) => {
+                    const mOver = mDiff > 0
+                    const hOver = diff > 0
+                    return (
+                      <tr key={e.id}>
+                        <td>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div style={{ width:26, height:26, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                              {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize:13 }}>{e.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color:'var(--text3)', fontSize:12 }}>{e.horasSemanales || WK}h</td>
+                        <td style={{ fontWeight:600, fontVariantNumeric:'tabular-nums' }}>{mhm(mMin)}</td>
+                        <td style={{ color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{mhm(Math.round(mExpected))}</td>
+                        <td>
+                          <span style={{ fontWeight:700, color: mOver ? 'var(--orange)' : mDiff < -30 ? 'var(--red)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                            {mOver ? '+' : ''}{mhm(Math.abs(Math.round(mDiff)))} {mOver ? '↑' : mDiff < -30 ? '↓' : '✓'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontWeight:700, color: hOver ? 'var(--orange)' : diff < -60 ? 'var(--red)' : 'var(--green)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>
+                            {hOver ? '+' : ''}{mhm(Math.abs(Math.round(diff)))} {hOver ? '↑' : diff < -60 ? '↓' : '✓'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!extRows.length && <tr><td colSpan={6} className="empty">Sin empleados activos</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:11, color:'var(--text3)', lineHeight:1.7 }}>
+              <strong style={{ color:'var(--text2)' }}>Nota:</strong> "Diferencia mes" compara horas del mes seleccionado vs. estimación (H/semana × 4 semanas). "Balance histórico" acumula toda la vida laboral del empleado en la app.
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Analítica tab */}
       {tab === 'analitica' && (
