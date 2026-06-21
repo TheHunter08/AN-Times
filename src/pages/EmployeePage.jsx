@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
@@ -9,6 +9,32 @@ import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
+
+// ─── HOOK: reloj en vivo (aislado para no re-renderizar el componente padre) ──
+function useClock() {
+  const [clockTime, setClockTime] = useState('')
+  const [clockDate, setClockDate] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date()
+      setClockTime(`${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`)
+      setClockDate(n.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' }))
+    }
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [])
+  return { clockTime, clockDate }
+}
+
+function TopbarClock() {
+  const { clockTime, clockDate } = useClock()
+  return (
+    <div className="emp-subdate">
+      {clockDate} · <span style={{ color:'var(--primary-light)', fontWeight:600 }}>{clockTime}</span>
+    </div>
+  )
+}
 
 // ─── HOOK REUTILIZABLE: canvas de firma ───────────────────────────────────────
 function useSignatureCanvas() {
@@ -68,8 +94,6 @@ export default function EmployeePage() {
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
   const [pendingGPS, setPendingGPS] = useState(null)
-  const [clockTime, setClockTime] = useState('')
-  const [clockDate, setClockDate] = useState('')
   const [calMonth, setCalMonth] = useState(new Date())
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
@@ -136,18 +160,6 @@ export default function EmployeePage() {
       setEmpTab(tab)
       window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [])
-
-  // Clock tick
-  useEffect(() => {
-    const tick = () => {
-      const n = new Date()
-      setClockTime(`${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`)
-      setClockDate(n.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' }))
-    }
-    tick()
-    const iv = setInterval(tick, 1000)
-    return () => clearInterval(iv)
   }, [])
 
   useEffect(() => {
@@ -299,7 +311,14 @@ export default function EmployeePage() {
     setPendingGPS(null)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => setPendingGPS({ lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }),
+        pos => {
+          const lat = +pos.coords.latitude.toFixed(5)
+          const lng = +pos.coords.longitude.toFixed(5)
+          // Descartar coordenadas inválidas (0,0 = Null Island, fuera de rango)
+          if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
+            setPendingGPS({ lat, lng, acc: Math.round(pos.coords.accuracy), ts: new Date().toISOString() })
+          }
+        },
         () => {},
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
@@ -320,7 +339,7 @@ export default function EmployeePage() {
     const emps = newDB.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
     saveDB({ records: newDB.records, employees: emps })
     try { navigator.vibrate(15) } catch {}
-    toast('✅ Jornada iniciada en ' + centro)
+    toast('Jornada iniciada en ' + centro, 3000, 'ok')
   }, [u, db, pendingGPS, closeModal, saveDB, toast])
 
   const doStop = useCallback(() => {
@@ -337,7 +356,7 @@ export default function EmployeePage() {
     const records = db.records.map(r => r.id === o.id ? closed : r)
     saveDB({ records })
     try { navigator.vibrate(15) } catch {}
-    toast('✅ Jornada finalizada — ' + mhm(Math.floor(t.work / 60)))
+    toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
     // Capturar GPS en background y actualizar el registro cuando resuelva
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -388,7 +407,7 @@ export default function EmployeePage() {
           <div className="emp-avatar" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
           <div style={{ minWidth:0, overflow:'hidden' }}>
             <div className="emp-greeting">👋 {u.name.split(' ')[0]}</div>
-            <div className="emp-subdate">{clockDate} · <span style={{color:'var(--primary-light)',fontWeight:600}}>{clockTime}</span></div>
+            <TopbarClock />
           </div>
         </div>
         <div className="emp-top-right">
@@ -421,7 +440,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} clockDate={clockDate} clockTime={clockTime} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -476,11 +495,21 @@ export default function EmployeePage() {
 // ─── OFFLINE BANNER ────────────────────────────────────────────────────────────
 function OfflineBanner() {
   const syncStatus = useAppStore(s => s.syncStatus)
-  if (syncStatus !== 'error') return null
+  const [realOffline, setRealOffline] = useState(() => !navigator.onLine)
+
+  useEffect(() => {
+    const on  = () => setRealOffline(false)
+    const off = () => setRealOffline(true)
+    window.addEventListener('online',  on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
+
+  if (syncStatus !== 'error' && !realOffline) return null
   return (
     <div style={{ background:'linear-gradient(90deg,#ef4444,#dc2626)', color:'#fff', fontSize:12, fontWeight:700, textAlign:'center', padding:'7px 16px', letterSpacing:'.3px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      Sin conexión — datos guardados localmente
+      {realOffline ? 'Sin internet — fichajes guardados localmente' : 'Error de conexión — datos guardados localmente'}
     </div>
   )
 }
@@ -534,7 +563,8 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate, clockTime }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal }) {
+  const { clockTime, clockDate } = useClock()
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -607,7 +637,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate,
                   <stop offset="100%" stopColor="#8B5CF6" />
                 </linearGradient>
               </defs>
-              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="9" />
+              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="var(--border2)" strokeWidth="9" />
               <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="url(#heroArcGrad)" strokeWidth="9"
                 strokeLinecap="round"
                 strokeDasharray={ARC_C} strokeDashoffset={arcOffset}
@@ -617,7 +647,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, clockDate,
               <div className="hero-arc-pct">{pct}%</div>
               <div className="hero-arc-sub">jornada completada</div>
               {timer.state !== 'idle' && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>
+                <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 3 }}>
                   {s2t(timer.ws)} activo
                 </div>
               )}
@@ -798,11 +828,16 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         y -= ROW_H
       })
 
-      // ─ Total row ──────────────────────────────────────────────────
-      if (y - 20 < 35 + SIG_AREA) { newPage() }
+      // ─ Total + resumen vs objetivo ────────────────────────────────
+      if (y - 40 < 35 + SIG_AREA) { newPage() }
+      const targetMin2 = monthRecs.length * 480   // 8h/día
+      const diffMin2   = totalMin2 - targetMin2
+      const diffSign   = diffMin2 >= 0 ? '+' : ''
+      const cDiff      = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
       page.drawRectangle({ x:ML, y:y-20, width:CW, height:20, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length!==1?'s':''} registrada${monthRecs.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
-      y -= 28
+      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-34, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
+      y -= 42
 
       // ─ Signature block ────────────────────────────────────────────
       if (y - SIG_AREA < 30) { newPage() }
@@ -926,7 +961,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
       {/* Premium social-feed timeline */}
       <div style={{ padding: '0 16px 12px' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text4)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 14 }}>
           Actividad de hoy
         </div>
         {!tlItems.length ? (
@@ -990,9 +1025,9 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         )
       })()}
 
-      {/* Historial últimos 7 días */}
+      {/* Historial últimos 30 días */}
       {(() => {
-        const histDays = Array.from({ length: 7 }, (_, i) => {
+        const histDays = Array.from({ length: 30 }, (_, i) => {
           const d = new Date(now)
           d.setDate(d.getDate() - i - 1)
           return d.toISOString().slice(0, 10)
@@ -1054,6 +1089,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
 function HistorialReciente({ histWithRecs, openModal, u }) {
   const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(7)
+
+  const shown = histWithRecs.slice(0, visible)
+  const hasMore = visible < histWithRecs.length
+
   return (
     <div style={{ padding:'0 16px 12px' }}>
       <button onClick={() => setOpen(o => !o)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 14px', cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent', transition:'background .15s' }}>
@@ -1066,14 +1106,18 @@ function HistorialReciente({ histWithRecs, openModal, u }) {
       </button>
       {open && (
         <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6 }}>
-          {histWithRecs.map(({ ds, recs }) => {
+          {shown.map(({ ds, recs }) => {
             const totalMin = recs.reduce((s, r) => s + calcMin(r), 0)
             const label = new Date(ds + 'T12:00:00').toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })
+            const isUnder = totalMin > 0 && totalMin < 480
             return (
               <div key={ds} style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 14px' }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                   <div style={{ fontSize:12, fontWeight:700, textTransform:'capitalize' }}>{label}</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalMin)}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    {isUnder && <span style={{ fontSize:9, fontWeight:700, color:'var(--orange)', background:'var(--orange-dim)', padding:'1px 5px', borderRadius:6 }}>↓ objetivo</span>}
+                    <div style={{ fontSize:13, fontWeight:800, color: totalMin >= 480 ? 'var(--green)' : 'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalMin)}</div>
+                  </div>
                 </div>
                 {recs.map(r => {
                   const wm = Math.floor(recWorkSecs(r) / 60)
@@ -1099,6 +1143,12 @@ function HistorialReciente({ histWithRecs, openModal, u }) {
               </div>
             )
           })}
+          {hasMore && (
+            <button onClick={() => setVisible(v => v + 7)}
+              style={{ background:'none', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'9px', cursor:'pointer', fontSize:12, color:'var(--text3)', fontFamily:'inherit', fontWeight:600, transition:'background .15s' }}>
+              Ver {Math.min(7, histWithRecs.length - visible)} días más…
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1213,7 +1263,7 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const cancelVac = (id) => {
     showConfirm('¿Cancelar esta solicitud de vacaciones?', () => {
       saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id) })
-      toast('Solicitud cancelada')
+      toast('Solicitud cancelada', 3000, 'warn')
     })
   }
 
@@ -1237,7 +1287,7 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
     const a = document.createElement('a')
     a.href = url; a.download = `vacaciones-${v.fechaInicio}.ics`; a.click()
     URL.revokeObjectURL(url)
-    toast('📅 Archivo .ics descargado — ábrelo para añadir al calendario')
+    toast('Archivo .ics descargado — ábrelo para añadir al calendario', 3000, 'ok')
   }
   const pct = vac.generated > 0 ? Math.round((vac.used / vac.generated) * 100) : 0
   const todayVacStr = today()
@@ -1250,8 +1300,11 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
           <div style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.2)', borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.4px', textTransform:'uppercase', marginBottom:8, width:'fit-content' }}>
             Mis Vacaciones
           </div>
-          <div className="vac-hero-title">Balance de días</div>
-          <div className="vac-hero-sub">{new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+          <div className="vac-hero-title">
+            <span style={{ fontSize:42, fontWeight:900, letterSpacing:'-2px' }}>{vac.available}</span>
+            <span style={{ fontSize:16, fontWeight:600, opacity:.8, marginLeft:6 }}>días disponibles</span>
+          </div>
+          <div className="vac-hero-sub">{vac.generated} generados · {vac.used} disfrutados · {vac.pending} pendientes</div>
         </div>
 
         <div className="vac-stats-row">
@@ -1775,7 +1828,7 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
     saveDB({ vacaciones: [...(db.vacaciones||[]), vac], notis: [...(db.notis||[]), noti] })
     queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
-    toast('✅ Solicitud enviada')
+    toast('Solicitud enviada', 3000, 'ok')
     onClose()
     setFi(''); setFf(''); setMotivo('')
   }
@@ -1822,7 +1875,7 @@ function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
     if (data.length > 200000) { toast('Firma muy grande, simplifica los trazos'); return }
     const firmas = { ...(db.firmas || {}), [u.id]: { ...(db.firmas?.[u.id] || {}), main: { data, updatedAt: new Date().toISOString(), empName: u.name } } }
     saveDB({ firmas })
-    toast('✅ Firma guardada correctamente')
+    toast('Firma guardada correctamente', 3000, 'ok')
     onClose()
   }
 
@@ -2164,7 +2217,7 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
     queuePush('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
     setStamping(false)
-    toast('✅ Documento firmado correctamente')
+    toast('Documento firmado correctamente', 3000, 'ok')
     setSigning(null)
   }
 
@@ -2430,7 +2483,7 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
     saveDB({ cierres: updatedCierres, notis:[...(db.notis||[]), noti] })
     queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
-    toast('✅ Cierre mensual firmado correctamente')
+    toast('Cierre mensual firmado correctamente', 3000, 'ok')
     onClose()
   }
 
@@ -2505,7 +2558,7 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
     saveDB({ employees: updatedEmps, firmas: updatedFirmas })
     setDone(true)
-    toast('✅ ¡Configuración lista! Ya puedes usar la app.')
+    toast('¡Configuración lista! Ya puedes usar la app.', 3000, 'ok')
   }
 
   const STEPS = ['Notificaciones', 'Tu firma', 'Recordatorio']
@@ -2718,6 +2771,7 @@ function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
 
   const send = () => {
     if (!motivo.trim()) { toast('Añade un motivo para la corrección'); return }
+    if (!inicio) { toast('Indica la hora de entrada correcta'); return }
     setSending(true)
     const corr = {
       id: gid(),
@@ -2730,8 +2784,16 @@ function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
       estado: 'pendiente',
       ts: Date.now()
     }
-    saveDB({ correccionesFichaje: [...(db.correccionesFichaje || []), corr] })
-    toast('✅ Solicitud enviada al administrador')
+    const withAudit = auditLog(db,
+      'correccion_solicitada',
+      `Corrección fichaje ${rec.inicio.slice(0,10)}: ${motivo.trim()}`,
+      u.name
+    )
+    saveDB({
+      correccionesFichaje: [...(db.correccionesFichaje || []), corr],
+      audit: withAudit.audit
+    })
+    toast('Solicitud enviada al administrador', 3000, 'ok')
     setSending(false)
     onClose()
   }

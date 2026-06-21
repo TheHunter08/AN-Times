@@ -156,7 +156,8 @@ export default function App() {
   useEffect(() => {
     fetchDB()
     initRealtime()
-    const iv = setInterval(fetchDB, 5 * 60 * 1000)
+    // El canal Realtime de Supabase gestiona actualizaciones en vivo.
+    // El polling queda solo para cuando la pestaña vuelve a estar visible (app en segundo plano).
     const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
     document.addEventListener('visibilitychange', onVisible)
 
@@ -175,7 +176,6 @@ export default function App() {
     })
 
     return () => {
-      clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
       stopRealtime()
       removePushReceived()
@@ -190,8 +190,12 @@ export default function App() {
     const reset = () => {
       clearTimeout(timer)
       timer = setTimeout(() => {
-        const { currentScreen: sc, logout } = useAppStore.getState()
-        if (sc !== 'login') logout()
+        const { currentScreen: sc, logout, db, session } = useAppStore.getState()
+        if (sc === 'login') return
+        // No cerrar sesión si hay una jornada activa en curso
+        const userId = session?.user?.id
+        const hasActiveRecord = userId && (db?.records || []).some(r => r.empId === userId && !r.fin)
+        if (!hasActiveRecord) logout()
       }, TIMEOUT)
     }
     const events = ['mousemove', 'touchstart', 'keydown', 'click', 'scroll']

@@ -1,17 +1,13 @@
-name: Recordatorio Fichar
+name: Auto-cierre jornadas >12h
 
 on:
   schedule:
-    # 08:00 Madrid (07:00 UTC en invierno, 06:00 UTC en verano)
-    # Lunes a viernes — doble disparo para cubrir cambio horario
-    - cron: '0 6 * * 1-5'
-    - cron: '0 7 * * 1-5'
-    # Segunda oportunidad a las 09:00 Madrid
-    - cron: '0 7,8 * * 1-5'
+    # Cada 4 horas entre las 06:00 y las 22:00 UTC (L-D)
+    - cron: '0 6,10,14,18,22 * * *'
   workflow_dispatch:
 
 jobs:
-  remind:
+  autoclose:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -21,8 +17,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm install web-push --no-save
-      - name: Recordatorio de fichaje
-        run: node push-fichar-reminder.js
+      - name: Cerrar jornadas abiertas >12h
+        run: node push-autoclose-jornada.js
         env:
           VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}

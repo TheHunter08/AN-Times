@@ -3,7 +3,7 @@ export const SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnv
 export const SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 
 export const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '0824'
-export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BNzMmzkGkkcwbsG_x3sEQo-aGM63sOwrOo2bpmRSG9QLBbfGmFIFGd8Hvo-jc5i0vFUAn5vK5IQa9kQdfnVreQc'
+export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BHkLMm4jcnQUppuN6UNx7b3gK073ZB0l7LHABbT74GrBxt-BeYWyi0LEadsf21Vpx9gO71Mc3TVRy2yTh_MaOsw'
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm

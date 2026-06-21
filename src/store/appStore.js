@@ -19,11 +19,12 @@ export const useAppStore = create((set, get) => ({
   },
 
   saveDB: (partial) => {
-    const newDB = { ...get().db, ...(partial || {}), _ts: Date.now() }
-    saveLocal(newDB)
-    set({ db: newDB })
-    cloudPush(newDB, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
-    return newDB
+    const merged = { ...get().db, ...(partial || {}), _ts: Date.now() }
+    if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
+    saveLocal(merged)
+    set({ db: merged })
+    cloudPush(merged, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
+    return merged
   },
 
   fetchDB: async () => {
@@ -126,11 +127,14 @@ export const useAppStore = create((set, get) => ({
 
   // ── Toasts ───────────────────────────────────────────────────────────
   toasts: [],
-  toast: (msg, dur = 3000) => {
+  toast: (msg, dur = 3000, type = '') => {
     const id = Date.now() + Math.random()
-    set(s => ({ toasts: [...s.toasts, { id, msg, dur }] }))
+    set(s => ({ toasts: [...s.toasts, { id, msg, dur, type }] }))
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), dur + 400)
   },
+  toastOk:   (msg) => get().toast(msg, 3000, 'ok'),
+  toastErr:  (msg) => get().toast(msg, 4000, 'err'),
+  toastWarn: (msg) => get().toast(msg, 3500, 'warn'),
 
   // ── Confirm dialog ───────────────────────────────────────────────────
   confirmDialog: null,
