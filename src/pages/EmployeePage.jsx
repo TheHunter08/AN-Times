@@ -26,9 +26,11 @@ export default function EmployeePage() {
     return () => clearInterval(iv)
   }, [])
 
-  // Push subscription on mount
+  // Push subscription on mount (PWA only — skip in browser tab)
   useEffect(() => {
     if (!u) return
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    if (!isPWA) return
     setTimeout(async () => {
       if ('Notification' in window && Notification.permission === 'granted') {
         await pushSubscribe('emp:' + u.id, VAPID_PUB)
