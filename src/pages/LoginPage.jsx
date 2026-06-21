@@ -84,7 +84,8 @@ export default function LoginPage() {
     if (newPin.length < 4) return
 
     // Admin PIN — comparación por hash (migración automática desde texto plano)
-    if (!selectedEmpId) {
+    // También activa el camino admin si el botón de acceso admin está visible
+    if (!selectedEmpId || showAdminBtn) {
       const adminLk = getLockoutState('__admin__')
       if (adminLk.locked) {
         setErr(`Bloqueado ${adminLk.remainingMin} min por exceso de intentos`)
@@ -162,7 +163,7 @@ export default function LoginPage() {
       if (navigator.vibrate) navigator.vibrate(200)
       setTimeout(() => { setShaking(false); setPin('') }, 450)
     }
-  }, [pin, selectedEmpId, db, doLogin, doAdminLogin])
+  }, [pin, selectedEmpId, showAdminBtn, db, doLogin, doAdminLogin])
 
   const handlePinDel = () => { setPin(p => p.slice(0, -1)); setErr('') }
 
@@ -345,12 +346,24 @@ export default function LoginPage() {
 
               {showAdminBtn && (
                 <button className="login-admin-btn"
-                  onClick={() => {
-                const adminLk = getLockoutState('__admin__')
-                if (adminLk.locked) { setErr(`Bloqueado ${adminLk.remainingMin} min`); return }
-                if (pin === ADMIN_PIN) { clearLockout('__admin__'); doAdminLogin(); setPin('') }
-                else { recordFailedAttempt('__admin__'); setErr('PIN admin incorrecto') }
-              }}>
+                  onClick={async () => {
+                    const adminLk = getLockoutState('__admin__')
+                    if (adminLk.locked) { setErr(`Bloqueado ${adminLk.remainingMin} min`); return }
+                    if (!pin) { setErr('Introduce el PIN de administrador'); return }
+                    const storedHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
+                    let ok = false
+                    if (storedHash && isPinHashed(storedHash)) {
+                      ok = (await hashPin(pin, '__admin__')) === storedHash
+                    } else {
+                      ok = pin === ADMIN_PIN
+                      if (ok) {
+                        const h = await hashPin(pin, '__admin__')
+                        try { localStorage.setItem('__admin_pin_hash__', h); localStorage.setItem('__admin_pin_len__', String(pin.length)) } catch {}
+                      }
+                    }
+                    if (ok) { clearLockout('__admin__'); doAdminLogin(); setPin('') }
+                    else { recordFailedAttempt('__admin__'); setErr('PIN admin incorrecto') }
+                  }}>
                   Acceso administrador
                 </button>
               )}
