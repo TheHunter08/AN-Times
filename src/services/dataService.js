@@ -87,13 +87,18 @@ export async function cloudFetchTs() {
 }
 
 // ── Supabase push (guarda datos) ──────────────────────────────────────────────
-let _pushFlight = false
-let _saveRetry  = 0
-let _saveTimer  = null
+let _pushFlight  = false
+let _pendingPush = null  // último save pendiente mientras hay uno en vuelo
+let _saveRetry   = 0
+let _saveTimer   = null
 
 export function cloudPush(db, onSuccess, onError) {
   if (!supabase) { onError?.(); return }
-  if (_pushFlight) return
+  if (_pushFlight) {
+    // Guardar el más reciente; se ejecutará cuando termine el vuelo actual
+    _pendingPush = { db, onSuccess, onError }
+    return
+  }
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
@@ -106,13 +111,19 @@ export function cloudPush(db, onSuccess, onError) {
       if (error) throw error
       _saveRetry = 0
       onSuccess?.(payload)
+      if (_pendingPush) {
+        const next = _pendingPush; _pendingPush = null
+        cloudPush(next.db, next.onSuccess, next.onError)
+      }
     })
     .catch(() => {
       _pushFlight = false
       onError?.()
       if (_saveRetry < 5) {
         _saveRetry++
-        setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
+        const next = _pendingPush || { db, onSuccess, onError }
+        _pendingPush = null
+        setTimeout(() => cloudPush(next.db, next.onSuccess, next.onError), 600 * _saveRetry)
       }
     })
 }
@@ -149,6 +160,8 @@ export function stopRealtime() {
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────
+const VAPID_KEY_STORAGE = 'an_times_vapid_key'
+
 export async function pushSubscribe(userId, vapidPub) {
   if (!supabase) return
   try {
@@ -162,8 +175,17 @@ export async function pushSubscribe(userId, vapidPub) {
       return Uint8Array.from([...s].map(c => c.charCodeAt(0)))
     }
     const buf2b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+
+    // Si la clave VAPID cambió, la suscripción existente es inválida → forzar re-suscripción
+    const storedKey = localStorage.getItem(VAPID_KEY_STORAGE)
+    if (storedKey && storedKey !== vapidPub) {
+      const old = await reg.pushManager.getSubscription()
+      if (old) await old.unsubscribe()
+    }
+
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
+    localStorage.setItem(VAPID_KEY_STORAGE, vapidPub)
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
     await supabase.from(PUSH_TABLE).upsert({
       user_id: userId,
@@ -173,14 +195,6 @@ export async function pushSubscribe(userId, vapidPub) {
       updated_at: new Date().toISOString()
     })
   } catch(e) { console.warn('[PUSH]', e) }
-}
-
-export function sendPushNotif(userId, title, body, tag = 'times') {
-  fetch('/api/sendpush', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, title, body, tag })
-  }).catch(() => {})
 }
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {

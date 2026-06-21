@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+﻿import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
@@ -58,7 +58,12 @@ export default function AdminPage() {
   const [sideOpen, setSideOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
-  const isMobile = window.innerWidth < 768
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   // Un "encargado" no es administrador: acceso restringido solo a su obra asignada
   const isEncargado = session.isEnc && !session.isJO
@@ -557,7 +562,7 @@ function PushNotifWidget({ db, toast }) {
     setSending(true)
     const tag = 'push-' + Date.now()
     await queuePush(target, title.trim(), body.trim(), tag, '/')
-    toast('🔔 Notificación enviada')
+    toast('Notificación enviada', 3000, 'ok')
     setSending(false)
     setTitle(''); setBody(''); setOpen(false)
   }
@@ -602,7 +607,7 @@ function ComunicadoWidget({ db, toast, saveDB }) {
     const msg = { id: gid(), from: 'admin', title: title.trim(), body: body.trim(), to: 'all', ts: new Date().toISOString() }
     saveDB({ mensajes: [...(db.mensajes||[]), msg] })
     await queuePush('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/?tab=inicio')
-    toast('✅ Comunicado enviado a todos los empleados')
+    toast('Comunicado enviado a todos los empleados', 3000, 'ok')
     setTitle(''); setBody(''); setOpen(false)
   }
 
@@ -717,7 +722,7 @@ function PanelControl({ db, toast, saveDB, session }) {
       const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
       saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
       queuePush(rec.empId, '⏱️ Jornada cerrada', `Administración ha cerrado tu jornada abierta (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
-      toast('✅ Jornada cerrada forzosamente')
+      toast('Jornada cerrada forzosamente', 3000, 'ok')
     })
   }
 
@@ -987,7 +992,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString() }
     saveDB({ [key]: [...(db[key]||[]), item] })
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
-    toast('✅ Ausencia registrada')
+    toast('Ausencia registrada', 3000, 'ok')
   }
 
   const delAus = (id, tipo) => {
@@ -1145,11 +1150,12 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
               : r
             )
           }
-          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString() } : c)
+          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin' } : c)
           const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
-          saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis||[]), noti] })
+          const withAudit = auditLog(db, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, session?.user?.name || 'Admin')
+          saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis||[]), noti], audit: withAudit.audit })
           queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
-          toast(estado === 'aprobada' ? '✅ Corrección aplicada' : '❌ Corrección rechazada')
+          toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
         }
 
         return (
@@ -1464,7 +1470,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       return [r.empName, r.centro||'', r.empresa||'', new Date(r.inicio).toLocaleString('es-ES'), new Date(r.fin).toLocaleString('es-ES'), `${Math.floor(wm/60)}:${p2(wm%60)}`, `${Math.floor(bm/60)}:${p2(bm%60)}`]
     })
     await downloadXLSX('Fichajes', [headers, ...rows], `fichajes_${from||'todo'}_${to||'hoy'}.xlsx`)
-    toast('✅ Excel descargado')
+    toast('Excel descargado', 3000, 'ok')
   }
 
   const [y, mo] = filterMonth.split('-').map(Number)
@@ -1483,7 +1489,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       return [e.name, ...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?`${Math.floor(dayMap[i+1]/60)}:${p2(dayMap[i+1]%60)}`:''), mhm(total)]
     })
     await downloadXLSX('Detalle diario', [header, ...rows], `detalle_${filterMonth}.xlsx`)
-    toast('✅ Excel descargado')
+    toast('Excel descargado', 3000, 'ok')
   }
 
   const exportResumenXLSX = async () => {
@@ -1492,7 +1498,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       e.name, days, mhm(totalMin), mhm(expected), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available, weeklyH
     ])
     await downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
-    toast('✅ Excel descargado')
+    toast('Excel descargado', 3000, 'ok')
   }
 
   const downloadNominaPDF = ({ e, totalMin, days }) => {
@@ -2225,7 +2231,7 @@ function PanelObras({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Obra creada', n, who)
     saveDB({ obras: [...obras, obra], audit: withAudit.audit })
     setNewObra('')
-    toast('✅ Obra creada')
+    toast('Obra creada', 3000, 'ok')
   }
 
   const delObra = (id) => {
@@ -2244,7 +2250,7 @@ function PanelObras({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Centro de trabajo añadido', n, who)
     saveDB({ centrosTrabajo: [...centros, n], audit: withAudit.audit })
     setNewCentro('')
-    toast('✅ Centro añadido')
+    toast('Centro añadido', 3000, 'ok')
   }
 
   const delCentro = (c) => {
@@ -2386,7 +2392,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
     queuePush(form.empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
-    toast('✅ Documento enviado al empleado')
+    toast('Documento enviado al empleado', 3000, 'ok')
     setShowForm(false)
     setForm(EMPTY)
     setFileData(''); setFileName('')
@@ -2404,7 +2410,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
     saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
     queuePush(empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
-    toast('✅ Jornada enviada para firma')
+    toast('Jornada enviada para firma', 3000, 'ok')
   }
 
   const del = (id) => {
@@ -2628,7 +2634,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Jornada aceptada', `${rec.empName} · ${fds(rec.inicio)}`, enc.name)
     saveDB({ records: updated, audit: withAudit.audit })
     queuePush(rec.empId, '✅ Jornada validada', `Tu jornada del ${fds(rec.inicio)} ha sido validada por ${enc.name}.`, 'jornada', '/?tab=jornada')
-    toast('✅ Jornada aceptada')
+    toast('Jornada aceptada', 3000, 'ok')
   }
 
   const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio.slice(0,16), fin: rec.fin ? rec.fin.slice(0,16) : '' })
@@ -2644,7 +2650,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Jornada modificada', `${rec?.empName || ''} · ${fds(editing.inicio)}`, enc.name)
     saveDB({ records: updated, audit: withAudit.audit })
     if (rec) queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} ha modificado tu jornada del ${fds(editing.inicio)}.`, 'jornada', '/?tab=jornada')
-    toast('✅ Jornada modificada')
+    toast('Jornada modificada', 3000, 'ok')
     setEditing(null)
   }
 
@@ -2657,7 +2663,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const tipoLbl = ausForm.tipo === 'medico' ? 'Ausencia médica' : 'Ausencia'
     queuePush(ausForm.empId, `🗓️ ${tipoLbl} registrada`, `${enc.name} registró una ${tipoLbl.toLowerCase()} el ${ausForm.fechaInicio}.`, 'ausencia', '/?tab=calendario')
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
-    toast('✅ Ausencia registrada')
+    toast('Ausencia registrada', 3000, 'ok')
   }
 
   const delAus = (id, tipo) => {
@@ -2678,9 +2684,10 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     }
     const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: enc.name } : c)
     const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
-    saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis || []), noti] })
+    const withAuditEnc = auditLog(db, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, enc.name)
+    saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis || []), noti], audit: withAuditEnc.audit })
     queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
-    toast(estado === 'aprobada' ? '✅ Corrección aplicada' : '❌ Corrección rechazada')
+    toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
 
   if (!misCentros.length) {
