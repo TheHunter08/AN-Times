@@ -1,9 +1,9 @@
 const webpush = require('web-push');
 
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC || 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4';
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BNzMmzkGkkcwbsG_x3sEQo-aGM63sOwrOo2bpmRSG9QLBbfGmFIFGd8Hvo-jc5i0vFUAn5vK5IQa9kQdfnVreQc';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
-const SB_URL        = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
-const SB_ANON       = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
+const SB_URL        = process.env.VITE_SB_URL   || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
+const SB_ANON       = process.env.VITE_SB_ANON  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
 
 if (VAPID_PRIVATE) {
   webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
@@ -37,15 +37,22 @@ async function sendOne(sub, payload) {
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.PUSH_ALLOWED_ORIGIN || '*');
+  const allowedOrigin = process.env.PUSH_ALLOWED_ORIGIN || '';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Push-Key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.PUSH_API_KEY || req.headers['x-push-key'] !== process.env.PUSH_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
+
+  // Verificar origen: si PUSH_ALLOWED_ORIGIN está configurado, solo acepta ese dominio
+  if (allowedOrigin) {
+    const origin = req.headers.origin || req.headers.referer || '';
+    if (!origin.startsWith(allowedOrigin)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
+
   if (!VAPID_PRIVATE) return res.status(500).json({ error: 'Missing VAPID_PRIVATE' });
 
   const { userId, title, body, tag, url } = req.body || {};
