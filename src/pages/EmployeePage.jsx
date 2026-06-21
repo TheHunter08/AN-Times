@@ -65,6 +65,7 @@ export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
   const timer = useTimer()
   const u = session.user
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
   const [pendingGPS, setPendingGPS] = useState(null)
   const [clockTime, setClockTime] = useState('')
   const [clockDate, setClockDate] = useState('')
@@ -72,8 +73,15 @@ export default function EmployeePage() {
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
 
-  // Auto-subscribe to push notifications on login
-  useEffect(() => { if (u?.id) pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
+  // Auto-subscribe to push notifications on login (PWA only)
+  useEffect(() => { if (u?.id && isPWA) pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
+
+  // In browser/web mode, silently mark onboarding done so the wizard never shows
+  useEffect(() => {
+    if (u?.id && !u.onboardingDone && !isPWA) {
+      saveDB({ employees: (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true } : e) })
+    }
+  }, [u?.id])
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
@@ -144,8 +152,8 @@ export default function EmployeePage() {
   useEffect(() => {
     if (!u) return
 
-    // Request permission once
-    setTimeout(async () => {
+    // Request permission once (PWA only — don't prompt in browser tab)
+    if (isPWA) setTimeout(async () => {
       if ('Notification' in window && Notification.permission === 'default') {
         await Notification.requestPermission()
       }

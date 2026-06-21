@@ -115,7 +115,8 @@ export default function AdminPage() {
   }, [isEncargado])
 
   useEffect(() => {
-    if (!isEncargado) {
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    if (!isEncargado && isPWA) {
       setTimeout(async () => {
         if ('Notification' in window && Notification.permission === 'default') {
           await Notification.requestPermission()
