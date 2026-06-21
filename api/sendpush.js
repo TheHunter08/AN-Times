@@ -62,7 +62,9 @@ module.exports = async function handler(req, res) {
   const { userId, title, body, tag, url } = req.body || {};
   if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' });
 
-  const payload = JSON.stringify({ title, body: body || '', tag: tag || 'times', url: url || '/' });
+  // Sanitize url: must be a relative path (no external redirects)
+  const safeUrl = typeof url === 'string' && url.startsWith('/') ? url : '/';
+  const payload = JSON.stringify({ title, body: body || '', tag: tag || 'times', url: safeUrl });
 
   // Broadcast a todos los suscriptores
   if (userId === '__all__') {
