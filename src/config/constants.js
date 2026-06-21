@@ -1,7 +1,10 @@
-export const DB_URL = `${import.meta.env.VITE_FB_DATABASE_URL}/an_times_data`
-export const FB_BASE = import.meta.env.VITE_FB_DATABASE_URL
-export const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN
-export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB
+// ── Supabase (base de datos principal) ──────────────────────────────────────
+export const SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+export const SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+
+// ── Firebase Auth (solo para login Google/email — no toca la BD) ─────────────
+export const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '0824'
+export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm
@@ -9,13 +12,12 @@ export const WM = 160 * 60  // monthly minutes norm
 export const VPM = 2.5      // vacation days per month
 
 export const FB_CONFIG = {
-  apiKey:            import.meta.env.VITE_FB_API_KEY,
-  authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN,
-  databaseURL:       import.meta.env.VITE_FB_DATABASE_URL,
-  projectId:         import.meta.env.VITE_FB_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FB_APP_ID,
+  apiKey:            import.meta.env.VITE_FB_API_KEY            || 'AIzaSyAYZdHMrGBnBb5O6p5oBIuikX1Qc9HgvjQ',
+  authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN        || 'times-inc.firebaseapp.com',
+  projectId:         import.meta.env.VITE_FB_PROJECT_ID         || 'times-inc',
+  storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET     || 'times-inc.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID || '366356529016',
+  appId:             import.meta.env.VITE_FB_APP_ID             || '1:366356529016:web:ffe5ba97c214c21fc9928d',
 }
 
 // Festivos oficiales Comunidad de Madrid 2026 (14 días: 8 nacionales + 2 autonómicos + 2 locales Madrid capital)

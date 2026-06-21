@@ -2,11 +2,24 @@ const webpush = require('web-push');
 
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC || 'BI4uEES76cujGjvpJ68hIKD4jeZfBUAHTmV9DTTbpnd91jAzld1iv_aeN9PkgKJ46J9m_r7GkvoiCeyOcsmm8q4';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
-const FB_BASE       = 'https://times-inc-default-rtdb.europe-west1.firebasedatabase.app';
-const FB_AUTH       = process.env.FIREBASE_DB_AUTH_TOKEN;
+const SB_URL        = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
+const SB_ANON       = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
 
 if (VAPID_PRIVATE) {
   webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
+}
+
+async function sbGet(userId) {
+  const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=endpoint,p256dh,auth&limit=1`;
+  const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } });
+  if (!r.ok) return null;
+  const rows = await r.json();
+  return rows?.[0] || null;
+}
+
+async function sbDelete(userId) {
+  const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`;
+  await fetch(url, { method: 'DELETE', headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }).catch(() => {});
 }
 
 module.exports = async function handler(req, res) {
@@ -20,28 +33,26 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   if (!VAPID_PRIVATE) return res.status(500).json({ error: 'Missing VAPID_PRIVATE' });
-  if (!FB_AUTH) return res.status(500).json({ error: 'Missing FIREBASE_DB_AUTH_TOKEN' });
 
   const { userId, title, body, tag, url } = req.body || {};
   if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' });
 
   try {
-    const fbRes = await fetch(`${FB_BASE}/pushSubs/${encodeURIComponent(userId)}.json?auth=${encodeURIComponent(FB_AUTH)}`);
-    const sub = await fbRes.json();
+    const sub = await sbGet(userId);
 
     if (!sub || !sub.endpoint) {
       return res.status(200).json({ skipped: true, reason: 'no subscription' });
     }
 
     await webpush.sendNotification(
-      { endpoint: sub.endpoint, keys: sub.keys },
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify({ title, body: body || '', tag: tag || 'times', url: url || '/' })
     );
 
     return res.status(200).json({ ok: true });
   } catch (err) {
     if (err.statusCode === 410) {
-      await fetch(`${FB_BASE}/pushSubs/${encodeURIComponent(userId)}.json?auth=${encodeURIComponent(FB_AUTH)}`, { method: 'DELETE' }).catch(() => {});
+      await sbDelete(userId);
       return res.status(200).json({ ok: false, reason: 'expired' });
     }
     console.error('[sendpush]', err.statusCode, err.body || err.message);

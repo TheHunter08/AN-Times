@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
-import { initStorage, flushOfflineQueue } from './services/dataService.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 
@@ -149,32 +148,21 @@ function GlobalConfirm() {
 
 export default function App() {
   const currentScreen = useAppStore(s => s.currentScreen)
-  const fetchDB      = useAppStore(s => s.fetchDB)
-  const hydrateIDB   = useAppStore(s => s.hydrateIDB)
-  const toast        = useAppStore(s => s.toast)
+  const fetchDB       = useAppStore(s => s.fetchDB)
+  const initRealtime  = useAppStore(s => s.initRealtime)
+  const stopRealtime  = useAppStore(s => s.stopRealtime)
 
-  // Inicialización: migrar localStorage→IDB, hidratar store, primer fetch
   useEffect(() => {
-    const init = async () => {
-      await initStorage()   // migra localStorage→IDB si es la primera vez
-      await hydrateIDB()    // carga datos completos desde IDB
-      await fetchDB()       // sincroniza con Firebase
+    fetchDB()
+    initRealtime()
+    const iv = setInterval(fetchDB, 5 * 60 * 1000)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVisible)
+      stopRealtime()
     }
-    init()
-    const iv = setInterval(fetchDB, 25000)
-    return () => clearInterval(iv)
-  }, [])
-
-  // Cuando vuelve la conexión, vaciar la cola offline de IDB
-  useEffect(() => {
-    const onOnline = () => {
-      flushOfflineQueue(
-        () => toast('✅ Datos sincronizados con el servidor'),
-        () => {}
-      )
-    }
-    window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
   }, [])
 
   // Auto-logout tras 30 min de inactividad

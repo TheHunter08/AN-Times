@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, loadLocalAsync, mergeDB, saveLocal, cloudPush, cloudFetchSmart, initStorage, flushOfflineQueue } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime } from '../services/dataService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -21,37 +21,43 @@ export const useAppStore = create((set, get) => ({
   saveDB: (partial) => {
     const newDB = { ...get().db, ...(partial || {}), _ts: Date.now() }
     saveLocal(newDB)
-    set({ db: newDB, syncStatus: 'syncing' })
-    cloudPush(
-      newDB,
-      () => set({ syncStatus: 'synced' }),
-      () => set({ syncStatus: 'error' }),
-      () => { set({ syncStatus: 'error' }); get().toast('⚠️ Sin conexión — datos guardados localmente') }
-    )
+    set({ db: newDB })
+    cloudPush(newDB, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
     return newDB
-  },
-
-  hydrateIDB: async () => {
-    // Lee desde IndexedDB (más capacidad que localStorage) y actualiza el store
-    const data = await loadLocalAsync()
-    if (data && data._ts && data._ts > (get().db._ts || 0)) {
-      set({ db: data })
-    }
   },
 
   fetchDB: async () => {
     const { db } = get()
-    const data = await cloudFetchSmart(db._ts)
-    if (!data) { set({ syncStatus: 'error' }); return }
-    if (data === 'no-change') { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
-    const shouldMerge = !db._ts || data._ts >= db._ts || (data.employees||[]).length !== (db.employees||[]).length
-    if (shouldMerge) {
-      const merged = mergeDB(INITIAL_DB, data)
-      saveLocal(merged)
-      set({ db: merged })
+    const tsResult = await cloudFetchTs()
+    if (!tsResult.ok) {
+      set({ syncStatus: 'error', syncError: tsResult.status })
+      return
     }
-    set({ syncStatus: 'synced', lastSyncTime: Date.now() })
+    set({ syncError: null })
+    if (tsResult.ts && db._ts && tsResult.ts <= db._ts) {
+      set({ syncStatus: 'synced', lastSyncTime: Date.now() })
+      return
+    }
+    const { ok, data, status } = await cloudFetch()
+    if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
+    if (!data) return
+    const merged = mergeDB(INITIAL_DB, data)
+    saveLocal(merged)
+    set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
   },
+
+  // ── Realtime Supabase ────────────────────────────────────────────────
+  initRealtime: () => {
+    startRealtime(
+      () => get().db,
+      (incoming) => {
+        const merged = mergeDB(INITIAL_DB, incoming)
+        saveLocal(merged)
+        set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
+      }
+    )
+  },
+  stopRealtime,
 
   // ── Session ─────────────────────────────────────────────────────────
   session: storedSes || { user: null, isAdmin: false, isEnc: false, isJO: false },
@@ -108,6 +114,7 @@ export const useAppStore = create((set, get) => ({
   // ── UI State ─────────────────────────────────────────────────────────
   isLoading: true,
   syncStatus: 'idle',
+  syncError: null,
   lastSyncTime: null,
   activeModal: null,
   modalData: null,
@@ -125,7 +132,7 @@ export const useAppStore = create((set, get) => ({
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), dur + 400)
   },
 
-  // ── Confirm dialog (reemplaza window.confirm para mobile) ────────────
+  // ── Confirm dialog ───────────────────────────────────────────────────
   confirmDialog: null,
   showConfirm: (msg, onConfirm) => set({ confirmDialog: { msg, onConfirm } }),
   closeConfirm: () => set({ confirmDialog: null }),

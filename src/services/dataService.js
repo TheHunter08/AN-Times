@@ -1,96 +1,17 @@
-import { DB_URL, FB_BASE, INITIAL_DB, ADMIN_PIN, FB_CONFIG } from '../config/constants.js'
-import { idbSave, idbLoad, idbQueuePush, idbGetPendingPushes, idbClearPendingPushes, migrateFromLocalStorage } from './idbService.js'
+import { createClient } from '@supabase/supabase-js'
+import { SB_URL, SB_ANON, INITIAL_DB, ADMIN_PIN } from '../config/constants.js'
 
-let _pushFlight = false
-let _saveRetry = 0
-let _saveTimer = null
-let _pollInterval = null
-let _authPromise = null
+// ── Cliente Supabase ──────────────────────────────────────────────────────────
+export const supabase = (SB_URL && SB_ANON)
+  ? createClient(SB_URL, SB_ANON)
+  : null
 
-// ─── Auth anónima de Firebase (REST) ───────────────────────────────────────
-// Las reglas de la Realtime Database exigen un usuario autenticado para leer/
-// escribir. Usamos auth anónima (invisible para el usuario, que sigue
-// entrando con su PIN) para que la base de datos no quede abierta a internet.
-function readCachedAuth() {
-  try { return JSON.parse(localStorage.getItem('an_times_auth') || 'null') } catch { return null }
-}
-function writeCachedAuth(a) {
-  try { localStorage.setItem('an_times_auth', JSON.stringify(a)) } catch {}
-}
+const TABLE      = 'app_data'
+const PUSH_TABLE = 'push_subs'
+const ROW_ID     = 1
 
-async function signInAnon() {
-  if (!FB_CONFIG.apiKey) {
-    console.error('[Times] VITE_FB_API_KEY no configurado')
-    throw new Error('Firebase API key missing')
-  }
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ returnSecureToken: true })
-  })
-  if (!r.ok) {
-    const body = await r.text().catch(() => '')
-    console.error('[Times] signInAnon falló:', r.status, body)
-    throw new Error('auth signup failed: ' + r.status)
-  }
-  const d = await r.json()
-  const auth = { idToken: d.idToken, refreshToken: d.refreshToken, expiresAt: Date.now() + Number(d.expiresIn || 3600) * 1000 }
-  writeCachedAuth(auth)
-  return auth
-}
-
-async function refreshAnon(refreshToken) {
-  const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB_CONFIG.apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
-  })
-  if (!r.ok) throw new Error('auth refresh failed')
-  const d = await r.json()
-  const auth = { idToken: d.id_token, refreshToken: d.refresh_token, expiresAt: Date.now() + Number(d.expires_in || 3600) * 1000 }
-  writeCachedAuth(auth)
-  return auth
-}
-
-export async function getAuthToken() {
-  if (_authPromise) return _authPromise
-  _authPromise = (async () => {
-    try {
-      const cached = readCachedAuth()
-      if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.idToken
-      if (cached?.refreshToken) {
-        try { return (await refreshAnon(cached.refreshToken)).idToken } catch {}
-      }
-      return (await signInAnon()).idToken
-    } catch (e) {
-      writeCachedAuth(null) // limpia caché corrupta para que el próximo intento parta de cero
-      throw e
-    } finally {
-      _authPromise = null
-    }
-  })()
-  return _authPromise
-}
-
-function withAuth(url, token) {
-  return token ? `${url}${url.includes('?') ? '&' : '?'}auth=${token}` : url
-}
-
-// Fetch autenticado: si Firebase devuelve 401/403 limpia la caché y reintenta con token nuevo
-async function authedFetch(url, opts = {}) {
-  let token = await safeToken()
-  let resp = await fetch(withAuth(url, token), { cache: 'no-store', ...opts })
-  if (resp.status === 401 || resp.status === 403) {
-    console.warn('[Times] Token rechazado (' + resp.status + '), renovando...')
-    writeCachedAuth(null)
-    token = await safeToken()
-    resp = await fetch(withAuth(url, token), { cache: 'no-store', ...opts })
-  }
-  return resp
-}
-
+// ── Local storage ─────────────────────────────────────────────────────────────
 export function loadLocal() {
-  // Lectura síncrona desde localStorage para startup sin bloquear
   try {
     const raw = localStorage.getItem('an_times_v1')
     if (raw) return mergeDB(INITIAL_DB, JSON.parse(raw))
@@ -98,39 +19,11 @@ export function loadLocal() {
   return { ...INITIAL_DB }
 }
 
-export async function loadLocalAsync() {
-  // Lectura async desde IndexedDB — más capacidad, sin límite de 5MB
-  try {
-    const data = await idbLoad()
-    if (data) return mergeDB(INITIAL_DB, data)
-  } catch {}
-  return loadLocal()
-}
-
 export function saveLocal(db) {
-  // Escribe en localStorage (sync, para lectura rápida) y en IDB (async, sin límite)
   try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch {}
-  idbSave(db) // fire-and-forget
 }
 
-export async function initStorage() {
-  // Migra datos de localStorage a IDB en el primer arranque
-  await migrateFromLocalStorage(mergeDB, INITIAL_DB)
-}
-
-// Vacía la cola offline y empuja cada snapshot pendiente
-export async function flushOfflineQueue(onSuccess, onError) {
-  const pending = await idbGetPendingPushes()
-  if (!pending.length) return
-  // El último snapshot tiene el estado más reciente — el resto se pueden descartar
-  const latest = pending[pending.length - 1]
-  // Borra la cola DESPUÉS de que el push tenga éxito, no antes
-  await cloudPush(latest.snapshot, async (pushed) => {
-    await idbClearPendingPushes()
-    onSuccess?.(pushed)
-  }, onError, () => {})
-}
-
+// ── mergeDB ───────────────────────────────────────────────────────────────────
 export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
   const adm = base.employees?.find(e => e.isAdmin) || {
@@ -140,154 +33,88 @@ export function mergeDB(base, incoming) {
   }
   const inc = incoming.employees?.length ? incoming.employees : base.employees
   return {
-    empresas:        (incoming.empresas?.length)        ? incoming.empresas        : base.empresas,
-    obras:           (incoming.obras?.length)           ? incoming.obras           : base.obras,
-    centrosTrabajo:  (incoming.centrosTrabajo?.length)  ? incoming.centrosTrabajo  : base.centrosTrabajo,
-    employees:       inc.some(e => e.isAdmin)           ? inc                      : [...inc, adm],
-    records:         incoming.records       || [],
-    vacaciones:      incoming.vacaciones    || [],
-    medicos:         incoming.medicos       || [],
-    ausencias:       incoming.ausencias     || [],
-    mensajes:        incoming.mensajes      || [],
-    notis:           incoming.notis         || [],
-    cierres:         incoming.cierres       || [],
-    monthSnapshots:  incoming.monthSnapshots|| {},
-    firmas:          incoming.firmas              || {},
-    documentos:      incoming.documentos          || [],
-    audit:           incoming.audit               || [],
-    correccionesFichaje: incoming.correccionesFichaje || [],
-    chats:           incoming.chats               || [],
-    _ts:             incoming._ts                 || 0
+    empresas:            (incoming.empresas?.length)       ? incoming.empresas       : base.empresas,
+    obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
+    centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
+    employees:           inc.some(e => e.isAdmin)          ? inc                     : [...inc, adm],
+    records:             incoming.records              || [],
+    vacaciones:          incoming.vacaciones           || [],
+    medicos:             incoming.medicos              || [],
+    ausencias:           incoming.ausencias            || [],
+    mensajes:            incoming.mensajes             || [],
+    notis:               incoming.notis                || [],
+    cierres:             incoming.cierres              || [],
+    monthSnapshots:      incoming.monthSnapshots       || {},
+    firmas:              incoming.firmas               || {},
+    documentos:          incoming.documentos           || [],
+    audit:               incoming.audit                || [],
+    correccionesFichaje: incoming.correccionesFichaje  || [],
+    chats:               incoming.chats                || [],
+    _ts:                 incoming._ts                  || 0
   }
 }
 
-async function safeToken() {
-  try { return await getAuthToken() } catch(e) {
-    console.warn('[Times] Auth anónima falló, intentando sin token:', e?.message || e)
-    return null
-  }
-}
-
+// ── Supabase fetch (descarga datos completos) ─────────────────────────────────
 export async function cloudFetch() {
+  if (!supabase) return { ok: false, data: null, status: 'no_config' }
   try {
-    const r = await authedFetch(DB_URL + '.json')
-    if (!r.ok) return null
-    return await r.json()
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('data, updated_at')
+      .eq('id', ROW_ID)
+      .maybeSingle()
+    if (error) return { ok: false, data: null, status: error.code || 'sb_error' }
+    return { ok: true, data: data?.data || null, updatedAt: data?.updated_at || null }
   } catch {
-    return null
+    return { ok: false, data: null, status: 'red' }
   }
 }
 
-// Comprueba _ts primero (~15 bytes) antes de descargar la DB completa.
-// Devuelve null (error), 'no-change' (sin cambios), o los datos completos.
-export async function cloudFetchSmart(localTS) {
+// ── Supabase fetch ligero: solo updated_at (~50 bytes) ───────────────────────
+export async function cloudFetchTs() {
+  if (!supabase) return { ok: false, ts: null, status: 'no_config' }
   try {
-    const tsResp = await authedFetch(DB_URL + '/_ts.json')
-    if (!tsResp.ok) return null
-    const remoteTS = await tsResp.json()
-    if (remoteTS && localTS && remoteTS <= localTS) return 'no-change'
-    const r = await authedFetch(DB_URL + '.json')
-    if (!r.ok) return null
-    return await r.json()
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('updated_at')
+      .eq('id', ROW_ID)
+      .maybeSingle()
+    if (error) return { ok: false, ts: null, status: error.code || 'sb_error' }
+    return { ok: true, ts: data?.updated_at ? new Date(data.updated_at).getTime() : 0 }
   } catch {
-    return null
+    return { ok: false, ts: null, status: 'red' }
   }
 }
 
-function mergeArraysById(local, remote) {
-  const map = new Map()
-  ;(remote || []).forEach(item => item?.id && map.set(item.id, item))
-  ;(local  || []).forEach(item => item?.id && map.set(item.id, item)) // local wins same id
-  return [...map.values()]
-}
+// ── Supabase push (guarda datos) ──────────────────────────────────────────────
+let _pushFlight = false
+let _saveRetry  = 0
+let _saveTimer  = null
 
-function mergeStringArrays(local, remote) {
-  return [...new Set([...(remote || []), ...(local || [])].filter(Boolean))]
-}
-
-function mergeObjects(local, remote) {
-  return { ...(remote || {}), ...(local || {}) }
-}
-
-function mergeForPush(local, remote) {
-  if (!remote) return local
-  return {
-    ...remote,
-    ...local,
-    empresas:        mergeStringArrays(local.empresas,       remote.empresas),
-    obras:           mergeStringArrays(local.obras,          remote.obras),
-    centrosTrabajo:  mergeStringArrays(local.centrosTrabajo, remote.centrosTrabajo),
-    employees:       mergeArraysById(local.employees,        remote.employees),
-    records:         mergeArraysById(local.records,          remote.records),
-    vacaciones:      mergeArraysById(local.vacaciones,       remote.vacaciones),
-    medicos:         mergeArraysById(local.medicos,          remote.medicos),
-    ausencias:       mergeArraysById(local.ausencias,        remote.ausencias),
-    mensajes:        mergeArraysById(local.mensajes,         remote.mensajes),
-    notis:           mergeArraysById(local.notis,            remote.notis),
-    cierres:         mergeArraysById(local.cierres,          remote.cierres),
-    chats:           mergeArraysById(local.chats,            remote.chats),
-    correccionesFichaje: mergeArraysById(local.correccionesFichaje, remote.correccionesFichaje),
-    documentos:      mergeArraysById(local.documentos,       remote.documentos),
-    audit:           mergeArraysById(local.audit,            remote.audit),
-    firmas:          mergeObjects(local.firmas,              remote.firmas),
-    monthSnapshots:  mergeObjects(local.monthSnapshots,      remote.monthSnapshots),
-  }
-}
-
-export async function cloudPush(db, onSuccess, onError, onFinalError) {
+export function cloudPush(db, onSuccess, onError) {
+  if (!supabase) { onError?.(); return }
   if (_pushFlight) return
   _pushFlight = true
-  try {
-    // Optimistic locking: check remote _ts first to detect concurrent edits
-    let localBase = db
-    try {
-      const tsResp = await authedFetch(DB_URL + '/_ts.json')
-      if (tsResp.ok) {
-        const remoteTS = await tsResp.json()
-        if (remoteTS && db._ts && remoteTS > db._ts) {
-          const remoteResp = await authedFetch(DB_URL + '.json')
-          if (remoteResp.ok) {
-            const remote = await remoteResp.json()
-            if (remote) localBase = mergeForPush(db, remote)
-          }
-        }
-      }
-    } catch {}
-    const payload = { ...localBase, _ts: Date.now() }
-    saveLocal(payload)
-    const r = await authedFetch(DB_URL + '.json', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    _pushFlight = false
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    _saveRetry = 0
-    onSuccess?.(payload)
-  } catch {
-    _pushFlight = false
-    onError?.()
-    if (_saveRetry < 5) {
-      _saveRetry++
-      setTimeout(() => cloudPush(loadLocal(), onSuccess, onError, onFinalError), 600 * _saveRetry)
-    } else {
-      _saveRetry = 0
-      // Sin conexión definitiva: encolar en IDB para reintentar cuando vuelva la red
-      idbQueuePush(loadLocal())
-      onFinalError?.()
-    }
-  }
-}
+  const payload = { ...db, _ts: Date.now() }
+  saveLocal(payload)
 
-export async function cloudPatchPath(path, value) {
-  try {
-    const r = await authedFetch(DB_URL + '/' + path + '.json', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(value)
+  supabase
+    .from(TABLE)
+    .upsert({ id: ROW_ID, data: payload, updated_at: new Date().toISOString() })
+    .then(({ error }) => {
+      _pushFlight = false
+      if (error) throw error
+      _saveRetry = 0
+      onSuccess?.(payload)
     })
-    return r.ok
-  } catch { return false }
+    .catch(() => {
+      _pushFlight = false
+      onError?.()
+      if (_saveRetry < 5) {
+        _saveRetry++
+        setTimeout(() => cloudPush(db, onSuccess, onError), 600 * _saveRetry)
+      }
+    })
 }
 
 export function scheduleSave(db, onSuccess, onError, delay = 0) {
@@ -296,22 +123,34 @@ export function scheduleSave(db, onSuccess, onError, delay = 0) {
   _saveTimer = setTimeout(() => cloudPush(db, onSuccess, onError), delay)
 }
 
-export function startPolling(currentDB, onUpdate, interval = 30000) {
-  stopPolling()
-  _pollInterval = setInterval(async () => {
-    const data = await cloudFetch()
-    if (!data) return
-    const shouldMerge = !currentDB._ts || data._ts > currentDB._ts ||
-      (data.employees || []).length !== (currentDB.employees || []).length
-    if (shouldMerge) onUpdate?.(data)
-  }, interval)
+// ── Supabase Realtime ─────────────────────────────────────────────────────────
+let _realtimeChannel = null
+
+export function startRealtime(currentGetDB, onUpdate) {
+  if (!supabase) return
+  stopRealtime()
+  _realtimeChannel = supabase
+    .channel('app_data_rt')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` },
+      (payload) => {
+        const incoming = payload.new?.data
+        if (!incoming) return
+        const local = currentGetDB()
+        if (incoming._ts && local._ts && incoming._ts <= local._ts) return
+        onUpdate?.(incoming)
+      }
+    )
+    .subscribe()
 }
 
-export function stopPolling() {
-  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null }
+export function stopRealtime() {
+  if (_realtimeChannel) { supabase?.removeChannel(_realtimeChannel); _realtimeChannel = null }
 }
 
+// ── Push notifications ────────────────────────────────────────────────────────
 export async function pushSubscribe(userId, vapidPub) {
+  if (!supabase) return
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     const perm = await Notification.requestPermission()
@@ -326,42 +165,30 @@ export async function pushSubscribe(userId, vapidPub) {
     const sub = await reg.pushManager.getSubscription() ||
       await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
     const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    await authedFetch(FB_BASE + '/pushSubs/' + encodeURIComponent(userId) + '.json', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: buf2b64(key), auth: buf2b64(auth) } })
+    await supabase.from(PUSH_TABLE).upsert({
+      user_id: userId,
+      endpoint: sub.endpoint,
+      p256dh: buf2b64(key),
+      auth: buf2b64(auth),
+      updated_at: new Date().toISOString()
     })
   } catch(e) { console.warn('[PUSH]', e) }
 }
 
-export function sendPushNotif(userId, title, body, tag = 'times', url = '/') {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
-      const n = new Notification(title, {
-        body, tag, icon: '/icon.svg', badge: '/icon.svg',
-        data: { url }, vibrate: [100, 50, 100]
-      })
-      n.onclick = () => { window.focus(); n.close() }
-    } catch {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title, {
-            body, tag, icon: '/icon.svg', badge: '/icon.svg',
-            data: { url }, vibrate: [100, 50, 100]
-          }).catch(() => {})
-        }).catch(() => {})
-      }
-    }
-  }
+export function sendPushNotif(userId, title, body, tag = 'times') {
+  fetch('/api/sendpush', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, title, body, tag })
+  }).catch(() => {})
 }
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   try {
-    const entry = { userId: to, title, body, tag, url, ts: Date.now() }
-    await authedFetch(FB_BASE + '/pushQueue.json', {
+    await fetch('/api/sendpush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
+      body: JSON.stringify({ userId: to, title, body, tag, url })
     })
   } catch {}
 }
