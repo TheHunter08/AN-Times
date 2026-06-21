@@ -121,22 +121,17 @@ export default function AdminPage() {
   }, [isEncargado])
 
   useEffect(() => {
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-    if (!isEncargado) {
-      setTimeout(async () => {
-        const native = await isNativePlatform()
-        if (native || isPWA) {
-          await requestPushPermission()
-          // Registrar suscripción bajo el ID real del admin y bajo '__admin__'
-          // para recibir notificaciones enviadas desde los empleados
-          const uid = useAppStore.getState().session?.user?.id
-          if (uid) {
-            pushSubscribe(uid, VAPID_PUB)
-            pushSubscribe('__admin__', VAPID_PUB)
-          }
-        }
-      }, 3000)
-    }
+    if (isEncargado) return
+    setTimeout(async () => {
+      const native = await isNativePlatform()
+      const uid = useAppStore.getState().session?.user?.id
+      if (native) { await requestPushPermission(); return }
+      const result = await requestPushPermission()
+      if (result && uid) {
+        pushSubscribe(uid, VAPID_PUB)
+        pushSubscribe('__admin__', VAPID_PUB)
+      }
+    }, 3000)
   }, [isEncargado])
 
   // Buscador global: Cmd+K / Ctrl+K
@@ -247,7 +242,7 @@ export default function AdminPage() {
             <>
               {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} saveDB={saveDB} />}
               {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
-              {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
               {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -330,6 +325,15 @@ function PanelDashboard({ db, toast, saveDB }) {
   const heat = useMemo(() => buildHeatmap(recs, emps.length), [recs, emps.length])
   const recentAudit = useMemo(() => (db.audit || []).slice(-5).reverse(), [db.audit])
 
+  const obraHours = useMemo(() => {
+    const map = {}
+    recs.filter(r => r.fin && r.inicio.startsWith(mk)).forEach(r => {
+      const obra = r.centro || r.obra || 'Sin centro'
+      map[obra] = (map[obra] || 0) + calcMin(r)
+    })
+    return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0,6)
+  }, [recs, mk])
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -360,14 +364,14 @@ function PanelDashboard({ db, toast, saveDB }) {
           const absentismo = esperados.length ? Math.round(ausentes / esperados.length * 100) : 0
           // Productividad: horas reales del mes vs objetivo (WD * 20 días por empleado activo)
           const objetivoMes = emps.length * WD * 20
-          const productividad = objetivoMes ? Math.min(120, Math.round(monthMin / objetivoMes * 100)) : 0
+          const productividad = objetivoMes ? Math.round(monthMin / objetivoMes * 100) : 0
           const docsPend = (db.documentos || []).filter(d => !d.firma).length
           return [
           { label:'Activos ahora',     val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} trabajando` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
           { label:'Horas hoy',         val: mhm(todayRecs.reduce((s,r)=>s+(r.fin?calcMin(r):calcSecs(r).work/60),0)|0), ico:'⏱️', glowColor:'#60a5fa', trend: `${todayRecs.length} fichaje${todayRecs.length!==1?'s':''}`, trendDir:'neu' },
           { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Mes en curso', trendDir: monthTrend >= 0 ? 'up' : 'down' },
           { label:'Absentismo hoy',    val: `${absentismo}%`,              ico:'📉', glowColor:'#f87171', trend: ausentes > 0 ? `${ausentes} sin fichar` : 'Todos presentes', trendDir: absentismo > 0 ? 'down' : 'up' },
-          { label:'Productividad',     val: `${productividad}%`,           ico:'⚡', glowColor:'#a78bfa', trend: productividad >= 90 ? 'En objetivo' : 'Bajo objetivo', trendDir: productividad >= 90 ? 'up' : 'down' },
+          { label:'Productividad',     val: `${productividad}%`,           ico: productividad > 100 ? '🔥' : '⚡', glowColor: productividad > 100 ? '#f59e0b' : '#a78bfa', trend: productividad > 100 ? `+${productividad - 100}% extra` : productividad >= 90 ? 'En objetivo' : 'Bajo objetivo', trendDir: productividad > 100 ? 'up' : productividad >= 90 ? 'up' : 'down' },
           { label:'Docs. pendientes',  val: String(docsPend),              ico:'✍️', glowColor:'#22d3ee', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : (docsPend > 0 ? 'Por firmar' : 'Al día'), trendDir: docsPend > 0 ? 'down' : 'up' },
           ]
         })().map(({ label, val, ico, glowColor, trend, trendDir }) => (
@@ -464,6 +468,29 @@ function PanelDashboard({ db, toast, saveDB }) {
           )}
         </div>
       </div>
+
+      {obraHours.length > 0 && (
+        <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">Horas por obra este mes</div>
+            <span className="dash-widget-badge" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{obraHours.length}</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {(() => {
+              const maxMin = obraHours[0]?.[1] || 1
+              return obraHours.map(([obra, min]) => (
+                <div key={obra} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ fontSize:11, fontWeight:600, minWidth:120, maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text2)' }}>{obra}</div>
+                  <div style={{ flex:1, height:6, background:'var(--bg-400)', borderRadius:3, overflow:'hidden' }}>
+                    <div style={{ height:'100%', borderRadius:3, background:'linear-gradient(90deg, var(--primary), var(--accent2))', width:`${Math.round(min/maxMin*100)}%`, transition:'width .6s' }} />
+                  </div>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--primary-light)', minWidth:40, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{mhm(min)}</div>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Heatmap */}
       <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
@@ -713,6 +740,9 @@ function CtrlCard({ e, live, todayMin, force }) {
   const t = live ? calcSecs(live) : null
   const isWorking = live && !live.enDescanso
   const isBreak = live && live.enDescanso
+  const elapsedMin = live ? Math.floor((Date.now() - new Date(live.inicio).getTime()) / 60000) : 0
+  const hasBreak = live?.breaks?.length > 0
+  const fatiguaAlert = isWorking && elapsedMin >= 600 && !hasBreak
   const dailyTarget = (e.horasSemanales || WK) / 5 * 60
   const workedMin = t ? Math.floor(t.work / 60) : todayMin
   const pct = workedMin ? Math.min(100, Math.round(workedMin / dailyTarget * 100)) : 0
@@ -733,6 +763,11 @@ function CtrlCard({ e, live, todayMin, force }) {
               <span title={`GPS: ${live.locInicio.lat?.toFixed(4)}, ${live.locInicio.lng?.toFixed(4)}`}
                 style={{ flexShrink:0, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:8, background:'rgba(6,182,212,.12)', color:'var(--teal)', border:'1px solid rgba(6,182,212,.25)' }}>
                 GPS ✓
+              </span>
+            )}
+            {fatiguaAlert && (
+              <span style={{ flexShrink:0, fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:8, background:'rgba(239,68,68,.15)', color:'var(--danger)', border:'1px solid rgba(239,68,68,.3)' }}>
+                ⚠️ +10h sin pausa
               </span>
             )}
           </div>
@@ -878,11 +913,12 @@ function PanelControl({ db, toast, saveDB, session }) {
 }
 
 // ─── PANEL FICHAJES ───────────────────────────────────────────────────────────
-function PanelFichajes({ db, toast, saveDB }) {
+function PanelFichajes({ db, toast, saveDB, session }) {
   const [search, setSearch] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterEmp, setFilterEmp] = useState('')
   const [quickFilter, setQuickFilter] = useState('')
+  const [editingRec, setEditingRec] = useState(null) // { id, field: 'inicio'|'fin', value }
   const emps = db.employees || []
   const recs = (db.records || []).filter(r => r.fin)
   const now = new Date()
@@ -963,6 +999,31 @@ function PanelFichajes({ db, toast, saveDB }) {
         ))}
       </div>
 
+      {/* Active filter badge */}
+      {(quickFilter || filterDate || filterEmp) && (
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
+          <span style={{ fontSize:11, color:'var(--text4)', fontWeight:600, alignSelf:'center' }}>Viendo:</span>
+          {quickFilter && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'var(--primary-dim)', color:'var(--primary-light)', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:20, border:'1px solid var(--primary-glow)' }}>
+              {quickFilter === 'hoy' ? 'Hoy' : quickFilter === 'semana' ? 'Esta semana' : 'Este mes'}
+              <button onClick={() => setQuickFilter('')} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, lineHeight:1, fontSize:12, fontWeight:700 }}>×</button>
+            </span>
+          )}
+          {filterDate && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'var(--primary-dim)', color:'var(--primary-light)', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:20, border:'1px solid var(--primary-glow)' }}>
+              {filterDate}
+              <button onClick={() => setFilterDate('')} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, lineHeight:1, fontSize:12, fontWeight:700 }}>×</button>
+            </span>
+          )}
+          {filterEmp && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'var(--primary-dim)', color:'var(--primary-light)', fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:20, border:'1px solid var(--primary-glow)' }}>
+              {emps.find(e => e.id === filterEmp)?.name || filterEmp}
+              <button onClick={() => setFilterEmp('')} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0, lineHeight:1, fontSize:12, fontWeight:700 }}>×</button>
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="premium-filters">
         <input placeholder="Buscar empleado o centro…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex:1, minWidth:180 }} />
         <input type="date" value={filterDate} onChange={e => { setFilterDate(e.target.value); setQuickFilter('') }} />
@@ -984,8 +1045,58 @@ function PanelFichajes({ db, toast, saveDB }) {
                 <tr key={r.id}>
                   <td>{r.empName}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{r.centro || '—'}</td>
-                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{ftime(r.inicio)}</td>
-                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{ftime(r.fin)}</td>
+                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>
+                    {editingRec?.id === r.id && editingRec?.field === 'inicio' ? (
+                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                        <input type="datetime-local" defaultValue={r.inicio.slice(0,16)} id="edit-rec-input"
+                          style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit', width:155 }} />
+                        <button className="btn btn-sm btn-primary" style={{ fontSize:10, padding:'3px 8px' }}
+                          onClick={() => {
+                            const val = document.getElementById('edit-rec-input').value
+                            if (!val) return
+                            const newInicio = new Date(val).toISOString()
+                            const updated = (db.records||[]).map(rec => rec.id === r.id ? { ...rec, inicio: newInicio } : rec)
+                            const withAudit = auditLog(db, 'Hora entrada editada', `${r.empName}: ${ftime(r.inicio)} → ${ftime(newInicio)}`, session?.user?.name || 'Admin')
+                            saveDB({ records: updated, audit: withAudit.audit })
+                            setEditingRec(null)
+                            toast('Hora de entrada actualizada', 3000, 'ok')
+                          }}>✓</button>
+                        <button className="btn btn-sm btn-secondary" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => setEditingRec(null)}>✕</button>
+                      </div>
+                    ) : (
+                      <span style={{ cursor:'pointer', textDecoration:'underline dotted', textUnderlineOffset:2 }} title="Click para editar" onClick={() => setEditingRec({ id:r.id, field:'inicio' })}>
+                        {ftime(r.inicio)}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>
+                    {editingRec?.id === r.id && editingRec?.field === 'fin' ? (
+                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                        <input type="datetime-local" defaultValue={r.fin?.slice(0,16)} id="edit-rec-fin-input"
+                          style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit', width:155 }} />
+                        <button className="btn btn-sm btn-primary" style={{ fontSize:10, padding:'3px 8px' }}
+                          onClick={() => {
+                            const val = document.getElementById('edit-rec-fin-input').value
+                            if (!val) return
+                            const newFin = new Date(val).toISOString()
+                            const updated = (db.records||[]).map(rec => {
+                              if (rec.id !== r.id) return rec
+                              const t2 = calcSecs({ ...rec, fin: newFin })
+                              return { ...rec, fin: newFin, workSecs: t2.work, breakSecs: t2.brk }
+                            })
+                            const withAudit = auditLog(db, 'Hora salida editada', `${r.empName}: ${ftime(r.fin)} → ${ftime(newFin)}`, session?.user?.name || 'Admin')
+                            saveDB({ records: updated, audit: withAudit.audit })
+                            setEditingRec(null)
+                            toast('Hora de salida actualizada', 3000, 'ok')
+                          }}>✓</button>
+                        <button className="btn btn-sm btn-secondary" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => setEditingRec(null)}>✕</button>
+                      </div>
+                    ) : (
+                      <span style={{ cursor:'pointer', textDecoration:'underline dotted', textUnderlineOffset:2 }} title="Click para editar" onClick={() => setEditingRec({ id:r.id, field:'fin' })}>
+                        {ftime(r.fin)}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{mhm(bm)}</td>
                   <td>
@@ -1096,7 +1207,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
           <input
             autoFocus
             style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
-            placeholder="Motivo del rechazo (opcional)"
+            placeholder="Motivo del rechazo (obligatorio)"
             value={rejMotivo}
             onChange={e => setRejMotivo(e.target.value)}
             onKeyDown={e => {
@@ -1104,7 +1215,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
               if (e.key === 'Escape') setRejecting(null)
             }}
           />
-          <button className="btn btn-sm btn-danger" onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
+          <button className="btn btn-sm btn-danger" disabled={!rejMotivo.trim()} onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
           <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
         </div>
       )}

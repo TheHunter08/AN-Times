@@ -2456,3 +2456,41 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   0%,100% { box-shadow: 0 8px 24px rgba(124,58,237,.4), 0 0 0 0 rgba(124,58,237,.0); }
   50%      { box-shadow: 0 12px 36px rgba(124,58,237,.6), 0 0 0 6px rgba(124,58,237,.1); }
 }
+
+/* ══ VISUAL IMPROVEMENTS V3 ══════════════════════════════════════════ */
+
+/* Fatigue alert badge pulse */
+@keyframes fatiguePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+/* PanelFichajes inline edit inputs */
+#sAdmin input[type="datetime-local"] {
+  color-scheme: dark;
+}
+[data-theme="light"] #sAdmin input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+/* Filter active badge hover */
+.filter-badge-x:hover { opacity: .7; }
+
+/* Obra bars smooth */
+.obra-bar { transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+/* CtrlCard fatigue badge animation */
+.ctrl-card .badge-fatigua {
+  animation: fatiguePulse 2s ease-in-out infinite;
+}
+
+/* KPI card — extra productivity */
+.adm-kpi-card.kpi-extra { border-top-color: rgba(245,158,11,.8) !important; }
+.adm-kpi-card.kpi-extra .adm-kpi-val { color: var(--orange); }
+
+/* Inline edit dotted underline on hover */
+td span[title="Click para editar"]:hover {
+  color: var(--primary-light);
+  text-decoration-color: var(--primary-light);
+}
+

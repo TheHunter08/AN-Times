@@ -94,6 +94,7 @@ export default function EmployeePage() {
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
   const [pendingGPS, setPendingGPS] = useState(null)
+  const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [calMonth, setCalMonth] = useState(new Date())
   const dbRef = useRef(db)
   useEffect(() => { dbRef.current = db }, [db])
@@ -314,6 +315,7 @@ export default function EmployeePage() {
     openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
     // Get GPS
     setPendingGPS(null)
+    setGpsStatus('pending')
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
@@ -322,9 +324,10 @@ export default function EmployeePage() {
           // Descartar coordenadas inválidas (0,0 = Null Island, fuera de rango)
           if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
             setPendingGPS({ lat, lng, acc: Math.round(pos.coords.accuracy), ts: new Date().toISOString() })
+            setGpsStatus('ok')
           }
         },
-        () => {},
+        () => { setGpsStatus('fail') },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
     }
@@ -332,6 +335,7 @@ export default function EmployeePage() {
 
   const confirmarCentro = useCallback((centro) => {
     if (!centro) { toast('Selecciona un centro de trabajo'); return }
+    setGpsStatus('idle')
     closeModal()
     const rec = {
       id: gid(), empId: u.id, empName: u.name, empresa: u.empresa || '',
@@ -447,7 +451,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -570,12 +574,20 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus }) {
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = openRec()
+
+  const lastAutoClosed = useMemo(() => {
+    return (db.records || [])
+      .filter(r => r.empId === u.id && r.autoClosedAt)
+      .sort((a, b) => b.autoClosedAt.localeCompare(a.autoClosedAt))[0] || null
+  }, [db.records, u.id])
+  const showAutoCloseWarning = lastAutoClosed &&
+    (Date.now() - new Date(lastAutoClosed.autoClosedAt).getTime()) < 24 * 60 * 60 * 1000
 
   const completedSecs = realRecs.filter(r => r.fin && r.closed).reduce((a, r) => a + recWorkSecs(r), 0)
   const liveSecs = o ? calcSecs(o).work : 0
@@ -694,6 +706,19 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal 
           ))}
         </div>
 
+        {/* Auto-close warning banner */}
+        {showAutoCloseWarning && (
+          <div style={{ margin:'8px 16px 0', padding:'10px 14px', background:'rgba(245,158,11,.08)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)', display:'flex', alignItems:'flex-start', gap:10 }}>
+            <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--orange)' }}>Jornada cerrada automáticamente</div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })} fue cerrada automáticamente por inactividad ({mhm(Math.floor((lastAutoClosed.workSecs||0)/60))}).
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* GPS card */}
         {o && (
           <div className="gps-card">
@@ -702,8 +727,11 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal 
             </div>
             <div>
               <div className="gps-name">{o.centro || u.centroTrabajo || 'Sin centro'}</div>
-              <div className={`gps-status${!o.locInicio ? ' pending' : ''}`}>
-                {o.locInicio ? 'GPS verificado' : 'Sin GPS'}
+              <div className={`gps-status${!o?.locInicio && gpsStatus !== 'pending' ? ' pending' : ''}`}>
+                {o?.locInicio ? 'GPS verificado'
+                  : gpsStatus === 'pending' ? '🔄 Capturando ubicación…'
+                  : gpsStatus === 'fail' ? 'Sin GPS — continuando sin ubicación'
+                  : 'Sin GPS'}
               </div>
             </div>
           </div>
@@ -741,6 +769,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   const [informeUrl, setInformeUrl]     = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [generatingWeekPdf, setGeneratingWeekPdf] = useState(false)
 
   const closeInforme = useCallback(() => {
     setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
@@ -894,6 +923,125 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
     }
   }
 
+  const exportWeekPDF = async () => {
+    setGeneratingWeekPdf(true)
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      const now2 = new Date()
+      const ws2 = wkStart(now2)
+      const weekRecs2 = (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws2).sort((a,b) => a.inicio.localeCompare(b.inicio))
+      const totalMin2 = weekRecs2.reduce((s,r) => s + calcMin(r), 0)
+      const weekLabel = `Semana del ${ws2.toLocaleDateString('es-ES', { day:'numeric', month:'long' })} al ${now2.toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })}`
+
+      const pdfDoc  = await PDFDocument.create()
+      const fontR   = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const fontB   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+      const PW = 595, PH = 842
+      const ML = 35, MR = 35
+      const CW = PW - ML - MR
+      const COLS = [
+        { label:'Fecha', w: 72 },
+        { label:'Entrada', w: 52 },
+        { label:'Salida', w: 52 },
+        { label:'Centro / Obra', w: 279 },
+        { label:'Horas netas', w: 70 },
+      ]
+      const ROW_H = 15, HEAD_H = 17, SIG_AREA = 110
+      const cPri    = rgb(0.36,0.38,0.82)
+      const cPriLt  = rgb(0.94,0.93,1.0)
+      const cDark   = rgb(0.10,0.10,0.15)
+      const cGray   = rgb(0.55,0.55,0.60)
+      const cLtGray = rgb(0.96,0.96,0.98)
+      const cBorder = rgb(0.82,0.82,0.88)
+      const cWhite  = rgb(1,1,1)
+      const cGreen  = rgb(0.10,0.62,0.46)
+
+      let page, y, pageNum = 0
+      const newPage = () => {
+        page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
+        page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
+        page.drawText(u.empresa || 'Empresa', { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText('REGISTRO DE JORNADA LABORAL — INFORME SEMANAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
+        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—')
+        page.drawText(`Trabajador: ${u.name}   ·   ${weekLabel}   ·   Obras: ${obras}`, { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
+        page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
+        y -= 74
+      }
+      const tableHeader = () => {
+        let xc = ML
+        page.drawRectangle({ x:ML, y:y-HEAD_H, width:CW, height:HEAD_H, color:cPri })
+        COLS.forEach(c => {
+          page.drawText(c.label, { x:xc+4, y:y-HEAD_H+5, size:7.5, font:fontB, color:cWhite, maxWidth:c.w-6 })
+          xc += c.w
+        })
+        y -= HEAD_H
+      }
+      newPage(); tableHeader()
+      weekRecs2.forEach((r, i) => {
+        if (y - ROW_H < 35 + SIG_AREA) { newPage(); tableHeader() }
+        const wm = Math.floor(recWorkSecs(r) / 60)
+        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '—'
+        const vals = [ r.inicio.slice(0,10), ftime(r.inicio), r.fin ? ftime(r.fin) : '—', centroObra, mhm(wm) ]
+        page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
+        page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
+        let xc = ML
+        vals.forEach((v, ci) => {
+          const isHours = ci === 4
+          page.drawText(String(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
+          xc += COLS[ci].w
+        })
+        let xs = ML
+        COLS.forEach((c,ci) => { if(ci<COLS.length-1) { page.drawLine({ start:{x:xs+c.w,y:y}, end:{x:xs+c.w,y:y-ROW_H}, thickness:0.3, color:cBorder }); xs+=c.w } })
+        y -= ROW_H
+      })
+      if (y - 40 < 35 + SIG_AREA) { newPage() }
+      const targetMin2 = weekRecs2.length * 480
+      const diffMin2 = totalMin2 - targetMin2
+      const diffSign = diffMin2 >= 0 ? '+' : ''
+      const cDiff = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
+      page.drawRectangle({ x:ML, y:y-20, width:CW, height:20, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${weekRecs2.length} jornada${weekRecs2.length!==1?'s':''} registrada${weekRecs2.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
+      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-34, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
+      y -= 42
+      if (y - SIG_AREA < 30) { newPage() }
+      y -= 10
+      page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:6.5, font:fontB, color:cGray })
+      const firma = db.firmas?.[u?.id]?.main
+      if (firma?.data) {
+        try {
+          const printable = await makePrintableSignature(firma.data)
+          const b64 = printable.split(',')[1]
+          const bin = atob(b64)
+          const bytes = new Uint8Array(bin.length)
+          for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i)
+          const sigImg = await pdfDoc.embedPng(bytes.buffer)
+          const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
+          page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
+          page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
+          page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
+          page.drawText('✓ Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
+        } catch {
+          page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
+          page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
+        }
+      } else {
+        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:cBorder, borderWidth:0.5 })
+        page.drawText('Sin firma digital registrada', { x:ML+10, y:y-55, size:7, font:fontR, color:cGray })
+        page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
+        page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+      }
+      page.drawText('Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([pdfBytes], { type:'application/pdf' })
+      setInformeUrl(URL.createObjectURL(blob))
+    } catch(e) {
+      toast('Error al generar el PDF: ' + (e?.message || e))
+    } finally {
+      setGeneratingWeekPdf(false)
+    }
+  }
+
   return (
     <>
     <PullToRefresh>
@@ -956,8 +1104,14 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         </div>
       </div>
 
-      {/* Monthly PDF export */}
-      <div style={{ padding:'0 16px 6px', display:'flex', justifyContent:'flex-end' }}>
+      {/* PDF export buttons */}
+      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, justifyContent:'flex-end' }}>
+        <button className="btn btn-secondary btn-sm" onClick={exportWeekPDF} disabled={generatingWeekPdf} style={{ opacity: generatingWeekPdf ? 0.7 : 1 }}>
+          {generatingWeekPdf
+            ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
+            : <>📅 Informe semanal</>
+          }
+        </button>
         <button className="btn btn-secondary btn-sm" onClick={exportMonthPDF} disabled={generatingPdf} style={{ opacity: generatingPdf ? 0.7 : 1 }}>
           {generatingPdf
             ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
