@@ -1,6 +1,6 @@
 // ── Supabase (base de datos principal) ──────────────────────────────────────
-export const SB_URL  = import.meta.env.VITE_SB_URL  || ''
-export const SB_ANON = import.meta.env.VITE_SB_ANON || ''
+export const SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+export const SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 
 // ── Firebase Auth (solo para login Google/email — no toca la BD) ─────────────
 export const ADMIN_PIN = '0824'
