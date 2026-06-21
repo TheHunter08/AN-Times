@@ -19,19 +19,24 @@ const SB_HEADERS = {
 const gid = () => createHash('sha1').update(Date.now() + Math.random().toString()).digest('hex').slice(0,12)
 
 async function readDB() {
-  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_HEADERS })
+  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_HEADERS })
   if (!res.ok) throw new Error(`DB read failed: ${res.status}`)
   const rows = await res.json()
-  return rows?.[0]?.data || null
+  if (!rows?.[0]) return null
+  return { data: rows[0].data, ts: rows[0].updated_at }
 }
 
-async function writeDB(data) {
-  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+async function writeDB(data, expectedTs) {
+  // Lock optimista: solo escribe si updated_at no ha cambiado desde la lectura
+  const cond = expectedTs ? `?id=eq.1&updated_at=eq.${encodeURIComponent(expectedTs)}` : '?id=eq.1'
+  const res = await fetch(`${SB_URL}/rest/v1/app_data${cond}`, {
     method: 'PATCH',
-    headers: { ...SB_HEADERS, Prefer: 'return=minimal' },
+    headers: { ...SB_HEADERS, Prefer: 'return=minimal,count=exact' },
     body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
   })
   if (!res.ok) throw new Error(`DB write failed: ${res.status}`)
+  const count = parseInt(res.headers.get('Content-Range')?.split('/')[1] || '1', 10)
+  if (count === 0) throw new Error('Escritura rechazada: la BD cambió mientras procesábamos. Reintenta.')
 }
 
 async function sendPush(empId, title, body) {
@@ -48,6 +53,8 @@ async function sendPush(empId, title, body) {
 
 function calcMin(r) {
   if (!r.fin) return 0
+  // Los registros cerrados tienen workSecs pre-calculado — mismo comportamiento que time.js
+  if (r.workSecs > 0) return Math.floor(r.workSecs / 60)
   const workMs = new Date(r.fin) - new Date(r.inicio)
   const breakMs = (r.breakSecs || 0) * 1000
   return Math.max(0, Math.floor((workMs - breakMs) / 60000))
@@ -62,8 +69,9 @@ async function main() {
 
   console.log(`Generando cierres para ${mesLabel} (${mes})…`)
 
-  const db = await readDB()
-  if (!db) throw new Error('No se pudo leer la BD')
+  const result = await readDB()
+  if (!result) throw new Error('No se pudo leer la BD')
+  const { data: db, ts: dbTs } = result
 
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const cierres = db.cierres || []
@@ -103,7 +111,7 @@ async function main() {
     return
   }
 
-  await writeDB({ ...db, cierres: [...cierres, ...nuevos] })
+  await writeDB({ ...db, cierres: [...cierres, ...nuevos] }, dbTs)
   console.log(`✅ ${nuevos.length} cierre(s) generado(s)`)
 
   for (const c of nuevos) {

@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
+import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
@@ -116,11 +117,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-    if (!isEncargado && isPWA) {
+    if (!isEncargado) {
       setTimeout(async () => {
-        if ('Notification' in window && Notification.permission === 'default') {
-          await Notification.requestPermission()
-        }
+        const native = await isNativePlatform()
+        if (native || isPWA) await requestPushPermission()
       }, 3000)
     }
   }, [isEncargado])
@@ -924,17 +924,17 @@ function PanelFichajes({ db, toast, saveDB }) {
                 </tr>
               )
             })}
-            {!filtered.length && <tr><td colSpan={7} className="empty">Sin resultados</td></tr>}
+            {!filtered.length && <tr><td colSpan={8} className="empty">Sin resultados</td></tr>}
           </tbody>
           {filtered.length > 0 && (
             <tfoot>
               <tr style={{ background:'var(--bg-500)' }}>
-                <td colSpan={4} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
+                <td colSpan={5} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
                   Total ({filtered.length} registros)
                 </td>
                 <td style={{ fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalWork)}</td>
                 <td style={{ fontWeight:700, color:'var(--text3)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>{mhm(totalBreak)}</td>
-                <td />
+                <td /><td />
               </tr>
             </tfoot>
           )}
@@ -1845,7 +1845,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
         const extRows = sortedEmps(db).filter(e => !e.baja && !e.isAdmin).map(e => {
           const eRecs = allRecs.filter(r => r.empId === e.id && r.fin)
           const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-          const weeklyH = e.horasSemanales || WK
+          const weeklyH = e.horasSemanales || (WK / 60)  // WK está en minutos; convertir a horas
           // Estimate expected: weeks since startDate × weekly hours
           const start = e.startDate ? new Date(e.startDate) : new Date()
           const msWorked = Date.now() - start.getTime()
@@ -1855,7 +1855,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
           // Current month stats
           const mRecs = eRecs.filter(r => r.inicio.startsWith(filterMonth))
           const mMin = mRecs.reduce((s, r) => s + calcMin(r), 0)
-          const mExpected = (weeklyH / 5) * 4 * 60 // ~4 weeks
+          const mExpected = Math.round((weeklyH / 5) * 4 * 60) // ~4 semanas en minutos
           const mDiff = mMin - mExpected
           return { e, totalMin, expectedMin, diff, mMin, mExpected, mDiff, weeklyH }
         })

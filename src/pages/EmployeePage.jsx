@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
+import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
 import { auditLog, sendPushNotif, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
@@ -152,11 +153,10 @@ export default function EmployeePage() {
   useEffect(() => {
     if (!u) return
 
-    // Request permission once (PWA only — don't prompt in browser tab)
-    if (isPWA) setTimeout(async () => {
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission()
-      }
+    // Solicitar permiso de notificaciones: nativo (Capacitor) o PWA web
+    setTimeout(async () => {
+      const native = await isNativePlatform()
+      if (native || isPWA) await requestPushPermission()
     }, 3000)
 
     // Smart notifications: check every 60s if any reminder should fire
@@ -2125,7 +2125,13 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null) // doc being signed
   const [stamping, setStamping] = useState(false)
   const [viewing, setViewing] = useState(null) // doc being previewed (read-only)
-  useModalBack(visible, onClose)
+  // Cuando hay sub-vista (ver/firmar), el botón atrás cierra la sub-vista,
+  // no el modal completo. closeRef en useModalBack se actualiza cada render
+  // por lo que siempre captura el estado actual de viewing/signing.
+  useModalBack(visible, () => {
+    if (viewing || signing) { setViewing(null); setSigning(null) }
+    else onClose()
+  })
   if (!visible) return null
 
   const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
@@ -2282,6 +2288,7 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
   const [salidaTime, setSalidaTime] = useState(() => getCfg('salidaTime', '21:00'))
   const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
   const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
+  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
 
   useModalBack(visible, onClose)
   if (!visible) return null
@@ -2324,10 +2331,10 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
           <span style={{ fontSize:14, color:'var(--text)' }}>Modo claro</span>
           <div
-            onClick={() => { toggleTheme(); toast(document.documentElement.getAttribute('data-theme')==='light' ? 'Modo claro activado' : 'Modo oscuro activado') }}
-            style={{ width:44, height:24, borderRadius:12, background: document.documentElement.getAttribute('data-theme')==='light' ? 'var(--primary)' : 'var(--bg-600)', cursor:'pointer', position:'relative', transition:'background .2s' }}
+            onClick={() => { toggleTheme(); setIsLight(l => !l); toast(isLight ? 'Modo oscuro activado' : 'Modo claro activado') }}
+            style={{ width:44, height:24, borderRadius:12, background: isLight ? 'var(--primary)' : 'var(--bg-600)', cursor:'pointer', position:'relative', transition:'background .2s' }}
           >
-            <div style={{ position:'absolute', top:3, left: document.documentElement.getAttribute('data-theme')==='light' ? 23 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+            <div style={{ position:'absolute', top:3, left: isLight ? 23 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
           </div>
         </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
