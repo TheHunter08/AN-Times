@@ -129,7 +129,7 @@ export function startRealtime(currentGetDB, onUpdate) {
   _realtimeChannel = supabase
     .channel('app_data_rt')
     .on('postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` },
+      { event: '*', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` },
       (payload) => {
         const incoming = payload.new?.data
         if (!incoming) return
