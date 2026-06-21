@@ -2297,3 +2297,171 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 [data-theme="light"] .toast.ok   { background: rgba(34,197,94,.08);  color: #16a34a; }
 [data-theme="light"] .toast.err  { background: rgba(239,68,68,.08);  color: #dc2626; }
 [data-theme="light"] .toast.warn { background: rgba(251,191,36,.08); color: #d97706; }
+
+/* ══════════════════════════════════════════════════════════
+   ── VISUAL DESIGN V2 UPGRADES ───────────────────────────
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Admin KPI: 3 columns on tablet+ ─────────────────────── */
+@media(min-width: 520px) {
+  .adm-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── KPI border accents for cards 5 & 6 ──────────────────── */
+.adm-kpi-card:nth-child(5) { border-top-color: rgba(239,68,68,.7); }
+.adm-kpi-card:nth-child(6) { border-top-color: rgba(6,182,212,.7); }
+[data-theme="light"] .adm-kpi-card:nth-child(5) { border-top-color: rgba(239,68,68,.5); }
+[data-theme="light"] .adm-kpi-card:nth-child(6) { border-top-color: rgba(6,182,212,.5); }
+
+/* ── Admin KPI card inner glow richer ────────────────────── */
+.adm-kpi-glow { opacity: .18; filter: blur(20px); }
+
+/* ── Admin sidebar: Linear-style active left-border ─────── */
+.adm-nav-item.active {
+  background: rgba(37,99,235,.1);
+  color: var(--text);
+  font-weight: 600;
+  border-left: 2px solid var(--primary-light);
+  padding-left: 8px;
+}
+[data-theme="light"] .adm-nav-item.active {
+  background: rgba(37,99,235,.08);
+  border-left-color: var(--primary);
+}
+
+/* ── Admin stat cards: subtle gradient tint ──────────────── */
+.adm-stat-card {
+  background: linear-gradient(135deg, var(--bg-700) 0%, rgba(255,255,255,.018) 100%);
+}
+[data-theme="light"] .adm-stat-card {
+  background: linear-gradient(135deg, #fff 0%, rgba(37,99,235,.02) 100%);
+}
+
+/* ── Control Live cards: richer working/break visuals ────── */
+.ctrl-card.working {
+  border-color: rgba(16,185,129,.35);
+  background: linear-gradient(160deg, rgba(16,185,129,.06) 0%, var(--bg-700) 60%);
+}
+.ctrl-card.on-break {
+  border-color: rgba(245,158,11,.35);
+  background: linear-gradient(160deg, rgba(245,158,11,.06) 0%, var(--bg-700) 60%);
+}
+[data-theme="light"] .ctrl-card.working  { background: linear-gradient(160deg, rgba(16,185,129,.05) 0%, #fff 60%); }
+[data-theme="light"] .ctrl-card.on-break { background: linear-gradient(160deg, rgba(245,158,11,.05) 0%, #fff 60%); }
+
+/* ── Progress bar: animated shimmer while active ─────────── */
+@keyframes progressShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.jor-progress-fill {
+  background: linear-gradient(90deg, var(--primary) 0%, var(--teal) 50%, var(--primary) 100%);
+  background-size: 200% 100%;
+  animation: progressShimmer 2.8s linear infinite;
+}
+[data-theme="light"] .jor-progress-fill {
+  background: linear-gradient(90deg, var(--primary) 0%, #0ea5e9 50%, var(--primary) 100%);
+  background-size: 200% 100%;
+}
+
+/* ── Employee hero main card: richer gradient + extra glow ─ */
+.jor-main-card {
+  background: linear-gradient(160deg,rgba(37,99,235,.20) 0%,rgba(22,29,40,.94) 50%,rgba(15,21,30,.98) 100%);
+  box-shadow: 0 24px 72px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.05), inset 0 1px 0 rgba(255,255,255,.09), 0 0 60px rgba(37,99,235,.12);
+}
+
+/* ── Employee hero timer: more vibrant gradient text ─────── */
+.jor-timer {
+  background: linear-gradient(135deg, #e0e7ff 0%, #818cf8 35%, #67e8f9 75%, #34d399 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 16px rgba(99,102,241,.25));
+}
+
+/* ── Employee bottom nav: active item pill indicator ─────── */
+.emp-nav-item.on {
+  background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(124,58,237,.1));
+  box-shadow: 0 0 12px rgba(37,99,235,.15);
+}
+
+/* ── Admin mobile nav: active item same treatment ────────── */
+.adm-mobile-nav-item.active {
+  background: linear-gradient(135deg, rgba(37,99,235,.2), rgba(124,58,237,.1));
+  box-shadow: 0 0 10px rgba(37,99,235,.12);
+}
+
+/* ── Vacaciones hero: deeper gradient + more opacity orbs ── */
+.vac-hero {
+  background: linear-gradient(145deg,#7c3aed 0%,#2563EB 45%,#0284c7 100%);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.15);
+}
+
+/* ── Profile avatar: glowing ring ───────────────────────── */
+.prf-av {
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.35), 0 0 24px rgba(37,99,235,.25);
+  animation: avatarGlow 3s ease-in-out infinite;
+}
+@keyframes avatarGlow {
+  0%,100% { box-shadow: 0 0 0 3px rgba(37,99,235,.3), 0 0 20px rgba(37,99,235,.2); }
+  50%     { box-shadow: 0 0 0 4px rgba(124,58,237,.4), 0 0 32px rgba(124,58,237,.25); }
+}
+
+/* ── Sol cards: stronger colored left-border ─────────────── */
+.sol-card.pending  { border-left: 3px solid var(--orange); background: linear-gradient(90deg, rgba(245,158,11,.06) 0%, var(--bg-700) 40%); }
+.sol-card.approved { border-left: 3px solid var(--green);  background: linear-gradient(90deg, rgba(16,185,129,.06) 0%, var(--bg-700) 40%); }
+.sol-card.rejected { border-left: 3px solid var(--red);    background: linear-gradient(90deg, rgba(239,68,68,.06) 0%, var(--bg-700) 40%); }
+[data-theme="light"] .sol-card.pending  { background: linear-gradient(90deg, rgba(245,158,11,.05) 0%, #fff 40%); }
+[data-theme="light"] .sol-card.approved { background: linear-gradient(90deg, rgba(16,185,129,.05) 0%, #fff 40%); }
+[data-theme="light"] .sol-card.rejected { background: linear-gradient(90deg, rgba(239,68,68,.05) 0%, #fff 40%); }
+
+/* ── Login clock hero: bigger + more contrast ────────────── */
+.login-clock-time {
+  font-size: 72px;
+  letter-spacing: -5px;
+  background: linear-gradient(135deg, #f8fafc 5%, #a5b4fc 55%, #67e8f9 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 4px 20px rgba(37,99,235,.2));
+}
+[data-theme="light"] .login-clock-time {
+  background: linear-gradient(135deg, #1e293b 5%, #2563EB 55%, #0891b2 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Dash widget: subtle inner top-border glow ────────────── */
+.dash-widget {
+  border-top: 2px solid var(--border2);
+  background: linear-gradient(160deg, var(--bg-700) 0%, rgba(255,255,255,.015) 100%);
+}
+[data-theme="light"] .dash-widget {
+  background: linear-gradient(160deg, #fff 0%, rgba(37,99,235,.015) 100%);
+  border-top-color: rgba(0,0,0,.07);
+}
+
+/* ── Pill tabs: active has gradient background ────────────── */
+.pill-tab.active {
+  background: linear-gradient(135deg, var(--bg-400), rgba(37,99,235,.08));
+  color: var(--text);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,.06);
+}
+[data-theme="light"] .pill-tab.active {
+  background: linear-gradient(135deg, #fff, rgba(37,99,235,.04));
+}
+
+/* ── Heatmap cells: rounded corners + transition ─────────── */
+.act-hm-cell { border-radius: 5px; transition: transform .12s, opacity .12s; }
+.act-hm-cell:hover { transform: scale(1.25); opacity: .85; }
+.act-hm-4 { box-shadow: 0 0 8px rgba(37,99,235,.5); }
+
+/* ── Fichar button idle animation: wider glow ──────────────── */
+@keyframes ficharIdle {
+  0%,100% { box-shadow: 0 8px 24px rgba(37,99,235,.4), 0 0 0 0 rgba(37,99,235,.0); }
+  50%      { box-shadow: 0 12px 36px rgba(37,99,235,.6), 0 0 0 6px rgba(37,99,235,.1); }
+}
+@keyframes ficharActiveIdle {
+  0%,100% { box-shadow: 0 8px 24px rgba(124,58,237,.4), 0 0 0 0 rgba(124,58,237,.0); }
+  50%      { box-shadow: 0 12px 36px rgba(124,58,237,.6), 0 0 0 6px rgba(124,58,237,.1); }
+}
