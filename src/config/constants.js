@@ -1,10 +1,10 @@
 // ── Supabase (base de datos principal) ──────────────────────────────────────
-export const SB_URL  = import.meta.env.VITE_SB_URL  || ''
-export const SB_ANON = import.meta.env.VITE_SB_ANON || ''
-
-if (import.meta.env.PROD && (!SB_URL || !SB_ANON)) {
-  console.error('[Times INC] CRÍTICO: VITE_SB_URL y VITE_SB_ANON son obligatorias en producción. La app funcionará sin sincronización.')
-}
+// Las credenciales anon son públicas por diseño (la seguridad es via RLS en Supabase).
+// Se usan como fallback para no depender de que Vercel tenga las env vars configuradas.
+const _DEFAULT_SB_URL  = 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const _DEFAULT_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+export const SB_URL  = import.meta.env.VITE_SB_URL  || _DEFAULT_SB_URL
+export const SB_ANON = import.meta.env.VITE_SB_ANON || _DEFAULT_SB_ANON
 
 // ── Admin PIN — se genera un PIN temporal si no está configurado ──────────────
 function initAdminPin() {
