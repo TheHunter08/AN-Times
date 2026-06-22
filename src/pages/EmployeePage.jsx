@@ -505,6 +505,16 @@ export default function EmployeePage() {
         {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
       </div>
 
+      {/* Floating jornada chip — visible desde cualquier pestaña salvo Jornada */}
+      {timer.state !== 'idle' && currentEmpTab !== 'jornada' && (
+        <div className="float-jornada-chip" onClick={() => { try { navigator.vibrate(5) } catch {}; setEmpTab('jornada') }}>
+          <span className="float-jornada-dot" style={{ background: timer.state === 'break' ? 'var(--orange)' : 'var(--green)' }} />
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink:0 }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span style={{ fontVariantNumeric:'tabular-nums' }}>{s2t(timer.ws)}</span>
+          {timer.state === 'break' && <span style={{ opacity:.7, fontSize:9, marginLeft:1 }}>· Pausa</span>}
+        </div>
+      )}
+
       {/* Bottom nav */}
       {(() => {
         const chatUnread = (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length
@@ -611,11 +621,28 @@ function PullToRefresh({ children }) {
   const { dist, refreshing } = pullState
   return (
     <div ref={tabRef} className="emp-tab active">
-      <div style={{ textAlign:'center', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', gap:5,
-        height: refreshing ? 40 : dist > 0 ? Math.round(dist * 0.7) : 0,
+      <div style={{ overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+        height: refreshing ? 44 : dist > 0 ? Math.round(dist * 0.7) : 0,
         transition: dist === 0 && !refreshing ? 'height .3s' : 'none',
         color:'var(--text3)', fontSize:11, fontWeight:600, flexShrink:0 }}>
-        {(refreshing || dist > 0) && (refreshing ? '↻ Actualizando…' : dist > 48 ? '↑ Suelta para actualizar' : '↓ Bajar para actualizar')}
+        {refreshing && (
+          <>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation:'ptr-spin .7s linear infinite', flexShrink:0 }}>
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Actualizando…
+          </>
+        )}
+        {!refreshing && dist > 0 && (
+          <>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: dist > 48 ? 'rotate(180deg)' : 'none', transition:'transform .25s', flexShrink:0 }}>
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <polyline points="19 12 12 19 5 12"/>
+            </svg>
+            {dist > 48 ? 'Suelta para actualizar' : 'Bajar para actualizar'}
+          </>
+        )}
       </div>
       {children}
     </div>
@@ -670,6 +697,19 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   }
 
   const statusClass = timer.state === 'idle' ? 'idle' : timer.state === 'break' ? 'break' : ''
+
+  if (!db.records) return (
+    <div className="emp-tab active">
+      <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skeleton" style={{ height:280, borderRadius:20 }} />
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
+          {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height:68, borderRadius:14 }} />)}
+        </div>
+        <div className="skeleton" style={{ height:56, borderRadius:14 }} />
+        <div className="skeleton" style={{ height:80, borderRadius:14 }} />
+      </div>
+    </div>
+  )
 
   return (
     <PullToRefresh>

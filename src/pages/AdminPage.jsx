@@ -1224,47 +1224,104 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     toast('Ausencia eliminada')
   }
 
-  const VacRow = ({ v }) => (
-    <div className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`} style={{ marginBottom:8, flexWrap:'wrap' }}>
-      <div style={{ width:40, height:40, borderRadius:12, background: v.estado==='pendiente'?'var(--orange-dim)':v.estado==='aprobada'?'var(--green-dim)':'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
-        {v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✓':'✗'}
-      </div>
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:13, fontWeight:700 }}>{v.empName}</div>
-        <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)} · {v.dias} días</div>
-        {v.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3 }}>{v.motivo}</div>}
-        {v.estado === 'rechazada' && v.motivoRechazo && (
-          <div style={{ fontSize:11, color:'var(--danger)', marginTop:3, fontStyle:'italic' }}>Motivo: {v.motivoRechazo}</div>
+  const VacRow = ({ v }) => {
+    const [swipeX, setSwipeX] = useState(0)
+    const [isDragging, setIsDragging] = useState(false)
+    const swipeRef = useRef({ startX: 0, active: false })
+
+    const onTouchStart = (e) => {
+      if (v.estado !== 'pendiente') return
+      swipeRef.current = { startX: e.touches[0].clientX, active: true }
+      setIsDragging(true)
+    }
+    const onTouchMove = (e) => {
+      if (!swipeRef.current.active) return
+      const dx = e.touches[0].clientX - swipeRef.current.startX
+      setSwipeX(Math.max(-100, Math.min(100, dx)))
+    }
+    const onTouchEnd = () => {
+      if (!swipeRef.current.active) return
+      swipeRef.current.active = false
+      setIsDragging(false)
+      if (swipeX > 75) {
+        act(v.id, 'aprobada')
+        try { navigator.vibrate(15) } catch {}
+      } else if (swipeX < -75) {
+        setRejecting(v.id); setRejMotivo('')
+        try { navigator.vibrate(10) } catch {}
+      }
+      setSwipeX(0)
+    }
+
+    const THRESH = 75
+    const progress = Math.abs(swipeX) / THRESH
+    const isApprove = swipeX > 20
+    const isReject = swipeX < -20
+
+    return (
+      <div style={{ position:'relative', marginBottom:8, borderRadius:'var(--r-lg)', overflow:'hidden' }}>
+        {/* Reveal backgrounds */}
+        {v.estado === 'pendiente' && (
+          <>
+            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', paddingLeft:20, background:'var(--green-dim)', borderRadius:'var(--r-lg)', opacity: isApprove ? Math.min(1, progress) : 0, transition: isDragging ? 'none' : 'opacity .3s', pointerEvents:'none' }}>
+              <span style={{ fontSize:20 }}>✓</span>
+              <span style={{ marginLeft:8, fontSize:12, fontWeight:700, color:'var(--green)' }}>Aprobar</span>
+            </div>
+            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:20, background:'rgba(239,68,68,.1)', borderRadius:'var(--r-lg)', opacity: isReject ? Math.min(1, progress) : 0, transition: isDragging ? 'none' : 'opacity .3s', pointerEvents:'none' }}>
+              <span style={{ fontSize:12, fontWeight:700, color:'var(--danger)' }}>Rechazar</span>
+              <span style={{ fontSize:20, marginLeft:8 }}>✗</span>
+            </div>
+          </>
         )}
-      </div>
-      <div className={`badge${v.estado==='aprobada'?' badge-green':v.estado==='rechazada'?' badge-red':' badge-orange'}`}>
-        {v.estado==='aprobada'?'Aprobada':v.estado==='rechazada'?'Rechazada':'Pendiente'}
-      </div>
-      {v.estado === 'pendiente' && rejecting !== v.id && (
-        <div style={{ display:'flex', gap:6 }}>
-          <button className="btn btn-sm btn-primary" onClick={() => act(v.id, 'aprobada')}>✓</button>
-          <button className="btn btn-sm btn-danger" onClick={() => { setRejecting(v.id); setRejMotivo('') }}>✗</button>
+        {/* Card */}
+        <div
+          className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`}
+          style={{ flexWrap:'wrap', transform:`translateX(${swipeX}px)`, transition: isDragging ? 'none' : 'transform .3s cubic-bezier(.16,1,.3,1)', marginBottom:0, position:'relative', zIndex:1 }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <div style={{ width:40, height:40, borderRadius:12, background: v.estado==='pendiente'?'var(--orange-dim)':v.estado==='aprobada'?'var(--green-dim)':'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
+            {v.estado==='pendiente'?'⏳':v.estado==='aprobada'?'✓':'✗'}
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700 }}>{v.empName}</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{fds(v.fechaInicio)} → {fds(v.fechaFin)} · {v.dias} días</div>
+            {v.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3 }}>{v.motivo}</div>}
+            {v.estado === 'rechazada' && v.motivoRechazo && (
+              <div style={{ fontSize:11, color:'var(--danger)', marginTop:3, fontStyle:'italic' }}>Motivo: {v.motivoRechazo}</div>
+            )}
+          </div>
+          <div className={`badge${v.estado==='aprobada'?' badge-green':v.estado==='rechazada'?' badge-red':' badge-orange'}`}>
+            {v.estado==='aprobada'?'Aprobada':v.estado==='rechazada'?'Rechazada':'Pendiente'}
+          </div>
+          {v.estado === 'pendiente' && rejecting !== v.id && (
+            <div style={{ display:'flex', gap:6 }}>
+              <button className="btn btn-sm btn-primary" onClick={() => act(v.id, 'aprobada')}>✓</button>
+              <button className="btn btn-sm btn-danger" onClick={() => { setRejecting(v.id); setRejMotivo('') }}>✗</button>
+            </div>
+          )}
+          {rejecting === v.id && (
+            <div style={{ width:'100%', marginTop:10, display:'flex', gap:8, alignItems:'center' }}>
+              <input
+                autoFocus
+                style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
+                placeholder="Motivo del rechazo (obligatorio)"
+                value={rejMotivo}
+                onChange={e => setRejMotivo(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }
+                  if (e.key === 'Escape') setRejecting(null)
+                }}
+              />
+              <button className="btn btn-sm btn-danger" disabled={!rejMotivo.trim()} onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
+              <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
+            </div>
+          )}
         </div>
-      )}
-      {rejecting === v.id && (
-        <div style={{ width:'100%', marginTop:10, display:'flex', gap:8, alignItems:'center' }}>
-          <input
-            autoFocus
-            style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
-            placeholder="Motivo del rechazo (obligatorio)"
-            value={rejMotivo}
-            onChange={e => setRejMotivo(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }
-              if (e.key === 'Escape') setRejecting(null)
-            }}
-          />
-          <button className="btn btn-sm btn-danger" disabled={!rejMotivo.trim()} onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
-          <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
-        </div>
-      )}
-    </div>
-  )
+      </div>
+    )
+  }
 
   return (
     <div className="adm-panel">
