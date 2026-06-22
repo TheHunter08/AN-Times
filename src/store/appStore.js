@@ -70,6 +70,7 @@ export const useAppStore = create((set, get) => ({
 
   logout: () => {
     try { localStorage.removeItem('an_times_ses') } catch {}
+    try { sessionStorage.removeItem('an_times_timer') } catch {}
     set({
       session: { user: null, isAdmin: false, isEnc: false, isJO: false },
       timer: { ws: 0, bs: 0, state: 'idle' },
@@ -79,9 +80,24 @@ export const useAppStore = create((set, get) => ({
   },
 
   // ── Timer ────────────────────────────────────────────────────────────
-  timer: { ws: 0, bs: 0, state: 'idle' },
-  setTimer: timer => set({ timer }),
-  updateTimer: partial => set(s => ({ timer: { ...s.timer, ...partial } })),
+  timer: (() => {
+    try {
+      const raw = sessionStorage.getItem('an_times_timer')
+      if (raw) return JSON.parse(raw)
+    } catch {}
+    return { ws: 0, bs: 0, state: 'idle' }
+  })(),
+  setTimer: timer => {
+    try { sessionStorage.setItem('an_times_timer', JSON.stringify(timer)) } catch {}
+    set({ timer })
+  },
+  updateTimer: partial => {
+    set(s => {
+      const timer = { ...s.timer, ...partial }
+      try { sessionStorage.setItem('an_times_timer', JSON.stringify(timer)) } catch {}
+      return { timer }
+    })
+  },
 
   // ── Navigation ───────────────────────────────────────────────────────
   currentScreen: (() => {

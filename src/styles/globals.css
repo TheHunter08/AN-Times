@@ -555,6 +555,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-tab {
   position: absolute; inset: 0; display: none; flex-direction: column;
   overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+  touch-action: pan-y;
   /* deja espacio para la nav flotante: altura nav (~52px) + posición bottom + safe area */
   padding-bottom: calc(80px + max(20px, env(safe-area-inset-bottom, 0px)));
 }
