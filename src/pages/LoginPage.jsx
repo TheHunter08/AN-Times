@@ -62,8 +62,7 @@ export default function LoginPage() {
     try { localStorage.setItem('an_times_rem', JSON.stringify({ empId: emp.id })) } catch {}
     if (ses.isAdmin) setScreen('admin', true)
     else setScreen('emp', true)
-    toast('Bienvenido, ' + emp.name.split(' ')[0])
-  }, [setSession, setScreen, toast])
+  }, [setSession, setScreen])
 
   const doAdminLogin = useCallback(() => {
     setSession({ user: null, isAdmin: true, isEnc: false, isJO: false })
