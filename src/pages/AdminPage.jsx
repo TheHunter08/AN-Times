@@ -578,20 +578,37 @@ function PanelDashboard({ db, toast, saveDB }) {
 }
 
 function PushNotifWidget({ db, toast }) {
-  const [open, setOpen]     = useState(false)
-  const [target, setTarget] = useState('__all__')
-  const [title, setTitle]   = useState('')
-  const [body, setBody]     = useState('')
+  const [open, setOpen]       = useState(false)
+  const [target, setTarget]   = useState('__all__')
+  const [title, setTitle]     = useState('')
+  const [body, setBody]       = useState('')
   const [sending, setSending] = useState(false)
+  const [lastResult, setLastResult] = useState(null) // { ok, skipped, sent, error }
 
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+  const permStatus = 'Notification' in window ? Notification.permission : 'unsupported'
 
   const send = async () => {
     if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
     setSending(true)
-    const tag = 'push-' + Date.now()
-    await queuePush(target, title.trim(), body.trim(), tag, '/')
-    toast('Notificación enviada', 3000, 'ok')
+    setLastResult(null)
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      const secret = import.meta.env.VITE_PUSH_SECRET
+      if (secret) headers['Authorization'] = `Bearer ${secret}`
+      const res = await fetch('/api/sendpush', {
+        method: 'POST', headers,
+        body: JSON.stringify({ userId: target, title: title.trim(), body: body.trim(), tag: 'push-' + Date.now(), url: '/' })
+      })
+      const json = await res.json().catch(() => ({}))
+      setLastResult({ ok: res.ok, ...json })
+      if (json.skipped) toast('Sin suscripción — el destinatario debe abrir la app primero', 4000, 'warn')
+      else if (!res.ok) toast('Error al enviar: ' + (json.error || res.status), 4000, 'error')
+      else toast(`Push enviado${json.sent > 1 ? ` (${json.sent} dispositivos)` : ''}`, 3000, 'ok')
+    } catch(e) {
+      setLastResult({ ok: false, error: e.message })
+      toast('Error de red al enviar push', 3000, 'error')
+    }
     setSending(false)
     setTitle(''); setBody(''); setOpen(false)
   }
@@ -604,12 +621,25 @@ function PushNotifWidget({ db, toast }) {
           {open ? 'Cancelar' : '+ Enviar'}
         </button>
       </div>
-      {!open && <div style={{ fontSize:11, color:'var(--text4)', marginTop:4 }}>Llegan al móvil aunque esté bloqueado</div>}
+      {!open && (
+        <div style={{ fontSize:11, color:'var(--text4)', marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
+          <span>Llegan al móvil aunque esté bloqueado</span>
+          <span style={{ color: permStatus === 'granted' ? 'var(--green)' : permStatus === 'denied' ? 'var(--danger)' : 'var(--orange)' }}>
+            Este dispositivo: {permStatus === 'granted' ? '✓ Push activado' : permStatus === 'denied' ? '✗ Push bloqueado — actívalo en ajustes del navegador' : '⚠ Push no solicitado'}
+          </span>
+          {lastResult && (
+            <span style={{ color: lastResult.ok ? 'var(--green)' : lastResult.skipped ? 'var(--orange)' : 'var(--danger)' }}>
+              Último envío: {lastResult.ok ? `✓ entregado${lastResult.sent > 1 ? ` (${lastResult.sent})` : ''}` : lastResult.skipped ? '⚠ sin suscripción' : `✗ ${lastResult.error || 'error'}`}
+            </span>
+          )}
+        </div>
+      )}
       {open && (
         <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           <select value={target} onChange={e => setTarget(e.target.value)}
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }}>
             <option value="__all__">Todos los empleados</option>
+            <option value="__admin__">Solo admins</option>
             {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
           <input placeholder="Título de la notificación..." value={title} onChange={e => setTitle(e.target.value)}
@@ -618,7 +648,7 @@ function PushNotifWidget({ db, toast }) {
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
           <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : '🔔 Enviar notificación'}</button>
           <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
-            Se envían vía VAPID incluso con el móvil bloqueado (GitHub Actions corre cada 5 min).
+            Si aparece "sin suscripción": el empleado debe abrir la app y aceptar los permisos de notificación.
           </div>
         </div>
       )}

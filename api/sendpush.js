@@ -12,7 +12,7 @@ if (VAPID_PRIVATE) {
 
 async function sbGet(userId) {
   if (!SB_URL || !SB_ANON) return null;
-  const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=user_id,endpoint,p256dh,auth&limit=1`;
+  const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=user_id,endpoint,p256dh,auth&order=updated_at.desc&limit=1`;
   const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } });
   if (!r.ok) return null;
   const rows = await r.json();

@@ -201,7 +201,7 @@ export async function pushSubscribe(userId, vapidPub) {
       p256dh: buf2b64(key),
       auth: buf2b64(auth),
       updated_at: new Date().toISOString()
-    })
+    }, { onConflict: 'user_id' })
   } catch(e) { console.warn('[PUSH]', e) }
 }
 
