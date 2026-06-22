@@ -135,7 +135,13 @@ async function _bgSync() {
 }
 
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') event.waitUntil(_bgSync())
+  if (event.tag === 'sync-data') event.waitUntil(
+    _bgSync().catch(async (err) => {
+      // Notify open tabs that sync failed so the UI can show a warning
+      const cs = await self.clients.matchAll({ type: 'window' })
+      cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
+    })
+  )
 })
 
 self.addEventListener('message', (event) => {

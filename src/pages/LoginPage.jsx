@@ -6,7 +6,7 @@ import { sortedEmps } from '../utils/time.js'
 import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
 
 export default function LoginPage() {
-  const { db, setSession, setScreen, toast, fetchDB, saveDB } = useAppStore()
+  const { db, setSession, setScreen, toast, saveDB } = useAppStore()
   const [mode, setMode] = useState('pin')
   const [pin, setPin] = useState('')
   const [selectedEmpId, setSelectedEmpId] = useState('')
@@ -34,7 +34,6 @@ export default function LoginPage() {
     } catch {}
   }, [])
 
-  useEffect(() => { fetchDB() }, [])
 
   useEffect(() => { requestAnimationFrame(() => setMounted(true)) }, [])
 
@@ -73,7 +72,7 @@ export default function LoginPage() {
   const findEmployeeByEmail = async (fbEmail) => {
     const normalized = fbEmail?.toLowerCase()
     if (!normalized) return null
-    await fetchDB()
+    await useAppStore.getState().fetchDB()
     const freshDB = useAppStore.getState().db
     return (freshDB.employees || []).find(e => e.email?.toLowerCase() === normalized) || null
   }

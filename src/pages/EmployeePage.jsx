@@ -97,6 +97,7 @@ export default function EmployeePage() {
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [calMonth, setCalMonth] = useState(new Date())
   const dbRef = useRef(db)
+  const geoAbortRef = useRef(false)
   useEffect(() => { dbRef.current = db }, [db])
 
   // Fast-path: if permission already granted from a previous session, register immediately
@@ -284,17 +285,19 @@ export default function EmployeePage() {
         if (elapsedStale > 720) {
           const acKey = 'an_autoclose_' + stale.id
           if (!hasSent(acKey)) {
+            // Re-read from current db snapshot to avoid double-close race
             const freshRec = dbRef.current.records.find(r => r.id === stale.id)
             if (!freshRec || freshRec.fin) return
             markSent(acKey)
             dirty = false  // guardado junto con records a continuación
             const closeTime = new Date().toISOString()
-            const breaks2 = [...(stale.breaks || [])]
-            const t2 = calcSecs({ ...stale, fin: closeTime, breaks: breaks2 })
-            const closed2 = { ...stale, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
-            const updRecs = dbRef.current.records.map(r => r.id === stale.id ? closed2 : r)
+            const breaks2 = [...(freshRec.breaks || [])]
+            const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
+            const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
+            const snapshot = dbRef.current.records
+            const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
             saveDB({ records: updRecs, notisSent })
-            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
+            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
           }
         }
       })
@@ -312,8 +315,7 @@ export default function EmployeePage() {
   // App Badge API — muestra el contador de no leídas en el icono de la app instalada
   useEffect(() => {
     if (!u || !('setAppBadge' in navigator)) return
-    const cnt = (db.notis || []).filter(n => n.empId === u.id && !n.leido).length
-    const total = cnt
+    const total = (db.notis || []).filter(n => n.empId === u.id && !n.leido).length
     try {
       if (total > 0) navigator.setAppBadge(total)
       else navigator.clearAppBadge()
@@ -327,21 +329,22 @@ export default function EmployeePage() {
     if (timer.state !== 'idle') return
     const cs = db.centrosTrabajo || []
     openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
-    // Get GPS
+    // Get GPS — geoAbortRef discards the result if modal is closed before it resolves
+    geoAbortRef.current = false
     setPendingGPS(null)
     setGpsStatus('pending')
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
+          if (geoAbortRef.current) return
           const lat = +pos.coords.latitude.toFixed(5)
           const lng = +pos.coords.longitude.toFixed(5)
-          // Descartar coordenadas inválidas (0,0 = Null Island, fuera de rango)
           if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
             setPendingGPS({ lat, lng, acc: Math.round(pos.coords.accuracy), ts: new Date().toISOString() })
             setGpsStatus('ok')
           }
         },
-        () => { setGpsStatus('fail') },
+        () => { if (!geoAbortRef.current) setGpsStatus('fail') },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
     }
@@ -349,6 +352,7 @@ export default function EmployeePage() {
 
   const confirmarCentro = useCallback((centro) => {
     if (!centro) { toast('Selecciona un centro de trabajo'); return }
+    geoAbortRef.current = true
     setGpsStatus('idle')
     closeModal()
     const rec = {
@@ -383,12 +387,12 @@ export default function EmployeePage() {
       toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
       // Capturar GPS en background y actualizar el registro cuando resuelva
       if (navigator.geolocation) {
+        const stopId = closed.id
         navigator.geolocation.getCurrentPosition(
           pos => {
             const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
-            const fresh = dbRef.current
-            const updated = fresh.records.map(r => r.id === closed.id ? { ...r, locFin } : r)
-            saveDB({ records: updated })
+            const updated = dbRef.current.records.map(r => r.id === stopId ? { ...r, locFin } : r)
+            useAppStore.getState().saveDB({ records: updated })
           },
           () => {},
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }

@@ -172,9 +172,8 @@ body {
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv01', 'cv09', 'cv03', 'cv04', 'ss01';
   font-variant-numeric: tabular-nums;
-  /* iOS 26: prevent rubber-band scroll in standalone */
+  /* prevent pull-to-refresh bounce on root in standalone PWA */
   overscroll-behavior: none;
-  -webkit-overflow-scrolling: none;
 }
 
 #root {
@@ -214,7 +213,7 @@ input:focus, select:focus, textarea:focus {
 input::placeholder, textarea::placeholder { color: var(--text4); }
 select { appearance: none; -webkit-appearance: none; }
 input[type=checkbox] { width: auto; accent-color: var(--primary); }
-input[type=date], input[type=time] { -webkit-appearance: none; appearance: none; }
+input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto; }
 @media (max-width: 768px) { input, select, textarea { font-size: 16px; } }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
