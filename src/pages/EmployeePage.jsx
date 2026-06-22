@@ -111,8 +111,49 @@ export default function EmployeePage() {
   const geoAbortRef = useRef(false)
   useEffect(() => { dbRef.current = db }, [db])
 
-  // Fast-path: if permission already granted from a previous session, register immediately
-  useEffect(() => { if (u?.id && 'Notification' in window && Notification.permission === 'granted') pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
+  // ── Notification permission banner (global, all tabs) ─────────────────────────
+  const _notifDismissKey = 'an_notif_dismiss_ts'
+  const _isNotifDismissed = () => {
+    try {
+      const ts = parseInt(localStorage.getItem(_notifDismissKey) || '0', 10)
+      return ts > 0 && (Date.now() - ts) < 30 * 24 * 60 * 60 * 1000  // 30 days
+    } catch { return false }
+  }
+  const [notifPerm, setNotifPerm] = useState(() =>
+    typeof Notification !== 'undefined' ? Notification.permission : 'granted'
+  )
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(_isNotifDismissed)
+  const showNotifBanner = notifPerm === 'default' && !notifBannerDismissed
+
+  const handleNotifActivate = async () => {
+    try {
+      const p = await Notification.requestPermission()
+      setNotifPerm(p)
+      if (p === 'granted' && u?.id) {
+        pushSubscribe(u.id, VAPID_PUB)
+        toast('Notificaciones activadas', 3000, 'ok')
+      }
+    } catch {}
+    try { localStorage.setItem(_notifDismissKey, String(Date.now())) } catch {}
+    setNotifBannerDismissed(true)
+  }
+  const handleNotifDismiss = () => {
+    try { localStorage.setItem(_notifDismissKey, String(Date.now())) } catch {}
+    setNotifBannerDismissed(true)
+  }
+
+  // Fast-path: if permission already granted, register subscription immediately
+  useEffect(() => {
+    if (!u?.id || !('Notification' in window)) return
+    if (Notification.permission === 'granted') {
+      pushSubscribe(u.id, VAPID_PUB)
+    }
+    // Keep banner in sync with actual permission (e.g. user granted from browser settings)
+    const id = setInterval(() => {
+      setNotifPerm(Notification.permission)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [u?.id])
 
   // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
   useEffect(() => {
@@ -202,14 +243,6 @@ export default function EmployeePage() {
 
   useEffect(() => {
     if (!u) return
-
-    // Solicitar permiso de notificaciones y registrar suscripción push
-    setTimeout(async () => {
-      const native = await isNativePlatform()
-      if (native) { await requestPushPermission(); return }
-      const result = await requestPushPermission()
-      if (result) pushSubscribe(u.id, VAPID_PUB)
-    }, 3000)
 
     // Smart notifications: check every 60s if any reminder should fire
     // Bug fix #8: claves de notificaciones en db.notisSent (sincronizado entre dispositivos)
@@ -544,6 +577,16 @@ export default function EmployeePage() {
 
       <OfflineBanner />
 
+      {/* Notificaciones push — banner nativo (solo si 'default', no permanente) */}
+      {showNotifBanner && (
+        <div style={{ background:'var(--bg-700)', borderBottom:'1px solid var(--border)', padding:'10px 14px', display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary)" strokeWidth="2" style={{ flexShrink:0 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span style={{ flex:1, color:'var(--text-primary)' }}>Activa las notificaciones para recibir avisos importantes</span>
+          <button onClick={handleNotifActivate} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>Activar</button>
+          <button onClick={handleNotifDismiss} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:'4px 6px', fontSize:18, lineHeight:1, flexShrink:0 }} aria-label="Cerrar">×</button>
+        </div>
+      )}
+
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} />}
@@ -708,9 +751,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const todayStr = today()
   const [showTip, setShowTip] = useState(() => {
     try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
-  })
-  const [notifDismissed, setNotifDismissed] = useState(() => {
-    try { return !!localStorage.getItem('an_notif_prompt_dismissed') } catch { return false }
   })
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -894,28 +934,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
-
-        {/* Notification permission prompt */}
-        {typeof Notification !== 'undefined' && Notification.permission === 'default' && timer.state === 'idle' && !notifDismissed && (
-          <div style={{ margin:'0 16px 10px', padding:'10px 12px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--primary-light)' }}>Activa las notificaciones</div>
-              <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>Recibe avisos de vacaciones, recordatorios y mensajes.</div>
-            </div>
-            <button className="btn btn-primary btn-sm" style={{ fontSize:11, padding:'5px 10px', flexShrink:0 }}
-              onClick={async () => {
-                const p = await Notification.requestPermission()
-                try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {}
-                setNotifDismissed(true)
-                if (p === 'granted' && u?.id) pushSubscribe(u.id, VAPID_PUB)
-              }}>
-              Activar
-            </button>
-            <button onClick={() => { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {}; setNotifDismissed(true) }}
-              style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', fontSize:16, padding:'0 2px', lineHeight:1, flexShrink:0 }}>✕</button>
-          </div>
-        )}
 
         {/* Auto-close warning banner */}
         {showAutoCloseWarning && (

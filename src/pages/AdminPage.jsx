@@ -1634,10 +1634,10 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
       const welcomeMsg = {
         id: gid(), from: 'admin', to: updatedForm.id,
         text: `¡Bienvenido/a a TIMES INC, ${updatedForm.name.split(' ')[0]}! 👋\nHas sido dado de alta en el sistema. Usa tu PIN para acceder y registrar tu jornada diaria. Si tienes dudas, escríbeme aquí.`,
-        ts: new Date().toISOString(), leido: false
+        ts: Date.now(), leido: false
       }
       extraData.chats = [...(db.chats || []), welcomeMsg]
-      const noti = { id: gid(), empId: updatedForm.id, action: '¡Bienvenido/a!', detail: 'Ya puedes acceder con tu PIN', ts: new Date().toISOString(), leido: false }
+      const noti = { id: gid(), empId: updatedForm.id, action: '¡Bienvenido/a!', detail: 'Ya puedes acceder con tu PIN', ts: Date.now(), leido: false }
       extraData.notis = [...(db.notis || []), noti]
     }
     saveDB({ employees: emps2, audit: withAudit.audit, ...extraData })

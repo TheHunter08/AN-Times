@@ -1,34 +1,42 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
-import { calcSecs, today } from '../utils/time.js'
+import { calcSecs } from '../utils/time.js'
 
 export function useTimer() {
-  const { db, session, timer, updateTimer, saveDB } = useAppStore()
-  const tickRef = useRef(0)
+  const timer   = useAppStore(s => s.timer)
+  const userId  = useAppStore(s => s.session.user?.id)
+  const tickRef     = useRef(0)
   const saveTickRef = useRef(null)
 
   useEffect(() => {
-    if (!session.user) return
+    if (!userId) return
 
     const interval = setInterval(() => {
-      const openRec = (db.records || []).find(r => r.empId === session.user.id && !r.fin)
+      // Always read fresh state — no stale closures, interval never resets on db change
+      const { db, timer: t, updateTimer, saveDB } = useAppStore.getState()
+
+      const openRec = (db.records || []).find(r => r.empId === userId && !r.fin)
       if (!openRec) {
-        if (timer.state !== 'idle') updateTimer({ state: 'idle', ws: 0, bs: 0 })
+        if (t.state !== 'idle') updateTimer({ state: 'idle', ws: 0, bs: 0 })
         return
       }
 
       const state = openRec.enDescanso ? 'break' : 'working'
-      const t = calcSecs(openRec)
-      updateTimer({ state, ws: t.work, bs: t.brk })
+      const secs  = calcSecs(openRec)
+      updateTimer({ state, ws: secs.work, bs: secs.brk })
 
-      // Persist every 30 ticks (~30s)
+      // Persist workSecs/breakSecs every ~30 s so server always has fresh data
       if ((++tickRef.current) % 30 === 0) {
-        const records = db.records.map(r =>
-          r.id === openRec.id ? { ...r, workSecs: t.work, breakSecs: t.brk } : r
-        )
         clearTimeout(saveTickRef.current)
+        const recId   = openRec.id
+        const work    = secs.work
+        const brk     = secs.brk
         saveTickRef.current = setTimeout(() => {
-          saveDB({ records })
+          const { db: fresh, saveDB: sd } = useAppStore.getState()
+          const records = fresh.records.map(r =>
+            r.id === recId ? { ...r, workSecs: work, breakSecs: brk } : r
+          )
+          sd({ records })
         }, 5000)
       }
     }, 1000)
@@ -37,7 +45,7 @@ export function useTimer() {
       clearInterval(interval)
       clearTimeout(saveTickRef.current)
     }
-  }, [db, session.user])
+  }, [userId])   // ← only re-run when the logged-in user changes, NOT on every db write
 
   return timer
 }
