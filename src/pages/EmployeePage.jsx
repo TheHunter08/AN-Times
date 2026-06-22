@@ -1339,7 +1339,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
     if (!t) return
     const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
     saveDB({ chats: [...chats, msg] })
-    queuePush(adminId, `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
+    queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
     setText('')
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
   }
@@ -2846,6 +2846,7 @@ function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
     if (!t) return
     const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
     saveDB({ chats: [...chats, msg] })
+    queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
     setText('')
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
   }
