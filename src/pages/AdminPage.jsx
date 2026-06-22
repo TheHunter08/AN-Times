@@ -127,8 +127,8 @@ export default function AdminPage() {
       const uid = useAppStore.getState().session?.user?.id
       if (native) { await requestPushPermission(); return }
       const result = await requestPushPermission()
-      if (result && uid) {
-        pushSubscribe(uid, VAPID_PUB)
+      if (result) {
+        if (uid) pushSubscribe(uid, VAPID_PUB)
         pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)

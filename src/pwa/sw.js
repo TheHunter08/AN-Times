@@ -50,8 +50,8 @@ self.addEventListener('push', (event) => {
   const title   = data.title || 'TIMES INC'
   const options = {
     body: data.body || data.message || '',
-    icon: '/icon.svg',
-    badge: '/icon.svg',
+    icon: '/icon-192.png',    // SVG no funciona en Android Chrome push notifications
+    badge: '/icon-192.png',
     tag: data.tag || 'times-noti',
     renotify: true,
     requireInteraction: false,

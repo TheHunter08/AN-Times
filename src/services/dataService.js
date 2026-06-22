@@ -175,8 +175,7 @@ export async function pushSubscribe(userId, vapidPub) {
   if (!supabase) return
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-    const perm = await Notification.requestPermission()
-    if (perm !== 'granted') return
+    if (Notification.permission !== 'granted') return
     const reg = await navigator.serviceWorker.ready
     const b64ToUint8 = b => {
       const p = '='.repeat((4 - b.length % 4) % 4)
@@ -211,8 +210,9 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
     const headers = { 'Content-Type': 'application/json' }
     const secret = import.meta.env.VITE_PUSH_SECRET
     if (secret) headers['Authorization'] = `Bearer ${secret}`
-    await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url }) })
-  } catch {}
+    const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url }) })
+    if (!res.ok) console.error('[PUSH] sendpush error', res.status, await res.text().catch(() => ''))
+  } catch(e) { console.error('[PUSH] queuePush fetch error', e) }
 }
 
 export function auditLog(db, action, detail, user) {
