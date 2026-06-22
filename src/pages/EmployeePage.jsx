@@ -886,8 +886,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Progreso semanal</div>
             <div style={{ fontSize:12, fontWeight:700, color: weekPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(weekMin)} / 40h</div>
           </div>
-          <div style={{ height:8, background:'var(--bg-500)', borderRadius:4, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:`${weekPct}%`, background: weekPct >= 100 ? 'linear-gradient(90deg, #16a34a, #22c55e)' : 'linear-gradient(90deg, var(--primary), var(--secondary))', borderRadius:4, transition:'width .6s cubic-bezier(.16,1,.3,1)' }} />
+          <div className="progress-bar">
+            <div className={`progress-bar-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${weekPct}%` }} />
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
             <span style={{ fontSize:9, color:'var(--text4)' }}>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
@@ -1622,7 +1622,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0, overflow:'hidden' }}>
+    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden', paddingBottom:'calc(80px + max(20px, env(safe-area-inset-bottom, 0px)))' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -1635,8 +1635,8 @@ function TabMensajes({ db, u, toast, saveDB }) {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
-        <div style={{ flex:1 }} />
+      <div style={{ flex:1, overflowY:'auto', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8, minHeight:0 }}>
+        <div style={{ marginTop:'auto' }} />
         {!conv.length && (
           <div className="empty-premium">
             <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
@@ -1651,8 +1651,8 @@ function TabMensajes({ db, u, toast, saveDB }) {
           return (
             <div key={m.id} style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems:'flex-end', gap:7 }}>
               {!isMe && (
-                <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginBottom:2 }}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--primary-light)" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginBottom:2, fontSize:9, fontWeight:800, color:'#fff', letterSpacing:'-.5px' }}>
+                  Adm
                 </div>
               )}
               <div style={{
@@ -1674,7 +1674,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ padding:'10px 12px', borderTop:'1px solid var(--border)', display:'flex', gap:8, background:'var(--bg-700)', paddingBottom:'max(10px,env(safe-area-inset-bottom,0px))', flexShrink:0 }}>
+      <div style={{ padding:'10px 12px', borderTop:'1px solid var(--border)', display:'flex', gap:8, background:'var(--bg-700)', flexShrink:0 }}>
         <input
           value={text}
           onChange={e => setText(e.target.value)}
