@@ -1359,8 +1359,9 @@ function TabMensajes({ db, u, toast, saveDB }) {
       </div>
 
       <div style={{ flex:1, overflowY:'auto', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ flex:1 }} />
         {!conv.length && (
-          <div className="empty-premium" style={{ marginTop:50 }}>
+          <div className="empty-premium">
             <div className="empty-premium-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
             <div className="empty-premium-title">Sin mensajes aún</div>
             <div className="empty-premium-sub">Escríbele a la administración y responderá lo antes posible</div>
@@ -2867,8 +2868,9 @@ function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
 
         {/* Mensajes */}
         <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ flex:1 }} />
           {!conv.length && (
-            <div style={{ textAlign:'center', color:'var(--text3)', fontSize:13, marginTop:60 }}>
+            <div style={{ textAlign:'center', color:'var(--text3)', fontSize:13 }}>
               <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
               Sin mensajes. Escribe tu primera consulta al administrador.
             </div>

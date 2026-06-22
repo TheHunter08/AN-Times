@@ -93,20 +93,27 @@ function SyncBanner() {
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
+const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil']
+
 function applyDeepLink(url) {
   try {
     const u = new URL(url, window.location.origin)
-    const go = u.searchParams.get('go')
-    if (!go) return
-    const [screen, target] = go.split(':')
+    const go  = u.searchParams.get('go')
+    const tab = u.searchParams.get('tab')
+    if (!go && !tab) return
     const { setScreen, setAdminPage, setEmpTab, openModal } = useAppStore.getState()
-    if (screen === 'admin') {
-      setScreen('admin', true)
-      if (target) setAdminPage(target)
-    } else if (screen === 'emp') {
-      setScreen('emp', true)
-      if (target === 'documentos') { setEmpTab('perfil'); openModal('documentos') }
-      else if (target) setEmpTab(target)
+    if (go) {
+      const [screen, target] = go.split(':')
+      if (screen === 'admin') {
+        setScreen('admin', true)
+        if (target) setAdminPage(target)
+      } else if (screen === 'emp') {
+        setScreen('emp', true)
+        if (target === 'documentos') { setEmpTab('perfil'); openModal('documentos') }
+        else if (target) setEmpTab(target)
+      }
+    } else if (tab && EMP_TABS.includes(tab)) {
+      setEmpTab(tab)
     }
     window.history.replaceState({}, '', window.location.pathname)
   } catch {}

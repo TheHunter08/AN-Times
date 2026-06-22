@@ -3148,7 +3148,7 @@ function PanelMensajes({ db, toast, saveDB, session }) {
     if (!t || !selEmpId) return
     const msg = { id: gid(), from: adminId, to: selEmpId, text: t, ts: Date.now(), leido: false }
     saveDB({ chats: [...chats, msg] })
-    queuePush(selEmpId, `Mensaje de ${session?.user?.name || 'Admin'}`, t, 'chat', '/?tab=mensajes')
+    queuePush(selEmpId, `Mensaje de ${session?.user?.name || 'Admin'}`, t, 'chat', '/?go=emp:mensajes')
     setText('')
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
   }
@@ -3213,7 +3213,8 @@ function PanelMensajes({ db, toast, saveDB, session }) {
 
               {/* Mensajes */}
               <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:8 }}>
-                {!conv.length && <div style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:40 }}>Sin mensajes. Escribe el primero.</div>}
+                <div style={{ flex:1 }} />
+                {!conv.length && <div style={{ textAlign:'center', fontSize:12, color:'var(--text3)' }}>Sin mensajes. Escribe el primero.</div>}
                 {conv.map(m => {
                   const isAdmin = m.from === adminId
                   return (
