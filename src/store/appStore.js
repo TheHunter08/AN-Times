@@ -41,7 +41,7 @@ export const useAppStore = create((set, get) => ({
     }
     const { ok, data, status } = await cloudFetch()
     if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
-    if (!data) return
+    if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
     const merged = mergeDB(INITIAL_DB, data)
     saveLocal(merged)
     set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })

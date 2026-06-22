@@ -48,6 +48,7 @@ function UpdateBanner() {
 
 function SyncBanner() {
   const syncStatus    = useAppStore(s => s.syncStatus)
+  const syncError     = useAppStore(s => s.syncError)
   const lastSyncTime  = useAppStore(s => s.lastSyncTime)
   const fetchDB       = useAppStore(s => s.fetchDB)
   const currentScreen = useAppStore(s => s.currentScreen)
@@ -60,6 +61,7 @@ function SyncBanner() {
   }, [fetchDB])
 
   if (syncStatus !== 'error' || currentScreen === 'login') return null
+  if (syncError === 'no_config') return null
 
   const sinceText = lastSyncTime
     ? (() => {
