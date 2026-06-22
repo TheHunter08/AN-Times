@@ -59,6 +59,7 @@ export default function AdminPage() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handler)
@@ -146,6 +147,7 @@ export default function AdminPage() {
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
   const pendingVacs = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
   const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
+  const activeNow = (db.records || []).filter(r => !r.fin).length
 
   const doLogout = () => { logout() }
 
@@ -182,6 +184,12 @@ export default function AdminPage() {
             TIMES INC
           </div>
           <div className="adm-page-title">{actPanel.label}</div>
+          {activeNow > 0 && (
+            <div onClick={() => nav('control')} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--green-dim)', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'3px 10px 3px 7px', cursor:'pointer', flexShrink:0 }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:'var(--green)', animation:'livePing 2s ease-in-out infinite', flexShrink:0 }} />
+              <span style={{ fontSize:11, fontWeight:700, color:'var(--green)', whiteSpace:'nowrap' }}>{activeNow} en obra</span>
+            </div>
+          )}
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <SyncBadge />
@@ -206,7 +214,7 @@ export default function AdminPage() {
               Panel Emp.
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Cambiar tema" style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, lineHeight:1, padding:'4px 6px', borderRadius:8, color:'var(--text3)' }}>🌙</button>
+          <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Cambiar tema" style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, lineHeight:1, padding:'4px 6px', borderRadius:8, color:'var(--text3)' }}>{isLight ? '🌙' : '☀️'}</button>
           <button className="btn btn-secondary btn-sm" onClick={doLogout}>Salir</button>
         </div>
       </div>

@@ -104,12 +104,25 @@ export default function EmployeePage() {
   const [pendingGPS, setPendingGPS] = useState(null)
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [calMonth, setCalMonth] = useState(new Date())
+  const [showConfetti, setShowConfetti] = useState(false)
+  // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
+  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   const dbRef = useRef(db)
   const geoAbortRef = useRef(false)
   useEffect(() => { dbRef.current = db }, [db])
 
   // Fast-path: if permission already granted from a previous session, register immediately
   useEffect(() => { if (u?.id && 'Notification' in window && Notification.permission === 'granted') pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
+
+  // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
+  useEffect(() => {
+    const base = 'TIMES INC'
+    if (timer.state === 'idle') { document.title = base; return }
+    const h = Math.floor(timer.ws / 3600)
+    const m = Math.floor((timer.ws % 3600) / 60)
+    document.title = `⏱️ ${h}h ${p2(m)}m · ${base}`
+    return () => { document.title = base }
+  }, [timer.ws, timer.state])
 
   // Screen Wake Lock: evita que la pantalla se apague mientras hay jornada activa
   useEffect(() => {
@@ -464,22 +477,20 @@ export default function EmployeePage() {
     }
   }, [db.config?.primaryColor])
 
-  // Confetti state for jornada completion
-  const [showConfetti, setShowConfetti] = useState(false)
-
   if (!u) return null
 
   const initials = u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
   const vac = vacData(u.id, db)
   const unread = (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length
 
-  // Smart greeting based on hour
-  const greeting = (() => {
+  // Smart greeting — memoised, recalculates only when user or hour changes
+  const greeting = useMemo(() => {
     const h = new Date().getHours()
-    if (h >= 6 && h < 14) return `Buenos días, ${u.name.split(' ')[0]} ☀️`
-    if (h >= 14 && h < 21) return `Buenas tardes, ${u.name.split(' ')[0]} 👋`
-    return `Buenas noches, ${u.name.split(' ')[0]} 🌙`
-  })()
+    const firstName = u.name.split(' ')[0]
+    if (h >= 6 && h < 14) return `Buenos días, ${firstName} ☀️`
+    if (h >= 14 && h < 21) return `Buenas tardes, ${firstName} 👋`
+    return `Buenas noches, ${firstName} 🌙`
+  }, [u.name])
 
   return (
     <div className="screen active" id="sEmp">
@@ -501,7 +512,7 @@ export default function EmployeePage() {
               {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Tema" aria-label="Cambiar tema claro/oscuro">🌙</button>
+          <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema claro/oscuro">{isLight ? '🌙' : '☀️'}</button>
           <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
           </button>
@@ -804,8 +815,16 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           </div>
 
           <div style={{ position:'relative' }}>
-            <button className={`hero-fichar-btn${timer.state !== 'idle' ? ' active' : ''}`}
-              onClick={() => {
+            <button className={`hero-fichar-btn ripple-btn${timer.state !== 'idle' ? ' active' : ''}`}
+              onClick={e => {
+                const btn = e.currentTarget
+                const r = document.createElement('span')
+                r.className = 'ripple'
+                const rect = btn.getBoundingClientRect()
+                const size = Math.max(rect.width, rect.height)
+                r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`
+                btn.appendChild(r)
+                setTimeout(() => r.remove(), 600)
                 if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
                 handleMainBtn()
               }}>
@@ -862,6 +881,26 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
+
+        {/* Notification permission prompt */}
+        {typeof Notification !== 'undefined' && Notification.permission === 'default' && timer.state === 'idle' && (() => {
+          try { if (localStorage.getItem('an_notif_prompt_dismissed')) return null } catch {}
+          return (
+            <div style={{ margin:'0 16px 10px', padding:'10px 12px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--primary-light)' }}>Activa las notificaciones</div>
+                <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>Recibe avisos de vacaciones, recordatorios y mensajes.</div>
+              </div>
+              <button className="btn btn-primary btn-sm" style={{ fontSize:11, padding:'5px 10px', flexShrink:0 }}
+                onClick={async () => { const p = await Notification.requestPermission(); if (p !== 'default') { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {} } }}>
+                Activar
+              </button>
+              <button onClick={() => { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {} }}
+                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', fontSize:16, padding:'0 2px', lineHeight:1, flexShrink:0 }}>✕</button>
+            </div>
+          )
+        })()}
 
         {/* Auto-close warning banner */}
         {showAutoCloseWarning && (
