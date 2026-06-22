@@ -300,9 +300,18 @@ export default function EmployeePage() {
       }
 
       // 7. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
+      // 7a. Aviso preventivo a las 11h50m (10 min antes del auto-cierre)
       const staleRecs = (db.records || []).filter(r => r.empId === u.id && !r.fin)
       staleRecs.forEach(stale => {
         const elapsedStale = (Date.now() - new Date(stale.inicio).getTime()) / 60000
+        if (elapsedStale >= 710 && elapsedStale < 720) {
+          const warnKey = 'an_autoclose_warn_' + stale.id
+          if (!hasSent(warnKey)) {
+            markSent(warnKey)
+            queuePush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
+            toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
+          }
+        }
         if (elapsedStale > 720) {
           const acKey = 'an_autoclose_' + stale.id
           if (!hasSent(acKey)) {

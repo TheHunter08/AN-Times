@@ -33,6 +33,12 @@ export function mergeDB(base, incoming) {
   }
   // Bug fix #7: no sobrescribir employees locales con array vacío (Supabase reset / rate-limit)
   const incomingEmps = (incoming.employees?.length > 0) ? incoming.employees : base.employees
+  // Bug fix #8: union de notisSent — cleanup entries older than 90 days
+  const _mergedNotis = { ...(base.notisSent || {}), ...(incoming.notisSent || {}) }
+  const _cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+  const mergedNotisSent = Object.fromEntries(
+    Object.entries(_mergedNotis).filter(([, v]) => { const t = Date.parse(v); return isNaN(t) || t > _cutoff })
+  )
   return {
     empresas:            (incoming.empresas?.length)       ? incoming.empresas       : base.empresas,
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
@@ -51,8 +57,7 @@ export function mergeDB(base, incoming) {
     audit:               incoming.audit                || [],
     correccionesFichaje: incoming.correccionesFichaje  || [],
     chats:               incoming.chats                || [],
-    // Bug fix #8: union de notisSent — nunca se "des-envía" una notificación
-    notisSent:           { ...(base.notisSent || {}), ...(incoming.notisSent || {}) },
+    notisSent:           mergedNotisSent,
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
   }

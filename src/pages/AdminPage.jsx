@@ -337,6 +337,8 @@ function toggleTheme() {
 // ─── PANEL DASHBOARD ──────────────────────────────────────────────────────────
 function PanelDashboard({ db, toast, saveDB }) {
   const { setAdminPage } = useAppStore()
+  const [showAllLive, setShowAllLive] = useState(false)
+  const [showAllToday, setShowAllToday] = useState(false)
   const now = new Date()
   const todayStr = today()
   const emps = (db.employees || []).filter(e => !e.baja)
@@ -447,7 +449,7 @@ function PanelDashboard({ db, toast, saveDB }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {liveRecs.slice(0,6).map(r => {
+              {(showAllLive ? liveRecs : liveRecs.slice(0,5)).map(r => {
                 const emp = emps.find(e => e.id === r.empId)
                 const t = calcSecs(r)
                 return (
@@ -463,6 +465,12 @@ function PanelDashboard({ db, toast, saveDB }) {
                   </div>
                 )
               })}
+              {liveRecs.length > 5 && (
+                <button onClick={() => setShowAllLive(v => !v)}
+                  style={{ fontSize:11, color:'var(--primary-light)', background:'none', border:'none', cursor:'pointer', padding:'4px 0', fontFamily:'inherit', textAlign:'left', fontWeight:600 }}>
+                  {showAllLive ? 'Ver menos' : `Ver todos (${liveRecs.length})`}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -482,7 +490,7 @@ function PanelDashboard({ db, toast, saveDB }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0,6).map(r => {
+              {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, showAllToday ? undefined : 5).map(r => {
                 const emp = emps.find(e => e.id === r.empId)
                 const isLive = !r.fin
                 const wm = r.fin ? Math.floor(recWorkSecs(r)/60) : null
@@ -503,6 +511,12 @@ function PanelDashboard({ db, toast, saveDB }) {
                   </div>
                 )
               })}
+              {todayRecs.length > 5 && (
+                <button onClick={() => setShowAllToday(v => !v)}
+                  style={{ fontSize:11, color:'var(--primary-light)', background:'none', border:'none', cursor:'pointer', padding:'4px 0', fontFamily:'inherit', textAlign:'left', fontWeight:600 }}>
+                  {showAllToday ? 'Ver menos' : `Ver todos (${todayRecs.length})`}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1040,6 +1054,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     a.href = url; a.download = `fichajes-${new Date().toISOString().slice(0,10)}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    toast(`${rows.length} fichajes exportados`, 3000, 'ok')
   }
 
   return (
@@ -1330,20 +1345,24 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
             </div>
           )}
           {rejecting === v.id && (
-            <div style={{ width:'100%', marginTop:10, display:'flex', gap:8, alignItems:'center' }}>
-              <input
-                autoFocus
-                style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
-                placeholder="Motivo del rechazo (obligatorio)"
-                value={rejMotivo}
-                onChange={e => setRejMotivo(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }
-                  if (e.key === 'Escape') setRejecting(null)
-                }}
-              />
-              <button className="btn btn-sm btn-danger" disabled={!rejMotivo.trim()} onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
-              <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
+            <div style={{ width:'100%', marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <input
+                  autoFocus
+                  maxLength={200}
+                  style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border2)', borderRadius:8, padding:'6px 10px', color:'var(--text)', fontSize:12, fontFamily:'inherit' }}
+                  placeholder="Motivo del rechazo (obligatorio)"
+                  value={rejMotivo}
+                  onChange={e => setRejMotivo(e.target.value.slice(0, 200))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }
+                    if (e.key === 'Escape') setRejecting(null)
+                  }}
+                />
+                <button className="btn btn-sm btn-danger" disabled={!rejMotivo.trim()} onClick={() => { act(v.id, 'rechazada', rejMotivo.trim()); setRejecting(null) }}>Rechazar</button>
+                <button className="btn btn-sm btn-secondary" onClick={() => setRejecting(null)}>✕</button>
+              </div>
+              <div style={{ fontSize:10, color: rejMotivo.length > 180 ? 'var(--orange)' : 'var(--text4)', textAlign:'right' }}>{rejMotivo.length}/200</div>
             </div>
           )}
         </div>
@@ -1501,9 +1520,16 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
                         <div style={{ fontSize:13, fontWeight:700 }}>{c.empName}</div>
                         <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
                           Original: {ftime(c.recInicio)} → {c.recFin ? ftime(c.recFin) : '—'}
+                          {c.recInicio && c.recFin && <span style={{ marginLeft:6, fontVariantNumeric:'tabular-nums' }}>({mhm(Math.floor((new Date(c.recFin)-new Date(c.recInicio))/60000))})</span>}
                         </div>
                         <div style={{ fontSize:11, color:'var(--primary-light)', marginTop:2 }}>
                           Propuesto: {ftime(c.propInicio)} → {c.propFin ? ftime(c.propFin) : '—'}
+                          {c.propInicio && c.propFin && (() => {
+                            const origMin = c.recInicio && c.recFin ? Math.floor((new Date(c.recFin)-new Date(c.recInicio))/60000) : 0
+                            const propMin = Math.floor((new Date(c.propFin)-new Date(c.propInicio))/60000)
+                            const diff = propMin - origMin
+                            return <span style={{ marginLeft:6, fontVariantNumeric:'tabular-nums', color: diff >= 0 ? 'var(--green)' : 'var(--red)', fontWeight:700 }}>({mhm(propMin)} · {diff >= 0 ? '+' : ''}{mhm(Math.abs(diff))})</span>
+                          })()}
                         </div>
                         {c.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3, fontStyle:'italic' }}>"{c.motivo}"</div>}
                       </div>
@@ -3619,6 +3645,27 @@ function PanelAuditoria({ db }) {
   const [auditUser, setAuditUser] = useState('')
   const audit = (db.audit || []).slice().reverse()
   const users = [...new Set(audit.map(a => a.user).filter(Boolean))]
+
+  const exportAuditCSV = () => {
+    const headers = ['Fecha','Hora','Acción','Usuario','Detalle']
+    const rows = filtered.map(a => {
+      const d = a.ts ? new Date(a.ts) : null
+      return [
+        d ? d.toLocaleDateString('es-ES') : '',
+        d ? d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '',
+        a.action || '',
+        a.user || '',
+        a.detail || ''
+      ]
+    })
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `auditoria_${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
   const ACTION_COLORS = {
     'Jornada': 'var(--green)', 'Empleado': 'var(--primary-light)', 'Obra': 'var(--teal)',
     'Documento': 'var(--orange)', 'Solicitud': 'var(--accent)', 'Centro': 'var(--secondary)',
@@ -3643,6 +3690,10 @@ function PanelAuditoria({ db }) {
           <h1 className="adm-panel-title gradient-text">Auditoría</h1>
           <div className="adm-panel-sub" style={{ marginTop:2 }}>{filtered.length} de {audit.length} registros</div>
         </div>
+        <button onClick={exportAuditCSV} className="btn btn-secondary btn-sm" disabled={!filtered.length} style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          CSV
+        </button>
       </div>
       <div className="premium-filters" style={{ marginBottom:16 }}>
         <input placeholder="Buscar acción o detalle…" value={auditQ} onChange={e => setAuditQ(e.target.value)} style={{ flex:1, minWidth:160 }} />
@@ -3687,6 +3738,35 @@ function PanelAjustes({ db, toast, saveDB }) {
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
   const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
   const [saving, setSaving] = useState(false)
+  const backupRef = useRef(null)
+
+  const exportBackup = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type:'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `an-times-backup-${new Date().toISOString().slice(0,10)}.json`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast('Backup descargado', 3000, 'ok')
+  }
+
+  const importBackup = e => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result)
+        if (!parsed.employees || !parsed.records) throw new Error('Formato inválido')
+        saveDB(parsed)
+        toast('Backup restaurado correctamente', 4000, 'ok')
+      } catch {
+        toast('Error: archivo no válido o corrupto', 4000, 'warn')
+      }
+    }
+    reader.readAsText(file)
+  }
 
   // Live preview: apply color as you change it
   useEffect(() => {
@@ -3777,6 +3857,29 @@ function PanelAjustes({ db, toast, saveDB }) {
       <button className="btn btn-primary" disabled={saving} onClick={save} style={{ width:'100%', padding:'14px' }}>
         {saving ? 'Guardando…' : '✓ Guardar ajustes'}
       </button>
+
+      <div className="dash-widget card-lift" style={{ marginTop:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">💾 Backup y restauración</div>
+        </div>
+        <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, marginBottom:14 }}>
+          Exporta todos los datos en formato JSON para hacer una copia de seguridad o migrar a otro entorno. Importar sobreescribe todos los datos actuales.
+        </div>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+          <button className="btn btn-secondary" onClick={exportBackup} style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar backup (JSON)
+          </button>
+          <button className="btn btn-secondary" onClick={() => backupRef.current?.click()} style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar backup
+          </button>
+          <input ref={backupRef} type="file" accept=".json" style={{ display:'none' }} onChange={importBackup} />
+        </div>
+        <div style={{ fontSize:11, color:'var(--red)', marginTop:10, fontWeight:600 }}>
+          ⚠ Importar reemplaza todos los datos actuales sin posibilidad de deshacer.
+        </div>
+      </div>
     </div>
   )
 }
