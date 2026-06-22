@@ -2496,3 +2496,71 @@ td span[title="Click para editar"]:hover {
   text-decoration-color: var(--primary-light);
 }
 
+/* ── Dashboard 2-col responsive grid ───────────────────────── */
+.dash-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 520px) {
+  .dash-2col { grid-template-columns: 1fr; }
+}
+
+/* ── Geofence badge on obras ────────────────────────────────── */
+.geo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.geo-badge.active {
+  background: rgba(16,185,129,.12);
+  color: var(--green);
+  border: 1px solid rgba(16,185,129,.25);
+}
+.geo-badge.none {
+  background: var(--bg-400);
+  color: var(--text4);
+  border: 1px solid var(--border);
+}
+
+/* ── Obra geofence settings panel (expand) ──────────────────── */
+.obra-geo-panel {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.obra-geo-coords {
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--bg-800);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── Notis panel: cap width on very wide screens ────────────── */
+@media (min-width: 480px) {
+  .notis-panel { max-width: 360px; }
+}
+
+/* ── Mobile: prevent adm-panel overflow on very narrow screens ─ */
+@media (max-width: 360px) {
+  .adm-panel { padding: 14px; }
+  .adm-panel-title { font-size: 18px; }
+}
+

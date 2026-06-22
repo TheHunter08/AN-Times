@@ -88,6 +88,14 @@ function useSignatureCanvas() {
   return { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData }
 }
 
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180
+  const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const timer = useTimer()
@@ -361,6 +369,18 @@ export default function EmployeePage() {
       workSecs: 0, breakSecs: 0, enDescanso: false, bStartTs: null, breaks: [], closed: false
     }
     if (pendingGPS) rec.locInicio = pendingGPS
+    // Geofencing: warn if employee is outside the obra's defined radius
+    if (pendingGPS) {
+      const obraGeo = (db.obras || []).find(o => o.nombre === centro)
+      if (obraGeo?.coords) {
+        const dist = haversine(pendingGPS.lat, pendingGPS.lng, obraGeo.coords.lat, obraGeo.coords.lng)
+        const radio = obraGeo.radio || 200
+        if (dist > radio) {
+          rec.geoAlert = { dist, radio, ts: new Date().toISOString() }
+          setTimeout(() => toast(`⚠️ Estás a ${dist}m de la obra (radio ${radio}m)`, 6000, 'warn'), 600)
+        }
+      }
+    }
     const newDB = { ...db, records: [...db.records, rec] }
     // Update employee's centroTrabajo
     const emps = newDB.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
