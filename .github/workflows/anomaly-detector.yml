@@ -21,4 +21,7 @@ jobs:
       - name: Detectar jornadas abiertas
         run: node anomaly-detector.js
         env:
+          VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VITE_SB_URL:   ${{ secrets.VITE_SB_URL }}
+          VITE_SB_ANON:  ${{ secrets.VITE_SB_ANON }}

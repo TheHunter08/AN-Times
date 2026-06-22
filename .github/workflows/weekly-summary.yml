@@ -22,4 +22,7 @@ jobs:
       - name: Resumen semanal de horas
         run: node push-weekly-summary.js
         env:
+          VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VITE_SB_URL:   ${{ secrets.VITE_SB_URL }}
+          VITE_SB_ANON:  ${{ secrets.VITE_SB_ANON }}
