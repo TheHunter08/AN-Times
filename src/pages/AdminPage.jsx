@@ -144,6 +144,7 @@ export default function AdminPage() {
   }, [])
 
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
+  const pendingVacs = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
   const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
 
   const doLogout = () => { logout() }
@@ -221,6 +222,9 @@ export default function AdminPage() {
                 <span style={{ flex:1 }}>{p.label}</span>
                 {p.id==='documentos' && pendingDocs > 0 && (
                   <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingDocs}</span>
+                )}
+                {p.id==='solicitudes' && pendingVacs > 0 && (
+                  <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--danger)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingVacs}</span>
                 )}
               </button>
             ))}

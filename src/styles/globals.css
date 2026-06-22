@@ -2711,6 +2711,26 @@ td span[title="Click para editar"]:hover {
 /* ── Pull-to-refresh spinner ─────────────────────────────────── */
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 
+/* ── Confetti fall animation ─────────────────────────────────── */
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg) scale(.5); opacity: 0; }
+}
+
+/* ── Hero clock card: active jornada glow ───────────────────── */
+.hero-clock-card.jornada-active {
+  border-color: rgba(37,99,235,.4);
+  box-shadow: 0 0 0 1px rgba(37,99,235,.18) inset,
+              0 8px 40px rgba(37,99,235,.18),
+              0 0 60px rgba(108,99,255,.08);
+  animation: jornadaGlow 3s ease-in-out infinite;
+}
+@keyframes jornadaGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(37,99,235,.18) inset, 0 8px 40px rgba(37,99,235,.15); }
+  50%       { box-shadow: 0 0 0 1px rgba(37,99,235,.35) inset, 0 8px 60px rgba(37,99,235,.3); }
+}
+
 /* ── Login logo entry bounce ─────────────────────────────────── */
 @keyframes logoEntry {
   0%   { transform: scale(0.55); opacity: 0; }
