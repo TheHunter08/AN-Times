@@ -2959,6 +2959,7 @@ function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
       correccionesFichaje: [...(db.correccionesFichaje || []), corr],
       audit: withAudit.audit
     })
+    queuePush('__admin__', `✏️ Corrección de fichaje`, `${u.name} solicita corregir la jornada del ${rec.inicio.slice(0,10)}.`, 'correccion', '/?go=admin:solicitudes')
     toast('Solicitud enviada al administrador', 3000, 'ok')
     setSending(false)
     onClose()

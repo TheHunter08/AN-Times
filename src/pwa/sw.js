@@ -50,14 +50,15 @@ self.addEventListener('push', (event) => {
   const title   = data.title || 'TIMES INC'
   const options = {
     body: data.body || data.message || '',
-    icon: '/icon-192.png',    // SVG no funciona en Android Chrome push notifications
+    icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: data.tag || 'times-noti',
     renotify: true,
-    requireInteraction: false,
+    requireInteraction: true,   // Mantiene la notificación visible en pantalla bloqueada
     data: { url: data.url || '/' },
     actions: data.actions || [],
     vibrate: [200, 100, 200],
+    silent: false,
   }
 
   event.waitUntil(self.registration.showNotification(title, options))

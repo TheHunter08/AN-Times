@@ -1211,6 +1211,8 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
     const key = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString() }
     saveDB({ [key]: [...(db[key]||[]), item] })
+    const tipoLbl2 = ausForm.tipo === 'medico' ? 'Ausencia médica' : 'Ausencia'
+    queuePush(ausForm.empId, `🗓️ ${tipoLbl2} registrada`, `Se ha registrado una ${tipoLbl2.toLowerCase()} el ${ausForm.fechaInicio}.`, 'ausencia', '/?tab=calendario')
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
     toast('Ausencia registrada', 3000, 'ok')
   }
