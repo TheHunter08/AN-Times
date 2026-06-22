@@ -164,11 +164,13 @@ export default function AdminPage() {
           <div className="adm-logo">
             <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
               <defs>
-                <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44">
-                  <stop offset="0%" stopColor="#7C5CFF"/><stop offset="55%" stopColor="#5E6AD2"/><stop offset="100%" stopColor="#3B4BD6"/>
+                <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="var(--accent)"/>
+                  <stop offset="100%" stopColor="var(--primary)"/>
                 </linearGradient>
-                <linearGradient id="admLogoAccent" x1="0" y1="0" x2="44" y2="44">
-                  <stop offset="0%" stopColor="#7DF9FF"/><stop offset="100%" stopColor="#00D2FF"/>
+                <linearGradient id="admLogoAccent" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="var(--secondary)"/>
+                  <stop offset="100%" stopColor="var(--teal)"/>
                 </linearGradient>
               </defs>
               <rect width="44" height="44" rx="10" fill="url(#admLogoBg)"/>

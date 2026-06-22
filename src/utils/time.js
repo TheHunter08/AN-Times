@@ -46,12 +46,20 @@ export const calcSecs = o => {
   if (!o) return { work: 0, brk: 0 }
   const s = new Date(o.inicio).getTime()
   const e = o.fin ? new Date(o.fin).getTime() : Date.now()
-  let elapsed = Math.floor((e - s) / 1000), brk = 0
+  let elapsed = Math.max(0, Math.floor((e - s) / 1000)), brk = 0
   ;(o.breaks || []).forEach(b => {
-    if (b.start && b.end) brk += Math.floor((new Date(b.end) - new Date(b.start)) / 1000)
+    if (b.start && b.end) {
+      const bs = new Date(b.start).getTime(), be = new Date(b.end).getTime()
+      if (be > bs) brk += Math.floor((be - bs) / 1000)
+    }
   })
-  if (o.enDescanso && o.bStartTs) brk += Math.floor((Date.now() - new Date(o.bStartTs).getTime()) / 1000)
-  return { work: Math.max(0, elapsed - brk), brk }
+  if (o.enDescanso && o.bStartTs) {
+    const bStartMs = new Date(o.bStartTs).getTime()
+    if (bStartMs > 0 && bStartMs <= Date.now()) {
+      brk += Math.max(0, Math.floor((Date.now() - bStartMs) / 1000))
+    }
+  }
+  return { work: Math.max(0, elapsed - brk), brk: Math.max(0, brk) }
 }
 
 export const calcMin = r => {

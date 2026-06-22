@@ -2,14 +2,16 @@ const webpush = require('web-push');
 
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BHkLMm4jcnQUppuN6UNx7b3gK073ZB0l7LHABbT74GrBxt-BeYWyi0LEadsf21Vpx9gO71Mc3TVRy2yTh_MaOsw';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
-const SB_URL        = process.env.VITE_SB_URL   || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
-const SB_ANON       = process.env.VITE_SB_ANON  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
+const SB_URL        = process.env.VITE_SB_URL;
+const SB_ANON       = process.env.VITE_SB_ANON;
+const PUSH_SECRET   = process.env.PUSH_SECRET;   // shared secret — requerido si está configurado
 
 if (VAPID_PRIVATE) {
   webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
 }
 
 async function sbGet(userId) {
+  if (!SB_URL || !SB_ANON) return null;
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=user_id,endpoint,p256dh,auth&limit=1`;
   const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } });
   if (!r.ok) return null;
@@ -18,6 +20,7 @@ async function sbGet(userId) {
 }
 
 async function sbGetAll() {
+  if (!SB_URL || !SB_ANON) return [];
   const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`;
   const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } });
   if (!r.ok) return [];
@@ -25,6 +28,7 @@ async function sbGetAll() {
 }
 
 async function sbDelete(userId) {
+  if (!SB_URL || !SB_ANON) return;
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`;
   await fetch(url, { method: 'DELETE', headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }).catch(() => {});
 }
@@ -40,10 +44,19 @@ module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.PUSH_ALLOWED_ORIGIN || '';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Autenticación: si PUSH_SECRET está configurado, exigir el header correcto
+  if (PUSH_SECRET) {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (token !== PUSH_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
 
   // Verificar origen: comparación exacta del origin header
   if (allowedOrigin) {
@@ -58,6 +71,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (!VAPID_PRIVATE) return res.status(500).json({ error: 'Missing VAPID_PRIVATE' });
+  if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Missing Supabase config (VITE_SB_URL / VITE_SB_ANON)' });
 
   const { userId, title, body, tag, url } = req.body || {};
   if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' });

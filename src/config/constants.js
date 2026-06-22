@@ -1,8 +1,25 @@
 // ── Supabase (base de datos principal) ──────────────────────────────────────
-export const SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-export const SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+export const SB_URL  = import.meta.env.VITE_SB_URL  || ''
+export const SB_ANON = import.meta.env.VITE_SB_ANON || ''
 
-export const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '0824'
+if (import.meta.env.PROD && (!SB_URL || !SB_ANON)) {
+  console.error('[Times INC] CRÍTICO: VITE_SB_URL y VITE_SB_ANON son obligatorias en producción. La app funcionará sin sincronización.')
+}
+
+// ── Admin PIN — se genera un PIN temporal si no está configurado ──────────────
+function initAdminPin() {
+  if (import.meta.env.VITE_ADMIN_PIN) return import.meta.env.VITE_ADMIN_PIN
+  try {
+    const stored = localStorage.getItem('__admin_pin_fb__')
+    if (stored) return stored
+    const generated = Math.floor(1000 + Math.random() * 9000).toString()
+    localStorage.setItem('__admin_pin_fb__', generated)
+    localStorage.setItem('__admin_pin_fb_new__', '1')
+    return generated
+  } catch { return '0000' }
+}
+export const ADMIN_PIN = initAdminPin()
+
 export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BHkLMm4jcnQUppuN6UNx7b3gK073ZB0l7LHABbT74GrBxt-BeYWyi0LEadsf21Vpx9gO71Mc3TVRy2yTh_MaOsw'
 
 export const WK = 40 * 60   // weekly minutes norm
@@ -68,5 +85,6 @@ export const INITIAL_DB = {
   audit: [],
   correccionesFichaje: [],
   chats: [],
+  notisSent: {},
   _ts: 0
 }

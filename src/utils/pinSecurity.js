@@ -1,36 +1,81 @@
 // PIN hashing and brute-force protection
-// SHA-256(pin:userId) via WebCrypto — sin dependencias externas
+// PBKDF2 + random salt via WebCrypto — sin dependencias externas
 
-const MAX_ATTEMPTS = 5
-const LOCKOUT_MS   = 5 * 60 * 1000   // 5 minutos
-const LK_KEY       = (id) => `an_lk_${id}`
+const MAX_ATTEMPTS  = 5
+const LOCKOUT_MS    = 5 * 60 * 1000   // 5 minutos
+const LK_KEY        = (id) => `an_lk_${id}`
+const PBKDF2_ITER   = 100_000
+const SALT_HEX_LEN  = 32              // 16 bytes → 32 hex chars
 
 export const PIN_MAX_ATTEMPTS = MAX_ATTEMPTS
 
-/** Devuelve SHA-256 de "pin:userId" como hex string (64 chars) */
-export async function hashPin(pin, userId) {
-  const msg = `${pin}:${userId}`
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg))
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function toHex(buf) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** ¿El valor almacenado es ya un hash SHA-256? */
+async function pbkdf2Derive(pin, saltHex, userId) {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: new TextEncoder().encode(saltHex + userId), iterations: PBKDF2_ITER, hash: 'SHA-256' },
+    keyMaterial, 256
+  )
+  return toHex(bits)
+}
+
+// SHA-256(pin:userId) — solo para verificar hashes legacy, NO para crear nuevos
+async function legacySha256(pin, userId) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${pin}:${userId}`))
+  return toHex(buf)
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Devuelve un hash PBKDF2 con salt aleatorio: "pbkdf2:{salt}:{hash}" */
+export async function hashPin(pin, userId) {
+  const saltBytes = crypto.getRandomValues(new Uint8Array(SALT_HEX_LEN / 2))
+  const saltHex = toHex(saltBytes)
+  const hash = await pbkdf2Derive(pin, saltHex, userId)
+  return `pbkdf2:${saltHex}:${hash}`
+}
+
+/** Verdadero si el valor ya es un hash almacenado (PBKDF2 o SHA-256 legacy) */
 export function isPinHashed(pin) {
-  return typeof pin === 'string' && pin.length === 64 && /^[0-9a-f]{64}$/.test(pin)
+  if (typeof pin !== 'string') return false
+  if (pin.startsWith('pbkdf2:')) return true
+  return pin.length === 64 && /^[0-9a-f]{64}$/.test(pin)   // legacy SHA-256
+}
+
+/** Verdadero si el hash almacenado es legacy y debería migrarse a PBKDF2 */
+export function needsRehash(stored) {
+  return typeof stored === 'string' && !stored.startsWith('pbkdf2:')
 }
 
 /**
  * Compara un PIN en texto plano contra el valor almacenado.
- * Soporta tanto hashes SHA-256 (nuevos) como texto plano (migración legacy).
+ * Soporta PBKDF2 (nuevo), SHA-256 (legacy) y texto plano (pre-hash).
  */
 export async function verifyPin(inputPin, storedPin, userId) {
   if (!storedPin || !inputPin) return false
-  if (isPinHashed(storedPin)) {
-    return (await hashPin(inputPin, userId)) === storedPin
+  if (storedPin.startsWith('pbkdf2:')) {
+    const parts = storedPin.split(':')
+    if (parts.length !== 3) return false
+    const [, salt, storedHash] = parts
+    const derived = await pbkdf2Derive(inputPin, salt, userId)
+    return derived === storedHash
   }
-  // Fallback legacy: comparación directa (migra en el siguiente save del admin)
+  if (isPinHashed(storedPin)) {
+    // Legacy SHA-256 — verificar y migrar en el sitio de llamada
+    return (await legacySha256(inputPin, userId)) === storedPin
+  }
+  // Texto plano (migración desde versiones muy antiguas)
   return inputPin === storedPin
 }
+
+// ── Lockout ───────────────────────────────────────────────────────────────────
 
 /** Estado actual de bloqueo para un empleado */
 export function getLockoutState(empId) {

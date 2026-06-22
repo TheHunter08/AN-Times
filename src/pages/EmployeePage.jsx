@@ -175,118 +175,117 @@ export default function EmployeePage() {
     }, 3000)
 
     // Smart notifications: check every 60s if any reminder should fire
+    // Bug fix #8: claves de notificaciones en db.notisSent (sincronizado entre dispositivos)
     const checkSmartNotis = () => {
       if (!('Notification' in window) || Notification.permission !== 'granted') return
       const now = new Date()
-      // Usar fecha local (no UTC) para evitar desfase de zona horaria
       const todayStr = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`
       const hh = now.getHours()
       const mm = now.getMinutes()
       const db = dbRef.current
+      const notisSent = { ...(db.notisSent || {}) }
+      let dirty = false
 
-      // 1. Recordatorio diario de fichaje (hora configurada por el usuario)
+      const hasSent = (key, val) => val !== undefined ? notisSent[key] === val : !!notisSent[key]
+      const markSent = (key, val = '1') => { notisSent[key] = val; dirty = true }
+
+      // 1. Recordatorio diario de fichaje
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
-        // Ventana de 5 minutos: si han pasado entre 0 y 4 minutos desde la hora configurada
         const minsPast = (hh - rh) * 60 + (mm - rm)
         if (minsPast >= 0 && minsPast < 5) {
           const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio.startsWith(todayStr))
           const lastKey = 'an_rem_' + u.id
-          if (!hasFichado && localStorage.getItem(lastKey) !== todayStr) {
-            localStorage.setItem(lastKey, todayStr)
-            const rTitle = '⏰ Recordatorio de fichaje'
-            const rBody  = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
-            queuePush(u.id, rTitle, rBody, 'reminder-fichar', '/?tab=inicio')
+          if (!hasFichado && !hasSent(lastKey, todayStr)) {
+            markSent(lastKey, todayStr)
+            queuePush(u.id, '⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder-fichar', '/?tab=inicio')
           }
         }
       }
 
-      // 2. Notificación cuando se acerca el fin de jornada (15 min antes de 8h)
+      // 2. Aviso de jornada larga (7h 45min)
       const openRec = (db.records || []).find(r => r.empId === u.id && !r.fin)
       if (openRec) {
         const elapsed = (Date.now() - new Date(openRec.inicio).getTime()) / 60000
         const warn14h = 'an_warn_14h_' + openRec.id
-        if (elapsed >= 465 && elapsed < 475 && !localStorage.getItem(warn14h)) {
-          localStorage.setItem(warn14h, '1')
-          const jTitle = '⏳ Jornada larga'
-          const jBody  = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
-          queuePush(u.id, jTitle, jBody, 'jornada', '/')
+        if (elapsed >= 465 && elapsed < 475 && !hasSent(warn14h)) {
+          markSent(warn14h)
+          queuePush(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
         }
       }
 
-      // 3. Recordatorio "¿Olvidaste fichar la salida?" a la hora de salida configurada
+      // 3. Recordatorio de salida olvidada
       if (getCfg('notiSalida', true) && openRec) {
         const [sh, sm] = (getCfg('salidaTime', '21:00')).split(':').map(Number)
         const salidaMinsPast = (hh - sh) * 60 + (mm - sm)
         if (salidaMinsPast >= 0 && salidaMinsPast < 5) {
           const sKey = 'an_salida_' + openRec.id
-          if (!localStorage.getItem(sKey)) {
-            localStorage.setItem(sKey, '1')
+          if (!hasSent(sKey)) {
+            markSent(sKey)
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
-            const sTitle = '🔔 ¿Olvidaste fichar la salida?'
-            const sBody  = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
-            queuePush(u.id, sTitle, sBody, 'jornada', '/?tab=inicio')
+            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`, 'jornada', '/?tab=inicio')
           }
         }
       }
 
-      // 4. Notificación de vacaciones aprobadas/rechazadas (una vez por solicitud)
+      // 4. Vacaciones aprobadas/rechazadas (una vez por solicitud, entre dispositivos)
       ;(db.vacaciones || []).filter(v => v.empId === u.id && (v.estado === 'aprobada' || v.estado === 'rechazada')).forEach(v => {
         const key = 'an_vac_res_' + v.id
-        if (!localStorage.getItem(key)) {
-          localStorage.setItem(key, '1')
+        if (!hasSent(key)) {
+          markSent(key)
           if (v.estado === 'aprobada') {
             queuePush(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/?go=emp:vacaciones')
           } else {
-            queuePush(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.`, 'vacaciones', '/?go=emp:vacaciones')
+            const motivoTxt = v.motivoRechazo ? ` Motivo: ${v.motivoRechazo}` : ''
+            queuePush(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`, 'vacaciones', '/?go=emp:vacaciones')
           }
         }
       })
 
-      // 4. Notificación de documentos pendientes de firma (una vez al día)
+      // 5. Documentos pendientes de firma (una vez al día a las 9h)
       const pendDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
       if (pendDocs.length > 0) {
         const key = 'an_docs_' + u.id
-        if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
-          localStorage.setItem(key, todayStr)
-          queuePush(u.id, '📄 Documentos pendientes',
-            `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/?go=emp:documentos')
+        if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
+          markSent(key, todayStr)
+          queuePush(u.id, '📄 Documentos pendientes', `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/?go=emp:documentos')
         }
       }
 
-      // 5. Recordatorio de cierre mensual pendiente de firma (una vez al día a las 9h)
+      // 6. Cierre mensual pendiente (una vez al día a las 9h)
       const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
       if (pendCierres.length > 0) {
         const key = 'an_cierre_' + u.id
-        if (localStorage.getItem(key) !== todayStr && hh === 9 && mm === 0) {
-          localStorage.setItem(key, todayStr)
-          queuePush(u.id, '📋 Cierre mensual pendiente',
-            `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
+        if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
+          markSent(key, todayStr)
+          queuePush(u.id, '📋 Cierre mensual pendiente', `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
         }
       }
 
-      // 6. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
+      // 7. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
       const staleRecs = (db.records || []).filter(r => r.empId === u.id && !r.fin)
       staleRecs.forEach(stale => {
         const elapsedStale = (Date.now() - new Date(stale.inicio).getTime()) / 60000
         if (elapsedStale > 720) {
           const acKey = 'an_autoclose_' + stale.id
-          if (!localStorage.getItem(acKey)) {
-            // Verificar que el registro sigue abierto en la BD más reciente (evita cierre doble entre clientes)
+          if (!hasSent(acKey)) {
             const freshRec = dbRef.current.records.find(r => r.id === stale.id)
             if (!freshRec || freshRec.fin) return
-            localStorage.setItem(acKey, '1')
+            markSent(acKey)
+            dirty = false  // guardado junto con records a continuación
             const closeTime = new Date().toISOString()
             const breaks2 = [...(stale.breaks || [])]
             const t2 = calcSecs({ ...stale, fin: closeTime, breaks: breaks2 })
             const closed2 = { ...stale, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
             const updRecs = dbRef.current.records.map(r => r.id === stale.id ? closed2 : r)
-            saveDB({ records: updRecs })
-            queuePush(u.id, '⏱️ Jornada cerrada automáticamente',
-              `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
+            saveDB({ records: updRecs, notisSent })
+            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${stale.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
           }
         }
       })
+
+      // Batch save: una sola escritura por ciclo si hubo cambios en notisSent
+      if (dirty) saveDB({ notisSent })
     }
 
     const iv = setInterval(checkSmartNotis, 60000)

@@ -31,12 +31,13 @@ export function mergeDB(base, incoming) {
     pin: ADMIN_PIN, color: '#5aa9e6', initials: 'AD',
     startDate: '2024-01-01', email: '', isAdmin: true
   }
-  const inc = incoming.employees?.length ? incoming.employees : base.employees
+  // Bug fix #7: no sobrescribir employees locales con array vacío (Supabase reset / rate-limit)
+  const incomingEmps = (incoming.employees?.length > 0) ? incoming.employees : base.employees
   return {
     empresas:            (incoming.empresas?.length)       ? incoming.empresas       : base.empresas,
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
-    employees:           inc.some(e => e.isAdmin)          ? inc                     : [...inc, adm],
+    employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
     records:             incoming.records              || [],
     vacaciones:          incoming.vacaciones           || [],
     medicos:             incoming.medicos              || [],
@@ -50,6 +51,8 @@ export function mergeDB(base, incoming) {
     audit:               incoming.audit                || [],
     correccionesFichaje: incoming.correccionesFichaje  || [],
     chats:               incoming.chats                || [],
+    // Bug fix #8: union de notisSent — nunca se "des-envía" una notificación
+    notisSent:           { ...(base.notisSent || {}), ...(incoming.notisSent || {}) },
     _ts:                 incoming._ts                  || 0
   }
 }
@@ -87,18 +90,18 @@ export async function cloudFetchTs() {
 }
 
 // ── Supabase push (guarda datos) ──────────────────────────────────────────────
-let _pushFlight  = false
-let _pendingPush = null  // último save pendiente mientras hay uno en vuelo
-let _saveRetry   = 0
-let _saveTimer   = null
+let _pushFlight = false
+let _pushQueue  = []     // cola FIFO: nunca se pierden saves consecutivos
+let _saveRetry  = 0
+let _saveTimer  = null
 
-export function cloudPush(db, onSuccess, onError) {
-  if (!supabase) { onError?.(); return }
-  if (_pushFlight) {
-    // Guardar el más reciente; se ejecutará cuando termine el vuelo actual
-    _pendingPush = { db, onSuccess, onError }
-    return
-  }
+function _drainQueue() {
+  if (_pushFlight || _pushQueue.length === 0) return
+  const { db, onSuccess, onError } = _pushQueue.shift()
+  _doCloudPush(db, onSuccess, onError)
+}
+
+function _doCloudPush(db, onSuccess, onError) {
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
@@ -111,21 +114,27 @@ export function cloudPush(db, onSuccess, onError) {
       if (error) throw error
       _saveRetry = 0
       onSuccess?.(payload)
-      if (_pendingPush) {
-        const next = _pendingPush; _pendingPush = null
-        cloudPush(next.db, next.onSuccess, next.onError)
-      }
+      _drainQueue()
     })
     .catch(() => {
       _pushFlight = false
       onError?.()
       if (_saveRetry < 5) {
         _saveRetry++
-        const next = _pendingPush || { db, onSuccess, onError }
-        _pendingPush = null
-        setTimeout(() => cloudPush(next.db, next.onSuccess, next.onError), 600 * _saveRetry)
+        // Re-encolar para reintento
+        _pushQueue.unshift({ db, onSuccess, onError })
+        setTimeout(() => _drainQueue(), 600 * _saveRetry)
       }
     })
+}
+
+export function cloudPush(db, onSuccess, onError) {
+  if (!supabase) { onError?.(); return }
+  if (_pushFlight) {
+    _pushQueue.push({ db, onSuccess, onError })
+    return
+  }
+  _doCloudPush(db, onSuccess, onError)
 }
 
 export function scheduleSave(db, onSuccess, onError, delay = 0) {
@@ -199,11 +208,10 @@ export async function pushSubscribe(userId, vapidPub) {
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   try {
-    await fetch('/api/sendpush', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: to, title, body, tag, url })
-    })
+    const headers = { 'Content-Type': 'application/json' }
+    const secret = import.meta.env.VITE_PUSH_SECRET
+    if (secret) headers['Authorization'] = `Bearer ${secret}`
+    await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url }) })
   } catch {}
 }
 

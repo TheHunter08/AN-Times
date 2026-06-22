@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
-import { hashPin, isPinHashed, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
+import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
 
 export default function LoginPage() {
   const { db, setSession, setScreen, toast, fetchDB, saveDB } = useAppStore()
@@ -21,6 +21,9 @@ export default function LoginPage() {
   const [logoTaps, setLogoTaps] = useState(0)
   const [showAdminBtn, setShowAdminBtn] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [generatedPinNotice, setGeneratedPinNotice] = useState(() => {
+    try { return localStorage.getItem('__admin_pin_fb_new__') === '1' } catch { return false }
+  })
 
   const emps = sortedEmps(db)
 
@@ -100,12 +103,16 @@ export default function LoginPage() {
       const opId = ++opIdRef.current
       const storedAdminHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
       let adminOk = false
-      if (storedAdminHash && isPinHashed(storedAdminHash)) {
-        adminOk = (await hashPin(newPin, '__admin__')) === storedAdminHash
+      if (storedAdminHash) {
+        adminOk = await verifyPin(newPin, storedAdminHash, '__admin__')
+        // Migrar hash legacy (SHA-256 / plaintext) → PBKDF2 en el primer login correcto
+        if (adminOk && needsRehash(storedAdminHash)) {
+          const h = await hashPin(newPin, '__admin__')
+          try { localStorage.setItem('__admin_pin_hash__', h) } catch {}
+        }
       } else {
         adminOk = newPin === ADMIN_PIN
         if (adminOk) {
-          // Migrar PIN de texto plano a hash en el primer login correcto
           const h = await hashPin(newPin, '__admin__')
           try { localStorage.setItem('__admin_pin_hash__', h); localStorage.setItem('__admin_pin_len__', String(newPin.length)) } catch {}
         }
@@ -344,6 +351,12 @@ export default function LoginPage() {
                 ))}
               </div>
 
+              {showAdminBtn && generatedPinNotice && (
+                <div style={{ margin:'8px 0', padding:'10px 14px', background:'rgba(245,158,11,.10)', border:'1px solid rgba(245,158,11,.30)', borderRadius:8, fontSize:12, color:'var(--orange)', lineHeight:1.5 }}>
+                  <strong>⚠️ PIN temporal de administrador: {ADMIN_PIN}</strong><br/>
+                  Anótalo y configura <code style={{ fontSize:11 }}>VITE_ADMIN_PIN</code> en producción.
+                </div>
+              )}
               {showAdminBtn && (
                 <button className="login-admin-btn"
                   onClick={async () => {
@@ -352,8 +365,12 @@ export default function LoginPage() {
                     if (!pin) { setErr('Introduce el PIN de administrador'); return }
                     const storedHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
                     let ok = false
-                    if (storedHash && isPinHashed(storedHash)) {
-                      ok = (await hashPin(pin, '__admin__')) === storedHash
+                    if (storedHash) {
+                      ok = await verifyPin(pin, storedHash, '__admin__')
+                      if (ok && needsRehash(storedHash)) {
+                        const h = await hashPin(pin, '__admin__')
+                        try { localStorage.setItem('__admin_pin_hash__', h) } catch {}
+                      }
                     } else {
                       ok = pin === ADMIN_PIN
                       if (ok) {
@@ -361,7 +378,7 @@ export default function LoginPage() {
                         try { localStorage.setItem('__admin_pin_hash__', h); localStorage.setItem('__admin_pin_len__', String(pin.length)) } catch {}
                       }
                     }
-                    if (ok) { clearLockout('__admin__'); doAdminLogin(); setPin('') }
+                    if (ok) { clearLockout('__admin__'); try { localStorage.removeItem('__admin_pin_fb_new__') } catch {}; setGeneratedPinNotice(false); doAdminLogin(); setPin('') }
                     else { recordFailedAttempt('__admin__'); setErr('PIN admin incorrecto') }
                   }}>
                   Acceso administrador
