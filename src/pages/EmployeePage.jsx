@@ -753,7 +753,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
         </div>
 
         {/* Stats grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+        <div className="stat-mini-grid">
           {[
             { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color: 'var(--primary-light)', bg: 'rgba(37,99,235,.12)' },
             { lbl: 'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color: 'var(--green)', bg: 'var(--green-dim)' },
@@ -782,18 +782,21 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
 
         {/* GPS card */}
         {o && (
-          <div className="gps-card">
+          <div className={`gps-card${gpsStatus === 'pending' ? ' capturing' : ''}${o.geoAlert ? ' geo-alert' : ''}`}>
             <div className="gps-ico">
               <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
             </div>
-            <div>
+            <div style={{ flex:1, minWidth:0 }}>
               <div className="gps-name">{o.centro || u.centroTrabajo || 'Sin centro'}</div>
-              <div className={`gps-status${!o?.locInicio && gpsStatus !== 'pending' ? ' pending' : ''}`}>
-                {o?.locInicio ? 'GPS verificado'
-                  : gpsStatus === 'pending' ? '🔄 Capturando ubicación…'
-                  : gpsStatus === 'fail' ? 'Sin GPS — continuando sin ubicación'
+              <div className={`gps-status${gpsStatus === 'pending' ? ' pending' : gpsStatus === 'fail' ? ' fail' : ''}`}>
+                {o?.locInicio ? '✓ GPS verificado'
+                  : gpsStatus === 'pending' ? 'Capturando ubicación…'
+                  : gpsStatus === 'fail' ? '⚠ Sin GPS — ubicación no registrada'
                   : 'Sin GPS'}
               </div>
+              {o.geoAlert && (
+                <div className="gps-alert-tag">⚠ Fuera de zona · +{o.geoAlert.dist}m del radio ({o.geoAlert.radio}m)</div>
+              )}
             </div>
           </div>
         )}
@@ -814,9 +817,9 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           )
           return (
             <div style={{ padding:'0 16px 12px' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--text4)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>
+              <div className="sec-label">
                 Mi equipo hoy
-                <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)' }}>
+                <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)', textTransform:'none', letterSpacing:0 }}>
                   {working.length} activo{working.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -1924,7 +1927,9 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
     <div className="emp-tab active" style={{ background:'var(--bg-800)' }}>
       <div className="prf-hero">
         <div style={{ position:'relative', marginBottom:14 }}>
-          <div className="prf-av" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
+          <div className="prf-av-wrap">
+            <div className="prf-av" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
+          </div>
         </div>
         <div className="prf-name">{u.name}</div>
         <div className="prf-role">{u.role === 'encargado' ? '⭐ Encargado' : u.role === 'jefe_obra' ? '🏗️ Jefe de Obra' : '👷 Empleado'}</div>

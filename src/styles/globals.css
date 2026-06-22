@@ -386,7 +386,7 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
   max-height: 90vh;
   padding-bottom: 20px;
 }
-.modal-drag { width: 38px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 16px; }
+.modal-drag { width: 48px; height: 5px; background: var(--border3); border-radius: 3px; margin: 0 auto 18px; }
 .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; letter-spacing: -.2px; }
 .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
 .modal-btns button { flex: 1; }
@@ -542,7 +542,11 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .icon-btn.logout-btn { background: var(--red-dim); border-color: rgba(229,83,75,.2); }
 .icon-btn.logout-btn svg { stroke: var(--red); }
 .noti-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; border: 2px solid var(--bg-800); display: none; }
-.noti-dot.show { display: block; }
+.noti-dot.show { display: block; animation: notiDotPulse 2.4s ease-in-out infinite; }
+@keyframes notiDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.5); }
+  60% { box-shadow: 0 0 0 4px rgba(239,68,68,.0); }
+}
 
 /* Enc panel chip */
 .enc-chip { display: flex; align-items: center; gap: 5px; background: var(--accent-dim); border: 1px solid var(--accent-glow); border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 700; color: var(--accent3); cursor: pointer; white-space: nowrap; }
@@ -599,7 +603,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-nav-item svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; transition: stroke .2s; }
 .emp-nav-item.on { color: var(--primary-light) !important; background: none; box-shadow: none; transform: translateY(-2px); }
 .emp-nav-item.on svg { stroke: var(--primary-light); stroke-width: 2.4; }
-.emp-nav-item.on::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--primary-light); }
+.emp-nav-item.on::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 22px; height: 3px; border-radius: 2px; background: var(--primary-light); box-shadow: 0 0 8px rgba(96,165,250,.7); }
 .emp-nav-item:active { transform: scale(.88); }
 
 /* ── Layout uniforme: en web/tablet la app se muestra como una columna
@@ -1598,12 +1602,20 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* prf-menu consolidated above in profile section */
 
 /* GPS card */
-.gps-card { background:var(--bg-600); border:1px solid var(--border); border-radius:var(--r); padding:12px 14px; display:flex; align-items:center; gap:12px; }
+.gps-card { background:var(--bg-600); border:1px solid var(--border); border-radius:var(--r); padding:12px 14px; display:flex; align-items:center; gap:12px; transition:border-color .2s; }
+.gps-card.capturing .gps-ico { animation: gpsCapture 1.6s ease-in-out infinite; }
+.gps-card.geo-alert { border-color: rgba(245,158,11,.35); background: linear-gradient(90deg, rgba(245,158,11,.05), var(--bg-600) 60%); }
+@keyframes gpsCapture {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,.5); }
+  50% { box-shadow: 0 0 0 6px rgba(37,99,235,.0); }
+}
 .gps-ico { width:34px; height:34px; border-radius:10px; background:var(--primary-dim); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .gps-ico svg { width:16px; height:16px; stroke:var(--primary-light); stroke-width:2; fill:none; }
 .gps-name { font-size:13px; font-weight:600; }
 .gps-status { font-size:11px; color:var(--green); font-weight:500; margin-top:2px; }
 .gps-status.pending { color:var(--text3); }
+.gps-status.fail { color:var(--orange); }
+.gps-alert-tag { font-size:10px; font-weight:700; color:var(--orange); background:var(--orange-dim); border:1px solid rgba(245,158,11,.25); border-radius:20px; padding:2px 8px; display:inline-block; margin-top:3px; }
 
 /* ── Premium Micro-interactions & Animations ──────────────── */
 
@@ -2018,13 +2030,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .hero-fichar-btn:active { transform: scale(.97); animation: none; box-shadow: 0 4px 12px rgba(37,99,235,.3); }
 .hero-fichar-btn.active {
-  background: linear-gradient(135deg, #7c3aed, #2563EB);
-  box-shadow: 0 8px 24px rgba(124,58,237,.4);
-  animation: ficharActiveIdle 3s ease-in-out infinite;
+  background: linear-gradient(135deg, #b91c1c, #ef4444);
+  box-shadow: 0 8px 24px rgba(185,28,28,.45);
+  animation: ficharStopPulse 2.5s ease-in-out infinite;
 }
-@keyframes ficharActiveIdle {
-  0%,100% { box-shadow: 0 8px 24px rgba(124,58,237,.4); }
-  50%      { box-shadow: 0 10px 32px rgba(124,58,237,.65), 0 0 0 5px rgba(124,58,237,.12); }
+@keyframes ficharStopPulse {
+  0%,100% { box-shadow: 0 8px 24px rgba(185,28,28,.45); }
+  50%      { box-shadow: 0 10px 32px rgba(239,68,68,.7), 0 0 0 6px rgba(239,68,68,.1); }
 }
 
 /* ── Admin KPI cards (Stripe-style) ─────────────────────── */
@@ -2494,6 +2506,103 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 td span[title="Click para editar"]:hover {
   color: var(--primary-light);
   text-decoration-color: var(--primary-light);
+}
+
+/* ══ DESIGN POLISH V3.1 ══════════════════════════════════════════ */
+
+/* ── Section label with trailing divider line ───────────────── */
+.sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--text4);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sec-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border2), transparent);
+}
+
+/* ── 4-col mini stats grid ──────────────────────────────────── */
+.stat-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 340px) {
+  .stat-mini-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Sol-card pending: urgent pulsing border ────────────────── */
+@keyframes pendingBorderPulse {
+  0%, 100% { border-left-color: var(--orange); }
+  50% { border-left-color: rgba(245,158,11,.3); }
+}
+.sol-card.pending { animation: pendingBorderPulse 2.4s ease-in-out infinite; }
+
+/* ── Stat-card-premium colored bottom accents ───────────────── */
+.stat-card-premium:nth-child(1) { border-bottom: 2px solid rgba(37,99,235,.45); }
+.stat-card-premium:nth-child(2) { border-bottom: 2px solid rgba(16,185,129,.45); }
+.stat-card-premium:nth-child(3) { border-bottom: 2px solid rgba(245,158,11,.45); }
+.stat-card-premium:nth-child(4) { border-bottom: 2px solid rgba(6,182,212,.45); }
+
+/* ── Live indicator ping (shared) ───────────────────────────── */
+@keyframes livePing {
+  0% { box-shadow: 0 0 0 0 rgba(16,185,129,.5); }
+  70% { box-shadow: 0 0 0 7px rgba(16,185,129,.0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,.0); }
+}
+.live-ping { animation: livePing 2s ease-in-out infinite; }
+
+/* ── Empty table row visual ─────────────────────────────────── */
+.empty-row td {
+  padding: 36px 20px !important;
+  text-align: center;
+  color: var(--text4) !important;
+  font-size: 13px !important;
+  background: transparent !important;
+}
+
+/* ── Adm-nav badge (unread count) ───────────────────────────── */
+.adm-nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* ── Profile avatar gradient border ────────────────────────── */
+.prf-av-wrap {
+  position: relative;
+  display: inline-block;
+}
+.prf-av-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(var(--primary), var(--accent), var(--secondary), var(--primary));
+  animation: avatarSpin 6s linear infinite;
+  z-index: 0;
+}
+@keyframes avatarSpin { to { transform: rotate(360deg); } }
+.prf-av-wrap .prf-av {
+  position: relative; z-index: 1;
+  border: 3px solid var(--bg-700);
 }
 
 /* ── Dashboard 2-col responsive grid ───────────────────────── */
