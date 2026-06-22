@@ -496,7 +496,7 @@ export default function LoginPage() {
         </div>
 
         <div className="login-footer">
-          <span>TIMES INC v2.1</span>
+          <span>TIMES INC v{__APP_VERSION__}</span>
           <span className="login-footer-dot" />
           <span>Control de jornada</span>
         </div>

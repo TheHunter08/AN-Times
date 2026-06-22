@@ -15,16 +15,27 @@ precacheAndRoute(self.__WB_MANIFEST)
 // HTML/navegación: NetworkFirst para que SIEMPRE se sirva el index.html más
 // reciente cuando hay red. Esto evita que un HTML cacheado apunte a hashes de
 // assets antiguos y la PWA se quede "pegada" en una versión vieja. Si no hay
-// red, cae al index.html precacheado (offline).
+// red, cae al index.html precacheado (offline) o a la página offline dedicada.
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
       cacheName: 'html-pages',
       networkTimeoutSeconds: 4,
       plugins: [new ExpirationPlugin({ maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 })]
-    })
+    }),
+    { whitelist: [/^\/(?!offline\.html)/] }
   )
 )
+
+// Offline fallback for navigation when no cache hit
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode !== 'navigate') return
+  event.respondWith(
+    fetch(event.request).catch(() =>
+      caches.match('/offline.html') || caches.match('/index.html')
+    )
+  )
+})
 
 // Cache Google Fonts
 registerRoute(

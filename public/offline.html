@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Sin conexión — TIMES INC</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;background:#0d0d18;font-family:system-ui,-apple-system,sans-serif;color:#f1f5f9}
+    body{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;padding:32px;text-align:center}
+    .icon{width:72px;height:72px;border-radius:20px;background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.2);display:flex;align-items:center;justify-content:center;margin:0 auto}
+    h1{font-size:22px;font-weight:800;letter-spacing:-.3px}
+    p{font-size:14px;color:#64748b;max-width:280px;line-height:1.7}
+    button{margin-top:8px;padding:14px 32px;background:linear-gradient(135deg,#7C5CFF,#5E6AD2);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .2s}
+    button:hover{opacity:.85}
+    .badge{margin-top:16px;font-size:11px;color:#334155;letter-spacing:.3px}
+  </style>
+</head>
+<body>
+  <div class="icon">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6C63FF" stroke-width="2" stroke-linecap="round">
+      <line x1="1" y1="1" x2="23" y2="23"/>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 6.58A11 11 0 0 0 3.8 8m3.6-4.43A11 11 0 0 1 12 3c5.5 0 10 3.86 10 8.64 0 1.26-.28 2.46-.78 3.54M2 2l20 20"/>
+    </svg>
+  </div>
+  <h1>Sin conexión</h1>
+  <p>No se puede conectar con el servidor. Tus datos locales están guardados y se sincronizarán cuando vuelva la conexión.</p>
+  <button onclick="window.location.reload()">Intentar de nuevo</button>
+  <div class="badge">TIMES INC · Datos guardados localmente</div>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import PrivacyModal from './components/PrivacyModal.jsx'
 import { isNativePlatform, onPushReceived, onPushTapped } from './services/nativeNotifications.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
@@ -290,6 +291,7 @@ export default function App() {
       </Suspense>
       <ToastContainer />
       <GlobalConfirm />
+      <PrivacyModal />
     </>
   )
 }

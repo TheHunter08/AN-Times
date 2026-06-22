@@ -1516,7 +1516,19 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
       ? (isNewPin ? 'Empleado actualizado (PIN cambiado)' : 'Empleado actualizado')
       : 'Empleado creado'
     const withAudit = auditLog(db, auditAction, form.name, session?.user?.name || 'Admin')
-    saveDB({ employees: emps2, audit: withAudit.audit })
+    // Auto welcome message for new employees
+    const extraData = {}
+    if (!editEmp) {
+      const welcomeMsg = {
+        id: gid(), from: 'admin', to: updatedForm.id,
+        text: `¡Bienvenido/a a TIMES INC, ${updatedForm.name.split(' ')[0]}! 👋\nHas sido dado de alta en el sistema. Usa tu PIN para acceder y registrar tu jornada diaria. Si tienes dudas, escríbeme aquí.`,
+        ts: new Date().toISOString(), leido: false
+      }
+      extraData.chats = [...(db.chats || []), welcomeMsg]
+      const noti = { id: gid(), empId: updatedForm.id, action: '¡Bienvenido/a!', detail: 'Ya puedes acceder con tu PIN', ts: new Date().toISOString(), leido: false }
+      extraData.notis = [...(db.notis || []), noti]
+    }
+    saveDB({ employees: emps2, audit: withAudit.audit, ...extraData })
     toast(editEmp ? '✅ Empleado actualizado' : '✅ Empleado creado')
     setShowForm(false)
   }
@@ -1524,6 +1536,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
   const { showConfirm } = useAppStore()
   const del = (id) => {
     showConfirm('¿Dar de baja a este empleado? Esta acción se puede revertir desde el perfil.', () => {
+      try { navigator.vibrate(20) } catch {}
       const emp = (db.employees||[]).find(e => e.id === id)
       const emps2 = (db.employees||[]).map(e => e.id === id ? { ...e, baja:true, fechaBaja: today() } : e)
       const withAudit = auditLog(db, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
@@ -1570,11 +1583,11 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
         <div className="card" style={{ marginBottom:20 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{editEmp ? 'Editar empleado' : 'Nuevo empleado'}</div>
           <div className="field-row">
-            <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} /></div>
-            <div className="field"><label>PIN (4-6 dígitos){editEmp ? '' : ' *'}</label><input type="password" value={form.pin} maxLength={6} placeholder={editEmp ? 'Vacío = sin cambios' : ''} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/g,'')}))} /></div>
+            <div className="field"><label>Nombre completo *</label><input value={form.name} maxLength={80} onChange={e => setForm(f=>({...f,name:e.target.value.slice(0,80)}))} /></div>
+            <div className="field"><label>PIN (4-6 dígitos){editEmp ? '' : ' *'}</label><input type="password" value={form.pin} maxLength={6} placeholder={editEmp ? 'Vacío = sin cambios' : ''} onChange={e => setForm(f=>({...f,pin:e.target.value.replace(/\D/g,'').slice(0,6)}))} /></div>
           </div>
           <div className="field-row">
-            <div className="field"><label>Email</label><input type="email" value={form.email||''} onChange={e => setForm(f=>({...f,email:e.target.value}))} /></div>
+            <div className="field"><label>Email</label><input type="email" value={form.email||''} maxLength={100} onChange={e => setForm(f=>({...f,email:e.target.value.slice(0,100)}))} /></div>
             <div className="field"><label>Rol</label>
               <select value={form.role||'emp'} onChange={e => setForm(f=>({...f,role:e.target.value}))}>
                 <option value="emp">Empleado</option>
@@ -1641,6 +1654,16 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
         <table className="adm-table">
           <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Empresa</th><th>Alta</th><th></th></tr></thead>
           <tbody>
+            {emps.length === 0 && (
+              <tr><td colSpan={6}>
+                <div style={{ padding:'40px 20px', textAlign:'center', color:'var(--text3)' }}>
+                  <div style={{ fontSize:36, marginBottom:12 }}>👷</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:'var(--text2)', marginBottom:6 }}>Sin empleados {empSearch ? 'con ese filtro' : 'todavía'}</div>
+                  <div style={{ fontSize:13, marginBottom:16 }}>{empSearch ? 'Prueba otra búsqueda.' : 'Crea el primer empleado con el botón "+ Nuevo".'}</div>
+                  {!empSearch && <button className="btn btn-primary btn-sm" onClick={openNew}>+ Añadir empleado</button>}
+                </div>
+              </td></tr>
+            )}
             {emps.map(e => (
               <tr key={e.id} style={{ opacity: e.baja ? 0.4 : 1 }}>
                 <td>

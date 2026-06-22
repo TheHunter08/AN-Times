@@ -420,7 +420,12 @@ export default function EmployeePage() {
     saveDB({ records })
   }, [db, openRec, saveDB, toast])
 
-  const doLogout = () => { logout() }
+  const doLogout = () => {
+    showConfirm('¿Cerrar sesión? Si tienes una jornada activa, seguirá registrada.', () => {
+      try { navigator.vibrate(20) } catch {}
+      logout()
+    })
+  }
 
   if (!u) return null
 
@@ -598,6 +603,9 @@ function PullToRefresh({ children }) {
 function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session }) {
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
+  const [showTip, setShowTip] = useState(() => {
+    try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
+  })
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = openRec()
@@ -694,13 +702,25 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             </div>
           </div>
 
-          <button className={`hero-fichar-btn${timer.state !== 'idle' ? ' active' : ''}`} onClick={handleMainBtn}>
-            {timer.state === 'idle'
-              ? '▶  Iniciar jornada'
-              : timer.state === 'break'
-                ? '⏹  Terminar jornada'
-                : '⏹  Registrar salida'}
-          </button>
+          <div style={{ position:'relative' }}>
+            <button className={`hero-fichar-btn${timer.state !== 'idle' ? ' active' : ''}`}
+              onClick={() => {
+                if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
+                handleMainBtn()
+              }}>
+              {timer.state === 'idle'
+                ? '▶  Iniciar jornada'
+                : timer.state === 'break'
+                  ? '⏹  Terminar jornada'
+                  : '⏹  Registrar salida'}
+            </button>
+            {showTip && timer.state === 'idle' && (
+              <div style={{ position:'absolute', top:'calc(100% + 10px)', left:'50%', transform:'translateX(-50%)', background:'var(--primary)', color:'#fff', borderRadius:10, padding:'8px 14px', fontSize:12, fontWeight:600, whiteSpace:'nowrap', boxShadow:'0 4px 20px rgba(108,99,255,.5)', pointerEvents:'none', zIndex:10 }}>
+                👆 Pulsa aquí para iniciar tu jornada
+                <div style={{ position:'absolute', top:-6, left:'50%', transform:'translateX(-50%)', width:0, height:0, borderLeft:'6px solid transparent', borderRight:'6px solid transparent', borderBottom:'6px solid var(--primary)' }} />
+              </div>
+            )}
+          </div>
 
           {timer.state !== 'idle' && (
             <button

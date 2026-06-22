@@ -1,5 +1,20 @@
 const webpush = require('web-push');
 
+// ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
+const _rl = new Map()
+function rateLimit(ip) {
+  const now = Date.now()
+  const window = 60_000
+  const max = 30
+  const entry = _rl.get(ip) || { count: 0, reset: now + window }
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + window }
+  entry.count++
+  _rl.set(ip, entry)
+  // Cleanup old entries periodically
+  if (_rl.size > 2000) { for (const [k, v] of _rl) { if (now > v.reset) _rl.delete(k) } }
+  return entry.count > max
+}
+
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE';
 const SB_URL        = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
@@ -46,6 +61,10 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Rate limiting
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
+  if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' });
 
   // Autenticación: si PUSH_SECRET está configurado, exigir el header correcto
   if (PUSH_SECRET) {

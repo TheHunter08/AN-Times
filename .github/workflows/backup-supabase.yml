@@ -1,0 +1,54 @@
+name: Daily Supabase Backup
+
+on:
+  schedule:
+    # Every day at 02:00 UTC (03:00 Madrid, 04:00 in summer)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download app_data snapshot
+        run: |
+          SB_URL="${{ secrets.VITE_SB_URL || 'https://eyyhlcvpyiorpdnvqsll.supabase.co' }}"
+          SB_ANON="${{ secrets.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I' }}"
+          DATE=$(date +%Y-%m-%d)
+
+          echo "Backing up app_data..."
+          curl -sf \
+            -H "apikey: $SB_ANON" \
+            -H "Authorization: Bearer $SB_ANON" \
+            "$SB_URL/rest/v1/app_data?id=eq.1&select=*" \
+            -o "backup_app_data_${DATE}.json"
+
+          echo "Backing up push_subs..."
+          curl -sf \
+            -H "apikey: $SB_ANON" \
+            -H "Authorization: Bearer $SB_ANON" \
+            "$SB_URL/rest/v1/push_subs?select=user_id,updated_at" \
+            -o "backup_push_subs_${DATE}.json"
+
+          echo "Backup size: $(du -sh backup_app_data_${DATE}.json)"
+          echo "backup_date=$DATE" >> $GITHUB_OUTPUT
+        id: backup
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ steps.backup.outputs.backup_date }}
+          path: backup_*.json
+          retention-days: 30
+
+      - name: Validate backup
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          SIZE=$(stat -c%s "backup_app_data_${DATE}.json" 2>/dev/null || echo 0)
+          if [ "$SIZE" -lt 50 ]; then
+            echo "ERROR: Backup file too small ($SIZE bytes). Data may be missing."
+            exit 1
+          fi
+          echo "Backup OK: ${SIZE} bytes"
