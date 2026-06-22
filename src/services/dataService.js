@@ -95,6 +95,49 @@ let _pushQueue  = []     // cola FIFO: nunca se pierden saves consecutivos
 let _saveRetry  = 0
 let _saveTimer  = null
 
+// ── IndexedDB helpers para Background Sync ────────────────────────────────────
+const _IDB_NAME = 'times-inc-sync'
+const _IDB_STORE = 'q'
+
+function _idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(_IDB_NAME, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore(_IDB_STORE)
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function _idbSet(key, val) {
+  const db = await _idbOpen()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(_IDB_STORE, 'readwrite')
+    const r  = tx.objectStore(_IDB_STORE).put(val, key)
+    r.onsuccess = res; r.onerror = () => rej(r.error)
+  })
+}
+
+async function _idbDel(key) {
+  try {
+    const db = await _idbOpen()
+    return new Promise((res, rej) => {
+      const tx = db.transaction(_IDB_STORE, 'readwrite')
+      const r  = tx.objectStore(_IDB_STORE).delete(key)
+      r.onsuccess = res; r.onerror = () => rej(r.error)
+    })
+  } catch {}
+}
+
+async function _storeForBgSync(data) {
+  try {
+    await _idbSet('pending', data)
+    const sw = await navigator.serviceWorker?.ready
+    if (sw && 'sync' in sw) await sw.sync.register('sync-data')
+  } catch {}
+}
+
+function _clearBgSync() { _idbDel('pending') }
+
 function _drainQueue() {
   if (_pushFlight || _pushQueue.length === 0) return
   const { db, onSuccess, onError } = _pushQueue.shift()
@@ -113,6 +156,7 @@ function _doCloudPush(db, onSuccess, onError) {
       _pushFlight = false
       if (error) throw error
       _saveRetry = 0
+      _clearBgSync()
       onSuccess?.(payload)
       _drainQueue()
     })
@@ -121,9 +165,11 @@ function _doCloudPush(db, onSuccess, onError) {
       onError?.()
       if (_saveRetry < 5) {
         _saveRetry++
-        // Re-encolar para reintento
         _pushQueue.unshift({ db, onSuccess, onError })
         setTimeout(() => _drainQueue(), 600 * _saveRetry)
+      } else {
+        _saveRetry = 0
+        _storeForBgSync(payload)
       }
     })
 }

@@ -102,6 +102,21 @@ export default function EmployeePage() {
   // Fast-path: if permission already granted from a previous session, register immediately
   useEffect(() => { if (u?.id && 'Notification' in window && Notification.permission === 'granted') pushSubscribe(u.id, VAPID_PUB) }, [u?.id])
 
+  // Screen Wake Lock: evita que la pantalla se apague mientras hay jornada activa
+  useEffect(() => {
+    if (!('wakeLock' in navigator)) return
+    let lock = null
+    const acquire = async () => {
+      try { lock = await navigator.wakeLock.request('screen') } catch {}
+    }
+    const release = () => { lock?.release(); lock = null }
+    if (timer.state !== 'idle') acquire()
+    else release()
+    const onVisible = () => { if (document.visibilityState === 'visible' && timer.state !== 'idle') acquire() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { release(); document.removeEventListener('visibilitychange', onVisible) }
+  }, [timer.state])
+
   // In browser/web mode, silently mark onboarding done so the wizard never shows
   useEffect(() => {
     if (u?.id && !u.onboardingDone && !isPWA) {
@@ -825,11 +840,13 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
 
   const [informeUrl, setInformeUrl]     = useState(null)
+  const [informeBlob, setInformeBlob]   = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [generatingWeekPdf, setGeneratingWeekPdf] = useState(false)
 
   const closeInforme = useCallback(() => {
     setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+    setInformeBlob(null)
   }, [])
 
   useModalBack(!!informeUrl, closeInforme)
@@ -972,6 +989,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       // ─ Save & show ────────────────────────────────────────────────
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type:'application/pdf' })
+      setInformeBlob(blob)
       setInformeUrl(URL.createObjectURL(blob))
     } catch(e) {
       toast('Error al generar el PDF: ' + (e?.message || e))
@@ -1091,6 +1109,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       page.drawText('Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type:'application/pdf' })
+      setInformeBlob(blob)
       setInformeUrl(URL.createObjectURL(blob))
     } catch(e) {
       toast('Error al generar el PDF: ' + (e?.message || e))
@@ -1289,10 +1308,13 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Descargar PDF
                 </a>
-                <button onClick={() => window.open(informeUrl, '_blank')} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'13px', background:'var(--bg-500)', color:'var(--text2)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent' }}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  Abrir
-                </button>
+                {informeBlob && 'share' in navigator && (
+                  <button onClick={() => navigator.share({ files: [new File([informeBlob], dlName, { type:'application/pdf' })], title:'Registro de jornada' }).catch(()=>{})}
+                    style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'13px', background:'var(--bg-500)', color:'var(--text2)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', WebkitTapHighlightColor:'transparent' }}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    Compartir
+                  </button>
+                )}
               </div>
             </div>
           ) : (

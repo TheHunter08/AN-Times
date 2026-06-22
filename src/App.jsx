@@ -259,6 +259,7 @@ export default function App() {
     applyDeepLink(window.location.href)
     const onMsg = (event) => {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
+      if (event.data?.type === 'BG_SYNC_DONE') fetchDB()
     }
     navigator.serviceWorker?.addEventListener('message', onMsg)
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg)

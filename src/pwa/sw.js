@@ -86,11 +86,56 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-// Background sync for offline actions
+// ─── BACKGROUND SYNC ────────────────────────────────────────────────────────────
+const _SB_URL  = 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const _IDB_NAME  = 'times-inc-sync'
+const _IDB_STORE = 'q'
+
+function _idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(_IDB_NAME, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore(_IDB_STORE)
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+async function _idbGet(key) {
+  const db = await _idbOpen()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(_IDB_STORE, 'readonly')
+    const r  = tx.objectStore(_IDB_STORE).get(key)
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error)
+  })
+}
+async function _idbDel(key) {
+  const db = await _idbOpen()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(_IDB_STORE, 'readwrite')
+    const r  = tx.objectStore(_IDB_STORE).delete(key)
+    r.onsuccess = res; r.onerror = () => rej(r.error)
+  })
+}
+
+async function _bgSync() {
+  const data = await _idbGet('pending')
+  if (!data) return
+  const res = await fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method: 'PATCH',
+    headers: {
+      apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal'
+    },
+    body: JSON.stringify({ data, updated_at: new Date().toISOString() })
+  })
+  if (!res.ok && res.status !== 409) throw new Error(`bgSync failed: ${res.status}`)
+  await _idbDel('pending')
+  const cs = await self.clients.matchAll({ type: 'window' })
+  cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
+}
+
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') {
-    event.waitUntil(Promise.resolve())
-  }
+  if (event.tag === 'sync-data') event.waitUntil(_bgSync())
 })
 
 self.addEventListener('message', (event) => {
