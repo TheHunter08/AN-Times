@@ -211,8 +211,16 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
     const secret = import.meta.env.VITE_PUSH_SECRET
     if (secret) headers['Authorization'] = `Bearer ${secret}`
     const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url }) })
-    if (!res.ok) console.error('[PUSH] sendpush error', res.status, await res.text().catch(() => ''))
-  } catch(e) { console.error('[PUSH] queuePush fetch error', e) }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error('[PUSH] sendpush error', res.status, text)
+      return { ok: false, status: res.status, error: text }
+    }
+    return await res.json().catch(() => ({ ok: true }))
+  } catch(e) {
+    console.error('[PUSH] queuePush fetch error', e)
+    return { ok: false, status: 'network', error: e.message }
+  }
 }
 
 export function auditLog(db, action, detail, user) {
