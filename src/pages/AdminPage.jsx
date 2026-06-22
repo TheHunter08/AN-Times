@@ -1635,14 +1635,19 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const now2 = new Date()
     const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
     const XLSX = await import('xlsx')
-    const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H. contratadas/sem','H. trabajadas (mes actual)','Estado']
-    const rows = allEmps.map(e => {
+    const empNombre = (db.config?.companyName || (db.empresas||[])[0] || '')
+    const title = [`Empleados — ${empNombre || 'TIMES INC'} — ${mk2}`]
+    const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
+    const dataRows = allEmps.map(e => {
       const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
-      return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, Math.round(monthMin/60*10)/10, e.baja?'Baja':'Activo']
+      return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, mhm(monthMin), Math.round(monthMin/60*100)/100, e.baja?'Baja':'Activo']
     })
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Empleados')
-    XLSX.writeFile(wb, `empleados_${mk2}.xlsx`)
+    const ws = XLSX.utils.aoa_to_sheet([title, [], headers, ...dataRows])
+    ws['!cols'] = [22,22,12,18,16,12,7,14,14,8].map(w => ({ wch: w }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Empleados')
+    XLSX.writeFile(wb, `empleados_${empNombre?empNombre.replace(/\s+/g,'_')+'_':''}${mk2}.xlsx`)
+    toast('Excel descargado', 3000, 'ok')
   }
 
   return (
@@ -1806,13 +1811,18 @@ function PanelInformes({ db, toast, saveDB, session }) {
     return { e, totalMin, diff, days: eRecs.length, vac, expected, weeklyH }
   })
 
-  const downloadXLSX = async (sheetName, aoa, filename) => {
+  const empresa = db.config?.companyName || (db.empresas||[])[0] || ''
+
+  const downloadXLSX = async (sheetName, aoa, filename, colWidths) => {
     const XLSX = await import('xlsx')
     const ws = XLSX.utils.aoa_to_sheet(aoa)
+    if (colWidths) ws['!cols'] = colWidths.map(w => ({ wch: w }))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
     XLSX.writeFile(wb, filename)
   }
+
+  const minToDecH = m => Math.round(m / 60 * 100) / 100
 
   const exportFichajesXLSX = async () => {
     let filtered = recs.filter(r => r.fin)
@@ -1820,41 +1830,135 @@ function PanelInformes({ db, toast, saveDB, session }) {
     if (from) filtered = filtered.filter(r => r.inicio.slice(0,10) >= from)
     if (to)   filtered = filtered.filter(r => r.inicio.slice(0,10) <= to)
     if (!filtered.length) { toast('Sin datos para exportar'); return }
-    const headers = ['Empleado','Centro','Empresa','Entrada','Salida','Horas trabajo','Horas descanso']
-    const rows = filtered.map(r => {
+    filtered.sort((a, b) => a.inicio.localeCompare(b.inicio))
+    const periodo = from || to ? `${from||'inicio'} a ${to||'hoy'}` : filterMonth
+    const title = [`Fichajes — ${empresa || 'TIMES INC'} — ${periodo}`]
+    const headers = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
+    const dataRows = filtered.map(r => {
       const wm = Math.floor(recWorkSecs(r)/60), bm = Math.floor((r.breakSecs||0)/60)
-      return [r.empName, r.centro||'', r.empresa||'', new Date(r.inicio).toLocaleString('es-ES'), new Date(r.fin).toLocaleString('es-ES'), `${Math.floor(wm/60)}:${p2(wm%60)}`, `${Math.floor(bm/60)}:${p2(bm%60)}`]
+      const d = new Date(r.inicio), fin = new Date(r.fin)
+      return [
+        r.empName,
+        r.empresa||'',
+        r.centro||'',
+        d.toLocaleDateString('es-ES'),
+        d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),
+        fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),
+        `${Math.floor(wm/60)}:${p2(wm%60)}`,
+        minToDecH(wm),
+        `${Math.floor(bm/60)}:${p2(bm%60)}`,
+        r.notes||''
+      ]
     })
-    await downloadXLSX('Fichajes', [headers, ...rows], `fichajes_${from||'todo'}_${to||'hoy'}.xlsx`)
+    const totalWm = filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0)
+    const totals = ['TOTAL','','','','','', mhm(totalWm), minToDecH(totalWm),'','']
+    const aoa = [title, [], headers, ...dataRows, [], totals]
+    const cols = [22,18,16,12,8,8,10,14,10,20]
+    const fname = `fichajes_${empresa?empresa.replace(/\s+/g,'_')+'_':''}${from||'todo'}_${to||'hoy'}.xlsx`
+    await downloadXLSX('Fichajes', aoa, fname, cols)
     toast('Excel descargado', 3000, 'ok')
   }
 
   const [y, mo] = filterMonth.split('-').map(Number)
   const daysInMonth = new Date(y, mo, 0).getDate()
+  const mesNombreXLSX = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
 
   const exportDetalleXLSX = async () => {
     const empRows = sortedEmps(db).filter(e => !e.baja)
-    const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>String(i+1)), 'Total']
-    const rows = empRows.map(e => {
+    const title = [`Detalle diario — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
+    const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>i+1), 'Total h', 'Total (dec.)']
+    const dataRows = empRows.map(e => {
       const dayMap = {}
       recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => {
         const day = parseInt(r.inicio.slice(8,10))
         dayMap[day] = (dayMap[day]||0) + calcMin(r)
       })
       const total = Object.values(dayMap).reduce((s,v)=>s+v,0)
-      return [e.name, ...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?`${Math.floor(dayMap[i+1]/60)}:${p2(dayMap[i+1]%60)}`:''), mhm(total)]
+      return [
+        e.name,
+        ...Array.from({length:daysInMonth},(_,i) => dayMap[i+1] ? minToDecH(dayMap[i+1]) : ''),
+        mhm(total),
+        minToDecH(total)
+      ]
     })
-    await downloadXLSX('Detalle diario', [header, ...rows], `detalle_${filterMonth}.xlsx`)
+    const grandTotal = empRows.reduce((s,e) => {
+      return s + recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0)
+    }, 0)
+    const totalsRow = ['TOTAL', ...Array(daysInMonth).fill(''), mhm(grandTotal), minToDecH(grandTotal)]
+    const aoa = [title, [], header, ...dataRows, [], totalsRow]
+    const cols = [22, ...Array(daysInMonth).fill(5), 10, 12]
+    await downloadXLSX('Detalle diario', aoa, `detalle_${empresa?empresa.replace(/\s+/g,'_')+'_':''}${filterMonth}.xlsx`, cols)
     toast('Excel descargado', 3000, 'ok')
   }
 
   const exportResumenXLSX = async () => {
-    const header = ['Empleado','Días','Total mes','Contratadas','Diferencia','Vac. disp.','H/semana']
-    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac, expected, weeklyH }) => [
-      e.name, days, mhm(totalMin), mhm(expected), `${diff>=0?'+':''}${mhm(Math.abs(diff))}`, vac.available, weeklyH
+    const title = [`Resumen mensual — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
+    const header = ['Empleado','Días','Total mes','Total (dec. h)','Contratadas (dec. h)','Diferencia (dec. h)','Balance','Vac. disp. (días)','H/semana']
+    const xlsxRows = rows.map(({ e, totalMin, diff, days, vac, weeklyH, expected }) => [
+      e.name,
+      days,
+      mhm(totalMin),
+      minToDecH(totalMin),
+      minToDecH(expected),
+      minToDecH(diff),
+      diff >= 0 ? `+${mhm(diff)}` : `-${mhm(Math.abs(diff))}`,
+      vac.available,
+      weeklyH
     ])
-    await downloadXLSX('Resumen mensual', [header, ...xlsxRows], `resumen_${filterMonth}.xlsx`)
+    const totalDays = rows.reduce((s,r)=>s+r.days,0)
+    const totalMin2 = rows.reduce((s,r)=>s+r.totalMin,0)
+    const totalDiff = rows.reduce((s,r)=>s+r.diff,0)
+    const totalsRow = ['TOTAL', totalDays, mhm(totalMin2), minToDecH(totalMin2), '', minToDecH(totalDiff), totalDiff>=0?`+${mhm(totalDiff)}`:`-${mhm(Math.abs(totalDiff))}`, '', '']
+    const aoa = [title, [], header, ...xlsxRows, [], totalsRow]
+    const cols = [22,7,11,14,16,16,12,14,10]
+    await downloadXLSX('Resumen mensual', aoa, `resumen_${empresa?empresa.replace(/\s+/g,'_')+'_':''}${filterMonth}.xlsx`, cols)
     toast('Excel descargado', 3000, 'ok')
+  }
+
+  const exportTodoXLSX = async () => {
+    const XLSX = await import('xlsx')
+    const wb = XLSX.utils.book_new()
+    const makeSheet = (aoa, cols) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      if (cols) ws['!cols'] = cols.map(w => ({ wch: w }))
+      return ws
+    }
+    // Hoja 1: Resumen
+    const h1 = [`Resumen mensual — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
+    const r1h = ['Empleado','Días','Total mes','Total (dec. h)','Contratadas (dec. h)','Diferencia (dec. h)','Balance','Vac. disp. (días)','H/semana']
+    const r1rows = rows.map(({ e, totalMin, diff, days, vac, weeklyH, expected }) => [e.name, days, mhm(totalMin), minToDecH(totalMin), minToDecH(expected), minToDecH(diff), diff>=0?`+${mhm(diff)}`:`-${mhm(Math.abs(diff))}`, vac.available, weeklyH])
+    const r1tot = ['TOTAL', rows.reduce((s,r)=>s+r.days,0), mhm(rows.reduce((s,r)=>s+r.totalMin,0)), minToDecH(rows.reduce((s,r)=>s+r.totalMin,0)), '', minToDecH(rows.reduce((s,r)=>s+r.diff,0)), '', '', '']
+    XLSX.utils.book_append_sheet(wb, makeSheet([h1,[],r1h,...r1rows,[],r1tot],[22,7,11,14,16,16,12,14,10]), 'Resumen')
+    // Hoja 2: Detalle
+    const h2 = [`Detalle diario — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
+    const r2h = ['Empleado',...Array.from({length:daysInMonth},(_,i)=>i+1),'Total h','Total (dec. h)']
+    const empRowsD = sortedEmps(db).filter(e => !e.baja)
+    const r2rows = empRowsD.map(e => {
+      const dayMap = {}
+      recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => { const d=parseInt(r.inicio.slice(8,10)); dayMap[d]=(dayMap[d]||0)+calcMin(r) })
+      const tot = Object.values(dayMap).reduce((s,v)=>s+v,0)
+      return [e.name,...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?minToDecH(dayMap[i+1]):''),mhm(tot),minToDecH(tot)]
+    })
+    const gt = empRowsD.reduce((s,e)=>s+recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0),0)
+    XLSX.utils.book_append_sheet(wb, makeSheet([h2,[],r2h,...r2rows,[],['TOTAL',...Array(daysInMonth).fill(''),mhm(gt),minToDecH(gt)]],[22,...Array(daysInMonth).fill(5),10,12]), 'Detalle diario')
+    // Hoja 3: Fichajes
+    const allFichajesThisMonth = recs.filter(r=>r.fin&&r.inicio.startsWith(filterMonth)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
+    const h3 = [`Fichajes — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
+    const r3h = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
+    const r3rows = allFichajesThisMonth.map(r => {
+      const wm=Math.floor(recWorkSecs(r)/60), bm=Math.floor((r.breakSecs||0)/60)
+      const d=new Date(r.inicio), fin=new Date(r.fin)
+      return [r.empName, r.empresa||'', r.centro||'', d.toLocaleDateString('es-ES'), d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}), fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}), `${Math.floor(wm/60)}:${p2(wm%60)}`, minToDecH(wm), `${Math.floor(bm/60)}:${p2(bm%60)}`, r.notes||'']
+    })
+    const totWm=allFichajesThisMonth.reduce((s,r)=>s+Math.floor(recWorkSecs(r)/60),0)
+    XLSX.utils.book_append_sheet(wb, makeSheet([h3,[],r3h,...r3rows,[],['TOTAL','','','','','',mhm(totWm),minToDecH(totWm),'','']],[22,18,16,12,8,8,10,14,10,20]), 'Fichajes')
+    // Hoja 4: Empleados
+    const r4h = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','Estado']
+    const r4rows = sortedEmps(db).map(e => [e.name,e.email||'',e.role||'emp',e.empresa||'',e.centroTrabajo||'',e.startDate||'',e.horasSemanales||40,e.baja?'Baja':'Activo'])
+    XLSX.utils.book_append_sheet(wb, makeSheet([r4h,...r4rows],[22,22,12,18,16,12,7,8]), 'Empleados')
+    const fname = `informe_completo_${empresa?empresa.replace(/\s+/g,'_')+'_':''}${filterMonth}.xlsx`
+    XLSX.writeFile(wb, fname)
+    toast('Excel completo descargado', 3000, 'ok')
   }
 
   const downloadNominaPDF = ({ e, totalMin, days }) => {
@@ -2471,79 +2575,27 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
 
       {/* Exportar tab */}
       {tab === 'exportar' && (
-        <div style={{ maxWidth:500, display:'flex', flexDirection:'column', gap:16 }}>
-          {/* Informe oficial inspección de trabajo */}
-          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div style={{ fontSize:14, fontWeight:700 }}>Registro de jornada — Inspección de Trabajo</div>
-            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
-              Formato oficial requerido por el RDL 8/2019. Incluye todos los empleados con entrada/salida diaria.
+        <div style={{ maxWidth:520, display:'flex', flexDirection:'column', gap:16 }}>
+
+          {/* Exportar todo - estrella del show */}
+          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10, border:'2px solid var(--primary)', background:'var(--primary-dim)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <div style={{ fontSize:14, fontWeight:700 }}>Informe completo — 4 hojas Excel</div>
             </div>
-            <button className="btn btn-primary" style={{ width:'100%' }} onClick={() => {
-              const [y2, mo2] = filterMonth.split('-').map(Number)
-              const mesNombre = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-              const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
-              const empresa = (db.empresas || [])[0] || '—'
-
-              // Construir filas por empleado y día
-              let rowsHtml = ''
-              empsActivos.forEach(e => {
-                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
-                  .sort((a, b) => a.inicio.localeCompare(b.inicio))
-                if (!eRecs.length) {
-                  rowsHtml += `<tr><td>${e.name}</td><td colspan="4" style="color:#999;text-align:center">Sin registros este mes</td></tr>`
-                  return
-                }
-                eRecs.forEach((r, i) => {
-                  const wm = Math.floor((r.workSecs > 0 ? r.workSecs : Math.max(0, (new Date(r.fin) - new Date(r.inicio))/1000 - (r.breakSecs||0))) / 60)
-                  const d   = new Date(r.inicio)
-                  rowsHtml += `<tr>
-                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${esc(e.name)}</td>` : ''}
-                    <td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td>
-                    <td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
-                    <td>${new Date(r.fin).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
-                    <td style="font-weight:600">${Math.floor(wm/60)}h ${p2(wm%60)}m</td>
-                  </tr>`
-                })
-              })
-
-              const win = window.open('', '_blank')
-              if (!win) { toast('Activa las ventanas emergentes'); return }
-              win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Registro de jornada ${mesNombre} · ${esc(empresa)}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
-h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
-.meta{display:flex;gap:24px;background:#f8f8f8;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12px}
-.meta div span{display:block;color:#888;font-size:11px}
-table{width:100%;border-collapse:collapse}th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover td{background:#f9fafb}
-.sign{margin-top:48px;display:flex;gap:64px}.sign-box{flex:1;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#666}
-footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
-@media print{button{display:none}}</style></head><body>
-<h1>Registro de control de jornada laboral</h1>
-<h2>${esc(empresa)} · ${mesNombre}</h2>
-<div class="meta">
-  <div><span>Empresa</span>${esc(empresa)}</div>
-  <div><span>Período</span>${mesNombre}</div>
-  <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
-  <div><span>Empleados</span>${empsActivos.length}</div>
-</div>
-<button onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Imprimir / Guardar PDF</button>
-<table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th></tr></thead>
-<tbody>${rowsHtml}</tbody></table>
-<div class="sign">
-  <div class="sign-box">Representante legal de la empresa<br><br><br>________________________</div>
-  <div class="sign-box">Sello empresa<br><br><br>________________________</div>
-</div>
-<footer><span>Documento generado por TIMES INC · Control horario RDL 8/2019</span><span>Página 1</span></footer>
-</body></html>`)
-              win.document.close()
-            }}>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Descargar registro oficial PDF
+            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+              Un único archivo con <strong>Resumen mensual</strong>, <strong>Detalle diario</strong>, <strong>Fichajes</strong> y <strong>Empleados</strong>. Incluye columnas de horas decimales para fórmulas, totales automáticos y anchos de columna optimizados.
+            </div>
+            <button className="btn btn-primary" style={{ width:'100%' }} onClick={exportTodoXLSX}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar informe completo ({mesNombreXLSX})
             </button>
           </div>
+
+          {/* Fichajes filtrados */}
           <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Exportar fichajes a Excel</div>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:2 }}>Exportar fichajes filtrados</div>
+            <div style={{ fontSize:12, color:'var(--text3)' }}>Filtra por empleado y rango de fechas. Incluye horas decimales, descansos y totales.</div>
             <div className="field">
               <label>Empleado</label>
               <select value={selEmp} onChange={e => setSelEmp(e.target.value)}>
@@ -2555,9 +2607,78 @@ footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;paddi
               <div className="field"><label>Desde</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
               <div className="field"><label>Hasta</label><input type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
             </div>
-            <button className="btn btn-primary" style={{ width:'100%' }} onClick={exportFichajesXLSX}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Descargar Excel
+            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={exportFichajesXLSX}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Descargar Excel fichajes
+            </button>
+          </div>
+
+          {/* Informe oficial inspección de trabajo */}
+          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ fontSize:14, fontWeight:700 }}>Registro oficial — Inspección de Trabajo</div>
+            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+              Formato RDL 8/2019 con todos los empleados, entrada/salida diaria y firmas. Listo para imprimir o guardar como PDF.
+            </div>
+            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => {
+              const mesNombre2 = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+              const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
+              const empresaNombre = empresa || '—'
+              let rowsHtml = ''
+              empsActivos.forEach(e => {
+                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+                  .sort((a, b) => a.inicio.localeCompare(b.inicio))
+                if (!eRecs.length) {
+                  rowsHtml += `<tr><td>${esc(e.name)}</td><td colspan="4" style="color:#999;text-align:center">Sin registros este mes</td></tr>`
+                  return
+                }
+                eRecs.forEach((r, i) => {
+                  const wm = Math.floor((r.workSecs > 0 ? r.workSecs : Math.max(0, (new Date(r.fin) - new Date(r.inicio))/1000 - (r.breakSecs||0))) / 60)
+                  const bm = Math.floor((r.breakSecs||0)/60)
+                  const d = new Date(r.inicio)
+                  rowsHtml += `<tr>
+                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${esc(e.name)}</td>` : ''}
+                    <td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td>
+                    <td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td>${new Date(r.fin).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td style="text-align:center">${bm > 0 ? `${Math.floor(bm/60)}h ${p2(bm%60)}m` : '—'}</td>
+                    <td style="font-weight:600">${Math.floor(wm/60)}h ${p2(wm%60)}m</td>
+                  </tr>`
+                })
+              })
+              const win = window.open('', '_blank')
+              if (!win) { toast('Activa las ventanas emergentes'); return }
+              win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Registro de jornada ${mesNombre2} · ${esc(empresaNombre)}</title>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
+.meta{display:flex;gap:24px;background:#f8f8f8;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12px}
+.meta div span{display:block;color:#888;font-size:11px}
+table{width:100%;border-collapse:collapse}th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover td{background:#f9fafb}
+.sign{margin-top:48px;display:flex;gap:64px}.sign-box{flex:1;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#666}
+footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
+@media print{button{display:none}}</style></head><body>
+<h1>Registro de control de jornada laboral</h1>
+<h2>${esc(empresaNombre)} · ${mesNombre2}</h2>
+<div class="meta">
+  <div><span>Empresa</span>${esc(empresaNombre)}</div>
+  <div><span>Período</span>${mesNombre2}</div>
+  <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
+  <div><span>Empleados</span>${empsActivos.length}</div>
+</div>
+<button onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Imprimir / Guardar PDF</button>
+<table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Descanso</th><th>Horas netas</th></tr></thead>
+<tbody>${rowsHtml}</tbody></table>
+<div class="sign">
+  <div class="sign-box">Representante legal de la empresa<br><br><br>________________________<br><span style="font-size:10px">${esc(empresaNombre)}</span></div>
+  <div class="sign-box">Sello empresa<br><br><br>________________________</div>
+</div>
+<footer><span>Documento generado por AN-Times · Control horario RDL 8/2019</span><span>${new Date().toLocaleDateString('es-ES')}</span></footer>
+</body></html>`)
+              win.document.close()
+            }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Descargar registro oficial PDF
             </button>
           </div>
         </div>
