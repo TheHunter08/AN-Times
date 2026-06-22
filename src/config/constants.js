@@ -20,7 +20,7 @@ function initAdminPin() {
 }
 export const ADMIN_PIN = initAdminPin()
 
-export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BHkLMm4jcnQUppuN6UNx7b3gK073ZB0l7LHABbT74GrBxt-BeYWyi0LEadsf21Vpx9gO71Mc3TVRy2yTh_MaOsw'
+export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm
