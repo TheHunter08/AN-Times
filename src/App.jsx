@@ -4,6 +4,48 @@ import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import { isNativePlatform, onPushReceived, onPushTapped } from './services/nativeNotifications.js'
 
+// ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
+function InAppNotification() {
+  const [notif, setNotif] = useState(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (e.data?.type !== 'PUSH_RECEIVED') return
+      setNotif({ title: e.data.title, body: e.data.body, url: e.data.url })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setNotif(null), 5000)
+    }
+    navigator.serviceWorker?.addEventListener('message', onMsg)
+    return () => { navigator.serviceWorker?.removeEventListener('message', onMsg); clearTimeout(timerRef.current) }
+  }, [])
+
+  if (!notif) return null
+  return (
+    <div
+      onClick={() => { if (notif.url && notif.url !== '/') window.dispatchEvent(new CustomEvent('push-deeplink', { detail: notif.url })); setNotif(null) }}
+      style={{
+        position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:99998,
+        minWidth:280, maxWidth:'calc(100vw - 32px)',
+        background:'var(--bg-600)', border:'1px solid var(--border2)',
+        borderRadius:14, boxShadow:'0 8px 32px rgba(0,0,0,.45)',
+        display:'flex', alignItems:'center', gap:12, padding:'12px 14px',
+        cursor: notif.url && notif.url !== '/' ? 'pointer' : 'default',
+        animation:'slideDown .3s cubic-bezier(.16,1,.3,1)'
+      }}>
+      <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{notif.title}</div>
+        {notif.body && <div style={{ fontSize:12, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{notif.body}</div>}
+      </div>
+      <button onClick={e => { e.stopPropagation(); setNotif(null) }}
+        style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', fontSize:16, lineHeight:1, padding:2, flexShrink:0 }}>✕</button>
+    </div>
+  )
+}
+
 function UpdateBanner() {
   const [show, setShow] = useState(false)
   const reloading = useRef(false)
@@ -238,6 +280,7 @@ export default function App() {
     <>
       <UpdateBanner />
       <SyncBanner />
+      <InAppNotification />
       {currentScreen === 'login' && <LoginPage />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp' && <EmployeePage />}

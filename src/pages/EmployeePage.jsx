@@ -89,7 +89,7 @@ function useSignatureCanvas() {
 }
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const timer = useTimer()
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -414,7 +414,10 @@ export default function EmployeePage() {
       {/* Topbar */}
       <div className="emp-topbar">
         <div className="emp-top-left">
-          <div className="emp-avatar" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
+          <div className="emp-avatar" style={{ background: u.color || 'var(--primary)', position:'relative' }}>
+            {initials}
+            {syncStatus === 'syncing' && <span style={{ position:'absolute', bottom:-2, right:-2, width:8, height:8, borderRadius:'50%', background:'var(--primary-light)', border:'2px solid var(--bg-700)', animation:'pulse 1.2s ease-in-out infinite' }} />}
+          </div>
           <div style={{ minWidth:0, overflow:'hidden' }}>
             <div className="emp-greeting">👋 {u.name.split(' ')[0]}</div>
             <TopbarClock />
@@ -450,7 +453,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -573,7 +576,7 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session }) {
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
@@ -735,6 +738,61 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             </div>
           </div>
         )}
+
+        {/* Mi equipo — solo para encargados y jefes de obra */}
+        {(u.role === 'encargado' || u.role === 'jefe_obra') && (() => {
+          const isJO = u.role === 'jefe_obra'
+          const teamEmps = (db.employees || []).filter(e =>
+            !e.isAdmin && !e.baja && e.id !== u.id &&
+            (isJO || !u.obrasAsignadas?.length ||
+              u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
+          )
+          if (!teamEmps.length) return null
+          const working = teamEmps.filter(e => (db.records||[]).some(r => r.empId === e.id && !r.fin))
+          const done    = teamEmps.filter(e =>
+            !working.find(w => w.id === e.id) &&
+            (db.records||[]).some(r => r.empId === e.id && r.fin && r.inicio.startsWith(todayStr))
+          )
+          return (
+            <div style={{ padding:'0 16px 12px' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text4)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>
+                Mi equipo hoy
+                <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)' }}>
+                  {working.length} activo{working.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {teamEmps.map(e => {
+                  const isWorking = working.find(w => w.id === e.id)
+                  const isDone    = done.find(d => d.id === e.id)
+                  const openRec2  = isWorking ? (db.records||[]).find(r => r.empId === e.id && !r.fin) : null
+                  const totalMin  = isDone
+                    ? (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(todayStr)).reduce((s,r) => s + calcMin(r), 0)
+                    : 0
+                  const dotColor = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
+                  const statusTxt = isWorking
+                    ? `Activo desde ${ftime(openRec2?.inicio)}`
+                    : isDone ? `${mhm(totalMin)} · Finalizado`
+                    : 'Sin fichar hoy'
+                  return (
+                    <div key={e.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'9px 12px' }}>
+                      <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, transition:'box-shadow .3s', boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
+                      <div style={{ width:32, height:32, borderRadius:9, background: e.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>
+                        {e.initials || e.name.slice(0,2).toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name.split(' ')[0]} {e.name.split(' ')[1] || ''}</div>
+                        <div style={{ fontSize:10, color: isWorking ? 'var(--green)' : isDone ? 'var(--text3)' : 'var(--text4)', marginTop:1 }}>{statusTxt}</div>
+                      </div>
+                      {isWorking && <div style={{ fontSize:9, fontWeight:800, color:'var(--green)', background:'var(--green-dim)', padding:'3px 8px', borderRadius:10, flexShrink:0, border:'1px solid rgba(16,185,129,.2)' }}>● EN OBRA</div>}
+                      {isDone && !isWorking && <div style={{ fontSize:9, fontWeight:800, color:'var(--primary-light)', background:'var(--primary-dim)', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>✓ FIN</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
       </div>
     </PullToRefresh>

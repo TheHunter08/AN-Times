@@ -61,7 +61,17 @@ self.addEventListener('push', (event) => {
     silent: false,
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  // Si hay una pestaña de la app en primer plano, enviar mensaje in-app en lugar de notificación OS
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+      const focused = cs.find(c => c.focused)
+      if (focused) {
+        focused.postMessage({ type: 'PUSH_RECEIVED', title, body: options.body, tag: options.tag, url: data.url || '/' })
+        return
+      }
+      return self.registration.showNotification(title, options)
+    })
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {

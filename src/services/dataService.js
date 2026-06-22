@@ -38,7 +38,7 @@ export function mergeDB(base, incoming) {
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
-    records:             incoming.records              || [],
+    records:             (incoming.records?.length > 0)    ? incoming.records          : base.records,
     vacaciones:          incoming.vacaciones           || [],
     medicos:             incoming.medicos              || [],
     ausencias:           incoming.ausencias            || [],
