@@ -5,7 +5,7 @@ export const today = () => {
   return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`
 }
 
-export const mhm = m => `${Math.floor(m/60)}h ${p2(m%60)}m`
+export const mhm = m => { m = Math.max(0, Math.floor(m || 0)); return `${Math.floor(m/60)}h ${p2(m%60)}m` }
 export const s2t = s => `${p2(Math.floor(s/3600))}:${p2(Math.floor((s%3600)/60))}:${p2(s%60)}`
 
 export const ftime = iso => {

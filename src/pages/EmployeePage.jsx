@@ -317,7 +317,8 @@ export default function EmployeePage() {
             const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
             const snapshot = dbRef.current.records
             const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
-            saveDB({ records: updRecs, notisSent })
+            const dbWithAudit = auditLog(dbRef.current, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
+            saveDB({ records: updRecs, notisSent, audit: dbWithAudit.audit })
             queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
           }
         }
@@ -483,14 +484,14 @@ export default function EmployeePage() {
   const vac = vacData(u.id, db)
   const unread = (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length
 
-  // Smart greeting — memoised, recalculates only when user or hour changes
-  const greeting = useMemo(() => {
+  // Smart greeting — computed fresh each render (component re-renders every second via timer)
+  const greeting = (() => {
     const h = new Date().getHours()
     const firstName = u.name.split(' ')[0]
     if (h >= 6 && h < 14) return `Buenos días, ${firstName} ☀️`
     if (h >= 14 && h < 21) return `Buenas tardes, ${firstName} 👋`
     return `Buenas noches, ${firstName} 🌙`
-  }, [u.name])
+  })()
 
   return (
     <div className="screen active" id="sEmp">
@@ -600,7 +601,7 @@ export default function EmployeePage() {
       <WelcomeSlides />
 
       {/* Onboarding: primer login */}
-      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
+      <OnboardingModal visible={!u.onboardingDone && isPWA} u={u} db={db} saveDB={saveDB} toast={toast} />
     </div>
   )
 }
@@ -698,6 +699,9 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const todayStr = today()
   const [showTip, setShowTip] = useState(() => {
     try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
+  })
+  const [notifDismissed, setNotifDismissed] = useState(() => {
+    try { return !!localStorage.getItem('an_notif_prompt_dismissed') } catch { return false }
   })
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -883,24 +887,26 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
         </div>
 
         {/* Notification permission prompt */}
-        {typeof Notification !== 'undefined' && Notification.permission === 'default' && timer.state === 'idle' && (() => {
-          try { if (localStorage.getItem('an_notif_prompt_dismissed')) return null } catch {}
-          return (
-            <div style={{ margin:'0 16px 10px', padding:'10px 12px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--primary-light)' }}>Activa las notificaciones</div>
-                <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>Recibe avisos de vacaciones, recordatorios y mensajes.</div>
-              </div>
-              <button className="btn btn-primary btn-sm" style={{ fontSize:11, padding:'5px 10px', flexShrink:0 }}
-                onClick={async () => { const p = await Notification.requestPermission(); if (p !== 'default') { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {} } }}>
-                Activar
-              </button>
-              <button onClick={() => { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {} }}
-                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', fontSize:16, padding:'0 2px', lineHeight:1, flexShrink:0 }}>✕</button>
+        {typeof Notification !== 'undefined' && Notification.permission === 'default' && timer.state === 'idle' && !notifDismissed && (
+          <div style={{ margin:'0 16px 10px', padding:'10px 12px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>🔔</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--primary-light)' }}>Activa las notificaciones</div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>Recibe avisos de vacaciones, recordatorios y mensajes.</div>
             </div>
-          )
-        })()}
+            <button className="btn btn-primary btn-sm" style={{ fontSize:11, padding:'5px 10px', flexShrink:0 }}
+              onClick={async () => {
+                const p = await Notification.requestPermission()
+                try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {}
+                setNotifDismissed(true)
+                if (p === 'granted' && u?.id) pushSubscribe(u.id, VAPID_PUB)
+              }}>
+              Activar
+            </button>
+            <button onClick={() => { try { localStorage.setItem('an_notif_prompt_dismissed', '1') } catch {}; setNotifDismissed(true) }}
+              style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text4)', fontSize:16, padding:'0 2px', lineHeight:1, flexShrink:0 }}>✕</button>
+          </div>
+        )}
 
         {/* Auto-close warning banner */}
         {showAutoCloseWarning && (
@@ -2902,12 +2908,10 @@ function WeeklyBars({ db, u, timer }) {
 }
 
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme')
-  const next = current === 'light' ? 'dark' : 'light'
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
   if (next === 'dark') document.documentElement.removeAttribute('data-theme')
   else document.documentElement.setAttribute('data-theme', 'light')
   try { localStorage.setItem('theme', next) } catch {}
-  document.querySelectorAll('.theme-toggle-btn').forEach(b => { b.textContent = next === 'light' ? '🌙' : '☀️' })
 }
 
 // ─── FIRMA DE CIERRE MENSUAL (empleado) ────────────────────────────────────────

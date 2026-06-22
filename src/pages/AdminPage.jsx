@@ -23,6 +23,7 @@ const PAGES = [
   { id:'obras',       label:'Obras' },
   { id:'documentos',  label:'Documentos' },
   { id:'auditoria',   label:'Auditoría' },
+  { id:'ajustes',     label:'Ajustes' },
 ]
 
 // Un "encargado" no es administrador: solo ve y gestiona la jornada de su obra asignada
@@ -32,6 +33,7 @@ const ENC_PAGES = [
 ]
 
 const NAV_ICONS = {
+  ajustes:     <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
   dashboard:   <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
   control:     <><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></>,
   fichajes:    <><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></>,
@@ -149,6 +151,20 @@ export default function AdminPage() {
   const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
   const activeNow = (db.records || []).filter(r => !r.fin).length
 
+  // Company theme: apply --primary from db.config if set
+  useEffect(() => {
+    const color = db.config?.primaryColor
+    if (!color) return
+    document.documentElement.style.setProperty('--primary', color)
+    document.documentElement.style.setProperty('--primary-glow', color + '30')
+    document.documentElement.style.setProperty('--primary-dim', color + '22')
+    return () => {
+      document.documentElement.style.removeProperty('--primary')
+      document.documentElement.style.removeProperty('--primary-glow')
+      document.documentElement.style.removeProperty('--primary-dim')
+    }
+  }, [db.config?.primaryColor])
+
   const doLogout = () => { logout() }
 
   const nav = (id) => { setAdminPage(id); if (window.innerWidth < 960) setSideOpen(false) }
@@ -263,6 +279,7 @@ export default function AdminPage() {
               {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
+              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} />}
             </>
           )}
         </div>
@@ -315,7 +332,6 @@ function toggleTheme() {
   if (next === 'dark') document.documentElement.removeAttribute('data-theme')
   else document.documentElement.setAttribute('data-theme', 'light')
   try { localStorage.setItem('theme', next) } catch {}
-  document.querySelectorAll('.theme-toggle-btn').forEach(b => { b.textContent = next === 'light' ? '🌙' : '☀️' })
 }
 
 // ─── PANEL DASHBOARD ──────────────────────────────────────────────────────────
@@ -3538,6 +3554,108 @@ function PanelAuditoria({ db }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── PANEL AJUSTES ────────────────────────────────────────────────────────────
+const COLOR_PRESETS = ['#6C63FF','#2563EB','#7c3aed','#0891b2','#059669','#dc2626','#d97706','#db2777']
+
+function PanelAjustes({ db, toast, saveDB }) {
+  const cfg = db.config || {}
+  const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
+  const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
+  const [saving, setSaving] = useState(false)
+
+  // Live preview: apply color as you change it
+  useEffect(() => {
+    document.documentElement.style.setProperty('--primary', primaryColor)
+    document.documentElement.style.setProperty('--primary-glow', primaryColor + '30')
+    document.documentElement.style.setProperty('--primary-dim', primaryColor + '22')
+  }, [primaryColor])
+
+  const save = () => {
+    setSaving(true)
+    const config = { ...cfg, primaryColor, companyName }
+    saveDB({ config })
+    toast('Ajustes guardados', 3000, 'ok')
+    setSaving(false)
+  }
+
+  const reset = () => {
+    setPrimaryColor('#6C63FF')
+    const config = { ...cfg, primaryColor: '', companyName }
+    saveDB({ config })
+    document.documentElement.style.removeProperty('--primary')
+    document.documentElement.style.removeProperty('--primary-glow')
+    document.documentElement.style.removeProperty('--primary-dim')
+    toast('Color restablecido', 2000, 'ok')
+  }
+
+  return (
+    <div className="adm-panel">
+      <div className="adm-panel-header">
+        <div>
+          <h1 className="adm-panel-title gradient-text">Ajustes</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>Personalización de la aplicación</div>
+        </div>
+      </div>
+
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">🏢 Empresa</div>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
+          <div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de empresa'}
+              style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">🎨 Color principal</div>
+          <button className="btn btn-secondary btn-sm" onClick={reset} style={{ fontSize:11 }}>Restablecer</button>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+              style={{ width:48, height:48, borderRadius:10, border:'2px solid var(--border)', cursor:'pointer', padding:2, background:'none', flexShrink:0 }} />
+            <input value={primaryColor} onChange={e => { if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) setPrimaryColor(e.target.value) }}
+              style={{ flex:1, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:13, fontFamily:'monospace' }} />
+            <div style={{ width:48, height:48, borderRadius:10, background: primaryColor, flexShrink:0, border:'1px solid var(--border)' }} />
+          </div>
+
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {COLOR_PRESETS.map(c => (
+              <div key={c} onClick={() => setPrimaryColor(c)}
+                style={{ width:32, height:32, borderRadius:9, background:c, cursor:'pointer',
+                  border: c.toLowerCase() === primaryColor.toLowerCase() ? '3px solid white' : '2px solid transparent',
+                  transition:'transform .15s, box-shadow .15s',
+                  boxShadow: c.toLowerCase() === primaryColor.toLowerCase() ? `0 0 10px ${c}` : 'none' }}
+                onMouseEnter={e => { e.currentTarget.style.transform='scale(1.2)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform='' }} />
+            ))}
+          </div>
+
+          <div style={{ padding:'12px 14px', background:'var(--bg-500)', borderRadius:10, border:'1px solid var(--border)' }}>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>Vista previa</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button className="btn btn-primary btn-sm">Botón primario</button>
+              <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:20, fontSize:11, fontWeight:700, color:'var(--primary-light)' }}>
+                <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--primary)' }} />
+                Chip
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button className="btn btn-primary" disabled={saving} onClick={save} style={{ width:'100%', padding:'14px' }}>
+        {saving ? 'Guardando…' : '✓ Guardar ajustes'}
+      </button>
     </div>
   )
 }

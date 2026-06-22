@@ -11,7 +11,7 @@ export function useTimer() {
     if (!session.user) return
 
     const interval = setInterval(() => {
-      const openRec = db.records.find(r => r.empId === session.user.id && !r.fin)
+      const openRec = (db.records || []).find(r => r.empId === session.user.id && !r.fin)
       if (!openRec) {
         if (timer.state !== 'idle') updateTimer({ state: 'idle', ws: 0, bs: 0 })
         return

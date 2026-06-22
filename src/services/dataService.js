@@ -53,6 +53,7 @@ export function mergeDB(base, incoming) {
     chats:               incoming.chats                || [],
     // Bug fix #8: union de notisSent — nunca se "des-envía" una notificación
     notisSent:           { ...(base.notisSent || {}), ...(incoming.notisSent || {}) },
+    config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
   }
 }

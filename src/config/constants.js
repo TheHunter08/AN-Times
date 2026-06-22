@@ -86,5 +86,6 @@ export const INITIAL_DB = {
   correccionesFichaje: [],
   chats: [],
   notisSent: {},
+  config: {},
   _ts: 0
 }
