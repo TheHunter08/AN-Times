@@ -184,9 +184,9 @@ export async function pushSubscribe(userId, vapidPub) {
     }
     const buf2b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
 
-    // Si la clave VAPID cambió, la suscripción existente es inválida → forzar re-suscripción
+    // Si la clave VAPID cambió (o nunca se guardó), la suscripción existente es inválida → forzar re-suscripción
     const storedKey = localStorage.getItem(VAPID_KEY_STORAGE)
-    if (storedKey && storedKey !== vapidPub) {
+    if (storedKey !== vapidPub) {
       const old = await reg.pushManager.getSubscription()
       if (old) await old.unsubscribe()
     }

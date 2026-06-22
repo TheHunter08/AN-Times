@@ -121,7 +121,6 @@ export default function AdminPage() {
   }, [isEncargado])
 
   useEffect(() => {
-    if (isEncargado) return
     setTimeout(async () => {
       const native = await isNativePlatform()
       const uid = useAppStore.getState().session?.user?.id
@@ -129,7 +128,7 @@ export default function AdminPage() {
       const result = await requestPushPermission()
       if (result) {
         if (uid) pushSubscribe(uid, VAPID_PUB)
-        pushSubscribe('__admin__', VAPID_PUB)
+        if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
   }, [isEncargado])
