@@ -518,7 +518,7 @@ export default function EmployeePage() {
           { id:'mensajes',   label:'Mensajes',   icon:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>, badge: chatUnread },
           { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
         ].map(({ id, label, icon, extra, badge }) => (
-          <button key={id} type="button" className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => setEmpTab(id)} aria-current={currentEmpTab===id} aria-label={label}>
+          <button key={id} type="button" className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => { try { navigator.vibrate(5) } catch {}; setEmpTab(id) }} aria-current={currentEmpTab===id} aria-label={label}>
             <span style={{ position:'relative', display:'inline-flex' }}>
               <svg viewBox="0 0 24 24" aria-hidden="true">{icon}{extra}</svg>
               {badge > 0 && <span style={{ position:'absolute', top:-4, right:-6, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px' }}>{badge}</span>}
@@ -542,6 +542,9 @@ export default function EmployeePage() {
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
       <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
+
+      {/* Welcome slides: intro animado en primera apertura */}
+      <WelcomeSlides />
 
       {/* Onboarding: primer login */}
       <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
@@ -649,6 +652,12 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const entradaRec = realRecs[0]
   const salidaRec = [...realRecs].reverse().find(r => r.fin && r.closed)
   const brkMin = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
+
+  const now = new Date()
+  const ws = wkStart(now)
+  const weekRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
+  const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
+  const weekPct = Math.min(100, Math.round(weekMin / WK * 100))
 
   // SVG arc
   const ARC_R = 50
@@ -765,6 +774,21 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
               <div className="stat-val" style={{ color, fontSize: 14 }}>{val}</div>
             </div>
           ))}
+        </div>
+
+        {/* Weekly progress bar */}
+        <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Progreso semanal</div>
+            <div style={{ fontSize:12, fontWeight:700, color: weekPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(weekMin)} / 40h</div>
+          </div>
+          <div style={{ height:8, background:'var(--bg-500)', borderRadius:4, overflow:'hidden' }}>
+            <div style={{ height:'100%', width:`${weekPct}%`, background: weekPct >= 100 ? 'linear-gradient(90deg, #16a34a, #22c55e)' : 'linear-gradient(90deg, var(--primary), var(--secondary))', borderRadius:4, transition:'width .6s cubic-bezier(.16,1,.3,1)' }} />
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
+            <span style={{ fontSize:9, color:'var(--text4)' }}>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
+            <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
+          </div>
         </div>
 
         {/* Auto-close warning banner */}
@@ -1973,6 +1997,26 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
 
       </div>
 
+      {/* Activity heatmap — 12 weeks */}
+      <div style={{ margin:'0 16px 16px' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:10 }}>Actividad · 12 semanas</div>
+        <div className="act-heatmap">
+          {Array.from({ length: 84 }).map((_, i) => {
+            const d = new Date(now)
+            d.setDate(d.getDate() - (83 - i))
+            const ds = d.toISOString().slice(0, 10)
+            const mins = dayMap[ds] || 0
+            const level = mins === 0 ? 0 : mins < WD * 0.25 ? 1 : mins < WD * 0.5 ? 2 : mins < WD ? 3 : 4
+            return <div key={ds} className={`act-hm-cell act-hm-${level}`} title={`${ds}: ${mhm(mins)}`} />
+          })}
+        </div>
+        <div style={{ display:'flex', gap:4, alignItems:'center', justifyContent:'flex-end', marginTop:6 }}>
+          <span style={{ fontSize:9, color:'var(--text4)' }}>Menos</span>
+          {[0,1,2,3,4].map(l => <div key={l} className={`act-hm-cell act-hm-${l}`} style={{ width:10, height:10 }} />)}
+          <span style={{ fontSize:9, color:'var(--text4)' }}>Más</span>
+        </div>
+      </div>
+
       {/* Cierres mensuales pendientes de firma */}
       {(() => {
         const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
@@ -2821,6 +2865,95 @@ function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={firmar}>✅ Firmar y enviar</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── WELCOME SLIDES (intro animado, primera vez en la app) ─────────────────────
+function WelcomeSlides() {
+  const [visible, setVisible] = useState(() => {
+    try { return !localStorage.getItem('an_welcome_v1') } catch { return false }
+  })
+  const [slide, setSlide] = useState(0)
+  const [exiting, setExiting] = useState(false)
+
+  const dismiss = () => {
+    setExiting(true)
+    setTimeout(() => {
+      try { localStorage.setItem('an_welcome_v1', '1') } catch {}
+      setVisible(false)
+    }, 350)
+  }
+
+  if (!visible) return null
+
+  const SLIDES = [
+    {
+      emoji: '⏱️',
+      color: '#2563EB',
+      title: 'Registra tu jornada',
+      sub: 'Ficha entrada y salida desde tu móvil. Tu historial siempre disponible, en cualquier lugar.',
+    },
+    {
+      emoji: '🌴',
+      color: '#16a34a',
+      title: 'Solicita vacaciones',
+      sub: 'Gestiona tus días libres fácilmente. Consulta el estado en tiempo real.',
+    },
+    {
+      emoji: '🏗️',
+      color: '#7c3aed',
+      title: 'Conecta con tu empresa',
+      sub: 'Mensajes, documentos y avisos de tu empresa, todo en un solo lugar.',
+    },
+  ]
+
+  const s = SLIDES[slide]
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:2000, display:'flex', alignItems:'flex-end',
+      background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
+      animation: exiting ? 'wsFadeOut .35s forwards' : 'wsFadeIn .3s',
+    }}>
+      <div style={{
+        width:'100%', maxWidth:480, margin:'0 auto',
+        background:'var(--bg-700)', borderRadius:'24px 24px 0 0',
+        border:'1px solid var(--border2)', borderBottom:'none',
+        padding:'28px 24px max(32px,env(safe-area-inset-bottom,0px))',
+        animation: exiting ? 'wsSlideOut .35s forwards' : 'slideUp .3s cubic-bezier(.16,1,.3,1)',
+        boxShadow:'0 -20px 60px rgba(0,0,0,.4)',
+      }}>
+        {/* Slide dots */}
+        <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:28 }}>
+          {SLIDES.map((_, i) => (
+            <div key={i} onClick={() => setSlide(i)} style={{ height:6, borderRadius:3, cursor:'pointer', transition:'all .3s',
+              width: i === slide ? 24 : 6,
+              background: i === slide ? s.color : 'var(--bg-500)' }} />
+          ))}
+        </div>
+
+        {/* Content */}
+        <div key={slide} style={{ textAlign:'center', animation:'slideUp .3s cubic-bezier(.16,1,.3,1)' }}>
+          <div style={{ width:80, height:80, borderRadius:22, background:`${s.color}22`, border:`2px solid ${s.color}44`,
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, margin:'0 auto 20px' }}>
+            {s.emoji}
+          </div>
+          <div style={{ fontSize:22, fontWeight:800, color:'var(--text)', marginBottom:10, letterSpacing:'-.4px' }}>{s.title}</div>
+          <div style={{ fontSize:14, color:'var(--text3)', lineHeight:1.65, marginBottom:32 }}>{s.sub}</div>
+        </div>
+
+        {/* Buttons */}
+        {slide < SLIDES.length - 1 ? (
+          <div style={{ display:'flex', gap:10 }}>
+            <button className="btn btn-secondary" style={{ flex:1 }} onClick={dismiss}>Omitir</button>
+            <button className="btn btn-primary" style={{ flex:2, background:s.color, borderColor:s.color }} onClick={() => setSlide(slide + 1)}>Siguiente →</button>
+          </div>
+        ) : (
+          <button className="btn btn-primary" style={{ width:'100%', background:s.color, borderColor:s.color }} onClick={dismiss}>
+            Empezar →
+          </button>
+        )}
       </div>
     </div>
   )

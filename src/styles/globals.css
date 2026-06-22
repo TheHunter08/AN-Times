@@ -2667,6 +2667,11 @@ td span[title="Click para editar"]:hover {
   .notis-panel { max-width: 360px; }
 }
 
+/* ── Welcome slides animations ──────────────────────────────── */
+@keyframes wsFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wsFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes wsSlideOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(80px); } }
+
 /* ── Mobile: prevent adm-panel overflow on very narrow screens ─ */
 @media (max-width: 360px) {
   .adm-panel { padding: 14px; }

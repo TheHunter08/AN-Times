@@ -268,15 +268,24 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('theme')
-      if (saved === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light')
-      } else if (!saved) {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        if (!prefersDark) document.documentElement.setAttribute('data-theme', 'light')
-      }
-    } catch {}
+    const applyTheme = (prefersDark) => {
+      try {
+        const saved = localStorage.getItem('theme')
+        if (saved === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light')
+        } else if (saved === 'dark') {
+          document.documentElement.removeAttribute('data-theme')
+        } else {
+          if (prefersDark) document.documentElement.removeAttribute('data-theme')
+          else document.documentElement.setAttribute('data-theme', 'light')
+        }
+      } catch {}
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    applyTheme(mq.matches)
+    const onChange = (e) => { try { if (!localStorage.getItem('theme')) applyTheme(e.matches) } catch { applyTheme(e.matches) } }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
   }, [])
 
   return (
