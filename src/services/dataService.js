@@ -172,7 +172,9 @@ function _doCloudPush(db, onSuccess, onError) {
       if (_saveRetry < 5) {
         _saveRetry++
         _pushQueue.unshift({ db, onSuccess, onError })
-        setTimeout(() => _drainQueue(), 600 * _saveRetry)
+        // Backoff exponencial: 1s, 2s, 4s, 8s, 16s (máx 30s)
+        const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
+        setTimeout(() => _drainQueue(), delay)
       } else {
         _saveRetry = 0
         _storeForBgSync(payload)
@@ -195,8 +197,10 @@ export function scheduleSave(db, onSuccess, onError, delay = 0) {
   _saveTimer = setTimeout(() => cloudPush(db, onSuccess, onError), delay)
 }
 
-// ── Supabase Realtime ─────────────────────────────────────────────────────────
+// ── Supabase Realtime con auto-reconexión ────────────────────────────────────
 let _realtimeChannel = null
+let _realtimeRetry   = 0
+let _realtimeTimer   = null
 
 export function startRealtime(currentGetDB, onUpdate) {
   if (!supabase) return
@@ -210,14 +214,27 @@ export function startRealtime(currentGetDB, onUpdate) {
         if (!incoming) return
         const local = currentGetDB()
         if (incoming._ts && local._ts && incoming._ts <= local._ts) return
+        _realtimeRetry = 0
         onUpdate?.(incoming)
       }
     )
-    .subscribe()
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        _realtimeRetry = 0
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        // Reconexión exponencial: máx 60s
+        clearTimeout(_realtimeTimer)
+        const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 60000)
+        _realtimeRetry++
+        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate), delay)
+      }
+    })
 }
 
 export function stopRealtime() {
+  clearTimeout(_realtimeTimer)
   if (_realtimeChannel) { supabase?.removeChannel(_realtimeChannel); _realtimeChannel = null }
+  _realtimeRetry = 0
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────

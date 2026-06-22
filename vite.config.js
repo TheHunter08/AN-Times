@@ -28,8 +28,9 @@ export default defineConfig({
         theme_color: '#0B1020',
         background_color: '#0B1020',
         display: 'standalone',
-        display_override: ['standalone', 'minimal-ui'],
+        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
         orientation: 'portrait-primary',
+        edge_side_panel: { preferred_width: 400 },
         scope: '/',
         start_url: '/?source=pwa',
         categories: ['business', 'productivity', 'utilities'],
@@ -87,11 +88,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'es2020',
+    // Aumentar el límite de aviso de chunk (xlsx y AdminPage son grandes por diseño)
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
-          state: ['zustand']
+          vendor:    ['react', 'react-dom'],
+          state:     ['zustand'],
+          charts:    ['recharts'],
+          pdf:       ['pdf-lib'],
+          excel:     ['xlsx'],
+          supabase:  ['@supabase/supabase-js'],
         }
       }
     }

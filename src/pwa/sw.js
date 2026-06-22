@@ -3,19 +3,33 @@ import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
-// Force immediate activation of new SW versions (no waiting for tab close)
+// ─── ACTIVACIÓN INMEDIATA (V3 Premium PWA) ────────────────────────────────────
+// El nuevo SW toma control sin esperar al cierre de pestañas existentes
 self.skipWaiting()
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      // Limpiar cachés antiguas de versiones previas del SW
+      caches.keys().then(keys =>
+        Promise.all(
+          keys
+            .filter(k => k.startsWith('times-') && !['times-inc-sync'].includes(k))
+            .map(k => k.startsWith('html-pages') || k.startsWith('google-fonts') || k.startsWith('supabase-api') ? null : caches.delete(k))
+            .filter(Boolean)
+        )
+      )
+    ])
+  )
 })
 
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
-// HTML/navegación: NetworkFirst para que SIEMPRE se sirva el index.html más
-// reciente cuando hay red. Esto evita que un HTML cacheado apunte a hashes de
-// assets antiguos y la PWA se quede "pegada" en una versión vieja. Si no hay
-// red, cae al index.html precacheado (offline) o a la página offline dedicada.
+// ─── HTML / NAVEGACIÓN ─────────────────────────────────────────────────────────
+// NetworkFirst: siempre sirve el index.html más reciente cuando hay red.
+// Evita que HTML cacheado apunte a hashes de assets obsoletos.
+// Fallback offline: precache de index.html.
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
@@ -27,26 +41,57 @@ registerRoute(
   )
 )
 
-// Offline fallback for navigation when no cache hit
+// Offline fallback para navegación sin cache hit
 self.addEventListener('fetch', (event) => {
   if (event.request.mode !== 'navigate') return
   event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match('/offline.html') || caches.match('/index.html')
-    )
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match('/index.html')
+      if (cached) return cached
+      return new Response('<h1>Sin conexión</h1><p>TIMES INC funciona offline. Reconectando…</p>', {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      })
+    })
   )
 })
 
-// Cache Google Fonts
+// ─── ASSETS ESTÁTICOS ─────────────────────────────────────────────────────────
+// StaleWhileRevalidate para JS/CSS: responde rápido desde cache y actualiza en background
 registerRoute(
-  ({ url }) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
-  new CacheFirst({ cacheName: 'google-fonts', plugins: [new ExpirationPlugin({ maxAgeSeconds: 60*60*24*365 })] })
+  ({ request }) => request.destination === 'script' || request.destination === 'style',
+  new StaleWhileRevalidate({
+    cacheName: 'static-assets',
+    plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 })]
+  })
 )
 
-// Network-first for Supabase API
+// Imágenes y fuentes locales: CacheFirst (raramente cambian)
+registerRoute(
+  ({ request }) => request.destination === 'image' || request.destination === 'font',
+  new CacheFirst({
+    cacheName: 'images-fonts',
+    plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 90 })]
+  })
+)
+
+// ─── GOOGLE FONTS ─────────────────────────────────────────────────────────────
+registerRoute(
+  ({ url }) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
+  new CacheFirst({
+    cacheName: 'google-fonts',
+    plugins: [new ExpirationPlugin({ maxAgeSeconds: 60 * 60 * 24 * 365 })]
+  })
+)
+
+// ─── SUPABASE API ─────────────────────────────────────────────────────────────
+// NetworkFirst con timeout: funciona offline con datos cacheados
 registerRoute(
   ({ url }) => url.hostname.includes('supabase.co'),
-  new NetworkFirst({ cacheName: 'supabase-api', networkTimeoutSeconds: 10 })
+  new NetworkFirst({
+    cacheName: 'supabase-api',
+    networkTimeoutSeconds: 8,
+    plugins: [new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 * 60 * 2 })]
+  })
 )
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
@@ -145,16 +190,52 @@ async function _bgSync() {
   cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
 }
 
+// ─── BACKGROUND SYNC (One-off: cuando recupera red) ────────────────────────────
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-data') event.waitUntil(
     _bgSync().catch(async (err) => {
-      // Notify open tabs that sync failed so the UI can show a warning
       const cs = await self.clients.matchAll({ type: 'window' })
       cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
     })
   )
 })
 
+// ─── PERIODIC BACKGROUND SYNC (V3 Premium — sincroniza aunque la app esté cerrada) ──
+// Requiere permisos 'periodic-background-sync' en el navegador (Chrome/Android)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'periodic-sync-data') {
+    event.waitUntil(
+      _bgSync().catch(() => {})
+    )
+  }
+})
+
+// ─── MENSAJES DESDE LA APP ────────────────────────────────────────────────────
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+  const { type } = event.data || {}
+
+  // La app pide al SW que active la nueva versión inmediatamente
+  if (type === 'SKIP_WAITING') self.skipWaiting()
+
+  // La app pide hacer sync manual ahora
+  if (type === 'FORCE_SYNC') event.waitUntil(_bgSync().catch(() => {}))
+
+  // La app pide limpiar la caché de Supabase (por ejemplo, tras login)
+  if (type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.delete('supabase-api').then(() =>
+        event.source?.postMessage({ type: 'CACHE_CLEARED' })
+      )
+    )
+  }
+})
+
+// ─── INSTALACIÓN GUIADA — OfflineShell ────────────────────────────────────────
+// Cuando el SW instala, pre-carga las rutas críticas para experiencia offline perfecta
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open('offline-shell').then(cache =>
+      cache.addAll(['/', '/index.html']).catch(() => {})
+    )
+  )
 })

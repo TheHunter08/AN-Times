@@ -5,6 +5,22 @@ import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
 import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
 
+function useLiveClock() {
+  const fmt = () => {
+    const n = new Date()
+    return {
+      time: n.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      date: n.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+    }
+  }
+  const [clock, setClock] = useState(fmt)
+  useEffect(() => {
+    const iv = setInterval(() => setClock(fmt()), 5000)
+    return () => clearInterval(iv)
+  }, [])
+  return clock
+}
+
 export default function LoginPage() {
   const { db, setSession, setScreen, toast, saveDB } = useAppStore()
   const [mode, setMode] = useState('pin')
@@ -24,6 +40,7 @@ export default function LoginPage() {
   const [generatedPinNotice, setGeneratedPinNotice] = useState(() => {
     try { return localStorage.getItem('__admin_pin_fb_new__') === '1' } catch { return false }
   })
+  const clock = useLiveClock()
 
   const emps = sortedEmps(db)
 
@@ -273,6 +290,12 @@ export default function LoginPage() {
       </div>
 
       <div className={`login-wrap${mounted ? ' login-mounted' : ''}`}>
+        {/* Reloj en vivo */}
+        <div className="login-clock-hero" aria-hidden="true">
+          <div className="login-clock-time">{clock.time}</div>
+          <div className="login-clock-date">{clock.date}</div>
+        </div>
+
         {/* Logo */}
         <div className="login-logo-row" onClick={handleLogoTap}>
           <div className="login-logo-icon">
