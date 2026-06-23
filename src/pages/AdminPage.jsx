@@ -197,7 +197,7 @@ export default function AdminPage() {
               <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#admLogoAccent)" strokeWidth="2" strokeLinecap="round"/>
               <circle cx="30" cy="19.8" r="1.1" fill="url(#admLogoAccent)"/>
             </svg>
-            TIMES INC
+            <span className="adm-logo-text">TIMES INC</span>
           </div>
           <div className="adm-page-title">{actPanel.label}</div>
           {activeNow > 0 && (
@@ -207,17 +207,17 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <div className="adm-topbar-actions">
           <SyncBadge />
           {!isEncargado && (
-            <button onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:8, display:'flex', alignItems:'center', gap:6, padding:'5px 10px', cursor:'pointer', color:'var(--text3)', fontSize:12 }}>
+            <button className="adm-topbar-search" onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <span className="adm-search-label">Buscar</span>
-              <kbd style={{ fontSize:9, padding:'1px 5px', background:'var(--bg-400)', border:'1px solid var(--border)', borderRadius:3, fontFamily:'monospace' }}>⌘K</kbd>
+              <kbd className="adm-search-kbd">⌘K</kbd>
             </button>
           )}
           {!isEncargado && (
-            <button title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
+            <button className="adm-topbar-icon-btn" title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               {adminUnreadChats > 0 && (
                 <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminUnreadChats > 9 ? '9+' : adminUnreadChats}</span>
@@ -225,13 +225,16 @@ export default function AdminPage() {
             </button>
           )}
           {session.user && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setScreen('emp')}>
+            <button className="btn btn-secondary btn-sm adm-topbar-emp-btn" onClick={() => setScreen('emp')} title="Panel Empleado">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Panel Emp.
+              <span className="adm-topbar-emp-lbl">Panel Emp.</span>
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Cambiar tema" style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, lineHeight:1, padding:'4px 6px', borderRadius:8, color:'var(--text3)' }}>{isLight ? '🌙' : '☀️'}</button>
-          <button className="btn btn-secondary btn-sm" onClick={doLogout}>Salir</button>
+          <button className="theme-toggle-btn adm-topbar-theme" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Cambiar tema">{isLight ? '🌙' : '☀️'}</button>
+          <button className="btn btn-secondary btn-sm adm-topbar-logout" onClick={doLogout} title="Cerrar sesión">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span className="adm-topbar-logout-lbl">Salir</span>
+          </button>
         </div>
       </div>
 

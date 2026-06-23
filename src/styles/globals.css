@@ -1308,6 +1308,45 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-search-label { display: none; }
 @media (min-width: 640px) { .adm-search-label { display: inline; } }
 
+/* Topbar admin — comportamiento responsivo (evita iconos cortados en móvil) */
+.adm-topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 1; min-width: 0; }
+.adm-topbar-search {
+  background: var(--bg-500); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+  cursor: pointer; color: var(--text3); font-size: 12px; flex-shrink: 0;
+}
+.adm-topbar-icon-btn {
+  position: relative; background: none; border: none; cursor: pointer;
+  color: var(--text3); display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+}
+.adm-search-kbd {
+  font-size: 9px; padding: 1px 5px; background: var(--bg-400);
+  border: 1px solid var(--border); border-radius: 3px; font-family: monospace;
+}
+.adm-topbar-emp-btn { flex-shrink: 0; }
+.adm-topbar-theme { flex-shrink: 0; }
+.adm-topbar-logout { flex-shrink: 0; }
+.adm-topbar-logout svg { display: none; }
+
+/* En móvil: ocultar el texto, dejar solo iconos críticos y "Salir" como icono */
+@media (max-width: 640px) {
+  .adm-topbar-search kbd, .adm-search-kbd { display: none; }
+  .adm-topbar-search { padding: 6px 8px; }
+  .adm-topbar-emp-lbl { display: none; }
+  .adm-topbar-emp-btn { padding: 6px 8px; min-width: 32px; }
+  .adm-topbar-theme { width: 30px; height: 30px; font-size: 13px; }
+  .adm-topbar-logout-lbl { display: none; }
+  .adm-topbar-logout { padding: 6px 8px; min-width: 32px; }
+  .adm-topbar-logout svg { display: inline-block; }
+  .adm-topbar-actions { gap: 4px; }
+}
+
+/* En pantallas muy pequeñas: además oculta el sync-text */
+@media (max-width: 380px) {
+  .adm-topbar-search { display: none; }
+}
+
 .ai-chat { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; margin-bottom: 12px; padding: 2px; }
 .ai-msg-user { padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 13px; line-height: 1.45; max-width: 85%; background: linear-gradient(135deg,#2563EB,#7C3AED); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(37,99,235,.25); animation: aiMsgIn .22s ease; }
 .ai-msg-bot  { padding: 10px 13px; border-radius: 16px 16px 16px 4px; font-size: 13px; line-height: 1.5; max-width: 88%; background: var(--bg-500); border: 1px solid var(--border); color: var(--text2); align-self: flex-start; animation: aiMsgIn .22s ease; }
@@ -1366,9 +1405,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .adm-menu-btn { width:34px; height:34px; background:var(--bg-500); border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
 .adm-menu-btn svg { width:16px; height:16px; }
-.adm-logo { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; letter-spacing:-.2px; }
+.adm-logo { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; letter-spacing:-.2px; flex-shrink:0; }
 .adm-page-title { font-size:13px; font-weight:600; color:var(--text3); display:none; }
 @media(min-width:480px) { .adm-page-title { display:block; } }
+/* En móvil: ocultar texto "TIMES INC" para dejar más espacio a los iconos del topbar */
+@media(max-width:640px) {
+  .adm-logo-text { display:none; }
+}
 
 /* ── Sidebar — Linear-style ────────────────────────────────── */
 .adm-sidebar {

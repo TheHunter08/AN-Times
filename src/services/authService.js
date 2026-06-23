@@ -48,6 +48,13 @@ export async function resetPassword(email) {
   if (error) throw { code: error.message, message: mapError(error) }
 }
 
+export async function updatePassword(newPassword) {
+  if (!supabase) throw new Error('Sin conexión con el servidor')
+  if (!newPassword || newPassword.length < 6) throw { message: 'La contraseña debe tener al menos 6 caracteres' }
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw { code: error.message, message: mapError(error) }
+}
+
 export async function signOut() {
   try { await supabase?.auth.signOut() } catch {}
 }
