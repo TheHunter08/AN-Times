@@ -259,6 +259,23 @@ export default function EmployeePage() {
       const hasSent = (key, val) => val !== undefined ? notisSent[key] === val : !!notisSent[key]
       const markSent = (key, val = '1') => { notisSent[key] = val; dirty = true }
 
+      // Permanent device-local guard for one-time notifications (vacaciones result).
+      // Survives realtime overwrites even if Supabase write is delayed.
+      const _lsPermKey = '__notisPermV__'
+      const _lsPermMap = (() => { try { return JSON.parse(localStorage.getItem(_lsPermKey) || '{}') } catch { return {} } })()
+      const isPermSent = (key) => !!_lsPermMap[key]
+      const markPermSent = (key) => { _lsPermMap[key] = '1'; try { localStorage.setItem(_lsPermKey, JSON.stringify(_lsPermMap)) } catch {} }
+
+      // Acumulador de notis a añadir a db.notis (para que aparezcan en la campana)
+      const bellNotis = []
+      const addBell = (action, detail) => {
+        bellNotis.push({
+          id: 'sn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          empId: u.id, action, detail,
+          ts: new Date().toISOString(), leido: false
+        })
+      }
+
       // 1. Recordatorio diario de fichaje
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
@@ -301,13 +318,18 @@ export default function EmployeePage() {
       // 4. Vacaciones aprobadas/rechazadas (una vez por solicitud, entre dispositivos)
       ;(db.vacaciones || []).filter(v => v.empId === u.id && (v.estado === 'aprobada' || v.estado === 'rechazada')).forEach(v => {
         const key = 'an_vac_res_' + v.id
-        if (!hasSent(key)) {
+        if (!hasSent(key) && !isPermSent(key)) {
           markSent(key)
+          markPermSent(key)
           if (v.estado === 'aprobada') {
-            queuePush(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/?go=emp:vacaciones')
+            const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`
+            queuePush(u.id, '🎉 Vacaciones aprobadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
+            addBell('🎉 Vacaciones aprobadas', _msgVac)
           } else {
             const motivoTxt = v.motivoRechazo ? ` Motivo: ${v.motivoRechazo}` : ''
-            queuePush(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`, 'vacaciones', '/?go=emp:vacaciones')
+            const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`
+            queuePush(u.id, '❌ Vacaciones rechazadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
+            addBell('❌ Vacaciones rechazadas', _msgVac)
           }
         }
       })
@@ -318,7 +340,9 @@ export default function EmployeePage() {
         const key = 'an_docs_' + u.id
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
-          queuePush(u.id, '📄 Documentos pendientes', `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/?go=emp:documentos')
+          const _msgDoc = `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`
+          queuePush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
+          addBell('📄 Documentos pendientes', _msgDoc)
         }
       }
 
@@ -328,7 +352,9 @@ export default function EmployeePage() {
         const key = 'an_cierre_' + u.id
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
-          queuePush(u.id, '📋 Cierre mensual pendiente', `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
+          const _msgCi = `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`
+          queuePush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
+          addBell('📋 Cierre mensual pendiente', _msgCi)
         }
       }
 
@@ -342,6 +368,7 @@ export default function EmployeePage() {
           if (!hasSent(warnKey)) {
             markSent(warnKey)
             queuePush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
+            addBell('⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
             toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
           }
         }
@@ -360,14 +387,24 @@ export default function EmployeePage() {
             const snapshot = dbRef.current.records
             const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
             const dbWithAudit = auditLog(dbRef.current, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
-            saveDB({ records: updRecs, notisSent, audit: dbWithAudit.audit })
-            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
+            const _msgAc = `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
+            addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
+            const _notisToSave = [...(dbRef.current.notis || []), ...bellNotis]
+            bellNotis.length = 0
+            saveDB({ records: updRecs, notisSent: { ...(dbRef.current.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: _notisToSave })
+            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
           }
         }
       })
 
-      // Batch save: una sola escritura por ciclo si hubo cambios en notisSent
-      if (dirty) saveDB({ notisSent })
+      // Batch save: una sola escritura por ciclo. Combina notisSent + bell notis.
+      // Merge new keys into current dbRef to avoid stale-snapshot overwrites.
+      if (dirty || bellNotis.length) {
+        const partial = {}
+        if (dirty) partial.notisSent = { ...(dbRef.current.notisSent || {}), ...notisSent }
+        if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
+        saveDB(partial)
+      }
     }
 
     const iv = setInterval(checkSmartNotis, 60000)
