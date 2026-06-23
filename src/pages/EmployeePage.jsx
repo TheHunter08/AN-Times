@@ -277,15 +277,20 @@ export default function EmployeePage() {
       }
 
       // 1. Recordatorio diario de fichaje
+      // Dispara una vez al día: desde reminderTime hasta las 23:59 si no se ha fichado.
+      // (antes era una ventana de 5min; si la app no estaba abierta justo en esos 5min,
+      // la noti se perdía para siempre).
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
-        if (minsPast >= 0 && minsPast < 5) {
-          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio.startsWith(todayStr))
+        if (minsPast >= 0) {
+          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)
-            queuePush(u.id, '⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder-fichar', '/?tab=inicio')
+            const _msgRem = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
+            queuePush(u.id, '⏰ Recordatorio de fichaje', _msgRem, 'reminder-fichar', '/?tab=inicio')
+            addBell('⏰ Recordatorio de fichaje', _msgRem)
           }
         }
       }
@@ -297,20 +302,25 @@ export default function EmployeePage() {
         const warn14h = 'an_warn_14h_' + openRec.id
         if (elapsed >= 465 && elapsed < 475 && !hasSent(warn14h)) {
           markSent(warn14h)
-          queuePush(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
+          const _msgLong = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
+          queuePush(u.id, '⏳ Jornada larga', _msgLong, 'jornada', '/')
+          addBell('⏳ Jornada larga', _msgLong)
         }
       }
 
       // 3. Recordatorio de salida olvidada
+      // Ventana abierta: desde salidaTime hasta el cierre de jornada
       if (getCfg('notiSalida', true) && openRec) {
         const [sh, sm] = (getCfg('salidaTime', '21:00')).split(':').map(Number)
         const salidaMinsPast = (hh - sh) * 60 + (mm - sm)
-        if (salidaMinsPast >= 0 && salidaMinsPast < 5) {
+        if (salidaMinsPast >= 0) {
           const sKey = 'an_salida_' + openRec.id
           if (!hasSent(sKey)) {
             markSent(sKey)
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
-            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`, 'jornada', '/?tab=inicio')
+            const _msgSal = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
+            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio')
+            addBell('🔔 ¿Olvidaste fichar la salida?', _msgSal)
           }
         }
       }
