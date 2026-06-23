@@ -29,15 +29,16 @@ function isDuplicate(userId, tag, title, body) {
   return false
 }
 
-const toB64Url = s => (s || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
+const toB64Url  = s => cleanEnv(s).replace(/^["']|["']$/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const isValidVapidPub = s => /^[A-Za-z0-9\-_]{86,90}$/.test(s)
 const isValidVapidPrv = s => /^[A-Za-z0-9\-_]{42,46}$/.test(s)
 const _vpub = toB64Url(process.env.VAPID_PUBLIC)
 const _vprv = toB64Url(process.env.VAPID_PRIVATE)
 const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
 const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
-const SB_URL        = (process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co').trim()
-const SB_ANON       = (process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I').trim()
+const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const PUSH_SECRET   = process.env.PUSH_SECRET
 
 let _loadError = null
