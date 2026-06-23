@@ -115,7 +115,7 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, lastSyncTime, fetchDB } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const timer = useTimer()
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -575,9 +575,6 @@ export default function EmployeePage() {
               {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
             </button>
           )}
-          <button className="icon-btn" onClick={() => { try { navigator.vibrate(8) } catch {}; fetchDB() }} title="Sincronizar" aria-label="Sincronizar ahora" disabled={syncStatus === 'syncing'} style={{ opacity: syncStatus === 'syncing' ? .6 : 1 }}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" style={{ animation: syncStatus === 'syncing' ? 'ptr-spin .9s linear infinite' : 'none' }}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          </button>
           <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema claro/oscuro">{isLight ? '🌙' : '☀️'}</button>
           <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
