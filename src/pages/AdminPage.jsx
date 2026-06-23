@@ -175,11 +175,11 @@ export default function AdminPage() {
     <div className="screen active" id="sAdmin">
       {/* Topbar */}
       <div className="adm-topbar">
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <button className="adm-menu-btn" onClick={() => setSideOpen(s => !s)}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0, overflow:'hidden' }}>
+          <button className="adm-menu-btn" onClick={() => setSideOpen(s => !s)} style={{ flexShrink:0 }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
-          <div className="adm-logo">
+          <div className="adm-logo" style={{ flexShrink:0 }}>
             <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
               <defs>
                 <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
@@ -199,9 +199,9 @@ export default function AdminPage() {
             </svg>
             <span className="adm-logo-text">TIMES INC</span>
           </div>
-          <div className="adm-page-title">{actPanel.label}</div>
+          <div className="adm-page-title" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{actPanel.label}</div>
           {activeNow > 0 && (
-            <div onClick={() => nav('control')} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--green-dim)', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'3px 10px 3px 7px', cursor:'pointer', flexShrink:0 }}>
+            <div onClick={() => nav('control')} className="adm-live-chip">
               <span style={{ width:7, height:7, borderRadius:'50%', background:'var(--green)', animation:'livePing 2s ease-in-out infinite', flexShrink:0 }} />
               <span style={{ fontSize:11, fontWeight:700, color:'var(--green)', whiteSpace:'nowrap' }}>{activeNow} en obra</span>
             </div>
@@ -256,6 +256,16 @@ export default function AdminPage() {
               </button>
             ))}
             <div className="adm-nav-divider" />
+            {session.user && (
+              <button type="button" className="adm-nav-item adm-sidebar-emp-btn" onClick={() => { setScreen('emp'); setSideOpen(false) }}>
+                <span className="adm-nav-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span>Panel empleado</span>
+              </button>
+            )}
+            <button type="button" className="adm-nav-item adm-sidebar-theme-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }}>
+              <span className="adm-nav-ico">{isLight ? '🌙' : '☀️'}</span>
+              <span>{isLight ? 'Modo oscuro' : 'Modo claro'}</span>
+            </button>
             <button type="button" className="adm-nav-item" onClick={doLogout} style={{ color:'var(--danger)' }}>
               <span className="adm-nav-ico">🚪</span><span>Cerrar sesión</span>
             </button>

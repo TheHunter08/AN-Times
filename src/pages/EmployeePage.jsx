@@ -666,7 +666,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -903,7 +903,7 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast }) {
   const { setEmpTab } = useAppStore()
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
@@ -1219,6 +1219,45 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
         {teamData && (() => {
           const { teamEmps, liveIds, doneIds, minByEmp } = teamData
           const liveCount = teamEmps.filter(e => liveIds.has(e.id)).length
+          const recs = db.records || []
+
+          const teamStartJornada = (e) => {
+            if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
+            const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
+            saveDB({ records: [...recs, newRec] })
+            queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
+            toast('Jornada iniciada', 2500, 'ok')
+          }
+
+          const teamToggleDescanso = (rec) => {
+            const now = new Date().toISOString()
+            let updated
+            if (rec.enDescanso) {
+              const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
+              updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+              queuePush(rec.empId, '▶ Descanso finalizado', `${u.name} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
+              toast('Jornada reanudada', 2500, 'ok')
+            } else {
+              updated = { ...rec, enDescanso: true, bStartTs: now }
+              queuePush(rec.empId, '⏸ Descanso iniciado', `${u.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
+              toast('Descanso iniciado', 2500, 'ok')
+            }
+            saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+          }
+
+          const teamForceClose = (rec) => {
+            const empName = teamEmps.find(e => e.id === rec.empId)?.name || rec.empName
+            if (!window.confirm(`¿Finalizar jornada de ${empName}?`)) return
+            const now = new Date().toISOString()
+            const breaks = [...(rec.breaks || [])]
+            if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
+            const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+            const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+            saveDB({ records: recs.map(r => r.id === rec.id ? closed : r) })
+            queuePush(rec.empId, '⏹ Jornada finalizada', `${u.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
+            toast('Jornada finalizada', 2500, 'ok')
+          }
+
           return (
             <div style={{ padding:'0 16px 12px' }}>
               <div className="sec-label">
@@ -1227,29 +1266,46 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                   {liveCount} activo{liveCount !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {teamEmps.map(e => {
                   const isWorking = liveIds.has(e.id)
                   const isDone    = !isWorking && doneIds.has(e.id)
-                  const openRec2  = isWorking ? (db.records||[]).find(r => r.empId === e.id && !r.fin) : null
+                  const openRec2  = isWorking ? recs.find(r => r.empId === e.id && !r.fin) : null
                   const totalMin  = isDone ? (minByEmp[e.id] || 0) : 0
                   const dotColor  = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
                   const statusTxt = isWorking
-                    ? `Activo desde ${ftime(openRec2?.inicio)}`
+                    ? (openRec2?.enDescanso ? `En descanso desde ${ftime(openRec2?.bStartTs || openRec2?.inicio)}` : `Activo desde ${ftime(openRec2?.inicio)}`)
                     : isDone ? `${mhm(totalMin)} · Finalizado`
                     : 'Sin fichar hoy'
                   return (
-                    <div key={e.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'9px 12px' }}>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, transition:'box-shadow .3s', boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
-                      <div style={{ width:32, height:32, borderRadius:9, background: e.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>
-                        {e.initials || e.name.slice(0,2).toUpperCase()}
+                    <div key={e.id} style={{ background:'var(--bg-600)', border:`1px solid ${isWorking ? 'rgba(54,178,126,.3)' : 'var(--border)'}`, borderRadius:'var(--r)', padding:'10px 12px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: isWorking || !isDone ? 8 : 0 }}>
+                        <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, transition:'box-shadow .3s', boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
+                        <div style={{ width:32, height:32, borderRadius:9, background: e.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>
+                          {e.initials || e.name.slice(0,2).toUpperCase()}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name.split(' ')[0]} {e.name.split(' ')[1] || ''}</div>
+                          <div style={{ fontSize:10, color: isWorking ? (openRec2?.enDescanso ? 'var(--orange)' : 'var(--green)') : isDone ? 'var(--text3)' : 'var(--text4)', marginTop:1 }}>{statusTxt}</div>
+                        </div>
                       </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name.split(' ')[0]} {e.name.split(' ')[1] || ''}</div>
-                        <div style={{ fontSize:10, color: isWorking ? 'var(--green)' : isDone ? 'var(--text3)' : 'var(--text4)', marginTop:1 }}>{statusTxt}</div>
-                      </div>
-                      {isWorking && <div style={{ fontSize:9, fontWeight:800, color:'var(--green)', background:'var(--green-dim)', padding:'3px 8px', borderRadius:10, flexShrink:0, border:'1px solid rgba(16,185,129,.2)' }}>● EN OBRA</div>}
-                      {isDone && !isWorking && <div style={{ fontSize:9, fontWeight:800, color:'var(--primary-light)', background:'var(--primary-dim)', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>✓ FIN</div>}
+                      {/* Botones de control — solo si saveDB disponible */}
+                      {saveDB && (
+                        isWorking ? (
+                          <div style={{ display:'flex', gap:6 }}>
+                            <button onClick={() => teamToggleDescanso(openRec2)} style={{ flex:1, fontSize:10, fontWeight:700, padding:'5px 6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text2)', cursor:'pointer' }}>
+                              {openRec2?.enDescanso ? '▶ Reanudar' : '⏸ Pausa'}
+                            </button>
+                            <button onClick={() => teamForceClose(openRec2)} style={{ flex:1, fontSize:10, fontWeight:700, padding:'5px 6px', borderRadius:6, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.1)', color:'var(--danger)', cursor:'pointer' }}>
+                              ■ Finalizar
+                            </button>
+                          </div>
+                        ) : !isDone ? (
+                          <button onClick={() => teamStartJornada(e)} style={{ width:'100%', fontSize:10, fontWeight:700, padding:'5px 0', borderRadius:6, border:'1px solid rgba(37,99,235,.3)', background:'var(--primary-dim)', color:'var(--primary-light)', cursor:'pointer' }}>
+                            ▶ Iniciar jornada
+                          </button>
+                        ) : null
+                      )}
                     </div>
                   )
                 })}

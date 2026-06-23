@@ -1358,22 +1358,39 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-topbar-logout { flex-shrink: 0; }
 .adm-topbar-logout svg { display: none; }
 
-/* En móvil: ocultar el texto, dejar solo iconos críticos y "Salir" como icono */
+/* Chip "X en obra" en el topbar */
+.adm-live-chip {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--green-dim); border: 1px solid rgba(16,185,129,.2);
+  border-radius: 20px; padding: 3px 10px 3px 7px;
+  cursor: pointer; flex-shrink: 1; min-width: 0; overflow: hidden;
+}
+
+/* En móvil: quitar del topbar lo que ya está en el sidebar */
 @media (max-width: 640px) {
   .adm-topbar-search kbd, .adm-search-kbd { display: none; }
   .adm-topbar-search { padding: 6px 8px; }
+  /* Tema y Salir van al sidebar en móvil — los ocultamos del topbar */
+  .adm-topbar-theme { display: none; }
+  .adm-topbar-logout { display: none; }
+  /* Panel Emp. — solo icono */
   .adm-topbar-emp-lbl { display: none; }
   .adm-topbar-emp-btn { padding: 6px 8px; min-width: 32px; }
-  .adm-topbar-theme { width: 30px; height: 30px; font-size: 13px; }
-  .adm-topbar-logout-lbl { display: none; }
-  .adm-topbar-logout { padding: 6px 8px; min-width: 32px; }
-  .adm-topbar-logout svg { display: inline-block; }
   .adm-topbar-actions { gap: 4px; }
+  /* Chip "en obra" oculto en pantallas muy pequeñas */
+  .adm-live-chip { display: none; }
 }
 
-/* En pantallas muy pequeñas: además oculta el sync-text */
+/* En pantallas >640px, los botones del sidebar que duplican topbar se ocultan */
+@media (min-width: 641px) {
+  .adm-sidebar-theme-btn { display: none; }
+  .adm-sidebar-emp-btn  { display: none; }
+}
+
+/* En pantallas muy pequeñas: también oculta buscar */
 @media (max-width: 380px) {
   .adm-topbar-search { display: none; }
+  .adm-topbar-emp-btn { display: none; }
 }
 
 .ai-chat { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; margin-bottom: 12px; padding: 2px; }
