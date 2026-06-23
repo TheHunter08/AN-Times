@@ -258,9 +258,16 @@ export async function pushSubscribe(userId, vapidPub) {
   }
   try {
     const reg = await navigator.serviceWorker.ready
-    const b64ToUint8 = b => {
+    // Sanea cualquier whitespace/quotes y normaliza base64url ANTES de atob,
+    // si no atob lanza "The string contains invalid characters" en iOS.
+    const b64ToUint8 = raw => {
+      const b = String(raw || '')
+        .replace(/\s+/g, '')
+        .replace(/^["']|["']$/g, '')
+        .replace(/-/g, '+')
+        .replace(/_/g, '/')
       const p = '='.repeat((4 - b.length % 4) % 4)
-      const s = atob((b + p).replace(/-/g, '+').replace(/_/g, '/'))
+      const s = atob(b + p)
       return Uint8Array.from([...s].map(c => c.charCodeAt(0)))
     }
     const buf2b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')

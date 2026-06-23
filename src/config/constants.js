@@ -20,7 +20,19 @@ function initAdminPin() {
 }
 export const ADMIN_PIN = initAdminPin()
 
-export const VAPID_PUB = import.meta.env.VITE_VAPID_PUB || 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
+// VAPID: saneamos espacios, normalizamos a base64url y validamos
+// que tenga formato correcto. Si la env var llega malformada (whitespace,
+// comillas, padding incorrecto), caemos al fallback hardcoded.
+const _VAPID_FALLBACK = 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
+const _sanitizeVapid = (s) => (s || '')
+  .replace(/\s+/g, '')          // quita espacios/newlines/tabs
+  .replace(/^["']|["']$/g, '')  // quita comillas envolventes
+  .replace(/\+/g, '-')          // normaliza a base64url
+  .replace(/\//g, '_')
+  .replace(/=+$/, '')           // quita padding
+const _isValidVapid = (s) => /^[A-Za-z0-9_-]{86,90}$/.test(s)
+const _candidate = _sanitizeVapid(import.meta.env.VITE_VAPID_PUB)
+export const VAPID_PUB = _isValidVapid(_candidate) ? _candidate : _VAPID_FALLBACK
 
 export const WK = 40 * 60   // weekly minutes norm
 export const WD = 8 * 60    // daily minutes norm
