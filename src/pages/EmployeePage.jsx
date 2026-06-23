@@ -2974,11 +2974,11 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
                 <button onClick={async () => {
                   try {
                     const r = await pushSubscribe(u.id, VAPID_PUB)
-                    if (!r?.ok) { toast('No suscrito: ' + (r?.reason || 'error'), 4000, 'err'); return }
+                    if (!r?.ok) { toast(r?.error || r?.reason || 'No se pudo suscribir', 7000, 'err'); return }
                     const res = await queuePush(u.id, '🔔 Prueba de notificación', 'Si ves esto, el sistema funciona correctamente.', 'test-' + Date.now(), '/')
                     if (res?.ok) toast('Push enviado — revisa la barra de estado', 4000, 'ok')
-                    else toast('Falló: ' + (res?.error || res?.status || 'desconocido'), 6000, 'err')
-                  } catch (e) { toast('Error: ' + e.message, 5000, 'err') }
+                    else toast('Push falló: ' + (res?.error || res?.status || 'desconocido'), 7000, 'err')
+                  } catch (e) { toast('Error: ' + e.message, 6000, 'err') }
                 }} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>Probar</button>
               </div>
             </>

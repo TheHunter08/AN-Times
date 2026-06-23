@@ -272,13 +272,39 @@ export async function pushSubscribe(userId, vapidPub) {
       if (old) { try { await old.unsubscribe() } catch {} }
     }
 
+    // Helper: intentar subscribe con reintento limpio (force unsubscribe + retry)
+    const doSubscribe = async () => {
+      return await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: b64ToUint8(vapidPub)
+      })
+    }
+
     let sub = await reg.pushManager.getSubscription()
     if (!sub) {
       try {
-        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
+        sub = await doSubscribe()
       } catch (err) {
-        console.error('[PUSH] subscribe() falló:', err.name, err.message)
-        return { ok: false, reason: 'subscribe_failed', error: err.message }
+        console.error('[PUSH] subscribe() falló (intento 1):', err.name, err.message)
+        // iOS suele tener suscripciones zombi tras cambios de VAPID/permission.
+        // Reintento: limpia cualquier estado residual y vuelve a suscribir.
+        try {
+          const stale = await reg.pushManager.getSubscription()
+          if (stale) { try { await stale.unsubscribe() } catch {} }
+          await new Promise(r => setTimeout(r, 400))
+          sub = await doSubscribe()
+          console.log('[PUSH] subscribe() OK tras reintento')
+        } catch (err2) {
+          console.error('[PUSH] subscribe() falló (intento 2):', err2.name, err2.message)
+          const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+          let hint = err2.message || err2.name || 'desconocido'
+          if (isIOS && !isPWA) hint = 'Instala la PWA en pantalla de inicio (Safari → Compartir → Añadir)'
+          else if (err2.name === 'NotAllowedError') hint = 'Permiso de notificaciones denegado o restringido por iOS'
+          else if (err2.name === 'AbortError') hint = 'No se pudo contactar con el servicio push (red o iOS)'
+          else if (err2.name === 'InvalidAccessError') hint = 'Clave VAPID inválida'
+          return { ok: false, reason: 'subscribe_failed', error: hint, errName: err2.name }
+        }
       }
     }
     localStorage.setItem(VAPID_KEY_STORAGE, vapidPub)
