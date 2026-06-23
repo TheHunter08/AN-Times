@@ -1584,7 +1584,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-topbar { justify-content:space-between; }
 
 /* vac-wrap2 */
-.vac-wrap2 { display:flex; flex-direction:column; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:20px; }
+.vac-wrap2 { display:flex; flex-direction:column; padding-bottom:20px; }
 .vac-stats-row { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--bg-600); }
 .vac-stat { flex:1; padding:14px 8px; text-align:center; border-right:1px solid var(--border); }
 .vac-stat:last-child { border-right:none; }

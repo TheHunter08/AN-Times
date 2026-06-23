@@ -739,10 +739,25 @@ function PullToRefresh({ children }) {
     const indicator = indicatorRef.current
     if (!el || !inner) return
 
+    // Guardia: si algún estado quedó colgado de una sesión anterior, lo reseteamos al montar.
+    inner.style.transition = 'none'
+    inner.style.transform = ''
+    if (indicator) indicator.style.opacity = '0'
+
     const setOffset = (px, animate) => {
       inner.style.transition = animate ? 'transform .3s cubic-bezier(.25,.46,.45,.94)' : 'none'
       inner.style.transform = px > 0 ? `translate3d(0, ${px}px, 0)` : ''
       if (indicator) indicator.style.opacity = px > 0 ? '1' : '0'
+    }
+
+    // Forzar reset si una transición se quedó a medias (p.ej. reload tras SW update)
+    const forceReset = () => {
+      ptr.current.active = false
+      ptr.current.dist = 0
+      ptr.current.refreshing = false
+      inner.style.transition = 'none'
+      inner.style.transform = ''
+      if (indicator) indicator.style.opacity = '0'
     }
 
     const setHint = (d) => {
@@ -799,6 +814,12 @@ function PullToRefresh({ children }) {
       if (!ptr.current.refreshing) setOffset(0, true)
     }
 
+    // Safety nets globales: si vuelvo a la pestaña, o el SW se activa y la app
+    // se queda con la transform a medias, forzamos reset.
+    const onVisibility = () => { if (document.visibilityState === 'visible') forceReset() }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pageshow', forceReset)
+
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })
@@ -808,6 +829,9 @@ function PullToRefresh({ children }) {
       el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
       el.removeEventListener('touchcancel', onCancel)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pageshow', forceReset)
+      forceReset()
     }
   }, [fetchDB])
 
@@ -1880,7 +1904,7 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const daysFrom = (ds) => Math.ceil((new Date(ds + 'T00:00:00') - new Date(todayVacStr + 'T00:00:00')) / 86400000)
 
   return (
-    <div className="emp-tab active">
+    <PullToRefresh>
       <div className="vac-wrap2">
         <div className="vac-hero" style={{ paddingTop:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.2)', borderRadius:20, padding:'5px 12px', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.4px', textTransform:'uppercase', marginBottom:8, width:'fit-content' }}>
@@ -1974,7 +1998,7 @@ function TabVacaciones({ db, u, vac, toast, saveDB }) {
           )}
         </div>
       </div>
-    </div>
+    </PullToRefresh>
   )
 }
 
@@ -2065,7 +2089,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   })
 
   return (
-    <div className="emp-tab active">
+    <PullToRefresh>
       <div className="cal-wrap">
         <div className="cal-header">
           <div className="cal-month" style={{ textTransform:'capitalize' }}>
@@ -2187,7 +2211,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           ))}
         </div>
       </div>
-    </div>
+    </PullToRefresh>
   )
 }
 
@@ -2231,7 +2255,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   }
 
   return (
-    <div className="emp-tab active" style={{ background:'var(--bg-800)' }}>
+    <PullToRefresh>
       <div className="prf-hero">
         <div style={{ position:'relative', marginBottom:14 }}>
           <div className="prf-av-wrap">
@@ -2324,7 +2348,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
-    </div>
+    </PullToRefresh>
   )
 }
 
