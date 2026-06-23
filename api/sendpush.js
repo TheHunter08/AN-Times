@@ -1,4 +1,13 @@
-const webpush = require('web-push');
+// Cargar web-push de forma defensiva — si el módulo no está disponible,
+// devolvemos un JSON con error claro en lugar de FUNCTION_INVOCATION_FAILED.
+let webpush = null;
+let _loadError = null;
+try {
+  webpush = require('web-push');
+} catch (e) {
+  _loadError = 'web-push module not installed: ' + e.message;
+  console.error('[sendpush] FATAL:', _loadError);
+}
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
 const _rl = new Map()
@@ -10,22 +19,29 @@ function rateLimit(ip) {
   if (now > entry.reset) { entry.count = 0; entry.reset = now + window }
   entry.count++
   _rl.set(ip, entry)
-  // Cleanup old entries periodically
   if (_rl.size > 2000) { for (const [k, v] of _rl) { if (now > v.reset) _rl.delete(k) } }
   return entry.count > max
 }
 
-const toB64Url = s => (s || '').replace(/\s+/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const isValidVapid = s => /^[A-Za-z0-9\-_]{40,}$/.test(s);
+const toB64Url = s => (s || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const isValidVapidPub = s => /^[A-Za-z0-9\-_]{86,90}$/.test(s);
+const isValidVapidPrv = s => /^[A-Za-z0-9\-_]{42,46}$/.test(s);
 const _vpub = toB64Url(process.env.VAPID_PUBLIC);
 const _vprv = toB64Url(process.env.VAPID_PRIVATE);
-const VAPID_PUBLIC  = isValidVapid(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ';
-const VAPID_PRIVATE = isValidVapid(_vprv) ? _vprv : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE';
-const SB_URL        = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co';
-const SB_ANON       = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I';
-const PUSH_SECRET   = process.env.PUSH_SECRET;   // shared secret — requerido si está configurado
+const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ';
+const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE';
+const SB_URL        = (process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co').trim();
+const SB_ANON       = (process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I').trim();
+const PUSH_SECRET   = process.env.PUSH_SECRET;
 
-webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
+if (webpush) {
+  try {
+    webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
+  } catch (e) {
+    _loadError = 'setVapidDetails failed: ' + e.message;
+    console.error('[sendpush] FATAL:', _loadError);
+  }
+}
 
 async function sbGet(userId) {
   if (!SB_URL || !SB_ANON) return null;
@@ -58,6 +74,7 @@ async function sendOne(sub, payload) {
 }
 
 module.exports = async function handler(req, res) {
+ try {
   const allowedOrigin = process.env.PUSH_ALLOWED_ORIGIN || '';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -65,6 +82,11 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Si el módulo web-push no se pudo cargar, devolver error claro
+  if (_loadError || !webpush) {
+    return res.status(500).json({ error: _loadError || 'web-push not available' });
+  }
 
   // Rate limiting
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
@@ -130,4 +152,12 @@ module.exports = async function handler(req, res) {
     console.error('[sendpush]', err.statusCode, err.body || err.message);
     return res.status(500).json({ error: err.message });
   }
+ } catch (fatal) {
+   // Cualquier excepción no manejada acaba aquí; devolvemos JSON con el mensaje
+   // real para que el cliente pueda diagnosticar (en lugar de FUNCTION_INVOCATION_FAILED).
+   console.error('[sendpush] uncaught:', fatal);
+   try {
+     return res.status(500).json({ error: 'uncaught: ' + (fatal?.message || String(fatal)) });
+   } catch { return; }
+ }
 };
