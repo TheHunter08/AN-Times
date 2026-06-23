@@ -681,23 +681,35 @@ function OfflineBanner() {
 }
 
 // ─── PULL TO REFRESH ────────────────────────────────────────────────────────────
-// Usa transform:translateY en el contenedor scroll en lugar de height dinámica
-// del indicador. Cambiar height dentro del scroll container hace que iOS bloquee
-// el scroll después del gesto — translateY nunca toca la geometría del scroll.
+// iOS PWA: NUNCA aplicar transform al contenedor con overflow:auto — rompe
+// -webkit-overflow-scrolling de forma permanente. El scroll vive en .emp-tab
+// limpio; el contenido se desplaza con transform en un wrapper INTERIOR,
+// manipulado vía .style directo (sin React rerender) para no invalidar el layer.
 function PullToRefresh({ children }) {
   const fetchDB = useAppStore(s => s.fetchDB)
   const scrollRef = useRef(null)
-  const [pullState, setPullState] = useState({ dist: 0, refreshing: false })
+  const innerRef = useRef(null)
+  const indicatorRef = useRef(null)
+  const arrowRef = useRef(null)
+  const labelRef = useRef(null)
+  const [refreshing, setRefreshing] = useState(false)
   const ptr = useRef({ startY: 0, active: false, dist: 0, refreshing: false })
 
   useEffect(() => {
     const el = scrollRef.current
-    if (!el) return
+    const inner = innerRef.current
+    const indicator = indicatorRef.current
+    if (!el || !inner) return
 
-    const reset = () => {
-      ptr.current.active = false
-      ptr.current.dist = 0
-      setPullState(s => ({ dist: 0, refreshing: s.refreshing }))
+    const setOffset = (px, animate) => {
+      inner.style.transition = animate ? 'transform .3s cubic-bezier(.25,.46,.45,.94)' : 'none'
+      inner.style.transform = px > 0 ? `translate3d(0, ${px}px, 0)` : ''
+      if (indicator) indicator.style.opacity = px > 0 ? '1' : '0'
+    }
+
+    const setHint = (d) => {
+      if (arrowRef.current) arrowRef.current.style.transform = d > 48 ? 'rotate(180deg)' : 'rotate(0deg)'
+      if (labelRef.current) labelRef.current.textContent = d > 48 ? 'Suelta para actualizar' : 'Bajar para actualizar'
     }
 
     const onStart = e => {
@@ -710,61 +722,66 @@ function PullToRefresh({ children }) {
     }
 
     const onMove = e => {
-      if (!ptr.current.active) return
+      if (!ptr.current.active || ptr.current.refreshing) return
       const d = e.touches[0].clientY - ptr.current.startY
       if (d > 0) {
-        ptr.current.dist = Math.min(d * 0.45, 60)
-        setPullState(s => ({ ...s, dist: ptr.current.dist }))
+        const offset = Math.min(d * 0.45, 80)
+        ptr.current.dist = offset
+        setOffset(offset, false)
+        setHint(offset)
       } else {
-        reset()
+        ptr.current.active = false
+        ptr.current.dist = 0
+        setOffset(0, true)
       }
     }
 
     const onEnd = async () => {
       const wasActive = ptr.current.active
+      const triggered = wasActive && ptr.current.dist > 48 && !ptr.current.refreshing
       ptr.current.active = false
-      if (wasActive && ptr.current.dist > 48 && !ptr.current.refreshing) {
+      ptr.current.dist = 0
+      if (triggered) {
         ptr.current.refreshing = true
-        ptr.current.dist = 0
-        setPullState({ dist: 0, refreshing: true })
+        setRefreshing(true)
+        setOffset(50, true)
         try { await fetchDB() } finally {
           ptr.current.refreshing = false
-          ptr.current.dist = 0
-          setPullState({ dist: 0, refreshing: false })
+          setRefreshing(false)
+          setOffset(0, true)
         }
       } else {
-        reset()
+        setOffset(0, true)
       }
+    }
+
+    const onCancel = () => {
+      ptr.current.active = false
+      ptr.current.dist = 0
+      if (!ptr.current.refreshing) setOffset(0, true)
     }
 
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })
-    el.addEventListener('touchcancel', reset, { passive: true })
+    el.addEventListener('touchcancel', onCancel, { passive: true })
     return () => {
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
-      el.removeEventListener('touchcancel', reset)
+      el.removeEventListener('touchcancel', onCancel)
     }
   }, [fetchDB])
 
-  const { dist, refreshing } = pullState
-  const ty = refreshing ? 44 : dist > 0 ? Math.round(dist * 0.7) : 0
-  const transitioning = dist === 0 && !refreshing
-
   return (
-    // Clip container: position:absolute fill emp-body, overflow:hidden para
-    // que el indicador quede recortado cuando translateY=0
-    <div style={{ position:'absolute', inset:0, overflow:'hidden', background:'var(--bg-800)' }}>
-
-      {/* Indicador fijo arriba, visible solo cuando el scroll se desplaza hacia abajo */}
-      <div style={{
-        position:'absolute', top:0, left:0, right:0, height:44,
+    <div ref={scrollRef} className="emp-tab active">
+      <div ref={indicatorRef} style={{
+        position:'absolute', top:0, left:0, right:0, height:50, zIndex:1,
         display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-        color:'var(--text3)', fontSize:11, fontWeight:600, pointerEvents:'none'
+        color:'var(--text3)', fontSize:11, fontWeight:600, pointerEvents:'none',
+        opacity:0, transition:'opacity .2s'
       }}>
-        {refreshing && (
+        {refreshing ? (
           <>
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation:'ptr-spin .7s linear infinite', flexShrink:0 }}>
               <polyline points="23 4 23 10 17 10"/>
@@ -772,29 +789,17 @@ function PullToRefresh({ children }) {
             </svg>
             Actualizando…
           </>
-        )}
-        {!refreshing && dist > 0 && (
+        ) : (
           <>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: dist > 48 ? 'rotate(180deg)' : 'none', transition:'transform .25s', flexShrink:0 }}>
+            <svg ref={arrowRef} viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transition:'transform .25s', flexShrink:0 }}>
               <line x1="12" y1="5" x2="12" y2="19"/>
               <polyline points="19 12 12 19 5 12"/>
             </svg>
-            {dist > 48 ? 'Suelta para actualizar' : 'Bajar para actualizar'}
+            <span ref={labelRef}>Bajar para actualizar</span>
           </>
         )}
       </div>
-
-      {/* Scroll container desplazado hacia abajo durante el pull — nunca cambia
-          su tamaño, por lo que iOS no bloquea el scroll */}
-      <div
-        ref={scrollRef}
-        className="emp-tab active"
-        style={{
-          transform: `translateY(${ty}px)`,
-          transition: transitioning ? 'transform .3s cubic-bezier(.25,.46,.45,.94)' : 'none',
-          willChange: ty !== 0 ? 'transform' : 'auto',
-        }}
-      >
+      <div ref={innerRef}>
         {children}
       </div>
     </div>
