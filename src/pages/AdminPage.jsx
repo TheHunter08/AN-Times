@@ -3252,6 +3252,22 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     toast('Jornada iniciada', 3000, 'ok')
   }
 
+  const toggleDescanso = (rec) => {
+    const now = new Date().toISOString()
+    let updated
+    if (rec.enDescanso) {
+      const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
+      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+      queuePush(rec.empId, '▶ Descanso finalizado', `${enc.name} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
+      toast('Descanso finalizado', 3000, 'ok')
+    } else {
+      updated = { ...rec, enDescanso: true, bStartTs: now }
+      queuePush(rec.empId, '⏸ Descanso iniciado', `${enc.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
+      toast('Descanso iniciado', 3000, 'ok')
+    }
+    saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+  }
+
   const forceClose = (rec) => {
     showConfirm(`¿Finalizar jornada de ${rec.empName}?`, () => {
       const now = new Date().toISOString()
@@ -3365,10 +3381,16 @@ function PanelMiObra({ db, toast, saveDB, session }) {
                   </div>
                   <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
                 </div>
-                {live
-                  ? <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => forceClose(live)}>■ Finalizar jornada</button>
-                  : <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar jornada</button>
-                }
+                {live ? (
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button className="btn btn-sm btn-secondary" style={{ flex:1, fontSize:11 }} onClick={() => toggleDescanso(live)}>
+                      {live.enDescanso ? '▶ Continuar' : '⏸ Pausa'}
+                    </button>
+                    <button className="btn btn-sm btn-danger" style={{ flex:1, fontSize:11 }} onClick={() => forceClose(live)}>■ Finalizar</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar jornada</button>
+                )}
               </div>
             )
           })}

@@ -117,8 +117,13 @@ function haversine(lat1, lng1, lat2, lng2) {
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const timer = useTimer()
-  const u = session.user
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+  // Derivar siempre desde db.employees para que onboardingDone y otros campos
+  // se actualicen reactivamente sin depender del snapshot estático de la sesión.
+  const u = useMemo(() => {
+    const su = session.user
+    if (!su) return null
+    return (db.employees || []).find(e => e.id === su.id) || su
+  }, [session.user?.id, db.employees])
   const [pendingGPS, setPendingGPS] = useState(null)
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [calMonth, setCalMonth] = useState(new Date())
@@ -198,14 +203,6 @@ export default function EmployeePage() {
     return () => { release(); document.removeEventListener('visibilitychange', onVisible) }
   }, [timer.state])
 
-  // In browser/web mode, silently mark onboarding done so the wizard never shows.
-  // Usa dbRef (siempre la última versión) para no leer un db.employees obsoleto.
-  useEffect(() => {
-    if (u?.id && !u.onboardingDone && !isPWA) {
-      saveDB({ employees: (dbRef.current.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true } : e) })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [u?.id, u?.onboardingDone])
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
@@ -307,7 +304,8 @@ export default function EmployeePage() {
       // (antes era una ventana de 5min; si la app no estaba abierta justo en esos 5min,
       // la noti se perdía para siempre).
       if (getCfg('notiFichaje', true)) {
-        const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
+        const _empRec = (db.employees || []).find(e => e.id === u.id)
+        const [rh, rm] = (_empRec?.reminderTime || getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
         if (minsPast >= 0) {
           const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
@@ -370,11 +368,11 @@ export default function EmployeePage() {
         }
       })
 
-      // 5. Documentos pendientes de firma (una vez al día a las 9h)
+      // 5. Documentos pendientes de firma (una vez al día a partir de las 9h)
       const pendDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
       if (pendDocs.length > 0) {
         const key = 'an_docs_' + u.id
-        if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
+        if (!hasSent(key, todayStr) && hh >= 9) {
           markSent(key, todayStr)
           const _msgDoc = `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`
           sendPush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
@@ -382,11 +380,11 @@ export default function EmployeePage() {
         }
       }
 
-      // 6. Cierre mensual pendiente (una vez al día a las 9h)
+      // 6. Cierre mensual pendiente (una vez al día a partir de las 9h)
       const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
       if (pendCierres.length > 0) {
         const key = 'an_cierre_' + u.id
-        if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
+        if (!hasSent(key, todayStr) && hh >= 9) {
           markSent(key, todayStr)
           const _msgCi = `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`
           sendPush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
@@ -707,7 +705,7 @@ export default function EmployeePage() {
       <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} onClose={closeModal} toast={toast} />
+      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
       <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
@@ -719,7 +717,7 @@ export default function EmployeePage() {
       <WelcomeSlides />
 
       {/* Onboarding: primer login */}
-      <OnboardingModal visible={!u.onboardingDone && isPWA} u={u} db={db} saveDB={saveDB} toast={toast} />
+      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
     </div>
   )
 }
@@ -768,13 +766,15 @@ function PullToRefresh({ children }) {
     if (!el || !inner) return
 
     // Guardia: si algún estado quedó colgado de una sesión anterior, lo reseteamos al montar.
+    // iOS bug: transform en hijo de overflow-scroll rompe -webkit-overflow-scrolling.
+    // Usamos marginTop en su lugar — no afecta al compositing layer del scroll container.
     inner.style.transition = 'none'
-    inner.style.transform = ''
+    inner.style.marginTop = ''
     if (indicator) indicator.style.opacity = '0'
 
     const setOffset = (px, animate) => {
-      inner.style.transition = animate ? 'transform .3s cubic-bezier(.25,.46,.45,.94)' : 'none'
-      inner.style.transform = px > 0 ? `translate3d(0, ${px}px, 0)` : ''
+      inner.style.transition = animate ? 'margin-top .3s cubic-bezier(.25,.46,.45,.94)' : 'none'
+      inner.style.marginTop = px > 0 ? `${px}px` : ''
       if (indicator) indicator.style.opacity = px > 0 ? '1' : '0'
     }
 
@@ -784,8 +784,10 @@ function PullToRefresh({ children }) {
       ptr.current.dist = 0
       ptr.current.refreshing = false
       inner.style.transition = 'none'
-      inner.style.transform = ''
+      inner.style.marginTop = ''
       if (indicator) indicator.style.opacity = '0'
+      // Forzar re-evaluación del scroll en iOS (wake up scroll container)
+      try { el.scrollTop = el.scrollTop } catch {}
     }
 
     const setHint = (d) => {
@@ -830,6 +832,8 @@ function PullToRefresh({ children }) {
           ptr.current.refreshing = false
           setRefreshing(false)
           setOffset(0, true)
+          // iOS: forzar re-evaluación del scroll tras la animación de retorno
+          setTimeout(() => { try { el.scrollTop = el.scrollTop } catch {} }, 350)
         }
       } else {
         setOffset(0, true)
@@ -2986,7 +2990,7 @@ function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   )
 }
 
-function ModalConfiguracion({ visible, u, onClose, toast }) {
+function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [notiFichaje, setNotiFichaje] = useState(() => getCfg('notiFichaje', true))
   const [notiSalida, setNotiSalida] = useState(() => getCfg('notiSalida', true))
   const [gpsAuto, setGpsAuto] = useState(() => getCfg('gpsAuto', true))
@@ -3007,6 +3011,10 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
     setCfg('salidaTime', salidaTime)
     setCfg('idioma', idioma)
     setCfg('formato', formato)
+    if (u?.id && saveDB && db) {
+      const updEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime } : e)
+      saveDB({ employees: updEmps })
+    }
     toast('Configuración guardada')
     onClose()
   }
@@ -3359,7 +3367,7 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
   const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
-  const [reminderTime, setReminderTime] = useState('08:00')
+  const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
 
   useEffect(() => { if (step === 1) initCanvas() }, [step])
 
@@ -3369,6 +3377,9 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     if (!('Notification' in window)) return
     const perm = await Notification.requestPermission()
     setNotifGranted(perm === 'granted')
+    if (perm === 'granted' && u?.id) {
+      pushSubscribe(u.id, VAPID_PUB).catch(() => {})
+    }
   }
 
   const finish = () => {
@@ -3377,6 +3388,7 @@ function OnboardingModal({ visible, u, db, saveDB, toast }) {
     const updatedEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e)
     const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
     saveDB({ employees: updatedEmps, firmas: updatedFirmas })
+    try { localStorage.setItem('cfg_reminderTime', reminderTime) } catch {}
     setDone(true)
     toast('¡Configuración lista! Ya puedes usar la app.', 3000, 'ok')
   }

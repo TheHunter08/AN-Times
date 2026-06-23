@@ -91,6 +91,10 @@ function UpdateBanner() {
     if (!waitingSW || applying) return
     setApplying(true)
     waitingSW.postMessage({ type: 'SKIP_WAITING' })
+    // iOS fallback: controllerchange puede no disparar en iOS PWA
+    setTimeout(() => {
+      if (!reloading.current) { reloading.current = true; window.location.reload() }
+    }, 1500)
   }
 
   if (!waitingSW || dismissed) return null
