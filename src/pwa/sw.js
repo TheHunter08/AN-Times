@@ -3,9 +3,10 @@ import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
-// ─── ACTIVACIÓN INMEDIATA (V3 Premium PWA) ────────────────────────────────────
-// El nuevo SW toma control sin esperar al cierre de pestañas existentes
-self.skipWaiting()
+// ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
+// NO se llama a self.skipWaiting() automáticamente — el cliente lo invoca vía
+// mensaje 'SKIP_WAITING' tras confirmar el banner "Nueva versión disponible".
+// Esto evita refrescos sorpresa durante una jornada activa.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
@@ -95,6 +96,10 @@ registerRoute(
 )
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
+// CRÍTICO: iOS PWA exige que TODO evento push muestre una notificación visible.
+// Si la app está en primer plano, además del showNotification mandamos un
+// PUSH_RECEIVED al cliente para que pueda mostrar el banner in-app y opcionalmente
+// cerrar la notificación OS (vía PUSH_SHOWN → cliente devuelve PUSH_DISMISS).
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -104,31 +109,32 @@ self.addEventListener('push', (event) => {
   }
 
   const title   = data.title || 'TIMES INC'
+  const url     = data.url || '/'
+  const tag     = data.tag || 'times-noti'
   const options = {
     body: data.body || data.message || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: data.tag || 'times-noti',
+    tag,
     renotify: true,
-    requireInteraction: true,   // Mantiene la notificación visible en pantalla bloqueada
-    data: { url: data.url || '/' },
+    requireInteraction: true,
+    data: { url, tag },
     actions: data.actions || [],
     vibrate: [200, 100, 200],
     silent: false,
   }
 
-  // Si hay una pestaña de la app en primer plano, enviar mensaje in-app en lugar de notificación OS
-  // client.focused es siempre false en iOS Safari/PWA, así que usamos visibilityState como fallback
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+  event.waitUntil((async () => {
+    // 1) SIEMPRE mostrar la notificación (requisito iOS Web Push)
+    await self.registration.showNotification(title, options)
+
+    // 2) Avisar a clientes abiertos para banner in-app o auto-dismiss
+    try {
+      const cs = await clients.matchAll({ type: 'window', includeUncontrolled: true })
       const focused = cs.find(c => c.focused) || cs.find(c => c.visibilityState === 'visible')
-      if (focused) {
-        focused.postMessage({ type: 'PUSH_RECEIVED', title, body: options.body, tag: options.tag, url: data.url || '/' })
-        return
-      }
-      return self.registration.showNotification(title, options)
-    })
-  )
+      if (focused) focused.postMessage({ type: 'PUSH_RECEIVED', title, body: options.body, tag, url })
+    } catch {}
+  })())
 })
 
 self.addEventListener('notificationclick', (event) => {
@@ -220,6 +226,15 @@ self.addEventListener('message', (event) => {
 
   // La app pide hacer sync manual ahora
   if (type === 'FORCE_SYNC') event.waitUntil(_bgSync().catch(() => {}))
+
+  // El banner in-app ya se ha mostrado: cerrar la notificación OS para no duplicar
+  if (type === 'PUSH_DISMISS' && event.data?.tag) {
+    event.waitUntil(
+      self.registration.getNotifications({ tag: event.data.tag })
+        .then(ns => ns.forEach(n => n.close()))
+        .catch(() => {})
+    )
+  }
 
   // La app pide limpiar la caché de Supabase (por ejemplo, tras login)
   if (type === 'CLEAR_CACHE') {

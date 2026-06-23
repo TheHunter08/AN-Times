@@ -247,10 +247,16 @@ export function stopRealtime() {
 const VAPID_KEY_STORAGE = 'an_times_vapid_key'
 
 export async function pushSubscribe(userId, vapidPub) {
-  if (!supabase) return
+  if (!supabase) return { ok: false, reason: 'no_supabase' }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[PUSH] Navegador sin soporte para Web Push')
+    return { ok: false, reason: 'no_support' }
+  }
+  if (Notification.permission !== 'granted') {
+    console.warn('[PUSH] Permiso no concedido:', Notification.permission)
+    return { ok: false, reason: 'no_permission' }
+  }
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-    if (Notification.permission !== 'granted') return
     const reg = await navigator.serviceWorker.ready
     const b64ToUint8 = b => {
       const p = '='.repeat((4 - b.length % 4) % 4)
@@ -263,21 +269,41 @@ export async function pushSubscribe(userId, vapidPub) {
     const storedKey = localStorage.getItem(VAPID_KEY_STORAGE)
     if (storedKey !== vapidPub) {
       const old = await reg.pushManager.getSubscription()
-      if (old) await old.unsubscribe()
+      if (old) { try { await old.unsubscribe() } catch {} }
     }
 
-    const sub = await reg.pushManager.getSubscription() ||
-      await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      try {
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(vapidPub) })
+      } catch (err) {
+        console.error('[PUSH] subscribe() falló:', err.name, err.message)
+        return { ok: false, reason: 'subscribe_failed', error: err.message }
+      }
+    }
     localStorage.setItem(VAPID_KEY_STORAGE, vapidPub)
-    const key = sub.getKey('p256dh'), auth = sub.getKey('auth')
-    await supabase.from(PUSH_TABLE).upsert({
+    const key  = sub.getKey('p256dh')
+    const auth = sub.getKey('auth')
+    if (!key || !auth) {
+      console.error('[PUSH] Suscripción sin claves p256dh/auth')
+      return { ok: false, reason: 'no_keys' }
+    }
+    const { error } = await supabase.from(PUSH_TABLE).upsert({
       user_id: userId,
       endpoint: sub.endpoint,
       p256dh: buf2b64(key),
-      auth: buf2b64(auth),
+      auth:   buf2b64(auth),
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' })
-  } catch(e) { console.warn('[PUSH]', e) }
+    if (error) {
+      console.error('[PUSH] upsert Supabase falló:', error)
+      return { ok: false, reason: 'db_failed', error: error.message }
+    }
+    return { ok: true, endpoint: sub.endpoint }
+  } catch(e) {
+    console.error('[PUSH] excepción inesperada:', e)
+    return { ok: false, reason: 'exception', error: e.message }
+  }
 }
 
 export async function queuePush(to, title, body, tag = 'times', url = '/') {

@@ -12,7 +12,11 @@ function InAppNotification() {
   useEffect(() => {
     const onMsg = (e) => {
       if (e.data?.type !== 'PUSH_RECEIVED') return
-      setNotif({ title: e.data.title, body: e.data.body, url: e.data.url })
+      // Solo mostrar banner in-app si la app está realmente en foreground
+      if (document.visibilityState !== 'visible') return
+      setNotif({ title: e.data.title, body: e.data.body, url: e.data.url, tag: e.data.tag })
+      // Pedir al SW que cierre la notificación OS para no duplicar (solo si app visible)
+      try { navigator.serviceWorker?.controller?.postMessage({ type: 'PUSH_DISMISS', tag: e.data.tag }) } catch {}
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setNotif(null), 5000)
     }
@@ -47,30 +51,32 @@ function InAppNotification() {
 }
 
 function UpdateBanner() {
-  const [show, setShow] = useState(false)
+  const [waitingSW, setWaitingSW] = useState(null)
+  const [applying, setApplying]   = useState(false)
   const reloading = useRef(false)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     let updateInterval = null
-    // Auto-reload when the SW controller changes (new version took over via skipWaiting)
     const onControllerChange = () => {
       if (reloading.current) return
       reloading.current = true
       window.location.reload()
     }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
-    // Show banner when a new SW is found installing (before it activates)
     navigator.serviceWorker.ready.then(reg => {
+      // Si ya hay un SW esperando, mostrar banner inmediatamente
+      if (reg.waiting) setWaitingSW(reg.waiting)
       const check = (sw) => {
         if (!sw) return
         sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed') setShow(true)
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            setWaitingSW(sw)
+          }
         })
       }
       if (reg.installing) check(reg.installing)
       reg.addEventListener('updatefound', () => check(reg.installing))
-      // Poll for updates every 5 min while app stays open
       updateInterval = setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000)
     }).catch(() => {})
     return () => {
@@ -79,11 +85,21 @@ function UpdateBanner() {
     }
   }, [])
 
-  if (!show) return null
+  const apply = () => {
+    if (!waitingSW || applying) return
+    setApplying(true)
+    waitingSW.postMessage({ type: 'SKIP_WAITING' })
+    // El reload se dispara automáticamente vía controllerchange
+  }
+
+  if (!waitingSW) return null
   return (
-    <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, padding:'10px 16px', background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff', display:'flex', alignItems:'center', gap:12, fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(108,99,255,.4)' }}>
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      <span style={{ flex:1 }}>Actualizando…</span>
+    <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, padding:'10px 14px', background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff', display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(108,99,255,.4)' }}>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span style={{ flex:1, minWidth:0 }}>{applying ? 'Actualizando…' : 'Nueva versión disponible'}</span>
+      {!applying && (
+        <button onClick={apply} style={{ background:'rgba(255,255,255,.18)', border:'1px solid rgba(255,255,255,.3)', color:'#fff', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>Actualizar</button>
+      )}
     </div>
   )
 }
@@ -132,6 +148,87 @@ function SyncBanner() {
       </button>
     </div>
   )
+}
+
+// ─── INSTALL PROMPT ────────────────────────────────────────────────────────────
+// Android/Chrome: usa el evento beforeinstallprompt nativo.
+// iOS Safari: nunca dispara el evento — mostramos instrucciones manuales.
+function InstallPrompt() {
+  const [bipEvent, setBipEvent] = useState(null)
+  const [iosShow, setIosShow]   = useState(false)
+
+  useEffect(() => {
+    const DISMISS_KEY = 'an_install_dismiss_ts'
+    const isDismissed = (() => {
+      try {
+        const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10)
+        return ts > 0 && (Date.now() - ts) < 7 * 24 * 60 * 60 * 1000
+      } catch { return false }
+    })()
+    if (isDismissed) return
+
+    // ¿Ya instalado?
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    if (isStandalone) return
+
+    // Android / Chrome
+    const onBIP = (e) => { e.preventDefault(); setBipEvent(e) }
+    window.addEventListener('beforeinstallprompt', onBIP)
+
+    // iOS Safari (no PWA installed): mostrar instrucciones manuales tras 8s
+    const ua = navigator.userAgent
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream
+    const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua)
+    if (isIOS && isSafari) {
+      const t = setTimeout(() => setIosShow(true), 8000)
+      return () => { window.removeEventListener('beforeinstallprompt', onBIP); clearTimeout(t) }
+    }
+    return () => window.removeEventListener('beforeinstallprompt', onBIP)
+  }, [])
+
+  const dismiss = () => {
+    try { localStorage.setItem('an_install_dismiss_ts', String(Date.now())) } catch {}
+    setBipEvent(null); setIosShow(false)
+  }
+
+  const install = async () => {
+    if (!bipEvent) return
+    bipEvent.prompt()
+    try { await bipEvent.userChoice } catch {}
+    setBipEvent(null)
+  }
+
+  if (bipEvent) {
+    return (
+      <div style={{ position:'fixed', left:12, right:12, bottom:'max(12px,env(safe-area-inset-bottom))', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
+        <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--text,#fff)' }}>Instalar TIMES INC</div>
+          <div style={{ fontSize:11, color:'var(--text3,#9ca3af)' }}>Acceso rápido desde tu pantalla de inicio</div>
+        </div>
+        <button onClick={install} style={{ background:'var(--primary,#6C63FF)', color:'#fff', border:'none', borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:800, cursor:'pointer' }}>Instalar</button>
+        <button onClick={dismiss} aria-label="Cerrar" style={{ background:'none', border:'none', color:'var(--text4,#6b7280)', cursor:'pointer', fontSize:18, padding:'2px 4px' }}>×</button>
+      </div>
+    )
+  }
+
+  if (iosShow) {
+    return (
+      <div style={{ position:'fixed', left:12, right:12, bottom:'max(12px,env(safe-area-inset-bottom))', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'14px', boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
+        <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+          <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text,#fff)', marginBottom:4 }}>Añadir a la pantalla de inicio</div>
+            <div style={{ fontSize:11, color:'var(--text3,#9ca3af)', lineHeight:1.5 }}>
+              Pulsa <span style={{ display:'inline-block', verticalAlign:'middle' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg></span> Compartir y luego <b>"Añadir a pantalla de inicio"</b>. Solo así recibirás las notificaciones.
+            </div>
+          </div>
+          <button onClick={dismiss} aria-label="Cerrar" style={{ background:'none', border:'none', color:'var(--text4,#6b7280)', cursor:'pointer', fontSize:18, padding:'2px 4px', flexShrink:0 }}>×</button>
+        </div>
+      </div>
+    )
+  }
+  return null
 }
 
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
@@ -281,6 +378,7 @@ export default function App() {
       <UpdateBanner />
       <SyncBanner />
       <InAppNotification />
+      <InstallPrompt />
       {currentScreen === 'login' && <LoginPage />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp' && <EmployeePage />}
