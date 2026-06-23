@@ -3,7 +3,6 @@ import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
 import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
-import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
@@ -29,9 +28,28 @@ function useClock() {
 
 function TopbarClock() {
   const { clockTime, clockDate } = useClock()
+  const lastSyncTime = useAppStore(s => s.lastSyncTime)
+  const syncStatus = useAppStore(s => s.syncStatus)
+  const [, force] = useState(0)
+  // Re-render cada minuto para refrescar "hace X min"
+  useEffect(() => { const id = setInterval(() => force(t => t + 1), 60000); return () => clearInterval(id) }, [])
+
+  const syncLabel = (() => {
+    if (syncStatus === 'syncing') return 'sincronizando…'
+    if (syncStatus === 'error') return 'sin conexión'
+    if (!lastSyncTime) return null
+    const m = Math.floor((Date.now() - lastSyncTime) / 60000)
+    if (m < 1) return 'sincronizado ahora'
+    if (m < 60) return `hace ${m} min`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `hace ${h} h`
+    return `hace ${Math.floor(h / 24)} d`
+  })()
+
   return (
     <div className="emp-subdate">
       {clockDate} · <span style={{ color:'var(--primary-light)', fontWeight:600 }}>{clockTime}</span>
+      {syncLabel && <span style={{ marginLeft:6, color: syncStatus === 'error' ? 'var(--danger)' : 'var(--text4)', fontSize:10 }}>· {syncLabel}</span>}
     </div>
   )
 }
@@ -97,7 +115,7 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, lastSyncTime, fetchDB } = useAppStore()
   const timer = useTimer()
   const u = session.user
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -180,12 +198,14 @@ export default function EmployeePage() {
     return () => { release(); document.removeEventListener('visibilitychange', onVisible) }
   }, [timer.state])
 
-  // In browser/web mode, silently mark onboarding done so the wizard never shows
+  // In browser/web mode, silently mark onboarding done so the wizard never shows.
+  // Usa dbRef (siempre la última versión) para no leer un db.employees obsoleto.
   useEffect(() => {
     if (u?.id && !u.onboardingDone && !isPWA) {
-      saveDB({ employees: (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true } : e) })
+      saveDB({ employees: (dbRef.current.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true } : e) })
     }
-  }, [u?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [u?.id, u?.onboardingDone])
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
@@ -555,6 +575,9 @@ export default function EmployeePage() {
               {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
             </button>
           )}
+          <button className="icon-btn" onClick={() => { try { navigator.vibrate(8) } catch {}; fetchDB() }} title="Sincronizar" aria-label="Sincronizar ahora" disabled={syncStatus === 'syncing'} style={{ opacity: syncStatus === 'syncing' ? .6 : 1 }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" style={{ animation: syncStatus === 'syncing' ? 'ptr-spin .9s linear infinite' : 'none' }}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
           <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema claro/oscuro">{isLight ? '🌙' : '☀️'}</button>
           <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
@@ -813,10 +836,17 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const [showTip, setShowTip] = useState(() => {
     try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
   })
-  const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
-  const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
+  // Memo: TabInicio re-renderiza cada segundo via timer; evitar refiltrar listas grandes
+  const recs = useMemo(
+    () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
+    [db.records, u.id, todayStr]
+  )
+  const realRecs = useMemo(() => recs.filter(r => !r.fin || recWorkSecs(r) >= 30), [recs])
   const o = openRec()
-  const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
+  const pendingDocs = useMemo(
+    () => (db.documentos || []).filter(d => d.empId === u.id && !d.firma),
+    [db.documentos, u.id]
+  )
 
   const lastAutoClosed = useMemo(() => {
     return (db.records || [])
@@ -1105,6 +1135,15 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
 
 // ─── TAB JORNADA ───────────────────────────────────────────────────────────────
 function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, activeModal, modalData }) {
+  if (!db.records) return (
+    <div className="emp-tab active">
+      <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skeleton" style={{ height:80, borderRadius:14 }} />
+        <div className="skeleton" style={{ height:200, borderRadius:18 }} />
+        <div className="skeleton" style={{ height:140, borderRadius:14 }} />
+      </div>
+    </div>
+  )
   const todayStr = today()
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)).sort((a,b) => a.inicio.localeCompare(b.inicio))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
@@ -2139,6 +2178,15 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
 // ─── TAB PERFIL ────────────────────────────────────────────────────────────────
 function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
+  if (!db.records) return (
+    <div className="emp-tab active">
+      <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skeleton" style={{ height:140, borderRadius:14 }} />
+        <div className="skeleton" style={{ height:80, borderRadius:14 }} />
+        <div className="skeleton" style={{ height:200, borderRadius:14 }} />
+      </div>
+    </div>
+  )
   const initials = u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
   const vac = vacData(u.id, db)
   const now = new Date()
@@ -2153,7 +2201,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
   const yearDays = new Set(yearRecs.map(r => r.inicio.slice(0, 10))).size
   const dayMap = {}
-  myRecs.forEach(r => { const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
+  myRecs.forEach(r => { if (!r.inicio) return; const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
   const recordMin = Math.max(0, ...Object.values(dayMap).filter(Boolean))
   let streak = 0
   const sd = new Date(now)
@@ -2529,7 +2577,7 @@ function aiAnswer(q, db, u) {
   // Historial
   if (ql.includes('historial') || ql.includes('registro') || ql.includes('último') || ql.includes('ultimo')) {
     const last = fin.slice(-3).reverse()
-    if (last.length) return `📋 Tus últimos registros:\n${last.map(r => `• ${r.inicio.slice(0, 10)}: ${mhm(calcMin(r))}`).join('\n')}`
+    if (last.length) return `📋 Tus últimos registros:\n${last.map(r => `• ${r.inicio?.slice(0, 10) || '—'}: ${mhm(calcMin(r))}`).join('\n')}`
     return '📋 Aún no tienes registros completados.'
   }
 

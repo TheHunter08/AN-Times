@@ -4,7 +4,6 @@ import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
-import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
@@ -125,11 +124,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      const native = await isNativePlatform()
+      if (!('Notification' in window)) return
       const uid = useAppStore.getState().session?.user?.id
-      if (native) { await requestPushPermission(); return }
-      const result = await requestPushPermission()
-      if (result) {
+      let perm = Notification.permission
+      if (perm === 'default') perm = await Notification.requestPermission()
+      if (perm === 'granted') {
         if (uid) pushSubscribe(uid, VAPID_PUB)
         if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
       }

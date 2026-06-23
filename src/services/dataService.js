@@ -12,11 +12,17 @@ const ROW_ID     = 1
 
 // ── Local storage ─────────────────────────────────────────────────────────────
 export function loadLocal() {
+  let raw = null
+  try { raw = localStorage.getItem('an_times_v1') } catch { return { ...INITIAL_DB } }
+  if (!raw) return { ...INITIAL_DB }
   try {
-    const raw = localStorage.getItem('an_times_v1')
-    if (raw) return mergeDB(INITIAL_DB, JSON.parse(raw))
-  } catch {}
-  return { ...INITIAL_DB }
+    return mergeDB(INITIAL_DB, JSON.parse(raw))
+  } catch (err) {
+    // Datos locales corruptos: log + limpiar para no quedar bloqueados al arrancar
+    console.error('[loadLocal] corrupt localStorage, resetting:', err)
+    try { localStorage.removeItem('an_times_v1') } catch {}
+    return { ...INITIAL_DB }
+  }
 }
 
 export function saveLocal(db) {

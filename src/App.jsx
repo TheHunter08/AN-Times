@@ -3,7 +3,6 @@ import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
-import { isNativePlatform, onPushReceived, onPushTapped } from './services/nativeNotifications.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -213,25 +212,9 @@ export default function App() {
     const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
     document.addEventListener('visibilitychange', onVisible)
 
-    // Notificaciones nativas (Capacitor iOS/Android)
-    let removePushReceived = () => {}
-    let removePushTapped   = () => {}
-    isNativePlatform().then(native => {
-      if (!native) return
-      onPushReceived(({ title, body }) => {
-        useAppStore.getState().toast(`🔔 ${title}${body ? ': ' + body : ''}`)
-      }).then(fn => { removePushReceived = fn })
-      onPushTapped(({ url }) => {
-        if (url) window.location.href = url
-        fetchDB()
-      }).then(fn => { removePushTapped = fn })
-    })
-
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
       stopRealtime()
-      removePushReceived()
-      removePushTapped()
     }
   }, [])
 
