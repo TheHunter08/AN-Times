@@ -118,9 +118,10 @@ self.addEventListener('push', (event) => {
   }
 
   // Si hay una pestaña de la app en primer plano, enviar mensaje in-app en lugar de notificación OS
+  // client.focused es siempre false en iOS Safari/PWA, así que usamos visibilityState como fallback
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-      const focused = cs.find(c => c.focused)
+      const focused = cs.find(c => c.focused) || cs.find(c => c.visibilityState === 'visible')
       if (focused) {
         focused.postMessage({ type: 'PUSH_RECEIVED', title, body: options.body, tag: options.tag, url: data.url || '/' })
         return

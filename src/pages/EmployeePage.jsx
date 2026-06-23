@@ -752,7 +752,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const [showTip, setShowTip] = useState(() => {
     try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
   })
-  const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr))
+  const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = openRec()
 
@@ -981,7 +981,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           const working = teamEmps.filter(e => (db.records||[]).some(r => r.empId === e.id && !r.fin))
           const done    = teamEmps.filter(e =>
             !working.find(w => w.id === e.id) &&
-            (db.records||[]).some(r => r.empId === e.id && r.fin && r.inicio.startsWith(todayStr))
+            (db.records||[]).some(r => r.empId === e.id && r.fin && r.inicio?.startsWith(todayStr))
           )
           return (
             <div style={{ padding:'0 16px 12px' }}>
@@ -997,7 +997,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                   const isDone    = done.find(d => d.id === e.id)
                   const openRec2  = isWorking ? (db.records||[]).find(r => r.empId === e.id && !r.fin) : null
                   const totalMin  = isDone
-                    ? (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(todayStr)).reduce((s,r) => s + calcMin(r), 0)
+                    ? (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(todayStr)).reduce((s,r) => s + calcMin(r), 0)
                     : 0
                   const dotColor = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
                   const statusTxt = isWorking
@@ -1032,7 +1032,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
 // ─── TAB JORNADA ───────────────────────────────────────────────────────────────
 function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, activeModal, modalData }) {
   const todayStr = today()
-  const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(todayStr)).sort((a,b) => a.inicio.localeCompare(b.inicio))
+  const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)).sort((a,b) => a.inicio.localeCompare(b.inicio))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = recs.find(r => !r.fin)
 
@@ -1050,7 +1050,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
 
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
 
   const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
 
@@ -1072,7 +1072,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
       const now2 = new Date()
       const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
-      const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
+      const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
       const totalMin2 = monthRecs.reduce((s,r) => s + calcMin(r), 0)
       const monthName = now2.toLocaleDateString('es-ES', { month:'long', year:'numeric' })
 
@@ -1159,10 +1159,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const diffMin2   = totalMin2 - targetMin2
       const diffSign   = diffMin2 >= 0 ? '+' : ''
       const cDiff      = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
-      page.drawRectangle({ x:ML, y:y-20, width:CW, height:20, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      page.drawRectangle({ x:ML, y:y-40, width:CW, height:40, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length!==1?'s':''} registrada${monthRecs.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
-      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-34, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
-      y -= 42
+      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-30, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
+      y -= 48
 
       // ─ Signature block ────────────────────────────────────────────
       if (y - SIG_AREA < 30) { newPage() }
@@ -1189,8 +1189,9 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
-        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:cBorder, borderWidth:0.5 })
-        page.drawText('Sin firma digital registrada', { x:ML+10, y:y-55, size:7, font:fontR, color:cGray })
+        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
+        page.drawText('⚠ Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
+        page.drawText('Configúrala en Perfil › Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
@@ -1219,7 +1220,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
       const now2 = new Date()
       const ws2 = wkStart(now2)
-      const weekRecs2 = (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws2).sort((a,b) => a.inicio.localeCompare(b.inicio))
+      const weekRecs2 = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= ws2).sort((a,b) => a.inicio.localeCompare(b.inicio))
       const totalMin2 = weekRecs2.reduce((s,r) => s + calcMin(r), 0)
       const weekLabel = `Semana del ${ws2.toLocaleDateString('es-ES', { day:'numeric', month:'long' })} al ${now2.toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' })}`
 
@@ -1290,10 +1291,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const diffMin2 = totalMin2 - targetMin2
       const diffSign = diffMin2 >= 0 ? '+' : ''
       const cDiff = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
-      page.drawRectangle({ x:ML, y:y-20, width:CW, height:20, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      page.drawRectangle({ x:ML, y:y-40, width:CW, height:40, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${weekRecs2.length} jornada${weekRecs2.length!==1?'s':''} registrada${weekRecs2.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
-      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-34, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
-      y -= 42
+      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-30, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
+      y -= 48
       if (y - SIG_AREA < 30) { newPage() }
       y -= 10
       page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:6.5, font:fontB, color:cGray })
@@ -1316,8 +1317,9 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
-        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:cBorder, borderWidth:0.5 })
-        page.drawText('Sin firma digital registrada', { x:ML+10, y:y-55, size:7, font:fontR, color:cGray })
+        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
+        page.drawText('⚠ Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
+        page.drawText('Configúrala en Perfil › Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
@@ -1486,7 +1488,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         })
         const histWithRecs = histDays.map(ds => ({
           ds,
-          recs: (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(ds) && r.fin),
+          recs: (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(ds) && r.fin),
         })).filter(h => h.recs.length > 0)
         if (!histWithRecs.length) return null
         return (
@@ -1640,7 +1642,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   }
 
   return (
-    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden', paddingBottom:'calc(80px + max(20px, env(safe-area-inset-bottom, 0px)))' }}>
+    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden', paddingBottom:'calc(90px + env(safe-area-inset-bottom, 0px))' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -1911,7 +1913,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   ), [db.medicos, u.id])
 
   const getDayRecs = dateStr =>
-    (db.records || []).filter(r => r.empId === u.id && r.inicio.startsWith(dateStr) && r.fin)
+    (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(dateStr) && r.fin)
 
   const getDayStatus = (ds, date) => {
     const dow = date.getDay()
@@ -2067,13 +2069,13 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
   const vac = vacData(u.id, db)
   const now = new Date()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
 
   // Personal stats
   const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
   const yearStr = `${now.getFullYear()}-`
-  const yearRecs = myRecs.filter(r => r.inicio.startsWith(yearStr))
+  const yearRecs = myRecs.filter(r => r.inicio?.startsWith(yearStr))
   const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
   const yearDays = new Set(yearRecs.map(r => r.inicio.slice(0, 10))).size
   const dayMap = {}
@@ -2182,14 +2184,18 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>openModal('infoPersonal') },
           { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', badge: pendingDocs, onClick:()=>openModal('documentos') },
           { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>openModal('configuracion') },
-          { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign') },
-        ].map(({ icon, label, color, stroke, onClick, badge }) => (
+          { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign'), noFirma: !db.firmas?.[u?.id]?.main },
+        ].map(({ icon, label, color, stroke, onClick, badge, noFirma }) => (
           <div key={label} className="prf-menu-item" onClick={onClick}>
             <div className="prf-menu-ico" style={color ? { background:color } : {}}>
               <svg viewBox="0 0 24 24" style={stroke ? { stroke } : {}}>{icon}</svg>
             </div>
-            <span className="prf-menu-lbl">{label}</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <span className="prf-menu-lbl">{label}</span>
+              {noFirma && <div style={{ fontSize:10, color:'var(--orange)', fontWeight:600, marginTop:1 }}>Sin configurar — toca para añadir</div>}
+            </div>
             {badge > 0 && <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', marginRight:4 }}>{badge}</span>}
+            {noFirma && <span style={{ fontSize:10, color:'var(--orange)', marginRight:6 }}>!</span>}
             <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         ))}
@@ -2420,7 +2426,7 @@ function aiAnswer(q, db, u) {
   const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
   const prevWeekMin = fin.filter(r => { const d = new Date(r.inicio); return d >= prevWs && d < ws }).reduce((s, r) => s + calcMin(r), 0)
 
-  const monthMin = fin.filter(r => r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const monthMin = fin.filter(r => r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const extraMonth = Math.max(0, monthMin - WD * 20)
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
 
@@ -2443,7 +2449,7 @@ function aiAnswer(q, db, u) {
   if (ql.includes('olvid') || ql.includes('quién') || ql.includes('quien') || ql.includes('sin fichar')) {
     const todayStr = today()
     const emps = (db.employees || []).filter(e => !e.baja)
-    const ficharon = new Set((db.records || []).filter(r => r.inicio.startsWith(todayStr)).map(r => r.empId))
+    const ficharon = new Set((db.records || []).filter(r => r.inicio?.startsWith(todayStr)).map(r => r.empId))
     const sinFichar = emps.filter(e => !ficharon.has(e.id))
     if (!sinFichar.length) return `✅ Hoy todo el equipo ha fichado (${emps.length} personas).`
     return `⚠️ Hoy aún no han fichado ${sinFichar.length} de ${emps.length}:\n${sinFichar.slice(0, 8).map(e => `• ${e.name}`).join('\n')}`
@@ -2856,6 +2862,34 @@ function ModalConfiguracion({ visible, u, onClose, toast }) {
           <h2 style={{ margin:0, fontSize:18 }}>Configuración</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
         </div>
+        {/* Notificaciones del sistema (permiso del navegador) */}
+        {(() => {
+          const perm = typeof Notification !== 'undefined' ? Notification.permission : 'granted'
+          if (perm === 'denied') return (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+              <span style={{ fontSize:14, color:'var(--text)' }}>Notificaciones del sistema</span>
+              <span style={{ fontSize:11, color:'var(--danger)', fontWeight:600 }}>Bloqueadas — activa en ajustes del navegador</span>
+            </div>
+          )
+          if (perm === 'granted') return (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+              <span style={{ fontSize:14, color:'var(--text)' }}>Notificaciones del sistema</span>
+              <span style={{ fontSize:11, color:'var(--green)', fontWeight:600 }}>✓ Activadas</span>
+            </div>
+          )
+          return (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+              <span style={{ fontSize:14, color:'var(--text)' }}>Notificaciones del sistema</span>
+              <button onClick={async () => {
+                try {
+                  const p = await Notification.requestPermission()
+                  if (p === 'granted') { toast('Notificaciones activadas', 3000, 'ok'); onClose() }
+                  else toast('Permiso denegado', 3000, 'err')
+                } catch { toast('No soportado en este dispositivo', 3000) }
+              }} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Activar</button>
+            </div>
+          )
+        })()}
         {toggle('Notificaciones de fichaje', notiFichaje, setNotiFichaje)}
         {toggle('Recordatorio de salida', notiSalida, setNotiSalida)}
         {toggle('GPS automático', gpsAuto, setGpsAuto)}
@@ -2912,7 +2946,7 @@ function WeeklyBars({ db, u, timer }) {
     const d = new Date(ws)
     d.setDate(d.getDate() + i)
     const ds = d.toISOString().slice(0, 10)
-    let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio.startsWith(ds))
+    let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(ds))
       .reduce((s, r) => s + calcMin(r), 0)
     if (i === dow && timer.state !== 'idle') min += Math.floor(timer.ws / 60)
     return { label, min, isToday: i === dow }
