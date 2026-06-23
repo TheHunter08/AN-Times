@@ -67,7 +67,8 @@ async function sendOne(sub, payload) {
 
 export default async function handler(req, res) {
   try {
-    const allowedOrigin = process.env.PUSH_ALLOWED_ORIGIN || ''
+    const _cleanHeader = s => String(s || '').replace(/[\r\n\t]/g, '').replace(/^["']|["']$/g, '').trim()
+    const allowedOrigin = _cleanHeader(process.env.PUSH_ALLOWED_ORIGIN)
     res.setHeader('Access-Control-Allow-Origin', allowedOrigin || '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
