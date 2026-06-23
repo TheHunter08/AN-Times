@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
-import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
+import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
@@ -596,18 +596,21 @@ export default function EmployeePage() {
 
   if (!u) return null
 
-  const initials = u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
-  const vac = vacData(u.id, db)
-  const unread = (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length
+  const initials = useMemo(
+    () => u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?',
+    [u.initials, u.name]
+  )
+  const vac = useMemo(() => vacData(u.id, db), [u.id, db.employees, db.vacaciones])
+  const unread = useMemo(() => (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length, [db.notis, u?.id])
+  const chatUnread = useMemo(() => (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length, [db.chats, u?.id])
 
-  // Smart greeting — computed fresh each render (component re-renders every second via timer)
-  const greeting = (() => {
+  const greeting = useMemo(() => {
     const h = new Date().getHours()
     const firstName = u.name.split(' ')[0]
     if (h >= 6 && h < 14) return `Buenos días, ${firstName} ☀️`
     if (h >= 14 && h < 21) return `Buenas tardes, ${firstName} 👋`
     return `Buenas noches, ${firstName} 🌙`
-  })()
+  }, [u.name, new Date().getHours()])
 
   return (
     <div className="screen active" id="sEmp">
@@ -635,7 +638,7 @@ export default function EmployeePage() {
           </button>
           <button className="icon-btn" onClick={() => openModal('chat')} style={{ position:'relative' }} aria-label="Chat con administrador">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            {(() => { const un = (db.chats||[]).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length; return un > 0 ? <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', pointerEvents:'none' }} aria-hidden="true">{un > 9 ? '9+' : un}</span> : null })()}
+            {chatUnread > 0 && <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', pointerEvents:'none' }} aria-hidden="true">{chatUnread > 9 ? '9+' : chatUnread}</span>}
           </button>
           <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ''}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -663,7 +666,7 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} />}
+        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} />}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -672,8 +675,7 @@ export default function EmployeePage() {
       </div>
 
       {/* Bottom nav */}
-      {(() => {
-        const chatUnread = (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length
+      {(()=> {
         return (
       <div className="emp-nav">
         {[
@@ -901,7 +903,8 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
-function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session }) {
+function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac }) {
+  const { setEmpTab } = useAppStore()
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
   const [showTip, setShowTip] = useState(() => {
@@ -941,9 +944,42 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
 
   const now = new Date()
   const ws = wkStart(now)
-  const weekRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
+  const wsStr = ws.toISOString().slice(0, 10)
+  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+  const weekRecs = useMemo(() => {
+    const wsDate = new Date(wsStr)
+    return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
+  }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
   const weekPct = Math.min(100, Math.round(weekMin / WK * 100))
+  const monthRecs = useMemo(
+    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)),
+    [db.records, u.id, mk]
+  )
+  const monthMin = useMemo(() => monthRecs.reduce((s, r) => s + calcMin(r), 0), [monthRecs])
+  const { netExtraMin: monthExtraMin, deficitMin: monthDeficitMin } = useMemo(
+    () => monthlyExtras(db.records, u.id, mk),
+    [db.records, u.id, mk]
+  )
+  const monthPct = Math.min(100, Math.round(monthMin / 9600 * 100))
+
+  // "Mi equipo" data — precomputado para evitar O(n²) cada segundo en encargados
+  const teamData = useMemo(() => {
+    if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
+    const isJO = u.role === 'jefe_obra'
+    const teamEmps = (db.employees || []).filter(e =>
+      !e.isAdmin && !e.baja && e.id !== u.id &&
+      (isJO || !u.obrasAsignadas?.length ||
+        u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
+    )
+    if (!teamEmps.length) return null
+    const todayRecords = (db.records || []).filter(r => r.inicio?.startsWith(todayStr))
+    const liveIds  = new Set(todayRecords.filter(r => !r.fin).map(r => r.empId))
+    const doneIds  = new Set(todayRecords.filter(r => r.fin && !liveIds.has(r.empId)).map(r => r.empId))
+    const minByEmp = {}
+    todayRecords.filter(r => r.fin).forEach(r => { minByEmp[r.empId] = (minByEmp[r.empId] || 0) + calcMin(r) })
+    return { teamEmps, liveIds, doneIds, minByEmp }
+  }, [u.role, u.id, u.obrasAsignadas, db.employees, db.records, todayStr])
 
   // SVG arc
   const ARC_R = 50
@@ -998,7 +1034,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
               </div>
             </div>
             <div className="hero-hour-pill">
-              <div className="hero-hour-label">Extra</div>
+              <div className="hero-hour-label">Extra hoy</div>
               <div className="hero-hour-value" style={{ color: 'var(--accent3)' }}>
                 {Math.floor(extraMin / 60)}h <span>{p2(extraMin % 60)}m</span>
               </div>
@@ -1096,6 +1132,41 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           </div>
         </div>
 
+        {/* Monthly progress bar */}
+        <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Este mes</div>
+            <div style={{ fontSize:12, fontWeight:700, color: monthPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(monthMin)} / 160h</div>
+          </div>
+          <div className="progress-bar">
+            <div className={`progress-bar-fill${monthPct >= 100 ? ' green' : ''}`} style={{ width:`${monthPct}%` }} />
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
+            <span style={{ fontSize:9, color:'var(--text4)' }}>{now.toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</span>
+            {monthExtraMin > 0 ? (
+              <span style={{ fontSize:9, color:'var(--green)', fontWeight:700 }}>+{mhm(monthExtraMin)} extra</span>
+            ) : monthDeficitMin > 0 ? (
+              <span style={{ fontSize:9, color:'var(--orange)' }}>−{mhm(monthDeficitMin)} déficit</span>
+            ) : (
+              <span style={{ fontSize:9, color: monthPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{monthPct >= 100 ? '✓ 160h alcanzadas' : `${100 - monthPct}% restante`}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Vacation balance */}
+        {vac && vac.available > 0 && (
+          <div onClick={() => setEmpTab('vacaciones')} style={{ margin:'-4px 16px 8px', padding:'10px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>🌴</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight:700 }}>{vac.available} días de vacaciones disponibles</div>
+              <div style={{ fontSize:10, color:'var(--text3)', marginTop:1 }}>
+                {vac.used > 0 ? `${vac.used} usados · ` : ''}{vac.pending > 0 ? `${vac.pending} pendientes · ` : ''}generados: {vac.generated}d en {vac.months} meses
+              </div>
+            </div>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        )}
+
         {/* Documentos pendientes de firma */}
         {pendingDocs.length > 0 && (
           <div onClick={() => openModal('documentos')} style={{ margin:'-4px 16px 0', padding:'12px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.3)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
@@ -1145,36 +1216,24 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
         )}
 
         {/* Mi equipo — solo para encargados y jefes de obra */}
-        {(u.role === 'encargado' || u.role === 'jefe_obra') && (() => {
-          const isJO = u.role === 'jefe_obra'
-          const teamEmps = (db.employees || []).filter(e =>
-            !e.isAdmin && !e.baja && e.id !== u.id &&
-            (isJO || !u.obrasAsignadas?.length ||
-              u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
-          )
-          if (!teamEmps.length) return null
-          const working = teamEmps.filter(e => (db.records||[]).some(r => r.empId === e.id && !r.fin))
-          const done    = teamEmps.filter(e =>
-            !working.find(w => w.id === e.id) &&
-            (db.records||[]).some(r => r.empId === e.id && r.fin && r.inicio?.startsWith(todayStr))
-          )
+        {teamData && (() => {
+          const { teamEmps, liveIds, doneIds, minByEmp } = teamData
+          const liveCount = teamEmps.filter(e => liveIds.has(e.id)).length
           return (
             <div style={{ padding:'0 16px 12px' }}>
               <div className="sec-label">
                 Mi equipo hoy
                 <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)', textTransform:'none', letterSpacing:0 }}>
-                  {working.length} activo{working.length !== 1 ? 's' : ''}
+                  {liveCount} activo{liveCount !== 1 ? 's' : ''}
                 </span>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {teamEmps.map(e => {
-                  const isWorking = working.find(w => w.id === e.id)
-                  const isDone    = done.find(d => d.id === e.id)
+                  const isWorking = liveIds.has(e.id)
+                  const isDone    = !isWorking && doneIds.has(e.id)
                   const openRec2  = isWorking ? (db.records||[]).find(r => r.empId === e.id && !r.fin) : null
-                  const totalMin  = isDone
-                    ? (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(todayStr)).reduce((s,r) => s + calcMin(r), 0)
-                    : 0
-                  const dotColor = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
+                  const totalMin  = isDone ? (minByEmp[e.id] || 0) : 0
+                  const dotColor  = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
                   const statusTxt = isWorking
                     ? `Activo desde ${ftime(openRec2?.inicio)}`
                     : isDone ? `${mhm(totalMin)} · Finalizado`
@@ -1230,11 +1289,18 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
   const now = new Date()
   const ws = wkStart(now)
-  const weekRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
+  const wsStr = ws.toISOString().slice(0, 10)
+  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+  const weekRecs = useMemo(() => {
+    const wsDate = new Date(wsStr)
+    return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
+  }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
 
-  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const monthMin = useMemo(
+    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0),
+    [db.records, u.id, mk]
+  )
 
   const tlItems = realRecs.map(r => ({ r, isCurrent: !r.fin }))
 
@@ -1337,16 +1403,21 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         y -= ROW_H
       })
 
-      // ─ Total + resumen vs objetivo ────────────────────────────────
-      if (y - 40 < 35 + SIG_AREA) { newPage() }
-      const targetMin2 = monthRecs.length * 480   // 8h/día
-      const diffMin2   = totalMin2 - targetMin2
-      const diffSign   = diffMin2 >= 0 ? '+' : ''
-      const cDiff      = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
-      page.drawRectangle({ x:ML, y:y-40, width:CW, height:40, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      // ─ Total + resumen vs objetivo (regla TIMES INC: 160h/mes, extras semanales >40h) ─────
+      if (y - 50 < 35 + SIG_AREA) { newPage() }
+      const exPdf = monthlyExtras(db.records, u.id, mk2)
+      const targetMin2 = 9600  // 160h = objetivo mensual TIMES INC
+      const cDiff = exPdf.netExtraMin > 0 ? cGreen : exPdf.deficitMin > 0 ? rgb(0.87,0.27,0.27) : cPri
+      page.drawRectangle({ x:ML, y:y-50, width:CW, height:50, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length!==1?'s':''} registrada${monthRecs.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
-      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-30, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
-      y -= 48
+      page.drawText(`Objetivo mensual: 160h (${mhm(targetMin2)})`, { x:ML+8, y:y-28, size:7.5, font:fontR, color:cDark, maxWidth:CW-16 })
+      const extraLine = exPdf.netExtraMin > 0
+        ? `H. extra netas: +${mhm(exPdf.netExtraMin)}  (${mhm(exPdf.weeklyExtraMin)} sem. − ${mhm(exPdf.shortfallMin)} déf.)`
+        : exPdf.deficitMin > 0
+          ? `Déficit: −${mhm(exPdf.deficitMin)} para completar las 160h obligatorias`
+          : totalMin2 >= targetMin2 ? '✓ Objetivo de 160h alcanzado' : `Pendiente: ${mhm(targetMin2 - totalMin2)} para las 160h`
+      page.drawText(extraLine, { x:ML+8, y:y-42, size:7.5, font:fontB, color:cDiff, maxWidth:CW-16 })
+      y -= 58
 
       // ─ Signature block ────────────────────────────────────────────
       if (y - SIG_AREA < 30) { newPage() }
@@ -1549,7 +1620,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         <div className="jor-stat-card orange">
           <div className="jor-stat-ico">⚡</div>
           <div className="jor-stat-val">{mhm(extraMin)}</div>
-          <div className="jor-stat-lbl">Extra</div>
+          <div className="jor-stat-lbl">Extra hoy</div>
         </div>
       </div>
 
@@ -2600,7 +2671,8 @@ function aiAnswer(q, db, u) {
   const prevWeekMin = fin.filter(r => { const d = new Date(r.inicio); return d >= prevWs && d < ws }).reduce((s, r) => s + calcMin(r), 0)
 
   const monthMin = fin.filter(r => r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-  const extraMonth = Math.max(0, monthMin - WD * 20)
+  // Regla TIMES INC: extras = semanas >40h, descontando déficit hasta 160h/mes
+  const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0 }
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
 
   // ¿Por qué trabajé menos esta semana?
@@ -2614,8 +2686,17 @@ function aiAnswer(q, db, u) {
 
   // ¿Cuántas horas extra tengo?
   if (ql.includes('extra')) {
-    if (extraMonth === 0) return `⚡ Este mes no tienes horas extra acumuladas. Llevas **${mhm(monthMin)}** sobre las ${mhm(WD * 20)} de referencia mensual.`
-    return `⚡ Tienes **${mhm(extraMonth)}** de horas extra este mes (${mhm(monthMin)} trabajados sobre ${mhm(WD * 20)} de referencia).`
+    const { netExtraMin, deficitMin, weeklyExtraMin, shortfallMin } = mExt
+    if (netExtraMin > 0) {
+      const comp = shortfallMin > 0
+        ? ` (${mhm(weeklyExtraMin)} semanales − ${mhm(shortfallMin)} de déficit mensual)`
+        : ''
+      return `⚡ Tienes **${mhm(netExtraMin)}** de horas extra netas este mes${comp}. Llevas **${mhm(monthMin)}** trabajados sobre el objetivo de 160h.`
+    }
+    if (deficitMin > 0) {
+      return `⚠️ Este mes tienes un déficit de **${mhm(deficitMin)}** para llegar a 160h. Llevas **${mhm(monthMin)}** trabajados.${weeklyExtraMin > 0 ? ` Las ${mhm(weeklyExtraMin)} extra semanales ya se usaron para compensar.` : ''}`
+    }
+    return `✅ Este mes llevas **${mhm(monthMin)}** trabajados. ${monthMin >= 9600 ? '¡Ya has cubierto las 160h objetivo!' : `Te faltan ${mhm(9600 - monthMin)} para llegar a 160h.`} Sin horas extra acumuladas todavía.`
   }
 
   // ¿Quién olvidó fichar? (visión de equipo si eres admin/encargado)

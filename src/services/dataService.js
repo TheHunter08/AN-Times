@@ -361,11 +361,12 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
   if (_pushDedupHit(to, tag, title, body)) {
     return { ok: true, deduped: true }
   }
+  const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
   try {
     const headers = { 'Content-Type': 'application/json' }
     const secret = import.meta.env.VITE_PUSH_SECRET
     if (secret) headers['Authorization'] = `Bearer ${secret}`
-    const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url }) })
+    const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       console.error('[PUSH] sendpush error', res.status, text)

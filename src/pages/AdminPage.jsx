@@ -352,15 +352,17 @@ function PanelDashboard({ db, toast, saveDB }) {
   const checkedIn = new Set(liveRecs.map(r => r.empId)).size
 
   const ws = wkStart(now)
-  const weekRecs = recs.filter(r => r.fin && new Date(r.inicio) >= ws)
-  const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0)
-
+  const wsStr = ws.toISOString().slice(0, 10)
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const monthMin = recs.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
-  const lastMonthMin = recs.filter(r => r.fin && r.inicio.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0)
+  const weekRecs = useMemo(() => {
+    const wsDate = new Date(wsStr)
+    return recs.filter(r => r.fin && new Date(r.inicio) >= wsDate)
+  }, [recs, wsStr])
+  const weekMin = useMemo(() => weekRecs.reduce((s, r) => s + calcMin(r), 0), [weekRecs])
+  const monthMin = useMemo(() => recs.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0), [recs, mk])
+  const lastMonthMin = useMemo(() => recs.filter(r => r.fin && r.inicio.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0), [recs, lastMk])
   const monthTrend = lastMonthMin > 0 ? Math.round((monthMin - lastMonthMin) / lastMonthMin * 100) : null
 
   const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length

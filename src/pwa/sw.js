@@ -110,16 +110,20 @@ self.addEventListener('push', (event) => {
     data = { title: 'TIMES INC', body: event.data ? event.data.text() : '' }
   }
 
-  const title = data.title || 'TIMES INC'
-  const url   = data.url || '/'
-  const tag   = data.tag || 'times-noti'
+  const title  = data.title || 'TIMES INC'
+  const rawUrl = data.url || '/'
+  const url    = (typeof rawUrl === 'string' && rawUrl.startsWith('/')) ? rawUrl : '/'
+  const tag    = data.tag || 'times-noti'
   const body  = data.body || data.message || ''
 
-  // Dedupe (5 min)
+  // Dedupe (5 min) — usar waitUntil incluso al descartar para no violar el requisito iOS
   const now = Date.now()
   const key = _pushKey(tag, title, body)
   const last = _pushSeen.get(key) || 0
-  if (now - last < 5 * 60_000) return
+  if (now - last < 5 * 60_000) {
+    event.waitUntil(Promise.resolve())  // iOS exige waitUntil aunque no mostremos nada
+    return
+  }
   _pushSeen.set(key, now)
   if (_pushSeen.size > 100) {
     for (const [k, t] of _pushSeen) if (now - t > 10 * 60_000) _pushSeen.delete(k)
@@ -153,12 +157,13 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = event.notification.data?.url || '/'
+  const rawClickUrl = event.notification.data?.url || '/'
+  const clickUrl = (typeof rawClickUrl === 'string' && rawClickUrl.startsWith('/')) ? rawClickUrl : '/'
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
       const existing = cs.find(c => c.url.includes(self.location.origin))
-      if (existing) { existing.focus(); existing.postMessage({ type:'PUSH_CLICK', url }) }
-      else clients.openWindow(url)
+      if (existing) { existing.focus(); existing.postMessage({ type:'PUSH_CLICK', url: clickUrl }) }
+      else clients.openWindow(clickUrl)
     })
   )
 })

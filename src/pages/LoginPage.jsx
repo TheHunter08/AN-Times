@@ -143,9 +143,13 @@ export default function LoginPage() {
       setPin(''); return
     }
 
-    // Disparar verificación al llegar a la longitud correcta
-    const expectedLen = isPinHashed(emp.pin) ? (emp.pinLen || 4) : (emp.pin?.length || 4)
-    if (newPin.length < expectedLen) return
+    // Disparar verificación al llegar a la longitud correcta.
+    // Si pinLen no existe (cuenta legacy con hash), intentamos desde 4 hasta 6 dígitos
+    // sin mostrar error en longitudes intermedias.
+    const knownLen = isPinHashed(emp.pin) ? emp.pinLen : (emp.pin?.length || 4)
+    const minLen = knownLen || 4
+    const maxLen = knownLen || 6
+    if (newPin.length < minLen) return
 
     verifyingRef.current = true
     const opId2 = ++opIdRef.current
@@ -155,14 +159,16 @@ export default function LoginPage() {
 
     if (ok) {
       clearLockout(emp.id)
-      // Migrar PIN en texto plano → hash automáticamente
-      if (!isPinHashed(emp.pin)) {
-        const hashed = await hashPin(newPin, emp.id)
+      // Migrar PIN en texto plano → hash automáticamente; también guardar pinLen si faltaba
+      if (!isPinHashed(emp.pin) || !emp.pinLen) {
+        const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
         const emps2 = (db.employees || []).map(e => e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e)
         useAppStore.getState().saveDB({ employees: emps2 })
       }
       doLogin(emp)
       setPin('')
+    } else if (!knownLen && newPin.length < maxLen) {
+      // Longitud desconocida (legacy) — esperar más dígitos sin mostrar error
     } else {
       const lk = recordFailedAttempt(emp.id)
       setShaking(true)
