@@ -264,7 +264,7 @@ export default function EmployeePage() {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
         if (minsPast >= 0 && minsPast < 5) {
-          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio.startsWith(todayStr))
+          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)

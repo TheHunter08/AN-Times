@@ -263,8 +263,13 @@ export default function App() {
       if (event.data?.type === 'BG_SYNC_DONE') fetchDB()
       if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
     }
+    const onDeepLink = (event) => applyDeepLink(event.detail)
     navigator.serviceWorker?.addEventListener('message', onMsg)
-    return () => navigator.serviceWorker?.removeEventListener('message', onMsg)
+    window.addEventListener('push-deeplink', onDeepLink)
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onMsg)
+      window.removeEventListener('push-deeplink', onDeepLink)
+    }
   }, [])
 
   useEffect(() => {

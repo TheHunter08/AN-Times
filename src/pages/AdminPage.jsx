@@ -124,7 +124,7 @@ export default function AdminPage() {
   }, [isEncargado])
 
   useEffect(() => {
-    setTimeout(async () => {
+    const t = setTimeout(async () => {
       const native = await isNativePlatform()
       const uid = useAppStore.getState().session?.user?.id
       if (native) { await requestPushPermission(); return }
@@ -134,6 +134,7 @@ export default function AdminPage() {
         if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
+    return () => clearTimeout(t)
   }, [isEncargado])
 
   // Buscador global: Cmd+K / Ctrl+K
