@@ -115,14 +115,14 @@ self.addEventListener('push', (event) => {
   const tag   = data.tag || 'times-noti'
   const body  = data.body || data.message || ''
 
-  // Dedupe
+  // Dedupe (5 min)
   const now = Date.now()
   const key = _pushKey(tag, title, body)
   const last = _pushSeen.get(key) || 0
-  if (now - last < 30_000) return
+  if (now - last < 5 * 60_000) return
   _pushSeen.set(key, now)
   if (_pushSeen.size > 100) {
-    for (const [k, t] of _pushSeen) if (now - t > 60_000) _pushSeen.delete(k)
+    for (const [k, t] of _pushSeen) if (now - t > 10 * 60_000) _pushSeen.delete(k)
   }
 
   const options = {

@@ -279,6 +279,16 @@ export default function EmployeePage() {
       const hasSent = (key, val) => val !== undefined ? notisSent[key] === val : !!notisSent[key]
       const markSent = (key, val = '1') => { notisSent[key] = val; dirty = true }
 
+      // Acumulador de notis a añadir a db.notis (para que aparezcan en la campana)
+      const bellNotis = []
+      const addBell = (action, detail) => {
+        bellNotis.push({
+          id: 'sn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          empId: u.id, action, detail,
+          ts: new Date().toISOString(), leido: false
+        })
+      }
+
       // 1. Recordatorio diario de fichaje
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
@@ -289,6 +299,7 @@ export default function EmployeePage() {
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)
             queuePush(u.id, '⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder-fichar', '/?tab=inicio')
+            addBell('⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.')
           }
         }
       }
@@ -301,6 +312,7 @@ export default function EmployeePage() {
         if (elapsed >= 465 && elapsed < 475 && !hasSent(warn14h)) {
           markSent(warn14h)
           queuePush(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
+          addBell('⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.')
         }
       }
 
@@ -313,7 +325,9 @@ export default function EmployeePage() {
           if (!hasSent(sKey)) {
             markSent(sKey)
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
-            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`, 'jornada', '/?tab=inicio')
+            const _msgSal = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
+            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio')
+            addBell('🔔 ¿Olvidaste fichar la salida?', _msgSal)
           }
         }
       }
@@ -338,7 +352,9 @@ export default function EmployeePage() {
         const key = 'an_docs_' + u.id
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
-          queuePush(u.id, '📄 Documentos pendientes', `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`, 'documentos', '/?go=emp:documentos')
+          const _msgDoc = `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`
+          queuePush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
+          addBell('📄 Documentos pendientes', _msgDoc)
         }
       }
 
@@ -348,7 +364,9 @@ export default function EmployeePage() {
         const key = 'an_cierre_' + u.id
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
-          queuePush(u.id, '📋 Cierre mensual pendiente', `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`, 'cierre', '/?go=emp:perfil')
+          const _msgCi = `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`
+          queuePush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
+          addBell('📋 Cierre mensual pendiente', _msgCi)
         }
       }
 
@@ -362,6 +380,7 @@ export default function EmployeePage() {
           if (!hasSent(warnKey)) {
             markSent(warnKey)
             queuePush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
+            addBell('⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
             toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
           }
         }
@@ -380,14 +399,23 @@ export default function EmployeePage() {
             const snapshot = dbRef.current.records
             const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
             const dbWithAudit = auditLog(dbRef.current, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
-            saveDB({ records: updRecs, notisSent, audit: dbWithAudit.audit })
-            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`, 'jornada', '/?tab=jornada')
+            const _msgAc = `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
+            addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
+            const _notisToSave = [...(dbRef.current.notis || []), ...bellNotis]
+            bellNotis.length = 0
+            saveDB({ records: updRecs, notisSent, audit: dbWithAudit.audit, notis: _notisToSave })
+            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
           }
         }
       })
 
-      // Batch save: una sola escritura por ciclo si hubo cambios en notisSent
-      if (dirty) saveDB({ notisSent })
+      // Batch save: una sola escritura por ciclo. Combina notisSent + bell notis.
+      if (dirty || bellNotis.length) {
+        const partial = {}
+        if (dirty) partial.notisSent = notisSent
+        if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
+        saveDB(partial)
+      }
     }
 
     const iv = setInterval(checkSmartNotis, 60000)

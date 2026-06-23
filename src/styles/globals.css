@@ -199,10 +199,10 @@ body {
   flex-direction: column;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* Scrollbar — invisible (estilo iOS nativo) */
+::-webkit-scrollbar { width: 0; height: 0; display: none; }
+::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track { background: transparent; }
+* { scrollbar-width: none; -ms-overflow-style: none; }
 
 /* ── Inputs ─────────────────────────────────────────────────── */
 input, select, textarea {

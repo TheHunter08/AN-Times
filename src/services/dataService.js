@@ -339,7 +339,28 @@ export async function pushSubscribe(userId, vapidPub) {
   }
 }
 
+// Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 5 min.
+// Evita que la misma smart-noti se reenvíe en checks consecutivos del bucle 60s.
+function _pushDedupHit(to, tag, title, body) {
+  try {
+    const key = '__pushdedup__'
+    const TTL = 5 * 60 * 1000
+    const now = Date.now()
+    const raw = localStorage.getItem(key)
+    const map = raw ? JSON.parse(raw) : {}
+    const fp = `${to}|${tag}|${title}|${body}`
+    if (map[fp] && now - map[fp] < TTL) return true
+    map[fp] = now
+    for (const k in map) { if (now - map[k] > TTL) delete map[k] }
+    localStorage.setItem(key, JSON.stringify(map))
+    return false
+  } catch { return false }
+}
+
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
+  if (_pushDedupHit(to, tag, title, body)) {
+    return { ok: true, deduped: true }
+  }
   try {
     const headers = { 'Content-Type': 'application/json' }
     const secret = import.meta.env.VITE_PUSH_SECRET

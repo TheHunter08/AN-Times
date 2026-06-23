@@ -16,15 +16,16 @@ function rateLimit(ip) {
   return entry.count > max
 }
 
-// ── Dedupe: si el mismo userId+tag+title+body llega en <30s, se ignora ──────
+// ── Dedupe: si el mismo userId+tag+title+body llega en <5min, se ignora ──────
 const _dedupe = new Map()
+const _DEDUPE_TTL = 5 * 60 * 1000
 function isDuplicate(userId, tag, title, body) {
   const now = Date.now()
   const key = `${userId}|${tag}|${title}|${body}`
   const last = _dedupe.get(key) || 0
-  if (now - last < 30_000) return true
+  if (now - last < _DEDUPE_TTL) return true
   _dedupe.set(key, now)
-  if (_dedupe.size > 500) { for (const [k, t] of _dedupe) { if (now - t > 60_000) _dedupe.delete(k) } }
+  if (_dedupe.size > 500) { for (const [k, t] of _dedupe) { if (now - t > _DEDUPE_TTL) _dedupe.delete(k) } }
   return false
 }
 
