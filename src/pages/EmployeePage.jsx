@@ -1642,7 +1642,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   }
 
   return (
-    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden', paddingBottom:'calc(90px + env(safe-area-inset-bottom, 0px))' }}>
+    <div style={{ position:'absolute', top:0, left:0, right:0, bottom:'calc(70px + max(20px, env(safe-area-inset-bottom, 0px)) + max(0px, env(safe-area-inset-bottom, 0px) - 12px))', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
