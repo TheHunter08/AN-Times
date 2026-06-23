@@ -53,6 +53,7 @@ function InAppNotification() {
 function UpdateBanner() {
   const [waitingSW, setWaitingSW] = useState(null)
   const [applying, setApplying]   = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const reloading = useRef(false)
 
   useEffect(() => {
@@ -65,7 +66,6 @@ function UpdateBanner() {
     }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
     navigator.serviceWorker.ready.then(reg => {
-      // Si ya hay un SW esperando, mostrar banner inmediatamente
       if (reg.waiting) setWaitingSW(reg.waiting)
       const check = (sw) => {
         if (!sw) return
@@ -77,7 +77,9 @@ function UpdateBanner() {
       }
       if (reg.installing) check(reg.installing)
       reg.addEventListener('updatefound', () => check(reg.installing))
-      updateInterval = setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000)
+      // Comprobar updates inmediatamente y luego cada 60s (antes era 5 min)
+      reg.update().catch(() => {})
+      updateInterval = setInterval(() => reg.update().catch(() => {}), 60 * 1000)
     }).catch(() => {})
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
@@ -89,16 +91,27 @@ function UpdateBanner() {
     if (!waitingSW || applying) return
     setApplying(true)
     waitingSW.postMessage({ type: 'SKIP_WAITING' })
-    // El reload se dispara automáticamente vía controllerchange
   }
 
-  if (!waitingSW) return null
+  if (!waitingSW || dismissed) return null
   return (
-    <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, padding:'10px 14px', background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff', display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(108,99,255,.4)' }}>
+    <div style={{
+      position:'fixed', zIndex:99999,
+      left:10, right:10,
+      bottom:`calc(80px + max(12px, env(safe-area-inset-bottom)))`,
+      padding:'10px 12px',
+      background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff',
+      display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600,
+      borderRadius:14, boxShadow:'0 8px 32px rgba(108,99,255,.45)',
+      animation:'slideUp .25s cubic-bezier(.16,1,.3,1)'
+    }}>
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       <span style={{ flex:1, minWidth:0 }}>{applying ? 'Actualizando…' : 'Nueva versión disponible'}</span>
       {!applying && (
-        <button onClick={apply} style={{ background:'rgba(255,255,255,.18)', border:'1px solid rgba(255,255,255,.3)', color:'#fff', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>Actualizar</button>
+        <>
+          <button onClick={apply} style={{ background:'rgba(255,255,255,.22)', border:'1px solid rgba(255,255,255,.35)', color:'#fff', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>Actualizar</button>
+          <button onClick={() => setDismissed(true)} aria-label="Cerrar" style={{ background:'none', border:'none', color:'rgba(255,255,255,.85)', cursor:'pointer', fontSize:18, lineHeight:1, padding:'2px 4px', flexShrink:0 }}>×</button>
+        </>
       )}
     </div>
   )
