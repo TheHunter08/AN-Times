@@ -323,7 +323,12 @@ export default function App() {
     initRealtime()
     // El canal Realtime de Supabase gestiona actualizaciones en vivo.
     // El polling queda solo para cuando la pestaña vuelve a estar visible (app en segundo plano).
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchDB() }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      fetchDB()
+      // iOS PWA: forzar check de SW al volver al primer plano (la app puede estar suspendida horas)
+      navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
+    }
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
