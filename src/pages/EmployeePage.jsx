@@ -690,28 +690,48 @@ function PullToRefresh({ children }) {
   useEffect(() => {
     const el = tabRef.current
     if (!el) return
+    const reset = () => {
+      ptr.current.active = false
+      ptr.current.dist = 0
+      setPullState(s => ({ dist: 0, refreshing: s.refreshing }))
+    }
     const onStart = e => {
-      if (el.scrollTop === 0) { ptr.current.startY = e.touches[0].clientY; ptr.current.active = true }
+      if (ptr.current.refreshing) return
+      if (el.scrollTop === 0) { ptr.current.startY = e.touches[0].clientY; ptr.current.active = true; ptr.current.dist = 0 }
     }
     const onMove = e => {
       if (!ptr.current.active) return
       const d = e.touches[0].clientY - ptr.current.startY
       if (d > 0) { ptr.current.dist = Math.min(d * 0.45, 60); setPullState(s => ({ ...s, dist: ptr.current.dist })) }
-      else { ptr.current.active = false }
+      else { reset() }
     }
     const onEnd = async () => {
-      if (!ptr.current.active) return
+      const wasActive = ptr.current.active
       ptr.current.active = false
-      if (ptr.current.dist > 48 && !ptr.current.refreshing) {
+      if (wasActive && ptr.current.dist > 48 && !ptr.current.refreshing) {
         ptr.current.refreshing = true
+        ptr.current.dist = 0
         setPullState({ dist: 0, refreshing: true })
-        try { await fetchDB() } finally { ptr.current.refreshing = false; setPullState({ dist: 0, refreshing: false }) }
-      } else { ptr.current.dist = 0; setPullState({ dist: 0, refreshing: false }) }
+        try { await fetchDB() } finally {
+          ptr.current.refreshing = false
+          ptr.current.dist = 0
+          setPullState({ dist: 0, refreshing: false })
+        }
+      } else {
+        ptr.current.dist = 0
+        setPullState(s => ({ dist: 0, refreshing: s.refreshing }))
+      }
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })
-    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd) }
+    el.addEventListener('touchcancel', reset, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', reset)
+    }
   }, [fetchDB])
 
   const { dist, refreshing } = pullState
