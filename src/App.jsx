@@ -328,6 +328,23 @@ export default function App() {
     }
   }, [])
 
+  // Háptica global: cualquier tap en botón vibra brevemente (throttled a 60ms)
+  useEffect(() => {
+    if (!('vibrate' in navigator)) return
+    let last = 0
+    const onTap = (e) => {
+      const t = e.target?.closest?.('button, [role="button"], a.btn, .pressable')
+      if (!t || t.disabled) return
+      const now = Date.now()
+      if (now - last < 60) return
+      last = now
+      try { navigator.vibrate(6) } catch {}
+    }
+    document.addEventListener('pointerdown', onTap, { passive: true })
+    return () => document.removeEventListener('pointerdown', onTap)
+  }, [])
+
+
   // Auto-logout tras 30 min de inactividad
   useEffect(() => {
     const TIMEOUT = 30 * 60 * 1000

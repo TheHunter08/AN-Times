@@ -8,6 +8,22 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Quitamos el menú contextual de mantener pulsado y el "drag" de iOS en
+   toda la UI; el texto de inputs/textareas se rehabilita más abajo. */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  -webkit-user-drag: none;
+}
+input, textarea, [contenteditable="true"], .selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 :root {
@@ -161,7 +177,7 @@ html, body {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text);
@@ -480,8 +496,24 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
    solid fill that was appearing beneath it. */
 
 /* ── Micro-interactions ─────────────────────────────────────── */
-button { -webkit-tap-highlight-color: transparent; transition: transform .1s ease, opacity .1s ease; font-family: inherit; }
-button:active { transform: scale(.96); opacity: .88; }
+button {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s cubic-bezier(.16,1,.3,1), opacity .12s ease;
+  font-family: inherit;
+  touch-action: manipulation;
+}
+button:active { transform: scale(.96); opacity: .85; }
+
+/* Cualquier elemento marcado como interactivo gana press feedback nativo */
+.pressable, [role="button"], a.btn {
+  transition: transform .12s cubic-bezier(.16,1,.3,1), opacity .12s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.pressable:active, [role="button"]:active, a.btn:active {
+  transform: scale(.97);
+  opacity: .88;
+}
 
 /* ── Accesibilidad: foco visible para navegación por teclado ──── */
 a:focus-visible, button:focus-visible, input:focus-visible,
