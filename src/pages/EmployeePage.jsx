@@ -2217,26 +2217,6 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
 
       </div>
 
-      {/* Activity heatmap — 12 weeks */}
-      <div style={{ margin:'0 16px 16px' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:10 }}>Actividad · 12 semanas</div>
-        <div className="act-heatmap">
-          {Array.from({ length: 84 }).map((_, i) => {
-            const d = new Date(now)
-            d.setDate(d.getDate() - (83 - i))
-            const ds = d.toISOString().slice(0, 10)
-            const mins = dayMap[ds] || 0
-            const level = mins === 0 ? 0 : mins < WD * 0.25 ? 1 : mins < WD * 0.5 ? 2 : mins < WD ? 3 : 4
-            return <div key={ds} className={`act-hm-cell act-hm-${level}`} title={`${ds}: ${mhm(mins)}`} />
-          })}
-        </div>
-        <div style={{ display:'flex', gap:4, alignItems:'center', justifyContent:'flex-end', marginTop:6 }}>
-          <span style={{ fontSize:9, color:'var(--text4)' }}>Menos</span>
-          {[0,1,2,3,4].map(l => <div key={l} className={`act-hm-cell act-hm-${l}`} style={{ width:10, height:10 }} />)}
-          <span style={{ fontSize:9, color:'var(--text4)' }}>Más</span>
-        </div>
-      </div>
-
       {/* Cierres mensuales pendientes de firma */}
       {(() => {
         const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
