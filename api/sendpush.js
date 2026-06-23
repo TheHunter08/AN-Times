@@ -16,6 +16,18 @@ function rateLimit(ip) {
   return entry.count > max
 }
 
+// ── Dedupe: si el mismo userId+tag+title+body llega en <30s, se ignora ──────
+const _dedupe = new Map()
+function isDuplicate(userId, tag, title, body) {
+  const now = Date.now()
+  const key = `${userId}|${tag}|${title}|${body}`
+  const last = _dedupe.get(key) || 0
+  if (now - last < 30_000) return true
+  _dedupe.set(key, now)
+  if (_dedupe.size > 500) { for (const [k, t] of _dedupe) { if (now - t > 60_000) _dedupe.delete(k) } }
+  return false
+}
+
 const toB64Url = s => (s || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const isValidVapidPub = s => /^[A-Za-z0-9\-_]{86,90}$/.test(s)
 const isValidVapidPrv = s => /^[A-Za-z0-9\-_]{42,46}$/.test(s)
@@ -100,7 +112,14 @@ export default async function handler(req, res) {
     if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' })
 
     const safeUrl = typeof url === 'string' && url.startsWith('/') ? url : '/'
-    const payload = JSON.stringify({ title, body: body || '', tag: tag || 'times', url: safeUrl })
+    const _tag = tag || 'times'
+    const _body = body || ''
+
+    if (isDuplicate(userId, _tag, title, _body)) {
+      return res.status(200).json({ ok: true, deduped: true })
+    }
+
+    const payload = JSON.stringify({ title, body: _body, tag: _tag, url: safeUrl })
 
     if (userId === '__all__') {
       const subs = await sbGetAll()

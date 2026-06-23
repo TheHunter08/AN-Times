@@ -97,9 +97,11 @@ registerRoute(
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
 // CRÍTICO: iOS PWA exige que TODO evento push muestre una notificación visible.
-// Si la app está en primer plano, además del showNotification mandamos un
-// PUSH_RECEIVED al cliente para que pueda mostrar el banner in-app y opcionalmente
-// cerrar la notificación OS (vía PUSH_SHOWN → cliente devuelve PUSH_DISMISS).
+// Dedupe in-memory: si llega un push con la misma firma (tag+title+body) en
+// menos de 30s, se ignora (evita duplicados cuando varios dispositivos lanzan
+// el mismo smart-noti).
+const _pushSeen = new Map()
+const _pushKey  = (tag, title, body) => `${tag}|${title}|${body}`
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -108,19 +110,31 @@ self.addEventListener('push', (event) => {
     data = { title: 'TIMES INC', body: event.data ? event.data.text() : '' }
   }
 
-  const title   = data.title || 'TIMES INC'
-  const url     = data.url || '/'
-  const tag     = data.tag || 'times-noti'
+  const title = data.title || 'TIMES INC'
+  const url   = data.url || '/'
+  const tag   = data.tag || 'times-noti'
+  const body  = data.body || data.message || ''
+
+  // Dedupe
+  const now = Date.now()
+  const key = _pushKey(tag, title, body)
+  const last = _pushSeen.get(key) || 0
+  if (now - last < 30_000) return
+  _pushSeen.set(key, now)
+  if (_pushSeen.size > 100) {
+    for (const [k, t] of _pushSeen) if (now - t > 60_000) _pushSeen.delete(k)
+  }
+
   const options = {
-    body: data.body || data.message || '',
+    body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag,
-    renotify: true,
-    requireInteraction: true,
+    renotify: false,         // mismo tag = actualiza silenciosamente, no re-alerta
+    requireInteraction: false, // se auto-cierra (no se queda pegada)
     data: { url, tag },
     actions: data.actions || [],
-    vibrate: [200, 100, 200],
+    vibrate: [180, 80, 180],
     silent: false,
   }
 
@@ -132,7 +146,7 @@ self.addEventListener('push', (event) => {
     try {
       const cs = await clients.matchAll({ type: 'window', includeUncontrolled: true })
       const focused = cs.find(c => c.focused) || cs.find(c => c.visibilityState === 'visible')
-      if (focused) focused.postMessage({ type: 'PUSH_RECEIVED', title, body: options.body, tag, url })
+      if (focused) focused.postMessage({ type: 'PUSH_RECEIVED', title, body, tag, url })
     } catch {}
   })())
 })
