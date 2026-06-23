@@ -811,6 +811,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const recs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = openRec()
+  const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
 
   const lastAutoClosed = useMemo(() => {
     return (db.records || [])
@@ -923,33 +924,25 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             </div>
           </div>
 
-          <div style={{ position:'relative' }}>
-            <button className={`hero-fichar-btn ripple-btn${timer.state !== 'idle' ? ' active' : ''}`}
-              onClick={e => {
-                const btn = e.currentTarget
-                const r = document.createElement('span')
-                r.className = 'ripple'
-                const rect = btn.getBoundingClientRect()
-                const size = Math.max(rect.width, rect.height)
-                r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`
-                btn.appendChild(r)
-                setTimeout(() => r.remove(), 600)
-                if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
-                handleMainBtn()
-              }}>
-              {timer.state === 'idle'
-                ? '▶  Iniciar jornada'
-                : timer.state === 'break'
-                  ? '⏹  Terminar jornada'
-                  : '⏹  Registrar salida'}
-            </button>
-            {showTip && timer.state === 'idle' && (
-              <div style={{ position:'absolute', top:'calc(100% + 10px)', left:'50%', transform:'translateX(-50%)', background:'var(--primary)', color:'#fff', borderRadius:10, padding:'8px 14px', fontSize:12, fontWeight:600, whiteSpace:'nowrap', boxShadow:'0 4px 20px rgba(108,99,255,.5)', pointerEvents:'none', zIndex:10 }}>
-                👆 Pulsa aquí para iniciar tu jornada
-                <div style={{ position:'absolute', top:-6, left:'50%', transform:'translateX(-50%)', width:0, height:0, borderLeft:'6px solid transparent', borderRight:'6px solid transparent', borderBottom:'6px solid var(--primary)' }} />
-              </div>
-            )}
-          </div>
+          <button className={`hero-fichar-btn ripple-btn${timer.state !== 'idle' ? ' active' : ''}`}
+            onClick={e => {
+              const btn = e.currentTarget
+              const r = document.createElement('span')
+              r.className = 'ripple'
+              const rect = btn.getBoundingClientRect()
+              const size = Math.max(rect.width, rect.height)
+              r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`
+              btn.appendChild(r)
+              setTimeout(() => r.remove(), 600)
+              if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
+              handleMainBtn()
+            }}>
+            {timer.state === 'idle'
+              ? '▶  Iniciar jornada'
+              : timer.state === 'break'
+                ? '⏹  Terminar jornada'
+                : '⏹  Registrar salida'}
+          </button>
 
           {timer.state !== 'idle' && (
             <button
@@ -990,6 +983,28 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
+
+        {/* Tip de primera vez — fuera del hero card para no ser clipeado por su overflow:hidden */}
+        {showTip && timer.state === 'idle' && (
+          <div style={{ margin:'-4px 16px 0', padding:'10px 14px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, fontSize:12, fontWeight:600, color:'var(--primary-light)' }}>
+            <span style={{ fontSize:16 }}>👆</span>
+            <span>Pulsa el botón <b>Iniciar jornada</b> para empezar a fichar</span>
+          </div>
+        )}
+
+        {/* Documentos pendientes de firma */}
+        {pendingDocs.length > 0 && (
+          <div onClick={() => openModal('documentos')} style={{ margin:'-4px 16px 0', padding:'12px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.3)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>📄</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--orange)' }}>
+                {pendingDocs.length === 1 ? 'Tienes 1 documento pendiente' : `Tienes ${pendingDocs.length} documentos pendientes`} de firma
+              </div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>Toca para revisarlos y firmar</div>
+            </div>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--orange)" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        )}
 
         {/* Auto-close warning banner */}
         {showAutoCloseWarning && (
