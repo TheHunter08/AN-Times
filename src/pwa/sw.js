@@ -96,12 +96,13 @@ registerRoute(
 )
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
-// CRÍTICO: iOS PWA exige que TODO evento push muestre una notificación visible.
-// Dedupe in-memory: si llega un push con la misma firma (tag+title+body) en
-// menos de 30s, se ignora (evita duplicados cuando varios dispositivos lanzan
-// el mismo smart-noti).
-const _pushSeen = new Map()
-const _pushKey  = (tag, title, body) => `${tag}|${title}|${body}`
+// CRÍTICO: iOS PWA exige que TODO evento push llame a event.waitUntil().
+// Dedupe persistente en IDB (no se pierde al reiniciar el SW en iOS/Android):
+//   - Clave: "psh|{tag}|{title}|{body}" → timestamp del último envío
+//   - Ventana: 5 minutos (evita duplicados del cron + cliente en background)
+//   - Limpieza: TTL 30min (no acumula entradas obsoletas)
+const _pushIdbKey = (tag, title, body) => `psh|${tag}|${title}|${body}`
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -114,39 +115,52 @@ self.addEventListener('push', (event) => {
   const rawUrl = data.url || '/'
   const url    = (typeof rawUrl === 'string' && rawUrl.startsWith('/')) ? rawUrl : '/'
   const tag    = data.tag || 'times-noti'
-  const body  = data.body || data.message || ''
-
-  // Dedupe (5 min) — usar waitUntil incluso al descartar para no violar el requisito iOS
-  const now = Date.now()
-  const key = _pushKey(tag, title, body)
-  const last = _pushSeen.get(key) || 0
-  if (now - last < 5 * 60_000) {
-    event.waitUntil(Promise.resolve())  // iOS exige waitUntil aunque no mostremos nada
-    return
-  }
-  _pushSeen.set(key, now)
-  if (_pushSeen.size > 100) {
-    for (const [k, t] of _pushSeen) if (now - t > 10 * 60_000) _pushSeen.delete(k)
-  }
+  const body   = data.body || data.message || ''
+  const now    = Date.now()
+  const idbKey = _pushIdbKey(tag, title, body)
 
   const options = {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag,
-    renotify: false,         // mismo tag = actualiza silenciosamente, no re-alerta
-    requireInteraction: false, // se auto-cierra (no se queda pegada)
+    renotify: false,
+    requireInteraction: false,
     data: { url, tag },
     actions: data.actions || [],
     vibrate: [180, 80, 180],
     silent: false,
   }
 
+  // waitUntil SIEMPRE (obligatorio iOS aunque descartemos el push)
   event.waitUntil((async () => {
-    // 1) SIEMPRE mostrar la notificación (requisito iOS Web Push)
+    // Dedupe persistente en IDB — sobrevive reinicios del SW
+    try {
+      const last = await _idbGet(idbKey)
+      if (last && now - last < 5 * 60_000) return  // duplicado, descartar silenciosamente
+
+      // Marcar ANTES de mostrar (evita race con otra instancia del SW)
+      await _idbPut(idbKey, now)
+
+      // Limpieza asíncrona de entradas antiguas (>30 min) — no bloquea
+      _idbOpen().then(db => {
+        const tx = db.transaction(_IDB_STORE, 'readwrite')
+        const store = tx.objectStore(_IDB_STORE)
+        store.openCursor().onsuccess = e => {
+          const cur = e.target.result
+          if (!cur) return
+          if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
+          cur.continue()
+        }
+      }).catch(() => {})
+    } catch {
+      // IDB no disponible — continuar sin dedup
+    }
+
+    // 1) Mostrar notificación (requisito iOS Web Push)
     await self.registration.showNotification(title, options)
 
-    // 2) Avisar a clientes abiertos para banner in-app o auto-dismiss
+    // 2) Avisar a clientes abiertos para banner in-app
     try {
       const cs = await clients.matchAll({ type: 'window', includeUncontrolled: true })
       const focused = cs.find(c => c.focused) || cs.find(c => c.visibilityState === 'visible')
@@ -195,6 +209,14 @@ async function _idbDel(key) {
   return new Promise((res, rej) => {
     const tx = db.transaction(_IDB_STORE, 'readwrite')
     const r  = tx.objectStore(_IDB_STORE).delete(key)
+    r.onsuccess = res; r.onerror = () => rej(r.error)
+  })
+}
+async function _idbPut(key, value) {
+  const db = await _idbOpen()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(_IDB_STORE, 'readwrite')
+    const r  = tx.objectStore(_IDB_STORE).put(value, key)
     r.onsuccess = res; r.onerror = () => rej(r.error)
   })
 }

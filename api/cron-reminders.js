@@ -1,11 +1,14 @@
-// ── Cron de recordatorios de fichaje ──────────────────────────────────────────
-// Ejecutado por Vercel Cron (vercel.json) cada hora.
-// Lee app_data de Supabase, detecta qué empleados no han fichado y tienen la
-// hora de recordatorio superada, y envía push notifications directamente via
-// web-push (sin pasar por /api/sendpush para evitar redondeo extra de red).
+// ── Cron de recordatorios ─────────────────────────────────────────────────────
+// Ejecutado por Vercel Cron cada hora (ver vercel.json: "0 * * * *").
+// Cubre TODOS los recordatorios críticos para cuando la app está cerrada:
+//   1. Recordatorio de fichaje (no ha registrado entrada hoy)
+//   2. Jornada larga (> 7h45m sin fichar salida)
+//   3. Salida olvidada (jornada abierta después de la hora de salida)
+//   4. Documentos pendientes de firma (≥9h)
+//   5. Cierre mensual pendiente (≥9h)
 //
-// Requiere en variables de entorno de Vercel:
-//   VAPID_PUBLIC, VAPID_PRIVATE, VITE_SB_URL, VITE_SB_ANON, CRON_SECRET
+// Las claves de dedup se marcan en db.notisSent (Supabase) para evitar
+// duplicados entre el cron y el cliente (cuando la app está en background).
 // ─────────────────────────────────────────────────────────────────────────────
 const webpush = require('web-push')
 
@@ -16,7 +19,7 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
 const SB_URL        = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON       = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
-const CRON_SECRET   = process.env.CRON_SECRET   // Set in Vercel env vars for manual trigger security
+const CRON_SECRET   = process.env.CRON_SECRET
 
 webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
 
@@ -30,7 +33,7 @@ async function getAppData() {
 }
 
 async function markNotisSent(keys) {
-  // Re-read fresh data to minimize overwrite risk, then merge only notisSent
+  // Re-lee la DB fresca para minimizar escritura en conflicto con el cliente
   const current = await getAppData()
   if (!current) return
   const merged = { ...current, notisSent: { ...(current.notisSent || {}), ...keys }, _ts: Date.now() }
@@ -53,7 +56,7 @@ async function deleteSub(userId) {
   }).catch(() => {})
 }
 
-// Convierte Date a hora en la zona Europe/Madrid (soporta horario de verano/invierno)
+// Zona horaria Spain (soporta horario de verano/invierno)
 function nowInSpain() {
   const str = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' })
   return new Date(str)
@@ -61,95 +64,176 @@ function nowInSpain() {
 
 function todayInSpain() {
   const d = nowInSpain()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${dd}`
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+function p2(n) { return String(n).padStart(2, '0') }
+
+async function sendPush(sub, payload, empName) {
+  await webpush.sendNotification(
+    { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+    payload
+  )
+  console.log(`[cron] push sent → ${empName}`)
 }
 
 module.exports = async function handler(req, res) {
-  // Vercel Cron envía el header x-vercel-cron:1 — aceptar también peticiones
-  // manuales autenticadas con CRON_SECRET para pruebas.
   const isCronInvocation = req.headers['x-vercel-cron'] === '1'
   if (!isCronInvocation && CRON_SECRET) {
     const token = (req.headers['authorization'] || '').replace('Bearer ', '')
     if (token !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
   }
-
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
   try {
     const db = await getAppData()
     if (!db) return res.status(500).json({ error: 'no app_data' })
 
-    const now    = nowInSpain()
-    const today  = todayInSpain()
-    const nowH   = now.getHours()
-    const nowM   = now.getMinutes()
+    const now       = nowInSpain()
+    const today     = todayInSpain()
+    const nowH      = now.getHours()
+    const nowM      = now.getMinutes()
+    const nowMs     = Date.now()
 
-    const employees  = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-    const records    = db.records || []
-    const notisSent  = db.notisSent || {}
-    const subs       = await getPushSubs()
-    const subMap     = new Map(subs.map(s => [s.user_id, s]))
+    const employees = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+    const records   = db.records    || []
+    const notisSent = db.notisSent  || {}
+    const cierres   = db.cierres    || []
+    const docs      = db.documentos || []
+    const cfgSalidaTime = db.config?.salidaTime || '21:00'
 
-    const toSend    = []   // { emp, sub }
-    const newKeys   = {}   // keys to mark as sent
+    const subs   = await getPushSubs()
+    const subMap = new Map(subs.map(s => [s.user_id, s]))
 
-    for (const emp of employees) {
-      // reminderTime está guardado en el empleado desde el onboarding (o default 20:00)
-      const reminderTime = emp.reminderTime || '20:00'
-      const [rh, rm] = reminderTime.split(':').map(Number)
-      const minsPast = (nowH - rh) * 60 + (nowM - rm)
+    // Acumulador: { sub, payload, emp, key }
+    const toSend = []
+    const newKeys = {}
 
-      // Solo si ya pasó la hora del recordatorio hoy
-      if (minsPast < 0) continue
+    const mkPayload = (title, body, tag, url = '/') =>
+      JSON.stringify({ title, body, tag, url: (typeof url === 'string' && url.startsWith('/')) ? url : '/' })
 
-      // Ya enviado hoy
-      const key = 'an_rem_' + emp.id
-      if (notisSent[key] === today) continue
-
-      // Ya fichó hoy
-      const hasFichado = records.some(r => r.empId === emp.id && typeof r.inicio === 'string' && r.inicio.startsWith(today))
-      if (hasFichado) continue
-
-      // Tiene suscripción push activa
-      const sub = subMap.get(emp.id)
-      if (!sub || !sub.endpoint) continue
-
-      toSend.push({ emp, sub })
-      newKeys[key] = today
+    const schedule = (emp, sub, key, keyVal, title, body, tag, url) => {
+      if (!sub?.endpoint) return
+      toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url) })
+      newKeys[key] = keyVal
     }
 
-    let sent = 0, failed = 0
-    for (const { emp, sub } of toSend) {
-      const payload = JSON.stringify({
-        title: '⏰ Recordatorio de fichaje',
-        body: '¿Has fichado hoy? No olvides registrar tu jornada laboral.',
-        tag: 'reminder-fichar',
-        url: '/?tab=inicio'
-      })
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        )
-        sent++
-        console.log(`[cron] reminder sent → ${emp.name}`)
-      } catch (err) {
-        if (err.statusCode === 410 || err.statusCode === 404) await deleteSub(emp.id)
-        else console.warn(`[cron] push error for ${emp.name}:`, err.statusCode, err.body || err.message)
-        failed++
-        delete newKeys['an_rem_' + emp.id] // no marcar como enviado si falló
+    for (const emp of employees) {
+      const sub = subMap.get(emp.id)
+      const empRecs = records.filter(r => r.empId === emp.id)
+      const openRec = empRecs.find(r => !r.fin)
+      const todayRecs = empRecs.filter(r => typeof r.inicio === 'string' && r.inicio.startsWith(today))
+      const hasFichado = todayRecs.length > 0
+
+      // ── 1. Recordatorio de fichaje ──────────────────────────────────────────
+      // Dispara si: no ha fichado hoy + hora >= reminderTime del empleado
+      {
+        const remTime = emp.reminderTime || '20:00'
+        const [rh, rm] = remTime.split(':').map(Number)
+        const key = 'an_rem_' + emp.id
+        if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {
+          schedule(emp, sub, key, today,
+            '⏰ Recordatorio de fichaje',
+            '¿Has fichado hoy? No olvides registrar tu jornada laboral.',
+            'reminder-fichar', '/?tab=inicio')
+        }
+      }
+
+      // ── 2. Jornada larga (> 7h 45min sin fichar salida) ────────────────────
+      // Se envía una vez por jornada (key basada en record ID)
+      if (openRec) {
+        const elapsedMin = (nowMs - new Date(openRec.inicio).getTime()) / 60000
+        if (elapsedMin >= 465) {
+          const key = 'an_warn_14h_' + openRec.id
+          if (!notisSent[key]) {
+            const hh = Math.floor(elapsedMin / 60), mm2 = Math.floor(elapsedMin % 60)
+            schedule(emp, sub, key, '1',
+              '⏳ Jornada larga',
+              `Llevas ${hh}h ${p2(mm2)}m trabajando. Recuerda fichar la salida.`,
+              'jornada', '/?tab=jornada')
+          }
+        }
+      }
+
+      // ── 3. Salida olvidada (jornada abierta después de la hora de salida) ──
+      // Usa la salidaTime del empleado o la global; una vez por jornada abierta.
+      if (openRec) {
+        const salidaT = emp.salidaTime || cfgSalidaTime
+        const [sh, sm] = salidaT.split(':').map(Number)
+        const key = 'an_salida_' + openRec.id
+        if (!notisSent[key] && ((nowH - sh) * 60 + (nowM - sm)) >= 0) {
+          const elapsedMin = Math.floor((nowMs - new Date(openRec.inicio).getTime()) / 60000)
+          const hh = Math.floor(elapsedMin / 60), mm2 = Math.floor(elapsedMin % 60)
+          schedule(emp, sub, key, '1',
+            '🔔 ¿Olvidaste fichar la salida?',
+            `Llevas ${hh}h ${p2(mm2)}m con la jornada abierta. ¿Ya has terminado?`,
+            'jornada', '/?tab=jornada')
+        }
+      }
+
+      // ── 4. Documentos pendientes de firma (≥9h, una vez al día) ────────────
+      if (nowH >= 9) {
+        const pendDocs = docs.filter(d => d.empId === emp.id && !d.firma)
+        if (pendDocs.length > 0) {
+          const key = 'an_docs_' + emp.id
+          if (notisSent[key] !== today) {
+            schedule(emp, sub, key, today,
+              '📄 Documentos pendientes',
+              `Tienes ${pendDocs.length} documento${pendDocs.length > 1 ? 's' : ''} pendiente${pendDocs.length > 1 ? 's' : ''} de firma.`,
+              'documentos', '/?go=emp:documentos')
+          }
+        }
+      }
+
+      // ── 5. Cierre mensual pendiente (≥9h, una vez al día) ──────────────────
+      if (nowH >= 9) {
+        const pendCierres = cierres.filter(c => c.empId === emp.id && c.estado === 'pendiente')
+        if (pendCierres.length > 0) {
+          const key = 'an_cierre_' + emp.id
+          if (notisSent[key] !== today) {
+            schedule(emp, sub, key, today,
+              '📋 Cierre mensual pendiente',
+              `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`,
+              'cierre', '/?go=emp:perfil')
+          }
+        }
       }
     }
 
-    // Persistir claves enviadas para no repetir hoy
+    // ── MARCAR CLAVES ANTES DE ENVIAR ─────────────────────────────────────────
+    // Esto previene la race condition con el cliente (en background):
+    // el cliente verá las claves ya marcadas y no enviará duplicados.
     if (Object.keys(newKeys).length > 0) await markNotisSent(newKeys)
 
-    const result = { ok: true, today, checked: employees.length, sent, failed, skipped: employees.length - toSend.length }
+    // ── ENVIAR PUSHES ─────────────────────────────────────────────────────────
+    let sent = 0, failed = 0, skipped = 0
+    const failedKeys = {}
+
+    for (const { emp, sub, payload } of toSend) {
+      try {
+        await sendPush(sub, payload, emp.name)
+        sent++
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await deleteSub(emp.id)
+        } else {
+          console.warn(`[cron] push error for ${emp.name}:`, err.statusCode, err.body || err.message)
+        }
+        failed++
+        // No des-marcamos las claves: mejor perder un envío que duplicar
+        // (el cron volverá a comprobar condiciones la próxima hora)
+      }
+    }
+
+    skipped = employees.length * 5 - toSend.length  // estimación
+
+    const result = {
+      ok: true, today, nowSpain: `${p2(nowH)}:${p2(nowM)}`,
+      checked: employees.length, sent, failed, queued: toSend.length
+    }
     console.log('[cron-reminders]', JSON.stringify(result))
     return res.status(200).json(result)
+
   } catch (e) {
     console.error('[cron-reminders] fatal', e)
     return res.status(500).json({ error: e.message })
