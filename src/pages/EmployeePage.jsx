@@ -279,6 +279,19 @@ export default function EmployeePage() {
       const hasSent = (key, val) => val !== undefined ? notisSent[key] === val : !!notisSent[key]
       const markSent = (key, val = '1') => { notisSent[key] = val; dirty = true }
 
+      // Si la app está visible (usuario mirando la pantalla), no enviar push del servidor:
+      // bastan los toasts in-app + la campana. Push solo cuando la app está cerrada/en background,
+      // evitando notificaciones duplicadas (in-app + push) sobre el mismo evento.
+      const appVisible = typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus()
+      const sendPush = (...args) => { if (!appVisible) queuePush(...args) }
+
+      // Permanent device-local guard for one-time notifications (vacaciones result).
+      // Survives realtime overwrites even if Supabase write is delayed.
+      const _lsPermKey = '__notisPermV__'
+      const _lsPermMap = (() => { try { return JSON.parse(localStorage.getItem(_lsPermKey) || '{}') } catch { return {} } })()
+      const isPermSent = (key) => !!_lsPermMap[key]
+      const markPermSent = (key) => { _lsPermMap[key] = '1'; try { localStorage.setItem(_lsPermKey, JSON.stringify(_lsPermMap)) } catch {} }
+
       // Acumulador de notis a añadir a db.notis (para que aparezcan en la campana)
       const bellNotis = []
       const addBell = (action, detail) => {
@@ -290,16 +303,20 @@ export default function EmployeePage() {
       }
 
       // 1. Recordatorio diario de fichaje
+      // Dispara una vez al día: desde reminderTime hasta las 23:59 si no se ha fichado.
+      // (antes era una ventana de 5min; si la app no estaba abierta justo en esos 5min,
+      // la noti se perdía para siempre).
       if (getCfg('notiFichaje', true)) {
         const [rh, rm] = (getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
-        if (minsPast >= 0 && minsPast < 5) {
+        if (minsPast >= 0) {
           const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)
-            queuePush(u.id, '⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.', 'reminder-fichar', '/?tab=inicio')
-            addBell('⏰ Recordatorio de fichaje', '¿Has fichado hoy? No olvides registrar tu jornada laboral.')
+            const _msgRem = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
+            sendPush(u.id, '⏰ Recordatorio de fichaje', _msgRem, 'reminder-fichar', '/?tab=inicio')
+            addBell('⏰ Recordatorio de fichaje', _msgRem)
           }
         }
       }
@@ -311,22 +328,24 @@ export default function EmployeePage() {
         const warn14h = 'an_warn_14h_' + openRec.id
         if (elapsed >= 465 && elapsed < 475 && !hasSent(warn14h)) {
           markSent(warn14h)
-          queuePush(u.id, '⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.', 'jornada', '/')
-          addBell('⏳ Jornada larga', 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.')
+          const _msgLong = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
+          sendPush(u.id, '⏳ Jornada larga', _msgLong, 'jornada', '/')
+          addBell('⏳ Jornada larga', _msgLong)
         }
       }
 
       // 3. Recordatorio de salida olvidada
+      // Ventana abierta: desde salidaTime hasta el cierre de jornada
       if (getCfg('notiSalida', true) && openRec) {
         const [sh, sm] = (getCfg('salidaTime', '21:00')).split(':').map(Number)
         const salidaMinsPast = (hh - sh) * 60 + (mm - sm)
-        if (salidaMinsPast >= 0 && salidaMinsPast < 5) {
+        if (salidaMinsPast >= 0) {
           const sKey = 'an_salida_' + openRec.id
           if (!hasSent(sKey)) {
             markSent(sKey)
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
             const _msgSal = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
-            queuePush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio')
+            sendPush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio')
             addBell('🔔 ¿Olvidaste fichar la salida?', _msgSal)
           }
         }
@@ -335,13 +354,18 @@ export default function EmployeePage() {
       // 4. Vacaciones aprobadas/rechazadas (una vez por solicitud, entre dispositivos)
       ;(db.vacaciones || []).filter(v => v.empId === u.id && (v.estado === 'aprobada' || v.estado === 'rechazada')).forEach(v => {
         const key = 'an_vac_res_' + v.id
-        if (!hasSent(key)) {
+        if (!hasSent(key) && !isPermSent(key)) {
           markSent(key)
+          markPermSent(key)
           if (v.estado === 'aprobada') {
-            queuePush(u.id, '🎉 Vacaciones aprobadas', `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`, 'vacaciones', '/?go=emp:vacaciones')
+            const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`
+            sendPush(u.id, '🎉 Vacaciones aprobadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
+            addBell('🎉 Vacaciones aprobadas', _msgVac)
           } else {
             const motivoTxt = v.motivoRechazo ? ` Motivo: ${v.motivoRechazo}` : ''
-            queuePush(u.id, '❌ Vacaciones rechazadas', `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`, 'vacaciones', '/?go=emp:vacaciones')
+            const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`
+            sendPush(u.id, '❌ Vacaciones rechazadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
+            addBell('❌ Vacaciones rechazadas', _msgVac)
           }
         }
       })
@@ -353,7 +377,7 @@ export default function EmployeePage() {
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
           const _msgDoc = `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`
-          queuePush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
+          sendPush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
           addBell('📄 Documentos pendientes', _msgDoc)
         }
       }
@@ -365,7 +389,7 @@ export default function EmployeePage() {
         if (!hasSent(key, todayStr) && hh === 9 && mm === 0) {
           markSent(key, todayStr)
           const _msgCi = `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`
-          queuePush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
+          sendPush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
           addBell('📋 Cierre mensual pendiente', _msgCi)
         }
       }
@@ -379,7 +403,7 @@ export default function EmployeePage() {
           const warnKey = 'an_autoclose_warn_' + stale.id
           if (!hasSent(warnKey)) {
             markSent(warnKey)
-            queuePush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
+            sendPush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
             addBell('⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
             toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
           }
@@ -403,16 +427,17 @@ export default function EmployeePage() {
             addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
             const _notisToSave = [...(dbRef.current.notis || []), ...bellNotis]
             bellNotis.length = 0
-            saveDB({ records: updRecs, notisSent, audit: dbWithAudit.audit, notis: _notisToSave })
-            queuePush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
+            saveDB({ records: updRecs, notisSent: { ...(dbRef.current.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: _notisToSave })
+            sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
           }
         }
       })
 
       // Batch save: una sola escritura por ciclo. Combina notisSent + bell notis.
+      // Merge new keys into current dbRef to avoid stale-snapshot overwrites.
       if (dirty || bellNotis.length) {
         const partial = {}
-        if (dirty) partial.notisSent = notisSent
+        if (dirty) partial.notisSent = { ...(dbRef.current.notisSent || {}), ...notisSent }
         if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
         saveDB(partial)
       }
@@ -421,8 +446,11 @@ export default function EmployeePage() {
     const iv = setInterval(checkSmartNotis, 60000)
     // Check immediately (after 5s to let permission settle)
     const t = setTimeout(checkSmartNotis, 5000)
-    return () => { clearInterval(iv); clearTimeout(t) }
-  }, [u])
+    // También cuando la pestaña vuelva a primer plano (cubre el caso de app cerrada → reabrir tras la hora del recordatorio)
+    const onVis = () => { if (document.visibilityState === 'visible') checkSmartNotis() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(iv); clearTimeout(t); document.removeEventListener('visibilitychange', onVis) }
+  }, [u?.id])
 
   // App Badge API — muestra el contador de no leídas en el icono de la app instalada
   useEffect(() => {

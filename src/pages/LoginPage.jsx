@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
-import { signInEmail, signInGoogle, resetPassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
+import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
 import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
@@ -18,6 +18,9 @@ export default function LoginPage() {
   const [shaking, setShaking] = useState(false)
   const [passVisible, setPassVisible] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  const [newPass, setNewPass] = useState('')
+  const [newPass2, setNewPass2] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(false)
   const [logoTaps, setLogoTaps] = useState(0)
   const [showAdminBtn, setShowAdminBtn] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -172,10 +175,23 @@ export default function LoginPage() {
 
   const handlePinDel = () => { setPin(p => p.slice(0, -1)); setErr('') }
 
-  // Manejar callback de Google OAuth (redirect de vuelta desde Supabase)
+  // Manejar callback de Google OAuth y recuperación de contraseña (redirect de vuelta desde Supabase)
   useEffect(() => {
     const { data: { subscription } } = onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // El usuario ha clicado el enlace del email de restablecimiento.
+        // Mostrar formulario para nueva contraseña (NO cerrar sesión: necesitamos el token).
+        setMode('reset-new'); setErr(''); setNewPass(''); setNewPass2(''); setResetSuccess(false)
+        return
+      }
       if (event === 'SIGNED_IN' && session?.user?.email) {
+        // Si llegamos aquí vía link de recuperación (URL con #type=recovery), también mostrar la pantalla
+        const url = new URL(window.location.href)
+        const hash = window.location.hash || ''
+        if (url.searchParams.get('reset') === '1' || hash.includes('type=recovery')) {
+          setMode('reset-new'); setErr(''); setNewPass(''); setNewPass2(''); setResetSuccess(false)
+          return
+        }
         const userEmail = session.user.email.toLowerCase()
         const emp = await findEmployeeByEmail(userEmail)
         // Limpiamos la sesión Supabase — la app gestiona su propia sesión por PIN
@@ -189,6 +205,35 @@ export default function LoginPage() {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Si la URL contiene ?reset=1 al cargar (sin tener todavía sesión), mostrar la pantalla
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')) {
+      setMode('reset-new')
+    }
+  }, [])
+
+  const doResetNew = async () => {
+    setErr('')
+    if (!newPass || !newPass2) { setErr('Introduce y confirma la nueva contraseña'); return }
+    if (newPass !== newPass2) { setErr('Las contraseñas no coinciden'); return }
+    if (newPass.length < 6) { setErr('La contraseña debe tener al menos 6 caracteres'); return }
+    setLoading(true)
+    try {
+      await updatePassword(newPass)
+      setResetSuccess(true)
+      await authSignOut().catch(() => {})
+      setTimeout(() => {
+        setMode('email')
+        setResetSuccess(false); setNewPass(''); setNewPass2('')
+        window.history.replaceState({}, '', window.location.pathname)
+      }, 2500)
+    } catch (ex) {
+      setErr(ex.message || 'No se pudo actualizar la contraseña. El enlace puede haber caducado.')
+    }
+    setLoading(false)
+  }
 
   const doEmailLogin = async () => {
     setErr('')
@@ -482,6 +527,45 @@ export default function LoginPage() {
               </button>
               <button className="login-link-btn" onClick={() => { setMode('email'); setErr('') }}>
                 ← Volver al inicio de sesión
+              </button>
+            </div>
+          )}
+
+          {/* Reset-new mode — formulario para nueva contraseña tras clic del email */}
+          {mode === 'reset-new' && (
+            <div className="login-email-section">
+              <div className="login-forgot-header">
+                <div className="login-forgot-title">Nueva contraseña</div>
+                <div className="login-forgot-sub">Introduce tu nueva contraseña</div>
+              </div>
+              <div className="login-input-group">
+                <div className="login-input-row">
+                  <span className="login-input-ico">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                  <input type={passVisible ? 'text' : 'password'} placeholder="Nueva contraseña" value={newPass}
+                    onChange={e => { setNewPass(e.target.value); setErr('') }}
+                    autoComplete="new-password" minLength={6} />
+                  <button type="button" className="login-eye-btn" onClick={() => setPassVisible(v => !v)} aria-label="Mostrar/ocultar">
+                    {passVisible ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <div className="login-input-row">
+                  <span className="login-input-ico">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                  <input type={passVisible ? 'text' : 'password'} placeholder="Confirmar contraseña" value={newPass2}
+                    onChange={e => { setNewPass2(e.target.value); setErr('') }}
+                    autoComplete="new-password" minLength={6} />
+                </div>
+              </div>
+              {err && <div className="login-err" role="alert">{err}</div>}
+              {resetSuccess && <div className="login-success" role="status">Contraseña actualizada. Inicia sesión con la nueva.</div>}
+              <button className="login-submit-btn" onClick={doResetNew} disabled={loading || resetSuccess}>
+                {loading ? <><span className="login-spinner" /> Guardando...</> : 'Guardar nueva contraseña'}
+              </button>
+              <button className="login-link-btn" onClick={async () => { await authSignOut().catch(() => {}); setMode('email'); setErr(''); window.history.replaceState({}, '', window.location.pathname) }}>
+                ← Cancelar
               </button>
             </div>
           )}

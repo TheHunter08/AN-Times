@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
-import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
+import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
@@ -197,7 +197,7 @@ export default function AdminPage() {
               <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#admLogoAccent)" strokeWidth="2" strokeLinecap="round"/>
               <circle cx="30" cy="19.8" r="1.1" fill="url(#admLogoAccent)"/>
             </svg>
-            TIMES INC
+            <span className="adm-logo-text">TIMES INC</span>
           </div>
           <div className="adm-page-title">{actPanel.label}</div>
           {activeNow > 0 && (
@@ -207,17 +207,17 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <div className="adm-topbar-actions">
           <SyncBadge />
           {!isEncargado && (
-            <button onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:8, display:'flex', alignItems:'center', gap:6, padding:'5px 10px', cursor:'pointer', color:'var(--text3)', fontSize:12 }}>
+            <button className="adm-topbar-search" onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <span className="adm-search-label">Buscar</span>
-              <kbd style={{ fontSize:9, padding:'1px 5px', background:'var(--bg-400)', border:'1px solid var(--border)', borderRadius:3, fontFamily:'monospace' }}>⌘K</kbd>
+              <kbd className="adm-search-kbd">⌘K</kbd>
             </button>
           )}
           {!isEncargado && (
-            <button title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')} style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', width:34, height:34, borderRadius:8 }}>
+            <button className="adm-topbar-icon-btn" title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               {adminUnreadChats > 0 && (
                 <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminUnreadChats > 9 ? '9+' : adminUnreadChats}</span>
@@ -225,13 +225,16 @@ export default function AdminPage() {
             </button>
           )}
           {session.user && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setScreen('emp')}>
+            <button className="btn btn-secondary btn-sm adm-topbar-emp-btn" onClick={() => setScreen('emp')} title="Panel Empleado">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Panel Emp.
+              <span className="adm-topbar-emp-lbl">Panel Emp.</span>
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Cambiar tema" style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, lineHeight:1, padding:'4px 6px', borderRadius:8, color:'var(--text3)' }}>{isLight ? '🌙' : '☀️'}</button>
-          <button className="btn btn-secondary btn-sm" onClick={doLogout}>Salir</button>
+          <button className="theme-toggle-btn adm-topbar-theme" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Cambiar tema">{isLight ? '🌙' : '☀️'}</button>
+          <button className="btn btn-secondary btn-sm adm-topbar-logout" onClick={doLogout} title="Cerrar sesión">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span className="adm-topbar-logout-lbl">Salir</span>
+          </button>
         </div>
       </div>
 
@@ -2346,22 +2349,30 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
         const extRows = sortedEmps(db).filter(e => !e.baja && !e.isAdmin).map(e => {
           const eRecs = allRecs.filter(r => r.empId === e.id && r.fin)
           const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-          const weeklyH = e.horasSemanales || (WK / 60)  // WK está en minutos; convertir a horas
-          // Estimate expected: weeks since startDate × weekly hours
+          const weeklyH = e.horasSemanales || (WK / 60)
+          const monthlyH = e.horasMensuales || 160
+          // Histórico (balance vida laboral)
           const start = e.startDate ? new Date(e.startDate) : new Date()
           const msWorked = Date.now() - start.getTime()
           const weeks = Math.max(0, msWorked / (7 * 24 * 3600 * 1000))
           const expectedMin = Math.round(weeks * weeklyH * 60)
           const diff = totalMin - expectedMin
-          // Current month stats
-          const mRecs = eRecs.filter(r => r.inicio.startsWith(filterMonth))
-          const mMin = mRecs.reduce((s, r) => s + calcMin(r), 0)
-          const mExpected = Math.round((weeklyH / 5) * 4 * 60) // ~4 semanas en minutos
-          const mDiff = mMin - mExpected
-          return { e, totalMin, expectedMin, diff, mMin, mExpected, mDiff, weeklyH }
+          // Regla TIMES INC: extras semanales (>40h/sem) compensadas contra
+          // el déficit del objetivo mensual (160h). Si las extras no alcanzan
+          // a cubrir el déficit, lo restante aparece como déficit real.
+          const ex = monthlyExtras(allRecs, e.id, filterMonth, { weeklyH, monthlyH })
+          return {
+            e, totalMin, expectedMin, diff, weeklyH, monthlyH,
+            mMin: ex.workedMin,
+            mExpected: monthlyH * 60,
+            mExtra: ex.netExtraMin,
+            mDeficit: ex.deficitMin,
+            mWeeklyExtra: ex.weeklyExtraMin,
+            mShortfall: ex.shortfallMin,
+          }
         })
-        const totalExtra = extRows.reduce((s, r) => s + Math.max(0, r.mDiff), 0)
-        const totalDeficit = extRows.reduce((s, r) => s + Math.max(0, -r.mDiff), 0)
+        const totalExtra = extRows.reduce((s, r) => s + r.mExtra, 0)
+        const totalDeficit = extRows.reduce((s, r) => s + r.mDeficit, 0)
         return (
           <div className="stagger-in">
             <div className="adm-stats-grid" style={{ marginBottom:20 }}>
@@ -2376,48 +2387,31 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                 <div className="stat-label">Déficit este mes</div>
               </div>
             </div>
-            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:10 }}>
-              Mes seleccionado: <strong style={{ color:'var(--text)' }}>{new Date(filterMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</strong>
-            </div>
-            <div className="adm-table-wrap">
-              <table className="adm-table">
-                <thead><tr><th>Empleado</th><th>H/sem</th><th>Trabajadas</th><th>Esperadas</th><th>Diferencia mes</th><th>Balance histórico</th></tr></thead>
-                <tbody>
-                  {extRows.map(({ e, mMin, mExpected, mDiff, diff }) => {
-                    const mOver = mDiff > 0
-                    const hOver = diff > 0
-                    return (
-                      <tr key={e.id}>
-                        <td>
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:26, height:26, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                              {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                            </div>
-                            <span style={{ fontSize:13 }}>{e.name}</span>
-                          </div>
-                        </td>
-                        <td style={{ color:'var(--text3)', fontSize:12 }}>{e.horasSemanales || WK}h</td>
-                        <td style={{ fontWeight:600, fontVariantNumeric:'tabular-nums' }}>{mhm(mMin)}</td>
-                        <td style={{ color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{mhm(Math.round(mExpected))}</td>
-                        <td>
-                          <span style={{ fontWeight:700, color: mOver ? 'var(--orange)' : mDiff < -30 ? 'var(--red)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
-                            {mOver ? '+' : ''}{mhm(Math.abs(Math.round(mDiff)))} {mOver ? '↑' : mDiff < -30 ? '↓' : '✓'}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight:700, color: hOver ? 'var(--orange)' : diff < -60 ? 'var(--red)' : 'var(--green)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>
-                            {hOver ? '+' : ''}{mhm(Math.abs(Math.round(diff)))} {hOver ? '↑' : diff < -60 ? '↓' : '✓'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!extRows.length && <tr><td colSpan={6} className="empty">Sin empleados activos</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:11, color:'var(--text3)', lineHeight:1.7 }}>
-              <strong style={{ color:'var(--text2)' }}>Nota:</strong> "Diferencia mes" compara horas del mes seleccionado vs. estimación (H/semana × 4 semanas). "Balance histórico" acumula toda la vida laboral del empleado en la app.
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {extRows.map(({ e, mMin, mExpected, mExtra, mDeficit, mWeeklyExtra, mShortfall }) => {
+                const compensated = mWeeklyExtra > 0 && mShortfall > 0
+                return (
+                  <div key={e.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:`1px solid ${mExtra > 0 ? 'rgba(245,158,11,.25)' : mDeficit > 0 ? 'rgba(239,68,68,.2)' : 'var(--border)'}` }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                      {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                        {mhm(mMin)} trabajadas · objetivo {mhm(Math.round(mExpected))}
+                        {compensated && <span style={{ marginLeft:6, color:'var(--text4)' }}>({mhm(Math.round(mWeeklyExtra))} sem. − {mhm(Math.round(mShortfall))} déf.)</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      {mExtra > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--orange)', fontVariantNumeric:'tabular-nums' }}>+{mhm(Math.round(mExtra))}</div>}
+                      {mDeficit > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--red)', fontVariantNumeric:'tabular-nums' }}>−{mhm(Math.round(mDeficit))}</div>}
+                      {mExtra === 0 && mDeficit === 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--green)' }}>✓</div>}
+                      <div style={{ fontSize:10, color:'var(--text4)' }}>{mExtra > 0 ? 'extras' : mDeficit > 0 ? 'déficit' : 'al día'}</div>
+                    </div>
+                  </div>
+                )
+              })}
+              {!extRows.length && <div className="empty">Sin empleados activos</div>}
             </div>
           </div>
         )
@@ -3248,6 +3242,30 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     setEditing(null)
   }
 
+  const startJornada = (e) => {
+    const alreadyOpen = liveRecs.find(r => r.empId === e.id)
+    if (alreadyOpen) { toast('Este empleado ya tiene una jornada abierta', 3000, 'warn'); return }
+    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || misCentros[0] || '', breaks: [], workSecs: 0, creadoPor: enc.name }
+    const withAudit = auditLog(db, 'Jornada iniciada por encargado', e.name, enc.name)
+    saveDB({ records: [...recs, newRec], audit: withAudit.audit })
+    queuePush(e.id, '▶ Jornada iniciada', `${enc.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
+    toast('Jornada iniciada', 3000, 'ok')
+  }
+
+  const forceClose = (rec) => {
+    showConfirm(`¿Finalizar jornada de ${rec.empName}?`, () => {
+      const now = new Date().toISOString()
+      const breaks = [...(rec.breaks || [])]
+      if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
+      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+      const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+      const withAudit = auditLog(db, 'Jornada finalizada por encargado', rec.empName, enc.name)
+      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      queuePush(rec.empId, '⏹ Jornada finalizada', `${enc.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
+      toast('Jornada finalizada', 3000, 'ok')
+    })
+  }
+
   const addAus = () => {
     if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
     const emp = emps.find(e => e.id === ausForm.empId)
@@ -3341,12 +3359,16 @@ function PanelMiObra({ db, toast, saveDB, session }) {
                     <div style={{ fontSize:11, color:'var(--text3)' }}>{live?.centro || e.centroTrabajo || '—'}</div>
                   </div>
                 </div>
-                <div style={{ textAlign:'center' }}>
+                <div style={{ textAlign:'center', marginBottom:12 }}>
                   <div style={{ fontSize:22, fontWeight:800, color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
                     {t ? mhm(Math.floor(t.work/60)) : '—'}
                   </div>
                   <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
                 </div>
+                {live
+                  ? <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => forceClose(live)}>■ Finalizar jornada</button>
+                  : <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar jornada</button>
+                }
               </div>
             )
           })}

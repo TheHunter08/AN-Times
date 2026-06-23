@@ -101,3 +101,48 @@ export const recWorkSecs = r => {
 
 export const sortedEmps = db =>
   (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+
+// ── Horas extra del mes (regla TIMES INC) ─────────────────────────────────────
+// • Las extras se acumulan por semana: cualquier minuto por encima de 40h/sem
+//   (o `weeklyH`/sem si el empleado tiene jornada parcial) cuenta como extra.
+// • El mes tiene un objetivo de 160h (o `monthlyH`).
+// • Si al final del mes el total trabajado no llega al objetivo, el déficit se
+//   resta primero del banco de extras semanales. Solo si las extras no cubren
+//   el déficit aparece como "Déficit" real en el informe.
+//
+// Devuelve: { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
+//   workedMin       — total minutos trabajados ese mes
+//   weeklyExtraMin  — suma de minutos por encima de 40h en cada semana
+//   shortfallMin    — minutos que faltan para el objetivo mensual (0 si llega)
+//   netExtraMin     — extras finales tras compensar déficit (≥0)
+//   deficitMin      — déficit real tras agotar el banco de extras (≥0)
+export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
+  const weeklyH  = opts.weeklyH  || 40
+  const monthlyH = opts.monthlyH || 160
+  const weeklyTarget  = weeklyH  * 60
+  const monthlyTarget = monthlyH * 60
+
+  const recs = (records || []).filter(r =>
+    r && r.empId === empId && r.fin && typeof r.inicio === 'string' && r.inicio.startsWith(monthKey)
+  )
+
+  // Agrupar por semana ISO (lunes como inicio — wkStart ya gestiona domingos)
+  const byWeek = new Map()
+  for (const r of recs) {
+    const ws = wkStart(r.inicio).toISOString().slice(0, 10)
+    byWeek.set(ws, (byWeek.get(ws) || 0) + calcMin(r))
+  }
+
+  let workedMin = 0
+  let weeklyExtraMin = 0
+  for (const wkMin of byWeek.values()) {
+    workedMin += wkMin
+    if (wkMin > weeklyTarget) weeklyExtraMin += wkMin - weeklyTarget
+  }
+
+  const shortfallMin = Math.max(0, monthlyTarget - workedMin)
+  const netExtraMin  = Math.max(0, weeklyExtraMin - shortfallMin)
+  const deficitMin   = Math.max(0, shortfallMin - weeklyExtraMin)
+
+  return { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
+}
