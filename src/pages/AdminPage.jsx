@@ -2384,58 +2384,31 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                 <div className="stat-label">Déficit este mes</div>
               </div>
             </div>
-            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:10 }}>
-              Mes seleccionado: <strong style={{ color:'var(--text)' }}>{new Date(filterMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</strong>
-            </div>
-            <div className="adm-table-wrap">
-              <table className="adm-table">
-                <thead><tr><th>Empleado</th><th>H/sem</th><th>Trabajadas</th><th>Objetivo</th><th>Extras netas</th><th>Déficit</th><th>Balance histórico</th></tr></thead>
-                <tbody>
-                  {extRows.map(({ e, mMin, mExpected, mExtra, mDeficit, mWeeklyExtra, mShortfall, diff }) => {
-                    const hOver = diff > 0
-                    const compensated = mWeeklyExtra > 0 && mShortfall > 0
-                    return (
-                      <tr key={e.id}>
-                        <td>
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:26, height:26, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                              {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                            </div>
-                            <span style={{ fontSize:13 }}>{e.name}</span>
-                          </div>
-                        </td>
-                        <td style={{ color:'var(--text3)', fontSize:12 }}>{e.horasSemanales || (WK/60)}h</td>
-                        <td style={{ fontWeight:600, fontVariantNumeric:'tabular-nums' }}>{mhm(mMin)}</td>
-                        <td style={{ color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{mhm(Math.round(mExpected))}</td>
-                        <td>
-                          <span style={{ fontWeight:700, color: mExtra > 0 ? 'var(--orange)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
-                            {mExtra > 0 ? '+' + mhm(Math.round(mExtra)) + ' ↑' : '—'}
-                          </span>
-                          {compensated && (
-                            <div style={{ fontSize:10, color:'var(--text4)', marginTop:2 }}>
-                              {mhm(Math.round(mWeeklyExtra))} sem. − {mhm(Math.round(mShortfall))} déf.
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <span style={{ fontWeight:700, color: mDeficit > 0 ? 'var(--red)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
-                            {mDeficit > 0 ? '−' + mhm(Math.round(mDeficit)) + ' ↓' : '✓'}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight:700, color: hOver ? 'var(--orange)' : diff < -60 ? 'var(--red)' : 'var(--green)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>
-                            {hOver ? '+' : ''}{mhm(Math.abs(Math.round(diff)))} {hOver ? '↑' : diff < -60 ? '↓' : '✓'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!extRows.length && <tr><td colSpan={7} className="empty">Sin empleados activos</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:11, color:'var(--text3)', lineHeight:1.7 }}>
-              <strong style={{ color:'var(--text2)' }}>Regla TIMES INC:</strong> Las horas extra empiezan a partir de <strong>40h/semana</strong> y se contabilizan por semana ISO. El objetivo mensual es <strong>160h</strong>. Si el empleado no llega a las 160h, el déficit se descuenta primero de su banco de extras semanales — solo aparece como "Déficit" lo que quede tras agotar las extras. "Balance histórico" acumula toda su vida laboral en la app.
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {extRows.map(({ e, mMin, mExpected, mExtra, mDeficit, mWeeklyExtra, mShortfall }) => {
+                const compensated = mWeeklyExtra > 0 && mShortfall > 0
+                return (
+                  <div key={e.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:`1px solid ${mExtra > 0 ? 'rgba(245,158,11,.25)' : mDeficit > 0 ? 'rgba(239,68,68,.2)' : 'var(--border)'}` }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                      {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                        {mhm(mMin)} trabajadas · objetivo {mhm(Math.round(mExpected))}
+                        {compensated && <span style={{ marginLeft:6, color:'var(--text4)' }}>({mhm(Math.round(mWeeklyExtra))} sem. − {mhm(Math.round(mShortfall))} déf.)</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      {mExtra > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--orange)', fontVariantNumeric:'tabular-nums' }}>+{mhm(Math.round(mExtra))}</div>}
+                      {mDeficit > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--red)', fontVariantNumeric:'tabular-nums' }}>−{mhm(Math.round(mDeficit))}</div>}
+                      {mExtra === 0 && mDeficit === 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--green)' }}>✓</div>}
+                      <div style={{ fontSize:10, color:'var(--text4)' }}>{mExtra > 0 ? 'extras' : mDeficit > 0 ? 'déficit' : 'al día'}</div>
+                    </div>
+                  </div>
+                )
+              })}
+              {!extRows.length && <div className="empty">Sin empleados activos</div>}
             </div>
           </div>
         )
@@ -3266,6 +3239,30 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     setEditing(null)
   }
 
+  const startJornada = (e) => {
+    const alreadyOpen = liveRecs.find(r => r.empId === e.id)
+    if (alreadyOpen) { toast('Este empleado ya tiene una jornada abierta', 3000, 'warn'); return }
+    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || misCentros[0] || '', breaks: [], workSecs: 0, creadoPor: enc.name }
+    const withAudit = auditLog(db, 'Jornada iniciada por encargado', e.name, enc.name)
+    saveDB({ records: [...recs, newRec], audit: withAudit.audit })
+    queuePush(e.id, '▶ Jornada iniciada', `${enc.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
+    toast('Jornada iniciada', 3000, 'ok')
+  }
+
+  const forceClose = (rec) => {
+    showConfirm(`¿Finalizar jornada de ${rec.empName}?`, () => {
+      const now = new Date().toISOString()
+      const breaks = [...(rec.breaks || [])]
+      if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
+      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+      const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+      const withAudit = auditLog(db, 'Jornada finalizada por encargado', rec.empName, enc.name)
+      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      queuePush(rec.empId, '⏹ Jornada finalizada', `${enc.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
+      toast('Jornada finalizada', 3000, 'ok')
+    })
+  }
+
   const addAus = () => {
     if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
     const emp = emps.find(e => e.id === ausForm.empId)
@@ -3359,12 +3356,16 @@ function PanelMiObra({ db, toast, saveDB, session }) {
                     <div style={{ fontSize:11, color:'var(--text3)' }}>{live?.centro || e.centroTrabajo || '—'}</div>
                   </div>
                 </div>
-                <div style={{ textAlign:'center' }}>
+                <div style={{ textAlign:'center', marginBottom:12 }}>
                   <div style={{ fontSize:22, fontWeight:800, color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
                     {t ? mhm(Math.floor(t.work/60)) : '—'}
                   </div>
                   <div style={{ fontSize:11, color:'var(--text3)' }}>{isWorking?'Trabajando':isBreak?'En descanso':'Sin jornada hoy'}</div>
                 </div>
+                {live
+                  ? <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => forceClose(live)}>■ Finalizar jornada</button>
+                  : <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar jornada</button>
+                }
               </div>
             )
           })}
