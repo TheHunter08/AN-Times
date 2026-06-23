@@ -1742,7 +1742,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   }
 
   return (
-    <div style={{ position:'absolute', top:0, left:0, right:0, bottom:'calc(70px + max(20px, env(safe-area-inset-bottom, 0px)) + max(0px, env(safe-area-inset-bottom, 0px) - 12px))', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ position:'absolute', top:0, left:0, right:0, bottom:'90px', display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'14px 16px 12px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -3234,7 +3234,7 @@ function WelcomeSlides() {
         width:'100%', maxWidth:480, margin:'0 auto',
         background:'var(--bg-700)', borderRadius:'24px 24px 0 0',
         border:'1px solid var(--border2)', borderBottom:'none',
-        padding:'28px 24px max(32px,env(safe-area-inset-bottom,0px))',
+        padding:'28px 24px 32px',
         animation: exiting ? 'wsSlideOut .35s forwards' : 'slideUp .3s cubic-bezier(.16,1,.3,1)',
         boxShadow:'0 -20px 60px rgba(0,0,0,.4)',
       }}>
@@ -3477,7 +3477,7 @@ function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
         </div>
 
         {/* Input */}
-        <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', display:'flex', gap:8, paddingBottom:`max(16px,env(safe-area-inset-bottom,0px))` }}>
+        <div style={{ padding:'12px 16px', borderTop:'1px solid var(--border)', display:'flex', gap:8 }}>
           <input value={text} onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
             placeholder="Escribe un mensaje…"
@@ -3545,7 +3545,7 @@ function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }) {
     <div style={{ position:'fixed', inset:0, zIndex:130, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        style={{ width:'100%', maxWidth:480, background:'var(--bg-700)', borderRadius:'20px 20px 0 0', padding:`24px 20px max(28px,env(safe-area-inset-bottom,0px))`, border:'1px solid var(--border2)', animation:'slideUp .22s ease' }}>
+        style={{ width:'100%', maxWidth:480, background:'var(--bg-700)', borderRadius:'20px 20px 0 0', padding:'24px 20px 28px', border:'1px solid var(--border2)', animation:'slideUp .22s ease' }}>
         <div style={{ width:36, height:4, borderRadius:2, background:'var(--border3)', margin:'0 auto 20px' }} />
         <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>Solicitar corrección de fichaje</div>
         <div style={{ fontSize:12, color:'var(--text3)', marginBottom:20 }}>

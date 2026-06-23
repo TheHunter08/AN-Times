@@ -35,7 +35,7 @@ export default function PrivacyModal() {
         background:'var(--bg-700)', borderRadius:'20px 20px 0 0',
         border:'1px solid var(--border2)', boxShadow:'0 -12px 48px rgba(0,0,0,.6)',
         animation:'slideUp .3s cubic-bezier(.16,1,.3,1)',
-        padding:'0 0 max(32px,env(safe-area-inset-bottom,0px))'
+        padding:'0 0 32px'
       }}>
         {/* Handle */}
         <div style={{ padding:'14px 20px 0', textAlign:'center' }}>

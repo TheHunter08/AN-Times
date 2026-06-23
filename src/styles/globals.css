@@ -85,11 +85,11 @@
   --r-pill: 999px;
 
   /* ── Safe areas */
-  --safe-top:    env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left:   env(safe-area-inset-left, 0px);
-  --safe-right:  env(safe-area-inset-right, 0px);
-  --safe-bot:    env(safe-area-inset-bottom, 0px);
+  --safe-top:    0px;
+  --safe-bottom: 0px;
+  --safe-left:   0px;
+  --safe-right:  0px;
+  --safe-bot:    0px;
 
   /* ── Layout */
   --sidebar: 224px;
@@ -377,7 +377,7 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
   max-height: 92dvh;
   overflow-y: auto;
   /* iOS 26: account for home indicator + extra bottom bar */
-  padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  padding-bottom: 20px;
   animation: sheetUp .28s cubic-bezier(.34,1.56,.64,1);
 }
 .modal.center-modal {
@@ -417,7 +417,7 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
 /* ── Toast ──────────────────────────────────────────────────── */
 #toast-root {
   position: fixed;
-  bottom: calc(80px + env(safe-area-inset-bottom));
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
@@ -509,7 +509,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-topbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; flex-shrink: 0; overflow: hidden;
-  padding: max(var(--safe-top, env(safe-area-inset-top)), 14px) 16px 12px;
+  padding: 14px 16px 12px;
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border);
@@ -559,36 +559,32 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   position: absolute; inset: 0; display: none; flex-direction: column;
   overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
   touch-action: pan-y;
-  /* deja espacio para la nav flotante: altura nav (~52px) + posición bottom + safe area */
-  padding-bottom: calc(80px + max(20px, env(safe-area-inset-bottom, 0px)));
+  /* deja espacio para la nav flotante */
+  padding-bottom: 100px;
 }
 .emp-tab.active { display: flex; }
 @media (display-mode: standalone) {
-  /* iOS PWA: aumentamos el clearance para el home indicator de iOS 26 */
-  .emp-tab { padding-bottom: calc(88px + max(28px, env(safe-area-inset-bottom, 0px))); }
+  .emp-tab { padding-bottom: 116px; }
 }
 
 /* Floating glass navigation — estilo Apple Music / Arc Browser */
 .emp-nav {
   position: fixed;
   left: 16px; right: 16px;
-  /* iOS 26.2 PWA fix: env() puede devolver 0 en standalone; garantizamos clearance mínimo */
-  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  bottom: 12px;
   display: flex; align-items: center; justify-content: space-around;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
-  /* La barra se extiende hacia abajo con el safe area, como una tab bar nativa */
-  padding: 8px 6px calc(8px + max(0px, env(safe-area-inset-bottom, 0px) - 12px));
+  padding: 8px 6px;
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.06);
   transform: translate3d(0,0,0); will-change: transform;
   z-index: 50;
 }
-/* En modo standalone (PWA instalada) garantizamos clearance extra para iOS 26 */
 @media (display-mode: standalone) {
-  .emp-nav { bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+  .emp-nav { bottom: 12px; }
 }
 .emp-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -1148,7 +1144,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .rec-table tbody tr:hover td { background: var(--bg-600); }
 
 /* Admin mobile nav */
-#admBottomNav { display: none; background: var(--bg-700); border-top: 1px solid var(--border); padding: 8px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); flex-direction: row; justify-content: space-around; align-items: center; flex-shrink: 0; }
+#admBottomNav { display: none; background: var(--bg-700); border-top: 1px solid var(--border); padding: 8px 0; flex-direction: row; justify-content: space-around; align-items: center; flex-shrink: 0; }
 .adm-bnav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 9px; font-weight: 600; cursor: pointer; padding: 2px 8px; color: var(--text4); transition: color .15s; letter-spacing: .3px; user-select: none; }
 .adm-bnav-item svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; fill: none; }
 .adm-bnav-item.on { color: var(--primary-light); }
@@ -1265,8 +1261,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 @media (max-width: 640px) {
   #sAdmin { flex-direction: column !important; }
   .adm-main { width: 100% !important; height: 100% !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }
-  .adm-content { flex: 1 !important; overflow-y: auto !important; min-height: 0 !important; padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)) !important; }
-  .adm-topbar { padding-top: max(12px,env(safe-area-inset-top)); height: auto !important; min-height: 56px; }
+  .adm-content { flex: 1 !important; overflow-y: auto !important; min-height: 0 !important; padding-bottom: 20px !important; }
+  .adm-topbar { padding-top: 12px; height: auto !important; min-height: 56px; }
   .dash-stats { grid-template-columns: 1fr 1fr; }
   .dash-row { grid-template-columns: 1fr; }
 }
@@ -1354,8 +1350,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px 10px;
-  padding-top: max(env(safe-area-inset-top, 0px), 0px);
-  min-height: calc(52px + env(safe-area-inset-top, 0px));
+  padding-top: 0px;
+  min-height: 52px;
   border-bottom: 1px solid var(--border);
   background: rgba(14,14,18,.85);
   flex-shrink: 0;
@@ -1394,7 +1390,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   flex: 1; overflow-y: auto;
   padding: 8px 8px 16px;
   display: flex; flex-direction: column; gap: 1px;
-  padding-top: max(12px, calc(env(safe-area-inset-top, 0px) + 6px));
+  padding-top: 12px;
 }
 .adm-sidebar-ov {
   position: fixed; inset: 0; background: rgba(0,0,0,.55);
@@ -1453,8 +1449,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   overscroll-behavior-y: contain;
   padding: 24px;
   min-height: 0;
-  /* deja espacio para que la nav flotante de cristal no tape el contenido */
-  padding-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 92px));
+  padding-bottom: 116px;
 }
 @media(min-width:960px) { .adm-panel { padding-bottom: 32px; } }
 .adm-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
@@ -1487,7 +1482,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-mobile-nav {
   position: fixed;
   left: 16px; right: 16px;
-  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  bottom: 14px;
   display: flex; align-items: center;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(180%);
@@ -1557,7 +1552,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-topbar { justify-content:space-between; }
 
 /* vac-wrap2 */
-.vac-wrap2 { display:flex; flex-direction:column; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:max(20px,env(safe-area-inset-bottom)); }
+.vac-wrap2 { display:flex; flex-direction:column; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:20px; }
 .vac-stats-row { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--bg-600); }
 .vac-stat { flex:1; padding:14px 8px; text-align:center; border-right:1px solid var(--border); }
 .vac-stat:last-child { border-right:none; }
@@ -1569,7 +1564,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .vac-list-item { display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-600); border:1px solid var(--border); border-radius:var(--r); }
 
 /* Calendar v2 */
-.cal-wrap { padding:16px; display:flex; flex-direction:column; gap:16px; padding-bottom:max(20px,env(safe-area-inset-bottom)); }
+.cal-wrap { padding:16px; display:flex; flex-direction:column; gap:16px; padding-bottom:20px; }
 .cal-header { display:flex; align-items:center; justify-content:space-between; }
 .cal-month { font-size:16px; font-weight:700; letter-spacing:-.2px; }
 .cal-nav { display:flex; gap:6px; align-items:center; }
@@ -1590,7 +1585,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .cal-hrs { font-size:8px; font-weight:700; opacity:.8; }
 
 /* Profile */
-.prf-wrap { flex:1; display:flex; flex-direction:column; gap:0; padding-bottom:max(96px,calc(80px + env(safe-area-inset-bottom))); overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--bg-800); }
+.prf-wrap { flex:1; display:flex; flex-direction:column; gap:0; padding-bottom:96px; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--bg-800); }
 .prf-hero { display:flex; flex-direction:column; align-items:center; padding:28px 20px 20px; background:linear-gradient(160deg,rgba(37,99,235,.12) 0%,transparent 100%); border-bottom:1px solid var(--border); }
 .prf-name { font-size:22px; font-weight:800; letter-spacing:-.4px; text-align:center; }
 .prf-role { font-size:12px; color:var(--primary-light); font-weight:600; margin-top:2px; }
@@ -2672,7 +2667,7 @@ td span[title="Click para editar"]:hover {
 /* ── Floating jornada chip ───────────────────────────────────── */
 .float-jornada-chip {
   position: fixed;
-  bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 10px);
+  bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 150;
@@ -3642,13 +3637,13 @@ textarea.input-error {
 .v3-sync.error   { background: var(--red); }
 .v3-sync.idle    { background: var(--text4); }
 
-/* ── V3 iOS Safe Areas (utilitarios globales) ─────────────────── */
-.pb-safe   { padding-bottom: max(16px, env(safe-area-inset-bottom, 16px)); }
-.pt-safe   { padding-top: max(0px, env(safe-area-inset-top, 0px)); }
-.pl-safe   { padding-left: max(0px, env(safe-area-inset-left, 0px)); }
-.pr-safe   { padding-right: max(0px, env(safe-area-inset-right, 0px)); }
-.mb-safe   { margin-bottom: max(16px, env(safe-area-inset-bottom, 16px)); }
-.pb-nav    { padding-bottom: max(80px, calc(68px + env(safe-area-inset-bottom, 16px))); }
+/* ── V3 Safe Areas (utilitarios globales) ─────────────────── */
+.pb-safe   { padding-bottom: 16px; }
+.pt-safe   { padding-top: 0px; }
+.pl-safe   { padding-left: 0px; }
+.pr-safe   { padding-right: 0px; }
+.mb-safe   { margin-bottom: 16px; }
+.pb-nav    { padding-bottom: 84px; }
 
 /* Fix: evitar que el teclado virtual iOS empuje el layout */
 @supports (-webkit-touch-callout: none) {
@@ -3776,7 +3771,7 @@ textarea.input-error {
   border-top: 1px solid var(--border);
   border-radius: var(--r-2xl) var(--r-2xl) 0 0;
   padding: 20px 16px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+  padding-bottom: 20px;
   box-shadow: 0 -8px 40px rgba(0,0,0,.4);
   animation: v3SlideUp var(--t-base) var(--ease-smooth);
   z-index: 100;
@@ -3790,7 +3785,7 @@ textarea.input-error {
 /* ── V3 Floating Chip ─────────────────────────────────────────── */
 .v3-float-chip {
   position: fixed;
-  bottom: calc(max(80px, calc(68px + env(safe-area-inset-bottom, 16px))) + 10px);
+  bottom: 94px;
   right: 14px;
   display: flex; align-items: center; gap: 6px;
   padding: 8px 14px;

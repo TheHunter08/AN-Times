@@ -98,7 +98,7 @@ function UpdateBanner() {
     <div style={{
       position:'fixed', zIndex:99999,
       left:10, right:10,
-      bottom:`calc(80px + max(12px, env(safe-area-inset-bottom)))`,
+      bottom:'92px',
       padding:'10px 12px',
       background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff',
       display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600,
@@ -213,7 +213,7 @@ function InstallPrompt() {
 
   if (bipEvent) {
     return (
-      <div style={{ position:'fixed', left:12, right:12, bottom:'max(12px,env(safe-area-inset-bottom))', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
+      <div style={{ position:'fixed', left:12, right:12, bottom:'12px', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
         <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:13, fontWeight:700, color:'var(--text,#fff)' }}>Instalar TIMES INC</div>
@@ -227,7 +227,7 @@ function InstallPrompt() {
 
   if (iosShow) {
     return (
-      <div style={{ position:'fixed', left:12, right:12, bottom:'max(12px,env(safe-area-inset-bottom))', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'14px', boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
+      <div style={{ position:'fixed', left:12, right:12, bottom:'12px', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'14px', boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
         <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
           <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
           <div style={{ flex:1, minWidth:0 }}>
@@ -291,7 +291,7 @@ function GlobalConfirm() {
   return (
     <div onClick={closeConfirm} style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,.45)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ width:'100%', maxWidth:480, padding:`24px 20px max(32px,env(safe-area-inset-bottom,0px))`,
+        style={{ width:'100%', maxWidth:480, padding:'24px 20px 32px',
           background:'var(--bg-700)', borderRadius:'20px 20px 0 0',
           border:'1px solid var(--border2)', boxShadow:'0 -8px 40px rgba(0,0,0,.5)',
           animation:'slideUp .2s cubic-bezier(.16,1,.3,1)' }}>
