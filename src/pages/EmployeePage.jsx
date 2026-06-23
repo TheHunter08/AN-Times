@@ -617,8 +617,8 @@ export default function EmployeePage() {
         {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
       </div>
 
-      {/* Floating jornada chip — visible desde cualquier pestaña salvo Jornada */}
-      {timer.state !== 'idle' && currentEmpTab !== 'jornada' && (
+      {/* Floating jornada chip — oculto en Inicio (hero card ya muestra el tiempo) y Jornada */}
+      {timer.state !== 'idle' && currentEmpTab !== 'jornada' && currentEmpTab !== 'inicio' && (
         <div className="float-jornada-chip" onClick={() => { try { navigator.vibrate(5) } catch {}; setEmpTab('jornada') }}>
           <span className="float-jornada-dot" style={{ background: timer.state === 'break' ? 'var(--orange)' : 'var(--green)' }} />
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink:0 }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
