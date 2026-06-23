@@ -948,6 +948,12 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                 ? '⏹  Terminar jornada'
                 : '⏹  Registrar salida'}
           </button>
+          {showTip && timer.state === 'idle' && (
+            <div style={{ marginTop:10, padding:'9px 14px', background:'var(--primary)', color:'#fff', borderRadius:10, fontSize:12, fontWeight:600, textAlign:'center', boxShadow:'0 4px 14px rgba(108,99,255,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span style={{ fontSize:14 }}>👆</span>
+              Pulsa el botón para iniciar tu jornada
+            </div>
+          )}
 
           {timer.state !== 'idle' && (
             <button
@@ -988,14 +994,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
-
-        {/* Tip de primera vez — fuera del hero card para no ser clipeado por su overflow:hidden */}
-        {showTip && timer.state === 'idle' && (
-          <div style={{ margin:'-4px 16px 0', padding:'10px 14px', background:'var(--primary-dim)', border:'1px solid var(--primary-glow)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, fontSize:12, fontWeight:600, color:'var(--primary-light)' }}>
-            <span style={{ fontSize:16 }}>👆</span>
-            <span>Pulsa el botón <b>Iniciar jornada</b> para empezar a fichar</span>
-          </div>
-        )}
 
         {/* Documentos pendientes de firma */}
         {pendingDocs.length > 0 && (
