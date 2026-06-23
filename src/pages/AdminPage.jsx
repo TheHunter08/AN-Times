@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
-import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps } from '../utils/time.js'
+import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
 import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { requestPushPermission, isNativePlatform } from '../services/nativeNotifications.js'
@@ -2346,22 +2346,30 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
         const extRows = sortedEmps(db).filter(e => !e.baja && !e.isAdmin).map(e => {
           const eRecs = allRecs.filter(r => r.empId === e.id && r.fin)
           const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-          const weeklyH = e.horasSemanales || (WK / 60)  // WK está en minutos; convertir a horas
-          // Estimate expected: weeks since startDate × weekly hours
+          const weeklyH = e.horasSemanales || (WK / 60)
+          const monthlyH = e.horasMensuales || 160
+          // Histórico (balance vida laboral)
           const start = e.startDate ? new Date(e.startDate) : new Date()
           const msWorked = Date.now() - start.getTime()
           const weeks = Math.max(0, msWorked / (7 * 24 * 3600 * 1000))
           const expectedMin = Math.round(weeks * weeklyH * 60)
           const diff = totalMin - expectedMin
-          // Current month stats
-          const mRecs = eRecs.filter(r => r.inicio.startsWith(filterMonth))
-          const mMin = mRecs.reduce((s, r) => s + calcMin(r), 0)
-          const mExpected = Math.round((weeklyH / 5) * 4 * 60) // ~4 semanas en minutos
-          const mDiff = mMin - mExpected
-          return { e, totalMin, expectedMin, diff, mMin, mExpected, mDiff, weeklyH }
+          // Regla TIMES INC: extras semanales (>40h/sem) compensadas contra
+          // el déficit del objetivo mensual (160h). Si las extras no alcanzan
+          // a cubrir el déficit, lo restante aparece como déficit real.
+          const ex = monthlyExtras(allRecs, e.id, filterMonth, { weeklyH, monthlyH })
+          return {
+            e, totalMin, expectedMin, diff, weeklyH, monthlyH,
+            mMin: ex.workedMin,
+            mExpected: monthlyH * 60,
+            mExtra: ex.netExtraMin,
+            mDeficit: ex.deficitMin,
+            mWeeklyExtra: ex.weeklyExtraMin,
+            mShortfall: ex.shortfallMin,
+          }
         })
-        const totalExtra = extRows.reduce((s, r) => s + Math.max(0, r.mDiff), 0)
-        const totalDeficit = extRows.reduce((s, r) => s + Math.max(0, -r.mDiff), 0)
+        const totalExtra = extRows.reduce((s, r) => s + r.mExtra, 0)
+        const totalDeficit = extRows.reduce((s, r) => s + r.mDeficit, 0)
         return (
           <div className="stagger-in">
             <div className="adm-stats-grid" style={{ marginBottom:20 }}>
@@ -2381,11 +2389,11 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
             </div>
             <div className="adm-table-wrap">
               <table className="adm-table">
-                <thead><tr><th>Empleado</th><th>H/sem</th><th>Trabajadas</th><th>Esperadas</th><th>Diferencia mes</th><th>Balance histórico</th></tr></thead>
+                <thead><tr><th>Empleado</th><th>H/sem</th><th>Trabajadas</th><th>Objetivo</th><th>Extras netas</th><th>Déficit</th><th>Balance histórico</th></tr></thead>
                 <tbody>
-                  {extRows.map(({ e, mMin, mExpected, mDiff, diff }) => {
-                    const mOver = mDiff > 0
+                  {extRows.map(({ e, mMin, mExpected, mExtra, mDeficit, mWeeklyExtra, mShortfall, diff }) => {
                     const hOver = diff > 0
+                    const compensated = mWeeklyExtra > 0 && mShortfall > 0
                     return (
                       <tr key={e.id}>
                         <td>
@@ -2396,12 +2404,22 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                             <span style={{ fontSize:13 }}>{e.name}</span>
                           </div>
                         </td>
-                        <td style={{ color:'var(--text3)', fontSize:12 }}>{e.horasSemanales || WK}h</td>
+                        <td style={{ color:'var(--text3)', fontSize:12 }}>{e.horasSemanales || (WK/60)}h</td>
                         <td style={{ fontWeight:600, fontVariantNumeric:'tabular-nums' }}>{mhm(mMin)}</td>
                         <td style={{ color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{mhm(Math.round(mExpected))}</td>
                         <td>
-                          <span style={{ fontWeight:700, color: mOver ? 'var(--orange)' : mDiff < -30 ? 'var(--red)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
-                            {mOver ? '+' : ''}{mhm(Math.abs(Math.round(mDiff)))} {mOver ? '↑' : mDiff < -30 ? '↓' : '✓'}
+                          <span style={{ fontWeight:700, color: mExtra > 0 ? 'var(--orange)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                            {mExtra > 0 ? '+' + mhm(Math.round(mExtra)) + ' ↑' : '—'}
+                          </span>
+                          {compensated && (
+                            <div style={{ fontSize:10, color:'var(--text4)', marginTop:2 }}>
+                              {mhm(Math.round(mWeeklyExtra))} sem. − {mhm(Math.round(mShortfall))} déf.
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span style={{ fontWeight:700, color: mDeficit > 0 ? 'var(--red)' : 'var(--text3)', fontVariantNumeric:'tabular-nums' }}>
+                            {mDeficit > 0 ? '−' + mhm(Math.round(mDeficit)) + ' ↓' : '✓'}
                           </span>
                         </td>
                         <td>
@@ -2412,12 +2430,12 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                       </tr>
                     )
                   })}
-                  {!extRows.length && <tr><td colSpan={6} className="empty">Sin empleados activos</td></tr>}
+                  {!extRows.length && <tr><td colSpan={7} className="empty">Sin empleados activos</td></tr>}
                 </tbody>
               </table>
             </div>
             <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:11, color:'var(--text3)', lineHeight:1.7 }}>
-              <strong style={{ color:'var(--text2)' }}>Nota:</strong> "Diferencia mes" compara horas del mes seleccionado vs. estimación (H/semana × 4 semanas). "Balance histórico" acumula toda la vida laboral del empleado en la app.
+              <strong style={{ color:'var(--text2)' }}>Regla TIMES INC:</strong> Las horas extra empiezan a partir de <strong>40h/semana</strong> y se contabilizan por semana ISO. El objetivo mensual es <strong>160h</strong>. Si el empleado no llega a las 160h, el déficit se descuenta primero de su banco de extras semanales — solo aparece como "Déficit" lo que quede tras agotar las extras. "Balance histórico" acumula toda su vida laboral en la app.
             </div>
           </div>
         )
