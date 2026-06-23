@@ -681,30 +681,45 @@ function OfflineBanner() {
 }
 
 // ─── PULL TO REFRESH ────────────────────────────────────────────────────────────
+// Usa transform:translateY en el contenedor scroll en lugar de height dinámica
+// del indicador. Cambiar height dentro del scroll container hace que iOS bloquee
+// el scroll después del gesto — translateY nunca toca la geometría del scroll.
 function PullToRefresh({ children }) {
   const fetchDB = useAppStore(s => s.fetchDB)
-  const tabRef = useRef(null)
+  const scrollRef = useRef(null)
   const [pullState, setPullState] = useState({ dist: 0, refreshing: false })
   const ptr = useRef({ startY: 0, active: false, dist: 0, refreshing: false })
 
   useEffect(() => {
-    const el = tabRef.current
+    const el = scrollRef.current
     if (!el) return
+
     const reset = () => {
       ptr.current.active = false
       ptr.current.dist = 0
       setPullState(s => ({ dist: 0, refreshing: s.refreshing }))
     }
+
     const onStart = e => {
       if (ptr.current.refreshing) return
-      if (el.scrollTop === 0) { ptr.current.startY = e.touches[0].clientY; ptr.current.active = true; ptr.current.dist = 0 }
+      if (el.scrollTop <= 0) {
+        ptr.current.startY = e.touches[0].clientY
+        ptr.current.active = true
+        ptr.current.dist = 0
+      }
     }
+
     const onMove = e => {
       if (!ptr.current.active) return
       const d = e.touches[0].clientY - ptr.current.startY
-      if (d > 0) { ptr.current.dist = Math.min(d * 0.45, 60); setPullState(s => ({ ...s, dist: ptr.current.dist })) }
-      else { reset() }
+      if (d > 0) {
+        ptr.current.dist = Math.min(d * 0.45, 60)
+        setPullState(s => ({ ...s, dist: ptr.current.dist }))
+      } else {
+        reset()
+      }
     }
+
     const onEnd = async () => {
       const wasActive = ptr.current.active
       ptr.current.active = false
@@ -718,10 +733,10 @@ function PullToRefresh({ children }) {
           setPullState({ dist: 0, refreshing: false })
         }
       } else {
-        ptr.current.dist = 0
-        setPullState(s => ({ dist: 0, refreshing: s.refreshing }))
+        reset()
       }
     }
+
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: true })
     el.addEventListener('touchend', onEnd, { passive: true })
@@ -735,12 +750,20 @@ function PullToRefresh({ children }) {
   }, [fetchDB])
 
   const { dist, refreshing } = pullState
+  const ty = refreshing ? 44 : dist > 0 ? Math.round(dist * 0.7) : 0
+  const transitioning = dist === 0 && !refreshing
+
   return (
-    <div ref={tabRef} className="emp-tab active">
-      <div style={{ overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-        height: refreshing ? 44 : dist > 0 ? Math.round(dist * 0.7) : 0,
-        transition: dist === 0 && !refreshing ? 'height .3s' : 'none',
-        color:'var(--text3)', fontSize:11, fontWeight:600, flexShrink:0 }}>
+    // Clip container: position:absolute fill emp-body, overflow:hidden para
+    // que el indicador quede recortado cuando translateY=0
+    <div style={{ position:'absolute', inset:0, overflow:'hidden', background:'var(--bg-800)' }}>
+
+      {/* Indicador fijo arriba, visible solo cuando el scroll se desplaza hacia abajo */}
+      <div style={{
+        position:'absolute', top:0, left:0, right:0, height:44,
+        display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+        color:'var(--text3)', fontSize:11, fontWeight:600, pointerEvents:'none'
+      }}>
         {refreshing && (
           <>
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation:'ptr-spin .7s linear infinite', flexShrink:0 }}>
@@ -760,7 +783,20 @@ function PullToRefresh({ children }) {
           </>
         )}
       </div>
-      {children}
+
+      {/* Scroll container desplazado hacia abajo durante el pull — nunca cambia
+          su tamaño, por lo que iOS no bloquea el scroll */}
+      <div
+        ref={scrollRef}
+        className="emp-tab active"
+        style={{
+          transform: `translateY(${ty}px)`,
+          transition: transitioning ? 'transform .3s cubic-bezier(.25,.46,.45,.94)' : 'none',
+          willChange: ty !== 0 ? 'transform' : 'auto',
+        }}
+      >
+        {children}
+      </div>
     </div>
   )
 }
