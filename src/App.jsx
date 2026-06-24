@@ -167,86 +167,6 @@ function SyncBanner() {
   )
 }
 
-// ─── INSTALL PROMPT ────────────────────────────────────────────────────────────
-// Android/Chrome: usa el evento beforeinstallprompt nativo.
-// iOS Safari: nunca dispara el evento — mostramos instrucciones manuales.
-function InstallPrompt() {
-  const [bipEvent, setBipEvent] = useState(null)
-  const [iosShow, setIosShow]   = useState(false)
-
-  useEffect(() => {
-    const DISMISS_KEY = 'an_install_dismiss_ts'
-    const isDismissed = (() => {
-      try {
-        const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10)
-        return ts > 0 && (Date.now() - ts) < 7 * 24 * 60 * 60 * 1000
-      } catch { return false }
-    })()
-    if (isDismissed) return
-
-    // ¿Ya instalado?
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-    if (isStandalone) return
-
-    // Android / Chrome
-    const onBIP = (e) => { e.preventDefault(); setBipEvent(e) }
-    window.addEventListener('beforeinstallprompt', onBIP)
-
-    // iOS Safari (no PWA installed): mostrar instrucciones manuales tras 8s
-    const ua = navigator.userAgent
-    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream
-    const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua)
-    if (isIOS && isSafari) {
-      const t = setTimeout(() => setIosShow(true), 8000)
-      return () => { window.removeEventListener('beforeinstallprompt', onBIP); clearTimeout(t) }
-    }
-    return () => window.removeEventListener('beforeinstallprompt', onBIP)
-  }, [])
-
-  const dismiss = () => {
-    try { localStorage.setItem('an_install_dismiss_ts', String(Date.now())) } catch {}
-    setBipEvent(null); setIosShow(false)
-  }
-
-  const install = async () => {
-    if (!bipEvent) return
-    bipEvent.prompt()
-    try { await bipEvent.userChoice } catch {}
-    setBipEvent(null)
-  }
-
-  if (bipEvent) {
-    return (
-      <div style={{ position:'fixed', left:12, right:12, bottom:'12px', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
-        <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:'var(--text,#fff)' }}>Instalar TIMES INC</div>
-          <div style={{ fontSize:11, color:'var(--text3,#9ca3af)' }}>Acceso rápido desde tu pantalla de inicio</div>
-        </div>
-        <button onClick={install} style={{ background:'var(--primary,#6C63FF)', color:'#fff', border:'none', borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:800, cursor:'pointer' }}>Instalar</button>
-        <button onClick={dismiss} aria-label="Cerrar" style={{ background:'none', border:'none', color:'var(--text4,#6b7280)', cursor:'pointer', fontSize:18, padding:'2px 4px' }}>×</button>
-      </div>
-    )
-  }
-
-  if (iosShow) {
-    return (
-      <div style={{ position:'fixed', left:12, right:12, bottom:'12px', zIndex:99997, background:'var(--bg-700,#1a1f2e)', border:'1px solid var(--border2,#2a3142)', borderRadius:14, padding:'14px', boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
-        <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-          <div style={{ width:38, height:38, borderRadius:10, background:'linear-gradient(135deg,#6C63FF,#5E6AD2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📲</div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--text,#fff)', marginBottom:4 }}>Añadir a la pantalla de inicio</div>
-            <div style={{ fontSize:11, color:'var(--text3,#9ca3af)', lineHeight:1.5 }}>
-              Pulsa <span style={{ display:'inline-block', verticalAlign:'middle' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg></span> Compartir y luego <b>"Añadir a pantalla de inicio"</b>. Solo así recibirás las notificaciones.
-            </div>
-          </div>
-          <button onClick={dismiss} aria-label="Cerrar" style={{ background:'none', border:'none', color:'var(--text4,#6b7280)', cursor:'pointer', fontSize:18, padding:'2px 4px', flexShrink:0 }}>×</button>
-        </div>
-      </div>
-    )
-  }
-  return null
-}
 
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
@@ -417,7 +337,6 @@ export default function App() {
       <UpdateBanner />
       <SyncBanner />
       <InAppNotification />
-      <InstallPrompt />
       {currentScreen === 'login' && <LoginPage />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp' && <EmployeePage />}

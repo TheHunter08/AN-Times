@@ -720,10 +720,10 @@ export default function EmployeePage() {
       {/* Confetti al cerrar jornada */}
       <Confetti visible={showConfetti} />
 
-      {/* Welcome slides: intro animado en primera apertura */}
-      <WelcomeSlides />
+      {/* Welcome slides: solo si ya completó el onboarding (no bloquear al nuevo empleado) */}
+      {u.onboardingDone && <WelcomeSlides />}
 
-      {/* Onboarding: primer login */}
+      {/* Onboarding: primer login — aparece siempre si no está completado */}
       <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
     </div>
   )
