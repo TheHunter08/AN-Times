@@ -3,6 +3,7 @@ import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
+import { applyBrandColor } from './utils/webauthn.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -233,10 +234,16 @@ function GlobalConfirm() {
 }
 
 export default function App() {
-  const currentScreen = useAppStore(s => s.currentScreen)
-  const fetchDB       = useAppStore(s => s.fetchDB)
-  const initRealtime  = useAppStore(s => s.initRealtime)
-  const stopRealtime  = useAppStore(s => s.stopRealtime)
+  const currentScreen  = useAppStore(s => s.currentScreen)
+  const fetchDB        = useAppStore(s => s.fetchDB)
+  const initRealtime   = useAppStore(s => s.initRealtime)
+  const stopRealtime   = useAppStore(s => s.stopRealtime)
+  const primaryColor   = useAppStore(s => s.db?.config?.primaryColor)
+
+  // Aplicar color de marca globalmente en cuanto carga (afecta login, empleado y admin)
+  useEffect(() => {
+    if (primaryColor) applyBrandColor(primaryColor)
+  }, [primaryColor])
 
   useEffect(() => {
     fetchDB()
@@ -293,6 +300,18 @@ export default function App() {
     events.forEach(e => window.addEventListener(e, reset, { passive: true }))
     reset()
     return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)) }
+  }, [])
+
+  useEffect(() => {
+    try {
+      const u = new URL(window.location.href)
+      const qrEmpId = u.searchParams.get('emp')
+      if (qrEmpId) {
+        localStorage.setItem('an_qr_emp', qrEmpId)
+        u.searchParams.delete('emp')
+        window.history.replaceState({}, '', u.pathname + (u.search !== '?' ? u.search : ''))
+      }
+    } catch {}
   }, [])
 
   useEffect(() => {

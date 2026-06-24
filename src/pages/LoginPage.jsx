@@ -4,6 +4,7 @@ import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, 
 import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
 import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
+import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric } from '../utils/webauthn.js'
 
 export default function LoginPage() {
   const { db, setSession, setScreen, toast, saveDB } = useAppStore()
@@ -27,6 +28,9 @@ export default function LoginPage() {
   const [generatedPinNotice, setGeneratedPinNotice] = useState(() => {
     try { return localStorage.getItem('__admin_pin_fb_new__') === '1' } catch { return false }
   })
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioLoading, setBioLoading]     = useState(false)
+  const [bioRegLoading, setBioRegLoading] = useState(false)
 
   const emps = sortedEmps(db)
 
@@ -35,10 +39,16 @@ export default function LoginPage() {
       const rem = JSON.parse(localStorage.getItem('an_times_rem') || 'null')
       if (rem?.empId) setSelectedEmpId(rem.empId)
     } catch {}
+    try {
+      const qrEmpId = localStorage.getItem('an_qr_emp')
+      if (qrEmpId) { setSelectedEmpId(qrEmpId); localStorage.removeItem('an_qr_emp') }
+    } catch {}
   }, [])
 
 
   useEffect(() => { requestAnimationFrame(() => setMounted(true)) }, [])
+
+  useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
 
   // Mostrar bloqueo si el empleado ya está en lockout
   useEffect(() => {
@@ -399,6 +409,61 @@ export default function LoginPage() {
                   </button>
                 ))}
               </div>
+
+              {/* Biometric login button — shown only when employee selected + credential exists */}
+              {bioAvailable && selectedEmpId && hasBiometric(selectedEmpId) && !showAdminBtn && (
+                <button
+                  className="login-bio-btn"
+                  disabled={bioLoading}
+                  onClick={async () => {
+                    setBioLoading(true)
+                    try {
+                      const ok = await authenticateBiometric(selectedEmpId)
+                      if (ok) {
+                        const emp = (db.employees || []).find(e => e.id === selectedEmpId)
+                        if (emp) doLogin(emp)
+                        else setErr('Empleado no encontrado')
+                      } else {
+                        setErr('Autenticación biométrica cancelada')
+                      }
+                    } catch {
+                      setErr('Error biométrico — usa el PIN')
+                    }
+                    setBioLoading(false)
+                  }}>
+                  {bioLoading
+                    ? <span className="login-bio-spinner" />
+                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
+                  }
+                  {bioLoading ? 'Verificando…' : 'Acceder con huella / Face ID'}
+                </button>
+              )}
+
+              {/* Biometric register link — offer to enable after employee selection */}
+              {bioAvailable && selectedEmpId && !hasBiometric(selectedEmpId) && !showAdminBtn && (
+                <button
+                  className="login-bio-register"
+                  disabled={bioRegLoading}
+                  onClick={async () => {
+                    const emp = (db.employees || []).find(e => e.id === selectedEmpId)
+                    if (!emp) return
+                    setBioRegLoading(true)
+                    try {
+                      await registerBiometric(emp.id, emp.name)
+                      // Force re-render to show the bio login button
+                      setBioAvailable(v => v)
+                      setErr('')
+                    } catch (ex) {
+                      if (ex.name !== 'NotAllowedError') setErr('No se pudo registrar la huella')
+                    }
+                    setBioRegLoading(false)
+                  }}>
+                  {bioRegLoading
+                    ? 'Registrando…'
+                    : '🔒 Activar acceso por huella / Face ID'
+                  }
+                </button>
+              )}
 
               {showAdminBtn && generatedPinNotice && (
                 <div style={{ margin:'8px 0', padding:'10px 14px', background:'rgba(245,158,11,.10)', border:'1px solid rgba(245,158,11,.30)', borderRadius:8, fontSize:12, color:'var(--orange)', lineHeight:1.5 }}>

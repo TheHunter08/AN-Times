@@ -9,6 +9,7 @@ import { PWAInstall } from '../components/PWAInstall.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
+import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed, dismissBioOffer, applyBrandColor } from '../utils/webauthn.js'
 
 // ─── HOOK: reloj en vivo (aislado para no re-renderizar el componente padre) ──
 function useClock() {
@@ -178,6 +179,35 @@ export default function EmployeePage() {
     }, 4000)
     return () => clearInterval(id)
   }, [u?.id])
+
+  // Recordatorio de fichaje — verifica cada minuto si hay que notificar
+  useEffect(() => {
+    if (!u?.reminderTime || !u?.id) return
+    const check = () => {
+      const now = new Date()
+      const [rh, rm] = u.reminderTime.split(':').map(Number)
+      if (now.getHours() * 60 + now.getMinutes() < rh * 60 + rm) return
+      const todayStr = now.toISOString().slice(0, 10)
+      const worked = (dbRef.current?.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
+      if (worked) return
+      const key = `rem_${u.id}_${todayStr}`
+      if (localStorage.getItem(key)) return
+      try {
+        if (Notification.permission === 'granted') {
+          new Notification('⏰ Recuerda fichar', { body: `Son las ${u.reminderTime}. ¿Has iniciado tu jornada?`, icon: '/pwa-192x192.png' })
+          localStorage.setItem(key, '1')
+        }
+      } catch {}
+    }
+    check()
+    const id = setInterval(check, 60_000)
+    return () => clearInterval(id)
+  }, [u?.reminderTime, u?.id])
+
+  // Color de acento personal del empleado (override brand color when logged in)
+  useEffect(() => {
+    if (u?.accentColor) applyBrandColor(u.accentColor)
+  }, [u?.accentColor])
 
   // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
   useEffect(() => {
@@ -932,6 +962,257 @@ function PullToRefresh({ children }) {
 }
 
 // ─── TAB INICIO ────────────────────────────────────────────────────────────────
+// ─── Utilities for streak and work pattern ────────────────────────────────────
+function calcStreak(records, empId, todayDate) {
+  const workedDays = new Set(
+    (records || [])
+      .filter(r => r.empId === empId && r.fin && (r.workSecs || 0) >= 1800)
+      .map(r => r.inicio?.slice(0, 10))
+      .filter(Boolean)
+  )
+  let count = 0
+  const d = new Date(todayDate)
+  if (!workedDays.has(todayDate)) {
+    d.setDate(d.getDate() - 1)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1)
+  }
+  while (count < 400) {
+    const ds = d.toISOString().slice(0, 10)
+    if (!workedDays.has(ds)) break
+    count++
+    d.setDate(d.getDate() - 1)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1)
+  }
+  return count
+}
+
+function calcWorkPattern(records, empId) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+  const recs = (records || []).filter(r =>
+    r.empId === empId && r.fin && r.inicio &&
+    new Date(r.inicio).getTime() > cutoff &&
+    (r.workSecs || 0) >= 3600
+  )
+  if (recs.length < 5) return null
+  const entryMins = recs.map(r => { const d = new Date(r.inicio); return d.getHours() * 60 + d.getMinutes() }).sort((a, b) => a - b)
+  const avg = Math.round(entryMins.reduce((a, b) => a + b, 0) / entryMins.length)
+  const p20 = entryMins[Math.floor(entryMins.length * 0.2)]
+  const p80 = entryMins[Math.floor(entryMins.length * 0.8)]
+  const fm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  return { earlyStr: fm(p20), lateStr: fm(p80), avgMin: avg, sampleSize: recs.length }
+}
+
+const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100]
+
+function streakLabel(n) {
+  if (n === 0) return null
+  const next = STREAK_MILESTONES.find(m => m > n)
+  return next ? `${next - n} días para el hito 🏆` : '¡Racha épica! 🌟'
+}
+
+// ─── WeatherCard ─────────────────────────────────────────────────────────────
+function WeatherCard() {
+  const [wx, setWx] = useState(null)
+  useEffect(() => {
+    try { const c = sessionStorage.getItem('wx_v1'); if (c) { const d = JSON.parse(c); if (Date.now() - d.ts < 30*60*1000) { setWx(d); return } } } catch {}
+    navigator.geolocation?.getCurrentPosition(({ coords }) => {
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude.toFixed(4)}&longitude=${coords.longitude.toFixed(4)}&current=temperature_2m,weather_code`)
+        .then(r => r.json()).then(d => {
+          const w = { ...d.current, ts: Date.now() }
+          setWx(w)
+          try { sessionStorage.setItem('wx_v1', JSON.stringify(w)) } catch {}
+        }).catch(() => {})
+    }, () => {}, { timeout: 5000 })
+  }, [])
+  if (!wx) return null
+  const c = wx.weather_code ?? 0
+  const icon = c === 0 ? '☀️' : c <= 2 ? '⛅' : c <= 3 ? '☁️' : c <= 49 ? '🌫️' : c <= 69 ? '🌧️' : c <= 79 ? '🌨️' : c <= 99 ? '⛈️' : '🌤️'
+  const desc = c === 0 ? 'Despejado' : c <= 2 ? 'Poco nublado' : c <= 3 ? 'Nublado' : c <= 49 ? 'Niebla' : c <= 69 ? 'Lluvia' : c <= 79 ? 'Nieve' : c <= 99 ? 'Tormenta' : 'Variable'
+  return (
+    <div className="v3-weather-pill">
+      <span>{icon}</span>
+      <span className="v3-weather-temp">{Math.round(wx.temperature_2m)}°C</span>
+      <span className="v3-weather-desc">{desc}</span>
+    </div>
+  )
+}
+
+// ─── WorkHeatmap ──────────────────────────────────────────────────────────────
+function WorkHeatmap({ records, empId }) {
+  const dayMap = useMemo(() => {
+    const m = {}
+    ;(records || []).filter(r => r.empId === empId && r.fin && r.inicio).forEach(r => {
+      const d = r.inicio.slice(0, 10); m[d] = (m[d] || 0) + calcMin(r)
+    })
+    return m
+  }, [records, empId])
+
+  const weeks = useMemo(() => {
+    const now = new Date(); now.setHours(0, 0, 0, 0)
+    const start = new Date(now)
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 14 * 7)
+    const result = []
+    for (let w = 0; w < 15; w++) {
+      const col = []
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(start)
+        dt.setDate(dt.getDate() + w * 7 + d)
+        const ds = dt.toISOString().slice(0, 10)
+        col.push({ ds, mins: dayMap[ds] || 0, future: dt > now })
+      }
+      result.push(col)
+    }
+    return result
+  }, [dayMap])
+
+  const color = (mins, future) => {
+    if (future) return 'transparent'
+    if (mins === 0) return 'var(--bg-500)'
+    if (mins < 120) return 'rgba(37,99,235,.25)'
+    if (mins < 300) return 'rgba(37,99,235,.5)'
+    if (mins < 450) return 'rgba(37,99,235,.75)'
+    return 'rgba(37,99,235,.95)'
+  }
+
+  return (
+    <div className="v3-heatmap-wrap">
+      <div className="v3-heatmap-grid">
+        {weeks.map((col, wi) => (
+          <div key={wi} className="v3-heatmap-col">
+            {col.map(({ ds, mins, future }) => (
+              <div key={ds} className="v3-heatmap-cell" style={{ background: color(mins, future) }}
+                title={mins > 0 ? `${ds}: ${mhm(mins)}` : ds} />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="v3-heatmap-legend">
+        <span>Menos</span>
+        {[0, 120, 300, 450, 600].map((m, i) => (
+          <div key={i} className="v3-heatmap-cell" style={{ background: color(m, false), width:10, height:10 }} />
+        ))}
+        <span>Más</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── PomodoroWidget ───────────────────────────────────────────────────────────
+function PomodoroWidget() {
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(false)
+  const [phase, setPhase] = useState('work')
+  const [secs, setSecs] = useState(25 * 60)
+  const [count, setCount] = useState(0)
+  const WS = 25 * 60, BS = 5 * 60
+
+  useEffect(() => {
+    if (!active) return
+    const id = setInterval(() => {
+      setSecs(s => {
+        if (s > 1) return s - 1
+        if (phase === 'work') {
+          setPhase('break'); setSecs(BS); setCount(c => c + 1)
+          try { new Notification('🍅 ¡Pomodoro completado!', { body: '5 min de descanso.' }) } catch {}
+        } else {
+          setPhase('work'); setSecs(WS)
+          try { new Notification('⏱️ ¡Vuelve al trabajo!', { body: 'Empieza el siguiente pomodoro.' }) } catch {}
+        }
+        try { navigator.vibrate?.([150, 80, 150]) } catch {}
+        return s
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [active, phase])
+
+  const reset = () => { setActive(false); setPhase('work'); setSecs(WS) }
+
+  if (!open) return (
+    <button className="v3-pomodoro-toggle" onClick={() => setOpen(true)}>
+      🍅 <span>Modo Pomodoro</span>
+    </button>
+  )
+
+  const total = phase === 'work' ? WS : BS
+  const R = 28, C2PI = 2 * Math.PI * R
+  const offset = C2PI * (1 - (total - secs) / total)
+  const mm = Math.floor(secs / 60), ss = secs % 60
+
+  return (
+    <div className={`v3-pomodoro-card${phase === 'break' ? ' break' : ''}`}>
+      <div className="v3-pomodoro-header">
+        <span>{phase === 'work' ? '🍅 Trabajo · 25 min' : '☕ Descanso · 5 min'}</span>
+        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+          {count > 0 && <span className="v3-pomodoro-count">×{count}</span>}
+          <button className="v3-pomodoro-close" onClick={() => { reset(); setOpen(false) }}>×</button>
+        </div>
+      </div>
+      <div className="v3-pomodoro-body">
+        <div style={{ position:'relative', width:64, height:64, flexShrink:0 }}>
+          <svg viewBox="0 0 64 64" width="64" height="64">
+            <circle cx="32" cy="32" r={R} fill="none" stroke="var(--border2)" strokeWidth="4.5" />
+            <circle cx="32" cy="32" r={R} fill="none"
+              stroke={phase === 'work' ? 'var(--primary)' : 'var(--green)'}
+              strokeWidth="4.5" strokeLinecap="round"
+              strokeDasharray={C2PI} strokeDashoffset={offset}
+              transform="rotate(-90 32 32)" />
+          </svg>
+          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, fontVariantNumeric:'tabular-nums' }}>
+            {String(mm).padStart(2,'0')}:{String(ss).padStart(2,'0')}
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className={`v3-pomodoro-btn${active ? ' active' : ''}`} onClick={() => setActive(a => !a)}>
+            {active ? '⏸' : '▶'}
+          </button>
+          <button className="v3-pomodoro-reset" onClick={reset} title="Reiniciar">↺</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+const ACHIEVEMENTS = [
+  { id:'a1', icon:'🌱', title:'Primera jornada', desc:'Primera jornada completada', check:(r)=>r.filter(x=>x.fin).length>=1 },
+  { id:'a2', icon:'⚡', title:'Tres en raya', desc:'3 días consecutivos', check:(r,s)=>s>=3 },
+  { id:'a3', icon:'🔥', title:'Semana de fuego', desc:'7 días seguidos', check:(r,s)=>s>=7 },
+  { id:'a4', icon:'🌟', title:'Mes imparable', desc:'30 días seguidos', check:(r,s)=>s>=30 },
+  { id:'a5', icon:'📅', title:'50 jornadas', desc:'50 días trabajados', check:(r)=>new Set(r.filter(x=>x.fin&&x.inicio).map(x=>x.inicio.slice(0,10))).size>=50 },
+  { id:'a6', icon:'💯', title:'100 jornadas', desc:'100 días trabajados', check:(r)=>new Set(r.filter(x=>x.fin&&x.inicio).map(x=>x.inicio.slice(0,10))).size>=100 },
+  { id:'a7', icon:'🏅', title:'Ultramaratón', desc:'10h en un solo día', check:(r)=>{const m={};r.filter(x=>x.fin&&x.inicio).forEach(x=>{const d=x.inicio.slice(0,10);m[d]=(m[d]||0)+calcMin(x)});return Object.values(m).some(v=>v>=600)} },
+  { id:'a8', icon:'💪', title:'Centurión', desc:'100h en un mes', check:(r)=>{const m={};r.filter(x=>x.fin&&x.inicio).forEach(x=>{const k=x.inicio.slice(0,7);m[k]=(m[k]||0)+calcMin(x)});return Object.values(m).some(v=>v>=6000)} },
+  { id:'a9', icon:'⏰', title:'Siempre puntual', desc:'5 días antes de las 09:30', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=570}).length>=5 },
+  { id:'a10', icon:'🌅', title:'Madrugador', desc:'3 veces antes de las 08:00', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=480}).length>=3 },
+]
+
+function AchievementsSection({ myRecs, streak }) {
+  const unlocked = useMemo(() => new Set(ACHIEVEMENTS.filter(a => a.check(myRecs, streak)).map(a => a.id)), [myRecs, streak])
+  return (
+    <div style={{ margin:'0 16px 16px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px' }}>Logros</div>
+        <div style={{ fontSize:11, color:'var(--text4)' }}>{unlocked.size}/{ACHIEVEMENTS.length} desbloqueados</div>
+      </div>
+      <div className="v3-achievements-grid">
+        {ACHIEVEMENTS.map(a => {
+          const ok = unlocked.has(a.id)
+          return (
+            <div key={a.id} className={`v3-achievement${ok ? ' unlocked' : ''}`} title={a.desc}>
+              <div className="v3-achievement-icon">{ok ? a.icon : '🔒'}</div>
+              <div className="v3-achievement-title">{a.title}</div>
+              <div className="v3-achievement-desc">{a.desc}</div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const ACCENT_PRESETS = ['#5E6AD2','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#F97316','#0EA5E9','#84CC16']
+
+// ─── TabInicio ─────────────────────────────────────────────────────────────────
 function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast }) {
   const { setEmpTab } = useAppStore()
   const { clockTime, clockDate } = useClock()
@@ -939,6 +1220,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const [showTip, setShowTip] = useState(() => {
     try { return localStorage.getItem('an_tip_fichar') !== '1' } catch { return false }
   })
+  const [bioOfferVisible, setBioOfferVisible] = useState(false)
+  const [bioOfferLoading, setBioOfferLoading] = useState(false)
   // Memo: TabInicio re-renderiza cada segundo via timer; evitar refiltrar listas grandes
   const recs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
@@ -959,6 +1242,20 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const [autoCloseDismissed, setAutoCloseDismissed] = useState(false)
   const showAutoCloseWarning = !autoCloseDismissed && lastAutoClosed &&
     (Date.now() - new Date(lastAutoClosed.autoClosedAt).getTime()) < 24 * 60 * 60 * 1000
+
+  // Racha de asistencia (se actualiza cuando cambian los records, no cada segundo)
+  const streak = useMemo(() => calcStreak(db.records, u.id, todayStr), [db.records, u.id, todayStr])
+  const streakNext = streakLabel(streak)
+
+  // IA horaria: patrón de entrada de los últimos 30 días
+  const workPattern = useMemo(() => calcWorkPattern(db.records, u.id), [db.records, u.id])
+
+  // Oferta biométrica — mostrar solo una vez si el dispositivo lo soporta y no está registrado
+  useEffect(() => {
+    if (!u?.id) return
+    if (hasBiometric(u.id) || isBioOfferDismissed(u.id)) return
+    checkPlatformAuth().then(ok => { if (ok) setBioOfferVisible(true) })
+  }, [u?.id])
 
   const completedSecs = realRecs.filter(r => r.fin && r.closed).reduce((a, r) => a + recWorkSecs(r), 0)
   const liveSecs = o ? calcSecs(o).work : 0
@@ -982,6 +1279,11 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
   const weekPct = Math.min(100, Math.round(weekMin / WK * 100))
+  const lastWeekMin = useMemo(() => {
+    const lws = new Date(wsStr); lws.setDate(lws.getDate() - 7)
+    const lwe = new Date(wsStr)
+    return (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= lws && new Date(r.inicio) < lwe).reduce((s, r) => s + calcMin(r), 0)
+  }, [db.records, u.id, wsStr])
   const monthRecs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)),
     [db.records, u.id, mk]
@@ -1039,6 +1341,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   return (
     <PullToRefresh>
       <div className="ini-wrap">
+
+        <WeatherCard />
 
         {/* Hero clock card */}
         <div className={`hero-clock-card${timer.state !== 'idle' ? ' jornada-active' : ''}`}>
@@ -1162,6 +1466,29 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           </div>
         </div>
 
+        {/* ── Comparativa semana a semana ─────────────────────────────── */}
+        {(weekMin > 0 || lastWeekMin > 0) && (
+          <div className="v3-compare-card">
+            <div className="v3-compare-title">Comparativa semanal</div>
+            {[{ label:'Sem. anterior', mins: lastWeekMin }, { label:'Esta semana', mins: weekMin }].map(({ label, mins }) => {
+              const pct = Math.min(100, mins / Math.max(lastWeekMin, weekMin, WK) * 100)
+              return (
+                <div key={label} className="v3-compare-row">
+                  <div className="v3-compare-lbl">{label}</div>
+                  <div className="v3-compare-track">
+                    <div className="v3-compare-fill" style={{ width:`${pct}%` }} />
+                  </div>
+                  <div className="v3-compare-val">{mhm(mins)}</div>
+                </div>
+              )
+            })}
+            {lastWeekMin > 0 && weekMin !== lastWeekMin && (() => {
+              const diff = weekMin - lastWeekMin
+              return <div className="v3-compare-delta" style={{ color: diff > 0 ? 'var(--green)' : 'var(--orange)' }}>{diff > 0 ? '+' : ''}{mhm(Math.abs(diff))} {diff > 0 ? 'más' : 'menos'} que la semana pasada</div>
+            })()}
+          </div>
+        )}
+
         {/* Monthly progress bar */}
         <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1182,6 +1509,86 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             )}
           </div>
         </div>
+
+        {/* ─── Streak + IA pattern row ─────────────────────────────────────────── */}
+        <div className="v3-insights-row">
+
+          {/* Racha de asistencia */}
+          {streak > 0 && (
+            <div className={`v3-streak-card${streak >= 7 ? ' hot' : ''}`}>
+              <div className="v3-streak-fire">{streak >= 30 ? '🌟' : streak >= 7 ? '🔥' : '✅'}</div>
+              <div className="v3-streak-body">
+                <div className="v3-streak-count">{streak} <span>día{streak !== 1 ? 's' : ''}</span></div>
+                <div className="v3-streak-label">racha activa</div>
+                {streakNext && <div className="v3-streak-next">{streakNext}</div>}
+              </div>
+            </div>
+          )}
+
+          {/* IA horaria offline — predicción de entrada */}
+          {workPattern && (
+            <div className="v3-pattern-card">
+              <div className="v3-pattern-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div className="v3-pattern-body">
+                <div className="v3-pattern-title">Tu horario habitual</div>
+                <div className="v3-pattern-range">{workPattern.earlyStr} – {workPattern.lateStr}</div>
+                {(() => {
+                  if (!entradaRec) return <div className="v3-pattern-sub">basado en {workPattern.sampleSize} días</div>
+                  const d = new Date(entradaRec.inicio)
+                  const entMin = d.getHours() * 60 + d.getMinutes()
+                  const diff = entMin - workPattern.avgMin
+                  const abs = Math.abs(diff)
+                  if (abs < 6) return <div className="v3-pattern-sub" style={{ color:'var(--green)' }}>✓ Llegaste a tu hora habitual</div>
+                  const fm = m => `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + 'min' : ''}`.trim()
+                  return (
+                    <div className="v3-pattern-sub" style={{ color: diff < 0 ? 'var(--green)' : 'var(--orange)' }}>
+                      {diff < 0 ? `⚡ ${fm(abs)} antes de lo habitual` : `+${fm(abs)} más tarde de lo habitual`}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Biometric offer bottom sheet */}
+        {bioOfferVisible && (
+          <div className="v3-bio-offer">
+            <div className="v3-bio-offer-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" width="28" height="28"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
+            </div>
+            <div className="v3-bio-offer-text">
+              <div className="v3-bio-offer-title">Activa el acceso rápido</div>
+              <div className="v3-bio-offer-sub">Entra con tu huella o Face ID la próxima vez, sin introducir el PIN.</div>
+            </div>
+            <div className="v3-bio-offer-actions">
+              <button className="v3-bio-offer-btn primary" disabled={bioOfferLoading}
+                onClick={async () => {
+                  setBioOfferLoading(true)
+                  try {
+                    await registerBiometric(u.id, u.name)
+                    setBioOfferVisible(false)
+                    dismissBioOffer(u.id)
+                    toast('¡Huella registrada! Ya puedes entrar sin PIN 🔓')
+                  } catch {
+                    toast('No se pudo registrar. Inténtalo desde la pantalla de login.')
+                    setBioOfferVisible(false)
+                    dismissBioOffer(u.id)
+                  }
+                  setBioOfferLoading(false)
+                }}>
+                {bioOfferLoading ? 'Registrando…' : 'Activar'}
+              </button>
+              <button className="v3-bio-offer-btn secondary"
+                onClick={() => { setBioOfferVisible(false); dismissBioOffer(u.id) }}>
+                Ahora no
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Vacation balance */}
         {vac && vac.available > 0 && (
@@ -1466,6 +1873,45 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         })
         y -= HEAD_H
       }
+
+      // ─ Cover page ─────────────────────────────────────────────────
+      const cover = pdfDoc.addPage([PW, PH])
+      // header band
+      cover.drawRectangle({ x:0, y:PH-120, width:PW, height:120, color:cPri })
+      cover.drawText(u.empresa || 'TIMES INC', { x:ML, y:PH-50, size:24, font:fontB, color:cWhite })
+      cover.drawText('REGISTRO DE JORNADA LABORAL', { x:ML, y:PH-78, size:11, font:fontR, color:rgb(0.8,0.82,1) })
+      cover.drawText(new Date().toLocaleDateString('es-ES'), { x:PW-MR-90, y:PH-50, size:10, font:fontR, color:rgb(0.8,0.82,1) })
+      // main info block
+      const ly = (n) => PH - 200 - n * 28
+      cover.drawText('Trabajador', { x:ML, y:ly(0)+10, size:8, font:fontR, color:cGray })
+      cover.drawText(u.name, { x:ML, y:ly(0)-6, size:16, font:fontB, color:cDark })
+      cover.drawLine({ start:{x:ML,y:ly(0)-16}, end:{x:PW-MR,y:ly(0)-16}, thickness:0.4, color:cBorder })
+      cover.drawText('Periodo', { x:ML, y:ly(1)+10, size:8, font:fontR, color:cGray })
+      cover.drawText(monthName.charAt(0).toUpperCase() + monthName.slice(1), { x:ML, y:ly(1)-6, size:16, font:fontB, color:cDark })
+      cover.drawLine({ start:{x:ML,y:ly(1)-16}, end:{x:PW-MR,y:ly(1)-16}, thickness:0.4, color:cBorder })
+      cover.drawText('Centro / Obra', { x:ML, y:ly(2)+10, size:8, font:fontR, color:cGray })
+      cover.drawText(u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—'), { x:ML, y:ly(2)-6, size:12, font:fontB, color:cDark, maxWidth:CW })
+      cover.drawLine({ start:{x:ML,y:ly(2)-16}, end:{x:PW-MR,y:ly(2)-16}, thickness:0.4, color:cBorder })
+      // stats row
+      const statsY = ly(3) - 10
+      cover.drawRectangle({ x:ML, y:statsY-80, width:CW, height:80, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      const exCover = monthlyExtras(db.records, u.id, mk2)
+      const statItems = [
+        { label:'Jornadas', val: String(monthRecs.length) },
+        { label:'Total horas', val: mhm(totalMin2) },
+        { label:'H. extra', val: exCover.netExtraMin > 0 ? `+${mhm(exCover.netExtraMin)}` : exCover.deficitMin > 0 ? `−${mhm(exCover.deficitMin)}` : '0h' },
+        { label:'Objetivo 160h', val: totalMin2 >= 9600 ? '✓ OK' : `Falta ${mhm(9600 - totalMin2)}` },
+      ]
+      const statW = CW / statItems.length
+      statItems.forEach((s, i) => {
+        const sx = ML + i * statW + statW / 2
+        cover.drawText(s.label, { x:sx-20, y:statsY-25, size:7.5, font:fontR, color:cGray, maxWidth:statW-8 })
+        cover.drawText(s.val, { x:sx-26, y:statsY-50, size:14, font:fontB, color:cPri, maxWidth:statW-4 })
+      })
+      cover.drawText(
+        'Generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada.',
+        { x:ML, y:40, size:6, font:fontR, color:cGray, maxWidth:CW }
+      )
 
       // ─ Start first page ────────────────────────────────────────────
       newPage(); tableHeader()
@@ -1756,6 +2202,13 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           }
         </button>
       </div>
+
+      {/* ── Pomodoro ─────────────────────────────────────────── */}
+      {o && (
+        <div style={{ padding:'0 16px 12px' }}>
+          <PomodoroWidget />
+        </div>
+      )}
 
       {/* Premium social-feed timeline */}
       <div style={{ padding: '0 16px 12px' }}>
@@ -2446,6 +2899,21 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
     sd.setDate(sd.getDate() - 1)
   }
 
+  const saveAccentColor = useCallback((color) => {
+    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, accentColor: color || undefined } : e)
+    saveDB({ employees: emps2 })
+    if (color) applyBrandColor(color)
+  }, [db.employees, u.id, saveDB])
+
+  const saveReminderTime = useCallback((time) => {
+    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e)
+    saveDB({ employees: emps2 })
+    if (time && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    toast(time ? `Recordatorio activado a las ${time}` : 'Recordatorio desactivado', 2500, 'ok')
+  }, [db.employees, u.id, saveDB, toast])
+
   return (
     <PullToRefresh>
       <div className="prf-hero">
@@ -2494,6 +2962,55 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           ))}
         </div>
 
+      </div>
+
+      {/* ── Logros ────────────────────────────────────────────────── */}
+      <AchievementsSection myRecs={myRecs} streak={streak} />
+
+      {/* ── Mi actividad — heatmap ─────────────────────────────────── */}
+      <div style={{ margin:'0 16px 16px' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
+        <WorkHeatmap records={db.records} empId={u.id} />
+      </div>
+
+      {/* ── Color de acento personal ───────────────────────────────── */}
+      <div style={{ margin:'0 16px 16px' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi color personal</div>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+          {ACCENT_PRESETS.map(c => (
+            <div key={c} onClick={() => saveAccentColor(u.accentColor === c ? null : c)}
+              style={{ width:26, height:26, borderRadius:'50%', background:c, cursor:'pointer', flexShrink:0,
+                border: u.accentColor === c ? '2px solid var(--text)' : '2px solid transparent',
+                transform: u.accentColor === c ? 'scale(1.25)' : 'scale(1)',
+                transition:'transform .15s, border-color .15s' }} />
+          ))}
+          <label style={{ width:26, height:26, borderRadius:'50%', overflow:'hidden', cursor:'pointer', flexShrink:0, border:'1px dashed var(--border2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }} title="Color personalizado">
+            🎨
+            <input type="color" value={u.accentColor||'#5E6AD2'} onChange={e => saveAccentColor(e.target.value)} style={{ opacity:0, position:'absolute', width:1, height:1 }} />
+          </label>
+        </div>
+        {u.accentColor && (
+          <button onClick={() => saveAccentColor(null)} style={{ marginTop:8, fontSize:11, color:'var(--text4)', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+            Restaurar color por defecto
+          </button>
+        )}
+      </div>
+
+      {/* ── Recordatorio de fichaje ────────────────────────────────── */}
+      <div style={{ margin:'0 16px 16px' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Recordatorio de fichaje</div>
+        <div style={{ padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontSize:20 }}>⏰</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>Avísame si a las… no he fichado</div>
+            <input type="time" value={u.reminderTime || ''} onChange={e => saveReminderTime(e.target.value)}
+              style={{ fontSize:14, fontWeight:700, background:'none', border:'none', color:'var(--primary-light)', padding:0, fontFamily:'inherit', cursor:'pointer' }} />
+          </div>
+          {u.reminderTime && (
+            <button onClick={() => saveReminderTime('')} style={{ fontSize:14, color:'var(--text4)', background:'none', border:'none', cursor:'pointer', padding:4 }}>✕</button>
+          )}
+        </div>
+        <div style={{ fontSize:10, color:'var(--text4)', marginTop:6 }}>Necesitas tener notificaciones activadas para recibir el aviso.</div>
       </div>
 
       {/* Cierres mensuales pendientes de firma */}

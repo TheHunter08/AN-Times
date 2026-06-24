@@ -4497,3 +4497,467 @@ textarea.input-error {
 .v3-card-enter:nth-child(2) { animation-delay: 50ms }
 .v3-card-enter:nth-child(3) { animation-delay: 100ms }
 .v3-card-enter:nth-child(4) { animation-delay: 150ms }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v3 REVOLUTIONARY FEATURES: Streak · IA Pattern · Biometric · Brand
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Insights row (streak + pattern side by side) ──────────────── */
+.v3-insights-row {
+  margin: 0 16px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.v3-insights-row:empty { display: none; }
+
+/* ── Streak card ────────────────────────────────────────────────── */
+.v3-streak-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  animation: v3FadeUp .35s var(--ease-smooth);
+  transition: border-color var(--t-med);
+}
+.v3-streak-card.hot {
+  border-color: rgba(251,146,60,.35);
+  background: rgba(251,146,60,.06);
+}
+.v3-streak-fire {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.v3-streak-body { min-width: 0; }
+.v3-streak-count {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+.v3-streak-count span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text3);
+}
+.v3-streak-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text4);
+  margin-top: 1px;
+}
+.v3-streak-next {
+  font-size: 9px;
+  color: var(--orange);
+  margin-top: 3px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── AI pattern card ────────────────────────────────────────────── */
+.v3-pattern-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 12px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  animation: v3FadeUp .4s .05s var(--ease-smooth) both;
+}
+.v3-pattern-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--primary-dim);
+  border: 1px solid var(--primary-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--primary-light);
+}
+.v3-pattern-body { min-width: 0; flex: 1; }
+.v3-pattern-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text4);
+  margin-bottom: 2px;
+}
+.v3-pattern-range {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v3-pattern-sub {
+  font-size: 9px;
+  color: var(--text4);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ── Biometric login button (LoginPage) ─────────────────────────── */
+.login-bio-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: var(--primary-dim);
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--r-lg);
+  color: var(--primary-light);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--t-fast), border-color var(--t-fast), opacity var(--t-fast);
+  -webkit-tap-highlight-color: transparent;
+  animation: v3FadeUp .3s var(--ease-smooth);
+}
+.login-bio-btn:active { opacity: .8; }
+.login-bio-btn:disabled { opacity: .6; pointer-events: none; }
+.login-bio-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--primary-glow);
+  border-top-color: var(--primary-light);
+  animation: spin .7s linear infinite;
+}
+
+/* ── Biometric register link (LoginPage) ────────────────────────── */
+.login-bio-register {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: none;
+  border: 1px dashed var(--border2);
+  border-radius: var(--r);
+  color: var(--text4);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: border-color var(--t-fast), color var(--t-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.login-bio-register:hover, .login-bio-register:active {
+  border-color: var(--primary-glow);
+  color: var(--primary-light);
+}
+.login-bio-register:disabled { opacity: .6; pointer-events: none; }
+
+/* ── Biometric offer bottom card (EmployeePage) ─────────────────── */
+.v3-bio-offer {
+  margin: 0 16px 12px;
+  padding: 14px 16px;
+  background: var(--bg-600);
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: v3SlideUp .35s var(--ease-spring);
+}
+.v3-bio-offer-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r);
+  background: var(--primary-dim);
+  border: 1px solid var(--primary-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+.v3-bio-offer-text { flex: 1; min-width: 0; }
+.v3-bio-offer-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.v3-bio-offer-sub {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+.v3-bio-offer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.v3-bio-offer-btn {
+  padding: 7px 13px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  white-space: nowrap;
+  transition: opacity var(--t-fast);
+}
+.v3-bio-offer-btn:active { opacity: .8; }
+.v3-bio-offer-btn:disabled { opacity: .6; pointer-events: none; }
+.v3-bio-offer-btn.primary {
+  background: var(--primary);
+  color: #fff;
+}
+.v3-bio-offer-btn.secondary {
+  background: var(--bg-500);
+  color: var(--text3);
+  border: 1px solid var(--border);
+}
+
+/* ── Weather pill ──────────────────────────────────────────────── */
+.v3-weather-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin: 0 16px 12px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.v3-weather-temp {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+.v3-weather-desc {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+/* ── Comparativa semanal ───────────────────────────────────────── */
+.v3-compare-card {
+  margin: 0 16px 16px;
+  padding: 14px 16px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.v3-compare-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-bottom: 12px;
+}
+.v3-compare-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.v3-compare-lbl {
+  font-size: 11px;
+  color: var(--text3);
+  width: 88px;
+  flex-shrink: 0;
+}
+.v3-compare-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-400);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.v3-compare-fill {
+  height: 100%;
+  background: var(--grad-primary);
+  border-radius: 3px;
+  transition: width .4s cubic-bezier(.16,1,.3,1);
+}
+.v3-compare-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  width: 42px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.v3-compare-delta {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* ── Heatmap de jornadas ──────────────────────────────────────── */
+.v3-heatmap-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.v3-heatmap-grid {
+  display: flex;
+  gap: 3px;
+}
+.v3-heatmap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.v3-heatmap-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--bg-400);
+  transition: opacity .1s;
+}
+.v3-heatmap-cell:active { opacity: .7; }
+.v3-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text4);
+}
+
+/* ── Pomodoro ─────────────────────────────────────────────────── */
+.v3-pomodoro-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--t-fast), border-color var(--t-fast);
+  width: 100%;
+  margin-bottom: 4px;
+}
+.v3-pomodoro-toggle:active { opacity: .8; }
+.v3-pomodoro-card {
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.v3-pomodoro-card.break {
+  border-color: var(--green);
+  background: rgba(0, 196, 140, .06);
+}
+.v3-pomodoro-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.v3-pomodoro-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.v3-pomodoro-btn {
+  padding: 8px 18px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-500);
+  color: var(--text3);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--t-fast);
+}
+.v3-pomodoro-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.v3-pomodoro-btn:active { opacity: .8; }
+.v3-pomodoro-reset {
+  background: none;
+  border: none;
+  color: var(--text4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+.v3-pomodoro-close {
+  background: none;
+  border: none;
+  color: var(--text4);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+.v3-pomodoro-count {
+  font-size: 10px;
+  color: var(--text4);
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ── Logros y badges ──────────────────────────────────────────── */
+.v3-achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0 16px 16px;
+}
+.v3-achievement {
+  padding: 12px 10px;
+  background: var(--bg-600);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  text-align: center;
+  opacity: .45;
+  filter: grayscale(1);
+  transition: opacity .3s, filter .3s;
+}
+.v3-achievement.unlocked {
+  opacity: 1;
+  filter: none;
+  border-color: var(--primary-glow);
+  background: var(--primary-dim);
+}
+.v3-achievement-icon {
+  font-size: 26px;
+  margin-bottom: 6px;
+}
+.v3-achievement-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 3px;
+}
+.v3-achievement-desc {
+  font-size: 10px;
+  color: var(--text3);
+  line-height: 1.4;
+}

@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import QRCode from 'qrcode'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
@@ -1592,6 +1593,14 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
 function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData, session }) {
   const allEmps = sortedEmps(db)
   const [empSearch, setEmpSearch] = useState('')
+  const [qrEmp, setQrEmp] = useState(null)
+  const qrCanvasRef = useRef(null)
+
+  useEffect(() => {
+    if (!qrEmp || !qrCanvasRef.current) return
+    const url = `${window.location.origin}${window.location.pathname}?emp=${encodeURIComponent(qrEmp.id)}`
+    QRCode.toCanvas(qrCanvasRef.current, url, { width: 240, margin: 2, color: { dark: '#0d0d18', light: '#ffffff' } }).catch(() => {})
+  }, [qrEmp])
   const emps = useMemo(() => {
     if (!empSearch.trim()) return allEmps
     const q = empSearch.toLowerCase()
@@ -1817,6 +1826,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
                 <td>
                   <div style={{ display:'flex', gap:6 }}>
                     <button className="btn btn-sm btn-secondary" onClick={() => openEdit(e)}>✏️</button>
+                    <button className="btn btn-sm btn-secondary" title="Generar QR de acceso" onClick={() => setQrEmp(e)}>QR</button>
                     {!e.baja && <button className="btn btn-sm btn-danger" onClick={() => del(e.id)}>Baja</button>}
                   </div>
                 </td>
@@ -1825,6 +1835,23 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
           </tbody>
         </table>
       </div>
+
+      {/* ── Modal QR ─────────────────────────────────────────────── */}
+      {qrEmp && (
+        <div onClick={() => setQrEmp(null)} style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,.6)', backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'var(--bg-700)', borderRadius:20, padding:'28px 24px 24px', boxShadow:'0 20px 60px rgba(0,0,0,.5)', border:'1px solid var(--border2)', textAlign:'center', maxWidth:320, width:'90%' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:4 }}>QR de acceso rápido</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16 }}>{qrEmp.name} · escanea para pre-seleccionar</div>
+            <div style={{ background:'#fff', borderRadius:12, display:'inline-block', padding:12, marginBottom:16 }}>
+              <canvas ref={qrCanvasRef} />
+            </div>
+            <div style={{ fontSize:11, color:'var(--text4)', marginBottom:20, lineHeight:1.5 }}>
+              Al escanear el QR, la app abrirá la pantalla de login con este empleado ya seleccionado.
+            </div>
+            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => setQrEmp(null)}>Cerrar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
