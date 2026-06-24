@@ -6,19 +6,13 @@ const _DEFAULT_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 export const SB_URL  = import.meta.env.VITE_SB_URL  || _DEFAULT_SB_URL
 export const SB_ANON = import.meta.env.VITE_SB_ANON || _DEFAULT_SB_ANON
 
-// ── Admin PIN — se genera un PIN temporal si no está configurado ──────────────
-function initAdminPin() {
-  if (import.meta.env.VITE_ADMIN_PIN) return import.meta.env.VITE_ADMIN_PIN
-  try {
-    const stored = localStorage.getItem('__admin_pin_fb__')
-    if (stored) return stored
-    const generated = Math.floor(1000 + Math.random() * 9000).toString()
-    localStorage.setItem('__admin_pin_fb__', generated)
-    localStorage.setItem('__admin_pin_fb_new__', '1')
-    return generated
-  } catch { return '0000' }
-}
-export const ADMIN_PIN = initAdminPin()
+// Limpia restos del sistema de PIN de admin legacy (migramos a email+pass Supabase)
+try {
+  localStorage.removeItem('__admin_pin_fb__')
+  localStorage.removeItem('__admin_pin_fb_new__')
+  localStorage.removeItem('__admin_pin_hash__')
+  localStorage.removeItem('__admin_pin_len__')
+} catch {}
 
 // VAPID: saneamos espacios, normalizamos a base64url y validamos
 // que tenga formato correcto. Si la env var llega malformada (whitespace,
@@ -80,7 +74,7 @@ export const INITIAL_DB = {
   obras: ['Soluciones Mata'],
   centrosTrabajo: ['Obra Principal', 'Oficina Central', 'Almacén'],
   employees: [
-    { id: 'admin', name: 'Administrador', empresa: 'Soluciones Mata', pin: ADMIN_PIN, color: '#5aa9e6', initials: 'AD', startDate: '2024-01-01', email: '', isAdmin: true },
+    { id: 'admin', name: 'Administrador', empresa: 'Soluciones Mata', pin: '', color: '#5aa9e6', initials: 'AD', startDate: '2024-01-01', email: '', isAdmin: true },
     { id: 'e1', name: 'Ismael Angeles de la Cruz', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '1111', color: '#6366f1', initials: 'IA', startDate: '2024-01-01', email: '', role: 'encargado', obrasAsignadas: ['Soluciones Mata'] },
     { id: 'e2', name: 'Franklin Lisandro Nuñez Roque', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '2222', color: '#10b981', initials: 'FL', startDate: '2024-01-01', email: '', role: 'empleado', obrasAsignadas: [] }
   ],

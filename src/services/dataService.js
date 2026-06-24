@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { SB_URL, SB_ANON, INITIAL_DB, ADMIN_PIN } from '../config/constants.js'
+import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
 export const supabase = (SB_URL && SB_ANON)
@@ -34,7 +34,7 @@ export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
   const adm = base.employees?.find(e => e.isAdmin) || {
     id: 'admin', name: 'Administrador', empresa: base.empresas[0] || '',
-    pin: ADMIN_PIN, color: '#5aa9e6', initials: 'AD',
+    pin: '', color: '#5aa9e6', initials: 'AD',
     startDate: '2024-01-01', email: '', isAdmin: true
   }
   // Bug fix #7: no sobrescribir employees locales con array vacío (Supabase reset / rate-limit)

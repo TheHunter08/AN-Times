@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
-import { ADMIN_PIN } from '../config/constants.js'
 import { sortedEmps } from '../utils/time.js'
-import { hashPin, isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS } from '../utils/pinSecurity.js'
+import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin } from '../utils/pinSecurity.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric } from '../utils/webauthn.js'
 
 export default function LoginPage() {
@@ -23,11 +22,13 @@ export default function LoginPage() {
   const [newPass2, setNewPass2] = useState('')
   const [resetSuccess, setResetSuccess] = useState(false)
   const [logoTaps, setLogoTaps] = useState(0)
-  const [showAdminBtn, setShowAdminBtn] = useState(false)
+  const [showAdminForm, setShowAdminForm] = useState(false)
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPass, setAdminPass] = useState('')
+  const [adminPassVisible, setAdminPassVisible] = useState(false)
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminErr, setAdminErr] = useState('')
   const [mounted, setMounted] = useState(false)
-  const [generatedPinNotice, setGeneratedPinNotice] = useState(() => {
-    try { return localStorage.getItem('__admin_pin_fb_new__') === '1' } catch { return false }
-  })
   const [bioAvailable, setBioAvailable] = useState(false)
   const [bioLoading, setBioLoading]     = useState(false)
   const [bioRegLoading, setBioRegLoading] = useState(false)
@@ -82,6 +83,47 @@ export default function LoginPage() {
     toast('Modo admin activado')
   }, [setSession, setScreen, toast])
 
+  const isAdminEmail = useCallback((userEmail) => {
+    if (!userEmail) return false
+    const em = userEmail.toLowerCase()
+    // 1. Configurado en db.config.adminEmails
+    const configured = (db.config?.adminEmails || []).map(e => e.toLowerCase())
+    if (configured.includes(em)) return true
+    // 2. Empleado con isAdmin: true
+    if ((db.employees || []).some(e => e.email?.toLowerCase() === em && e.isAdmin)) return true
+    return false
+  }, [db])
+
+  const doAdminEmailLogin = useCallback(async () => {
+    setAdminErr('')
+    if (!adminEmail.trim()) { setAdminErr('Introduce tu email de administrador'); return }
+    if (!adminPass) { setAdminErr('Introduce tu contraseña'); return }
+    if (!isAuthReady()) { setAdminErr('Sin conexión con el servidor'); return }
+    setAdminLoading(true)
+    try {
+      const result = await signInEmail(adminEmail.trim(), adminPass)
+      const userEmail = result.user?.email
+      await useAppStore.getState().fetchDB()
+      const freshDB = useAppStore.getState().db
+      const em = userEmail?.toLowerCase()
+      const configuredEmails = (freshDB.config?.adminEmails || []).map(e => e.toLowerCase())
+      const empIsAdmin = (freshDB.employees || []).some(e => e.email?.toLowerCase() === em && e.isAdmin)
+      const isAdmin = configuredEmails.includes(em) || empIsAdmin
+      await authSignOut()
+      if (isAdmin) {
+        doAdminLogin()
+        setShowAdminForm(false)
+        setAdminEmail('')
+        setAdminPass('')
+      } else {
+        setAdminErr('Este email no tiene permisos de administrador')
+      }
+    } catch (ex) {
+      setAdminErr(ex.message || 'Email o contraseña incorrectos')
+    }
+    setAdminLoading(false)
+  }, [adminEmail, adminPass, doAdminLogin])
+
   const findEmployeeByEmail = async (fbEmail) => {
     const normalized = fbEmail?.toLowerCase()
     if (!normalized) return null
@@ -92,57 +134,11 @@ export default function LoginPage() {
 
   const handlePin = useCallback(async (k) => {
     if (pin.length >= 6 || verifyingRef.current) return
+    if (!selectedEmpId) return  // sin empleado seleccionado, ignorar PIN
     const newPin = pin + k
     setPin(newPin)
     setErr('')
     if (newPin.length < 4) return
-
-    // Admin PIN — comparación por hash (migración automática desde texto plano)
-    // También activa el camino admin si el botón de acceso admin está visible
-    if (!selectedEmpId || showAdminBtn) {
-      const adminLk = getLockoutState('__admin__')
-      if (adminLk.locked) {
-        setErr(`Bloqueado ${adminLk.remainingMin} min por exceso de intentos`)
-        setPin(''); return
-      }
-      const adminPinLen = (() => {
-        try { return parseInt(localStorage.getItem('__admin_pin_len__') || '0', 10) || ADMIN_PIN.length } catch { return ADMIN_PIN.length }
-      })()
-      if (newPin.length < adminPinLen) return
-
-      verifyingRef.current = true
-      const opId = ++opIdRef.current
-      const storedAdminHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
-      let adminOk = false
-      if (storedAdminHash) {
-        adminOk = await verifyPin(newPin, storedAdminHash, '__admin__')
-        // Migrar hash legacy (SHA-256 / plaintext) → PBKDF2 en el primer login correcto
-        if (adminOk && needsRehash(storedAdminHash)) {
-          const h = await hashPin(newPin, '__admin__')
-          try { localStorage.setItem('__admin_pin_hash__', h) } catch {}
-        }
-      } else {
-        adminOk = newPin === ADMIN_PIN
-        if (adminOk) {
-          const h = await hashPin(newPin, '__admin__')
-          try { localStorage.setItem('__admin_pin_hash__', h); localStorage.setItem('__admin_pin_len__', String(newPin.length)) } catch {}
-        }
-      }
-      verifyingRef.current = false
-      if (opId !== opIdRef.current) return  // resultado obsoleto, descartar
-
-      if (adminOk) {
-        clearLockout('__admin__')
-        doAdminLogin(); setPin(''); return
-      }
-      recordFailedAttempt('__admin__')
-      const lkAfter = getLockoutState('__admin__')
-      setShaking(true)
-      setErr(lkAfter.locked ? `Bloqueado ${lkAfter.remainingMin} min por exceso de intentos` : 'PIN incorrecto')
-      if (navigator.vibrate) navigator.vibrate(200)
-      setTimeout(() => { setShaking(false); setPin('') }, 450)
-      return
-    }
 
     const emp = (db.employees || []).find(e => e.id === selectedEmpId)
     if (!emp) return
@@ -187,7 +183,7 @@ export default function LoginPage() {
       if (navigator.vibrate) navigator.vibrate(200)
       setTimeout(() => { setShaking(false); setPin('') }, 450)
     }
-  }, [pin, selectedEmpId, showAdminBtn, db, doLogin, doAdminLogin])
+  }, [pin, selectedEmpId, db, doLogin])
 
   const handlePinDel = () => { setPin(p => p.slice(0, -1)); setErr('') }
 
@@ -209,12 +205,18 @@ export default function LoginPage() {
           return
         }
         const userEmail = session.user.email.toLowerCase()
-        const emp = await findEmployeeByEmail(userEmail)
-        // Limpiamos la sesión Supabase — la app gestiona su propia sesión por PIN
+        await useAppStore.getState().fetchDB()
+        const freshDB = useAppStore.getState().db
+        const emp = (freshDB.employees || []).find(e => e.email?.toLowerCase() === userEmail)
         await authSignOut()
-        if (emp) doLogin(emp)
-        else if (['admin@times-inc.com', 'admin@timesync.app'].includes(userEmail)) doAdminLogin()
-        else setErr('Cuenta no registrada. Contacta al administrador.')
+        if (emp) {
+          if (emp.isAdmin) doAdminLogin()
+          else doLogin(emp)
+        } else if (isAdminEmail(userEmail)) {
+          doAdminLogin()
+        } else {
+          setErr('Cuenta no registrada. Contacta al administrador.')
+        }
         // Limpiar ?auth=google de la URL
         window.history.replaceState({}, '', window.location.pathname)
       }
@@ -259,11 +261,18 @@ export default function LoginPage() {
     try {
       const result = await signInEmail(email, pass)
       const userEmail = result.user?.email
-      const emp = await findEmployeeByEmail(userEmail)
+      await useAppStore.getState().fetchDB()
+      const freshDB = useAppStore.getState().db
+      const emp = (freshDB.employees || []).find(e => e.email?.toLowerCase() === userEmail?.toLowerCase())
       await authSignOut()
-      if (emp) doLogin(emp)
-      else if (['admin@times-inc.com', 'admin@timesync.app'].includes(userEmail?.toLowerCase())) doAdminLogin()
-      else setErr('Tu cuenta no está registrada. Contacta al administrador.')
+      if (emp) {
+        if (emp.isAdmin) doAdminLogin()
+        else doLogin(emp)
+      } else if (isAdminEmail(userEmail)) {
+        doAdminLogin()
+      } else {
+        setErr('Tu cuenta no está registrada. Contacta al administrador.')
+      }
     } catch (ex) {
       setErr(ex.message || 'Error al iniciar sesión')
     }
@@ -304,7 +313,7 @@ export default function LoginPage() {
     const next = logoTaps + 1
     setLogoTaps(next)
     setTimeout(() => setLogoTaps(0), 800)
-    if (next >= 3) { setLogoTaps(0); setShowAdminBtn(true) }
+    if (next >= 3) { setLogoTaps(0); setShowAdminForm(true); setAdminErr('') }
   }
 
   // Soporte de teclado físico para el numpad
@@ -411,7 +420,7 @@ export default function LoginPage() {
               </div>
 
               {/* Biometric login button — shown only when employee selected + credential exists */}
-              {bioAvailable && selectedEmpId && hasBiometric(selectedEmpId) && !showAdminBtn && (
+              {bioAvailable && selectedEmpId && hasBiometric(selectedEmpId) && !showAdminForm && (
                 <button
                   className="login-bio-btn"
                   disabled={bioLoading}
@@ -440,7 +449,7 @@ export default function LoginPage() {
               )}
 
               {/* Biometric register link — offer to enable after employee selection */}
-              {bioAvailable && selectedEmpId && !hasBiometric(selectedEmpId) && !showAdminBtn && (
+              {bioAvailable && selectedEmpId && !hasBiometric(selectedEmpId) && !showAdminForm && (
                 <button
                   className="login-bio-register"
                   disabled={bioRegLoading}
@@ -465,38 +474,36 @@ export default function LoginPage() {
                 </button>
               )}
 
-              {showAdminBtn && generatedPinNotice && (
-                <div style={{ margin:'8px 0', padding:'10px 14px', background:'rgba(245,158,11,.10)', border:'1px solid rgba(245,158,11,.30)', borderRadius:8, fontSize:12, color:'var(--orange)', lineHeight:1.5 }}>
-                  <strong>⚠️ PIN temporal de administrador: {ADMIN_PIN}</strong><br/>
-                  Anótalo y configura <code style={{ fontSize:11 }}>VITE_ADMIN_PIN</code> en producción.
+              {showAdminForm && (
+                <div style={{ margin:'8px 0', background:'var(--bg-600)', border:'1px solid var(--border2)', borderRadius:12, padding:'16px', display:'flex', flexDirection:'column', gap:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>🔐 Acceso de administrador</div>
+                    <button onClick={() => { setShowAdminForm(false); setAdminErr('') }}
+                      style={{ background:'none', border:'none', color:'var(--text4)', cursor:'pointer', fontSize:16, lineHeight:1, padding:'2px 4px' }}>✕</button>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>Usa las credenciales de tu cuenta Supabase con permisos de administrador.</div>
+                  <input
+                    type="email" autoComplete="email" placeholder="Email administrador"
+                    value={adminEmail} onChange={e => { setAdminEmail(e.target.value); setAdminErr('') }}
+                    onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
+                    style={{ padding:'10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+                  <div style={{ position:'relative' }}>
+                    <input
+                      type={adminPassVisible ? 'text' : 'password'} autoComplete="current-password" placeholder="Contraseña"
+                      value={adminPass} onChange={e => { setAdminPass(e.target.value); setAdminErr('') }}
+                      onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
+                      style={{ width:'100%', padding:'10px 36px 10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+                    <button onClick={() => setAdminPassVisible(v => !v)}
+                      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--text4)', cursor:'pointer', padding:2, fontSize:14 }}>
+                      {adminPassVisible ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  {adminErr && <div style={{ fontSize:11, color:'var(--danger)', fontWeight:600 }}>{adminErr}</div>}
+                  <button onClick={doAdminEmailLogin} disabled={adminLoading}
+                    style={{ padding:'11px', borderRadius:8, background:'var(--primary)', color:'#fff', border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', opacity: adminLoading ? .7 : 1 }}>
+                    {adminLoading ? 'Verificando…' : 'Entrar como administrador'}
+                  </button>
                 </div>
-              )}
-              {showAdminBtn && (
-                <button className="login-admin-btn"
-                  onClick={async () => {
-                    const adminLk = getLockoutState('__admin__')
-                    if (adminLk.locked) { setErr(`Bloqueado ${adminLk.remainingMin} min`); return }
-                    if (!pin) { setErr('Introduce el PIN de administrador'); return }
-                    const storedHash = (() => { try { return localStorage.getItem('__admin_pin_hash__') } catch { return null } })()
-                    let ok = false
-                    if (storedHash) {
-                      ok = await verifyPin(pin, storedHash, '__admin__')
-                      if (ok && needsRehash(storedHash)) {
-                        const h = await hashPin(pin, '__admin__')
-                        try { localStorage.setItem('__admin_pin_hash__', h) } catch {}
-                      }
-                    } else {
-                      ok = pin === ADMIN_PIN
-                      if (ok) {
-                        const h = await hashPin(pin, '__admin__')
-                        try { localStorage.setItem('__admin_pin_hash__', h); localStorage.setItem('__admin_pin_len__', String(pin.length)) } catch {}
-                      }
-                    }
-                    if (ok) { clearLockout('__admin__'); try { localStorage.removeItem('__admin_pin_fb_new__') } catch {}; setGeneratedPinNotice(false); doAdminLogin(); setPin('') }
-                    else { recordFailedAttempt('__admin__'); setErr('PIN admin incorrecto') }
-                  }}>
-                  Acceso administrador
-                </button>
               )}
             </div>
           )}
