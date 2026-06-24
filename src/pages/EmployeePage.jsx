@@ -5,6 +5,7 @@ import { today, s2t, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkSta
 import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
+import { PWAInstall } from '../components/PWAInstall.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
@@ -652,15 +653,19 @@ export default function EmployeePage() {
         </div>
       </div>
 
+      <PWAInstall />
       <OfflineBanner />
 
-      {/* Notificaciones push — banner nativo (solo si 'default', no permanente) */}
+      {/* Notificaciones push v3 */}
       {showNotifBanner && (
-        <div style={{ background:'var(--bg-700)', borderBottom:'1px solid var(--border)', padding:'10px 14px', display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary)" strokeWidth="2" style={{ flexShrink:0 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span style={{ flex:1, color:'var(--text-primary)' }}>Activa las notificaciones para recibir avisos importantes</span>
-          <button onClick={handleNotifActivate} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>Activar</button>
-          <button onClick={handleNotifDismiss} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:'4px 6px', fontSize:18, lineHeight:1, flexShrink:0 }} aria-label="Cerrar">×</button>
+        <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(37,99,235,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
+          <div className="v3-notif-banner-icon">🔔</div>
+          <div className="v3-notif-banner-text">
+            <div className="v3-notif-banner-title">Activa las notificaciones</div>
+            <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
+          </div>
+          <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>Activar</button>
+          <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>
         </div>
       )}
 
@@ -724,13 +729,16 @@ export default function EmployeePage() {
   )
 }
 
-// ─── OFFLINE BANNER ────────────────────────────────────────────────────────────
+// ─── OFFLINE BANNER v3 ─────────────────────────────────────────────────────────
 function OfflineBanner() {
   const syncStatus = useAppStore(s => s.syncStatus)
+  const fetchDB    = useAppStore(s => s.fetchDB)
   const [realOffline, setRealOffline] = useState(() => !navigator.onLine)
+  const [lastSync, setLastSync] = useState(null)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
-    const on  = () => setRealOffline(false)
+    const on  = () => { setRealOffline(false); setLastSync(new Date()) }
     const off = () => setRealOffline(true)
     window.addEventListener('online',  on)
     window.addEventListener('offline', off)
@@ -738,10 +746,31 @@ function OfflineBanner() {
   }, [])
 
   if (syncStatus !== 'error' && !realOffline) return null
+
+  const handleRetry = async () => {
+    if (retrying) return
+    setRetrying(true)
+    try { await fetchDB() } catch {}
+    setRetrying(false)
+  }
+
+  const ago = lastSync ? Math.floor((Date.now() - lastSync.getTime()) / 60000) : null
+
   return (
-    <div style={{ background:'linear-gradient(90deg,#ef4444,#dc2626)', color:'#fff', fontSize:12, fontWeight:700, textAlign:'center', padding:'7px 16px', letterSpacing:'.3px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      {realOffline ? 'Sin internet — fichajes guardados localmente' : 'Error de conexión — datos guardados localmente'}
+    <div className="offline-v3">
+      <div className="offline-v3-dot" />
+      <div className="offline-v3-text">
+        <div>{realOffline ? 'Sin conexión' : 'Error de conexión'}</div>
+        <div className="offline-v3-sub">
+          {realOffline ? 'Los fichajes se guardan localmente' : 'Datos guardados localmente'}
+          {ago !== null && ` · Última sync hace ${ago}min`}
+        </div>
+      </div>
+      {!realOffline && (
+        <button className="offline-v3-retry" onClick={handleRetry} disabled={retrying}>
+          {retrying ? '…' : 'Reintentar'}
+        </button>
+      )}
     </div>
   )
 }
@@ -927,7 +956,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
       .filter(r => r.empId === u.id && r.autoClosedAt)
       .sort((a, b) => b.autoClosedAt.localeCompare(a.autoClosedAt))[0] || null
   }, [db.records, u.id])
-  const showAutoCloseWarning = lastAutoClosed &&
+  const [autoCloseDismissed, setAutoCloseDismissed] = useState(false)
+  const showAutoCloseWarning = !autoCloseDismissed && lastAutoClosed &&
     (Date.now() - new Date(lastAutoClosed.autoClosedAt).getTime()) < 24 * 60 * 60 * 1000
 
   const completedSecs = realRecs.filter(r => r.fin && r.closed).reduce((a, r) => a + recWorkSecs(r), 0)
@@ -1110,9 +1140,9 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin / 60).toString().padStart(2, '0')}:${p2(brkMin % 60)}` : '00:00', color: 'var(--orange)', bg: 'var(--orange-dim)' },
             { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m` : '0h 00m', color: 'var(--secondary)', bg: 'rgba(6,182,212,.1)' },
           ].map(({ lbl, val, color, bg }) => (
-            <div key={lbl} className="stat-card-premium" style={{ textAlign: 'center' }}>
-              <div className="stat-lbl">{lbl}</div>
-              <div className="stat-val" style={{ color, fontSize: 14 }}>{val}</div>
+            <div key={lbl} className="stat-card-premium v3-stat-card" style={{ textAlign: 'center' }}>
+              <div className="stat-lbl v3-stat-label">{lbl}</div>
+              <div className="stat-val v3-stat-value" style={{ color, fontSize: 14 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -1123,8 +1153,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Progreso semanal</div>
             <div style={{ fontSize:12, fontWeight:700, color: weekPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(weekMin)} / 40h</div>
           </div>
-          <div className="progress-bar">
-            <div className={`progress-bar-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${weekPct}%` }} />
+          <div className="v3-progress">
+            <div className={`v3-progress-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${Math.min(weekPct, 100)}%` }} />
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
             <span style={{ fontSize:9, color:'var(--text4)' }}>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
@@ -1138,8 +1168,8 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Este mes</div>
             <div style={{ fontSize:12, fontWeight:700, color: monthPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(monthMin)} / 160h</div>
           </div>
-          <div className="progress-bar">
-            <div className={`progress-bar-fill${monthPct >= 100 ? ' green' : ''}`} style={{ width:`${monthPct}%` }} />
+          <div className="v3-progress">
+            <div className={`v3-progress-fill${monthPct >= 100 ? ' green' : monthDeficitMin > 0 ? ' orange' : ''}`} style={{ width:`${Math.min(monthPct, 100)}%` }} />
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
             <span style={{ fontSize:9, color:'var(--text4)' }}>{now.toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</span>
@@ -1183,14 +1213,15 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
 
         {/* Auto-close warning banner */}
         {showAutoCloseWarning && (
-          <div style={{ margin:'8px 16px 0', padding:'10px 14px', background:'rgba(245,158,11,.08)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)', display:'flex', alignItems:'flex-start', gap:10 }}>
-            <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
-            <div>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--orange)' }}>Jornada cerrada automáticamente</div>
-              <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+          <div className="v3-autoclose-warn">
+            <span className="v3-autoclose-warn-icon">⚠️</span>
+            <div className="v3-autoclose-warn-text">
+              <div className="v3-autoclose-warn-title">Jornada cerrada automáticamente</div>
+              <div className="v3-autoclose-warn-sub">
                 Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })} fue cerrada automáticamente por inactividad ({mhm(Math.floor((lastAutoClosed.workSecs||0)/60))}).
               </div>
             </div>
+            <button className="v3-autoclose-warn-close" onClick={() => setAutoCloseDismissed(true)}>×</button>
           </div>
         )}
 
@@ -1278,9 +1309,9 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                     : isDone ? `${mhm(totalMin)} · Finalizado`
                     : 'Sin fichar hoy'
                   return (
-                    <div key={e.id} style={{ background:'var(--bg-600)', border:`1px solid ${isWorking ? 'rgba(54,178,126,.3)' : 'var(--border)'}`, borderRadius:'var(--r)', padding:'10px 12px' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: isWorking || !isDone ? 8 : 0 }}>
-                        <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, transition:'box-shadow .3s', boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
+                    <div key={e.id} className={`v3-team-card${isWorking ? (openRec2?.enDescanso ? ' paused' : ' working') : ''}`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
                         <div style={{ width:32, height:32, borderRadius:9, background: e.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>
                           {e.initials || e.name.slice(0,2).toUpperCase()}
                         </div>
@@ -1292,18 +1323,20 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                       {/* Botones de control — solo si saveDB disponible */}
                       {saveDB && (
                         isWorking ? (
-                          <div style={{ display:'flex', gap:6 }}>
-                            <button onClick={() => teamToggleDescanso(openRec2)} style={{ flex:1, fontSize:10, fontWeight:700, padding:'5px 6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text2)', cursor:'pointer' }}>
+                          <div className="v3-team-card-actions">
+                            <button onClick={() => teamToggleDescanso(openRec2)} className="v3-team-btn">
                               {openRec2?.enDescanso ? '▶ Reanudar' : '⏸ Pausa'}
                             </button>
-                            <button onClick={() => teamForceClose(openRec2)} style={{ flex:1, fontSize:10, fontWeight:700, padding:'5px 6px', borderRadius:6, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.1)', color:'var(--danger)', cursor:'pointer' }}>
+                            <button onClick={() => teamForceClose(openRec2)} className="v3-team-btn danger">
                               ■ Finalizar
                             </button>
                           </div>
                         ) : !isDone ? (
-                          <button onClick={() => teamStartJornada(e)} style={{ width:'100%', fontSize:10, fontWeight:700, padding:'5px 0', borderRadius:6, border:'1px solid rgba(37,99,235,.3)', background:'var(--primary-dim)', color:'var(--primary-light)', cursor:'pointer' }}>
-                            ▶ Iniciar jornada
-                          </button>
+                          <div className="v3-team-card-actions">
+                            <button onClick={() => teamStartJornada(e)} className="v3-team-btn primary" style={{ flex:'none', width:'100%' }}>
+                              ▶ Iniciar jornada
+                            </button>
+                          </div>
                         ) : null
                       )}
                     </div>
