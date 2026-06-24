@@ -9,7 +9,7 @@ import { PWAInstall } from '../components/PWAInstall.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
-import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed, dismissBioOffer, applyBrandColor } from '../utils/webauthn.js'
+import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed, dismissBioOffer, applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 
 // ─── HOOK: reloj en vivo (aislado para no re-renderizar el componente padre) ──
 function useClock() {
@@ -706,7 +706,7 @@ export default function EmployeePage() {
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
         {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-        {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
+{currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
       </div>
 
       {/* Bottom nav */}
@@ -743,6 +743,8 @@ export default function EmployeePage() {
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} />
+      <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
       <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
@@ -1186,10 +1188,31 @@ const ACHIEVEMENTS = [
   { id:'a10', icon:'🌅', title:'Madrugador', desc:'3 veces antes de las 08:00', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=480}).length>=3 },
 ]
 
-function AchievementsSection({ myRecs, streak }) {
+function AchievementsSection({ myRecs, streak, u }) {
   const unlocked = useMemo(() => new Set(ACHIEVEMENTS.filter(a => a.check(myRecs, streak)).map(a => a.id)), [myRecs, streak])
+
+  useEffect(() => {
+    if (!u?.id || unlocked.size === 0) return
+    const key = `achiev_notified_${u.id}`
+    try {
+      const prev = new Set(JSON.parse(localStorage.getItem(key) || '[]'))
+      if (prev.size === 0) { localStorage.setItem(key, JSON.stringify([...unlocked])); return }
+      const newOnes = ACHIEVEMENTS.filter(a => unlocked.has(a.id) && !prev.has(a.id))
+      if (newOnes.length > 0) {
+        newOnes.forEach(a => {
+          try {
+            if (Notification.permission === 'granted') {
+              new Notification(`🏆 ¡Logro desbloqueado! ${a.icon} ${a.title}`, { body: a.desc, icon: '/pwa-192x192.png' })
+            }
+          } catch {}
+        })
+        localStorage.setItem(key, JSON.stringify([...unlocked]))
+      }
+    } catch {}
+  }, [unlocked, u?.id])
+
   return (
-    <div style={{ margin:'0 16px 16px' }}>
+    <div style={{ padding:'0 16px 16px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
         <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px' }}>Logros</div>
         <div style={{ fontSize:11, color:'var(--text4)' }}>{unlocked.size}/{ACHIEVEMENTS.length} desbloqueados</div>
@@ -1466,28 +1489,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           </div>
         </div>
 
-        {/* ── Comparativa semana a semana ─────────────────────────────── */}
-        {(weekMin > 0 || lastWeekMin > 0) && (
-          <div className="v3-compare-card">
-            <div className="v3-compare-title">Comparativa semanal</div>
-            {[{ label:'Sem. anterior', mins: lastWeekMin }, { label:'Esta semana', mins: weekMin }].map(({ label, mins }) => {
-              const pct = Math.min(100, mins / Math.max(lastWeekMin, weekMin, WK) * 100)
-              return (
-                <div key={label} className="v3-compare-row">
-                  <div className="v3-compare-lbl">{label}</div>
-                  <div className="v3-compare-track">
-                    <div className="v3-compare-fill" style={{ width:`${pct}%` }} />
-                  </div>
-                  <div className="v3-compare-val">{mhm(mins)}</div>
-                </div>
-              )
-            })}
-            {lastWeekMin > 0 && weekMin !== lastWeekMin && (() => {
-              const diff = weekMin - lastWeekMin
-              return <div className="v3-compare-delta" style={{ color: diff > 0 ? 'var(--green)' : 'var(--orange)' }}>{diff > 0 ? '+' : ''}{mhm(Math.abs(diff))} {diff > 0 ? 'más' : 'menos'} que la semana pasada</div>
-            })()}
-          </div>
-        )}
 
         {/* Monthly progress bar */}
         <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
@@ -1590,19 +1591,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           </div>
         )}
 
-        {/* Vacation balance */}
-        {vac && vac.available > 0 && (
-          <div onClick={() => setEmpTab('vacaciones')} style={{ margin:'-4px 16px 8px', padding:'10px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>🌴</span>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700 }}>{vac.available} días de vacaciones disponibles</div>
-              <div style={{ fontSize:10, color:'var(--text3)', marginTop:1 }}>
-                {vac.used > 0 ? `${vac.used} usados · ` : ''}{vac.pending > 0 ? `${vac.pending} pendientes · ` : ''}generados: {vac.generated}d en {vac.months} meses
-              </div>
-            </div>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-        )}
 
         {/* Documentos pendientes de firma */}
         {pendingDocs.length > 0 && (
@@ -2964,55 +2952,6 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
 
       </div>
 
-      {/* ── Logros ────────────────────────────────────────────────── */}
-      <AchievementsSection myRecs={myRecs} streak={streak} />
-
-      {/* ── Mi actividad — heatmap ─────────────────────────────────── */}
-      <div style={{ margin:'0 16px 16px' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
-        <WorkHeatmap records={db.records} empId={u.id} />
-      </div>
-
-      {/* ── Color de acento personal ───────────────────────────────── */}
-      <div style={{ margin:'0 16px 16px' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi color personal</div>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-          {ACCENT_PRESETS.map(c => (
-            <div key={c} onClick={() => saveAccentColor(u.accentColor === c ? null : c)}
-              style={{ width:26, height:26, borderRadius:'50%', background:c, cursor:'pointer', flexShrink:0,
-                border: u.accentColor === c ? '2px solid var(--text)' : '2px solid transparent',
-                transform: u.accentColor === c ? 'scale(1.25)' : 'scale(1)',
-                transition:'transform .15s, border-color .15s' }} />
-          ))}
-          <label style={{ width:26, height:26, borderRadius:'50%', overflow:'hidden', cursor:'pointer', flexShrink:0, border:'1px dashed var(--border2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }} title="Color personalizado">
-            🎨
-            <input type="color" value={u.accentColor||'#5E6AD2'} onChange={e => saveAccentColor(e.target.value)} style={{ opacity:0, position:'absolute', width:1, height:1 }} />
-          </label>
-        </div>
-        {u.accentColor && (
-          <button onClick={() => saveAccentColor(null)} style={{ marginTop:8, fontSize:11, color:'var(--text4)', background:'none', border:'none', cursor:'pointer', padding:0 }}>
-            Restaurar color por defecto
-          </button>
-        )}
-      </div>
-
-      {/* ── Recordatorio de fichaje ────────────────────────────────── */}
-      <div style={{ margin:'0 16px 16px' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Recordatorio de fichaje</div>
-        <div style={{ padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', display:'flex', alignItems:'center', gap:12 }}>
-          <span style={{ fontSize:20 }}>⏰</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>Avísame si a las… no he fichado</div>
-            <input type="time" value={u.reminderTime || ''} onChange={e => saveReminderTime(e.target.value)}
-              style={{ fontSize:14, fontWeight:700, background:'none', border:'none', color:'var(--primary-light)', padding:0, fontFamily:'inherit', cursor:'pointer' }} />
-          </div>
-          {u.reminderTime && (
-            <button onClick={() => saveReminderTime('')} style={{ fontSize:14, color:'var(--text4)', background:'none', border:'none', cursor:'pointer', padding:4 }}>✕</button>
-          )}
-        </div>
-        <div style={{ fontSize:10, color:'var(--text4)', marginTop:6 }}>Necesitas tener notificaciones activadas para recibir el aviso.</div>
-      </div>
-
       {/* Cierres mensuales pendientes de firma */}
       {(() => {
         const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
@@ -3033,6 +2972,8 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
         {[
           { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>openModal('infoPersonal') },
           { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', badge: pendingDocs, onClick:()=>openModal('documentos') },
+          { icon:<><circle cx="12" cy="8" r="6"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></>, label:'Logros', color:'rgba(245,158,11,.12)', stroke:'#f59e0b', onClick:()=>openModal('logros') },
+          { icon:<><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></>, label:'Temas', color:'rgba(139,92,246,.12)', stroke:'#8b5cf6', onClick:()=>openModal('temas') },
           { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>openModal('configuracion') },
           { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign'), noFirma: !db.firmas?.[u?.id]?.main },
         ].map(({ icon, label, color, stroke, onClick, badge, noFirma }) => (
@@ -3058,6 +2999,94 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
         </div>
       </div>
     </PullToRefresh>
+  )
+}
+
+// ─── ModalLogros ───────────────────────────────────────────────────────────────
+function ModalLogros({ visible, db, u, onClose }) {
+  useModalBack(visible, onClose)
+  if (!visible) return null
+  const myRecs = (db.records || []).filter(r => r.empId === u.id && r.fin)
+  const todayStr = today()
+  const dayMap = {}
+  myRecs.forEach(r => { if (!r.inicio) return; const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
+  let streak = 0
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    const ds = d.toISOString().slice(0,10)
+    if (ds === todayStr && !dayMap[ds]) continue
+    if (dayMap[ds]) streak++; else break
+  }
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', flexDirection:'column', background:'var(--bg-800)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 12px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:4, display:'flex' }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>Logros</div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+        <div style={{ padding:'16px 0' }}>
+          <AchievementsSection myRecs={myRecs} streak={streak} u={u} />
+          <div style={{ padding:'0 16px 16px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
+            <WorkHeatmap records={db.records} empId={u.id} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── ModalTemas ────────────────────────────────────────────────────────────────
+function ModalTemas({ visible, db, u, onClose, saveDB }) {
+  useModalBack(visible, onClose)
+  if (!visible) return null
+  const saveAccentColor = (color) => {
+    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, accentColor: color || undefined } : e)
+    saveDB({ employees: emps2 })
+    if (color) applyBrandColor(color); else removeBrandColor()
+  }
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', flexDirection:'column', background:'var(--bg-800)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 12px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:4, display:'flex' }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>Temas</div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'20px 16px' }}>
+        <div style={{ fontSize:12, color:'var(--text3)', marginBottom:24 }}>Personaliza el aspecto de la app</div>
+
+        <div style={{ background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'18px' }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:4 }}>Mi color personal</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:18 }}>Se aplica en botones, iconos y acentos de toda la app</div>
+          <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+            {ACCENT_PRESETS.map(c => (
+              <div key={c} onClick={() => saveAccentColor(u.accentColor === c ? null : c)}
+                style={{ width:36, height:36, borderRadius:'50%', background:c, cursor:'pointer', flexShrink:0,
+                  border: u.accentColor === c ? '3px solid var(--text)' : '3px solid transparent',
+                  transform: u.accentColor === c ? 'scale(1.2)' : 'scale(1)',
+                  transition:'transform .15s, border-color .15s',
+                  boxShadow: u.accentColor === c ? `0 0 0 2px var(--bg-700), 0 0 12px ${c}80` : 'none' }} />
+            ))}
+            <label style={{ width:36, height:36, borderRadius:'50%', overflow:'hidden', cursor:'pointer', flexShrink:0,
+              border:'2px dashed var(--border2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}
+              title="Color personalizado">
+              🎨
+              <input type="color" value={u.accentColor||'#5E6AD2'} onChange={e => saveAccentColor(e.target.value)}
+                style={{ opacity:0, position:'absolute', width:1, height:1 }} />
+            </label>
+          </div>
+          {u.accentColor && (
+            <button onClick={() => saveAccentColor(null)}
+              style={{ marginTop:16, fontSize:12, color:'var(--text4)', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+              ↩ Restaurar color por defecto
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -3784,8 +3813,8 @@ function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
           </div>
         </div>
         <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontSize:14, color:'var(--text)', marginBottom:4 }}>Recordatorio de entrada</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Avisa si no has fichado a esta hora</div>
+          <div style={{ fontSize:14, color:'var(--text)', marginBottom:4 }}>Recordatorio de fichaje</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>Te avisa si no has fichado entrada a esta hora</div>
           <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
             style={{ padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-700)', color:'var(--text)', fontSize:14 }} />
         </div>
