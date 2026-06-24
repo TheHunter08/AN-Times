@@ -129,7 +129,7 @@ module.exports = async function handler(req, res) {
       // ── 1. Recordatorio de fichaje ──────────────────────────────────────────
       // Dispara si: no ha fichado hoy + hora >= reminderTime del empleado
       {
-        const remTime = emp.reminderTime || '20:00'
+        const remTime = emp.reminderTime || '08:30'
         const [rh, rm] = remTime.split(':').map(Number)
         const key = 'an_rem_' + emp.id
         if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {

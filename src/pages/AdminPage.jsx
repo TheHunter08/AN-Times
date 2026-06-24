@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
 import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
-import { WD, WK, ADMIN_PIN, VAPID_PUB } from '../config/constants.js'
+import { WD, WK, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
@@ -830,7 +830,7 @@ function LiveTimerCell({ rec }) {
 }
 
 // Componente de tarjeta con su propio tick — evita re-render de toda la grid cada 5s
-function CtrlCard({ e, live, todayMin, force }) {
+function CtrlCard({ e, live, todayMin, force, startJornada, toggleDescanso }) {
   const [, setTick] = useState(0)
   useEffect(() => {
     const iv = setInterval(() => setTick(t => t + 1), 5000)
@@ -891,9 +891,16 @@ function CtrlCard({ e, live, todayMin, force }) {
           </div>
         )}
       </div>
-      {live && (
-        <button className="btn btn-sm btn-danger" style={{ width:'100%', fontSize:11 }} onClick={() => force(live)}>
-          Forzar cierre
+      {live ? (
+        <div style={{ display:'flex', gap:6 }}>
+          <button className="btn btn-sm btn-secondary" style={{ flex:1, fontSize:11 }} onClick={() => toggleDescanso(live)}>
+            {live.enDescanso ? '▶ Continuar' : '⏸ Pausa'}
+          </button>
+          <button className="btn btn-sm btn-danger" style={{ flex:1, fontSize:11 }} onClick={() => force(live)}>■ Fin</button>
+        </div>
+      ) : (
+        <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>
+          ▶ Iniciar jornada
         </button>
       )}
     </div>
@@ -918,6 +925,33 @@ function PanelControl({ db, toast, saveDB, session }) {
     return map
   }, [recs])
 
+  const adminName = session?.user?.name || 'Admin'
+
+  const startJornada = (e) => {
+    if (liveRecs.find(r => r.empId === e.id)) { toast('Ya tiene jornada abierta', 3000, 'warn'); return }
+    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: adminName }
+    const withAudit = auditLog(db, 'Jornada iniciada por admin', e.name, adminName)
+    saveDB({ records: [...recs, newRec], audit: withAudit.audit })
+    queuePush(e.id, '▶ Jornada iniciada', `${adminName} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
+    toast(`Jornada iniciada — ${e.name.split(' ')[0]}`, 3000, 'ok')
+  }
+
+  const toggleDescanso = (rec) => {
+    const now = new Date().toISOString()
+    let updated
+    if (rec.enDescanso) {
+      const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
+      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+      queuePush(rec.empId, '▶ Descanso finalizado', `${adminName} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
+      toast('Descanso finalizado', 3000, 'ok')
+    } else {
+      updated = { ...rec, enDescanso: true, bStartTs: now }
+      queuePush(rec.empId, '⏸ Descanso iniciado', `${adminName} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
+      toast('Descanso iniciado', 3000, 'ok')
+    }
+    saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+  }
+
   const force = (rec) => {
     const workedMin = Math.floor((Date.now() - new Date(rec.inicio).getTime()) / 60000)
     const warnMsg = workedMin < 5 ? ` ⚠️ Solo lleva ${workedMin} min trabajando.` : ''
@@ -927,9 +961,9 @@ function PanelControl({ db, toast, saveDB, session }) {
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
       const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-      const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, session?.user?.name || 'Admin')
+      const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, adminName)
       saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
-      queuePush(rec.empId, '⏱️ Jornada cerrada', `Administración ha cerrado tu jornada abierta (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
+      queuePush(rec.empId, '⏱️ Jornada cerrada', `${adminName} ha cerrado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
       toast('Jornada cerrada forzosamente', 3000, 'ok')
     })
   }
@@ -970,6 +1004,8 @@ function PanelControl({ db, toast, saveDB, session }) {
               live={liveRecs.find(r => r.empId === e.id)}
               todayMin={todayMinMap[e.id] || 0}
               force={force}
+              startJornada={startJornada}
+              toggleDescanso={toggleDescanso}
             />
           ))}
         </div>
@@ -999,7 +1035,16 @@ function PanelControl({ db, toast, saveDB, session }) {
                       {live ? <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>{live.enDescanso?'⏸ Descanso':'▶ Trabajando'}</span>
                              : <span className="badge">Libre</span>}
                     </td>
-                    <td>{live && <button className="btn btn-sm btn-danger" onClick={() => force(live)}>Cerrar</button>}</td>
+                    <td>
+                      {live ? (
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button className="btn btn-sm btn-secondary" style={{ fontSize:11 }} onClick={() => toggleDescanso(live)}>{live.enDescanso ? '▶' : '⏸'}</button>
+                          <button className="btn btn-sm btn-danger" style={{ fontSize:11 }} onClick={() => force(live)}>■ Fin</button>
+                        </div>
+                      ) : (
+                        <button className="btn btn-sm btn-primary" style={{ fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar</button>
+                      )}
+                    </td>
                   </tr>
                 )
               })}

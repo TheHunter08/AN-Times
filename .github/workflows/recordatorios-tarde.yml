@@ -1,0 +1,33 @@
+name: Recordatorios tarde/noche
+
+# Cubre los huecos del cron de Vercel (solo 1/día en plan Hobby).
+# Llama al endpoint cron-reminders a las horas clave de la tarde:
+#   - 14:00 UTC = ~16h Madrid verano / ~15h invierno (jornada larga, salida olvidada)
+#   - 18:00 UTC = ~20h Madrid verano / ~19h invierno (recordatorio de fichaje tarde, salida olvidada)
+#   - 20:00 UTC = ~22h Madrid verano / ~21h invierno (último aviso salida olvidada)
+
+on:
+  schedule:
+    - cron: '0 14 * * *'
+    - cron: '0 18 * * *'
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  recordatorios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Llamar cron recordatorios
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "$VERCEL_APP_URL/api/cron-reminders" \
+            -H "Authorization: Bearer $CRON_SECRET")
+          echo "Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Error: cron returned $STATUS"
+            exit 1
+          fi
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          CRON_SECRET:    ${{ secrets.CRON_SECRET }}

@@ -187,7 +187,7 @@ export default function EmployeePage() {
       const now = new Date()
       const [rh, rm] = u.reminderTime.split(':').map(Number)
       if (now.getHours() * 60 + now.getMinutes() < rh * 60 + rm) return
-      const todayStr = now.toISOString().slice(0, 10)
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
       const worked = (dbRef.current?.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
       if (worked) return
       const key = `rem_${u.id}_${todayStr}`
