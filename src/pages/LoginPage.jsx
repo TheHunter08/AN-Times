@@ -387,37 +387,71 @@ export default function LoginPage() {
                 </select>
               </div>
 
-              <div className="login-pin-label">Introduce tu PIN</div>
-
-              <div className={`login-dots${shaking ? ' shake' : ''}`} role="status" aria-label={`PIN: ${pin.length} de 4 dígitos`}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className={`login-dot${i < pin.length ? ' filled' : ''}${shaking ? ' error' : ''}`} />
-                ))}
-              </div>
-
-              {err && <div className="login-err" role="alert">{err}</div>}
-
-              <div className="login-numpad" role="group" aria-label="Teclado numérico">
-                {KEYS.map((k, idx) => (
-                  <button key={idx}
-                    className={`login-key${k === '⌫' ? ' login-key-del' : ''}${k === '' ? ' login-key-empty' : ''}`}
-                    onClick={() => k === '⌫' ? handlePinDel() : k !== '' ? handlePin(k) : null}
-                    disabled={k === ''}
-                    aria-label={k === '⌫' ? 'Borrar' : k === '' ? '' : `Tecla ${k}`}>
-                    {k === '⌫' ? (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-                        <line x1="18" y1="9" x2="12" y2="15" /><line x1="12" y1="9" x2="18" y2="15" />
-                      </svg>
-                    ) : k === '' ? '' : (
-                      <>
-                        <span className="login-key-num">{k}</span>
-                        {KEY_LABELS[k] && <span className="login-key-letters">{KEY_LABELS[k]}</span>}
-                      </>
-                    )}
+              {showAdminForm ? (
+                <div style={{ margin:'8px 0', background:'var(--bg-600)', border:'1px solid var(--border2)', borderRadius:12, padding:'16px', display:'flex', flexDirection:'column', gap:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>🔐 Acceso de administrador</div>
+                    <button onClick={() => { setShowAdminForm(false); setAdminErr('') }}
+                      style={{ background:'none', border:'none', color:'var(--text4)', cursor:'pointer', fontSize:16, lineHeight:1, padding:'2px 4px' }}>✕</button>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>Usa las credenciales de tu cuenta Supabase con permisos de administrador.</div>
+                  <input
+                    type="email" autoComplete="email" placeholder="Email administrador"
+                    value={adminEmail} onChange={e => { setAdminEmail(e.target.value); setAdminErr('') }}
+                    onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
+                    style={{ padding:'10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+                  <div style={{ position:'relative' }}>
+                    <input
+                      type={adminPassVisible ? 'text' : 'password'} autoComplete="current-password" placeholder="Contraseña"
+                      value={adminPass} onChange={e => { setAdminPass(e.target.value); setAdminErr('') }}
+                      onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
+                      style={{ width:'100%', padding:'10px 36px 10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+                    <button onClick={() => setAdminPassVisible(v => !v)}
+                      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--text4)', cursor:'pointer', padding:2, fontSize:14 }}>
+                      {adminPassVisible ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  {adminErr && <div style={{ fontSize:11, color:'var(--danger)', fontWeight:600 }}>{adminErr}</div>}
+                  <button onClick={doAdminEmailLogin} disabled={adminLoading}
+                    style={{ padding:'11px', borderRadius:8, background:'var(--primary)', color:'#fff', border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', opacity: adminLoading ? .7 : 1 }}>
+                    {adminLoading ? 'Verificando…' : 'Entrar como administrador'}
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <>
+                <div className="login-pin-label">Introduce tu PIN</div>
+
+                <div className={`login-dots${shaking ? ' shake' : ''}`} role="status" aria-label={`PIN: ${pin.length} de 4 dígitos`}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className={`login-dot${i < pin.length ? ' filled' : ''}${shaking ? ' error' : ''}`} />
+                  ))}
+                </div>
+
+                {err && <div className="login-err" role="alert">{err}</div>}
+
+                <div className="login-numpad" role="group" aria-label="Teclado numérico">
+                  {KEYS.map((k, idx) => (
+                    <button key={idx}
+                      className={`login-key${k === '⌫' ? ' login-key-del' : ''}${k === '' ? ' login-key-empty' : ''}`}
+                      onClick={() => k === '⌫' ? handlePinDel() : k !== '' ? handlePin(k) : null}
+                      disabled={k === ''}
+                      aria-label={k === '⌫' ? 'Borrar' : k === '' ? '' : `Tecla ${k}`}>
+                      {k === '⌫' ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                          <line x1="18" y1="9" x2="12" y2="15" /><line x1="12" y1="9" x2="18" y2="15" />
+                        </svg>
+                      ) : k === '' ? '' : (
+                        <>
+                          <span className="login-key-num">{k}</span>
+                          {KEY_LABELS[k] && <span className="login-key-letters">{KEY_LABELS[k]}</span>}
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                </>
+              )}
 
               {/* Biometric login button — shown only when employee selected + credential exists */}
               {bioAvailable && selectedEmpId && hasBiometric(selectedEmpId) && !showAdminForm && (
@@ -474,37 +508,6 @@ export default function LoginPage() {
                 </button>
               )}
 
-              {showAdminForm && (
-                <div style={{ margin:'8px 0', background:'var(--bg-600)', border:'1px solid var(--border2)', borderRadius:12, padding:'16px', display:'flex', flexDirection:'column', gap:10 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>🔐 Acceso de administrador</div>
-                    <button onClick={() => { setShowAdminForm(false); setAdminErr('') }}
-                      style={{ background:'none', border:'none', color:'var(--text4)', cursor:'pointer', fontSize:16, lineHeight:1, padding:'2px 4px' }}>✕</button>
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text3)' }}>Usa las credenciales de tu cuenta Supabase con permisos de administrador.</div>
-                  <input
-                    type="email" autoComplete="email" placeholder="Email administrador"
-                    value={adminEmail} onChange={e => { setAdminEmail(e.target.value); setAdminErr('') }}
-                    onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
-                    style={{ padding:'10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none' }} />
-                  <div style={{ position:'relative' }}>
-                    <input
-                      type={adminPassVisible ? 'text' : 'password'} autoComplete="current-password" placeholder="Contraseña"
-                      value={adminPass} onChange={e => { setAdminPass(e.target.value); setAdminErr('') }}
-                      onKeyDown={e => e.key === 'Enter' && doAdminEmailLogin()}
-                      style={{ width:'100%', padding:'10px 36px 10px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg-700)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
-                    <button onClick={() => setAdminPassVisible(v => !v)}
-                      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--text4)', cursor:'pointer', padding:2, fontSize:14 }}>
-                      {adminPassVisible ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                  {adminErr && <div style={{ fontSize:11, color:'var(--danger)', fontWeight:600 }}>{adminErr}</div>}
-                  <button onClick={doAdminEmailLogin} disabled={adminLoading}
-                    style={{ padding:'11px', borderRadius:8, background:'var(--primary)', color:'#fff', border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', opacity: adminLoading ? .7 : 1 }}>
-                    {adminLoading ? 'Verificando…' : 'Entrar como administrador'}
-                  </button>
-                </div>
-              )}
             </div>
           )}
 

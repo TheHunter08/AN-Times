@@ -92,6 +92,6 @@ export const INITIAL_DB = {
   correccionesFichaje: [],
   chats: [],
   notisSent: {},
-  config: {},
+  config: { adminEmails: ['ismael.angeles.c@live.com'] },
   _ts: 0
 }
