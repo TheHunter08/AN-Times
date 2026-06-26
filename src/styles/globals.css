@@ -2654,6 +2654,9 @@ td span[title="Click para editar"]:hover {
   .stat-mini-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── v4 KPI horizontal scroll ─────────────────────────────────── */
+.v4-kpi-scroll::-webkit-scrollbar { display: none; }
+
 /* ── Sol-card pending: urgent pulsing border ────────────────── */
 @keyframes pendingBorderPulse {
   0%, 100% { border-left-color: var(--orange); }

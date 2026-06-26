@@ -1490,6 +1490,25 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             {timer.state === 'idle' ? 'Sin jornada activa' : timer.state === 'break' ? 'En descanso' : 'Jornada activa'}
           </div>
 
+          {/* v4: pills de estado */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10, marginBottom:2 }}>
+            {timer.state !== 'idle' && (
+              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background: timer.state === 'break' ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)', color: timer.state === 'break' ? 'var(--orange)' : 'var(--green)', border:`1px solid ${timer.state === 'break' ? 'rgba(245,158,11,.2)' : 'rgba(16,185,129,.2)'}` }}>
+                {timer.state === 'break' ? '⏸ En descanso' : '● Jornada activa'}
+              </span>
+            )}
+            {openRec?.centro && (
+              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background:'var(--primary-dim)', color:'var(--primary-light)', border:'1px solid var(--primary-glow)' }}>
+                {openRec.centro}
+              </span>
+            )}
+            {timer.state === 'break' && brkMin > 20 && (
+              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background:'rgba(239,68,68,.1)', color:'var(--danger)', border:'1px solid rgba(239,68,68,.2)' }}>
+                ⚠ {brkMin}min descanso
+              </span>
+            )}
+          </div>
+
           <div className="hero-hours-row">
             <div className="hero-hour-pill">
               <div className="hero-hour-label">Trabajado</div>
@@ -1549,11 +1568,19 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
               if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
               handleMainBtn()
             }}>
-            {timer.state === 'idle'
-              ? '▶  Iniciar jornada'
-              : timer.state === 'break'
-                ? '⏹  Terminar jornada'
-                : '⏹  Registrar salida'}
+            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
+              {timer.state === 'idle' ? '▶' : '■'}
+            </div>
+            <div style={{ textAlign:'left' }}>
+              <div>
+                {timer.state === 'idle' ? 'Iniciar jornada' : timer.state === 'break' ? 'Terminar jornada' : 'Registrar salida'}
+              </div>
+              <div style={{ fontSize:11, fontWeight:500, opacity:.75, marginTop:2 }}>
+                {timer.state === 'idle'
+                  ? 'Toca para comenzar tu día'
+                  : `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m trabajadas${openRec?.breaks?.length ? ` · ${openRec.breaks.length} descanso${openRec.breaks.length !== 1 ? 's' : ''}` : ''}`}
+              </div>
+            </div>
           </button>
           {showTip && timer.state === 'idle' && (
             <div style={{ marginTop:10, padding:'9px 14px', background:'var(--primary)', color:'#fff', borderRadius:10, fontSize:12, fontWeight:600, textAlign:'center', boxShadow:'0 4px 14px rgba(108,99,255,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
@@ -1572,17 +1599,20 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           )}
         </div>
 
-        {/* Stats grid */}
-        <div className="stat-mini-grid">
+        {/* v4: KPI horizontal scroll */}
+        <div style={{ display:'flex', gap:10, padding:'0 16px 4px', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}
+          className="v4-kpi-scroll">
           {[
-            { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color: 'var(--primary-light)', bg: 'rgba(37,99,235,.12)' },
-            { lbl: 'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color: 'var(--green)', bg: 'var(--green-dim)' },
-            { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin / 60).toString().padStart(2, '0')}:${p2(brkMin % 60)}` : '00:00', color: 'var(--orange)', bg: 'var(--orange-dim)' },
-            { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m` : '0h 00m', color: 'var(--secondary)', bg: 'rgba(6,182,212,.1)' },
-          ].map(({ lbl, val, color, bg }) => (
-            <div key={lbl} className="stat-card-premium v3-stat-card" style={{ textAlign: 'center' }}>
-              <div className="stat-lbl v3-stat-label">{lbl}</div>
-              <div className="stat-val v3-stat-value" style={{ color, fontSize: 14 }}>{val}</div>
+            { lbl:'Entrada',  val: entradaRec ? ftime(entradaRec.inicio) : '- -', color:'var(--primary-light)', trend: entradaRec ? 'Hora de entrada' : 'Sin fichar hoy' },
+            { lbl:'Hoy',      val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--text1)', trend: brkMin > 0 ? `${Math.floor(brkMin/60)}h ${p2(brkMin%60)}m pausa` : 'Sin pausas' },
+            { lbl:'Semana',   val: mhm(weekMin), color: weekPct >= 100 ? 'var(--green)' : 'var(--text1)', trend: weekPct >= 100 ? '✓ 40h' : `${100 - weekPct}% restante` },
+            { lbl:'Mes',      val: mhm(monthMin), color: monthPct >= 100 ? 'var(--green)' : 'var(--text1)', trend: monthExtraMin > 0 ? `+${mhm(monthExtraMin)} extra` : monthDeficitMin > 0 ? `−${mhm(monthDeficitMin)} déficit` : `${monthPct}%` },
+            ...(extraMin > 0 ? [{ lbl:'Extras hoy', val:`+${Math.floor(extraMin/60)}h ${p2(extraMin%60)}m`, color:'var(--accent3)', trend:'Por encima del objetivo' }] : []),
+          ].map(({ lbl, val, color, trend }) => (
+            <div key={lbl} style={{ flexShrink:0, background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:14, padding:'11px 14px', minWidth:100 }}>
+              <div style={{ fontSize:9, color:'var(--text4)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{lbl}</div>
+              <div style={{ fontSize:17, fontWeight:800, color, fontVariantNumeric:'tabular-nums', lineHeight:1 }}>{val}</div>
+              <div style={{ fontSize:9, color:'var(--text4)', marginTop:4, fontWeight:600 }}>{trend}</div>
             </div>
           ))}
         </div>
@@ -1666,25 +1696,6 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
             </div>
           )}
 
-        </div>
-
-        {/* ─── Acciones rápidas ────────────────────────────────────────────── */}
-        <div style={{ padding:'0 16px 4px' }}>
-          <div className="sec-label" style={{ marginBottom:8 }}>Acciones rápidas</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
-            {[
-              { icon:<path d="M9 11l3 3L22 4"/>, label:'Mi jornada', action:() => setEmpTab('jornada') },
-              { icon:<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>, label:'Vacaciones', action:() => setEmpTab('vacaciones') },
-              { icon:<><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>, label:'Calendario', action:() => setEmpTab('calendario') },
-            ].map(({ icon, label, action }) => (
-              <button key={label} onClick={action} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, padding:'12px 8px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', color:'var(--text2)', fontSize:11, fontWeight:700, WebkitTapHighlightColor:'transparent', transition:'background .15s' }}
-                onMouseEnter={e => e.currentTarget.style.background='var(--bg-500)'}
-                onMouseLeave={e => e.currentTarget.style.background='var(--bg-600)'}>
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--primary-light)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Biometric offer bottom sheet */}
