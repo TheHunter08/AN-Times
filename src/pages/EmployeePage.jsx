@@ -88,8 +88,9 @@ function useSignatureCanvas() {
 
   const clearCanvas = useCallback(() => {
     const c = canvasRef.current; if (!c) return
-    c.getContext('2d').fillStyle = '#0D1218'
-    c.getContext('2d').fillRect(0, 0, c.width, c.height)
+    const ctx = c.getContext('2d')
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-700').trim() || '#0D1218'
+    ctx.fillRect(0, 0, c.width, c.height)
   }, [])
 
   const initCanvas = useCallback(() => clearCanvas(), [clearCanvas])
@@ -100,7 +101,7 @@ function useSignatureCanvas() {
     if (!Array.from(pixels).some((v, i) => i % 4 !== 3 && v > 30)) return null
     const small = document.createElement('canvas'); small.width = 320; small.height = 120
     const ctx2 = small.getContext('2d')
-    ctx2.fillStyle = '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
+    ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-700').trim() || '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
     ctx2.drawImage(c, 0, 0, 320, 120)
     return small.toDataURL('image/jpeg', 0.7)
   }, [])
@@ -134,6 +135,9 @@ export default function EmployeePage() {
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   const dbRef = useRef(db)
   const geoAbortRef = useRef(false)
+  const startingRef = useRef(false)
+  const breakingRef = useRef(false)
+  const notisRunningRef = useRef(false)
   useEffect(() => { dbRef.current = db }, [db])
 
   // ── Notification permission banner (global, all tabs) ─────────────────────────
@@ -280,12 +284,21 @@ export default function EmployeePage() {
     }
   }, [setEmpTab])
 
-  // Manejar shortcuts del manifest PWA (?tab=inicio|jornada|vacaciones|calendario|perfil)
+  // Manejar shortcuts del manifest PWA (?tab=...) y deep links de notificaciones (?go=emp:vacaciones)
   useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get('tab')
-    if (tab && ['inicio','jornada','vacaciones','calendario','mensajes','perfil'].includes(tab)) {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    const go = params.get('go')
+    const VALID = ['inicio','jornada','vacaciones','calendario','mensajes','perfil']
+    if (tab && VALID.includes(tab)) {
       setEmpTab(tab)
       window.history.replaceState({}, '', window.location.pathname)
+    } else if (go?.startsWith('emp:')) {
+      const target = go.slice(4)
+      if (VALID.includes(target)) {
+        setEmpTab(target)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
     }
   }, [])
 
@@ -296,6 +309,8 @@ export default function EmployeePage() {
     // Bug fix #8: claves de notificaciones en db.notisSent (sincronizado entre dispositivos)
     const checkSmartNotis = () => {
       if (!('Notification' in window) || Notification.permission !== 'granted') return
+      if (notisRunningRef.current) return
+      notisRunningRef.current = true
       const now = new Date()
       const todayStr = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`
       const hh = now.getHours()
@@ -503,6 +518,7 @@ export default function EmployeePage() {
         if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
         saveDB(partial)
       }
+      notisRunningRef.current = false
     }
 
     const iv = setInterval(checkSmartNotis, 60000)
@@ -529,6 +545,9 @@ export default function EmployeePage() {
   // === TIMER ACTIONS ===
   const doStart = () => {
     if (timer.state !== 'idle') return
+    if (activeModal === 'selCentro' || startingRef.current) return
+    startingRef.current = true
+    setTimeout(() => { startingRef.current = false }, 10000)
     const cs = db.centrosTrabajo || []
     openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
     // Get GPS — geoAbortRef discards the result if modal is closed before it resolves
@@ -553,6 +572,7 @@ export default function EmployeePage() {
   }
 
   const confirmarCentro = useCallback((centro) => {
+    startingRef.current = false
     if (!centro) { toast('Selecciona un centro de trabajo'); return }
     geoAbortRef.current = true
     setGpsStatus('idle')
@@ -618,8 +638,11 @@ export default function EmployeePage() {
   }, [db, openRec, saveDB, toast, showConfirm])
 
   const doBreak = useCallback(() => {
+    if (breakingRef.current) return
+    breakingRef.current = true
+    setTimeout(() => { breakingRef.current = false }, 2000)
     const o = openRec()
-    if (!o) return
+    if (!o) { breakingRef.current = false; return }
     const now = new Date().toISOString()
     let updated
     if (o.enDescanso) {

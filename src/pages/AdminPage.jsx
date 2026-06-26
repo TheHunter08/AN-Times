@@ -727,13 +727,16 @@ function ComunicadoWidget({ db, toast, saveDB }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
 
   const send = async () => {
     if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
+    setSending(true)
     const msg = { id: gid(), from: 'admin', title: title.trim(), body: body.trim(), to: 'all', ts: new Date().toISOString() }
     saveDB({ mensajes: [...(db.mensajes||[]), msg] })
     await queuePush('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/?tab=inicio')
     toast('Comunicado enviado a todos los empleados', 3000, 'ok')
+    setSending(false)
     setTitle(''); setBody(''); setOpen(false)
   }
 
@@ -753,7 +756,7 @@ function ComunicadoWidget({ db, toast, saveDB }) {
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
           <textarea placeholder="Mensaje para todos los empleados..." value={body} onChange={e => setBody(e.target.value)} rows={3}
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'vertical', fontFamily:'inherit' }} />
-          <button className="btn btn-primary btn-sm" onClick={send}>Enviar a todos</button>
+          <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : 'Enviar a todos'}</button>
         </div>
       )}
       {mensajes.length > 0 && (
@@ -1084,7 +1087,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 300), [recs, quickFilter, filterDate, filterEmp, search])
+  }).sort((a,b) => b.inicio.localeCompare(a.inicio) || a.id.localeCompare(b.id)).slice(0, 300), [recs, quickFilter, filterDate, filterEmp, search])
 
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
   const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
@@ -1200,6 +1203,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                             const val = document.getElementById('edit-rec-input').value
                             if (!val) return
                             const newInicio = new Date(val).toISOString()
+                            if (r.fin && newInicio >= r.fin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
                             const updated = (db.records||[]).map(rec => rec.id === r.id ? { ...rec, inicio: newInicio } : rec)
                             const withAudit = auditLog(db, 'Hora entrada editada', `${r.empName}: ${ftime(r.inicio)} → ${ftime(newInicio)}`, session?.user?.name || 'Admin')
                             saveDB({ records: updated, audit: withAudit.audit })
@@ -1224,6 +1228,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                             const val = document.getElementById('edit-rec-fin-input').value
                             if (!val) return
                             const newFin = new Date(val).toISOString()
+                            if (newFin <= r.inicio) { toast('La salida debe ser posterior a la entrada', 3500, 'err'); return }
                             const updated = (db.records||[]).map(rec => {
                               if (rec.id !== r.id) return rec
                               const t2 = calcSecs({ ...rec, fin: newFin })
@@ -1315,6 +1320,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
 
   const addAus = () => {
     if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
+    if (ausForm.fechaFin && ausForm.fechaFin < ausForm.fechaInicio) { toast('La fecha fin no puede ser anterior al inicio', 3500, 'err'); return }
     const emp = emps.find(e => e.id === ausForm.empId)
     const key = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString() }
@@ -3418,6 +3424,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
 
   const addAus = () => {
     if (!ausForm.empId || !ausForm.fechaInicio) { toast('Selecciona empleado y fecha'); return }
+    if (ausForm.fechaFin && ausForm.fechaFin < ausForm.fechaInicio) { toast('La fecha fin no puede ser anterior al inicio', 3500, 'err'); return }
     const emp = emps.find(e => e.id === ausForm.empId)
     const key  = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString(), registradoPor: enc.name }
