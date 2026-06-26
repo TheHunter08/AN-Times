@@ -1857,6 +1857,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const fontR   = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontB   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
+      // Helper: fecha local (no UTC) para mostrar en PDF
+      const localDate = iso => { const d = new Date(iso); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}` }
+      // Helper: limpia caracteres fuera de WinAnsi que hacen crash en pdf-lib con Helvetica
+      const safe = s => String(s ?? '').replace(/✓/g,'OK').replace(/✔/g,'OK').replace(/⚠/g,'(!)').replace(/−/g,'-').replace(/—/g,'-').replace(/[^\x00-\xFF]/g,'?')
+
       // ─ Layout constants ────────────────────────────────────────────
       const PW = 595, PH = 842       // A4 portrait
       const ML = 35, MR = 35        // margins left/right
@@ -1930,8 +1935,8 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const statItems = [
         { label:'Jornadas', val: String(monthRecs.length) },
         { label:'Total horas', val: mhm(totalMin2) },
-        { label:'H. extra', val: exCover.netExtraMin > 0 ? `+${mhm(exCover.netExtraMin)}` : exCover.deficitMin > 0 ? `−${mhm(exCover.deficitMin)}` : '0h' },
-        { label:'Objetivo 160h', val: totalMin2 >= 9600 ? '✓ OK' : `Falta ${mhm(9600 - totalMin2)}` },
+        { label:'H. extra', val: exCover.netExtraMin > 0 ? `+${mhm(exCover.netExtraMin)}` : exCover.deficitMin > 0 ? `-${mhm(exCover.deficitMin)}` : '0h' },
+        { label:'Objetivo 160h', val: totalMin2 >= 9600 ? 'OK (160h)' : `Falta ${mhm(9600 - totalMin2)}` },
       ]
       const statW = CW / statItems.length
       statItems.forEach((s, i) => {
@@ -1951,8 +1956,8 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       monthRecs.forEach((r, i) => {
         if (y - ROW_H < 35 + SIG_AREA) { newPage(); tableHeader() }
         const wm = Math.floor(recWorkSecs(r) / 60)
-        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '—'
-        const vals = [ r.inicio.slice(0,10), ftime(r.inicio), r.fin ? ftime(r.fin) : '—', centroObra, mhm(wm) ]
+        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '-'
+        const vals = [ localDate(r.inicio), ftime(r.inicio), r.fin ? ftime(r.fin) : '-', centroObra, mhm(wm) ]
 
         page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
         page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
@@ -1960,7 +1965,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         let xc = ML
         vals.forEach((v, ci) => {
           const isHours = ci === 4
-          page.drawText(String(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
+          page.drawText(safe(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
           xc += COLS[ci].w
         })
         // vertical separators
@@ -1978,10 +1983,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length!==1?'s':''} registrada${monthRecs.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
       page.drawText(`Objetivo mensual: 160h (${mhm(targetMin2)})`, { x:ML+8, y:y-28, size:7.5, font:fontR, color:cDark, maxWidth:CW-16 })
       const extraLine = exPdf.netExtraMin > 0
-        ? `H. extra netas: +${mhm(exPdf.netExtraMin)}  (${mhm(exPdf.weeklyExtraMin)} sem. − ${mhm(exPdf.shortfallMin)} déf.)`
+        ? `H. extra netas: +${mhm(exPdf.netExtraMin)}  (${mhm(exPdf.weeklyExtraMin)} sem. - ${mhm(exPdf.shortfallMin)} def.)`
         : exPdf.deficitMin > 0
-          ? `Déficit: −${mhm(exPdf.deficitMin)} para completar las 160h obligatorias`
-          : totalMin2 >= targetMin2 ? '✓ Objetivo de 160h alcanzado' : `Pendiente: ${mhm(targetMin2 - totalMin2)} para las 160h`
+          ? `Deficit: -${mhm(exPdf.deficitMin)} para completar las 160h obligatorias`
+          : totalMin2 >= targetMin2 ? 'Objetivo de 160h alcanzado' : `Pendiente: ${mhm(targetMin2 - totalMin2)} para las 160h`
       page.drawText(extraLine, { x:ML+8, y:y-42, size:7.5, font:fontB, color:cDiff, maxWidth:CW-16 })
       y -= 58
 
@@ -2003,16 +2008,15 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
           page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
           page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
-          // green tick
-          page.drawText('✓ Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
+          page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
         } catch {
           page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
           page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
         page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
-        page.drawText('⚠ Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
-        page.drawText('Configúrala en Perfil › Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
+        page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
+        page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
@@ -2093,14 +2097,14 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       weekRecs2.forEach((r, i) => {
         if (y - ROW_H < 35 + SIG_AREA) { newPage(); tableHeader() }
         const wm = Math.floor(recWorkSecs(r) / 60)
-        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '—'
-        const vals = [ r.inicio.slice(0,10), ftime(r.inicio), r.fin ? ftime(r.fin) : '—', centroObra, mhm(wm) ]
+        const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '-'
+        const vals = [ localDate(r.inicio), ftime(r.inicio), r.fin ? ftime(r.fin) : '-', centroObra, mhm(wm) ]
         page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
         page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
         let xc = ML
         vals.forEach((v, ci) => {
           const isHours = ci === 4
-          page.drawText(String(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
+          page.drawText(safe(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
           xc += COLS[ci].w
         })
         let xs = ML
@@ -2132,19 +2136,19 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
           page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
           page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
-          page.drawText('✓ Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
+          page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
         } catch {
           page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
           page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
         page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
-        page.drawText('⚠ Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
-        page.drawText('Configúrala en Perfil › Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
+        page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
+        page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
-      page.drawText('Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
+      page.drawText('Documento generado automaticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type:'application/pdf' })
       setInformeBlob(blob)
