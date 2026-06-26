@@ -9,6 +9,11 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
+.login-spinner, [class*="skeleton"], svg *, button:active {
+  transition: none !important;
 }
 
 /* Quitamos el menú contextual de mantener pulsado y el "drag" de iOS en
@@ -158,7 +163,7 @@ input, textarea, [contenteditable="true"], .selectable {
   --text:  #09090B;
   --text2: #27272A;
   --text3: #3F3F46;   /* ratio 8.1:1 — cumple WCAG AA */
-  --text4: #6B7280;   /* ratio 4.6:1 — cumple WCAG AA (antes #A1A1AA = 3.5:1, insuficiente) */
+  --text4: #595e72;   /* ratio ~7:1 sobre blanco — era #6B7280 (4.6:1) */
   /* Borders — very subtle */
   --border:  rgba(0,0,0,0.06);
   --border2: rgba(0,0,0,0.10);

@@ -71,7 +71,7 @@ registerRoute(
   ({ request }) => request.destination === 'image' || request.destination === 'font',
   new CacheFirst({
     cacheName: 'images-fonts',
-    plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 90 })]
+    plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 })]
   })
 )
 

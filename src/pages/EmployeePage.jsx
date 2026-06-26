@@ -458,6 +458,7 @@ export default function EmployeePage() {
             bellNotis.length = 0
             saveDB({ records: updRecs, notisSent: { ...(dbRef.current.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: _notisToSave })
             sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
+            return
           }
         }
       })
@@ -1177,11 +1178,19 @@ function WorkHeatmap({ records, empId }) {
 // ─── PomodoroWidget ───────────────────────────────────────────────────────────
 function PomodoroWidget() {
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState(false)
-  const [phase, setPhase] = useState('work')
-  const [secs, setSecs] = useState(25 * 60)
-  const [count, setCount] = useState(0)
   const WS = 25 * 60, BS = 5 * 60
+  const _pkey = 'an_pomodoro'
+  const _load = () => { try { return JSON.parse(localStorage.getItem(_pkey) || 'null') } catch { return null } }
+  const _save = s => { try { localStorage.setItem(_pkey, JSON.stringify(s)) } catch {} }
+  const _init = _load() || { active: false, phase: 'work', secs: WS, count: 0 }
+  const [active, setActive] = useState(_init.active)
+  const [phase, setPhase] = useState(_init.phase)
+  const [secs, setSecs] = useState(_init.secs)
+  const [count, setCount] = useState(_init.count)
+
+  useEffect(() => {
+    _save({ active, phase, secs, count })
+  }, [active, phase, secs, count])
 
   useEffect(() => {
     if (!active) return
@@ -1263,7 +1272,7 @@ const ACHIEVEMENTS = [
   { id:'a10', icon:'🌅', title:'Madrugador', desc:'3 veces antes de las 08:00', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=480}).length>=3 },
 ]
 
-function AchievementsSection({ myRecs, streak, u }) {
+function AchievementsSection({ myRecs, streak, u, saveDB, db }) {
   const unlocked = useMemo(() => new Set(ACHIEVEMENTS.filter(a => a.check(myRecs, streak)).map(a => a.id)), [myRecs, streak])
 
   useEffect(() => {
@@ -1282,6 +1291,12 @@ function AchievementsSection({ myRecs, streak, u }) {
           } catch {}
         })
         localStorage.setItem(key, JSON.stringify([...unlocked]))
+        if (saveDB && db && newOnes.length > 0) {
+          const emps = (db.employees || []).map(e =>
+            e.id === u.id ? { ...e, achievements: [...unlocked] } : e
+          )
+          saveDB({ employees: emps })
+        }
       }
     } catch {}
   }, [unlocked, u?.id])
@@ -2604,6 +2619,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
   const chats = db.chats || []
   const adminId = 'admin'
   const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
 
   const conv = chats
@@ -2620,11 +2636,17 @@ function TabMensajes({ db, u, toast, saveDB }) {
 
   const send = () => {
     const t = text.trim()
-    if (!t) return
-    const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
-    saveDB({ chats: [...chats, msg] })
-    queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
+    if (!t || sending) return
+    setSending(true)
+    const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false, estado: 'enviando' }
     setText('')
+    try {
+      saveDB({ chats: [...chats, msg] })
+      queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
+      setTimeout(() => { setSending(false) }, 300)
+    } catch {
+      setSending(false)
+    }
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
   }
 
@@ -2672,7 +2694,7 @@ function TabMensajes({ db, u, toast, saveDB }) {
                 {!isMe && <div style={{ fontSize:10, fontWeight:700, color:'var(--primary-light)', marginBottom:3 }}>Administración</div>}
                 {m.text}
                 <div style={{ fontSize:10, color: isMe ? 'rgba(255,255,255,.55)' : 'var(--text4)', marginTop:3, textAlign:'right' }}>
-                  {dia} · {hora}
+                  {dia} · {hora}{isMe && <span style={{ marginLeft:4 }}>{m.estado === 'enviando' ? '⏳' : '✓'}</span>}
                 </div>
               </div>
             </div>
@@ -2687,13 +2709,18 @@ function TabMensajes({ db, u, toast, saveDB }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Escribe un mensaje…"
+          aria-label="Escribe un mensaje"
           style={{ flex:1, background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:22, padding:'10px 16px', fontSize:14, color:'var(--text)', fontFamily:'inherit', outline:'none' }}
         />
         <button
           onClick={send}
-          disabled={!text.trim()}
-          style={{ width:42, height:42, borderRadius:'50%', background:'var(--primary)', border:'none', cursor:text.trim()?'pointer':'default', opacity:text.trim()?1:.4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'opacity .15s' }}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          disabled={!text.trim() || sending}
+          aria-label="Enviar mensaje"
+          style={{ width:48, height:48, borderRadius:'50%', background:'var(--primary)', border:'none', cursor:(text.trim()&&!sending)?'pointer':'default', opacity:(text.trim()&&!sending)?1:.4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'opacity .15s' }}>
+          {sending
+            ? <span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,.3)', borderTopColor:'#fff', borderRadius:'50%', display:'inline-block', animation:'spin 0.7s linear infinite' }} />
+            : <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          }
         </button>
       </div>
     </div>
@@ -2703,11 +2730,11 @@ function TabMensajes({ db, u, toast, saveDB }) {
 // ─── TAB VACACIONES ────────────────────────────────────────────────────────────
 function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const { openModal, showConfirm } = useAppStore()
-  const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id).sort((a,b) => b.fechaInicio.localeCompare(a.fechaInicio))
+  const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id).sort((a,b) => new Date(b.fechaInicio || 0) - new Date(a.fechaInicio || 0))
 
   const cancelVac = (id) => {
     showConfirm('¿Cancelar esta solicitud de vacaciones?', () => {
-      saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id) })
+      saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id || v.estado !== 'pendiente') })
       toast('Solicitud cancelada', 3000, 'warn')
     })
   }
@@ -2880,8 +2907,9 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const absDays = useMemo(() => new Set(
     (db.ausencias || []).filter(a => a.empId === u.id).flatMap(a => {
       const days = []
-      const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
-      const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
+      const s = new Date((a.fechaInicio || a.fecha || '') + 'T00:00:00')
+      const e = new Date((a.fechaFin   || a.fechaInicio || a.fecha || '') + 'T00:00:00')
+      if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return []
       const d = new Date(s)
       while (d <= e) { days.push(lds(d)); d.setDate(d.getDate()+1) }
       return days
@@ -2891,8 +2919,9 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const medDays = useMemo(() => new Set(
     (db.medicos || []).filter(a => a.empId === u.id).flatMap(a => {
       const days = []
-      const s = new Date((a.fechaInicio || a.fecha) + 'T00:00:00')
-      const e = new Date((a.fechaFin || a.fecha) + 'T00:00:00')
+      const s = new Date((a.fechaInicio || a.fecha || '') + 'T00:00:00')
+      const e = new Date((a.fechaFin   || a.fechaInicio || a.fecha || '') + 'T00:00:00')
+      if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return []
       const d = new Date(s)
       while (d <= e) { days.push(lds(d)); d.setDate(d.getDate()+1) }
       return days
@@ -3260,7 +3289,7 @@ function ModalLogros({ visible, db, u, onClose }) {
       </div>
       <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
         <div style={{ padding:'16px 0' }}>
-          <AchievementsSection myRecs={myRecs} streak={streak} u={u} />
+          <AchievementsSection myRecs={myRecs} streak={streak} u={u} saveDB={saveDB} db={db} />
           <div style={{ padding:'0 16px 16px' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
             <WorkHeatmap records={db.records} empId={u.id} />
@@ -3351,7 +3380,12 @@ function ModalSelCentro({ visible, data, onConfirm, onClose }) {
 }
 
 function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
-  const notis = (db.notis || []).filter(n => n.empId === u?.id).slice(-20).reverse()
+  const [search, setSearch] = useState('')
+  const notis = (db.notis || [])
+    .filter(n => n.empId === u?.id)
+    .slice(-50)
+    .reverse()
+    .filter(n => !search || (n.action||'').toLowerCase().includes(search.toLowerCase()) || (n.detail||'').toLowerCase().includes(search.toLowerCase()))
   const mensajes = (db.mensajes || []).filter(m => m.to === 'all' || m.to === u?.id).slice(-10).reverse()
   useModalBack(visible, onClose)
   if (!visible) return null
@@ -3374,10 +3408,19 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
           <h2 style={{ margin:0 }}>🔔 Notificaciones</h2>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            {notis.some(n => !n.leido) && <button onClick={markRead} style={{ background:'none', border:'none', color:'var(--primary-light)', fontSize:11, fontWeight:600, cursor:'pointer', padding:'2px 6px' }}>Marcar leídas</button>}
             {notis.length > 0 && <button onClick={clearAll} style={{ background:'none', border:'none', color:'var(--danger)', fontSize:11, fontWeight:600, cursor:'pointer', padding:'2px 6px' }}>Borrar todo</button>}
             <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
           </div>
         </div>
+        <input
+          type="search"
+          placeholder="Buscar notificaciones…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Buscar notificaciones"
+          style={{ width:'100%', padding:'8px 12px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none', marginBottom:10, boxSizing:'border-box' }}
+        />
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
           {mensajes.map(m => (
             <div key={'msg-'+m.id} className="nitem" style={{ borderLeft:'3px solid var(--primary)' }}>
@@ -3405,7 +3448,6 @@ function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
             </div>
           ))}
         </div>
-        <button className="btn btn-secondary btn-full btn-sm" style={{ marginTop:12 }} onClick={markRead}>Marcar como leídas</button>
       </div>
     </div>
   )
