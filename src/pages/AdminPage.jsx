@@ -1285,6 +1285,9 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
   const [rejecting, setRejecting] = useState(null)  // id de vacación pendiente de rechazar
   const [rejMotivo, setRejMotivo] = useState('')
+  const [editCorrId, setEditCorrId] = useState(null)
+  const [editInicio, setEditInicio] = useState('')
+  const [editFin, setEditFin] = useState('')
 
   const vacs = (db.vacaciones || []).sort((a,b) => b.ts?.localeCompare(a.ts||'')||0)
   const pend = vacs.filter(v => v.estado === 'pendiente')
@@ -1548,24 +1551,29 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
         const corrPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente').sort((a,b) => b.ts - a.ts)
         const corrRest = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente').sort((a,b) => b.ts - a.ts).slice(0, 20)
 
-        const actCorr = (id, estado) => {
+        const actCorr = (id, estado, overrideInicio, overrideFin) => {
           const corr = (db.correccionesFichaje || []).find(c => c.id === id)
           if (!corr) return
           let newRecords = db.records || []
           if (estado === 'aprobada') {
+            const finalInicio = overrideInicio || corr.propInicio
+            const finalFin = overrideFin || corr.propFin
             newRecords = newRecords.map(r => {
               if (r.id !== corr.recId) return r
-              const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin }
+              const updated = { ...r, inicio: finalInicio, fin: finalFin }
               const t = calcSecs(updated)
               return { ...updated, workSecs: t.work, breakSecs: t.brk }
             })
           }
-          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin' } : c)
+          const finalInicioLabel = overrideInicio || corr.propInicio
+          const finalFinLabel = overrideFin || corr.propFin
+          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin', finalInicio: finalInicioLabel, finalFin: finalFinLabel } : c)
           const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
           const withAudit = auditLog(db, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, session?.user?.name || 'Admin')
           saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis||[]), noti], audit: withAudit.audit })
           queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
           toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
+          setEditCorrId(null)
         }
 
         return (
@@ -1593,9 +1601,41 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
                           })()}
                         </div>
                         {c.motivo && <div style={{ fontSize:11, color:'var(--text4)', marginTop:3, fontStyle:'italic' }}>"{c.motivo}"</div>}
+                        {editCorrId === c.id && (
+                          <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6, padding:10, background:'var(--bg-500)', borderRadius:8, border:'1px solid var(--border)' }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', marginBottom:2 }}>Editar horas antes de aprobar</div>
+                            <div style={{ display:'flex', gap:8 }}>
+                              <div style={{ flex:1 }}>
+                                <label style={{ fontSize:10, color:'var(--text3)' }}>Entrada</label>
+                                <input type="datetime-local" value={editInicio} onChange={e => setEditInicio(e.target.value)}
+                                  style={{ width:'100%', fontSize:11, padding:'5px 6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text2)', marginTop:2 }} />
+                              </div>
+                              <div style={{ flex:1 }}>
+                                <label style={{ fontSize:10, color:'var(--text3)' }}>Salida</label>
+                                <input type="datetime-local" value={editFin} onChange={e => setEditFin(e.target.value)}
+                                  style={{ width:'100%', fontSize:11, padding:'5px 6px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text2)', marginTop:2 }} />
+                              </div>
+                            </div>
+                            <div style={{ display:'flex', gap:6, justifyContent:'flex-end', marginTop:2 }}>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setEditCorrId(null)}>Cancelar</button>
+                              <button className="btn btn-primary btn-sm" onClick={() => {
+                                const ini = editInicio ? new Date(editInicio).toISOString() : null
+                                const fin = editFin   ? new Date(editFin).toISOString()   : null
+                                actCorr(c.id, 'aprobada', ini, fin)
+                              }}>Aprobar y guardar</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                         <button className="btn btn-sm btn-primary" onClick={() => actCorr(c.id, 'aprobada')}>✓</button>
+                        <button className="btn btn-sm" style={{ background:'var(--bg-500)', color:'var(--text2)', border:'1px solid var(--border)' }}
+                          onClick={() => {
+                            if (editCorrId === c.id) { setEditCorrId(null); return }
+                            setEditCorrId(c.id)
+                            setEditInicio(c.propInicio ? c.propInicio.slice(0,16) : '')
+                            setEditFin(c.propFin ? c.propFin.slice(0,16) : '')
+                          }}>✎</button>
                         <button className="btn btn-sm btn-danger"  onClick={() => actCorr(c.id, 'rechazada')}>✕</button>
                       </div>
                     </div>
@@ -1908,6 +1948,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const [selMonth, setSelMonth] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [agruparCentro, setAgruparCentro] = useState(false)
   const recs = db.records || []
   const emps = (db.employees || []).filter(e => !e.baja)
   const now = new Date()
@@ -1943,9 +1984,13 @@ function PanelInformes({ db, toast, saveDB, session }) {
     if (from) filtered = filtered.filter(r => r.inicio.slice(0,10) >= from)
     if (to)   filtered = filtered.filter(r => r.inicio.slice(0,10) <= to)
     if (!filtered.length) { toast('Sin datos para exportar'); return }
-    filtered.sort((a, b) => a.inicio.localeCompare(b.inicio))
+    if (agruparCentro) {
+      filtered.sort((a, b) => (a.centro||'').localeCompare(b.centro||'') || a.empName.localeCompare(b.empName) || a.inicio.localeCompare(b.inicio))
+    } else {
+      filtered.sort((a, b) => a.inicio.localeCompare(b.inicio))
+    }
     const periodo = from || to ? `${from||'inicio'} a ${to||'hoy'}` : filterMonth
-    const title = [`Fichajes — ${empresa || 'TIMES INC'} — ${periodo}`]
+    const title = [`Fichajes — ${empresa || 'TIMES INC'} — ${periodo}${agruparCentro ? ' (agrupado por centro)' : ''}`]
     const headers = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
     const dataRows = filtered.map(r => {
       const wm = Math.floor(recWorkSecs(r)/60), bm = Math.floor((r.breakSecs||0)/60)
@@ -2711,6 +2756,11 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
               <div className="field"><label>Desde</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
               <div className="field"><label>Hasta</label><input type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
             </div>
+            <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--text2)', cursor:'pointer', userSelect:'none' }}>
+              <input type="checkbox" checked={agruparCentro} onChange={e => setAgruparCentro(e.target.checked)}
+                style={{ width:16, height:16, cursor:'pointer' }} />
+              Agrupar por centro de trabajo
+            </label>
             <button className="btn btn-secondary" style={{ width:'100%' }} onClick={exportFichajesXLSX}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Descargar Excel fichajes
@@ -3865,6 +3915,11 @@ function PanelAjustes({ db, toast, saveDB }) {
   const cfg = db.config || {}
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
   const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
+  const [wdHoras, setWdHoras] = useState(cfg.wdMin ? String(Math.round(cfg.wdMin / 60 * 100) / 100) : '8')
+  const [wkHoras, setWkHoras] = useState(cfg.wkMin ? String(Math.round(cfg.wkMin / 60 * 100) / 100) : '40')
+  const [festivosExtra, setFestivosExtra] = useState(cfg.festivosExtra || {})
+  const [newFestivoFecha, setNewFestivoFecha] = useState('')
+  const [newFestivoNombre, setNewFestivoNombre] = useState('')
   const [saving, setSaving] = useState(false)
   const backupRef = useRef(null)
 
@@ -3905,7 +3960,9 @@ function PanelAjustes({ db, toast, saveDB }) {
 
   const save = () => {
     setSaving(true)
-    const config = { ...cfg, primaryColor, companyName }
+    const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
+    const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
+    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra }
     saveDB({ config })
     toast('Ajustes guardados', 3000, 'ok')
     setSaving(false)
@@ -3940,6 +3997,44 @@ function PanelAjustes({ db, toast, saveDB }) {
             <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de empresa'}
               style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
           </div>
+          <div style={{ display:'flex', gap:12 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Jornada diaria (horas)</div>
+              <input type="number" min="1" max="24" step="0.5" value={wdHoras} onChange={e => setWdHoras(e.target.value)}
+                style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Jornada semanal (horas)</div>
+              <input type="number" min="1" max="60" step="0.5" value={wkHoras} onChange={e => setWkHoras(e.target.value)}
+                style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">📅 Festivos personalizados</div>
+        </div>
+        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Añade festivos propios de tu empresa o comunidad además de los festivos de Madrid ya incluidos.</div>
+        {Object.entries(festivosExtra).sort(([a],[b]) => a.localeCompare(b)).map(([fecha, nombre]) => (
+          <div key={fecha} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid var(--border)' }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', flex:1 }}>{fecha}</div>
+            <div style={{ fontSize:12, color:'var(--text3)', flex:2 }}>{nombre}</div>
+            <button className="btn btn-ghost btn-sm" style={{ color:'var(--red)', padding:'2px 8px' }}
+              onClick={() => { const f = { ...festivosExtra }; delete f[fecha]; setFestivosExtra(f) }}>✕</button>
+          </div>
+        ))}
+        <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+          <input type="date" value={newFestivoFecha} onChange={e => setNewFestivoFecha(e.target.value)}
+            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'7px 10px', fontSize:12 }} />
+          <input value={newFestivoNombre} onChange={e => setNewFestivoNombre(e.target.value)} placeholder="Nombre del festivo"
+            style={{ flex:1, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'7px 10px', fontSize:12 }} />
+          <button className="btn btn-secondary btn-sm" onClick={() => {
+            if (!newFestivoFecha || !newFestivoNombre.trim()) return
+            setFestivosExtra(prev => ({ ...prev, [newFestivoFecha]: newFestivoNombre.trim() }))
+            setNewFestivoFecha(''); setNewFestivoNombre('')
+          }}>Añadir</button>
         </div>
       </div>
 

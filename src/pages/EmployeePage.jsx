@@ -462,6 +462,38 @@ export default function EmployeePage() {
         }
       })
 
+      // 8. Horas extra: aviso cuando se superan 9h en un día o 45h en la semana
+      {
+        const openR = (db.records || []).find(r => r.empId === u.id && !r.fin)
+        if (openR) {
+          const elapsed = (Date.now() - new Date(openR.inicio).getTime()) / 60000
+          // Aviso a las 9h exactas del día (una vez por jornada)
+          if (elapsed >= 540 && elapsed < 550) {
+            const key9h = 'an_extra9h_' + openR.id
+            if (!hasSent(key9h)) {
+              markSent(key9h)
+              const _msg9h = 'Llevas 9 horas trabajando hoy. Recuerda descansar.'
+              sendPush(u.id, '⚡ 9 horas trabajadas', _msg9h, 'jornada', '/?tab=inicio')
+              addBell('⚡ 9 horas trabajadas', _msg9h)
+            }
+          }
+        }
+        // Aviso semanal: si las horas semanales superan 45h
+        const wkKey = 'an_extra45h_' + todayStr.slice(0, 7)
+        if (!hasSent(wkKey, 'week_' + todayStr)) {
+          const ws = wkStart(new Date())
+          const weekMin = (db.records || [])
+            .filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
+            .reduce((s, r) => s + calcMin(r), 0)
+          if (weekMin >= 2700) {  // 45h = 2700 min
+            markSent(wkKey, 'week_' + todayStr)
+            const _msg45h = `Llevas ${mhm(weekMin)} esta semana. Has superado las 45h semanales.`
+            sendPush(u.id, '⚡ Semana de horas extra', _msg45h, 'jornada', '/?tab=inicio')
+            addBell('⚡ Semana de horas extra', _msg45h)
+          }
+        }
+      }
+
       // Batch save: una sola escritura por ciclo. Combina notisSent + bell notis.
       // Merge new keys into current dbRef to avoid stale-snapshot overwrites.
       if (dirty || bellNotis.length) {
@@ -1835,6 +1867,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const [informeBlob, setInformeBlob]   = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [generatingWeekPdf, setGeneratingWeekPdf] = useState(false)
+  const [showRangeExport, setShowRangeExport] = useState(false)
+  const nowIso = new Date().toISOString().slice(0, 10)
+  const [exportFrom, setExportFrom] = useState(nowIso.slice(0, 7) + '-01')
+  const [exportTo, setExportTo] = useState(nowIso)
+  const [generatingRangePdf, setGeneratingRangePdf] = useState(false)
 
   const closeInforme = useCallback(() => {
     setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
@@ -1842,6 +1879,77 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   }, [])
 
   useModalBack(!!informeUrl, closeInforme)
+
+  const exportRangePDF = async () => {
+    if (!exportFrom || !exportTo || exportFrom > exportTo) { return }
+    setGeneratingRangePdf(true)
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      const rangeRecs = (db.records || [])
+        .filter(r => r.empId === u.id && r.fin && r.inicio >= exportFrom + 'T00:00:00' && r.inicio <= exportTo + 'T23:59:59')
+        .sort((a,b) => a.inicio.localeCompare(b.inicio))
+      const totalMin2 = rangeRecs.reduce((s,r) => s + calcMin(r), 0)
+      const rangeLabel = `${exportFrom} – ${exportTo}`
+
+      const pdfDoc = await PDFDocument.create()
+      const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const safe = s => String(s ?? '').replace(/[^\x00-\xFF]/g,'?')
+      const PW = 595, PH = 842, ML = 35, MR = 35, CW = PW - ML - MR
+      const COLS = [
+        { label:'Fecha', w:72 }, { label:'Entrada', w:52 }, { label:'Salida', w:52 },
+        { label:'Centro / Obra', w:279 }, { label:'Horas netas', w:70 },
+      ]
+      const ROW_H = 15, HEAD_H = 17
+      const cPri   = rgb(0.36,0.38,0.82), cPriLt = rgb(0.94,0.93,1.0)
+      const cDark  = rgb(0.10,0.10,0.15), cGray  = rgb(0.45,0.45,0.50)
+      const cBorder= rgb(0.87,0.87,0.92), cWhite = rgb(1,1,1)
+      let page = pdfDoc.addPage([PW, PH])
+      let y = PH - 45
+      page.drawText('INFORME DE JORNADA — RANGO', { x:ML, y, size:13, font:fontB, color:cPri })
+      y -= 18
+      page.drawText(safe(u.name), { x:ML, y, size:10, font:fontB, color:cDark })
+      y -= 14
+      page.drawText(`Período: ${rangeLabel}`, { x:ML, y, size:8, font:fontR, color:cGray })
+      y -= 18
+      let cx = ML
+      COLS.forEach(col => {
+        page.drawRectangle({ x:cx, y:y-HEAD_H+3, width:col.w, height:HEAD_H, color:cPri })
+        page.drawText(col.label, { x:cx+4, y:y-HEAD_H+8, size:7, font:fontB, color:cWhite, maxWidth:col.w-8 })
+        cx += col.w
+      })
+      y -= HEAD_H
+      rangeRecs.forEach((r, idx) => {
+        if (y - ROW_H < 50) { page = pdfDoc.addPage([PW, PH]); y = PH - 45 }
+        if (idx % 2 === 0) page.drawRectangle({ x:ML, y:y-ROW_H+3, width:CW, height:ROW_H, color:cPriLt })
+        const d = new Date(r.inicio)
+        const cols2 = [
+          `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`,
+          `${p2(d.getHours())}:${p2(d.getMinutes())}`,
+          r.fin ? `${p2(new Date(r.fin).getHours())}:${p2(new Date(r.fin).getMinutes())}` : '--',
+          safe(r.centro || ''),
+          mhm(calcMin(r)),
+        ]
+        let cx2 = ML
+        cols2.forEach((val, ci) => {
+          page.drawText(val, { x:cx2+4, y:y-ROW_H+7, size:7, font:fontR, color:cDark, maxWidth:COLS[ci].w-8 })
+          cx2 += COLS[ci].w
+        })
+        y -= ROW_H
+      })
+      y -= 10
+      page.drawText(`Total: ${mhm(totalMin2)} en ${rangeRecs.length} registros`, { x:ML, y, size:9, font:fontB, color:cPri })
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([pdfBytes], { type:'application/pdf' })
+      setInformeBlob(blob)
+      setInformeUrl(URL.createObjectURL(blob))
+      setShowRangeExport(false)
+    } catch(e) {
+      toast('Error al generar PDF de rango: ' + (e?.message || e))
+    } finally {
+      setGeneratingRangePdf(false)
+    }
+  }
 
   const exportMonthPDF = async () => {
     setGeneratingPdf(true)
@@ -2019,6 +2127,27 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+      }
+
+      // ─ Firma del responsable ──────────────────────────────────────
+      const adminFirma = db.firmas?.['admin']?.main || db.firmas?.[session?.user?.id]?.main
+      page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
+      if (adminFirma?.data) {
+        try {
+          const printable2 = await makePrintableSignature(adminFirma.data)
+          const b642 = printable2.split(',')[1]
+          const bin2 = atob(b642)
+          const bytes2 = new Uint8Array(bin2.length)
+          for (let i=0; i<bin2.length; i++) bytes2[i] = bin2.charCodeAt(i)
+          const sigImg2 = await pdfDoc.embedPng(bytes2.buffer)
+          const sigW2 = 130, sigH2 = sigW2 * (sigImg2.height / sigImg2.width)
+          page.drawImage(sigImg2, { x:ML+CW/2, y:y-18-sigH2, width:sigW2, height:sigH2 })
+          page.drawLine({ start:{x:ML+CW/2,y:y-22-sigH2}, end:{x:ML+CW/2+170,y:y-22-sigH2}, thickness:0.5, color:cGray })
+          page.drawText('Firma del Responsable', { x:ML+CW/2, y:y-31-sigH2, size:6.5, font:fontR, color:cGray, maxWidth:170 })
+        } catch {}
+      } else {
+        page.drawLine({ start:{x:ML+CW/2,y:y-65}, end:{x:ML+CW/2+170,y:y-65}, thickness:0.5, color:cGray })
+        page.drawText('Firma del Responsable', { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
       }
 
       // ─ Legal footer ───────────────────────────────────────────────
@@ -2223,7 +2352,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       </div>
 
       {/* PDF export buttons */}
-      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, justifyContent:'flex-end' }}>
+      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, justifyContent:'flex-end', flexWrap:'wrap' }}>
         <button className="btn btn-secondary btn-sm" onClick={exportWeekPDF} disabled={generatingWeekPdf} style={{ opacity: generatingWeekPdf ? 0.7 : 1 }}>
           {generatingWeekPdf
             ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
@@ -2236,7 +2365,33 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
             : <><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Informe firmado PDF</>
           }
         </button>
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowRangeExport(v => !v)} style={{ opacity:1 }}>
+          📆 Rango
+        </button>
       </div>
+      {showRangeExport && (
+        <div style={{ margin:'0 16px 10px', padding:12, background:'var(--bg-500)', borderRadius:12, border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>Exportar por rango de fechas</div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:3, flex:1 }}>
+              <label style={{ fontSize:10, color:'var(--text3)', fontWeight:600 }}>Desde</label>
+              <input type="date" value={exportFrom} onChange={e => setExportFrom(e.target.value)}
+                style={{ fontSize:12, padding:'6px 8px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text2)', outline:'none' }} />
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:3, flex:1 }}>
+              <label style={{ fontSize:10, color:'var(--text3)', fontWeight:600 }}>Hasta</label>
+              <input type="date" value={exportTo} onChange={e => setExportTo(e.target.value)}
+                style={{ fontSize:12, padding:'6px 8px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text2)', outline:'none' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowRangeExport(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={exportRangePDF} disabled={generatingRangePdf} style={{ opacity: generatingRangePdf ? 0.7 : 1 }}>
+              {generatingRangePdf ? 'Generando…' : 'Exportar PDF'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Pomodoro ─────────────────────────────────────────── */}
       {o && (
@@ -2751,16 +2906,19 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
     const dow = date.getDay()
     if (dow === 0 || dow === 6) return 'weekend'
     if (vacDays.has(ds)) return 'vacation'
-    if (FESTIVOS_MADRID_2026[ds]) return 'festivo'
-    if (absDays.has(ds) || medDays.has(ds)) return 'absence'
+    const festivoNombre = (db.config?.festivosExtra || {})[ds] || FESTIVOS_MADRID_2026[ds]
+    if (festivoNombre) return 'festivo'
+    if (medDays.has(ds)) return 'medical'
+    if (absDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
-    if (mins >= WD * 0.9) return 'complete'
+    const wdEfectivo = db.config?.wdMin || WD
+    if (mins >= wdEfectivo * 0.9) return 'complete'
     if (mins > 0) return 'pending'
     if (ds < todayStr) return 'missing'
     return 'future'
   }
 
-  const monthStats = { complete: 0, pending: 0, absence: 0, vacation: 0, missing: 0, festivo: 0 }
+  const monthStats = { complete: 0, pending: 0, absence: 0, medical: 0, vacation: 0, missing: 0, festivo: 0 }
   cells.forEach(date => {
     if (!date) return
     const ds = lds(date)
@@ -2792,6 +2950,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
             { n: monthStats.complete, label:'Completos', color:'var(--green)', bg:'var(--green-dim)' },
             { n: monthStats.pending,  label:'Parciales', color:'var(--orange)', bg:'rgba(245,158,11,.1)' },
             { n: monthStats.absence,  label:'Ausencias', color:'var(--red)', bg:'var(--red-dim)' },
+            { n: monthStats.medical,  label:'Baja médica', color:'#f59e0b', bg:'rgba(245,158,11,.1)' },
             { n: monthStats.vacation, label:'Vacaciones', color:'var(--blue)', bg:'rgba(68,147,248,.1)' },
             { n: monthStats.festivo,  label:'Festivos', color:'#e879f9', bg:'rgba(232,121,249,.1)' },
           ].filter(c => c.n > 0).map(c => (
@@ -2814,6 +2973,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
               !isToday && status === 'complete' ? 'cal-complete' : '',
               !isToday && status === 'pending' ? 'cal-pending' : '',
               !isToday && status === 'absence' ? 'cal-absence' : '',
+              !isToday && status === 'medical' ? 'cal-medical' : '',
               !isToday && status === 'vacation' ? 'vacation' : '',
               !isToday && status === 'weekend' ? 'weekend' : '',
               !isToday && status === 'missing' ? 'cal-missing' : '',
@@ -2822,10 +2982,11 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
             ].filter(Boolean).join(' ')
 
             return (
-              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)} title={FESTIVOS_MADRID_2026[ds] || undefined}>
+              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)} title={(db.config?.festivosExtra || {})[ds] || FESTIVOS_MADRID_2026[ds] || undefined}>
                 {date.getDate()}
                 {mins > 0 && !isToday && <div className="cal-hrs">{Math.floor(mins/60)}h</div>}
                 {status === 'absence' && !isToday && <div className="cal-hrs">✕</div>}
+                {status === 'medical' && !isToday && <div className="cal-hrs">🏥</div>}
                 {status === 'vacation' && !isToday && <div className="cal-hrs">🌴</div>}
                 {status === 'festivo' && !isToday && <div className="cal-hrs">★</div>}
               </div>
@@ -2839,8 +3000,9 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           const totMin = recs.reduce((s, r) => s + calcMin(r), 0)
           const selDate = new Date(selDay + 'T00:00:00')
           const status = getDayStatus(selDay, selDate)
-          const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', festivo: FESTIVOS_MADRID_2026[selDay] || 'Festivo', future:'' }
-          const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', festivo:'#e879f9', future:'var(--text4)' }
+          const festivoLabel = (db.config?.festivosExtra || {})[selDay] || FESTIVOS_MADRID_2026[selDay] || 'Festivo'
+          const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', medical:'Baja médica', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', festivo: festivoLabel, future:'' }
+          const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', medical:'#f59e0b', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', festivo:'#e879f9', future:'var(--text4)' }
           return (
             <div className="card" style={{ borderLeft:`3px solid ${statusColors[status] || 'var(--border)'}` }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
@@ -2868,7 +3030,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
                     <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                   </div>
                   <div style={{ fontSize:12, color:'var(--text4)' }}>
-                    {status === 'absence' ? 'Día de ausencia registrado' : status === 'vacation' ? 'Día de vacaciones' : 'Sin registros este día'}
+                    {status === 'absence' ? 'Día de ausencia registrado' : status === 'medical' ? 'Baja médica registrada' : status === 'vacation' ? 'Día de vacaciones' : 'Sin registros este día'}
                   </div>
                 </div>
               )}
@@ -2884,7 +3046,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
         {/* Legend */}
         <div style={{ display:'flex', flexWrap:'wrap', gap:14, padding:'12px 0' }}>
-          {[['var(--green)','Completo'],['var(--orange)','Parcial'],['var(--red)','Ausencia'],['var(--blue)','Vacaciones']].map(([c,l]) => (
+          {[['var(--green)','Completo'],['var(--orange)','Parcial'],['var(--red)','Ausencia'],['#f59e0b','Baja médica'],['var(--blue)','Vacaciones']].map(([c,l]) => (
             <div key={l} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--text2)' }}>
               <div style={{ width:10, height:10, borderRadius:3, background:c, flexShrink:0 }} />{l}
             </div>
@@ -3045,6 +3207,30 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
+
+      {/* Historial de cambios */}
+      {(() => {
+        const myAudit = (db.audit || [])
+          .filter(a => a.detail?.includes(u.name) || a.empId === u.id || (a.detail && a.detail.includes(u.id)))
+          .slice(-20)
+          .reverse()
+        if (!myAudit.length) return null
+        return (
+          <div className="card" style={{ marginTop:12 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text2)', marginBottom:10 }}>Historial de cambios</div>
+            {myAudit.slice(0, 5).map((a, i) => (
+              <div key={i} style={{ display:'flex', gap:10, padding:'8px 0', borderBottom: i < Math.min(myAudit.length,5)-1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:'var(--bg-500)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>📋</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.action}</div>
+                  {a.detail && <div style={{ fontSize:11, color:'var(--text3)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.detail}</div>}
+                  <div style={{ fontSize:10, color:'var(--text4)', marginTop:2 }}>{new Date(a.ts).toLocaleString('es-ES')}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
     </PullToRefresh>
   )
 }

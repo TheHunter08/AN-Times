@@ -17,12 +17,23 @@ const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').repla
 const isValid   = s => /^[A-Za-z0-9\-_]{40,}$/.test(s)
 
 const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(process.env.VAPID_PUBLIC)  : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
-const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
+const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const CRON_SECRET   = process.env.CRON_SECRET
 
-webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
+let _cronVapidError = null
+if (!VAPID_PRIVATE) {
+  _cronVapidError = 'VAPID_PRIVATE env var no configurada'
+  console.error('[cron-reminders] FATAL:', _cronVapidError)
+} else {
+  try {
+    webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
+  } catch (e) {
+    _cronVapidError = 'setVapidDetails failed: ' + e.message
+    console.error('[cron-reminders] FATAL:', _cronVapidError)
+  }
+}
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
@@ -86,6 +97,8 @@ module.exports = async function handler(req, res) {
   }
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
+  if (_cronVapidError) return res.status(500).json({ error: _cronVapidError })
+
   try {
     const db = await getAppData()
     if (!db) return res.status(500).json({ error: 'no app_data' })
@@ -95,6 +108,12 @@ module.exports = async function handler(req, res) {
     const nowH      = now.getHours()
     const nowM      = now.getMinutes()
     const nowMs     = Date.now()
+
+    const isValidTime = s => /^\d{1,2}:\d{2}$/.test(String(s || ''))
+    const safeTimeSplit = (s, def) => {
+      const t = isValidTime(s) ? s : def
+      return t.split(':').map(Number)
+    }
 
     const employees = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
     const records   = db.records    || []
@@ -130,7 +149,7 @@ module.exports = async function handler(req, res) {
       // Dispara si: no ha fichado hoy + hora >= reminderTime del empleado
       {
         const remTime = emp.reminderTime || '08:30'
-        const [rh, rm] = remTime.split(':').map(Number)
+        const [rh, rm] = safeTimeSplit(remTime, '08:30')
         const key = 'an_rem_' + emp.id
         if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {
           schedule(emp, sub, key, today,
@@ -160,7 +179,7 @@ module.exports = async function handler(req, res) {
       // Usa la salidaTime del empleado o la global; una vez por jornada abierta.
       if (openRec) {
         const salidaT = emp.salidaTime || cfgSalidaTime
-        const [sh, sm] = salidaT.split(':').map(Number)
+        const [sh, sm] = safeTimeSplit(salidaT, '21:00')
         const key = 'an_salida_' + openRec.id
         if (!notisSent[key] && ((nowH - sh) * 60 + (nowM - sm)) >= 0) {
           const elapsedMin = Math.floor((nowMs - new Date(openRec.inicio).getTime()) / 60000)

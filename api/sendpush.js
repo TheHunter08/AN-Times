@@ -36,17 +36,22 @@ const isValidVapidPrv = s => /^[A-Za-z0-9\-_]{42,46}$/.test(s)
 const _vpub = toB64Url(process.env.VAPID_PUBLIC)
 const _vprv = toB64Url(process.env.VAPID_PRIVATE)
 const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
-const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
+const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const PUSH_SECRET   = process.env.PUSH_SECRET
 
 let _loadError = null
-try {
-  webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
-} catch (e) {
-  _loadError = 'setVapidDetails failed: ' + e.message
+if (!VAPID_PRIVATE) {
+  _loadError = 'VAPID_PRIVATE env var no configurada'
   console.error('[sendpush] FATAL:', _loadError)
+} else {
+  try {
+    webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
+  } catch (e) {
+    _loadError = 'setVapidDetails failed: ' + e.message
+    console.error('[sendpush] FATAL:', _loadError)
+  }
 }
 
 async function sbGet(userId) {
