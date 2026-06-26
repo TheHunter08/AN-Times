@@ -91,7 +91,7 @@ export const vacData = (empId, db) => {
   }
   const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada').reduce((s, v) => s + countDays(v), 0)
   const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente').reduce((s, v) => s + countDays(v), 0)
-  return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used).toFixed(1))) }
+  return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used - pend).toFixed(1))) }
 }
 
 export const recWorkSecs = r => {

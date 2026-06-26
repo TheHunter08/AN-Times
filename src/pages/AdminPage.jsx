@@ -391,6 +391,14 @@ function PanelDashboard({ db, toast, saveDB }) {
     return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0,6)
   }, [recs, mk])
 
+  const last7Hours = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now); d.setDate(d.getDate() - (6 - i))
+      const ds = d.toISOString().slice(0, 10)
+      return recs.filter(r => r.fin && r.inicio.startsWith(ds)).reduce((s, r) => s + calcMin(r), 0) / 60
+    })
+  }, [recs])
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -425,18 +433,28 @@ function PanelDashboard({ db, toast, saveDB }) {
           const docsPend = (db.documentos || []).filter(d => !d.firma).length
           return [
           { label:'Activos ahora',     val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} trabajando` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
-          { label:'Horas hoy',         val: mhm(todayRecs.reduce((s,r)=>s+(r.fin?calcMin(r):calcSecs(r).work/60),0)|0), ico:'⏱️', glowColor:'#60a5fa', trend: `${todayRecs.length} fichaje${todayRecs.length!==1?'s':''}`, trendDir:'neu' },
-          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Mes en curso', trendDir: monthTrend >= 0 ? 'up' : 'down' },
+          { label:'Horas hoy',         val: mhm(todayRecs.reduce((s,r)=>s+(r.fin?calcMin(r):calcSecs(r).work/60),0)|0), ico:'⏱️', glowColor:'#60a5fa', trend: `${todayRecs.length} fichaje${todayRecs.length!==1?'s':''}`, trendDir:'neu', spark: last7Hours },
+          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Mes en curso', trendDir: monthTrend >= 0 ? 'up' : 'down', spark: last7Hours },
           { label:'Absentismo hoy',    val: `${absentismo}%`,              ico:'📉', glowColor:'#f87171', trend: ausentes > 0 ? `${ausentes} sin fichar` : 'Todos presentes', trendDir: absentismo > 0 ? 'down' : 'up' },
           { label:'Productividad',     val: `${productividad}%`,           ico: productividad > 100 ? '🔥' : '⚡', glowColor: productividad > 100 ? '#f59e0b' : '#a78bfa', trend: productividad > 100 ? `+${productividad - 100}% extra` : productividad >= 90 ? 'En objetivo' : 'Bajo objetivo', trendDir: productividad > 100 ? 'up' : productividad >= 90 ? 'up' : 'down' },
           { label:'Docs. pendientes',  val: String(docsPend),              ico:'✍️', glowColor:'#22d3ee', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : (docsPend > 0 ? 'Por firmar' : 'Al día'), trendDir: docsPend > 0 ? 'down' : 'up' },
           ]
-        })().map(({ label, val, ico, glowColor, trend, trendDir }) => (
+        })().map(({ label, val, ico, glowColor, trend, trendDir, spark }) => (
           <div key={label} className="adm-kpi-card">
             <div className="adm-kpi-glow" style={{ background: glowColor }} />
             <div className="adm-kpi-icon">{ico}</div>
             <div className="adm-kpi-val">{val}</div>
             <div className="adm-kpi-label">{label}</div>
+            {spark && (() => {
+              const mx = Math.max(...spark, 0.1)
+              return (
+                <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:20, marginTop:4, marginBottom:2 }}>
+                  {spark.map((v, i) => (
+                    <div key={i} style={{ flex:1, borderRadius:2, background: i === 6 ? glowColor : 'rgba(255,255,255,.18)', height: Math.max(3, Math.round((v / mx) * 20)), transition:'height .3s' }} />
+                  ))}
+                </div>
+              )
+            })()}
             <div className={`adm-kpi-trend ${trendDir}`}>{trend}</div>
           </div>
         ))}
@@ -1021,8 +1039,9 @@ function PanelControl({ db, toast, saveDB, session }) {
             <tbody>
               {emps.map(e => {
                 const live = liveRecs.find(r => r.empId === e.id)
+                const fichoHoy = !live && (todayMinMap[e.id] || 0) > 0
                 return (
-                  <tr key={e.id} style={{ opacity: live ? 1 : 0.4 }}>
+                  <tr key={e.id} style={{ opacity: live ? 1 : fichoHoy ? 0.7 : 0.4 }}>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                         <div style={{ width:28, height:28, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
@@ -1036,7 +1055,8 @@ function PanelControl({ db, toast, saveDB, session }) {
                     <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}><LiveTimerCell rec={live} /></td>
                     <td>
                       {live ? <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>{live.enDescanso?'⏸ Descanso':'▶ Trabajando'}</span>
-                             : <span className="badge">Libre</span>}
+                           : fichoHoy ? <span className="badge badge-blue">✓ Fichó hoy</span>
+                           : <span className="badge">Sin fichar</span>}
                     </td>
                     <td>
                       {live ? (
@@ -1736,6 +1756,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
       pinLen = existing?.pinLen
     }
     const updatedForm = { ...form, pin: finalPin, ...(pinLen !== undefined ? { pinLen } : {}) }
+    if (!updatedForm.empresa?.trim()) updatedForm.empresa = 'Sin asignar'
     const emps2 = editEmp
       ? (db.employees||[]).map(e => e.id === editEmp ? updatedForm : e)
       : [...(db.employees||[]), updatedForm]
