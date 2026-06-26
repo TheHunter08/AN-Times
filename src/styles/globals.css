@@ -4191,6 +4191,22 @@ textarea.input-error {
   font-family: inherit; flex-shrink: 0;
 }
 .offline-v3-retry:active { opacity: .7; }
+.offline-v3--office {
+  background: rgba(6,182,212,.08);
+  border-color: rgba(6,182,212,.25);
+  color: var(--teal);
+}
+.offline-v3--pending {
+  background: rgba(99,102,241,.08);
+  border-color: rgba(99,102,241,.25);
+  color: var(--primary-light);
+}
+.offline-v3--ok {
+  background: rgba(54,178,126,.08);
+  border-color: rgba(54,178,126,.25);
+  color: var(--green);
+}
+@keyframes spin { to { transform: rotate(360deg) } }
 
 /* ── v3 Hero card improvements ────────────────────────────────── */
 .hero-clock-card.v3 {

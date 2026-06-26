@@ -318,15 +318,30 @@ export default function App() {
     applyDeepLink(window.location.href)
     const onMsg = (event) => {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
-      if (event.data?.type === 'BG_SYNC_DONE') fetchDB()
+      if (event.data?.type === 'BG_SYNC_DONE') {
+        fetchDB()
+        useAppStore.setState({ syncStatus: 'synced', offlinePending: false })
+      }
       if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
     }
     const onDeepLink = (event) => applyDeepLink(event.detail)
+    const onSynced = () => {
+      fetchDB()
+      useAppStore.setState({ syncStatus: 'synced', offlinePending: false })
+    }
     navigator.serviceWorker?.addEventListener('message', onMsg)
     window.addEventListener('push-deeplink', onDeepLink)
+    window.addEventListener('times-synced', onSynced)
+    // Cuando vuelva internet, marcar para re-sync
+    const onOnline = () => useAppStore.setState(s =>
+      s.offlinePending ? { syncStatus: 'syncing' } : {}
+    )
+    window.addEventListener('online', onOnline)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
+      window.removeEventListener('times-synced', onSynced)
+      window.removeEventListener('online', onOnline)
     }
   }, [])
 

@@ -169,6 +169,55 @@ self.addEventListener('push', (event) => {
   })())
 })
 
+// ─── PUSH SUBSCRIPTION CHANGE ────────────────────────────────────────────────
+// Cuando el navegador invalida la suscripción (expira, cambia de dispositivo…)
+// re-suscribimos automáticamente y guardamos el nuevo endpoint en Supabase.
+// Sin este handler, las push desaparecen silenciosamente tras días/semanas.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    try {
+      // 1. Obtener la nueva suscripción del PushManager
+      let newSub = null
+      try {
+        newSub = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: event.newSubscription?.options?.applicationServerKey
+            || event.oldSubscription?.options?.applicationServerKey
+        })
+      } catch { return }
+
+      if (!newSub) return
+
+      // 2. Leer userId guardado en IDB (lo guardamos al suscribir desde la app)
+      const userId = await _idbGet('push_user_id')
+      if (!userId) return
+
+      // 3. Helpers base64
+      const buf2b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+      const key  = newSub.getKey('p256dh')
+      const auth = newSub.getKey('auth')
+      if (!key || !auth) return
+
+      // 4. Actualizar en Supabase
+      await fetch(`${_SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`,
+          'Content-Type': 'application/json', Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({
+          endpoint: newSub.endpoint,
+          p256dh: buf2b64(key),
+          auth: buf2b64(auth),
+          updated_at: new Date().toISOString()
+        })
+      })
+    } catch {}
+  })())
+})
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const rawClickUrl = event.notification.data?.url || '/'

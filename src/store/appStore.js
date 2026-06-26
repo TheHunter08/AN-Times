@@ -22,8 +22,12 @@ export const useAppStore = create((set, get) => ({
     const merged = { ...get().db, ...(partial || {}), _ts: Date.now() }
     if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
     saveLocal(merged)
-    set({ db: merged, syncStatus: 'syncing' })
-    cloudPush(merged, () => set({ syncStatus: 'synced' }), () => set({ syncStatus: 'error' }))
+    const isOffline = !navigator.onLine
+    set({ db: merged, syncStatus: isOffline ? 'offline' : 'syncing', offlinePending: isOffline })
+    cloudPush(merged,
+      () => set({ syncStatus: 'synced', offlinePending: false }),
+      () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
+    )
     return merged
   },
 
@@ -133,6 +137,7 @@ export const useAppStore = create((set, get) => ({
   syncStatus: 'idle',
   syncError: null,
   lastSyncTime: null,
+  offlinePending: false,   // hay datos locales pendientes de subir
   activeModal: null,
   modalData: null,
 

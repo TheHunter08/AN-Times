@@ -144,7 +144,30 @@ async function _storeForBgSync(data) {
   try {
     await _idbSet('pending', data)
     const sw = await navigator.serviceWorker?.ready
-    if (sw && 'sync' in sw) await sw.sync.register('sync-data')
+    if (sw && 'sync' in sw) {
+      await sw.sync.register('sync-data')
+    } else {
+      // Fallback: escuchar online y sync manual
+      const onOnline = async () => {
+        window.removeEventListener('online', onOnline)
+        await _bgSyncFallback()
+      }
+      window.addEventListener('online', onOnline)
+    }
+  } catch {}
+}
+
+async function _bgSyncFallback() {
+  try {
+    const data = await _idbGet('pending')
+    if (!data || !supabase) return
+    const { error } = await supabase
+      .from(TABLE)
+      .upsert({ id: ROW_ID, data, updated_at: new Date().toISOString() })
+    if (!error) {
+      await _idbDel('pending')
+      window.dispatchEvent(new CustomEvent('times-synced'))
+    }
   } catch {}
 }
 
@@ -160,6 +183,14 @@ function _doCloudPush(db, onSuccess, onError) {
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
+
+  // Sin red: guardar en IDB inmediatamente para background sync (no reintentar)
+  if (!navigator.onLine) {
+    _pushFlight = false
+    onError?.()
+    _storeForBgSync(payload)
+    return
+  }
 
   supabase
     .from(TABLE)
@@ -315,6 +346,8 @@ export async function pushSubscribe(userId, vapidPub) {
       }
     }
     localStorage.setItem(VAPID_KEY_STORAGE, vapidPub)
+    // Guardar userId en IDB para que el SW lo use en pushsubscriptionchange
+    _idbSet('push_user_id', userId).catch(() => {})
     const key  = sub.getKey('p256dh')
     const auth = sub.getKey('auth')
     if (!key || !auth) {
