@@ -226,6 +226,7 @@ function _doCloudPush(db, onSuccess, onError) {
       } else {
         _saveRetry = 0
         _storeForBgSync(payload)
+        window.dispatchEvent(new CustomEvent('times-save-failed'))
       }
     })
 }

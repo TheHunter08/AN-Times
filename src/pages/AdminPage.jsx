@@ -220,14 +220,14 @@ export default function AdminPage() {
         <div className="adm-topbar-actions">
           <SyncBadge />
           {!isEncargado && (
-            <button className="adm-topbar-search" onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)">
+            <button className="adm-topbar-search" onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" aria-label="Buscar empleados y registros">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <span className="adm-search-label">Buscar</span>
               <kbd className="adm-search-kbd">⌘K</kbd>
             </button>
           )}
           {!isEncargado && (
-            <button className="adm-topbar-icon-btn" title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} onClick={() => nav('mensajes')}>
+            <button className="adm-topbar-icon-btn" title={adminUnreadChats > 0 ? `${adminUnreadChats} mensaje${adminUnreadChats>1?'s':''} sin leer` : 'Mensajes'} aria-label={adminUnreadChats > 0 ? `${adminUnreadChats} mensajes sin leer` : 'Mensajes'} onClick={() => nav('mensajes')}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               {adminUnreadChats > 0 && (
                 <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{adminUnreadChats > 9 ? '9+' : adminUnreadChats}</span>
@@ -1111,6 +1111,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const [filterEmp, setFilterEmp] = useState('')
   const [quickFilter, setQuickFilter] = useState('')
   const [editingRec, setEditingRec] = useState(null) // { id, field: 'inicio'|'fin', value }
+  const [pageSize, setPageSize] = useState(100)
   const emps = db.employees || []
   const recs = (db.records || []).filter(r => r.fin)
   const now = new Date()
@@ -1132,7 +1133,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio) || a.id.localeCompare(b.id)).slice(0, 300), [recs, quickFilter, filterDate, filterEmp, search])
+  }).sort((a,b) => b.inicio.localeCompare(a.inicio) || a.id.localeCompare(b.id)), [recs, quickFilter, filterDate, filterEmp, search])
+  const pagedFiltered = filtered.slice(0, pageSize)
 
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
   const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
@@ -1229,7 +1231,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
         <table className="adm-table">
           <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th><th>GPS</th><th></th></tr></thead>
           <tbody>
-            {filtered.map(r => {
+            {pagedFiltered.map(r => {
               const wm = Math.floor(recWorkSecs(r)/60)
               const bm = Math.floor((r.breakSecs||0)/60)
               const over = wm > WD
@@ -1249,7 +1251,13 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                             if (!val) return
                             const newInicio = new Date(val).toISOString()
                             if (r.fin && newInicio >= r.fin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
-                            const updated = (db.records||[]).map(rec => rec.id === r.id ? { ...rec, inicio: newInicio } : rec)
+                            const empRecs = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
+                            if (empRecs.some(rec => newInicio < rec.fin && (r.fin || newInicio) > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
+                            const updated = (db.records||[]).map(rec => {
+                              if (rec.id !== r.id) return rec
+                              const t2 = calcSecs({ ...rec, inicio: newInicio })
+                              return { ...rec, inicio: newInicio, workSecs: t2.work, breakSecs: t2.brk }
+                            })
                             const withAudit = auditLog(db, 'Hora entrada editada', `${r.empName}: ${ftime(r.inicio)} → ${ftime(newInicio)}`, session?.user?.name || 'Admin')
                             saveDB({ records: updated, audit: withAudit.audit })
                             setEditingRec(null)
@@ -1274,6 +1282,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                             if (!val) return
                             const newFin = new Date(val).toISOString()
                             if (newFin <= r.inicio) { toast('La salida debe ser posterior a la entrada', 3500, 'err'); return }
+                            const empRecs2 = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
+                            if (empRecs2.some(rec => r.inicio < rec.fin && newFin > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
                             const updated = (db.records||[]).map(rec => {
                               if (rec.id !== r.id) return rec
                               const t2 = calcSecs({ ...rec, fin: newFin })
@@ -1309,7 +1319,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                 </tr>
               )
             })}
-            {!filtered.length && <tr><td colSpan={8} className="empty">Sin resultados</td></tr>}
+            {!pagedFiltered.length && <tr><td colSpan={8} className="empty">Sin resultados</td></tr>}
           </tbody>
           {filtered.length > 0 && (
             <tfoot>
@@ -1325,6 +1335,13 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           )}
         </table>
       </div>
+      {filtered.length > pageSize && (
+        <div style={{ textAlign:'center', marginTop:14 }}>
+          <button className="btn btn-secondary" onClick={() => setPageSize(s => s + 100)}>
+            Ver más ({filtered.length - pageSize} restantes)
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1985,7 +2002,16 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
             <div style={{ fontSize:11, color:'var(--text4)', marginBottom:20, lineHeight:1.5 }}>
               Al escanear el QR, la app abrirá la pantalla de login con este empleado ya seleccionado.
             </div>
-            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => setQrEmp(null)}>Cerrar</button>
+            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+              <button className="btn btn-secondary btn-sm" style={{ flex:1 }} onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}?emp=${encodeURIComponent(qrEmp.id)}`
+                navigator.clipboard?.writeText(url).then(() => toast('Enlace copiado', 2000, 'ok')).catch(() => toast('No se pudo copiar', 2000, 'err'))
+              }}>
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copiar enlace
+              </button>
+              <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setQrEmp(null)}>Cerrar</button>
+            </div>
           </div>
         </div>
       )}
@@ -2000,6 +2026,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const [selMonth, setSelMonth] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [procesandoCierre, setProcesandoCierre] = useState(new Set())
   const [agruparCentro, setAgruparCentro] = useState(false)
   const recs = db.records || []
   const emps = (db.employees || []).filter(e => !e.baja)
@@ -2010,8 +2037,8 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const rows = sortedEmps(db).filter(e => !e.baja).map(e => {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const weeklyH = e.horasSemanales || WK
-    const expected = weeklyH * 4
+    const weeklyH = e.horasSemanales || (WK / 60)  // siempre en horas
+    const expected = weeklyH * 4 * 60              // 4 semanas → minutos
     const diff = totalMin - expected
     const vac = vacData(e.id, db)
     return { e, totalMin, diff, days: eRecs.length, vac, expected, weeklyH }
@@ -2260,6 +2287,8 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
   }
 
   const generarCierre = (e, totalMin, days) => {
+    if (procesandoCierre.has(e.id)) return
+    setProcesandoCierre(s => new Set([...s, e.id]))
     const mes = filterMonth
     const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
     const cierre = {
@@ -2272,6 +2301,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     saveDB({ cierres: [...(db.cierres||[]), cierre] })
     queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mes} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
     toast(`✅ Cierre enviado a ${e.name}`)
+    setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
   const downloadCierrePDF = (cierre, emp) => {
@@ -2359,8 +2389,8 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                         <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre, e)}>PDF</button>
                       </>
                     ) : (
-                      <button className="btn btn-primary btn-sm" onClick={() => generarCierre(e, totalMin, days)} disabled={!days}>
-                        Enviar cierre
+                      <button className="btn btn-primary btn-sm" onClick={() => generarCierre(e, totalMin, days)} disabled={!days || procesandoCierre.has(e.id)}>
+                        {procesandoCierre.has(e.id) ? '…' : 'Enviar cierre'}
                       </button>
                     )}
                   </div>
@@ -3378,8 +3408,8 @@ function PanelMiObra({ db, toast, saveDB, session }) {
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && (misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
   const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
-  const liveRecs = recs.filter(r => !r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)))
-  const pendRecs = recs.filter(r => r.fin && (misCentros.includes(r.centro) || empIds.has(r.empId)) && !r.aceptada)
+  const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
+  const pendRecs = recs.filter(r => r.fin && empIds.has(r.empId) && !r.aceptada)
     .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
   const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
   const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
@@ -4247,7 +4277,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
     const days = new Set(eRecs.map(r => r.inicio.slice(0, 10))).size
-    const weeklyH = e.horasSemanales || WK
+    const weeklyH = e.horasSemanales || (WK / 60)  // siempre en horas
     const expected = Math.round((weeklyH / 5) * days * 60)
     const diff = totalMin - expected
     return { e, totalMin, days, diff }

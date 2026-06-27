@@ -31,24 +31,31 @@ export const useAppStore = create((set, get) => ({
     return merged
   },
 
+  dbLoading: false,
+
   fetchDB: async () => {
     const { db } = get()
-    const tsResult = await cloudFetchTs()
-    if (!tsResult.ok) {
-      set({ syncStatus: 'error', syncError: tsResult.status })
-      return
+    set({ dbLoading: true })
+    try {
+      const tsResult = await cloudFetchTs()
+      if (!tsResult.ok) {
+        set({ syncStatus: 'error', syncError: tsResult.status })
+        return
+      }
+      set({ syncError: null })
+      if (tsResult.ts && db._ts && tsResult.ts <= db._ts) {
+        set({ syncStatus: 'synced', lastSyncTime: Date.now() })
+        return
+      }
+      const { ok, data, status } = await cloudFetch()
+      if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
+      if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
+      const merged = mergeDB(get().db, data)
+      saveLocal(merged)
+      set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
+    } finally {
+      set({ dbLoading: false })
     }
-    set({ syncError: null })
-    if (tsResult.ts && db._ts && tsResult.ts <= db._ts) {
-      set({ syncStatus: 'synced', lastSyncTime: Date.now() })
-      return
-    }
-    const { ok, data, status } = await cloudFetch()
-    if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
-    if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
-    const merged = mergeDB(get().db, data)
-    saveLocal(merged)
-    set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
   },
 
   // ── Realtime Supabase ────────────────────────────────────────────────

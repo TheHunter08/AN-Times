@@ -1123,17 +1123,24 @@ function streakLabel(n) {
 // ─── WeatherCard ─────────────────────────────────────────────────────────────
 function WeatherCard() {
   const [wx, setWx] = useState(null)
+  const [denied, setDenied] = useState(false)
   useEffect(() => {
     try { const c = sessionStorage.getItem('wx_v1'); if (c) { const d = JSON.parse(c); if (Date.now() - d.ts < 30*60*1000) { setWx(d); return } } } catch {}
-    navigator.geolocation?.getCurrentPosition(({ coords }) => {
+    if (!navigator.geolocation) { setDenied(true); return }
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude.toFixed(4)}&longitude=${coords.longitude.toFixed(4)}&current=temperature_2m,weather_code`)
         .then(r => r.json()).then(d => {
           const w = { ...d.current, ts: Date.now() }
           setWx(w)
           try { sessionStorage.setItem('wx_v1', JSON.stringify(w)) } catch {}
         }).catch(() => {})
-    }, () => {}, { timeout: 5000 })
+    }, () => setDenied(true), { timeout: 5000 })
   }, [])
+  if (denied) return (
+    <div className="v3-weather-pill" style={{ opacity:.55, cursor:'pointer' }} onClick={() => navigator.geolocation?.getCurrentPosition(() => {}, () => {})}>
+      <span>📍</span><span className="v3-weather-desc">Activa ubicación</span>
+    </div>
+  )
   if (!wx) return null
   const c = wx.weather_code ?? 0
   const icon = c === 0 ? '☀️' : c <= 2 ? '⛅' : c <= 3 ? '☁️' : c <= 49 ? '🌫️' : c <= 69 ? '🌧️' : c <= 79 ? '🌨️' : c <= 99 ? '⛈️' : '🌤️'
@@ -1406,9 +1413,11 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
   const liveSecs = o ? calcSecs(o).work : 0
   const totSecs = completedSecs + liveSecs
   const totMin = Math.floor(totSecs / 60)
-  const pct = Math.min(100, Math.round(totMin / WD * 100))
-  const remainMin = Math.max(0, WD - totMin)
-  const extraMin = Math.max(0, totMin - WD)
+  const empWD = Math.round((u.horasSemanales || WK / 60) / 5 * 60)  // minutos/día según contrato
+  const empWK = (u.horasSemanales || WK / 60) * 60                  // minutos/semana
+  const pct = Math.min(100, Math.round(totMin / empWD * 100))
+  const remainMin = Math.max(0, empWD - totMin)
+  const extraMin = Math.max(0, totMin - empWD)
 
   const entradaRec = realRecs[0]
   const salidaRec = [...realRecs].reverse().find(r => r.fin && r.closed)
@@ -1423,7 +1432,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
-  const weekPct = Math.min(100, Math.round(weekMin / WK * 100))
+  const weekPct = Math.min(100, Math.round(weekMin / empWK * 100))
   const lastWeekMin = useMemo(() => {
     const lws = new Date(wsStr); lws.setDate(lws.getDate() - 7)
     const lwe = new Date(wsStr)

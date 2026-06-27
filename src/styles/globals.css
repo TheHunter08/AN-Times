@@ -4986,3 +4986,5 @@ textarea.input-error {
   color: var(--text3);
   line-height: 1.4;
 }
+
+@keyframes loadingBar { 0%{background-position:200% 0} 100%{background-position:-200% 0} }

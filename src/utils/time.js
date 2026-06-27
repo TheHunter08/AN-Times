@@ -68,7 +68,11 @@ export const calcMin = r => {
   return Math.floor(calcSecs(r).work / 60)
 }
 
-export const gid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+export const gid = () => {
+  const arr = new Uint32Array(2)
+  ;(typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto : { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = Math.random() * 0xFFFFFFFF | 0; return a } }).getRandomValues(arr)
+  return arr[0].toString(36).padStart(7,'0') + arr[1].toString(36).padStart(7,'0')
+}
 
 export const vacData = (empId, db) => {
   const emp = (db.employees || []).find(e => e.id === empId)

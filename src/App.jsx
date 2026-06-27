@@ -255,6 +255,19 @@ function GlobalConfirm() {
   )
 }
 
+function LoadingBar() {
+  const dbLoading = useAppStore(s => s.dbLoading)
+  if (!dbLoading) return null
+  return (
+    <div style={{
+      position:'fixed', top:0, left:0, right:0, height:3, zIndex:999999,
+      background:'linear-gradient(90deg, var(--primary), var(--accent), var(--primary))',
+      backgroundSize:'200% 100%',
+      animation:'loadingBar 1.2s linear infinite',
+    }} />
+  )
+}
+
 export default function App() {
   const currentScreen  = useAppStore(s => s.currentScreen)
   const fetchDB        = useAppStore(s => s.fetchDB)
@@ -342,7 +355,7 @@ export default function App() {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
       if (event.data?.type === 'BG_SYNC_DONE') {
         fetchDB()
-        useAppStore.setState({ syncStatus: 'synced', offlinePending: false })
+        useAppStore.setState({ offlinePending: false })
       }
       if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
     }
@@ -354,6 +367,8 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message', onMsg)
     window.addEventListener('push-deeplink', onDeepLink)
     window.addEventListener('times-synced', onSynced)
+    const onSaveFailed = () => useAppStore.getState().toast('No se pudo guardar tras varios intentos. Comprueba la conexión.', 5000, 'err')
+    window.addEventListener('times-save-failed', onSaveFailed)
     // Cuando vuelva internet, marcar para re-sync
     const onOnline = () => useAppStore.setState(s =>
       s.offlinePending ? { syncStatus: 'syncing' } : {}
@@ -363,6 +378,7 @@ export default function App() {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
       window.removeEventListener('times-synced', onSynced)
+      window.removeEventListener('times-save-failed', onSaveFailed)
       window.removeEventListener('online', onOnline)
     }
   }, [])
@@ -416,6 +432,7 @@ export default function App() {
 
   return (
     <>
+      <LoadingBar />
       <UpdateBanner />
       <SyncBanner />
       <InAppNotification />
