@@ -134,32 +134,33 @@ self.addEventListener('push', (event) => {
     silent: false,
   }
 
-  // waitUntil SIEMPRE (obligatorio iOS aunque descartemos el push)
+  // waitUntil SIEMPRE (obligatorio iOS aunque sea duplicado — iOS mata la app si no)
   event.waitUntil((async () => {
-    // Dedupe persistente en IDB — sobrevive reinicios del SW
+    // Dedupe persistente en IDB — sobrevive reinicios del SW.
+    // IMPORTANTE: NO hacemos return antes de showNotification.
+    // iOS exige que SIEMPRE se muestre una notificación en el push handler.
+    // El dedup visual lo hacen tag + renotify:false (reemplaza silenciosamente).
     try {
       const last = await _idbGet(idbKey)
-      if (last && now - last < 5 * 60_000) return  // duplicado, descartar silenciosamente
-
-      // Marcar ANTES de mostrar (evita race con otra instancia del SW)
-      await _idbPut(idbKey, now)
-
-      // Limpieza asíncrona de entradas antiguas (>30 min) — no bloquea
-      _idbOpen().then(db => {
-        const tx = db.transaction(_IDB_STORE, 'readwrite')
-        const store = tx.objectStore(_IDB_STORE)
-        store.openCursor().onsuccess = e => {
-          const cur = e.target.result
-          if (!cur) return
-          if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
-          cur.continue()
-        }
-      }).catch(() => {})
+      if (!last || now - last >= 5 * 60_000) {
+        // No es duplicado: marcar y limpiar
+        await _idbPut(idbKey, now)
+        _idbOpen().then(idb => {
+          const tx = idb.transaction(_IDB_STORE, 'readwrite')
+          const store = tx.objectStore(_IDB_STORE)
+          store.openCursor().onsuccess = e => {
+            const cur = e.target.result
+            if (!cur) return
+            if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
+            cur.continue()
+          }
+        }).catch(() => {})
+      }
     } catch {
       // IDB no disponible — continuar sin dedup
     }
 
-    // 1) Mostrar notificación (requisito iOS Web Push)
+    // 1) Mostrar notificación (requisito iOS Web Push — siempre, incluso duplicados)
     await self.registration.showNotification(title, options)
 
     // 2) Avisar a clientes abiertos para banner in-app

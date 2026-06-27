@@ -44,8 +44,7 @@ async function getAppData() {
   return rows?.[0]?.data || null
 }
 
-async function markNotisSent(keys) {
-  const current = await getAppData()
+async function markNotisSent(current, keys) {
   if (!current) return
   const merged = { ...current, notisSent: { ...(current.notisSent || {}), ...keys }, _ts: Date.now() }
   await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
@@ -214,7 +213,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (Object.keys(newKeys).length > 0) await markNotisSent(newKeys)
+    if (Object.keys(newKeys).length > 0) await markNotisSent(db, newKeys)
 
     let sent = 0, failed = 0
     for (const { emp, sub, payload } of toSend) {

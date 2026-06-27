@@ -311,6 +311,7 @@ export default function EmployeePage() {
       if (!('Notification' in window) || Notification.permission !== 'granted') return
       if (notisRunningRef.current) return
       notisRunningRef.current = true
+      try {
       const now = new Date()
       const todayStr = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`
       const hh = now.getHours()
@@ -518,7 +519,8 @@ export default function EmployeePage() {
         if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
         saveDB(partial)
       }
-      notisRunningRef.current = false
+      } catch(e) { console.error('[smartNotis]', e) }
+      finally { notisRunningRef.current = false }
     }
 
     const iv = setInterval(checkSmartNotis, 60000)
