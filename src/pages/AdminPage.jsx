@@ -32,6 +32,12 @@ const ENC_PAGES = [
   { id:'mensajes', label:'Mensajes' },
 ]
 
+const JO_PAGES = [
+  { id:'miobra',   label:'Mi Obra' },
+  { id:'validar',  label:'Validar Horas' },
+  { id:'mensajes', label:'Mensajes' },
+]
+
 const NAV_ICONS = {
   ajustes:     <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
   dashboard:   <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
@@ -45,6 +51,7 @@ const NAV_ICONS = {
   auditoria:   <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
   mensajes:    <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
   miobra:      <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+  validar:     <><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
 }
 
 function NavIcon({ id, size = 17 }) {
@@ -70,21 +77,24 @@ export default function AdminPage() {
 
   // Un "encargado" no es administrador: acceso restringido solo a su obra asignada
   const isEncargado = session.isEnc && !session.isJO
-  const pages = isEncargado ? ENC_PAGES : PAGES
+  const isJefeObra = !!session.isJO
+  const pages = isJefeObra ? JO_PAGES : isEncargado ? ENC_PAGES : PAGES
 
   // Swipe touch navigation — mirror del sistema en EmployeePage
   const admMainRef = useRef(null)
   const currentPageRef = useRef(currentAdminPage)
   const prevPageRef = useRef(currentAdminPage)
   const isEncargadoRef = useRef(isEncargado)
+  const isJefeObraRef = useRef(isJefeObra)
 
   useEffect(() => { isEncargadoRef.current = isEncargado }, [isEncargado])
+  useEffect(() => { isJefeObraRef.current = isJefeObra }, [isJefeObra])
 
   // Animación de dirección al cambiar página (igual que emp-body[data-dir])
   useEffect(() => {
     const prev = prevPageRef.current
     if (prev !== currentAdminPage && admMainRef.current) {
-      const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
+      const order = (isJefeObraRef.current ? JO_PAGES : isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
       const pi = order.indexOf(prev), ci = order.indexOf(currentAdminPage)
       admMainRef.current.dataset.dir = ci >= pi ? 'right' : 'left'
     }
@@ -109,7 +119,7 @@ export default function AdminPage() {
       const vx = Math.abs(dx) / dt
       const isSwipe = Math.abs(dx) > 45 && (Math.abs(dx) > 70 || vx > 0.45) && Math.abs(dx) > Math.abs(dy) * 2
       if (!isSwipe) return
-      const order = (isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
+      const order = (isJefeObraRef.current ? JO_PAGES : isEncargadoRef.current ? ENC_PAGES : PAGES).map(p => p.id)
       const ci = order.indexOf(currentPageRef.current)
       if (dx < 0 && ci < order.length - 1) { try { navigator.vibrate(8) } catch {} ; setAdminPage(order[ci + 1]) }
       else if (dx > 0 && ci > 0) { try { navigator.vibrate(8) } catch {} ; setAdminPage(order[ci - 1]) }
@@ -120,8 +130,8 @@ export default function AdminPage() {
   }, [setAdminPage])
 
   useEffect(() => {
-    if (isEncargado && !pages.find(p => p.id === currentAdminPage)) setAdminPage('miobra')
-  }, [isEncargado])
+    if ((isEncargado || isJefeObra) && !pages.find(p => p.id === currentAdminPage)) setAdminPage('miobra')
+  }, [isEncargado, isJefeObra])
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -131,7 +141,7 @@ export default function AdminPage() {
       if (perm === 'default') perm = await Notification.requestPermission()
       if (perm === 'granted') {
         if (uid) pushSubscribe(uid, VAPID_PUB)
-        if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
+        if (!isEncargado && !isJefeObra) pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
     return () => clearTimeout(t)
@@ -276,10 +286,16 @@ export default function AdminPage() {
 
         {/* Main content */}
         <div className="adm-main" ref={admMainRef}>
-          {isEncargado ? (
+          {isJefeObra ? (
             <>
-              {currentAdminPage === 'miobra'    && <PanelMiObra  db={db} toast={toast} saveDB={saveDB} session={session} />}
-              {currentAdminPage === 'mensajes'  && <PanelMensajes db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'miobra'   && <PanelMiObra       db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'validar'  && <PanelValidarHoras  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'mensajes' && <PanelMensajes      db={db} toast={toast} saveDB={saveDB} session={session} />}
+            </>
+          ) : isEncargado ? (
+            <>
+              {currentAdminPage === 'miobra'   && <PanelMiObra  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'mensajes' && <PanelMensajes db={db} toast={toast} saveDB={saveDB} session={session} />}
             </>
           ) : (
             <>
@@ -307,7 +323,7 @@ export default function AdminPage() {
             <span>{p.label.slice(0,8)}</span>
           </button>
         ))}
-        {!isEncargado && (
+        {!isEncargado && !isJefeObra && (
           <button type="button" className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)} aria-label="Más opciones">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
             <span>Más</span>
@@ -4202,6 +4218,186 @@ function SearchModal({ db, open, q, setQ, onClose, onNav }) {
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── PANEL VALIDAR HORAS (Jefe de Obra) ──────────────────────────────────────
+function PanelValidarHoras({ db, toast, saveDB, session }) {
+  const now = new Date()
+  const [selMonth, setSelMonth] = useState(`${now.getFullYear()}-${p2(now.getMonth()+1)}`)
+
+  const joObras = session?.user?.obrasAsignadas || []
+  const recs = db.records || []
+
+  const emps = (db.employees || []).filter(e =>
+    !e.baja && !e.isAdmin && e.obrasAsignadas?.some(o => joObras.includes(o))
+  )
+
+  const rows = emps.map(e => {
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+    const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
+    const days = new Set(eRecs.map(r => r.inicio.slice(0, 10))).size
+    const weeklyH = e.horasSemanales || WK
+    const expected = Math.round((weeklyH / 5) * days * 60)
+    const diff = totalMin - expected
+    return { e, totalMin, days, diff }
+  })
+
+  const printHtml = (html) => {
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument || iframe.contentWindow.document
+    doc.open(); doc.write(html); doc.close()
+    setTimeout(() => {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print() } catch {}
+      setTimeout(() => { try { document.body.removeChild(iframe) } catch {} }, 4000)
+    }, 350)
+  }
+
+  const generarCierreJO = (e, totalMin, days) => {
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+    const cierre = {
+      id: gid(), empId: e.id, empName: e.name, mes: selMonth,
+      generadoPor: session?.user?.name || 'Jefe de Obra',
+      generadoAt: new Date().toISOString(),
+      totalMin, dias: days, estado: 'pendiente', firma: null,
+      records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
+    }
+    saveDB({ cierres: [...(db.cierres||[]), cierre] })
+    const mesLabel = new Date(selMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
+    queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
+    toast(`✅ Cierre enviado a ${e.name}`)
+  }
+
+  const generarTodosJO = () => {
+    const nuevos = []
+    rows.forEach(({ e, totalMin, days }) => {
+      if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === selMonth)) return
+      if (!days) return
+      const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+      nuevos.push({
+        id: gid(), empId: e.id, empName: e.name, mes: selMonth,
+        generadoPor: session?.user?.name || 'Jefe de Obra',
+        generadoAt: new Date().toISOString(),
+        totalMin, dias: days, estado: 'pendiente', firma: null,
+        records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
+      })
+    })
+    if (!nuevos.length) { toast('Todos los empleados ya tienen cierre o sin registros'); return }
+    saveDB({ cierres: [...(db.cierres||[]), ...nuevos] })
+    nuevos.forEach(c => {
+      const mesLabel = new Date(c.mes+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
+      queuePush(c.empId, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
+    })
+    toast(`✅ ${nuevos.length} cierre${nuevos.length!==1?'s':''} generado${nuevos.length!==1?'s':''}`)
+  }
+
+  const downloadCierrePDF = (cierre) => {
+    const mes = new Date(cierre.mes + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+    const rowsHtml = (cierre.records_snapshot || []).map(r => {
+      const m = Math.floor((r.workSecs||0)/60)
+      const d = new Date(r.inicio)
+      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
+    }).join('')
+    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
+<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{body{padding:20px}}</style>
+</head><body>
+<h1>Cierre de jornada mensual · ${mes}</h1>
+<h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
+<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+<div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
+${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
+<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma jefe de obra</div></div>
+</body></html>`)
+  }
+
+  const pendientes = rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===selMonth) && r.days>0).length
+  const mesLabel = new Date(selMonth+'-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+  const firmados = (db.cierres||[]).filter(c => c.estado==='firmado' && emps.some(e => e.id===c.empId))
+
+  return (
+    <div className="adm-panel">
+      <div className="adm-panel-header">
+        <div>
+          <h1 className="adm-panel-title gradient-text">Validar Horas</h1>
+          <div className="adm-panel-sub" style={{ marginTop:2, textTransform:'capitalize' }}>{mesLabel}</div>
+        </div>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+        <input type="month" value={selMonth} onChange={e => setSelMonth(e.target.value)}
+          style={{ width:'auto', padding:'7px 12px', fontSize:13, borderRadius:8 }} />
+      </div>
+
+      {!joObras.length ? (
+        <div className="empty">No tienes obras asignadas. Contacta con el administrador.</div>
+      ) : (
+        <>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
+            📋 <strong>Validar horas</strong> — Genera el cierre mensual y envíaselo a tus empleados para firma digital. Obras: <strong>{joObras.join(', ')}</strong>
+          </div>
+
+          <button className="btn btn-primary" style={{ width:'100%', marginBottom:16 }} onClick={generarTodosJO} disabled={!pendientes}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Enviar cierre a todos ({pendientes} pendientes)
+          </button>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {rows.map(({ e, totalMin, days, diff }) => {
+              const cierre = (db.cierres||[]).find(c => c.empId === e.id && c.mes === selMonth)
+              return (
+                <div key={e.id} className="card" style={{ display:'flex', alignItems:'center', gap:14 }}>
+                  <div style={{ width:40, height:40, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700 }}>{e.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                      {days} días · {mhm(totalMin)}
+                      {days > 0 && <span style={{ color: diff>=0?'var(--green)':'var(--red)', marginLeft:4 }}>{diff>=0?'+':''}{mhm(Math.abs(diff))}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
+                    {cierre ? (
+                      <>
+                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
+                          {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente'}
+                        </span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)}>PDF</button>
+                      </>
+                    ) : (
+                      <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days}>
+                        Enviar cierre
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {!rows.length && <div className="empty">Sin empleados activos en tus obras para este mes</div>}
+          </div>
+
+          {firmados.length > 0 && (
+            <div style={{ marginTop:28 }}>
+              <div className="adm-section-title" style={{ marginBottom:12 }}>Cierres firmados</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {firmados.sort((a,b) => b.mes.localeCompare(a.mes)).slice(0,20).map(c => (
+                  <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
+                    <div style={{ fontSize:18 }}>✅</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{c.empName} · {c.mes}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>Firmado {new Date(c.firma?.firmadoAt).toLocaleDateString('es-ES')} · {mhm(c.totalMin)}</div>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)}>PDF</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
