@@ -2146,6 +2146,18 @@ function PanelInformes({ db, toast, saveDB, session }) {
     toast('Excel completo descargado', 3000, 'ok')
   }
 
+  const printHtml = (html) => {
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument || iframe.contentWindow.document
+    doc.open(); doc.write(html); doc.close()
+    setTimeout(() => {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print() } catch(err) { console.warn('[printHtml]', err) }
+      setTimeout(() => { try { document.body.removeChild(iframe) } catch {} }, 4000)
+    }, 350)
+  }
+
   const downloadNominaPDF = ({ e, totalMin, days }) => {
     const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
       .sort((a, b) => a.inicio.localeCompare(b.inicio))
@@ -2161,9 +2173,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       const d = new Date(r.inicio), fin = new Date(r.fin)
       return `<tr><td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${esc(r.centro||'—')}</td><td>${mhm(wm)}</td></tr>`
     }).join('')
-    const win = window.open('', '_blank')
-    if (!win) { toast('Activa las ventanas emergentes en el navegador'); return }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${mes} · ${esc(e.name)}</title>
+    printHtml(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${mes} · ${esc(e.name)}</title>
 <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:750px;margin:0 auto}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;color:#666;font-weight:400;margin:0 0 24px}
 .meta{display:flex;gap:32px;margin-bottom:24px;padding:14px 18px;background:#f8f8f8;border-radius:8px;font-size:13px}
@@ -2176,7 +2186,7 @@ td{padding:8px 12px;border-bottom:1px solid #eee}tr:last-child td{border-bottom:
 .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;margin-left:8px}
 .b-ok{background:#dcfce7;color:#166534}.b-warn{background:#fef9c3;color:#854d0e}
 footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}
-@media print{button{display:none}}</style></head><body>
+@media print{body{padding:20px}}</style></head><body>
 <h1>${esc(e.name)} <span class="badge ${totalMin >= (e.horasSemanales||WK)*4*0.9 ? 'b-ok':'b-warn'}">${mhm(totalMin)}</span></h1>
 <h2>Nómina de horas · ${mes}</h2>
 <div class="meta">
@@ -2195,8 +2205,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
 <div class="sign"><div class="sign-box">Firma empleado<br><br><br>_________________________<br>${esc(e.name)}</div>
 <div class="sign-box">Firma empresa<br><br><br>_________________________<br>Representante</div></div>
 <footer><span>Generado: ${new Date().toLocaleString('es-ES')}</span><span>TIMES INC · Registro de jornada laboral</span></footer>
-<script>window.print()</script></body></html>`)
-    win.document.close()
+</body></html>`)
   }
 
   const generarTodosCierres = () => {
@@ -2247,20 +2256,16 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
       const d = new Date(r.inicio)
       return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
     }).join('')
-    const win = window.open('', '_blank')
-    if (!win) { toast('Permite ventanas emergentes'); return }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
-    <style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{button{display:none}}</style>
-    </head><body>
-    <h1>Cierre de jornada mensual · ${mes}</h1>
-    <h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
-    <table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-    <div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
-    ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
-    <div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma empresa</div></div>
-    <br><button onclick="window.print()">Imprimir / Guardar PDF</button>
-    </body></html>`)
-    win.document.close()
+    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
+<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{body{padding:20px}}</style>
+</head><body>
+<h1>Cierre de jornada mensual · ${mes}</h1>
+<h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
+<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+<div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
+${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
+<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma empresa</div></div>
+</body></html>`)
   }
 
   const TABS = [
