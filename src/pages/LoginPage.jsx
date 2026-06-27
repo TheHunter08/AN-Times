@@ -52,7 +52,7 @@ export default function LoginPage() {
 
   useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
 
-  useEffect(() => { setEmpHasBio(selectedEmpId ? empHasBio : false) }, [selectedEmpId])
+  useEffect(() => { setEmpHasBio(selectedEmpId ? hasBiometric(selectedEmpId) : false) }, [selectedEmpId])
 
   // Mostrar bloqueo si el empleado ya está en lockout
   useEffect(() => {

@@ -2253,6 +2253,8 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const pdfDoc  = await PDFDocument.create()
       const fontR   = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontB   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const localDate = iso => { const d = new Date(iso); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}` }
+      const safe = s => String(s ?? '').replace(/[^\x00-\xFF]/g,'?')
 
       const PW = 595, PH = 842
       const ML = 35, MR = 35
