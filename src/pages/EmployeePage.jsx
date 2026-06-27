@@ -1599,20 +1599,17 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
           )}
         </div>
 
-        {/* v4: KPI horizontal scroll */}
-        <div style={{ display:'flex', gap:10, padding:'0 16px 4px', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}
-          className="v4-kpi-scroll">
+        {/* Stats grid */}
+        <div className="stat-mini-grid">
           {[
-            { lbl:'Entrada',  val: entradaRec ? ftime(entradaRec.inicio) : '- -', color:'var(--primary-light)', trend: entradaRec ? 'Hora de entrada' : 'Sin fichar hoy' },
-            { lbl:'Hoy',      val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color:'var(--text1)', trend: brkMin > 0 ? `${Math.floor(brkMin/60)}h ${p2(brkMin%60)}m pausa` : 'Sin pausas' },
-            { lbl:'Semana',   val: mhm(weekMin), color: weekPct >= 100 ? 'var(--green)' : 'var(--text1)', trend: weekPct >= 100 ? '✓ 40h' : `${100 - weekPct}% restante` },
-            { lbl:'Mes',      val: mhm(monthMin), color: monthPct >= 100 ? 'var(--green)' : 'var(--text1)', trend: monthExtraMin > 0 ? `+${mhm(monthExtraMin)} extra` : monthDeficitMin > 0 ? `−${mhm(monthDeficitMin)} déficit` : `${monthPct}%` },
-            ...(extraMin > 0 ? [{ lbl:'Extras hoy', val:`+${Math.floor(extraMin/60)}h ${p2(extraMin%60)}m`, color:'var(--accent3)', trend:'Por encima del objetivo' }] : []),
-          ].map(({ lbl, val, color, trend }) => (
-            <div key={lbl} style={{ flexShrink:0, background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:14, padding:'11px 14px', minWidth:100 }}>
-              <div style={{ fontSize:9, color:'var(--text4)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{lbl}</div>
-              <div style={{ fontSize:17, fontWeight:800, color, fontVariantNumeric:'tabular-nums', lineHeight:1 }}>{val}</div>
-              <div style={{ fontSize:9, color:'var(--text4)', marginTop:4, fontWeight:600 }}>{trend}</div>
+            { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color: 'var(--primary-light)', bg: 'rgba(37,99,235,.12)' },
+            { lbl: 'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color: 'var(--green)', bg: 'var(--green-dim)' },
+            { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin / 60).toString().padStart(2, '0')}:${p2(brkMin % 60)}` : '00:00', color: 'var(--orange)', bg: 'var(--orange-dim)' },
+            { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m` : '0h 00m', color: 'var(--secondary)', bg: 'rgba(6,182,212,.1)' },
+          ].map(({ lbl, val, color, bg }) => (
+            <div key={lbl} className="stat-card-premium v3-stat-card" style={{ textAlign: 'center' }}>
+              <div className="stat-lbl v3-stat-label">{lbl}</div>
+              <div className="stat-val v3-stat-value" style={{ color, fontSize: 14 }}>{val}</div>
             </div>
           ))}
         </div>
