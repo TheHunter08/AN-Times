@@ -2203,12 +2203,16 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
 
-      // ─ Firma del responsable ──────────────────────────────────────
-      const adminFirma = db.firmas?.['admin']?.main || db.firmas?.[u?.id]?.main
+      // ─ Firma del responsable (jefe de obra de la misma obra) ─────
+      const joEmp = u.obrasAsignadas?.length
+        ? (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja && e.obrasAsignadas?.some(o => u.obrasAsignadas.includes(o)))
+        : (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja)
+      const responsableFirma = (joEmp ? db.firmas?.[joEmp.id]?.main : null) || db.firmas?.['admin']?.main
+      const responsableNombre = joEmp ? safe(joEmp.name) : 'Jefe de Obra / Responsable'
       page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
-      if (adminFirma?.data) {
+      if (responsableFirma?.data) {
         try {
-          const printable2 = await makePrintableSignature(adminFirma.data)
+          const printable2 = await makePrintableSignature(responsableFirma.data)
           const b642 = printable2.split(',')[1]
           const bin2 = atob(b642)
           const bytes2 = new Uint8Array(bin2.length)
@@ -2217,11 +2221,11 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           const sigW2 = 130, sigH2 = sigW2 * (sigImg2.height / sigImg2.width)
           page.drawImage(sigImg2, { x:ML+CW/2, y:y-18-sigH2, width:sigW2, height:sigH2 })
           page.drawLine({ start:{x:ML+CW/2,y:y-22-sigH2}, end:{x:ML+CW/2+170,y:y-22-sigH2}, thickness:0.5, color:cGray })
-          page.drawText('Firma del Responsable', { x:ML+CW/2, y:y-31-sigH2, size:6.5, font:fontR, color:cGray, maxWidth:170 })
+          page.drawText(responsableNombre, { x:ML+CW/2, y:y-31-sigH2, size:6.5, font:fontR, color:cGray, maxWidth:170 })
         } catch {}
       } else {
         page.drawLine({ start:{x:ML+CW/2,y:y-65}, end:{x:ML+CW/2+170,y:y-65}, thickness:0.5, color:cGray })
-        page.drawText('Firma del Responsable', { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
+        page.drawText(responsableNombre, { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
       }
 
       // ─ Legal footer ───────────────────────────────────────────────
@@ -2352,6 +2356,30 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
         page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+      }
+      // ─ Firma del responsable (jefe de obra de la misma obra) ─────
+      const joEmpW = u.obrasAsignadas?.length
+        ? (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja && e.obrasAsignadas?.some(o => u.obrasAsignadas.includes(o)))
+        : (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja)
+      const responsableFirmaW = (joEmpW ? db.firmas?.[joEmpW.id]?.main : null) || db.firmas?.['admin']?.main
+      const responsableNombreW = joEmpW ? safe(joEmpW.name) : 'Jefe de Obra / Responsable'
+      page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
+      if (responsableFirmaW?.data) {
+        try {
+          const p2r = await makePrintableSignature(responsableFirmaW.data)
+          const b64r = p2r.split(',')[1]
+          const binr = atob(b64r)
+          const bytesr = new Uint8Array(binr.length)
+          for (let i=0; i<binr.length; i++) bytesr[i] = binr.charCodeAt(i)
+          const sigImgR = await pdfDoc.embedPng(bytesr.buffer)
+          const sigWR = 130, sigHR = sigWR * (sigImgR.height / sigImgR.width)
+          page.drawImage(sigImgR, { x:ML+CW/2, y:y-18-sigHR, width:sigWR, height:sigHR })
+          page.drawLine({ start:{x:ML+CW/2,y:y-22-sigHR}, end:{x:ML+CW/2+170,y:y-22-sigHR}, thickness:0.5, color:cGray })
+          page.drawText(responsableNombreW, { x:ML+CW/2, y:y-31-sigHR, size:6.5, font:fontR, color:cGray, maxWidth:170 })
+        } catch {}
+      } else {
+        page.drawLine({ start:{x:ML+CW/2,y:y-65}, end:{x:ML+CW/2+170,y:y-65}, thickness:0.5, color:cGray })
+        page.drawText(responsableNombreW, { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
       }
       page.drawText('Documento generado automaticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
       const pdfBytes = await pdfDoc.save()
