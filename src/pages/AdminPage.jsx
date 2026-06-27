@@ -33,9 +33,8 @@ const ENC_PAGES = [
 ]
 
 const JO_PAGES = [
-  { id:'miobra',   label:'Mi Obra' },
+  ...PAGES,
   { id:'validar',  label:'Validar Horas' },
-  { id:'mensajes', label:'Mensajes' },
 ]
 
 const NAV_ICONS = {
@@ -141,7 +140,7 @@ export default function AdminPage() {
       if (perm === 'default') perm = await Notification.requestPermission()
       if (perm === 'granted') {
         if (uid) pushSubscribe(uid, VAPID_PUB)
-        if (!isEncargado && !isJefeObra) pushSubscribe('__admin__', VAPID_PUB)
+        if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
     return () => clearTimeout(t)
@@ -288,9 +287,19 @@ export default function AdminPage() {
         <div className="adm-main" ref={admMainRef}>
           {isJefeObra ? (
             <>
-              {currentAdminPage === 'miobra'   && <PanelMiObra       db={db} toast={toast} saveDB={saveDB} session={session} />}
-              {currentAdminPage === 'validar'  && <PanelValidarHoras  db={db} toast={toast} saveDB={saveDB} session={session} />}
-              {currentAdminPage === 'mensajes' && <PanelMensajes      db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'empleados'   && <PanelEmpleados   db={db} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} session={session} />}
+              {currentAdminPage === 'informes'    && <PanelInformes    db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'mensajes'    && <PanelMensajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
+              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'miobra'      && <PanelMiObra      db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'validar'     && <PanelValidarHoras db={db} toast={toast} saveDB={saveDB} session={session} />}
             </>
           ) : isEncargado ? (
             <>
@@ -323,7 +332,7 @@ export default function AdminPage() {
             <span>{p.label.slice(0,8)}</span>
           </button>
         ))}
-        {!isEncargado && !isJefeObra && (
+        {!isEncargado && (
           <button type="button" className={`adm-mobile-nav-item${['informes','obras','documentos','auditoria'].includes(currentAdminPage)?' active':''}`} onClick={() => setSideOpen(true)} aria-label="Más opciones">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
             <span>Más</span>
