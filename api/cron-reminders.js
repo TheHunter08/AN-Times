@@ -10,7 +10,7 @@
 // Las claves de dedup se marcan en db.notisSent (Supabase) para evitar
 // duplicados entre el cron y el cliente (cuando la app está en background).
 // ─────────────────────────────────────────────────────────────────────────────
-const webpush = require('web-push')
+import webpush from 'web-push'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -45,7 +45,6 @@ async function getAppData() {
 }
 
 async function markNotisSent(keys) {
-  // Re-lee la DB fresca para minimizar escritura en conflicto con el cliente
   const current = await getAppData()
   if (!current) return
   const merged = { ...current, notisSent: { ...(current.notisSent || {}), ...keys }, _ts: Date.now() }
@@ -68,7 +67,6 @@ async function deleteSub(userId) {
   }).catch(() => {})
 }
 
-// Zona horaria Spain (soporta horario de verano/invierno)
 function nowInSpain() {
   const str = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' })
   return new Date(str)
@@ -89,7 +87,7 @@ async function sendPush(sub, payload, empName) {
   console.log(`[cron] push sent → ${empName}`)
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const isCronInvocation = req.headers['x-vercel-cron'] === '1'
   if (!isCronInvocation && CRON_SECRET) {
     const token = (req.headers['authorization'] || '').replace('Bearer ', '')
@@ -125,7 +123,6 @@ module.exports = async function handler(req, res) {
     const subs   = await getPushSubs()
     const subMap = new Map(subs.map(s => [s.user_id, s]))
 
-    // Acumulador: { sub, payload, emp, key }
     const toSend = []
     const newKeys = {}
 
@@ -146,7 +143,6 @@ module.exports = async function handler(req, res) {
       const hasFichado = todayRecs.length > 0
 
       // ── 1. Recordatorio de fichaje ──────────────────────────────────────────
-      // Dispara si: no ha fichado hoy + hora >= reminderTime del empleado
       {
         const remTime = emp.reminderTime || '08:30'
         const [rh, rm] = safeTimeSplit(remTime, '08:30')
@@ -160,7 +156,6 @@ module.exports = async function handler(req, res) {
       }
 
       // ── 2. Jornada larga (> 7h 45min sin fichar salida) ────────────────────
-      // Se envía una vez por jornada (key basada en record ID)
       if (openRec) {
         const elapsedMin = (nowMs - new Date(openRec.inicio).getTime()) / 60000
         if (elapsedMin >= 465) {
@@ -175,8 +170,7 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // ── 3. Salida olvidada (jornada abierta después de la hora de salida) ──
-      // Usa la salidaTime del empleado o la global; una vez por jornada abierta.
+      // ── 3. Salida olvidada ──────────────────────────────────────────────────
       if (openRec) {
         const salidaT = emp.salidaTime || cfgSalidaTime
         const [sh, sm] = safeTimeSplit(salidaT, '21:00')
@@ -220,15 +214,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── MARCAR CLAVES ANTES DE ENVIAR ─────────────────────────────────────────
-    // Esto previene la race condition con el cliente (en background):
-    // el cliente verá las claves ya marcadas y no enviará duplicados.
     if (Object.keys(newKeys).length > 0) await markNotisSent(newKeys)
 
-    // ── ENVIAR PUSHES ─────────────────────────────────────────────────────────
-    let sent = 0, failed = 0, skipped = 0
-    const failedKeys = {}
-
+    let sent = 0, failed = 0
     for (const { emp, sub, payload } of toSend) {
       try {
         await sendPush(sub, payload, emp.name)
@@ -240,12 +228,8 @@ module.exports = async function handler(req, res) {
           console.warn(`[cron] push error for ${emp.name}:`, err.statusCode, err.body || err.message)
         }
         failed++
-        // No des-marcamos las claves: mejor perder un envío que duplicar
-        // (el cron volverá a comprobar condiciones la próxima hora)
       }
     }
-
-    skipped = employees.length * 5 - toSend.length  // estimación
 
     const result = {
       ok: true, today, nowSpain: `${p2(nowH)}:${p2(nowM)}`,

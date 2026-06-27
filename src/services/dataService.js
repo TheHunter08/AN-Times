@@ -129,6 +129,17 @@ async function _idbSet(key, val) {
   })
 }
 
+async function _idbGet(key) {
+  try {
+    const db = await _idbOpen()
+    return new Promise((res, rej) => {
+      const tx = db.transaction(_IDB_STORE, 'readonly')
+      const r  = tx.objectStore(_IDB_STORE).get(key)
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error)
+    })
+  } catch { return undefined }
+}
+
 async function _idbDel(key) {
   try {
     const db = await _idbOpen()
