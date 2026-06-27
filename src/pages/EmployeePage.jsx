@@ -540,7 +540,10 @@ export default function EmployeePage() {
     } catch {}
   }, [db.notis, u])
 
-  const openRec = () => (db.records || []).find(r => r.empId === u?.id && !r.fin)
+  const openRec = useCallback(
+    () => (db.records || []).find(r => r.empId === u?.id && !r.fin),
+    [db.records, u?.id]
+  )
 
   // === TIMER ACTIONS ===
   const doStart = () => {
@@ -691,13 +694,17 @@ export default function EmployeePage() {
   const unread = useMemo(() => (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length, [db.notis, u?.id])
   const chatUnread = useMemo(() => (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length, [db.chats, u?.id])
 
+  const [greetHour, setGreetHour] = useState(new Date().getHours())
+  useEffect(() => {
+    const id = setInterval(() => setGreetHour(new Date().getHours()), 60000)
+    return () => clearInterval(id)
+  }, [])
   const greeting = useMemo(() => {
-    const h = new Date().getHours()
     const firstName = u.name.split(' ')[0]
-    if (h >= 6 && h < 14) return `Buenos días, ${firstName} ☀️`
-    if (h >= 14 && h < 21) return `Buenas tardes, ${firstName} 👋`
+    if (greetHour >= 6 && greetHour < 14) return `Buenos días, ${firstName} ☀️`
+    if (greetHour >= 14 && greetHour < 21) return `Buenas tardes, ${firstName} 👋`
     return `Buenas noches, ${firstName} 🌙`
-  }, [u.name, new Date().getHours()])
+  }, [u.name, greetHour])
 
   return (
     <div className="screen active" id="sEmp">
@@ -1497,9 +1504,9 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
                 {timer.state === 'break' ? '⏸ En descanso' : '● Jornada activa'}
               </span>
             )}
-            {openRec?.centro && (
+            {o?.centro && (
               <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background:'var(--primary-dim)', color:'var(--primary-light)', border:'1px solid var(--primary-glow)' }}>
-                {openRec.centro}
+                {o.centro}
               </span>
             )}
             {timer.state === 'break' && brkMin > 20 && (
@@ -1578,7 +1585,7 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
               <div style={{ fontSize:11, fontWeight:500, opacity:.75, marginTop:2 }}>
                 {timer.state === 'idle'
                   ? 'Toca para comenzar tu día'
-                  : `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m trabajadas${openRec?.breaks?.length ? ` · ${openRec.breaks.length} descanso${openRec.breaks.length !== 1 ? 's' : ''}` : ''}`}
+                  : `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m trabajadas${o?.breaks?.length ? ` · ${o.breaks.length} descanso${o.breaks.length !== 1 ? 's' : ''}` : ''}`}
               </div>
             </div>
           </button>
@@ -2195,7 +2202,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       }
 
       // ─ Firma del responsable ──────────────────────────────────────
-      const adminFirma = db.firmas?.['admin']?.main || db.firmas?.[session?.user?.id]?.main
+      const adminFirma = db.firmas?.['admin']?.main || db.firmas?.[u?.id]?.main
       page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
       if (adminFirma?.data) {
         try {

@@ -366,6 +366,32 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  // Sincronizar theme-color meta con el tema activo (dark/light toggle en app)
+  useEffect(() => {
+    const updateThemeColor = () => {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light'
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.content = isLight ? '#ffffff' : '#0d0d18'
+    }
+    const observer = new MutationObserver(updateThemeColor)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    updateThemeColor()
+    return () => observer.disconnect()
+  }, [])
+
+  // Registrar Periodic Background Sync (Chrome/Android — sincroniza datos aunque la app esté cerrada)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.ready.then(reg => {
+      if (!('periodicSync' in reg)) return
+      navigator.permissions.query({ name: 'periodic-background-sync' }).then(perm => {
+        if (perm.state === 'granted') {
+          reg.periodicSync.register('periodic-sync-data', { minInterval: 24 * 60 * 60 * 1000 }).catch(() => {})
+        }
+      }).catch(() => {})
+    }).catch(() => {})
+  }, [])
+
   return (
     <>
       <UpdateBanner />

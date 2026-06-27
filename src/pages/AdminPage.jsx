@@ -1289,7 +1289,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           {filtered.length > 0 && (
             <tfoot>
               <tr style={{ background:'var(--bg-500)' }}>
-                <td colSpan={5} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
+                <td colSpan={4} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
                   Total ({filtered.length} registros)
                 </td>
                 <td style={{ fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalWork)}</td>
@@ -1817,7 +1817,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Empleados</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2 }}>{emps.length} empleado{emps.length!==1?'s':''} {empSearch ? 'encontrados' : 'activos'}</div>
+          <div className="adm-panel-sub" style={{ marginTop:2 }}>{emps.length} empleado{emps.length!==1?'s':''} {empSearch ? 'encontrados' : `(${emps.filter(e=>!e.baja).length} activos)`}</div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button className="btn btn-secondary btn-sm" onClick={exportEmpleadosXLSX} title="Exportar Excel">
@@ -2663,7 +2663,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
         const obras = db.obras || []
         const allEmps = sortedEmps(db).filter(e => !e.baja)
         const obraRows = obras.map(obra => {
-          const assigned = allEmps.filter(e => (e.obrasAsignadas || []).includes(obra))
+          const assigned = allEmps.filter(e => (e.obrasAsignadas || []).includes(obra.nombre))
           const empData = assigned.map(e => {
             const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
             const mins = eRecs.reduce((s, r) => s + calcMin(r), 0)
@@ -2831,9 +2831,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                   </tr>`
                 })
               })
-              const win = window.open('', '_blank')
-              if (!win) { toast('Activa las ventanas emergentes'); return }
-              win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+              printHtml(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <title>Registro de jornada ${mesNombre2} · ${esc(empresaNombre)}</title>
 <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
 h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
@@ -2852,7 +2850,6 @@ footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;paddi
   <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
   <div><span>Empleados</span>${empsActivos.length}</div>
 </div>
-<button onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Imprimir / Guardar PDF</button>
 <table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Descanso</th><th>Horas netas</th></tr></thead>
 <tbody>${rowsHtml}</tbody></table>
 <div class="sign">
@@ -2861,7 +2858,6 @@ footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;paddi
 </div>
 <footer><span>Documento generado por AN-Times · Control horario RDL 8/2019</span><span>${new Date().toLocaleDateString('es-ES')}</span></footer>
 </body></html>`)
-              win.document.close()
             }}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               Descargar registro oficial PDF
@@ -3474,8 +3470,12 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     if (!corr) return
     let newRecords = db.records || []
     if (estado === 'aprobada') {
-      newRecords = newRecords.map(r => r.id === corr.recId
-        ? { ...r, inicio: corr.propInicio, fin: corr.propFin, workSecs: 0 } : r)
+      newRecords = newRecords.map(r => {
+        if (r.id !== corr.recId) return r
+        const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin }
+        const t = calcSecs(updated)
+        return { ...updated, workSecs: t.work, breakSecs: t.brk }
+      })
     }
     const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: enc.name } : c)
     const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }

@@ -7,17 +7,19 @@ import { ExpirationPlugin } from 'workbox-expiration'
 // NO se llama a self.skipWaiting() automáticamente — el cliente lo invoca vía
 // mensaje 'SKIP_WAITING' tras confirmar el banner "Nueva versión disponible".
 // Esto evita refrescos sorpresa durante una jornada activa.
+const ACTIVE_CACHES = new Set([
+  'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'supabase-api'
+])
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
-      // Limpiar cachés antiguas de versiones previas del SW
+      // Eliminar cachés de versiones antiguas que ya no están en uso
       caches.keys().then(keys =>
         Promise.all(
           keys
-            .filter(k => k.startsWith('times-') && !['times-inc-sync'].includes(k))
-            .map(k => k.startsWith('html-pages') || k.startsWith('google-fonts') || k.startsWith('supabase-api') ? null : caches.delete(k))
-            .filter(Boolean)
+            .filter(k => !ACTIVE_CACHES.has(k) && !k.startsWith('workbox-precache'))
+            .map(k => caches.delete(k))
         )
       )
     ])
@@ -220,7 +222,9 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const rawClickUrl = event.notification.data?.url || '/'
+  // event.action contiene el id del botón de acción pulsado ('' si se hizo clic en el cuerpo)
+  const actionUrl = event.notification.data?.actionUrls?.[event.action]
+  const rawClickUrl = actionUrl || event.notification.data?.url || '/'
   const clickUrl = (typeof rawClickUrl === 'string' && rawClickUrl.startsWith('/')) ? rawClickUrl : '/'
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {

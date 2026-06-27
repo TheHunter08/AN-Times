@@ -75,6 +75,7 @@ export const useAppStore = create((set, get) => ({
   logout: () => {
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}
+    try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
     set({
       session: { user: null, isAdmin: false, isEnc: false, isJO: false },
       timer: { ws: 0, bs: 0, state: 'idle' },

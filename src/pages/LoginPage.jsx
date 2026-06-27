@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [bioAvailable, setBioAvailable] = useState(false)
   const [bioLoading, setBioLoading]     = useState(false)
   const [bioRegLoading, setBioRegLoading] = useState(false)
+  const [empHasBio, setEmpHasBio] = useState(false)
 
   const emps = sortedEmps(db)
 
@@ -50,6 +51,8 @@ export default function LoginPage() {
   useEffect(() => { requestAnimationFrame(() => setMounted(true)) }, [])
 
   useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
+
+  useEffect(() => { setEmpHasBio(selectedEmpId ? empHasBio : false) }, [selectedEmpId])
 
   // Mostrar bloqueo si el empleado ya está en lockout
   useEffect(() => {
@@ -454,7 +457,7 @@ export default function LoginPage() {
               )}
 
               {/* Biometric login button — shown only when employee selected + credential exists */}
-              {bioAvailable && selectedEmpId && hasBiometric(selectedEmpId) && !showAdminForm && (
+              {bioAvailable && selectedEmpId && empHasBio && !showAdminForm && (
                 <button
                   className="login-bio-btn"
                   disabled={bioLoading}
@@ -483,7 +486,7 @@ export default function LoginPage() {
               )}
 
               {/* Biometric register link — offer to enable after employee selection */}
-              {bioAvailable && selectedEmpId && !hasBiometric(selectedEmpId) && !showAdminForm && (
+              {bioAvailable && selectedEmpId && !empHasBio && !showAdminForm && (
                 <button
                   className="login-bio-register"
                   disabled={bioRegLoading}
@@ -493,8 +496,7 @@ export default function LoginPage() {
                     setBioRegLoading(true)
                     try {
                       await registerBiometric(emp.id, emp.name)
-                      // Force re-render to show the bio login button
-                      setBioAvailable(v => v)
+                      setEmpHasBio(true)
                       setErr('')
                     } catch (ex) {
                       if (ex.name !== 'NotAllowedError') setErr('No se pudo registrar la huella')
