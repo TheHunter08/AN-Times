@@ -2072,10 +2072,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
         // header strip
         page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(u.empresa || 'Empresa', { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText(safe(u.empresa || 'Empresa'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
         page.drawText('REGISTRO DE JORNADA LABORAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
-        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—')
-        page.drawText(`Trabajador: ${u.name}   ·   Mes: ${monthName}   ·   Obras: ${obras}`, { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
+        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
+        page.drawText(safe(`Trabajador: ${u.name}   .   Mes: ${monthName}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
         page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
         y -= 74
       }
@@ -2094,19 +2094,19 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const cover = pdfDoc.addPage([PW, PH])
       // header band
       cover.drawRectangle({ x:0, y:PH-120, width:PW, height:120, color:cPri })
-      cover.drawText(u.empresa || 'TIMES INC', { x:ML, y:PH-50, size:24, font:fontB, color:cWhite })
+      cover.drawText(safe(u.empresa || 'TIMES INC'), { x:ML, y:PH-50, size:24, font:fontB, color:cWhite })
       cover.drawText('REGISTRO DE JORNADA LABORAL', { x:ML, y:PH-78, size:11, font:fontR, color:rgb(0.8,0.82,1) })
       cover.drawText(new Date().toLocaleDateString('es-ES'), { x:PW-MR-90, y:PH-50, size:10, font:fontR, color:rgb(0.8,0.82,1) })
       // main info block
       const ly = (n) => PH - 200 - n * 28
       cover.drawText('Trabajador', { x:ML, y:ly(0)+10, size:8, font:fontR, color:cGray })
-      cover.drawText(u.name, { x:ML, y:ly(0)-6, size:16, font:fontB, color:cDark })
+      cover.drawText(safe(u.name), { x:ML, y:ly(0)-6, size:16, font:fontB, color:cDark })
       cover.drawLine({ start:{x:ML,y:ly(0)-16}, end:{x:PW-MR,y:ly(0)-16}, thickness:0.4, color:cBorder })
       cover.drawText('Periodo', { x:ML, y:ly(1)+10, size:8, font:fontR, color:cGray })
       cover.drawText(monthName.charAt(0).toUpperCase() + monthName.slice(1), { x:ML, y:ly(1)-6, size:16, font:fontB, color:cDark })
       cover.drawLine({ start:{x:ML,y:ly(1)-16}, end:{x:PW-MR,y:ly(1)-16}, thickness:0.4, color:cBorder })
       cover.drawText('Centro / Obra', { x:ML, y:ly(2)+10, size:8, font:fontR, color:cGray })
-      cover.drawText(u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—'), { x:ML, y:ly(2)-6, size:12, font:fontB, color:cDark, maxWidth:CW })
+      cover.drawText(safe(u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')), { x:ML, y:ly(2)-6, size:12, font:fontB, color:cDark, maxWidth:CW })
       cover.drawLine({ start:{x:ML,y:ly(2)-16}, end:{x:PW-MR,y:ly(2)-16}, thickness:0.4, color:cBorder })
       // stats row
       const statsY = ly(3) - 10
@@ -2187,18 +2187,18 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
           page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
           page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
-          page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
+          page.drawText(safe(`${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}`), { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
           page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
         } catch {
           page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
-          page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
+          page.drawText(safe(u.name), { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
         page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
         page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
         page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
-        page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+        page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
 
       // ─ Firma del responsable ──────────────────────────────────────
@@ -2280,10 +2280,10 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const newPage = () => {
         page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
         page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(u.empresa || 'Empresa', { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
-        page.drawText('REGISTRO DE JORNADA LABORAL — INFORME SEMANAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
-        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '—')
-        page.drawText(`Trabajador: ${u.name}   ·   ${weekLabel}   ·   Obras: ${obras}`, { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
+        page.drawText(safe(u.empresa || 'Empresa'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText('REGISTRO DE JORNADA LABORAL - INFORME SEMANAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
+        const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
+        page.drawText(safe(`Trabajador: ${u.name}   .   ${weekLabel}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
         page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
         y -= 74
       }
@@ -2338,18 +2338,18 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
           const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
           page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
           page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
-          page.drawText(`${u.name}   ·   Firmado digitalmente   ·   ${new Date().toLocaleString('es-ES')}`, { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
+          page.drawText(safe(`${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}`), { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
           page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
         } catch {
           page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
-          page.drawText(u.name, { x:ML, y:y-73, size:7, font:fontR, color:cGray })
+          page.drawText(safe(u.name), { x:ML, y:y-73, size:7, font:fontR, color:cGray })
         }
       } else {
         page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
         page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
         page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
         page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
-        page.drawText(u.name, { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
+        page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
       }
       page.drawText('Documento generado automaticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
       const pdfBytes = await pdfDoc.save()
