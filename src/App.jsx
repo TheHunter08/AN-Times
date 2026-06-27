@@ -55,7 +55,14 @@ function UpdateBanner() {
   const [waitingSW, setWaitingSW] = useState(null)
   const [applying, setApplying]   = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const reloading = useRef(false)
+  const reloading   = useRef(false)
+  const waitingRef  = useRef(null)   // ref para evitar closure stale en setInterval
+
+  const _setSW = (sw) => {
+    if (!sw || waitingRef.current === sw) return
+    waitingRef.current = sw
+    setWaitingSW(sw)
+  }
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
@@ -67,25 +74,40 @@ function UpdateBanner() {
     }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
     navigator.serviceWorker.ready.then(reg => {
-      if (reg.waiting) setWaitingSW(reg.waiting)
+      // 1. SW ya esperando al montar (recarga tras deploy sin clic del usuario)
+      if (reg.waiting) _setSW(reg.waiting)
+
       const check = (sw) => {
         if (!sw) return
+        // Comprobar estado ya alcanzado ANTES de añadir el listener (race condition)
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          _setSW(sw); return
+        }
         sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            setWaitingSW(sw)
-          }
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) _setSW(sw)
         })
       }
+
       if (reg.installing) check(reg.installing)
-      reg.addEventListener('updatefound', () => check(reg.installing))
-      // Comprobar updates inmediatamente y luego cada 60s (antes era 5 min)
+      reg.addEventListener('updatefound', () => {
+        // reg.installing puede cambiar entre updatefound y el listener → usar ref
+        const sw = reg.installing
+        check(sw)
+      })
+
+      // Forzar comprobación inmediata y cada 60s
       reg.update().catch(() => {})
-      updateInterval = setInterval(() => reg.update().catch(() => {}), 60 * 1000)
+      updateInterval = setInterval(() => {
+        reg.update().catch(() => {})
+        // Fallback: si reg.waiting apareció sin disparar updatefound (iOS)
+        if (reg.waiting) _setSW(reg.waiting)
+      }, 60 * 1000)
     }).catch(() => {})
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
       if (updateInterval) clearInterval(updateInterval)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const apply = () => {
