@@ -1,0 +1,48 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Cada 3 días a las 04:00 UTC — evita la pausa por inactividad del plan Free
+    - cron: '0 4 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Ping Supabase con escritura
+        run: |
+          SB_URL="${{ secrets.VITE_SB_URL }}"
+          SB_URL="${SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
+          SB_ANON="${{ secrets.VITE_SB_ANON }}"
+          SB_ANON="${SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+
+          echo "=== Supabase keepalive — $(date -u) ==="
+
+          # 1. Leer datos actuales
+          RESP=$(curl -sf \
+            -H "apikey: $SB_ANON" \
+            -H "Authorization: Bearer $SB_ANON" \
+            "$SB_URL/rest/v1/app_data?id=eq.1&select=updated_at")
+          echo "Lectura OK: $RESP"
+
+          # 2. PATCH: actualizar _keepalive_ts en app_data (write real → cuenta como actividad)
+          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          PATCH=$(curl -sf -o /dev/null -w "%{http_code}" \
+            -X PATCH \
+            -H "apikey: $SB_ANON" \
+            -H "Authorization: Bearer $SB_ANON" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            "$SB_URL/rest/v1/app_data?id=eq.1" \
+            -d "{\"updated_at\": \"$TS\"}")
+
+          echo "PATCH status: $PATCH"
+          if [ "$PATCH" = "204" ] || [ "$PATCH" = "200" ]; then
+            echo "✅ Keepalive completado — Supabase activo"
+          else
+            echo "⚠️  PATCH devolvió $PATCH — revisar"
+            exit 1
+          fi

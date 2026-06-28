@@ -68,6 +68,12 @@ export default function AdminPage() {
   const [searchQ, setSearchQ] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
+  const [pushOpen, setPushOpen] = useState(false)
+  const [pushTarget, setPushTarget] = useState('all')
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushBody, setPushBody] = useState('')
+  const [pushSending, setPushSending] = useState(false)
+  const [pushResult, setPushResult] = useState(null)
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handler)
@@ -181,6 +187,33 @@ export default function AdminPage() {
 
   const actPanel = pages.find(p => p.id === currentAdminPage) || pages[0]
 
+  const sendPushMasivo = async () => {
+    if (!pushTitle.trim() || !pushBody.trim()) { toast('Completa título y mensaje'); return }
+    setPushSending(true)
+    setPushResult(null)
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      const secret = import.meta.env.VITE_PUSH_SECRET
+      if (secret) headers['Authorization'] = `Bearer ${secret}`
+      const tgt = (pushTarget === 'all' || pushTarget === 'activos') ? pushTarget : { role: pushTarget }
+      const res = await fetch('/api/send-push-all', {
+        method: 'POST', headers,
+        body: JSON.stringify({ title: pushTitle.trim(), body: pushBody.trim(), url: '/', target: tgt })
+      })
+      const json = await res.json().catch(() => ({}))
+      setPushResult({ ok: res.ok, ...json })
+      if (!res.ok) toast('Error: ' + (json.error || res.status), 4000, 'error')
+      else {
+        toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}`, 3000, 'ok')
+        setPushOpen(false); setPushTitle(''); setPushBody('')
+      }
+    } catch(e) {
+      setPushResult({ ok: false, error: e.message })
+      toast('Error de red', 3000, 'error')
+    }
+    setPushSending(false)
+  }
+
   return (
     <div className="screen active" id="sAdmin">
       {/* Topbar */}
@@ -234,6 +267,11 @@ export default function AdminPage() {
               )}
             </button>
           )}
+          {!isEncargado && (
+            <button className="adm-topbar-icon-btn" title="Push masivo" aria-label="Enviar notificación masiva" onClick={() => setPushOpen(true)}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </button>
+          )}
           {session.user && (
             <button className="btn btn-secondary btn-sm adm-topbar-emp-btn" onClick={() => setScreen('emp')} title="Panel Empleado">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -247,6 +285,51 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      {/* Modal push masivo */}
+      {pushOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 16px' }}
+          onClick={e => { if (e.target === e.currentTarget) setPushOpen(false) }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(6px)' }} />
+          <div style={{ position:'relative', background:'var(--bg-400)', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:24, width:'100%', maxWidth:440, boxShadow:'0 24px 64px rgba(0,0,0,.6)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <div style={{ fontWeight:700, fontSize:16, display:'flex', alignItems:'center', gap:8 }}>
+                <span>📢</span> Notificación masiva
+              </div>
+              <button onClick={() => setPushOpen(false)} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:20, cursor:'pointer', lineHeight:1 }}>×</button>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <select value={pushTarget} onChange={e => setPushTarget(e.target.value)}
+                style={{ borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:13 }}>
+                <option value="all">Todos los empleados</option>
+                <option value="activos">Activos ahora (fichados)</option>
+                <option value="jefe_obra">Solo jefes de obra</option>
+                <option value="encargado">Solo encargados</option>
+                <option value="empleado">Solo empleados base</option>
+              </select>
+              <input placeholder="Título (máx 80 caracteres)…" maxLength={80} value={pushTitle} onChange={e => setPushTitle(e.target.value)}
+                style={{ borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:13 }} />
+              <textarea placeholder="Mensaje (máx 200 caracteres)…" maxLength={200} value={pushBody} onChange={e => setPushBody(e.target.value)} rows={3}
+                style={{ borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
+              <div style={{ fontSize:10, color:'var(--text4)', textAlign:'right' }}>{pushTitle.length}/80 · {pushBody.length}/200</div>
+              {pushResult && (
+                <div style={{ fontSize:12, color: pushResult.ok ? 'var(--green)' : 'var(--danger)', background: pushResult.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)', borderRadius:8, padding:'8px 12px' }}>
+                  {pushResult.ok
+                    ? `✓ Enviado a ${pushResult.sent ?? 0} empleado${pushResult.sent !== 1 ? 's' : ''}${pushResult.failed > 0 ? ` · ${pushResult.failed} fallaron` : ''}${pushResult.noSub > 0 ? ` · ${pushResult.noSub} sin suscripción` : ''}`
+                    : `✗ ${pushResult.error || 'Error desconocido'}`}
+                </div>
+              )}
+              <button className="btn btn-primary" disabled={pushSending || !pushTitle.trim() || !pushBody.trim()} onClick={sendPushMasivo}
+                style={{ marginTop:4 }}>
+                {pushSending ? 'Enviando…' : '📢 Enviar a todos'}
+              </button>
+              <p style={{ fontSize:10, color:'var(--text4)', margin:0, lineHeight:1.5 }}>
+                Solo llega a empleados con la app instalada y permisos concedidos.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
         {/* Sidebar */}
@@ -802,13 +885,12 @@ function PanelDashboard({ db, toast, saveDB }) {
 
 function PushNotifWidget({ db, toast }) {
   const [open, setOpen]       = useState(false)
-  const [target, setTarget]   = useState('__all__')
+  const [target, setTarget]   = useState('all')
   const [title, setTitle]     = useState('')
   const [body, setBody]       = useState('')
   const [sending, setSending] = useState(false)
-  const [lastResult, setLastResult] = useState(null) // { ok, skipped, sent, error }
+  const [lastResult, setLastResult] = useState(null)
 
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const permStatus = 'Notification' in window ? Notification.permission : 'unsupported'
 
   const send = async () => {
@@ -819,15 +901,16 @@ function PushNotifWidget({ db, toast }) {
       const headers = { 'Content-Type': 'application/json' }
       const secret = import.meta.env.VITE_PUSH_SECRET
       if (secret) headers['Authorization'] = `Bearer ${secret}`
-      const res = await fetch('/api/sendpush', {
+
+      const tgt = (target === 'all' || target === 'activos') ? target : { role: target }
+      const res = await fetch('/api/send-push-all', {
         method: 'POST', headers,
-        body: JSON.stringify({ userId: target, title: title.trim(), body: body.trim(), tag: 'push-' + Date.now(), url: '/' })
+        body: JSON.stringify({ title: title.trim(), body: body.trim(), url: '/', target: tgt })
       })
       const json = await res.json().catch(() => ({}))
       setLastResult({ ok: res.ok, ...json })
-      if (json.skipped) toast('Sin suscripción — el destinatario debe abrir la app primero', 4000, 'warn')
-      else if (!res.ok) toast('Error al enviar: ' + (json.error || res.status), 4000, 'error')
-      else toast(`Push enviado${json.sent > 1 ? ` (${json.sent} dispositivos)` : ''}`, 3000, 'ok')
+      if (!res.ok) toast('Error al enviar: ' + (json.error || res.status), 4000, 'error')
+      else toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}${json.failed > 0 ? ` (${json.failed} fallaron)` : ''}`, 3000, 'ok')
     } catch(e) {
       setLastResult({ ok: false, error: e.message })
       toast('Error de red al enviar push', 3000, 'error')
@@ -839,20 +922,22 @@ function PushNotifWidget({ db, toast }) {
   return (
     <div className="dash-widget card-lift" style={{ marginTop:12 }}>
       <div className="dash-widget-header">
-        <div className="dash-widget-title">🔔 Notificaciones Push</div>
+        <div className="dash-widget-title">📢 Push Masivo</div>
         <button className="btn btn-primary btn-sm" onClick={() => setOpen(o => !o)}>
           {open ? 'Cancelar' : '+ Enviar'}
         </button>
       </div>
       {!open && (
         <div style={{ fontSize:11, color:'var(--text4)', marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
-          <span>Llegan al móvil aunque esté bloqueado</span>
+          <span>Notificación masiva — llega al móvil aunque esté bloqueado</span>
           <span style={{ color: permStatus === 'granted' ? 'var(--green)' : permStatus === 'denied' ? 'var(--danger)' : 'var(--orange)' }}>
             Este dispositivo: {permStatus === 'granted' ? '✓ Push activado' : permStatus === 'denied' ? '✗ Push bloqueado — actívalo en ajustes del navegador' : '⚠ Push no solicitado'}
           </span>
           {lastResult && (
-            <span style={{ color: lastResult.ok ? 'var(--green)' : lastResult.skipped ? 'var(--orange)' : 'var(--danger)' }}>
-              Último envío: {lastResult.ok ? `✓ entregado${lastResult.sent > 1 ? ` (${lastResult.sent})` : ''}` : lastResult.skipped ? '⚠ sin suscripción' : `✗ ${lastResult.error || 'error'}`}
+            <span style={{ color: lastResult.ok ? 'var(--green)' : 'var(--danger)' }}>
+              Último envío: {lastResult.ok
+                ? `✓ ${lastResult.sent ?? 0} enviados${lastResult.failed > 0 ? `, ${lastResult.failed} fallaron` : ''}${lastResult.noSub > 0 ? `, ${lastResult.noSub} sin suscripción` : ''}`
+                : `✗ ${lastResult.error || 'error'}`}
             </span>
           )}
         </div>
@@ -861,17 +946,24 @@ function PushNotifWidget({ db, toast }) {
         <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           <select value={target} onChange={e => setTarget(e.target.value)}
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }}>
-            <option value="__all__">Todos los empleados</option>
-            <option value="__admin__">Solo admins</option>
-            {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            <option value="all">Todos los empleados</option>
+            <option value="activos">Activos ahora (fichados)</option>
+            <option value="jefe_obra">Solo jefes de obra</option>
+            <option value="encargado">Solo encargados</option>
+            <option value="empleado">Solo empleados base</option>
           </select>
-          <input placeholder="Título de la notificación..." value={title} onChange={e => setTitle(e.target.value)}
+          <input placeholder="Título (máx 80 caracteres)…" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
-          <textarea placeholder="Mensaje..." value={body} onChange={e => setBody(e.target.value)} rows={2}
+          <textarea placeholder="Mensaje (máx 200 caracteres)…" maxLength={200} value={body} onChange={e => setBody(e.target.value)} rows={2}
             style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
-          <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : '🔔 Enviar notificación'}</button>
+          <div style={{ fontSize:10, color:'var(--text4)', textAlign:'right' }}>
+            {title.length}/80 · {body.length}/200
+          </div>
+          <button className="btn btn-primary btn-sm" disabled={sending || !title.trim() || !body.trim()} onClick={send}>
+            {sending ? 'Enviando…' : '📢 Enviar notificación masiva'}
+          </button>
           <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
-            Si aparece "sin suscripción": el empleado debe abrir la app y aceptar los permisos de notificación.
+            Solo llega a empleados con la app abierta alguna vez y permisos concedidos.
           </div>
         </div>
       )}

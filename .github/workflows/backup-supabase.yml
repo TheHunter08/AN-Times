@@ -60,3 +60,18 @@ jobs:
             exit 1
           fi
           echo "Backup OK: ${SIZE} bytes"
+
+      - name: Keepalive write — evita pausa Supabase Free
+        run: |
+          SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
+          SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            -X PATCH \
+            -H "apikey: $SB_ANON" \
+            -H "Authorization: Bearer $SB_ANON" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            "$SB_URL/rest/v1/app_data?id=eq.1" \
+            -d "{\"updated_at\": \"$TS\"}")
+          echo "Keepalive PATCH: $STATUS"
