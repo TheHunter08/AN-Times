@@ -579,6 +579,20 @@ export default function EmployeePage() {
   const confirmarCentro = useCallback((centro) => {
     startingRef.current = false
     if (!centro) { toast('Selecciona un centro de trabajo'); return }
+    // GPS obligatorio: bloquear si la obra lo requiere y no hay ubicación
+    const obraReq = (db.obras || []).find(o => o.nombre === centro)
+    if (obraReq?.gpsRequired) {
+      if (gpsStatus === 'pending') {
+        toast('⏳ Obteniendo ubicación GPS, espera un momento y vuelve a intentarlo…', 5000, 'warn')
+        startingRef.current = false
+        return
+      }
+      if (gpsStatus !== 'ok') {
+        toast('📍 GPS obligatorio en esta obra. Activa la ubicación del dispositivo e inténtalo de nuevo.', 6000, 'err')
+        startingRef.current = false
+        return
+      }
+    }
     geoAbortRef.current = true
     setGpsStatus('idle')
     closeModal()

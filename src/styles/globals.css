@@ -7019,3 +7019,69 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .adm-topbar-search { background: rgba(0,0,0,.04) !important; border-color: rgba(0,0,0,.08) !important; color: rgba(0,0,0,.45) !important; }
 [data-theme="light"] .adm-nav-section { color: rgba(99,102,241,.5) !important; }
 
+/* ═══════════════════════════════════════════════════════════════
+   TIMES INC 3.0 — GEO-FENCING ALERTS PANEL
+   ═══════════════════════════════════════════════════════════════ */
+
+.geo-alerts-panel {
+  background: rgba(245,158,11,.07);
+  border: 1px solid rgba(245,158,11,.22);
+  border-left: 3px solid rgba(245,158,11,.7);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.geo-alerts-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--orange);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.geo-alerts-count {
+  margin-left: auto;
+  background: rgba(245,158,11,.18);
+  border: 1px solid rgba(245,158,11,.3);
+  color: var(--orange);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 8px;
+}
+
+.geo-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.15);
+  border: 1px solid rgba(255,255,255,.04);
+}
+
+.geo-alert-row.geo-alert-high {
+  background: rgba(239,68,68,.06);
+  border-color: rgba(239,68,68,.15);
+}
+
+.geo-alert-row.geo-alert-med {
+  background: rgba(245,158,11,.05);
+  border-color: rgba(245,158,11,.12);
+}
+
+[data-theme="light"] .geo-alerts-panel {
+  background: rgba(245,158,11,.05);
+  border-color: rgba(245,158,11,.2);
+}
+[data-theme="light"] .geo-alert-row { background: rgba(0,0,0,.03); border-color: rgba(0,0,0,.06); }
+[data-theme="light"] .geo-alert-row.geo-alert-high { background: rgba(239,68,68,.04); border-color: rgba(239,68,68,.12); }
+[data-theme="light"] .geo-alert-row.geo-alert-med { background: rgba(245,158,11,.04); border-color: rgba(245,158,11,.1); }
+

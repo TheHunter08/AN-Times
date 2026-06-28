@@ -485,6 +485,49 @@ function PanelDashboard({ db, toast, saveDB }) {
         ))}
       </div>
 
+      {/* Geo-fencing alerts today */}
+      {(() => {
+        const geoRecs = todayRecs.filter(r => r.geoAlert)
+        if (!geoRecs.length) return null
+        return (
+          <div className="geo-alerts-panel stagger-in">
+            <div className="geo-alerts-header">
+              <span style={{ fontSize:16 }}>⚠️</span>
+              <span>Alertas de ubicación hoy</span>
+              <span className="geo-alerts-count">{geoRecs.length}</span>
+            </div>
+            {geoRecs.map(r => {
+              const emp = emps.find(e => e.id === r.empId)
+              const severity = r.geoAlert.dist > r.geoAlert.radio * 2 ? 'high' : 'med'
+              return (
+                <div key={r.id} className={`geo-alert-row geo-alert-${severity}`}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                    <div style={{ width:32, height:32, borderRadius:'50%', background: severity==='high' ? 'rgba(239,68,68,.15)' : 'rgba(245,158,11,.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
+                      {severity === 'high' ? '🔴' : '🟠'}
+                    </div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emp?.name || r.empName}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{r.centro} · {new Date(r.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color: severity==='high' ? 'var(--red)' : 'var(--orange)' }}>{r.geoAlert.dist}m fuera</span>
+                    <span style={{ fontSize:10, color:'var(--text4)' }}>(radio {r.geoAlert.radio}m)</span>
+                    {r.locInicio && (
+                      <a href={`https://www.openstreetmap.org/?mlat=${r.locInicio.lat}&mlon=${r.locInicio.lng}&zoom=17`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize:11, color:'var(--primary-light)', textDecoration:'none', fontWeight:600, whiteSpace:'nowrap' }}>
+                        Ver mapa ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
       {/* Live workers + Today activity */}
       <div className="dash-2col stagger-in">
         {/* Working now */}
@@ -1305,15 +1348,30 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                   <td style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{mhm(bm)}</td>
                   <td>
-                    {loc ? (
-                      <a href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}&zoom=17#map=17/${loc.lat}/${loc.lng}`}
-                        target="_blank" rel="noopener noreferrer"
-                        title={`Ver en mapa (${loc.lat}, ${loc.lng})${r.geoAlert ? ` ⚠️ Fuera de zona: ${r.geoAlert.dist}m (radio ${r.geoAlert.radio}m)` : ''}`}
-                        style={{ textDecoration:'none', display:'inline-flex', alignItems:'center', gap:4 }}>
-                        <span style={{ fontSize:16 }}>📍</span>
-                        {r.geoAlert && <span style={{ fontSize:9, fontWeight:700, color:'var(--orange)', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:20, padding:'1px 5px', whiteSpace:'nowrap' }}>+{r.geoAlert.dist}m</span>}
-                      </a>
-                    ) : <span style={{ color:'var(--text4)', fontSize:11 }}>—</span>}
+                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                      {loc ? (
+                        <a href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}&zoom=17`}
+                          target="_blank" rel="noopener noreferrer"
+                          title={`Entrada: ${loc.lat}, ${loc.lng} ±${loc.acc||'?'}m${r.geoAlert ? ` ⚠️ Fuera de zona: ${r.geoAlert.dist}m (radio ${r.geoAlert.radio}m)` : ''}`}
+                          style={{ textDecoration:'none', display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:13 }}>▶ 📍</span>
+                          {r.geoAlert ? (
+                            <span style={{ fontSize:9, fontWeight:700, color: r.geoAlert.dist > r.geoAlert.radio * 2 ? 'var(--red)' : 'var(--orange)', background: r.geoAlert.dist > r.geoAlert.radio * 2 ? 'rgba(239,68,68,.1)' : 'var(--orange-dim)', border:`1px solid ${r.geoAlert.dist > r.geoAlert.radio * 2 ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.25)'}`, borderRadius:20, padding:'1px 5px', whiteSpace:'nowrap' }}>⚠ +{r.geoAlert.dist}m</span>
+                          ) : (
+                            <span style={{ fontSize:9, color:'var(--green)', fontWeight:600 }}>✓</span>
+                          )}
+                        </a>
+                      ) : <span style={{ color:'var(--text4)', fontSize:11 }}>▶ —</span>}
+                      {r.locFin ? (
+                        <a href={`https://www.openstreetmap.org/?mlat=${r.locFin.lat}&mlon=${r.locFin.lng}&zoom=17`}
+                          target="_blank" rel="noopener noreferrer"
+                          title={`Salida: ${r.locFin.lat}, ${r.locFin.lng}`}
+                          style={{ textDecoration:'none', display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:13 }}>⏹ 📍</span>
+                          <span style={{ fontSize:9, color:'var(--text4)' }}>salida</span>
+                        </a>
+                      ) : r.fin ? <span style={{ fontSize:10, color:'var(--text4)' }}>⏹ —</span> : null}
+                    </div>
                   </td>
                   <td><button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button></td>
                 </tr>
@@ -2982,6 +3040,11 @@ function PanelObras({ db, toast, saveDB, session }) {
     saveDB({ obras: updated })
   }
 
+  const setGpsRequired = (obraId, required) => {
+    const updated = obras.map(o => o.id === obraId ? { ...o, gpsRequired: required } : o)
+    saveDB({ obras: updated })
+  }
+
   const clearGeo = (obraId) => {
     showConfirm('¿Quitar la geovalla de esta obra?', () => {
       const updated = obras.map(o => o.id === obraId ? { ...o, coords: undefined, radio: undefined } : o)
@@ -3103,8 +3166,20 @@ function PanelObras({ db, toast, saveDB, session }) {
                         <button className="btn btn-sm btn-danger" onClick={() => clearGeo(o.id)}>Quitar</button>
                       )}
                     </div>
+                    <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', padding:'6px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={o.gpsRequired || false}
+                        onChange={e => setGpsRequired(o.id, e.target.checked)}
+                        style={{ width:15, height:15, accentColor:'var(--primary)', cursor:'pointer' }}
+                      />
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text2)' }}>GPS obligatorio para fichar</span>
+                      {o.gpsRequired && <span style={{ fontSize:10, fontWeight:700, color:'var(--red)', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:10, padding:'1px 6px' }}>ACTIVO</span>}
+                    </label>
                     <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
-                      Si el empleado ficha fuera del radio definido, recibirá un aviso de ubicación.
+                      {o.gpsRequired
+                        ? 'Los empleados no podrán fichar sin ubicación GPS activa.'
+                        : 'Si el empleado ficha fuera del radio definido, recibirá un aviso de ubicación.'}
                     </div>
                   </div>
                 )}
