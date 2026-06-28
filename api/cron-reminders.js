@@ -16,8 +16,8 @@ const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const isValid   = s => /^[A-Za-z0-9\-_]{40,}$/.test(s)
 
-const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(process.env.VAPID_PUBLIC)  : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
-const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
+const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(process.env.VAPID_PUBLIC)  : null
+const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const CRON_SECRET   = process.env.CRON_SECRET
@@ -110,7 +110,8 @@ async function sendWhatsApp(phone, message, empName) {
 
 export default async function handler(req, res) {
   const isCronInvocation = req.headers['x-vercel-cron'] === '1'
-  if (!isCronInvocation && CRON_SECRET) {
+  if (!isCronInvocation) {
+    if (!CRON_SECRET) return res.status(500).json({ error: 'Server misconfigured: CRON_SECRET not set' })
     const token = (req.headers['authorization'] || '').replace('Bearer ', '')
     if (token !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
   }

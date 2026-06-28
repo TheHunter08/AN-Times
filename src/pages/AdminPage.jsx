@@ -78,7 +78,7 @@ async function callSendPushAll(titleText, bodyText, targetValue) {
 
 function showPushToast(json, toast) {
   if (!json.ok) {
-    toast('Error: ' + (json.error || json.status), 4000, 'error')
+    toast('Error: ' + (json.error || json.status), 4000, 'err')
   } else if (json.sent === 0 && (json.noSub ?? 0) > 0) {
     toast(`Ningún empleado tiene push activado (${json.noSub} sin suscripción)`, 4000, 'warn')
   } else {

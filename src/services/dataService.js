@@ -262,7 +262,7 @@ export function startRealtime(currentGetDB, onUpdate) {
         const incoming = payload.new?.data
         if (!incoming) return
         const local = currentGetDB()
-        if (incoming._ts && local._ts && incoming._ts <= local._ts) return
+        if (incoming._ts != null && local._ts != null && incoming._ts <= local._ts) return
         _realtimeRetry = 0
         onUpdate?.(incoming)
       }

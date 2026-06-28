@@ -5,8 +5,9 @@
  * Mantiene la base de datos principal ligera.
  */
 
-const SB_URL  = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const SB_URL  = process.env.VITE_SB_URL
+const SB_ANON = process.env.VITE_SB_ANON
+if (!SB_URL || !SB_ANON) { console.error('[archive] VITE_SB_URL / VITE_SB_ANON not set'); process.exit(1) }
 
 const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 

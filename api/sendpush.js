@@ -100,11 +100,10 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
     if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' })
 
-    if (PUSH_SECRET) {
-      const authHeader = req.headers['authorization'] || ''
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-      if (token !== PUSH_SECRET) return res.status(401).json({ error: 'Unauthorized' })
-    }
+    if (!PUSH_SECRET) return res.status(500).json({ error: 'Server misconfigured: PUSH_SECRET not set' })
+    const authHeader = req.headers['authorization'] || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+    if (token !== PUSH_SECRET) return res.status(401).json({ error: 'Unauthorized' })
 
     if (allowedOrigin) {
       const origin = req.headers.origin || ''

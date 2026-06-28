@@ -19,11 +19,15 @@ export const useAppStore = create((set, get) => ({
   },
 
   saveDB: (partial) => {
-    const merged = { ...get().db, ...(partial || {}), _ts: Date.now() }
-    if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
-    saveLocal(merged)
-    const isOffline = !navigator.onLine
-    set({ db: merged, syncStatus: isOffline ? 'offline' : 'syncing', offlinePending: isOffline })
+    // Usar updater de Zustand para leer siempre el estado más reciente,
+    // evitando sobrescrituras cuando dos saves se encadenan rápido o llega un sync de realtime
+    let merged
+    set(state => {
+      merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
+      if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
+      saveLocal(merged)
+      return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: !navigator.onLine }
+    })
     cloudPush(merged,
       () => set({ syncStatus: 'synced', offlinePending: false }),
       () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
