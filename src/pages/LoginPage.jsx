@@ -2,7 +2,43 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
-import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin } from '../utils/pinSecurity.js'
+import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin, recordFailedAttempt as recordFailed } from '../utils/pinSecurity.js'
+
+const EMAIL_LK_KEY = 'an_email_lk'
+const EMAIL_MAX_ATTEMPTS = 5
+const EMAIL_LOCKOUT_MS = 10 * 60 * 1000
+
+function getEmailLockout() {
+  try {
+    const raw = localStorage.getItem(EMAIL_LK_KEY)
+    if (!raw) return { locked: false, attempts: 0 }
+    const d = JSON.parse(raw)
+    if (d.until) {
+      const remaining = d.until - Date.now()
+      if (remaining > 0) return { locked: true, remainingSecs: Math.floor(remaining / 1000) }
+      localStorage.removeItem(EMAIL_LK_KEY)
+    }
+    return { locked: false, attempts: d.attempts || 0 }
+  } catch { return { locked: false, attempts: 0 } }
+}
+
+function recordEmailFailed() {
+  try {
+    const state = getEmailLockout()
+    if (state.locked) return state
+    const attempts = (state.attempts || 0) + 1
+    if (attempts >= EMAIL_MAX_ATTEMPTS) {
+      localStorage.setItem(EMAIL_LK_KEY, JSON.stringify({ until: Date.now() + EMAIL_LOCKOUT_MS }))
+      return { locked: true, remainingSecs: Math.floor(EMAIL_LOCKOUT_MS / 1000) }
+    }
+    localStorage.setItem(EMAIL_LK_KEY, JSON.stringify({ attempts }))
+    return { locked: false, attempts, remaining: EMAIL_MAX_ATTEMPTS - attempts }
+  } catch { return { locked: false, attempts: 0 } }
+}
+
+function clearEmailLockout() {
+  try { localStorage.removeItem(EMAIL_LK_KEY) } catch {}
+}
 import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric, clearBiometric } from '../utils/webauthn.js'
 
 export default function LoginPage() {
@@ -112,11 +148,17 @@ export default function LoginPage() {
     setAdminErr('')
     if (!adminEmail.trim()) { setAdminErr('Introduce tu email de administrador'); return }
     if (!adminPass) { setAdminErr('Introduce tu contraseña'); return }
+    const lk = getEmailLockout()
+    if (lk.locked) {
+      const m = Math.floor(lk.remainingSecs / 60), s = lk.remainingSecs % 60
+      setAdminErr(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`); return
+    }
     if (!isAuthReady()) { setAdminErr('Sin conexión con el servidor'); return }
     setAdminLoading(true)
     try {
       const result = await signInEmail(adminEmail.trim(), adminPass)
       const userEmail = result.user?.email
+      clearEmailLockout()
       await useAppStore.getState().fetchDB()
       const freshDB = useAppStore.getState().db
       const em = userEmail?.toLowerCase()
@@ -130,10 +172,18 @@ export default function LoginPage() {
         setAdminEmail('')
         setAdminPass('')
       } else {
+        recordEmailFailed()
         setAdminErr('Este email no tiene permisos de administrador')
       }
     } catch (ex) {
-      setAdminErr(ex.message || 'Email o contraseña incorrectos')
+      const newLk = recordEmailFailed()
+      if (newLk.locked) {
+        const m = Math.floor(newLk.remainingSecs / 60), s = newLk.remainingSecs % 60
+        setAdminErr(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`)
+      } else {
+        const remaining = newLk.remaining != null ? ` (${newLk.remaining} intentos)` : ''
+        setAdminErr((ex.message || 'Email o contraseña incorrectos') + remaining)
+      }
     }
     setAdminLoading(false)
   }, [adminEmail, adminPass, doAdminLogin])
@@ -275,11 +325,17 @@ export default function LoginPage() {
   const doEmailLogin = async () => {
     setErr('')
     if (!email || !pass) { setErr('Introduce tu email y contraseña'); return }
+    const lk = getEmailLockout()
+    if (lk.locked) {
+      const m = Math.floor(lk.remainingSecs / 60), s = lk.remainingSecs % 60
+      setErr(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`); return
+    }
     if (!isAuthReady()) { setErr('Sin conexión con el servidor. Usa el PIN.'); return }
     setLoading(true)
     try {
       const result = await signInEmail(email, pass)
       const userEmail = result.user?.email
+      clearEmailLockout()
       await useAppStore.getState().fetchDB()
       const freshDB = useAppStore.getState().db
       const emp = (freshDB.employees || []).find(e => e.email?.toLowerCase() === userEmail?.toLowerCase())
@@ -293,7 +349,14 @@ export default function LoginPage() {
         setErr('Tu cuenta no está registrada. Contacta al administrador.')
       }
     } catch (ex) {
-      setErr(ex.message || 'Error al iniciar sesión')
+      const newLk = recordEmailFailed()
+      if (newLk.locked) {
+        const m = Math.floor(newLk.remainingSecs / 60), s = newLk.remainingSecs % 60
+        setErr(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`)
+      } else {
+        const remaining = newLk.remaining != null ? ` (${newLk.remaining} intentos restantes)` : ''
+        setErr((ex.message || 'Email o contraseña incorrectos') + remaining)
+      }
     }
     setLoading(false)
   }
@@ -440,13 +503,16 @@ export default function LoginPage() {
                 <>
                 <div className="login-pin-label">Introduce tu PIN</div>
 
-                <div className={`login-dots${shaking ? ' shake' : ''}`} role="status" aria-label={`PIN: ${pin.length} de 4 dígitos`}>
+                <div className={`login-dots${shaking ? ' shake' : ''}`}>
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className={`login-dot${i < pin.length ? ' filled' : ''}${shaking ? ' error' : ''}`} />
                   ))}
                 </div>
+                <div role="status" aria-live="polite" aria-atomic="true" style={{ position:'absolute', width:1, height:1, overflow:'hidden', clip:'rect(0,0,0,0)' }}>
+                  {pin.length > 0 ? `${pin.length} dígito${pin.length !== 1 ? 's' : ''} introducido${pin.length !== 1 ? 's' : ''}` : 'PIN vacío'}
+                </div>
 
-                {err && <div className="login-err" role="alert">{err}</div>}
+                {err && <div className="login-err" role="alert" aria-live="assertive">{err}</div>}
 
                 <div className="login-numpad" role="group" aria-label="Teclado numérico">
                   {KEYS.map((k, idx) => (

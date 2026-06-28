@@ -340,7 +340,7 @@ export default function EmployeePage() {
       const bellNotis = []
       const addBell = (action, detail) => {
         bellNotis.push({
-          id: 'sn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          id: 'sn_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(36).slice(2, 9)),
           empId: u.id, action, detail,
           ts: new Date().toISOString(), leido: false
         })

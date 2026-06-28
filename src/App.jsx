@@ -118,6 +118,10 @@ function UpdateBanner() {
     setTimeout(() => {
       if (!reloading.current) { reloading.current = true; window.location.reload() }
     }, 1500)
+    // Seguridad: si tras 8s sigue sin recargar (red caída), resetear el banner
+    setTimeout(() => {
+      if (!reloading.current) { setApplying(false) }
+    }, 8000)
   }
 
   if (!waitingSW || dismissed) return null

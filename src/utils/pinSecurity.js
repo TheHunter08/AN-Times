@@ -90,7 +90,7 @@ export function getLockoutState(empId) {
         lockedUntil: d.until,
         remainingMs: remaining,
         remainingMin: Math.ceil(remaining / 60000),
-        remainingSecs: Math.ceil(remaining / 1000),
+        remainingSecs: Math.floor(remaining / 1000),
       }
       localStorage.removeItem(LK_KEY(empId))
       return { locked: false, attempts: 0 }

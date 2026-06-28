@@ -141,21 +141,30 @@ self.addEventListener('push', (event) => {
     // iOS exige que SIEMPRE se muestre una notificación en el push handler.
     // El dedup visual lo hacen tag + renotify:false (reemplaza silenciosamente).
     try {
-      const last = await _idbGet(idbKey)
-      if (!last || now - last >= 5 * 60_000) {
-        // No es duplicado: marcar y limpiar
-        await _idbPut(idbKey, now)
+      // Transacción atómica: leer + escribir en la misma tx para evitar race conditions
+      // si dos push llegan simultáneamente (ambos pasarían el check de lectura por separado)
+      await new Promise((resolve, reject) => {
         _idbOpen().then(idb => {
           const tx = idb.transaction(_IDB_STORE, 'readwrite')
           const store = tx.objectStore(_IDB_STORE)
-          store.openCursor().onsuccess = e => {
-            const cur = e.target.result
-            if (!cur) return
-            if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
-            cur.continue()
+          const getReq = store.get(idbKey)
+          getReq.onsuccess = () => {
+            const last = getReq.result
+            if (!last || now - last >= 5 * 60_000) {
+              store.put(now, idbKey)
+              // Limpiar entradas expiradas en la misma tx
+              store.openCursor().onsuccess = e => {
+                const cur = e.target.result
+                if (!cur) return
+                if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
+                cur.continue()
+              }
+            }
           }
-        }).catch(() => {})
-      }
+          tx.oncomplete = resolve
+          tx.onerror = reject
+        }).catch(reject)
+      })
     } catch {
       // IDB no disponible — continuar sin dedup
     }

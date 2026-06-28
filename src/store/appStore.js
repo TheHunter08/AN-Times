@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime } from '../services/dataService.js'
+import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
 const storedSes = (() => {
@@ -24,7 +25,11 @@ export const useAppStore = create((set, get) => ({
     let merged
     set(state => {
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
-      if (merged.audit?.length > 300) merged.audit = merged.audit.slice(-300)
+      if (merged.audit?.length > 300) {
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+        const recent = merged.audit.filter(a => new Date(a.ts).getTime() > cutoff)
+        merged.audit = recent.length >= 50 ? recent : merged.audit.slice(-300)
+      }
       saveLocal(merged)
       return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: !navigator.onLine }
     })
@@ -76,7 +81,18 @@ export const useAppStore = create((set, get) => ({
   stopRealtime,
 
   // ── Session ─────────────────────────────────────────────────────────
-  session: storedSes || { user: null, isAdmin: false, isEnc: false, isJO: false },
+  session: (() => {
+    if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false }
+    if (storedSes.user) {
+      const localDB = loadLocal()
+      const stillActive = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
+      if (!stillActive) {
+        try { localStorage.removeItem('an_times_ses') } catch {}
+        return { user: null, isAdmin: false, isEnc: false, isJO: false }
+      }
+    }
+    return storedSes
+  })(),
 
   setSession: ses => {
     set({ session: ses })
@@ -84,6 +100,7 @@ export const useAppStore = create((set, get) => ({
   },
 
   logout: () => {
+    authSignOut().catch(() => {})
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
@@ -119,7 +136,12 @@ export const useAppStore = create((set, get) => ({
   currentScreen: (() => {
     if (!storedSes) return 'login'
     if (storedSes.isAdmin && !storedSes.user) return 'admin'
-    if (storedSes.user) return 'emp'
+    if (storedSes.user) {
+      const localDB = loadLocal()
+      const ok = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
+      if (!ok) return 'login'
+      return 'emp'
+    }
     return 'login'
   })(),
   currentEmpTab: 'inicio',

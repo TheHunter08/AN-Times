@@ -46,16 +46,17 @@ export const calcSecs = o => {
   if (!o) return { work: 0, brk: 0 }
   const s = new Date(o.inicio).getTime()
   const e = o.fin ? new Date(o.fin).getTime() : Date.now()
+  if (isNaN(s) || isNaN(e) || e < s) return { work: 0, brk: 0 }
   let elapsed = Math.max(0, Math.floor((e - s) / 1000)), brk = 0
   ;(o.breaks || []).forEach(b => {
     if (b.start && b.end) {
       const bs = new Date(b.start).getTime(), be = new Date(b.end).getTime()
-      if (be > bs) brk += Math.floor((be - bs) / 1000)
+      if (!isNaN(bs) && !isNaN(be) && be > bs) brk += Math.floor((be - bs) / 1000)
     }
   })
   if (o.enDescanso && o.bStartTs) {
     const bStartMs = new Date(o.bStartTs).getTime()
-    if (bStartMs > 0 && bStartMs <= Date.now()) {
+    if (!isNaN(bStartMs) && bStartMs > 0 && bStartMs <= Date.now()) {
       brk += Math.max(0, Math.floor((Date.now() - bStartMs) / 1000))
     }
   }
@@ -89,6 +90,7 @@ export const vacData = (empId, db) => {
   const countDays = v => {
     if (v.fechaInicio && v.fechaFin) {
       const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
+      if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return v.dias || 0
       return Math.round((e - s) / 86400000) + 1
     }
     return v.dias || 0
@@ -123,8 +125,8 @@ export const sortedEmps = db =>
 //   netExtraMin     — extras finales tras compensar déficit (≥0)
 //   deficitMin      — déficit real tras agotar el banco de extras (≥0)
 export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
-  const weeklyH  = opts.weeklyH  || 40
-  const monthlyH = opts.monthlyH || 160
+  const weeklyH  = Math.max(1, opts.weeklyH  || 40)
+  const monthlyH = Math.max(1, opts.monthlyH || 160)
   const weeklyTarget  = weeklyH  * 60
   const monthlyTarget = monthlyH * 60
 

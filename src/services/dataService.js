@@ -50,7 +50,7 @@ export function mergeDB(base, incoming) {
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
-    records:             (incoming.records?.length > 0)    ? incoming.records          : base.records,
+    records:             (incoming.records?.length > 0)    ? incoming.records.filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())) : base.records,
     vacaciones:          incoming.vacaciones           || [],
     medicos:             incoming.medicos              || [],
     ausencias:           incoming.ausencias            || [],
@@ -295,9 +295,11 @@ export async function pushSubscribe(userId, vapidPub) {
     console.warn('[PUSH] Navegador sin soporte para Web Push')
     return { ok: false, reason: 'no_support' }
   }
+  if (Notification.permission === 'denied') {
+    return { ok: false, reason: 'permission_denied', hint: 'Activa las notificaciones en la configuración del navegador para este sitio.' }
+  }
   if (Notification.permission !== 'granted') {
-    console.warn('[PUSH] Permiso no concedido:', Notification.permission)
-    return { ok: false, reason: 'no_permission' }
+    return { ok: false, reason: 'permission_not_granted', hint: 'Necesitas conceder permiso de notificaciones cuando el navegador lo solicite.' }
   }
   try {
     const reg = await navigator.serviceWorker.ready

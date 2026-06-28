@@ -65,6 +65,36 @@ export const FESTIVOS_MADRID = {
   '2027-12-06': 'Día de la Constitución',
   '2027-12-08': 'Inmaculada Concepción',
   '2027-12-25': 'Navidad',
+  // 2028
+  '2028-01-01': 'Año Nuevo',
+  '2028-01-06': 'Reyes Magos',
+  '2028-04-13': 'Jueves Santo',
+  '2028-04-14': 'Viernes Santo',
+  '2028-05-01': 'Día del Trabajo',
+  '2028-05-02': 'Comunidad de Madrid',
+  '2028-05-15': 'San Isidro',
+  '2028-08-15': 'Asunción de la Virgen',
+  '2028-10-12': 'Fiesta Nacional de España',
+  '2028-11-01': 'Todos los Santos',
+  '2028-11-09': 'La Almudena',
+  '2028-12-06': 'Día de la Constitución',
+  '2028-12-08': 'Inmaculada Concepción',
+  '2028-12-25': 'Navidad',
+  // 2029
+  '2029-01-01': 'Año Nuevo',
+  '2029-01-06': 'Reyes Magos',
+  '2029-03-29': 'Jueves Santo',
+  '2029-03-30': 'Viernes Santo',
+  '2029-05-01': 'Día del Trabajo',
+  '2029-05-02': 'Comunidad de Madrid',
+  '2029-05-15': 'San Isidro',
+  '2029-08-15': 'Asunción de la Virgen',
+  '2029-10-12': 'Fiesta Nacional de España',
+  '2029-11-01': 'Todos los Santos',
+  '2029-11-09': 'La Almudena',
+  '2029-12-06': 'Día de la Constitución',
+  '2029-12-08': 'Inmaculada Concepción',
+  '2029-12-25': 'Navidad',
 }
 // Alias para compatibilidad con importaciones existentes
 export const FESTIVOS_MADRID_2026 = FESTIVOS_MADRID
@@ -75,8 +105,8 @@ export const INITIAL_DB = {
   centrosTrabajo: ['Obra Principal', 'Oficina Central', 'Almacén'],
   employees: [
     { id: 'admin', name: 'Administrador', empresa: 'Soluciones Mata', pin: '', color: '#5aa9e6', initials: 'AD', startDate: '2024-01-01', email: '', isAdmin: true },
-    { id: 'e1', name: 'Ismael Angeles de la Cruz', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '1111', color: '#6366f1', initials: 'IA', startDate: '2024-01-01', email: '', role: 'encargado', obrasAsignadas: ['Soluciones Mata'] },
-    { id: 'e2', name: 'Franklin Lisandro Nuñez Roque', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '2222', color: '#10b981', initials: 'FL', startDate: '2024-01-01', email: '', role: 'empleado', obrasAsignadas: [] }
+    { id: 'e1', name: 'Ismael Angeles de la Cruz', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '1111', pinLen: 4, color: '#6366f1', initials: 'IA', startDate: '2024-01-01', email: '', role: 'encargado', obrasAsignadas: ['Soluciones Mata'] },
+    { id: 'e2', name: 'Franklin Lisandro Nuñez Roque', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '2222', pinLen: 4, color: '#10b981', initials: 'FL', startDate: '2024-01-01', email: '', role: 'empleado', obrasAsignadas: [] }
   ],
   records: [],
   vacaciones: [],
