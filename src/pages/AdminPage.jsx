@@ -483,7 +483,7 @@ function PanelDashboard({ db, toast, saveDB }) {
   const [showAllToday, setShowAllToday] = useState(false)
   const now = new Date()
   const todayStr = today()
-  const emps = (db.employees || []).filter(e => !e.baja)
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
 
   const liveRecs = recs.filter(r => !r.fin)
@@ -1173,7 +1173,7 @@ function CtrlCard({ e, live, todayMin, force, startJornada, toggleDescanso }) {
 // ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
 function PanelControl({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
-  const emps = (db.employees || []).filter(e => !e.baja)
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
   const [view, setView] = useState('cards')
@@ -1329,7 +1329,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const [quickFilter, setQuickFilter] = useState('')
   const [editingRec, setEditingRec] = useState(null) // { id, field: 'inicio'|'fin', value }
   const [pageSize, setPageSize] = useState(100)
-  const emps = db.employees || []
+  const emps = (db.employees || []).filter(e => !e.isAdmin)
   const recs = (db.records || []).filter(r => r.fin)
   const now = new Date()
   const todayStr = today()

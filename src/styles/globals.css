@@ -7659,3 +7659,159 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .emp-nav-item.on::before { background: rgba(37,99,235,.10) !important; box-shadow: 0 0 12px rgba(37,99,235,.14) !important; }
 [data-theme="light"] .emp-nav-item.on::after { background: linear-gradient(90deg, #1d4ed8, #3b82f6) !important; box-shadow: 0 0 6px rgba(37,99,235,.4) !important; }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   MODO WEB — Layout desktop para pantallas ≥ 900px
+   - Employee panel: sidebar izquierdo con navegación vertical
+   - Login: layout de dos columnas (branding + formulario)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 900px) {
+
+  /* ── Employee panel: sidebar nav izquierdo ── */
+  #sEmp .emp-nav {
+    position: fixed !important;
+    left: 0 !important; top: 0 !important; bottom: 0 !important;
+    right: auto !important;
+    transform: none !important;
+    width: 210px !important;
+    max-width: 210px !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    padding: 76px 10px 24px !important;
+    border-radius: 0 !important;
+    border-right: 1px solid rgba(255,255,255,.09) !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    box-shadow: none !important;
+    background: rgba(8,8,16,.97) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  }
+
+  /* Quitar el max-width centrado del panel 600px */
+  #sEmp .emp-topbar,
+  #sEmp .emp-body {
+    max-width: none !important;
+    width: auto !important;
+    margin-left: 210px !important;
+    margin-right: 0 !important;
+  }
+
+  /* Ítems de nav en modo sidebar: fila horizontal */
+  #sEmp .emp-nav-item {
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    border-radius: 8px !important;
+    flex: none !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
+  /* Icono más pequeño en sidebar */
+  #sEmp .emp-nav-item svg {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Indicador activo: fondo en lugar de píldora superior */
+  #sEmp .emp-nav-item.on::before { display: none !important; }
+  #sEmp .emp-nav-item.on::after  { display: none !important; }
+  #sEmp .emp-nav-item.on {
+    background: rgba(37,99,235,.15) !important;
+    border-radius: 8px !important;
+  }
+
+  /* Tabs ya no necesitan padding inferior grande */
+  #sEmp .emp-tab { padding-bottom: 24px !important; }
+
+  /* Label de versión/empresa en sidebar — pequeño, al pie */
+  #sEmp .emp-nav::after {
+    content: 'TIMES INC';
+    display: block;
+    margin-top: auto;
+    padding-top: 16px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,.18);
+    text-align: center;
+  }
+
+  /* Modo claro: sidebar empleado */
+  [data-theme="light"] #sEmp .emp-nav {
+    background: rgba(248,248,252,.97) !important;
+    border-right-color: rgba(0,0,0,.08) !important;
+  }
+  [data-theme="light"] #sEmp .emp-nav-item.on {
+    background: rgba(37,99,235,.08) !important;
+  }
+
+  /* ── Login: dos columnas ── */
+  .login-wrap {
+    max-width: 860px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 390px !important;
+    grid-template-rows: auto 1fr !important;
+    column-gap: 56px !important;
+    row-gap: 0 !important;
+    align-items: center !important;
+    padding: 40px 48px !important;
+    min-height: 100vh !important;
+  }
+
+  .login-logo-row {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    gap: 14px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .login-logo-icon { width: 68px !important; height: 68px !important; }
+  .login-logo-name { font-size: 30px !important; }
+  .login-logo-sub  { font-size: 13px !important; margin-top: 2px !important; }
+
+  /* Subtítulo ampliado bajo el logo en desktop */
+  .login-logo-text::after {
+    content: 'Ficha tu jornada, gestiona vacaciones\Ay controla el tiempo de tu equipo.';
+    display: block;
+    font-size: 14px;
+    color: var(--text3);
+    margin-top: 10px;
+    line-height: 1.6;
+    max-width: 340px;
+  }
+
+  .login-card {
+    grid-column: 2 !important;
+    grid-row: 1 / 3 !important;
+    margin-bottom: 0 !important;
+    align-self: center !important;
+  }
+
+  /* Footer de seguridad debajo del branding */
+  .login-security {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    align-self: end !important;
+    padding-bottom: 12px !important;
+  }
+}
+
+/* ── 1280px: admin panel con contenido más ancho ── */
+@media (min-width: 1280px) {
+  .adm-panel > * { max-width: 1200px !important; }
+  .adm-panel { padding: 28px 40px !important; }
+}
