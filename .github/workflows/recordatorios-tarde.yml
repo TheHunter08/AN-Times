@@ -20,10 +20,15 @@ jobs:
     steps:
       - name: Llamar cron recordatorios
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "$VERCEL_APP_URL/api/cron-reminders" \
+          # Fallback a la URL de producción si el secret no está configurado
+          APP_URL="${VERCEL_APP_URL:-https://an-times.vercel.app}"
+          APP_URL="${APP_URL// /}"
+          echo "Llamando a: $APP_URL/api/cron-reminders"
+          STATUS=$(curl -s -o /tmp/cron_resp.txt -w "%{http_code}" \
+            -X GET "$APP_URL/api/cron-reminders" \
             -H "Authorization: Bearer $CRON_SECRET")
           echo "Status: $STATUS"
+          echo "Response: $(cat /tmp/cron_resp.txt)"
           if [ "$STATUS" != "200" ]; then
             echo "Error: cron returned $STATUS"
             exit 1

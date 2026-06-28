@@ -11,11 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    env:
+      VITE_SB_URL:  ${{ secrets.VITE_SB_URL }}
+      VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
+
     steps:
       - name: Download app_data snapshot
         run: |
-          SB_URL="${{ secrets.VITE_SB_URL || 'https://eyyhlcvpyiorpdnvqsll.supabase.co' }}"
-          SB_ANON="${{ secrets.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I' }}"
+          # Use secret if valid, otherwise fall back to hardcoded value
+          SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
+          SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+          # Strip any accidental whitespace
+          SB_URL="${SB_URL// /}"
+          SB_ANON="${SB_ANON// /}"
           DATE=$(date +%Y-%m-%d)
 
           echo "Backing up app_data..."
