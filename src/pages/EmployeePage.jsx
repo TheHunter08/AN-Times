@@ -2396,7 +2396,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
     <>
     <PullToRefresh>
       {/* ── TIMES INC 3.0 — Jornada Header ──────────────── */}
-      <div style={{ padding:'20px 20px 16px', background:'#000', borderBottom:'1px solid rgba(255,255,255,.06)', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="jor-header" style={{ padding:'20px 20px 16px', background:'#000', borderBottom:'1px solid rgba(255,255,255,.06)', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
           <div style={{ fontSize:30, fontWeight:900, letterSpacing:'-1.5px', color:'#fff', lineHeight:1.1 }}>Mi Jornada</div>
           <div style={{ fontSize:13, color:'rgba(255,255,255,.35)', marginTop:4, textTransform:'capitalize' }}>
@@ -2409,18 +2409,18 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       </div>
 
       {/* ── TIMES INC 3.0 — Stat Pills ───────────────────── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:'#000' }}>
-        <div style={{ background:'#0D0D14', border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+      <div className="jor-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:'#000' }}>
+        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>{weekMin > WK ? '🔴' : '⏱️'}</div>
           <div style={{ fontSize:17, fontWeight:800, color: weekMin > WK ? '#fbbf24' : '#818cf8', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(Math.floor(weekMin))}</div>
           <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
         </div>
-        <div style={{ background:'#0D0D14', border:'1px solid rgba(16,185,129,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:'1px solid rgba(16,185,129,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>✅</div>
           <div style={{ fontSize:17, fontWeight:800, color:'#34d399', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(normMin)}</div>
           <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Normal hoy</div>
         </div>
-        <div style={{ background:'#0D0D14', border:'1px solid rgba(245,158,11,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:'1px solid rgba(245,158,11,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>⚡</div>
           <div style={{ fontSize:17, fontWeight:800, color:'#fbbf24', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(extraMin)}</div>
           <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Extra hoy</div>
@@ -2429,7 +2429,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
 
       {/* ── TIMES INC 3.0 — Total card + Weekly chart ────── */}
       <div style={{ padding:'0 16px 12px' }}>
-        <div style={{ background:'#0D0D14', border:'1px solid rgba(255,255,255,.07)', borderRadius:22, padding:'18px 18px 14px', marginBottom:0 }}>
+        <div className="jor-total-card" style={{ background:'#0D0D14', border:'1px solid rgba(255,255,255,.07)', borderRadius:22, padding:'18px 18px 14px', marginBottom:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
             <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px' }}>Total trabajado hoy</div>
             <div style={{ fontSize:11, fontWeight:700, color:'#818cf8', background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.25)', padding:'3px 10px', borderRadius:999 }}>
@@ -2456,7 +2456,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       </div>
 
       {/* ── TIMES INC 3.0 — PDF export buttons ──────────── */}
-      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, flexWrap:'wrap' }}>
+      <div className="jor-pdf-row" style={{ padding:'0 16px 6px', display:'flex', gap:8, flexWrap:'wrap' }}>
         <button onClick={exportWeekPDF} disabled={generatingWeekPdf}
           style={{ flex:1, padding:'11px 10px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingWeekPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
           {generatingWeekPdf ? <><span className="login-spinner" style={{ width:10,height:10,borderWidth:1.5,borderColor:'rgba(255,255,255,.1)',borderTopColor:'rgba(255,255,255,.5)',marginRight:5,display:'inline-block',verticalAlign:'middle' }}/>Generando…</> : <>📅 Semanal</>}
