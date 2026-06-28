@@ -12,16 +12,25 @@ import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
 
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
+const PanelTurnos    = lazy(() => import('./admin/PanelTurnos.jsx'))
+const PanelAnomalias = lazy(() => import('./admin/PanelAnomalias.jsx'))
+const PanelGastos    = lazy(() => import('./admin/PanelGastos.jsx'))
+const PanelDenuncias = lazy(() => import('./admin/PanelDenuncias.jsx'))
+
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
   { id:'control',     label:'Control Live' },
   { id:'fichajes',    label:'Fichajes' },
   { id:'solicitudes', label:'Solicitudes' },
   { id:'empleados',   label:'Empleados' },
+  { id:'turnos',      label:'Turnos' },
   { id:'informes',    label:'Informes' },
   { id:'mensajes',    label:'Mensajes' },
   { id:'obras',       label:'Obras' },
   { id:'documentos',  label:'Documentos' },
+  { id:'gastos',      label:'Gastos' },
+  { id:'anomalias',   label:'Anomalías' },
+  { id:'denuncias',   label:'Denuncias' },
   { id:'auditoria',   label:'Auditoría' },
   { id:'ajustes',     label:'Ajustes' },
 ]
@@ -51,6 +60,10 @@ const NAV_ICONS = {
   mensajes:    <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
   miobra:      <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
   validar:     <><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
+  turnos:      <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="9" y2="15"/><line x1="15" y1="15" x2="15" y2="15"/></>,
+  gastos:      <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+  anomalias:   <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+  denuncias:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
 }
 
 function NavIcon({ id, size = 17 }) {
@@ -403,6 +416,12 @@ export default function AdminPage() {
               {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'miobra'      && <PanelMiObra      db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'validar'     && <PanelValidarHoras db={db} toast={toast} saveDB={saveDB} session={session} />}
+              <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
+                {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'denuncias' && <PanelDenuncias db={db} toast={toast} saveDB={saveDB} session={session} />}
+              </Suspense>
             </>
           ) : isEncargado ? (
             <>
@@ -422,6 +441,12 @@ export default function AdminPage() {
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
               {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
+              <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
+                {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'denuncias' && <PanelDenuncias db={db} toast={toast} saveDB={saveDB} session={session} />}
+              </Suspense>
             </>
           )}
         </div>

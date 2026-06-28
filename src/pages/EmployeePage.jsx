@@ -6,6 +6,10 @@ import { WD, WK, FESTIVOS_MADRID_2026, VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { PWAInstall } from '../components/PWAInstall.jsx'
+import WellbeingModal from '../components/WellbeingModal.jsx'
+import TabTurnos from '../components/TabTurnos.jsx'
+import TabGastos from '../components/TabGastos.jsx'
+import TabDenuncia from '../components/TabDenuncia.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../utils/pdfSign.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { useModalBack } from '../hooks/useModalBack.js'
@@ -54,6 +58,17 @@ function TopbarClock() {
       {syncLabel && <span style={{ marginLeft:6, color: syncStatus === 'error' ? 'var(--danger)' : 'var(--text4)', fontSize:10 }}>· {syncLabel}</span>}
     </div>
   )
+}
+
+// ─── HOOK: ancho de ventana (desktop detect) ──────────────────────────────────
+function useWindowWidth() {
+  const [w, setW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const handler = () => setW(window.innerWidth)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return w
 }
 
 // ─── HOOK REUTILIZABLE: canvas de firma ───────────────────────────────────────
@@ -119,6 +134,7 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
+  const winW = useWindowWidth()
   const timer = useTimer()
   // Derivar siempre desde db.employees para que onboardingDone y otros campos
   // se actualicen reactivamente sin depender del snapshot estático de la sesión.
@@ -130,6 +146,11 @@ export default function EmployeePage() {
   const [pendingGPS, setPendingGPS] = useState(null)
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [calMonth, setCalMonth] = useState(new Date())
+  const [showWellbeing, setShowWellbeing] = useState(false)
+  const [wellbeingRecId, setWellbeingRecId] = useState(null)
+  const [geoPrompt, setGeoPrompt] = useState(null) // { obraName, dist }
+  const geoWatchRef = useRef(null)
+  const geoDismissedRef = useRef(false)
   const [showConfetti, setShowConfetti] = useState(false)
   // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
@@ -239,10 +260,33 @@ export default function EmployeePage() {
   }, [timer.state])
 
 
+  // ── Geofencing: auto-prompt when employee enters obra radius ──────────────
+  useEffect(() => {
+    if (!u?.id || !navigator.geolocation) return
+    const obras = (dbRef.current?.obras || []).filter(o => o.coords && o.radio)
+    if (!obras.length) return
+    const checkPos = (pos) => {
+      if (geoDismissedRef.current) return
+      const hasOpenRec = (dbRef.current?.records || []).some(r => r.empId === u.id && !r.fin)
+      if (hasOpenRec) { setGeoPrompt(null); return }
+      const lat = pos.coords.latitude, lng = pos.coords.longitude
+      const inRange = obras.find(o => {
+        const R = 6371e3
+        const φ1 = lat * Math.PI/180, φ2 = o.coords.lat * Math.PI/180
+        const Δφ = (o.coords.lat - lat) * Math.PI/180, Δλ = (o.coords.lng - lng) * Math.PI/180
+        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
+        return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= (o.radio || 200)
+      })
+      setGeoPrompt(inRange ? { obraName: inRange.nombre } : null)
+    }
+    geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, () => {}, { enableHighAccuracy: false, maximumAge: 60000 })
+    return () => { if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current) }
+  }, [u?.id])
+
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
   const currentTabRef = useRef(currentEmpTab)
-  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil']
+  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil', 'turnos', 'gastos', 'denuncia']
   useEffect(() => {
     const prev = prevTabRef.current
     if (prev !== currentEmpTab && empBodyRef.current) {
@@ -620,6 +664,9 @@ export default function EmployeePage() {
     saveDB({ records: newDB.records, employees: emps })
     try { navigator.vibrate(15) } catch {}
     toast('Jornada iniciada en ' + centro, 3000, 'ok')
+    // Wellbeing check-in after clock-in
+    setWellbeingRecId(rec.id)
+    setShowWellbeing(true)
   }, [u, db, pendingGPS, closeModal, saveDB, toast])
 
   const doStop = useCallback(() => {
@@ -722,6 +769,151 @@ export default function EmployeePage() {
     return `Buenas noches, ${firstName} 🌙`
   }, [u.name, greetHour])
 
+  const handleWellbeingSubmit = ({ mood, nota }) => {
+    if (!mood || !wellbeingRecId) return
+    const entry = { id: gid(), empId: u.id, mood, nota: nota || '', ts: new Date().toISOString(), recordId: wellbeingRecId }
+    saveDB({ wellbeing: [...(db.wellbeing || []), entry] })
+  }
+
+  const handleGeoStart = () => {
+    geoDismissedRef.current = true
+    setGeoPrompt(null)
+    doStart()
+  }
+
+  const dskNavItems = [
+    { id:'inicio',     label:'Inicio',      icon:<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>, extra:<polyline points="9 22 9 12 15 12 15 22"/>, live: timer.state !== 'idle' },
+    { id:'jornada',    label:'Jornada',     icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></> },
+    { id:'vacaciones', label:'Vacaciones',  icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
+    { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
+    { id:'mensajes',   label:'Mensajes',   icon:<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>, badge: chatUnread },
+    { id:'turnos',     label:'Turnos',     icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="15" y2="15"/></> },
+    { id:'gastos',     label:'Gastos',     icon:<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
+    { id:'denuncia',   label:'Denuncia',   icon:<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></> },
+    { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
+  ]
+
+  if (winW >= 1024) return (
+    <div className="screen active emp-dsk" id="sEmp">
+      <aside className="emp-dsk-sidebar">
+        <div className="emp-dsk-brand">
+          <span className="emp-dsk-brand-icon">T</span>
+          <span className="emp-dsk-brand-name">TIMES INC</span>
+        </div>
+
+        <nav className="emp-dsk-nav" aria-label="Navegación principal">
+          {dskNavItems.map(({ id, label, icon, extra, badge, live }) => (
+            <button key={id} type="button"
+              className={`emp-dsk-nav-item${currentEmpTab === id ? ' on' : ''}`}
+              onClick={() => setEmpTab(id)} aria-current={currentEmpTab === id}>
+              <span className="emp-dsk-nav-icon-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true">{icon}{extra}</svg>
+                {badge > 0 && <span className="emp-dsk-badge">{badge > 9 ? '9+' : badge}</span>}
+                {live && !badge && <span className="emp-dsk-live-dot" />}
+              </span>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="emp-dsk-sidebar-footer">
+          <div className="emp-dsk-footer-user">
+            <div className="emp-dsk-avatar" style={{ background: u.color || 'var(--primary)' }}>{initials}</div>
+            <div className="emp-dsk-footer-info">
+              <div className="emp-dsk-footer-name">{u.name}</div>
+              <div className="emp-dsk-footer-role">{u.role || 'Empleado'}</div>
+            </div>
+          </div>
+          <button className="emp-dsk-logout-btn" onClick={doLogout} title="Cerrar sesión" aria-label="Cerrar sesión">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <div className="emp-dsk-main">
+        <header className="emp-dsk-topbar">
+          <div className="emp-dsk-greeting-block">
+            <div className="emp-greeting">{greeting}</div>
+            <TopbarClock />
+          </div>
+          <div className="emp-dsk-topbar-actions">
+            {(session.isEnc || session.isJO) && (
+              <button className="enc-chip" onClick={() => setScreen('admin')}>
+                {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
+              </button>
+            )}
+            <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema">
+              {isLight ? '🌙' : '☀️'}
+            </button>
+            <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Asistente IA">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
+            </button>
+            <button className="icon-btn" onClick={() => openModal('chat')} style={{ position:'relative' }} aria-label="Chat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              {chatUnread > 0 && <span className="emp-dsk-badge" style={{ position:'absolute', top:-4, right:-4 }}>{chatUnread > 9 ? '9+' : chatUnread}</span>}
+            </button>
+            <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label="Notificaciones">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unread > 0 && <span className="emp-dsk-badge" style={{ position:'absolute', top:-4, right:-4 }}>{unread > 9 ? '9+' : unread}</span>}
+            </button>
+          </div>
+        </header>
+
+        <PWAInstall />
+        <OfflineBanner />
+        {showNotifBanner && (
+          <div className="v3-notif-banner" style={{ borderRadius:0, borderLeft:'none', borderRight:'none', borderTop:'none' }}>
+            <div className="v3-notif-banner-icon">🔔</div>
+            <div className="v3-notif-banner-text">
+              <div className="v3-notif-banner-title">Activa las notificaciones</div>
+              <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
+            </div>
+            <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>Activar</button>
+            <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>
+          </div>
+        )}
+
+        {geoPrompt && (
+          <div style={{ background:'rgba(99,102,241,.15)', borderBottom:'1px solid rgba(99,102,241,.3)', padding:'10px 20px', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+            <span style={{ fontSize:18 }}>📍</span>
+            <span style={{ flex:1, fontSize:13, color:'var(--primary-light)' }}>Pareces estar en <strong>{geoPrompt.obraName}</strong> — ¿iniciar jornada?</span>
+            <button onClick={handleGeoStart} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Iniciar</button>
+            <button onClick={() => { geoDismissedRef.current = true; setGeoPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer' }}>×</button>
+          </div>
+        )}
+        <div className="emp-dsk-content" ref={empBodyRef}>
+          {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} />}
+          {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
+          {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+          {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
+          {currentEmpTab === 'gastos' && <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'denuncia' && <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
+        </div>
+      </div>
+
+      <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
+      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={closeModal} />
+      <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />
+      <ModalAI visible={activeModal==='ai'} db={db} u={u} onClose={closeModal} />
+      <ModalVacForm visible={activeModal==='vacForm'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} />
+      <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
+      <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
+      <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
+      <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
+      <Confetti visible={showConfetti} />
+      {u.onboardingDone && <WelcomeSlides />}
+      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
+    </div>
+  )
+
   return (
     <div className="screen active" id="sEmp">
       {/* Topbar */}
@@ -778,6 +970,16 @@ export default function EmployeePage() {
         </div>
       )}
 
+      {/* Geofencing banner */}
+      {geoPrompt && (
+        <div style={{ background:'rgba(99,102,241,.15)', borderBottom:'1px solid rgba(99,102,241,.3)', padding:'8px 14px', display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:16 }}>📍</span>
+          <span style={{ flex:1, fontSize:12, color:'var(--primary-light)' }}>Cerca de <strong>{geoPrompt.obraName}</strong> — ¿iniciar jornada?</span>
+          <button onClick={handleGeoStart} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:11, fontWeight:700, cursor:'pointer' }}>Iniciar</button>
+          <button onClick={() => { geoDismissedRef.current = true; setGeoPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer', lineHeight:1 }}>×</button>
+        </div>
+      )}
+
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} />}
@@ -785,19 +987,23 @@ export default function EmployeePage() {
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
         {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-{currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
+        {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
+        {currentEmpTab === 'gastos' && <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} />}
+        {currentEmpTab === 'denuncia' && <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} />}
+        {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
       </div>
 
-      {/* Bottom nav */}
-      {(()=> {
-        return (
-      <div className="emp-nav">
+      {/* Bottom nav — scrollable to fit all 9 tabs */}
+      <div className="emp-nav emp-nav-scroll">
         {[
           { id:'inicio',     label:'Inicio',     icon:<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>, extra:<polyline points="9 22 9 12 15 12 15 22"/> },
           { id:'jornada',    label:'Jornada',    icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>, live: timer.state !== 'idle' },
           { id:'vacaciones', label:'Vac.',        icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
-          { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
+          { id:'calendario', label:'Cal.',        icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
           { id:'mensajes',   label:'Mensajes',   icon:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>, badge: chatUnread },
+          { id:'turnos',     label:'Turnos',     icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="15" y2="15"/></> },
+          { id:'gastos',     label:'Gastos',     icon:<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
+          { id:'denuncia',   label:'Denuncia',   icon:<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></> },
           { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
         ].map(({ id, label, icon, extra, badge, live }) => (
           <button key={id} type="button" className={`emp-nav-item${currentEmpTab===id?' on':''}`} onClick={() => { try { navigator.vibrate(5) } catch {}; setEmpTab(id) }} aria-current={currentEmpTab===id} aria-label={label}>
@@ -810,10 +1016,9 @@ export default function EmployeePage() {
           </button>
         ))}
       </div>
-        )
-      })()}
 
       {/* Modals */}
+      <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
       <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={closeModal} />
       <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />
       <ModalAI visible={activeModal==='ai'} db={db} u={u} onClose={closeModal} />
