@@ -1496,125 +1496,102 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
     <PullToRefresh>
       <div className="ini-wrap">
 
-        <WeatherCard />
+        {/* ── TIMES INC 3.0 — Hero Card ──────────────────────────── */}
+        <div className="v30-hero-card">
 
-        {/* Hero clock card */}
-        <div className={`hero-clock-card${timer.state !== 'idle' ? ' jornada-active' : ''}`}>
-          <div className="hero-clock-display">{clockTime || '--:--:--'}</div>
-          <div className="hero-clock-date">{clockDate}</div>
-
-          <div className={`hero-status-badge${statusClass ? ' ' + statusClass : ''}`}>
-            <span className="hero-badge-dot" />
-            {timer.state === 'idle' ? 'Sin jornada activa' : timer.state === 'break' ? 'En descanso' : 'Jornada activa'}
+          {/* Clock row */}
+          <div className="v30-hc-top">
+            <div className="v30-hc-clock-block">
+              <div className="v30-hc-clock">
+                <span className="v30-hc-hm">{clockTime?.slice(0,5) || '--:--'}</span>
+                <span className="v30-hc-sec">{clockTime?.slice(5) || ':--'}</span>
+              </div>
+              <div className="v30-hc-date">{clockDate}</div>
+            </div>
+            <div className="v30-hc-weather"><WeatherCard /></div>
           </div>
 
-          {/* v4: pills de estado */}
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10, marginBottom:2 }}>
-            {timer.state !== 'idle' && (
-              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background: timer.state === 'break' ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)', color: timer.state === 'break' ? 'var(--orange)' : 'var(--green)', border:`1px solid ${timer.state === 'break' ? 'rgba(245,158,11,.2)' : 'rgba(16,185,129,.2)'}` }}>
-                {timer.state === 'break' ? '⏸ En descanso' : '● Jornada activa'}
-              </span>
-            )}
-            {o?.centro && (
-              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background:'var(--primary-dim)', color:'var(--primary-light)', border:'1px solid var(--primary-glow)' }}>
-                {o.centro}
-              </span>
-            )}
-            {timer.state === 'break' && brkMin > 20 && (
-              <span style={{ padding:'3px 10px', borderRadius:20, fontSize:10, fontWeight:700, background:'rgba(239,68,68,.1)', color:'var(--danger)', border:'1px solid rgba(239,68,68,.2)' }}>
-                ⚠ {brkMin}min descanso
-              </span>
-            )}
-          </div>
-
-          <div className="hero-hours-row">
-            <div className="hero-hour-pill">
-              <div className="hero-hour-label">Trabajado</div>
-              <div className="hero-hour-value">
-                {Math.floor(totMin / 60)}h <span>{p2(totMin % 60)}m</span>
-              </div>
-            </div>
-            <div className="hero-hour-pill">
-              <div className="hero-hour-label">Restante</div>
-              <div className="hero-hour-value">
-                {Math.floor(remainMin / 60)}h <span>{p2(remainMin % 60)}m</span>
-              </div>
-            </div>
-            <div className="hero-hour-pill">
-              <div className="hero-hour-label">Extra hoy</div>
-              <div className="hero-hour-value" style={{ color: 'var(--accent3)' }}>
-                {Math.floor(extraMin / 60)}h <span>{p2(extraMin % 60)}m</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="hero-arc-row">
-            <svg className="hero-arc-svg" viewBox="0 0 120 120">
-              <defs>
-                <linearGradient id="heroArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#2563EB" />
-                  <stop offset="100%" stopColor="#8B5CF6" />
-                </linearGradient>
-              </defs>
-              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="var(--border2)" strokeWidth="9" />
-              <circle cx="60" cy="60" r={ARC_R} fill="none" stroke="url(#heroArcGrad)" strokeWidth="9"
-                strokeLinecap="round"
-                strokeDasharray={ARC_C} strokeDashoffset={arcOffset}
-                transform="rotate(-90 60 60)" />
-            </svg>
-            <div>
-              <div className="hero-arc-pct">{pct}%</div>
-              <div className="hero-arc-sub">jornada completada</div>
-              {timer.state !== 'idle' && (
-                <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 3 }}>
-                  {s2t(timer.ws)} activo
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button className={`hero-fichar-btn ripple-btn${timer.state !== 'idle' ? ' active' : ''}`}
-            onClick={e => {
-              const btn = e.currentTarget
-              const r = document.createElement('span')
-              r.className = 'ripple'
-              const rect = btn.getBoundingClientRect()
-              const size = Math.max(rect.width, rect.height)
-              r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`
-              btn.appendChild(r)
-              setTimeout(() => r.remove(), 600)
-              if (showTip) { try { localStorage.setItem('an_tip_fichar', '1') } catch {}; setShowTip(false) }
-              handleMainBtn()
-            }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
-              {timer.state === 'idle' ? '▶' : '■'}
-            </div>
-            <div style={{ textAlign:'left' }}>
-              <div>
-                {timer.state === 'idle' ? 'Iniciar jornada' : timer.state === 'break' ? 'Terminar jornada' : 'Registrar salida'}
-              </div>
-              <div style={{ fontSize:11, fontWeight:500, opacity:.75, marginTop:2 }}>
-                {timer.state === 'idle'
-                  ? 'Toca para comenzar tu día'
-                  : `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m trabajadas${o?.breaks?.length ? ` · ${o.breaks.length} descanso${o.breaks.length !== 1 ? 's' : ''}` : ''}`}
-              </div>
-            </div>
-          </button>
-          {showTip && timer.state === 'idle' && (
-            <div style={{ marginTop:10, padding:'9px 14px', background:'var(--primary)', color:'#fff', borderRadius:10, fontSize:12, fontWeight:600, textAlign:'center', boxShadow:'0 4px 14px rgba(108,99,255,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>👆</span>
-              Pulsa el botón para iniciar tu jornada
-            </div>
-          )}
-
-          {timer.state !== 'idle' && (
+          {/* Button zone */}
+          <div className="v30-hc-btn-area">
+            {/* Outer glow ring — separate layer, won't overlap stats */}
+            <div className={`v30-hc-glow${timer.state === 'break' ? ' brk' : timer.state !== 'idle' ? ' live' : ''}`}/>
             <button
-              className={`jor-break-chip${timer.state === 'break' ? ' active' : ''}`}
-              onClick={doBreak}
-              style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>
-              {timer.state === 'break' ? '▶️ Reanudar trabajo' : '⏸️ Iniciar descanso'}
+              className={`v30-hc-btn${timer.state === 'break' ? ' brk' : timer.state !== 'idle' ? ' live' : ''}`}
+              onClick={() => {
+                try { navigator.vibrate([12]) } catch {}
+                if (showTip) { try { localStorage.setItem('an_tip_fichar','1') } catch {}; setShowTip(false) }
+                handleMainBtn()
+              }}
+            >
+              <svg viewBox="0 0 24 24" className="v30-hc-btn-ico" aria-hidden="true">
+                {timer.state === 'idle'
+                  ? <polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/>
+                  : <rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>}
+              </svg>
+              <span className="v30-hc-btn-lbl">
+                {timer.state === 'idle' ? 'INICIAR' : timer.state === 'break' ? 'PAUSADO' : 'PARAR'}
+              </span>
+            </button>
+          </div>
+
+          {/* Tip / live status — just below button, above stats */}
+          {showTip && timer.state === 'idle' ? (
+            <div className="v30-hc-tip-text">👆 Pulsa el círculo para comenzar</div>
+          ) : timer.state !== 'idle' ? (
+            <div className="v30-hc-live-row">
+              <span className="v30-dot on"/>
+              <span className="v30-hc-live-txt">
+                {timer.state === 'break' ? `En descanso · ${brkMin}min` : `Jornada activa · ${s2t(timer.ws)}`}
+              </span>
+            </div>
+          ) : null}
+
+          {/* Break toggle — when active */}
+          {timer.state !== 'idle' && (
+            <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={doBreak}>
+              {timer.state === 'break' ? '▶  Reanudar trabajo' : '⏸  Iniciar descanso'}
             </button>
           )}
+
+          {/* Break warn chip */}
+          {(timer.state === 'break' && brkMin > 20) && (
+            <div className="v30-chip v30-chip-warn">⚠ {brkMin}min de descanso</div>
+          )}
+
+          {/* Divider */}
+          <div className="v30-hc-sep"/>
+
+          {/* Stats row */}
+          <div className="v30-hc-stats">
+            <div className="v30-hc-stat">
+              <div className="v30-hc-stat-num">{Math.floor(totMin/60)}h {p2(totMin%60)}m</div>
+              <div className="v30-hc-stat-lbl">Trabajado</div>
+            </div>
+            <div className="v30-hc-divider"/>
+            <div className="v30-hc-stat">
+              <div className="v30-hc-stat-num">{Math.floor(remainMin/60)}h {p2(remainMin%60)}m</div>
+              <div className="v30-hc-stat-lbl">Restante</div>
+            </div>
+            <div className="v30-hc-divider"/>
+            <div className="v30-hc-stat">
+              <div className="v30-hc-stat-num" style={{ color:'#818cf8' }}>{pct}%</div>
+              <div className="v30-hc-stat-lbl">Jornada</div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="v30-hc-progress">
+            <div className="v30-hc-progress-fill" style={{ width:`${pct}%` }}/>
+          </div>
+          <div className="v30-hc-progress-labels">
+            <span>{o?.centro || 'Sin obra asignada'}</span>
+            {timer.state !== 'idle' && extraMin > 0 && (
+              <span style={{ color:'#34d399', fontWeight:600 }}>
+                +{Math.floor(extraMin/60)}h {p2(extraMin%60)}m extra
+              </span>
+            )}
+          </div>
+
         </div>
 
         {/* Stats grid */}
@@ -1633,38 +1610,37 @@ function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal,
         </div>
 
         {/* Weekly progress bar */}
-        <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Progreso semanal</div>
-            <div style={{ fontSize:12, fontWeight:700, color: weekPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(weekMin)} / 40h</div>
+        <div className="v30-prog-block">
+          <div className="v30-prog-row">
+            <div className="v30-prog-label">Semana</div>
+            <div className={`v30-prog-val${weekPct >= 100 ? ' green' : ''}`}>{mhm(weekMin)} / 40h</div>
           </div>
-          <div className="v3-progress">
-            <div className={`v3-progress-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${Math.min(weekPct, 100)}%` }} />
+          <div className="v30-prog-track">
+            <div className={`v30-prog-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${Math.min(weekPct, 100)}%` }} />
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
-            <span style={{ fontSize:9, color:'var(--text4)' }}>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
-            <span style={{ fontSize:9, color: weekPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
+          <div className="v30-prog-footer">
+            <span>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
+            <span style={{ color: weekPct >= 100 ? '#34d399' : undefined }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
 
-
         {/* Monthly progress bar */}
-        <div style={{ margin:'0 16px 12px', padding:'12px 14px', background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.6px', color:'var(--text3)' }}>Este mes</div>
-            <div style={{ fontSize:12, fontWeight:700, color: monthPct >= 100 ? 'var(--green)' : 'var(--primary-light)' }}>{mhm(monthMin)} / 160h</div>
+        <div className="v30-prog-block">
+          <div className="v30-prog-row">
+            <div className="v30-prog-label">Este mes</div>
+            <div className={`v30-prog-val${monthPct >= 100 ? ' green' : ''}`}>{mhm(monthMin)} / 160h</div>
           </div>
-          <div className="v3-progress">
-            <div className={`v3-progress-fill${monthPct >= 100 ? ' green' : monthDeficitMin > 0 ? ' orange' : ''}`} style={{ width:`${Math.min(monthPct, 100)}%` }} />
+          <div className="v30-prog-track">
+            <div className={`v30-prog-fill${monthPct >= 100 ? ' green' : monthDeficitMin > 0 ? ' orange' : ''}`} style={{ width:`${Math.min(monthPct, 100)}%` }} />
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}>
-            <span style={{ fontSize:9, color:'var(--text4)' }}>{now.toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</span>
+          <div className="v30-prog-footer">
+            <span>{now.toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</span>
             {monthExtraMin > 0 ? (
-              <span style={{ fontSize:9, color:'var(--green)', fontWeight:700 }}>+{mhm(monthExtraMin)} extra</span>
+              <span style={{ color:'#34d399', fontWeight:700 }}>+{mhm(monthExtraMin)} extra</span>
             ) : monthDeficitMin > 0 ? (
-              <span style={{ fontSize:9, color:'var(--orange)' }}>−{mhm(monthDeficitMin)} déficit</span>
+              <span style={{ color:'#fbbf24' }}>−{mhm(monthDeficitMin)} déficit</span>
             ) : (
-              <span style={{ fontSize:9, color: monthPct >= 100 ? 'var(--green)' : 'var(--text4)' }}>{monthPct >= 100 ? '✓ 160h alcanzadas' : `${100 - monthPct}% restante`}</span>
+              <span style={{ color: monthPct >= 100 ? '#34d399' : undefined }}>{monthPct >= 100 ? '✓ 160h alcanzadas' : `${100 - monthPct}% restante`}</span>
             )}
           </div>
         </div>
@@ -2405,81 +2381,79 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   return (
     <>
     <PullToRefresh>
-      <div style={{ padding:'14px 16px 14px', background:'linear-gradient(160deg,rgba(108,99,255,.08) 0%,transparent 100%)', borderBottom:'1px solid var(--border)' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
-          <div style={{ fontSize:20, fontWeight:800, letterSpacing:'-.5px' }}>Mi Jornada</div>
-          <div style={{ fontSize:10, color:'var(--text3)', background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:20, padding:'4px 10px', fontWeight:600, textTransform:'uppercase', letterSpacing:'.4px' }}>
-            Hoy
+      {/* ── TIMES INC 3.0 — Jornada Header ──────────────── */}
+      <div style={{ padding:'20px 20px 16px', background:'#000', borderBottom:'1px solid rgba(255,255,255,.06)', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+        <div>
+          <div style={{ fontSize:30, fontWeight:900, letterSpacing:'-1.5px', color:'#fff', lineHeight:1.1 }}>Mi Jornada</div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,.35)', marginTop:4, textTransform:'capitalize' }}>
+            {now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}
           </div>
         </div>
-        <div style={{ fontSize:13, color:'var(--text3)', textTransform:'capitalize' }}>
-          {now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}
+        <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.10)', borderRadius:999, padding:'5px 13px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', marginTop:4 }}>
+          Hoy
         </div>
       </div>
 
-      {/* Stats 3-col */}
-      <div className="jor-stats-row">
-        <div className={`jor-stat-card${weekMin > WK ? ' orange' : ' primary'}`}>
-          <div className="jor-stat-ico">{weekMin > WK ? '🔴' : '⏱️'}</div>
-          <div className="jor-stat-val">{mhm(Math.floor(weekMin))}</div>
-          <div className="jor-stat-lbl">Esta semana{weekMin > WK ? ' ↑' : ''}</div>
+      {/* ── TIMES INC 3.0 — Stat Pills ───────────────────── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:'#000' }}>
+        <div style={{ background:'#0D0D14', border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <div style={{ fontSize:18, marginBottom:2 }}>{weekMin > WK ? '🔴' : '⏱️'}</div>
+          <div style={{ fontSize:17, fontWeight:800, color: weekMin > WK ? '#fbbf24' : '#818cf8', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(Math.floor(weekMin))}</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
         </div>
-        <div className="jor-stat-card">
-          <div className="jor-stat-ico">✅</div>
-          <div className="jor-stat-val">{mhm(normMin)}</div>
-          <div className="jor-stat-lbl">Normal hoy</div>
+        <div style={{ background:'#0D0D14', border:'1px solid rgba(16,185,129,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <div style={{ fontSize:18, marginBottom:2 }}>✅</div>
+          <div style={{ fontSize:17, fontWeight:800, color:'#34d399', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(normMin)}</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Normal hoy</div>
         </div>
-        <div className="jor-stat-card orange">
-          <div className="jor-stat-ico">⚡</div>
-          <div className="jor-stat-val">{mhm(extraMin)}</div>
-          <div className="jor-stat-lbl">Extra hoy</div>
+        <div style={{ background:'#0D0D14', border:'1px solid rgba(245,158,11,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <div style={{ fontSize:18, marginBottom:2 }}>⚡</div>
+          <div style={{ fontSize:17, fontWeight:800, color:'#fbbf24', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(extraMin)}</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Extra hoy</div>
         </div>
       </div>
 
-      {/* Total card + Weekly chart */}
+      {/* ── TIMES INC 3.0 — Total card + Weekly chart ────── */}
       <div style={{ padding:'0 16px 12px' }}>
-        <div className="card" style={{ marginBottom:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-            <div style={{ fontSize:11, color:'var(--text3)', fontWeight:500 }}>Total trabajado hoy</div>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--primary-light)', background:'var(--primary-dim)', padding:'2px 8px', borderRadius:12 }}>
+        <div style={{ background:'#0D0D14', border:'1px solid rgba(255,255,255,.07)', borderRadius:22, padding:'18px 18px 14px', marginBottom:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px' }}>Total trabajado hoy</div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#818cf8', background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.25)', padding:'3px 10px', borderRadius:999 }}>
               {Math.round(totMin / (WD || 480) * 100)}%
             </div>
           </div>
-          <div className="gradient-text" style={{ fontSize:36, fontWeight:800, letterSpacing:'-1.5px', marginBottom:12 }}>{mhm(totMin)}</div>
+          <div style={{ fontSize:44, fontWeight:800, letterSpacing:'-2px', color:'#fff', fontVariantNumeric:'tabular-nums', lineHeight:1, marginBottom:14 }}>{mhm(totMin)}</div>
 
           {/* Weekly mini bar chart */}
           <WeeklyBars db={db} u={u} timer={timer} />
 
-          <div style={{ display:'flex', flexDirection:'column', gap:6, paddingTop:10, borderTop:'1px solid var(--border)' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, paddingTop:12, borderTop:'1px solid rgba(255,255,255,.06)' }}>
             {[
-              { lbl:'Descansos', val: mhm(brkMin), color:'var(--orange)' },
-              { lbl:'Mes actual', val: mhm(monthMin), color:'var(--teal)' },
+              { lbl:'Descansos', val: mhm(brkMin), color:'#fbbf24' },
+              { lbl:'Mes actual', val: mhm(monthMin), color:'#2dd4bf' },
             ].map(({ lbl, val, color }) => (
               <div key={lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13 }}>
-                <span style={{ color:'var(--text3)' }}>{lbl}</span>
-                <span style={{ fontWeight:600, color }}>{val}</span>
+                <span style={{ color:'rgba(255,255,255,.35)', fontWeight:500 }}>{lbl}</span>
+                <span style={{ fontWeight:700, color }}>{val}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* PDF export buttons */}
-      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, justifyContent:'flex-end', flexWrap:'wrap' }}>
-        <button className="btn btn-secondary btn-sm" onClick={exportWeekPDF} disabled={generatingWeekPdf} style={{ opacity: generatingWeekPdf ? 0.7 : 1 }}>
-          {generatingWeekPdf
-            ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
-            : <>📅 Informe semanal</>
-          }
+      {/* ── TIMES INC 3.0 — PDF export buttons ──────────── */}
+      <div style={{ padding:'0 16px 6px', display:'flex', gap:8, flexWrap:'wrap' }}>
+        <button onClick={exportWeekPDF} disabled={generatingWeekPdf}
+          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingWeekPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          {generatingWeekPdf ? <><span className="login-spinner" style={{ width:10,height:10,borderWidth:1.5,borderColor:'rgba(255,255,255,.1)',borderTopColor:'rgba(255,255,255,.5)',marginRight:5,display:'inline-block',verticalAlign:'middle' }}/>Generando…</> : <>📅 Semanal</>}
         </button>
-        <button className="btn btn-secondary btn-sm" onClick={exportMonthPDF} disabled={generatingPdf} style={{ opacity: generatingPdf ? 0.7 : 1 }}>
-          {generatingPdf
-            ? <><span className="login-spinner" style={{ width:11, height:11, borderWidth:1.5, borderColor:'rgba(108,99,255,.2)', borderTopColor:'var(--primary-light)', marginRight:6, display:'inline-block', verticalAlign:'middle' }} />Generando…</>
-            : <><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Informe firmado PDF</>
-          }
+        <button onClick={exportMonthPDF} disabled={generatingPdf}
+          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          {generatingPdf ? <><span className="login-spinner" style={{ width:10,height:10,borderWidth:1.5,borderColor:'rgba(255,255,255,.1)',borderTopColor:'rgba(255,255,255,.5)',marginRight:5,display:'inline-block',verticalAlign:'middle' }}/>Generando…</> : <><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF firmado</>}
         </button>
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowRangeExport(v => !v)} style={{ opacity:1 }}>
-          📆 Rango
+        <button onClick={() => setShowRangeExport(v => !v)}
+          style={{ padding:'11px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          📆
         </button>
       </div>
       {showRangeExport && (
