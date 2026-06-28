@@ -2,25 +2,34 @@
 // POST /api/send-push-all
 // Body: { title, body, url?, target }
 //   target: 'all' | 'activos' | { role: 'jefe_obra'|'encargado'|'empleado' } | { empIds: [...] }
-// Auth: header x-admin-secret: <CRON_SECRET>
+// Auth: Authorization: Bearer <CRON_SECRET>  o  x-admin-secret: <CRON_SECRET>
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 
-const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
-const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-const isValid   = s => /^[A-Za-z0-9\-_]{40,}$/.test(s)
+const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
+const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const isValid  = s => /^[A-Za-z0-9\-_]{40,}$/.test(s)
 
-const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(process.env.VAPID_PUBLIC)  : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
-const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : 'fvQg0fFEkOoUGLdOfUkdZ4uI2k7vv6bmUPqbChZSOnE'
-const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
-const CRON_SECRET   = process.env.CRON_SECRET || process.env.VITE_PUSH_SECRET
+// Fallar en inicio si faltan claves — evita errores crípticos en tiempo de ejecución
+const VAPID_PUBLIC  = toB64Url(process.env.VAPID_PUBLIC)
+const VAPID_PRIVATE = toB64Url(process.env.VAPID_PRIVATE)
+if (!isValid(VAPID_PUBLIC) || !isValid(VAPID_PRIVATE)) {
+  console.error('[send-push-all] VAPID keys missing or invalid — configure VAPID_PUBLIC and VAPID_PRIVATE in env')
+}
+
+const SB_URL  = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const SB_ANON = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+
+// Usar solo CRON_SECRET (sin prefijo VITE_) para que no quede expuesto en el bundle del cliente
+const CRON_SECRET = process.env.CRON_SECRET
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
 try {
   webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
-} catch {}
+} catch (e) {
+  console.error('[send-push-all] setVapidDetails failed:', e.message)
+}
 
 async function getAppData() {
   const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_H })
@@ -44,9 +53,14 @@ async function deleteSub(userId) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  // Auth: solo admin con CRON_SECRET puede llamar esto
+  // Fallar cerrado: si CRON_SECRET no está configurado, rechazar siempre
+  if (!CRON_SECRET) {
+    console.error('[send-push-all] CRON_SECRET not set — rejecting all requests')
+    return res.status(500).json({ error: 'Server misconfigured: CRON_SECRET not set' })
+  }
+
   const secret = (req.headers['x-admin-secret'] || req.headers['authorization'] || '').replace('Bearer ', '')
-  if (CRON_SECRET && secret !== CRON_SECRET) {
+  if (secret !== CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -56,25 +70,24 @@ export default async function handler(req, res) {
   if (body.length > 200)  return res.status(400).json({ error: 'body máx 200 caracteres' })
 
   try {
-    const db   = await getAppData()
-    const subs = await getPushSubs()
+    // Fetch en paralelo — independientes entre sí
+    const [db, subs] = await Promise.all([getAppData(), getPushSubs()])
     if (!db) return res.status(500).json({ error: 'no app_data' })
 
-    const allEmps = (db.employees || []).filter(e => !e.baja)
+    const allEmps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
     const subMap  = new Map(subs.map(s => [s.user_id, s]))
 
-    // Seleccionar destinatarios según target
     let recipients = []
     if (target === 'all') {
       recipients = allEmps
     } else if (target === 'activos') {
-      const today = new Date().toISOString().slice(0, 10)
+      const todayStr = new Date().toISOString().slice(0, 10)
       const activeIds = new Set(
-        (db.records || []).filter(r => !r.fin && r.inicio?.startsWith(today)).map(r => r.empId)
+        (db.records || []).filter(r => !r.fin && r.inicio?.startsWith(todayStr)).map(r => r.empId)
       )
       recipients = allEmps.filter(e => activeIds.has(e.id))
     } else if (target?.role) {
-      recipients = allEmps.filter(e => e.role === target.role || (target.role === 'admin' && e.isAdmin))
+      recipients = allEmps.filter(e => e.role === target.role)
     } else if (Array.isArray(target?.empIds)) {
       const ids = new Set(target.empIds)
       recipients = allEmps.filter(e => ids.has(e.id))
@@ -82,29 +95,34 @@ export default async function handler(req, res) {
       recipients = allEmps
     }
 
-    const payload = JSON.stringify({
-      title,
-      body,
-      tag: 'admin-broadcast',
-      url: (typeof url === 'string' && url.startsWith('/')) ? url : '/'
-    })
+    const safeUrl = (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) ? url : '/'
+    const payload = JSON.stringify({ title, body, tag: 'admin-broadcast', url: safeUrl })
 
-    let sent = 0, failed = 0, noSub = 0
-    for (const emp of recipients) {
-      const sub = subMap.get(emp.id)
-      if (!sub?.endpoint) { noSub++; continue }
-      try {
+    // Envío en paralelo con Promise.allSettled — evita timeout de Vercel por ejecución secuencial
+    const toSend = recipients.filter(e => subMap.get(e.id)?.endpoint)
+    const noSub  = recipients.length - toSend.length
+
+    const results = await Promise.allSettled(
+      toSend.map(async emp => {
+        const sub = subMap.get(emp.id)
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload
         )
-        sent++
         console.log(`[push-all] sent → ${emp.name}`)
-      } catch (err) {
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await deleteSub(emp.id)
+      })
+    )
+
+    let sent = 0, failed = 0
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        sent++
+      } else {
+        const err = results[i].reason
+        if (err?.statusCode === 410 || err?.statusCode === 404) {
+          deleteSub(toSend[i].id) // fire-and-forget, sub expirada
         }
-        console.warn(`[push-all] failed → ${emp.name}: ${err.statusCode || err.message}`)
+        console.warn(`[push-all] failed → ${toSend[i].name}: ${err?.statusCode || err?.message}`)
         failed++
       }
     }

@@ -61,6 +61,36 @@ function NavIcon({ id, size = 17 }) {
   )
 }
 
+// ── Helper compartido para envío push masivo ──────────────────────────────────
+// Usado por el modal de topbar y por PushNotifWidget para evitar duplicar lógica
+async function callSendPushAll(titleText, bodyText, targetValue) {
+  const headers = { 'Content-Type': 'application/json' }
+  const secret = import.meta.env.VITE_PUSH_SECRET
+  if (secret) headers['Authorization'] = `Bearer ${secret}`
+  const tgt = (targetValue === 'all' || targetValue === 'activos') ? targetValue : { role: targetValue }
+  const res = await fetch('/api/send-push-all', {
+    method: 'POST', headers,
+    body: JSON.stringify({ title: titleText, body: bodyText, url: '/', target: tgt })
+  })
+  const json = await res.json().catch(() => ({}))
+  return { ok: res.ok, status: res.status, ...json }
+}
+
+function showPushToast(json, toast) {
+  if (!json.ok) {
+    toast('Error: ' + (json.error || json.status), 4000, 'error')
+  } else if (json.sent === 0 && (json.noSub ?? 0) > 0) {
+    toast(`Ningún empleado tiene push activado (${json.noSub} sin suscripción)`, 4000, 'warn')
+  } else {
+    const extra = [
+      json.failed > 0 ? `${json.failed} fallaron` : '',
+      json.noSub  > 0 ? `${json.noSub} sin push`  : '',
+    ].filter(Boolean).join(' · ')
+    toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}${extra ? ` · ${extra}` : ''}`, 3000, 'ok')
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function AdminPage() {
   const { db, session, currentAdminPage, setAdminPage, saveDB, toast, setScreen, logout, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
   const [sideOpen, setSideOpen] = useState(false)
@@ -192,26 +222,16 @@ export default function AdminPage() {
     setPushSending(true)
     setPushResult(null)
     try {
-      const headers = { 'Content-Type': 'application/json' }
-      const secret = import.meta.env.VITE_PUSH_SECRET
-      if (secret) headers['Authorization'] = `Bearer ${secret}`
-      const tgt = (pushTarget === 'all' || pushTarget === 'activos') ? pushTarget : { role: pushTarget }
-      const res = await fetch('/api/send-push-all', {
-        method: 'POST', headers,
-        body: JSON.stringify({ title: pushTitle.trim(), body: pushBody.trim(), url: '/', target: tgt })
-      })
-      const json = await res.json().catch(() => ({}))
-      setPushResult({ ok: res.ok, ...json })
-      if (!res.ok) toast('Error: ' + (json.error || res.status), 4000, 'error')
-      else {
-        toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}`, 3000, 'ok')
-        setPushOpen(false); setPushTitle(''); setPushBody('')
-      }
+      const json = await callSendPushAll(pushTitle.trim(), pushBody.trim(), pushTarget)
+      setPushResult(json)
+      showPushToast(json, toast)
+      if (json.ok && json.sent > 0) { setPushOpen(false); setPushTitle(''); setPushBody('') }
     } catch(e) {
       setPushResult({ ok: false, error: e.message })
       toast('Error de red', 3000, 'error')
+    } finally {
+      setPushSending(false)
     }
-    setPushSending(false)
   }
 
   return (
@@ -898,25 +918,16 @@ function PushNotifWidget({ db, toast }) {
     setSending(true)
     setLastResult(null)
     try {
-      const headers = { 'Content-Type': 'application/json' }
-      const secret = import.meta.env.VITE_PUSH_SECRET
-      if (secret) headers['Authorization'] = `Bearer ${secret}`
-
-      const tgt = (target === 'all' || target === 'activos') ? target : { role: target }
-      const res = await fetch('/api/send-push-all', {
-        method: 'POST', headers,
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), url: '/', target: tgt })
-      })
-      const json = await res.json().catch(() => ({}))
-      setLastResult({ ok: res.ok, ...json })
-      if (!res.ok) toast('Error al enviar: ' + (json.error || res.status), 4000, 'error')
-      else toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}${json.failed > 0 ? ` (${json.failed} fallaron)` : ''}`, 3000, 'ok')
+      const json = await callSendPushAll(title.trim(), body.trim(), target)
+      setLastResult(json)
+      showPushToast(json, toast)
+      if (json.ok) { setTitle(''); setBody(''); setOpen(false) }
     } catch(e) {
       setLastResult({ ok: false, error: e.message })
       toast('Error de red al enviar push', 3000, 'error')
+    } finally {
+      setSending(false)
     }
-    setSending(false)
-    setTitle(''); setBody(''); setOpen(false)
   }
 
   return (
