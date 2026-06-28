@@ -3035,7 +3035,8 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
     const dow = date.getDay()
     if (dow === 0 || dow === 6) return 'weekend'
     if (vacDays.has(ds)) return 'vacation'
-    const festivoNombre = (db.config?.festivosExtra || {})[ds] || FESTIVOS_MADRID_2026[ds]
+    const usaMadrid = db.config?.usarFestivosMadrid !== false
+    const festivoNombre = (db.config?.festivosExtra || {})[ds] || (usaMadrid ? FESTIVOS_MADRID_2026[ds] : undefined)
     if (festivoNombre) return 'festivo'
     if (medDays.has(ds)) return 'medical'
     if (absDays.has(ds)) return 'absence'
@@ -3111,7 +3112,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
             ].filter(Boolean).join(' ')
 
             return (
-              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)} title={(db.config?.festivosExtra || {})[ds] || FESTIVOS_MADRID_2026[ds] || undefined}>
+              <div key={i} className={cls} onClick={() => setSelDay(selDay === ds ? null : ds)} title={(db.config?.festivosExtra || {})[ds] || (db.config?.usarFestivosMadrid !== false ? FESTIVOS_MADRID_2026[ds] : undefined) || undefined}>
                 {date.getDate()}
                 {mins > 0 && !isToday && <div className="cal-hrs">{Math.floor(mins/60)}h</div>}
                 {status === 'absence' && !isToday && <div className="cal-hrs">✕</div>}
@@ -3129,7 +3130,7 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
           const totMin = recs.reduce((s, r) => s + calcMin(r), 0)
           const selDate = new Date(selDay + 'T00:00:00')
           const status = getDayStatus(selDay, selDate)
-          const festivoLabel = (db.config?.festivosExtra || {})[selDay] || FESTIVOS_MADRID_2026[selDay] || 'Festivo'
+          const festivoLabel = (db.config?.festivosExtra || {})[selDay] || (db.config?.usarFestivosMadrid !== false ? FESTIVOS_MADRID_2026[selDay] : undefined) || 'Festivo'
           const statusLabels = { complete:'Jornada completa', pending:'Jornada incompleta', absence:'Ausencia', medical:'Baja médica', vacation:'Vacaciones', missing:'Sin fichaje', weekend:'Fin de semana', festivo: festivoLabel, future:'' }
           const statusColors = { complete:'var(--green)', pending:'var(--orange)', absence:'var(--red)', medical:'#f59e0b', vacation:'var(--blue)', missing:'var(--text4)', weekend:'var(--text4)', festivo:'#e879f9', future:'var(--text4)' }
           return (

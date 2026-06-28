@@ -400,7 +400,7 @@ export default function AdminPage() {
               {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
-              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'miobra'      && <PanelMiObra      db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'validar'     && <PanelValidarHoras db={db} toast={toast} saveDB={saveDB} session={session} />}
             </>
@@ -421,7 +421,7 @@ export default function AdminPage() {
               {currentAdminPage === 'obras'       && <PanelObras       db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'documentos'  && <PanelDocumentos  db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
-              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} />}
+              {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
             </>
           )}
         </div>
@@ -992,7 +992,8 @@ function ComunicadoWidget({ db, toast, saveDB }) {
     if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
     setSending(true)
     const msg = { id: gid(), from: 'admin', title: title.trim(), body: body.trim(), to: 'all', ts: new Date().toISOString() }
-    saveDB({ mensajes: [...(db.mensajes||[]), msg] })
+    const withAudit = auditLog(db, 'Comunicado enviado', msg.title, 'Admin')
+    saveDB({ mensajes: [...(db.mensajes||[]), msg], audit: withAudit.audit })
     await queuePush('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/?tab=inicio')
     toast('Comunicado enviado a todos los empleados', 3000, 'ok')
     setSending(false)
@@ -1358,7 +1359,9 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
   const del = (id) => {
     showConfirm('¿Eliminar este fichaje?', () => {
-      saveDB({ records: (db.records||[]).filter(r => r.id !== id) })
+      const rec = (db.records||[]).find(r => r.id === id)
+      const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''}`, session?.user?.name || 'Admin')
+      saveDB({ records: (db.records||[]).filter(r => r.id !== id), audit: withAudit.audit })
       toast('Fichaje eliminado')
     })
   }
@@ -4248,13 +4251,14 @@ function PanelAuditoria({ db }) {
 // ─── PANEL AJUSTES ────────────────────────────────────────────────────────────
 const COLOR_PRESETS = ['#6C63FF','#2563EB','#7c3aed','#0891b2','#059669','#dc2626','#d97706','#db2777']
 
-function PanelAjustes({ db, toast, saveDB }) {
+function PanelAjustes({ db, toast, saveDB, session }) {
   const cfg = db.config || {}
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
   const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
   const [wdHoras, setWdHoras] = useState(cfg.wdMin ? String(Math.round(cfg.wdMin / 60 * 100) / 100) : '8')
   const [wkHoras, setWkHoras] = useState(cfg.wkMin ? String(Math.round(cfg.wkMin / 60 * 100) / 100) : '40')
   const [festivosExtra, setFestivosExtra] = useState(cfg.festivosExtra || {})
+  const [usarFestivosMadrid, setUsarFestivosMadrid] = useState(cfg.usarFestivosMadrid !== false)
   const [newFestivoFecha, setNewFestivoFecha] = useState('')
   const [newFestivoNombre, setNewFestivoNombre] = useState('')
   const [saving, setSaving] = useState(false)
@@ -4299,8 +4303,9 @@ function PanelAjustes({ db, toast, saveDB }) {
     setSaving(true)
     const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
     const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
-    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra }
-    saveDB({ config })
+    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid }
+    const withAudit = auditLog(db, 'Configuración guardada', companyName || 'Ajustes', session?.user?.name || 'Admin')
+    saveDB({ config, audit: withAudit.audit })
     toast('Ajustes guardados', 3000, 'ok')
     setSaving(false)
   }
@@ -4353,7 +4358,15 @@ function PanelAjustes({ db, toast, saveDB }) {
         <div className="dash-widget-header">
           <div className="dash-widget-title">📅 Festivos personalizados</div>
         </div>
-        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Añade festivos propios de tu empresa o comunidad además de los festivos de Madrid ya incluidos.</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>Festivos base de la Comunidad de Madrid</div>
+          <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer', fontSize:12 }}>
+            <input type="checkbox" checked={usarFestivosMadrid} onChange={e => setUsarFestivosMadrid(e.target.checked)}
+              style={{ accentColor:'var(--primary)', width:15, height:15 }} />
+            Incluir festivos Madrid
+          </label>
+        </div>
+        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Añade festivos propios de tu empresa o comunidad autónoma.</div>
         {Object.entries(festivosExtra).sort(([a],[b]) => a.localeCompare(b)).map(([fecha, nombre]) => (
           <div key={fecha} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid var(--border)' }}>
             <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', flex:1 }}>{fecha}</div>

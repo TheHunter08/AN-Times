@@ -84,7 +84,14 @@ export function getLockoutState(empId) {
     if (!raw) return { locked: false, attempts: 0 }
     const d = JSON.parse(raw)
     if (d.until) {
-      if (Date.now() < d.until) return { locked: true, remainingMin: Math.ceil((d.until - Date.now()) / 60000) }
+      const remaining = d.until - Date.now()
+      if (remaining > 0) return {
+        locked: true,
+        lockedUntil: d.until,
+        remainingMs: remaining,
+        remainingMin: Math.ceil(remaining / 60000),
+        remainingSecs: Math.ceil(remaining / 1000),
+      }
       localStorage.removeItem(LK_KEY(empId))
       return { locked: false, attempts: 0 }
     }

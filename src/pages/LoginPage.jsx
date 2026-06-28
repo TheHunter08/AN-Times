@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
 import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin } from '../utils/pinSecurity.js'
-import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric } from '../utils/webauthn.js'
+import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric, clearBiometric } from '../utils/webauthn.js'
 
 export default function LoginPage() {
   const { db, setSession, setScreen, toast, saveDB } = useAppStore()
@@ -54,14 +54,25 @@ export default function LoginPage() {
 
   useEffect(() => { setEmpHasBio(selectedEmpId ? hasBiometric(selectedEmpId) : false) }, [selectedEmpId])
 
-  // Mostrar bloqueo si el empleado ya está en lockout
+  // Countdown en vivo cuando el empleado está bloqueado
   useEffect(() => {
     if (!selectedEmpId) { setErr(''); return }
     const emp = (db.employees || []).find(e => e.id === selectedEmpId)
     if (!emp) return
-    const lk = getLockoutState(emp.id)
-    if (lk.locked) setErr(`Bloqueado ${lk.remainingMin} min por exceso de intentos`)
-    else setErr('')
+
+    const update = () => {
+      const lk = getLockoutState(emp.id)
+      if (!lk.locked) { setErr(''); return false }
+      const secs = lk.remainingSecs || 0
+      const m = Math.floor(secs / 60)
+      const s = secs % 60
+      setErr(`Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
+      return true
+    }
+
+    if (!update()) return
+    const id = setInterval(() => { if (!update()) clearInterval(id) }, 1000)
+    return () => clearInterval(id)
   }, [selectedEmpId, db])
 
   const verifyingRef = useRef(false)
@@ -148,7 +159,9 @@ export default function LoginPage() {
 
     const lkState = getLockoutState(emp.id)
     if (lkState.locked) {
-      setErr(`Bloqueado ${lkState.remainingMin} min por exceso de intentos`)
+      const secs = lkState.remainingSecs || 0
+      const m = Math.floor(secs / 60); const s = secs % 60
+      setErr(`Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`)
       setPin(''); return
     }
 
@@ -181,8 +194,11 @@ export default function LoginPage() {
     } else {
       const lk = recordFailedAttempt(emp.id)
       setShaking(true)
-      if (lk.locked) setErr(`Demasiados intentos. Bloqueado ${lk.remainingMin} min.`)
-      else setErr(`PIN incorrecto (${lk.remaining} intentos restantes)`)
+      if (lk.locked) {
+        const secs = lk.remainingSecs || 0
+        const m = Math.floor(secs / 60); const s = secs % 60
+        setErr(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2,'0')} restantes`)
+      } else setErr(`PIN incorrecto (${lk.remaining} intentos restantes)`)
       if (navigator.vibrate) navigator.vibrate(200)
       setTimeout(() => { setShaking(false); setPin('') }, 450)
     }
@@ -482,6 +498,20 @@ export default function LoginPage() {
                     : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
                   }
                   {bioLoading ? 'Verificando…' : 'Acceder con huella / Face ID'}
+                </button>
+              )}
+
+              {/* Biometric remove link — allow disabling stored credential */}
+              {bioAvailable && selectedEmpId && empHasBio && !showAdminForm && (
+                <button
+                  className="login-bio-register"
+                  style={{ color: 'var(--danger)', opacity: 0.7, fontSize: 11, marginTop: -4 }}
+                  onClick={() => {
+                    clearBiometric(selectedEmpId)
+                    setEmpHasBio(false)
+                    setErr('')
+                  }}>
+                  Desactivar acceso biométrico
                 </button>
               )}
 
