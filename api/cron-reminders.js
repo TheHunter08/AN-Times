@@ -213,6 +213,37 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── 6. Alerta a admin/JO: jornada abierta > 10h ────────────────────────
+    {
+      const ALERT_MIN = 600 // 10 horas
+      const allEmps = db.employees || []
+      const longRecs = records.filter(r => {
+        if (r.fin) return false
+        const elapsed = (nowMs - new Date(r.inicio).getTime()) / 60000
+        return elapsed >= ALERT_MIN
+      })
+      if (longRecs.length > 0) {
+        const recipients = allEmps.filter(e => !e.baja && (e.isAdmin || e.role === 'jefe_obra'))
+        const hourKey = `${today}_${p2(nowH)}`
+        for (const rec of longRecs) {
+          const emp = allEmps.find(e => e.id === rec.empId)
+          if (!emp) continue
+          const elapsedMin = Math.floor((nowMs - new Date(rec.inicio).getTime()) / 60000)
+          const hh = Math.floor(elapsedMin / 60), mm2 = Math.floor(elapsedMin % 60)
+          for (const admin of recipients) {
+            const adminSub = subMap.get(admin.id)
+            const key = `an_alert10h_${admin.id}_${rec.empId}_${hourKey}`
+            if (!notisSent[key]) {
+              schedule(admin, adminSub, key, '1',
+                '🚨 Jornada muy larga',
+                `${emp.name} lleva ${hh}h ${p2(mm2)}m con la jornada abierta.`,
+                'alert-10h', '/?go=admin:fichajes')
+            }
+          }
+        }
+      }
+    }
+
     if (Object.keys(newKeys).length > 0) await markNotisSent(db, newKeys)
 
     let sent = 0, failed = 0
