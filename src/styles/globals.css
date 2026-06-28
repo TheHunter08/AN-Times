@@ -7085,3 +7085,235 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .geo-alert-row.geo-alert-high { background: rgba(239,68,68,.04); border-color: rgba(239,68,68,.12); }
 [data-theme="light"] .geo-alert-row.geo-alert-med { background: rgba(245,158,11,.04); border-color: rgba(245,158,11,.1); }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   TIMES INC v4 — PREMIUM DESIGN UPGRADE
+   Overrides anteriores — todos los cambios visuales van aquí abajo.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Hero card empleado ──────────────────────────────────────────────────── */
+.v30-hero-card {
+  background: #07070d;
+  border: 1px solid rgba(255,255,255,.065);
+  border-radius: 26px;
+  padding: 22px 20px 20px;
+  gap: 14px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 20px 60px rgba(0,0,0,.55);
+}
+.v30-hero-card::before {
+  content: '';
+  position: absolute;
+  top: -50px; left: -50px;
+  width: 240px; height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,.10) 0%, transparent 68%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── 2. Reloj ───────────────────────────────────────────────────────────────── */
+.v30-hc-hm {
+  font-size: 60px;
+  letter-spacing: -5px;
+  filter: drop-shadow(0 0 28px rgba(99,102,241,.52));
+}
+.v30-hc-sec {
+  font-size: 28px;
+  color: rgba(129,140,248,.38);
+}
+.v30-hc-date {
+  font-size: 10px;
+  color: rgba(255,255,255,.26);
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+/* ── 3. Botón principal ─────────────────────────────────────────────────────── */
+.v30-hc-btn-area { width: 180px; height: 180px; }
+
+.v30-hc-btn {
+  top: 9px; left: 9px;
+  width: 162px; height: 162px;
+  background: linear-gradient(148deg, #1e40af 0%, #4338ca 50%, #6d28d9 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.10) inset,
+    0 2px 0 rgba(255,255,255,.18) inset,
+    0 8px 40px rgba(67,56,202,.50),
+    0 2px 10px rgba(0,0,0,.65);
+  transition: transform 130ms cubic-bezier(.2,1.3,.4,1), box-shadow 200ms;
+  gap: 9px;
+}
+.v30-hc-btn:active {
+  transform: scale(.89) !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 14px rgba(67,56,202,.35), 0 1px 4px rgba(0,0,0,.65);
+  animation: none !important;
+}
+.v30-hc-btn:not(.live):not(.brk) {
+  animation: v4PulseIdle 3.2s ease-in-out infinite;
+}
+@keyframes v4PulseIdle {
+  0%,100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 40px rgba(67,56,202,.45), 0 2px 10px rgba(0,0,0,.65); }
+  50%     { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 60px rgba(99,102,241,.75), 0 0 70px rgba(99,102,241,.28), 0 2px 10px rgba(0,0,0,.65); }
+}
+.v30-hc-btn.live {
+  background: linear-gradient(148deg, #065f46 0%, #059669 50%, #10b981 100%);
+  animation: v4PulseLive 2.2s ease-in-out infinite;
+}
+@keyframes v4PulseLive {
+  0%,100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 40px rgba(16,185,129,.45), 0 2px 10px rgba(0,0,0,.65); }
+  50%     { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 60px rgba(52,211,153,.75), 0 0 65px rgba(52,211,153,.25), 0 2px 10px rgba(0,0,0,.65); }
+}
+.v30-hc-btn.brk {
+  background: linear-gradient(148deg, #78350f 0%, #b45309 50%, #f59e0b 100%);
+  animation: v4PulseBrk 2.8s ease-in-out infinite;
+}
+@keyframes v4PulseBrk {
+  0%,100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 40px rgba(245,158,11,.42), 0 2px 10px rgba(0,0,0,.65); }
+  50%     { box-shadow: 0 0 0 1px rgba(255,255,255,.10) inset, 0 2px 0 rgba(255,255,255,.18) inset, 0 8px 55px rgba(251,191,36,.7), 0 0 60px rgba(251,191,36,.2), 0 2px 10px rgba(0,0,0,.65); }
+}
+
+.v30-hc-btn-ico { width: 36px; height: 36px; }
+.v30-hc-btn-lbl { font-size: 10px; font-weight: 900; letter-spacing: 2.5px; color: rgba(255,255,255,.92); }
+
+/* ── 4. Estado live ─────────────────────────────────────────────────────────── */
+.v30-hc-live-row {
+  gap: 7px;
+  background: rgba(52,211,153,.07);
+  border: 1px solid rgba(52,211,153,.18);
+  border-radius: 20px;
+  padding: 5px 13px;
+}
+.v30-hc-live-txt { font-size: 12px; font-weight: 700; color: #34d399; }
+.v30-hc-tip-text { font-size: 12px; color: rgba(255,255,255,.28); }
+
+/* ── 5. Separator + Stats ───────────────────────────────────────────────────── */
+.v30-hc-sep { background: rgba(255,255,255,.05); }
+.v30-hc-stat-num { font-size: 18px; font-weight: 800; letter-spacing: -.4px; }
+.v30-hc-stat-lbl { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: rgba(255,255,255,.27); }
+.v30-hc-divider { width: 1px; height: 30px; background: rgba(255,255,255,.07); flex-shrink: 0; }
+
+/* ── 6. Barra de progreso ───────────────────────────────────────────────────── */
+.v30-hc-progress {
+  width: 100%;
+  height: 5px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.07);
+  overflow: hidden;
+}
+.v30-hc-progress-fill {
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #3730a3, #6366f1, #a78bfa);
+  transition: width .7s cubic-bezier(.4,0,.2,1);
+}
+.v30-hc-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(255,255,255,.25);
+  font-weight: 600;
+  margin-top: 5px;
+  letter-spacing: .1px;
+}
+
+/* ── 7. Botón descanso ──────────────────────────────────────────────────────── */
+.v30-break-btn {
+  width: 100%;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  padding: 11px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,.55);
+  letter-spacing: .2px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s, transform .1s;
+}
+.v30-break-btn:active { background: rgba(255,255,255,.09); transform: scale(.98); }
+.v30-break-btn.brk { background: rgba(52,211,153,.08); border-color: rgba(52,211,153,.22); color: #34d399; }
+
+/* ── 8. Bloque progreso semanal ─────────────────────────────────────────────── */
+.v30-prog-block {
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+/* ── 9. Mini stat cards (entrada/salida/pausa/total) ────────────────────────── */
+.stat-card-premium {
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 16px;
+  padding: 12px 14px;
+  transition: background .15s, transform .1s;
+}
+.stat-card-premium:active { background: rgba(255,255,255,.07); transform: scale(.97); }
+.stat-card-premium:nth-child(1) { border-left: 2.5px solid rgba(99,102,241,.65); border-bottom: 1px solid rgba(255,255,255,.07); }
+.stat-card-premium:nth-child(2) { border-left: 2.5px solid rgba(52,211,153,.65); border-bottom: 1px solid rgba(255,255,255,.07); }
+.stat-card-premium:nth-child(3) { border-left: 2.5px solid rgba(251,191,36,.65); border-bottom: 1px solid rgba(255,255,255,.07); }
+.stat-card-premium:nth-child(4) { border-left: 2.5px solid rgba(6,182,212,.65); border-bottom: 1px solid rgba(255,255,255,.07); }
+.v3-stat-label { font-size: 9px !important; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: rgba(255,255,255,.28) !important; margin-bottom: 5px; display: block; }
+.v3-stat-value { font-size: 15px !important; font-weight: 800; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+
+/* ── 10. Admin KPI cards ────────────────────────────────────────────────────── */
+.adm-kpi-card {
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.07);
+  border-top: 2.5px solid rgba(255,255,255,.1);
+  border-radius: 20px;
+  padding: 18px 16px 16px;
+  transition: transform .15s, box-shadow .2s;
+}
+.adm-kpi-card:hover { box-shadow: 0 10px 40px rgba(0,0,0,.4); transform: translateY(-3px); }
+.adm-kpi-card:active { transform: scale(.97) !important; box-shadow: none !important; }
+.adm-kpi-card:nth-child(1) { border-top-color: rgba(79,70,229,.85); }
+.adm-kpi-card:nth-child(2) { border-top-color: rgba(16,185,129,.85); }
+.adm-kpi-card:nth-child(3) { border-top-color: rgba(251,191,36,.85); }
+.adm-kpi-card:nth-child(4) { border-top-color: rgba(239,68,68,.85); }
+.adm-kpi-card:nth-child(5) { border-top-color: rgba(124,58,237,.85); }
+.adm-kpi-card:nth-child(6) { border-top-color: rgba(6,182,212,.85); }
+.adm-kpi-glow { width: 90px; height: 90px; bottom: -28px; right: -28px; opacity: .14; }
+.adm-kpi-icon { font-size: 20px; margin-bottom: 14px; }
+.adm-kpi-val { font-size: 30px; font-weight: 900; letter-spacing: -1.5px; line-height: 1; }
+.adm-kpi-label { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: rgba(255,255,255,.3); margin-top: 7px; }
+.adm-kpi-trend { font-size: 10px; font-weight: 700; margin-top: 9px; letter-spacing: .1px; }
+.adm-kpi-trend.up   { color: #4ade80; }
+.adm-kpi-trend.down { color: #f87171; }
+.adm-kpi-trend.neu  { color: rgba(255,255,255,.3); }
+
+/* ── 11. Light mode overrides ───────────────────────────────────────────────── */
+[data-theme="light"] .v30-hero-card {
+  background: #fff;
+  border-color: rgba(0,0,0,.07);
+  box-shadow: 0 8px 40px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.95) inset;
+}
+[data-theme="light"] .v30-hero-card::before {
+  background: radial-gradient(circle, rgba(99,102,241,.05) 0%, transparent 68%);
+}
+[data-theme="light"] .v30-hc-glow::after   { background: #fff; }
+[data-theme="light"] .v30-hc-stat-num      { color: #111; }
+[data-theme="light"] .v30-hc-stat-lbl      { color: rgba(0,0,0,.32); }
+[data-theme="light"] .v30-hc-sep           { background: rgba(0,0,0,.06); }
+[data-theme="light"] .v30-hc-date          { color: rgba(0,0,0,.30); }
+[data-theme="light"] .v30-hc-progress      { background: rgba(0,0,0,.06); }
+[data-theme="light"] .v30-hc-progress-labels { color: rgba(0,0,0,.32); }
+[data-theme="light"] .v30-hc-live-row      { background: rgba(16,185,129,.06); border-color: rgba(16,185,129,.2); }
+[data-theme="light"] .v30-hc-tip-text      { color: rgba(0,0,0,.3); }
+[data-theme="light"] .v30-break-btn        { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.09); color: rgba(0,0,0,.45); }
+[data-theme="light"] .v30-break-btn.brk    { background: rgba(16,185,129,.07); border-color: rgba(16,185,129,.22); }
+[data-theme="light"] .v30-prog-block       { background: rgba(0,0,0,.025); border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .stat-card-premium    { background: rgba(0,0,0,.025); border-color: rgba(0,0,0,.08); }
+[data-theme="light"] .stat-card-premium:nth-child(1) { border-left-color: rgba(99,102,241,.5); border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .stat-card-premium:nth-child(2) { border-left-color: rgba(16,185,129,.5); border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .stat-card-premium:nth-child(3) { border-left-color: rgba(245,158,11,.5); border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .stat-card-premium:nth-child(4) { border-left-color: rgba(6,182,212,.5); border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .v3-stat-label        { color: rgba(0,0,0,.32) !important; }
+[data-theme="light"] .adm-kpi-card         { background: #fff; border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .adm-kpi-card:hover   { box-shadow: 0 8px 30px rgba(0,0,0,.1); }
+[data-theme="light"] .adm-kpi-label        { color: rgba(0,0,0,.38); }
+[data-theme="light"] .adm-kpi-trend.neu    { color: rgba(0,0,0,.35); }
+
