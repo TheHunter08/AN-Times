@@ -86,6 +86,28 @@ async function sendPush(sub, payload, empName) {
   console.log(`[cron] push sent → ${empName}`)
 }
 
+const WA_TOKEN    = process.env.WHATSAPP_TOKEN
+const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID
+
+async function sendWhatsApp(phone, message, empName) {
+  if (!WA_TOKEN || !WA_PHONE_ID) return false
+  const clean = String(phone || '').replace(/\D/g, '')
+  if (clean.length < 9) return false
+  try {
+    const r = await fetch(`https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: clean, type: 'text', text: { body: message } })
+    })
+    if (r.ok) { console.log(`[cron] whatsapp sent → ${empName}`); return true }
+    console.warn(`[cron] whatsapp error → ${empName}:`, await r.text())
+    return false
+  } catch (e) {
+    console.warn(`[cron] whatsapp fetch error → ${empName}:`, e.message)
+    return false
+  }
+}
+
 export default async function handler(req, res) {
   const isCronInvocation = req.headers['x-vercel-cron'] === '1'
   if (!isCronInvocation && CRON_SECRET) {
@@ -128,9 +150,14 @@ export default async function handler(req, res) {
     const mkPayload = (title, body, tag, url = '/') =>
       JSON.stringify({ title, body, tag, url: (typeof url === 'string' && url.startsWith('/')) ? url : '/' })
 
+    const waToSend = []
     const schedule = (emp, sub, key, keyVal, title, body, tag, url) => {
-      if (!sub?.endpoint) return
-      toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url) })
+      if (sub?.endpoint) {
+        toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url) })
+      } else if (emp.telefono) {
+        // Sin push sub → intentar WhatsApp como canal alternativo
+        waToSend.push({ emp, message: `*${title}*\n${body}`, key, keyVal })
+      }
       newKeys[key] = keyVal
     }
 
@@ -261,9 +288,15 @@ export default async function handler(req, res) {
       }
     }
 
+    let waSent = 0
+    for (const { emp, message } of waToSend) {
+      const ok = await sendWhatsApp(emp.telefono, message, emp.name)
+      if (ok) waSent++
+    }
+
     const result = {
       ok: true, today, nowSpain: `${p2(nowH)}:${p2(nowM)}`,
-      checked: employees.length, sent, failed, queued: toSend.length
+      checked: employees.length, sent, failed, queued: toSend.length, waSent
     }
     console.log('[cron-reminders]', JSON.stringify(result))
     return res.status(200).json(result)

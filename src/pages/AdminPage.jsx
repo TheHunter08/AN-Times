@@ -528,6 +528,76 @@ function PanelDashboard({ db, toast, saveDB }) {
         )
       })()}
 
+      {/* Anomaly detection panel */}
+      {(() => {
+        const allRecs = db.records || []
+        const anomalies = []
+
+        // 1. Jornadas abiertas de días anteriores
+        allRecs.filter(r => !r.fin && r.inicio && r.inicio.slice(0,10) < todayStr).forEach(r => {
+          const emp = emps.find(e => e.id === r.empId)
+          if (!emp) return
+          const elMin = Math.floor((Date.now() - new Date(r.inicio).getTime()) / 60000)
+          anomalies.push({ id: r.id + '_open', tipo: 'open', emp, rec: r, label: 'Jornada abierta', sub: `${emp.name} · iniciada ${r.inicio.slice(0,10)} · ${mhm(elMin)} sin cerrar`, severity: 'high' })
+        })
+
+        // 2. Jornadas muy cortas (< 15 min) en últimos 3 días
+        const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0,10)
+        allRecs.filter(r => r.fin && r.inicio >= threeDaysAgo).forEach(r => {
+          const mins = calcMin(r)
+          if (mins > 0 && mins < 15) {
+            const emp = emps.find(e => e.id === r.empId)
+            if (!emp) return
+            anomalies.push({ id: r.id + '_short', tipo: 'short', emp, rec: r, label: 'Jornada muy corta', sub: `${emp.name} · ${r.inicio.slice(0,10)} · solo ${mhm(mins)}`, severity: 'med' })
+          }
+        })
+
+        // 3. Fichaje a hora inusual hoy (antes de 05:30 o después de 23:00)
+        todayRecs.forEach(r => {
+          const h = new Date(r.inicio).getHours()
+          if (h < 5 || h >= 23) {
+            const emp = emps.find(e => e.id === r.empId)
+            if (!emp) return
+            anomalies.push({ id: r.id + '_hour', tipo: 'hour', emp, rec: r, label: 'Hora inusual', sub: `${emp.name} fichó a las ${new Date(r.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}`, severity: 'med' })
+          }
+        })
+
+        // 4. Doble fichaje mismo día
+        const todayEmpCounts = {}
+        todayRecs.forEach(r => { todayEmpCounts[r.empId] = (todayEmpCounts[r.empId] || 0) + 1 })
+        Object.entries(todayEmpCounts).filter(([, c]) => c > 1).forEach(([empId, count]) => {
+          const emp = emps.find(e => e.id === empId)
+          if (!emp) return
+          anomalies.push({ id: empId + '_double', tipo: 'double', emp, rec: null, label: 'Doble fichaje', sub: `${emp.name} · ${count} entradas hoy`, severity: 'med' })
+        })
+
+        if (!anomalies.length) return null
+        const sevColor = { high: 'var(--red)', med: 'var(--orange)' }
+        const sevBg    = { high: 'rgba(239,68,68,.1)', med: 'rgba(245,158,11,.08)' }
+        return (
+          <div className="geo-alerts-panel stagger-in" style={{ borderLeftColor:'var(--primary-light)' }}>
+            <div className="geo-alerts-header">
+              <span style={{ fontSize:16 }}>🤖</span>
+              <span>Anomalías detectadas</span>
+              <span className="geo-alerts-count" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{anomalies.length}</span>
+            </div>
+            {anomalies.map(a => (
+              <div key={a.id} className="geo-alert-row" style={{ background: sevBg[a.severity] }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                  <div style={{ width:32, height:32, borderRadius:'50%', background: a.emp?.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    {(a.emp?.initials || a.emp?.name?.slice(0,2) || '?').toUpperCase()}
+                  </div>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color: sevColor[a.severity] }}>{a.label}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.sub}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* Live workers + Today activity */}
       <div className="dash-2col stagger-in">
         {/* Working now */}
@@ -1941,6 +2011,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
           </div>
           <div className="field-row">
             <div className="field"><label>Email</label><input type="email" value={form.email||''} maxLength={100} onChange={e => setForm(f=>({...f,email:e.target.value.slice(0,100)}))} /></div>
+            <div className="field"><label>WhatsApp (ej: 34612345678)</label><input type="tel" value={form.telefono||''} maxLength={15} placeholder="34612345678" onChange={e => setForm(f=>({...f,telefono:e.target.value.replace(/\D/g,'').slice(0,15)}))} /></div>
             <div className="field"><label>Rol</label>
               <select value={form.role||'emp'} onChange={e => setForm(f=>({...f,role:e.target.value}))}>
                 <option value="emp">Empleado</option>
