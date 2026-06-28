@@ -6277,12 +6277,15 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
    ═══════════════════════════════════════════════════════════════ */
 
 .emp-nav {
-  background: rgba(8,8,12,0.96) !important;
-  border-top: 1px solid rgba(255,255,255,.07) !important;
-  backdrop-filter: blur(40px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
-  padding: 10px 8px 12px !important;
-  border-radius: 28px 28px 0 0 !important;
+  background: rgba(7,7,14,0.94) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-top: 1px solid rgba(255,255,255,.13) !important;
+  backdrop-filter: blur(40px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+  padding: 10px 6px 11px !important;
+  border-radius: var(--r-pill) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,.72), 0 4px 16px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.09) !important;
+  left: 14px !important; right: 14px !important; bottom: 16px !important;
 }
 
 .emp-nav-item {
@@ -7609,4 +7612,50 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .dash-widget     { background: #fff !important; border-color: rgba(0,0,0,.08) !important; box-shadow: 0 4px 16px rgba(0,0,0,.08) !important; }
 [data-theme="light"] .adm-sidebar-inner { background: #fff !important; border-right-color: rgba(0,0,0,.07) !important; }
 [data-theme="light"] .adm-section-title { color: rgba(0,0,0,.35) !important; }
+
+/* ── Nav bar active item upgrade ─────────────────────────────────────────────── */
+
+.emp-nav-item.on {
+  color: #818cf8 !important;
+}
+.emp-nav-item.on svg {
+  stroke: #818cf8 !important;
+  stroke-width: 2.2 !important;
+  filter: drop-shadow(0 0 5px rgba(129,140,248,.55)) !important;
+  transform: scale(1.08) !important;
+}
+.emp-nav-item.on::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 4px !important;
+  left: 50%; transform: translateX(-50%) !important;
+  width: 46px; height: 30px !important;
+  border-radius: 15px !important;
+  background: rgba(99,102,241,.18) !important;
+  box-shadow: 0 0 16px rgba(99,102,241,.22) !important;
+}
+.emp-nav-item.on::after {
+  content: '' !important;
+  position: absolute !important;
+  top: -1px !important;
+  left: 50%; transform: translateX(-50%) !important;
+  width: 24px; height: 2.5px !important;
+  border-radius: 0 0 3px 3px !important;
+  background: linear-gradient(90deg, #6366f1, #818cf8) !important;
+  box-shadow: 0 0 8px rgba(99,102,241,.6) !important;
+}
+.emp-nav-item { transition: color .15s, transform .12s !important; }
+.emp-nav-item:not(.on) svg { transition: transform .15s !important; }
+.emp-nav-item:active { transform: scale(.84) !important; }
+
+[data-theme="light"] .emp-nav {
+  background: rgba(255,255,255,.95) !important;
+  border-color: rgba(0,0,0,.09) !important;
+  border-top-color: rgba(0,0,0,.11) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+[data-theme="light"] .emp-nav-item.on { color: var(--primary) !important; }
+[data-theme="light"] .emp-nav-item.on svg { stroke: var(--primary) !important; filter: drop-shadow(0 0 4px rgba(37,99,235,.35)) !important; }
+[data-theme="light"] .emp-nav-item.on::before { background: rgba(37,99,235,.10) !important; box-shadow: 0 0 12px rgba(37,99,235,.14) !important; }
+[data-theme="light"] .emp-nav-item.on::after { background: linear-gradient(90deg, #1d4ed8, #3b82f6) !important; box-shadow: 0 0 6px rgba(37,99,235,.4) !important; }
 
