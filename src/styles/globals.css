@@ -5451,6 +5451,14 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .v30-hc-glow::after { background: #fff; }
 [data-theme="light"] .v30-hc-hm { background: linear-gradient(135deg, #1e40af 0%, #4f46e5 50%, #7c3aed 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: none; }
 
+/* ── Reloj: en pantallas muy estrechas, ocultar descripción del tiempo
+   para que el pill no desplace los segundos ──────────────────────── */
+@media (max-width: 375px) {
+  .v3-weather-desc { display: none; }
+  .v30-hc-hm { font-size: 50px !important; letter-spacing: -4px !important; }
+  .v30-hc-sec { font-size: 23px !important; }
+}
+
 /* ── Clock (old, kept for compat) ───────────────────────────── */
 .v30-time-header {
   width: 100%;

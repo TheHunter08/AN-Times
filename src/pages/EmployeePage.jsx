@@ -902,7 +902,7 @@ export default function EmployeePage() {
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} />
+      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
       <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
@@ -1022,7 +1022,7 @@ export default function EmployeePage() {
       <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} />
+      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
       <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
       <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
       <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
@@ -3650,7 +3650,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilV
 }
 
 // ─── ModalLogros ───────────────────────────────────────────────────────────────
-function ModalLogros({ visible, db, u, onClose }) {
+function ModalLogros({ visible, db, u, onClose, saveDB }) {
   useModalBack(visible, onClose)
   if (!visible) return null
   const myRecs = (db.records || []).filter(r => r.empId === u.id && r.fin)
