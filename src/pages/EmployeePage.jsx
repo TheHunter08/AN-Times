@@ -3389,6 +3389,22 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
 // ─── TAB PERFIL ────────────────────────────────────────────────────────────────
 function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilView = 'perfil', setPerfilView }) {
+  // Hooks DEBEN ir antes de cualquier early return (Rules of Hooks)
+  const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
+  const saveAccentColor = useCallback((color) => {
+    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, accentColor: color || undefined } : e)
+    saveDB({ employees: emps2 })
+    if (color) applyBrandColor(color)
+  }, [db.employees, u.id, saveDB])
+  const saveReminderTime = useCallback((time) => {
+    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e)
+    saveDB({ employees: emps2 })
+    if (time && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    toast(time ? `Recordatorio activado a las ${time}` : 'Recordatorio desactivado', 2500, 'ok')
+  }, [db.employees, u.id, saveDB, toast])
+
   if (perfilView === 'gastos')   return <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
   if (perfilView === 'denuncia') return <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
 
@@ -3408,8 +3424,7 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilV
   const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
 
-  // Personal stats
-  const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
+  // Personal stats (myRecs ya calculado arriba con useMemo)
   const yearStr = `${now.getFullYear()}-`
   const yearRecs = myRecs.filter(r => r.inicio?.startsWith(yearStr))
   const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
@@ -3428,21 +3443,6 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilV
     }
     sd.setDate(sd.getDate() - 1)
   }
-
-  const saveAccentColor = useCallback((color) => {
-    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, accentColor: color || undefined } : e)
-    saveDB({ employees: emps2 })
-    if (color) applyBrandColor(color)
-  }, [db.employees, u.id, saveDB])
-
-  const saveReminderTime = useCallback((time) => {
-    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e)
-    saveDB({ employees: emps2 })
-    if (time && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-    toast(time ? `Recordatorio activado a las ${time}` : 'Recordatorio desactivado', 2500, 'ok')
-  }, [db.employees, u.id, saveDB, toast])
 
   return (
     <PullToRefresh>

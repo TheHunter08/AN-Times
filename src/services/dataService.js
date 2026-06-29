@@ -65,6 +65,9 @@ export function mergeDB(base, incoming) {
     chats:               incoming.chats                || [],
     gastos:              incoming.gastos               || [],
     denuncias:           incoming.denuncias            || [],
+    wellbeing:           incoming.wellbeing            || [],
+    turnos:              incoming.turnos               || [],
+    anomalias_vistas:    incoming.anomalias_vistas     || [],
     notisSent:           mergedNotisSent,
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
