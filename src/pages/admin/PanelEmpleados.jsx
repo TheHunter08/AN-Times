@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
 import { useAppStore } from '../../store/appStore.js'
 import { today, mhm, p2, calcMin, gid, sortedEmps } from '../../utils/time.js'
-import { hashPin, isPinHashed } from '../../utils/auth.js'
+import { hashPin, isPinHashed } from '../../utils/pinSecurity.js'
 import { auditLog } from '../../services/dataService.js'
 import { queuePush } from '../../services/dataService.js'
 
