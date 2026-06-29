@@ -512,7 +512,7 @@ function PanelDashboard({ db, toast, saveDB }) {
   const recs = db.records || []
 
   const liveRecs = recs.filter(r => !r.fin)
-  const todayRecs = recs.filter(r => r.inicio.startsWith(todayStr))
+  const todayRecs = recs.filter(r => r.inicio?.startsWith(todayStr))
   const checkedIn = new Set(liveRecs.map(r => r.empId)).size
 
   const ws = wkStart(now)
@@ -522,11 +522,11 @@ function PanelDashboard({ db, toast, saveDB }) {
   const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
   const weekRecs = useMemo(() => {
     const wsDate = new Date(wsStr)
-    return recs.filter(r => r.fin && new Date(r.inicio) >= wsDate)
+    return recs.filter(r => r.fin && r.inicio && new Date(r.inicio) >= wsDate)
   }, [recs, wsStr])
   const weekMin = useMemo(() => weekRecs.reduce((s, r) => s + calcMin(r), 0), [weekRecs])
-  const monthMin = useMemo(() => recs.filter(r => r.fin && r.inicio.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0), [recs, mk])
-  const lastMonthMin = useMemo(() => recs.filter(r => r.fin && r.inicio.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0), [recs, lastMk])
+  const monthMin = useMemo(() => recs.filter(r => r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0), [recs, mk])
+  const lastMonthMin = useMemo(() => recs.filter(r => r.fin && r.inicio?.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0), [recs, lastMk])
   const monthTrend = lastMonthMin > 0 ? Math.round((monthMin - lastMonthMin) / lastMonthMin * 100) : null
 
   const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
@@ -537,7 +537,7 @@ function PanelDashboard({ db, toast, saveDB }) {
 
   const obraHours = useMemo(() => {
     const map = {}
-    recs.filter(r => r.fin && r.inicio.startsWith(mk)).forEach(r => {
+    recs.filter(r => r.fin && r.inicio?.startsWith(mk)).forEach(r => {
       const obra = r.centro || r.obra || 'Sin centro'
       map[obra] = (map[obra] || 0) + calcMin(r)
     })
@@ -548,7 +548,7 @@ function PanelDashboard({ db, toast, saveDB }) {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now); d.setDate(d.getDate() - (6 - i))
       const ds = d.toISOString().slice(0, 10)
-      return recs.filter(r => r.fin && r.inicio.startsWith(ds)).reduce((s, r) => s + calcMin(r), 0) / 60
+      return recs.filter(r => r.fin && r.inicio?.startsWith(ds)).reduce((s, r) => s + calcMin(r), 0) / 60
     })
   }, [recs])
 
@@ -1070,7 +1070,7 @@ function buildHeatmap(recs, empCount) {
     const k = d.toISOString().slice(0,10)
     map[k] = { count: 0, min: 0 }
   }
-  recs.filter(r => r.fin).forEach(r => {
+  recs.filter(r => r.fin && r.inicio).forEach(r => {
     const k = r.inicio.slice(0,10)
     if (map[k]) { map[k].count++; map[k].min += calcMin(r) }
   })
@@ -1207,7 +1207,7 @@ function PanelControl({ db, toast, saveDB, session }) {
   const todayMinMap = useMemo(() => {
     const tod = today()
     const map = {}
-    recs.filter(r => r.fin && r.inicio.startsWith(tod)).forEach(r => {
+    recs.filter(r => r.fin && r.inicio?.startsWith(tod)).forEach(r => {
       map[r.empId] = (map[r.empId] || 0) + calcMin(r)
     })
     return map
@@ -1361,14 +1361,14 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
 
   const qs = {
-    hoy:    r => r.inicio.startsWith(todayStr),
-    semana: r => new Date(r.inicio) >= wkStart(now),
-    mes:    r => r.inicio.startsWith(mk),
+    hoy:    r => r.inicio?.startsWith(todayStr),
+    semana: r => r.inicio && new Date(r.inicio) >= wkStart(now),
+    mes:    r => r.inicio?.startsWith(mk),
   }
 
   const filtered = useMemo(() => recs.filter(r => {
     if (quickFilter && qs[quickFilter] && !qs[quickFilter](r)) return false
-    if (!quickFilter && filterDate && !r.inicio.startsWith(filterDate)) return false
+    if (!quickFilter && filterDate && !r.inicio?.startsWith(filterDate)) return false
     if (filterEmp && r.empId !== filterEmp) return false
     if (search) {
       const q = search.toLowerCase()
@@ -1396,8 +1396,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const rows = filtered.map(r => [
       r.empName || '',
       r.centro || '',
-      r.inicio.slice(0,10),
-      r.inicio.slice(11,16),
+      r.inicio?.slice(0,10) || '',
+      r.inicio?.slice(11,16) || '',
       r.fin?.slice(11,16) || '',
       Math.floor(recWorkSecs(r)/60),
       Math.floor((r.breakSecs||0)/60)
@@ -1487,7 +1487,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                   <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>
                     {editingRec?.id === r.id && editingRec?.field === 'inicio' ? (
                       <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                        <input type="datetime-local" defaultValue={r.inicio.slice(0,16)} id="edit-rec-input"
+                        <input type="datetime-local" defaultValue={r.inicio?.slice(0,16) || ''} id="edit-rec-input"
                           style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit', width:155 }} />
                         <button className="btn btn-sm btn-primary" style={{ fontSize:10, padding:'3px 8px' }}
                           onClick={() => {
@@ -2102,7 +2102,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const title = [`Empleados — ${empNombre || 'TIMES INC'} — ${mk2}`]
     const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
     const dataRows = allEmps.map(e => {
-      const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
+      const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
       return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, mhm(monthMin), Math.round(monthMin/60*100)/100, e.baja?'Baja':'Activo']
     })
     const ws = XLSX.utils.aoa_to_sheet([title, [], headers, ...dataRows])
@@ -2295,7 +2295,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const filterMonth = selMonth || `${now.getFullYear()}-${p2(now.getMonth()+1)}`
 
   const rows = sortedEmps(db).filter(e => !e.baja).map(e => {
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
     const weeklyH = e.horasSemanales || (WK / 60)  // siempre en horas
     const expected = weeklyH * 4 * 60              // 4 semanas → minutos
@@ -2320,8 +2320,8 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const exportFichajesXLSX = async () => {
     let filtered = recs.filter(r => r.fin)
     if (selEmp) filtered = filtered.filter(r => r.empId === selEmp)
-    if (from) filtered = filtered.filter(r => r.inicio.slice(0,10) >= from)
-    if (to)   filtered = filtered.filter(r => r.inicio.slice(0,10) <= to)
+    if (from) filtered = filtered.filter(r => (r.inicio?.slice(0,10) || '') >= from)
+    if (to)   filtered = filtered.filter(r => (r.inicio?.slice(0,10) || '') <= to)
     if (!filtered.length) { toast('Sin datos para exportar'); return }
     if (agruparCentro) {
       filtered.sort((a, b) => (a.centro||'').localeCompare(b.centro||'') || a.empName.localeCompare(b.empName) || a.inicio.localeCompare(b.inicio))
@@ -2366,7 +2366,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     const header = ['Empleado', ...Array.from({length:daysInMonth},(_,i)=>i+1), 'Total h', 'Total (dec.)']
     const dataRows = empRows.map(e => {
       const dayMap = {}
-      recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => {
+      recs.filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(filterMonth)).forEach(r => {
         const day = parseInt(r.inicio.slice(8,10))
         dayMap[day] = (dayMap[day]||0) + calcMin(r)
       })
@@ -2379,7 +2379,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       ]
     })
     const grandTotal = empRows.reduce((s,e) => {
-      return s + recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0)
+      return s + recs.filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0)
     }, 0)
     const totalsRow = ['TOTAL', ...Array(daysInMonth).fill(''), mhm(grandTotal), minToDecH(grandTotal)]
     const aoa = [title, [], header, ...dataRows, [], totalsRow]
@@ -2432,14 +2432,14 @@ function PanelInformes({ db, toast, saveDB, session }) {
     const empRowsD = sortedEmps(db).filter(e => !e.baja)
     const r2rows = empRowsD.map(e => {
       const dayMap = {}
-      recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(filterMonth)).forEach(r => { const d=parseInt(r.inicio.slice(8,10)); dayMap[d]=(dayMap[d]||0)+calcMin(r) })
+      recs.filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(filterMonth)).forEach(r => { const d=parseInt(r.inicio.slice(8,10)); dayMap[d]=(dayMap[d]||0)+calcMin(r) })
       const tot = Object.values(dayMap).reduce((s,v)=>s+v,0)
       return [e.name,...Array.from({length:daysInMonth},(_,i)=>dayMap[i+1]?minToDecH(dayMap[i+1]):''),mhm(tot),minToDecH(tot)]
     })
-    const gt = empRowsD.reduce((s,e)=>s+recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0),0)
+    const gt = empRowsD.reduce((s,e)=>s+recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio?.startsWith(filterMonth)).reduce((ss,r)=>ss+calcMin(r),0),0)
     XLSX.utils.book_append_sheet(wb, makeSheet([h2,[],r2h,...r2rows,[],['TOTAL',...Array(daysInMonth).fill(''),mhm(gt),minToDecH(gt)]],[22,...Array(daysInMonth).fill(5),10,12]), 'Detalle diario')
     // Hoja 3: Fichajes
-    const allFichajesThisMonth = recs.filter(r=>r.fin&&r.inicio.startsWith(filterMonth)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
+    const allFichajesThisMonth = recs.filter(r=>r.fin&&r.inicio?.startsWith(filterMonth)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
     const h3 = [`Fichajes — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
     const r3h = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
     const r3rows = allFichajesThisMonth.map(r => {
@@ -2471,7 +2471,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
   }
 
   const downloadNominaPDF = ({ e, totalMin, days }) => {
-    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
       .sort((a, b) => a.inicio.localeCompare(b.inicio))
     const mes = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
     const ausEmp = (db.ausencias || []).filter(a => a.empId === e.id && (a.fechaInicio || a.fecha || '').startsWith(filterMonth.slice(0,7)))
@@ -2526,7 +2526,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     const nuevos = []
     empsActivos.forEach(e => {
       if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === mes)) return
-      const eRecs = (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
+      const eRecs = (db.records||[]).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(mes))
       if (!eRecs.length) return
       const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
       nuevos.push({
@@ -2550,7 +2550,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     if (procesandoCierre.has(e.id)) return
     setProcesandoCierre(s => new Set([...s, e.id]))
     const mes = filterMonth
-    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
+    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(mes))
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes,
       generadoPor: session?.user?.name || 'Admin',
@@ -2753,7 +2753,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
               <tbody>
                 {sortedEmps(db).filter(e=>!e.baja).map(e => {
                   const dayMap = {}
-                  recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio.startsWith(filterMonth)).forEach(r=>{
+                  recs.filter(r=>r.empId===e.id&&r.fin&&r.inicio?.startsWith(filterMonth)).forEach(r=>{
                     const day = parseInt(r.inicio.slice(8,10))
                     dayMap[day] = (dayMap[day]||0) + calcMin(r)
                   })
@@ -2946,7 +2946,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
               const label = d.toLocaleDateString('es-ES', { month:'short', year:'2-digit' })
               const entry = { mes: label }
               sortedEmps(db).filter(e => !e.baja).forEach(e => {
-                entry[e.name.split(' ')[0]] = Math.round(recs.filter(r => r.empId===e.id && r.fin && r.inicio.startsWith(mk)).reduce((s,r)=>s+calcMin(r),0) / 60 * 10) / 10
+                entry[e.name.split(' ')[0]] = Math.round(recs.filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(mk)).reduce((s,r)=>s+calcMin(r),0) / 60 * 10) / 10
               })
               months.push(entry)
             }
@@ -2980,7 +2980,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
         const obraRows = obras.map(obra => {
           const assigned = allEmps.filter(e => (e.obrasAsignadas || []).includes(obra.nombre))
           const empData = assigned.map(e => {
-            const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+            const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
             const mins = eRecs.reduce((s, r) => s + calcMin(r), 0)
             return { e, mins, days: eRecs.length }
           }).filter(d => d.mins > 0 || assigned.length > 0)
@@ -2990,7 +2990,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
         // Employees with no obra assigned
         const unassinged = allEmps.filter(e => !(e.obrasAsignadas || []).length)
         const unassignedData = unassinged.map(e => {
-          const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+          const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
           const mins = eRecs.reduce((s, r) => s + calcMin(r), 0)
           return { e, mins, days: eRecs.length }
         }).filter(d => d.mins > 0)
@@ -3126,7 +3126,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
               const empresaNombre = empresa || '—'
               let rowsHtml = ''
               empsActivos.forEach(e => {
-                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(filterMonth))
+                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
                   .sort((a, b) => a.inicio.localeCompare(b.inicio))
                 if (!eRecs.length) {
                   rowsHtml += `<tr><td>${esc(e.name)}</td><td colspan="4" style="color:#999;text-align:center">Sin registros este mes</td></tr>`
@@ -4495,7 +4495,7 @@ function SearchModal({ db, open, q, setQ, onClose, onNav }) {
     const emps = (db.employees || []).filter(e => !e.baja && e.name.toLowerCase().includes(lq)).slice(0, 4)
       .map(e => ({ type:'emp', label:e.name, sub:e.role==='encargado'?'Encargado':e.role==='jefe_obra'?'Jefe de Obra':'Empleado', panel:'empleados', color:e.color }))
     const recs = (db.records || []).filter(r => r.fin && (r.empName?.toLowerCase().includes(lq) || r.centro?.toLowerCase().includes(lq))).slice(0, 4)
-      .map(r => ({ type:'rec', label:r.empName, sub:(r.centro||'')+ ' · '+r.inicio.slice(0,10), panel:'fichajes' }))
+      .map(r => ({ type:'rec', label:r.empName, sub:(r.centro||'')+ ' · '+(r.inicio?.slice(0,10)||''), panel:'fichajes' }))
     const obras = (db.obras || []).filter(o => o.nombre?.toLowerCase().includes(lq)).slice(0, 3)
       .map(o => ({ type:'obra', label:o.nombre, sub:o.estado||'activa', panel:'obras' }))
     const centros = (db.centrosTrabajo || []).filter(c => c.toLowerCase().includes(lq)).slice(0, 2)
@@ -4561,9 +4561,9 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
   )
 
   const rows = emps.map(e => {
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const days = new Set(eRecs.map(r => r.inicio.slice(0, 10))).size
+    const days = new Set(eRecs.map(r => r.inicio?.slice(0, 10)).filter(Boolean)).size
     const weeklyH = e.horasSemanales || (WK / 60)  // siempre en horas
     const expected = Math.round((weeklyH / 5) * days * 60)
     const diff = totalMin - expected
@@ -4583,7 +4583,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
   }
 
   const generarCierreJO = (e, totalMin, days) => {
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes: selMonth,
       generadoPor: session?.user?.name || 'Jefe de Obra',
@@ -4602,7 +4602,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     rows.forEach(({ e, totalMin, days }) => {
       if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === selMonth)) return
       if (!days) return
-      const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(selMonth))
+      const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
       nuevos.push({
         id: gid(), empId: e.id, empName: e.name, mes: selMonth,
         generadoPor: session?.user?.name || 'Jefe de Obra',
