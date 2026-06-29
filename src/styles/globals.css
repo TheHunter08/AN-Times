@@ -7862,6 +7862,41 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
   display: inline-flex;
 }
 
+/* ── Perfil sub-tabs (móvil + desktop) ─────────────────────────────────── */
+.emp-perfil-subtabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  flex-shrink: 0;
+  background: var(--bg-800, #0d0d18);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.emp-perfil-subtab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, background .15s;
+}
+.emp-perfil-subtab:hover { color: var(--text1); }
+.emp-perfil-subtab.on {
+  color: var(--primary-light, #a5b4fc);
+  font-weight: 600;
+  border-bottom-color: var(--primary-light, #a5b4fc);
+}
+[data-theme="light"] .emp-perfil-subtabs { border-bottom-color: rgba(0,0,0,.08); background: #fff; }
+[data-theme="light"] .emp-perfil-subtab.on { color: var(--primary); border-bottom-color: var(--primary); }
+
 /* ── Perfil sub-tabs (desktop) ──────────────────────────────────────────── */
 .emp-dsk-perfil-tabs {
   display: flex;
