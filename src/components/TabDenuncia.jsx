@@ -17,7 +17,9 @@ function estadoLabel(estado) {
 }
 
 function genAnonId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  const arr = new Uint8Array(6);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(36).padStart(2,'0')).join('').slice(0,8).toUpperCase();
 }
 
 const inputStyle = {
@@ -60,22 +62,28 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
       return;
     }
     setSubmitting(true);
-    const anonId = genAnonId();
-    const nueva = {
-      id: gid(),
-      anonId,
-      tipo,
-      mensaje: mensaje.trim(),
-      ts: new Date().toISOString(),
-      estado: 'nueva',
-      respuesta: null,
-    };
-    const updatedDB = { ...db, denuncias: [...(db.denuncias || []), nueva] };
-    await saveDB(updatedDB);
-    setSubmittedCode(anonId);
-    setMensaje('');
-    setTipo('acoso');
-    setSubmitting(false);
+    try {
+      const anonId = genAnonId();
+      const nueva = {
+        id: gid(),
+        anonId,
+        tipo,
+        mensaje: mensaje.trim(),
+        ts: new Date().toISOString(),
+        estado: 'nueva',
+        respuesta: null,
+      };
+      const updatedDB = { ...db, denuncias: [...(db.denuncias || []), nueva] };
+      await saveDB(updatedDB);
+      setSubmittedCode(anonId);
+      setMensaje('');
+      setTipo('acoso');
+    } catch (err) {
+      console.error('Error al guardar denuncia:', err);
+      toast && toast('Error al enviar la denuncia. Inténtalo de nuevo.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleTrack() {
@@ -94,8 +102,8 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
   return (
     <div style={{ padding: '16px', paddingBottom: '40px' }}>
       {onBack && (
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'0 0 14px', fontSize:13, fontWeight:600 }}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'10px 0 14px', fontSize:14, fontWeight:600, minHeight:44 }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Perfil
         </button>
       )}

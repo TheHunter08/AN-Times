@@ -54,6 +54,11 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   async function handleFoto(e) {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 500 * 1024) {
+      toast && toast('La imagen no puede superar 500 KB', 'error');
+      e.target.value = '';
+      return;
+    }
     try {
       const b64 = await fileToBase64(file);
       setFoto(b64);
@@ -78,25 +83,31 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
     if (!concepto.trim()) { toast && toast('Indica el concepto', 'error'); return; }
     if (!importe || +importe <= 0) { toast && toast('El importe debe ser mayor que 0', 'error'); return; }
     setSubmitting(true);
-    const nuevo = {
-      id: gid(),
-      empId: u.id,
-      empName: u.name,
-      concepto: concepto.trim(),
-      importe: +importe,
-      fecha,
-      foto: foto || null,
-      estado: 'pendiente',
-      ts: new Date().toISOString(),
-      categoria,
-      notas: notas.trim(),
-    };
-    const updatedDB = { ...db, gastos: [...(db.gastos || []), nuevo] };
-    await saveDB(updatedDB);
-    toast && toast('Gasto enviado correctamente', 'success');
-    resetForm();
-    setOpen(false);
-    setSubmitting(false);
+    try {
+      const nuevo = {
+        id: gid(),
+        empId: u.id,
+        empName: u.name,
+        concepto: concepto.trim(),
+        importe: +importe,
+        fecha,
+        foto: foto || null,
+        estado: 'pendiente',
+        ts: new Date().toISOString(),
+        categoria,
+        notas: notas.trim(),
+      };
+      const updatedDB = { ...db, gastos: [...(db.gastos || []), nuevo] };
+      await saveDB(updatedDB);
+      toast && toast('Gasto enviado correctamente', 'success');
+      resetForm();
+      setOpen(false);
+    } catch (err) {
+      console.error('Error al guardar gasto:', err);
+      toast && toast('Error al guardar el gasto. Inténtalo de nuevo.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const inputStyle = {
@@ -123,8 +134,8 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   return (
     <div style={{ padding: '16px', paddingBottom: '32px' }}>
       {onBack && (
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'0 0 14px', fontSize:13, fontWeight:600 }}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'10px 0 14px', fontSize:14, fontWeight:600, minHeight:44 }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Perfil
         </button>
       )}

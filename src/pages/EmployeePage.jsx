@@ -296,6 +296,7 @@ export default function EmployeePage() {
     }
     prevTabRef.current = currentEmpTab
     currentTabRef.current = currentEmpTab
+    if (prev !== currentEmpTab && prev === 'perfil') setPerfilSubTab('perfil')
   }, [currentEmpTab])
 
   useEffect(() => {
