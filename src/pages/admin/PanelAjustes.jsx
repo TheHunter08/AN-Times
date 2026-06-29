@@ -82,12 +82,12 @@ export default function PanelAjustes({ db, toast, saveDB, session }) {
 
       <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
         <div className="dash-widget-header">
-          <div className="dash-widget-title">🏢 Empresa</div>
+          <div className="dash-widget-title">🏗️ Obras</div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
           <div>
             <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>
-            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de empresa'}
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de obra'}
               style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
           </div>
           <div style={{ display:'flex', gap:12 }}>

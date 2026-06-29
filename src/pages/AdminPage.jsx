@@ -2100,7 +2100,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const XLSX = await import('xlsx')
     const empNombre = (db.config?.companyName || (db.empresas||[])[0] || '')
     const title = [`Empleados — ${empNombre || 'TIMES INC'} — ${mk2}`]
-    const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
+    const headers = ['Nombre','Email','Rol','Obra','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
     const dataRows = allEmps.map(e => {
       const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
       return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, mhm(monthMin), Math.round(monthMin/60*100)/100, e.baja?'Baja':'Activo']
@@ -2130,7 +2130,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
       </div>
 
       <div className="premium-filters" style={{ marginBottom:16 }}>
-        <input placeholder="Buscar empleado, empresa, centro…" value={empSearch} onChange={e => setEmpSearch(e.target.value)} style={{ flex:1 }} />
+        <input placeholder="Buscar empleado, obra, centro…" value={empSearch} onChange={e => setEmpSearch(e.target.value)} style={{ flex:1 }} />
       </div>
 
       {showForm && (
@@ -2152,7 +2152,12 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
             </div>
           </div>
           <div className="field-row">
-            <div className="field"><label>Empresa</label><input value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))} /></div>
+            <div className="field"><label>Obra</label>
+              <select value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))}>
+                <option value="">— Sin asignar —</option>
+                {(db.empresas||[]).map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
             <div className="field"><label>Centro de trabajo</label>
               <select value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))}>
                 <option value="">— Sin asignar —</option>
@@ -2207,7 +2212,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
 
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Empresa</th><th>Alta</th><th></th></tr></thead>
+          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Obra</th><th>Alta</th><th></th></tr></thead>
           <tbody>
             {emps.length === 0 && (
               <tr><td colSpan={6}>
@@ -2330,7 +2335,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     }
     const periodo = from || to ? `${from||'inicio'} a ${to||'hoy'}` : filterMonth
     const title = [`Fichajes — ${empresa || 'TIMES INC'} — ${periodo}${agruparCentro ? ' (agrupado por centro)' : ''}`]
-    const headers = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
+    const headers = ['Empleado','Obra','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
     const dataRows = filtered.map(r => {
       const wm = Math.floor(recWorkSecs(r)/60), bm = Math.floor((r.breakSecs||0)/60)
       const d = new Date(r.inicio), fin = new Date(r.fin)
@@ -2441,7 +2446,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     // Hoja 3: Fichajes
     const allFichajesThisMonth = recs.filter(r=>r.fin&&r.inicio?.startsWith(filterMonth)).sort((a,b)=>a.inicio.localeCompare(b.inicio))
     const h3 = [`Fichajes — ${empresa || 'TIMES INC'} — ${mesNombreXLSX}`]
-    const r3h = ['Empleado','Empresa','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
+    const r3h = ['Empleado','Obra','Centro','Fecha','Entrada','Salida','H. trabajo','H. trabajo (dec.)','H. descanso','Notas']
     const r3rows = allFichajesThisMonth.map(r => {
       const wm=Math.floor(recWorkSecs(r)/60), bm=Math.floor((r.breakSecs||0)/60)
       const d=new Date(r.inicio), fin=new Date(r.fin)
@@ -2450,7 +2455,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     const totWm=allFichajesThisMonth.reduce((s,r)=>s+Math.floor(recWorkSecs(r)/60),0)
     XLSX.utils.book_append_sheet(wb, makeSheet([h3,[],r3h,...r3rows,[],['TOTAL','','','','','',mhm(totWm),minToDecH(totWm),'','']],[22,18,16,12,8,8,10,14,10,20]), 'Fichajes')
     // Hoja 4: Empleados
-    const r4h = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','Estado']
+    const r4h = ['Nombre','Email','Rol','Obra','Centro trabajo','Alta','H/sem','Estado']
     const r4rows = sortedEmps(db).map(e => [e.name,e.email||'',e.role||'emp',e.empresa||'',e.centroTrabajo||'',e.startDate||'',e.horasSemanales||40,e.baja?'Baja':'Activo'])
     XLSX.utils.book_append_sheet(wb, makeSheet([r4h,...r4rows],[22,22,12,18,16,12,7,8]), 'Empleados')
     const fname = `informe_completo_${empresa?empresa.replace(/\s+/g,'_')+'_':''}${filterMonth}.xlsx`
@@ -2502,7 +2507,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
 <h1>${esc(e.name)} <span class="badge ${totalMin >= (e.horasSemanales||WK)*4*0.9 ? 'b-ok':'b-warn'}">${mhm(totalMin)}</span></h1>
 <h2>Nómina de horas · ${mes}</h2>
 <div class="meta">
-  <div><span>Empresa</span><strong>${esc(e.empresa||'—')}</strong></div>
+  <div><span>Obra</span><strong>${esc(e.empresa||'—')}</strong></div>
   <div><span>Centro</span><strong>${esc(e.centroTrabajo||'—')}</strong></div>
   <div><span>Jornada</span><strong>${e.horasSemanales||WK}h/sem</strong></div>
   <div><span>Días trabajados</span><strong>${days}</strong></div>
@@ -2515,7 +2520,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
   <div><span>Ausencias/bajas</span><strong>${ausEmp.length} registro${ausEmp.length!==1?'s':''}</strong></div>
 </div>
 <div class="sign"><div class="sign-box">Firma empleado<br><br><br>_________________________<br>${esc(e.name)}</div>
-<div class="sign-box">Firma empresa<br><br><br>_________________________<br>Representante</div></div>
+<div class="sign-box">Firma obra<br><br><br>_________________________<br>Representante</div></div>
 <footer><span>Generado: ${new Date().toLocaleString('es-ES')}</span><span>TIMES INC · Registro de jornada laboral</span></footer>
 </body></html>`)
   }
@@ -2579,7 +2584,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
 <table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
 <div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
 ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
-<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma empresa</div></div>
+<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma obra</div></div>
 </body></html>`)
   }
 
@@ -3160,7 +3165,7 @@ footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;paddi
 <h1>Registro de control de jornada laboral</h1>
 <h2>${esc(empresaNombre)} · ${mesNombre2}</h2>
 <div class="meta">
-  <div><span>Empresa</span>${esc(empresaNombre)}</div>
+  <div><span>Obra</span>${esc(empresaNombre)}</div>
   <div><span>Período</span>${mesNombre2}</div>
   <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
   <div><span>Empleados</span>${empsActivos.length}</div>
@@ -3168,8 +3173,8 @@ footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;paddi
 <table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Descanso</th><th>Horas netas</th></tr></thead>
 <tbody>${rowsHtml}</tbody></table>
 <div class="sign">
-  <div class="sign-box">Representante legal de la empresa<br><br><br>________________________<br><span style="font-size:10px">${esc(empresaNombre)}</span></div>
-  <div class="sign-box">Sello empresa<br><br><br>________________________</div>
+  <div class="sign-box">Representante legal de la obra<br><br><br>________________________<br><span style="font-size:10px">${esc(empresaNombre)}</span></div>
+  <div class="sign-box">Sello obra<br><br><br>________________________</div>
 </div>
 <footer><span>Documento generado por AN-Times · Control horario RDL 8/2019</span><span>${new Date().toLocaleDateString('es-ES')}</span></footer>
 </body></html>`)
@@ -4356,12 +4361,12 @@ function PanelAjustes({ db, toast, saveDB, session }) {
 
       <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
         <div className="dash-widget-header">
-          <div className="dash-widget-title">🏢 Empresa</div>
+          <div className="dash-widget-title">🏗️ Obras</div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
           <div>
             <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>
-            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de empresa'}
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de obra'}
               style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
           </div>
           <div style={{ display:'flex', gap:12 }}>

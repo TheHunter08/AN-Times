@@ -2289,7 +2289,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
         page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
         // header strip
         page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(safe(u.empresa || 'Empresa'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText(safe(u.empresa || 'Obra'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
         page.drawText('REGISTRO DE JORNADA LABORAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
         const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
         page.drawText(safe(`Trabajador: ${u.name}   .   Mes: ${monthName}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
@@ -2501,7 +2501,7 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       const newPage = () => {
         page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
         page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(safe(u.empresa || 'Empresa'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
+        page.drawText(safe(u.empresa || 'Obra'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
         page.drawText('REGISTRO DE JORNADA LABORAL - INFORME SEMANAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
         const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
         page.drawText(safe(`Trabajador: ${u.name}   .   ${weekLabel}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
@@ -4201,7 +4201,7 @@ function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
         {field('Nombre', nombre, setNombre)}
         {field('Email', email, setEmail)}
         {field('Teléfono', tel, setTel)}
-        {field('Empresa', emp.empresa || '—', null, true)}
+        {field('Obra', emp.empresa || '—', null, true)}
         {field('Centro de trabajo', emp.centroTrabajo || '—', null, true)}
         {field('Rol', emp.role==='encargado'?'Encargado':emp.role==='jefe_obra'?'Jefe de Obra':'Empleado', null, true)}
         {field('Fecha de alta', emp.fechaAlta || '—', null, true)}
@@ -4687,8 +4687,8 @@ function WelcomeSlides() {
     {
       emoji: '🏗️',
       color: '#7c3aed',
-      title: 'Conecta con tu empresa',
-      sub: 'Mensajes, documentos y avisos de tu empresa, todo en un solo lugar.',
+      title: 'Conecta con tu obra',
+      sub: 'Mensajes, documentos y avisos de tu obra, todo en un solo lugar.',
     },
   ]
 

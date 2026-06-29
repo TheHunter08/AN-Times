@@ -104,7 +104,7 @@ export default function PanelEmpleados({ db, toast, saveDB, session }) {
     const XLSX = await import('xlsx')
     const empNombre = (db.config?.companyName || (db.empresas||[])[0] || '')
     const title = [`Empleados — ${empNombre || 'TIMES INC'} — ${mk2}`]
-    const headers = ['Nombre','Email','Rol','Empresa','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
+    const headers = ['Nombre','Email','Rol','Obra','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
     const dataRows = allEmps.map(e => {
       const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
       return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, mhm(monthMin), Math.round(monthMin/60*100)/100, e.baja?'Baja':'Activo']
@@ -134,7 +134,7 @@ export default function PanelEmpleados({ db, toast, saveDB, session }) {
       </div>
 
       <div className="premium-filters" style={{ marginBottom:16 }}>
-        <input placeholder="Buscar empleado, empresa, centro…" value={empSearch} onChange={e => setEmpSearch(e.target.value)} style={{ flex:1 }} />
+        <input placeholder="Buscar empleado, obra, centro…" value={empSearch} onChange={e => setEmpSearch(e.target.value)} style={{ flex:1 }} />
       </div>
 
       {showForm && (
@@ -156,7 +156,12 @@ export default function PanelEmpleados({ db, toast, saveDB, session }) {
             </div>
           </div>
           <div className="field-row">
-            <div className="field"><label>Empresa</label><input value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))} /></div>
+            <div className="field"><label>Obra</label>
+              <select value={form.empresa||''} onChange={e => setForm(f=>({...f,empresa:e.target.value}))}>
+                <option value="">— Sin asignar —</option>
+                {(db.empresas||[]).map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
             <div className="field"><label>Centro de trabajo</label>
               <select value={form.centroTrabajo||''} onChange={e => setForm(f=>({...f,centroTrabajo:e.target.value}))}>
                 <option value="">— Sin asignar —</option>
@@ -211,7 +216,7 @@ export default function PanelEmpleados({ db, toast, saveDB, session }) {
 
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Empresa</th><th>Alta</th><th></th></tr></thead>
+          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Obra</th><th>Alta</th><th></th></tr></thead>
           <tbody>
             {emps.length === 0 && (
               <tr><td colSpan={6}>
