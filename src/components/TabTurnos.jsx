@@ -69,7 +69,7 @@ export default function TabTurnos({ db, u }) {
   today.setHours(0, 0, 0, 0);
   const upcoming = turnos
     .filter((t) => t.fecha >= toYMD(today) && t.tipo !== 'libre')
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .sort((a, b) => (a.fecha||'').localeCompare(b.fecha||''))
     .slice(0, 3);
 
   const weekLabel = (() => {

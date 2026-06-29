@@ -871,7 +871,7 @@ function PanelDashboard({ db, toast, saveDB }) {
               { label: prevDate.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: lastMonthMin, color:'var(--text3)', bar:'var(--bg-400)' },
               { label: now.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: monthMin, color:'var(--primary-light)', bar:'linear-gradient(90deg,var(--primary),var(--accent))' },
             ].map(({ label, val, color, bar }) => {
-              const pct = Math.round(val / Math.max(monthMin, lastMonthMin) * 100)
+              const pct = Math.round(val / Math.max(monthMin, lastMonthMin, 1) * 100)
               return (
                 <div key={label}>
                   <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', marginBottom:4 }}>{label}</div>
@@ -2665,7 +2665,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
             <div style={{ marginTop:28 }}>
               <div className="adm-section-title" style={{ marginBottom:12 }}>Cierres firmados</div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {(db.cierres||[]).filter(c => c.estado==='firmado').sort((a,b) => b.mes.localeCompare(a.mes)).slice(0,20).map(c => {
+                {(db.cierres||[]).filter(c => c.estado==='firmado').sort((a,b) => (b.mes||'').localeCompare(a.mes||'')).slice(0,20).map(c => {
                   const emp = (db.employees||[]).find(e => e.id === c.empId)
                   return (
                     <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
@@ -4709,7 +4709,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
             <div style={{ marginTop:28 }}>
               <div className="adm-section-title" style={{ marginBottom:12 }}>Cierres firmados</div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {firmados.sort((a,b) => b.mes.localeCompare(a.mes)).slice(0,20).map(c => (
+                {firmados.sort((a,b) => (b.mes||'').localeCompare(a.mes||'')).slice(0,20).map(c => (
                   <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r)' }}>
                     <div style={{ fontSize:18 }}>✅</div>
                     <div style={{ flex:1 }}>

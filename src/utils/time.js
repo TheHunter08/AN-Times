@@ -108,7 +108,7 @@ export const recWorkSecs = r => {
 }
 
 export const sortedEmps = db =>
-  (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+  (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => (a.name||'').localeCompare(b.name||'', 'es', { sensitivity: 'base' }))
 
 // ── Horas extra del mes (regla TIMES INC) ─────────────────────────────────────
 // • Las extras se acumulan por semana: cualquier minuto por encima de 40h/sem

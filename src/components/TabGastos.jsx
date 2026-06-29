@@ -39,7 +39,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
 
   const misGastos = (db.gastos || [])
     .filter((g) => g.empId === u.id)
-    .sort((a, b) => b.ts.localeCompare(a.ts));
+    .sort((a, b) => (b.ts||'').localeCompare(a.ts||''));
 
   // Monthly stats
   const thisMonth = new Date().toISOString().slice(0, 7);

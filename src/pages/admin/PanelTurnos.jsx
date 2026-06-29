@@ -51,7 +51,7 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
   const who = session?.user?.name || 'Admin'
 
   const emps = useMemo(
-    () => (db.employees || []).filter(e => !e.baja && !e.isAdmin).sort((a, b) => a.name.localeCompare(b.name)),
+    () => (db.employees || []).filter(e => !e.baja && !e.isAdmin).sort((a, b) => (a.name||'').localeCompare(b.name||'')),
     [db.employees]
   )
 
