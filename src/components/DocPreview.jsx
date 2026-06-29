@@ -131,7 +131,7 @@ export function DocPreview({ d, db, empId }) {
     return <iframe src={d.url} title={d.titulo} sandbox="allow-same-origin allow-scripts allow-popups" style={{ width:'100%', height:'50vh', border:'1px solid var(--border)', borderRadius:8, background:'#fff' }} />
   }
   if (d.tipo === 'jornada' && d.mes) {
-    const recs = (db.records || []).filter(r => r.empId === empId && r.fin && r.inicio.startsWith(d.mes)).sort((a,b) => a.inicio.localeCompare(b.inicio))
+    const recs = (db.records || []).filter(r => r.empId === empId && r.fin && r.inicio?.startsWith(d.mes)).sort((a,b) => (a.inicio||'').localeCompare(b.inicio||''))
     const total = recs.reduce((s, r) => s + calcMin(r), 0)
     return (
       <div style={{ maxHeight:'50vh', overflowY:'auto', border:'1px solid var(--border)', borderRadius:8 }}>
