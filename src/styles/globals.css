@@ -8323,3 +8323,23 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
   border-color: rgba(0,0,0,.08) !important;
   box-shadow: 0 1px 4px rgba(0,0,0,.05) !important;
 }
+
+/* ── Racha de día y horario habitual (streak + pattern cards) ── */
+[data-theme="light"] .v3-streak-card {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.08) !important;
+}
+[data-theme="light"] .v3-streak-card.hot {
+  background: rgba(245,158,11,.05) !important;
+  border-color: rgba(245,158,11,.22) !important;
+}
+[data-theme="light"] .v3-streak-count        { color: #09090B !important; }
+[data-theme="light"] .v3-streak-count span   { color: rgba(0,0,0,.38) !important; }
+[data-theme="light"] .v3-streak-label        { color: rgba(0,0,0,.38) !important; }
+
+[data-theme="light"] .v3-pattern-card {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.08) !important;
+}
+[data-theme="light"] .v3-pattern-title       { color: rgba(0,0,0,.65) !important; }
+[data-theme="light"] .v3-pattern-sub         { color: rgba(0,0,0,.38) !important; }
