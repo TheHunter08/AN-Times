@@ -5,8 +5,10 @@
  * Mantiene la base de datos principal ligera.
  */
 
-const SB_URL  = process.env.VITE_SB_URL
-const SB_ANON = process.env.VITE_SB_ANON
+// Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
+const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
+const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
 if (!SB_URL || !SB_ANON) { console.error('[archive] VITE_SB_URL / VITE_SB_ANON not set'); process.exit(1) }
 
 const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }

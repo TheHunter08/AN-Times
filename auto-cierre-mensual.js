@@ -4,9 +4,11 @@
 
 import { createHash } from 'crypto'
 
-const SB_URL  = process.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON = process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
-const PUSH_URL = process.env.PUSH_URL || 'https://an-times.vercel.app/api/sendpush'
+// Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
+const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
+const SB_URL   = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const SB_ANON  = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const PUSH_URL = cleanEnv(process.env.PUSH_URL) || 'https://an-times.vercel.app/api/sendpush'
 
 const SB_HEADERS = {
   apikey: SB_ANON,
