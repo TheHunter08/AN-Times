@@ -12,7 +12,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
   const pendRecs = recs.filter(r => r.fin && empIds.has(r.empId) && !r.aceptada)
-    .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
+    .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, 50)
   const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
   const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
   const teamAus = [
@@ -44,7 +44,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     toast('Jornada aceptada', 3000, 'ok')
   }
 
-  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio.slice(0,16), fin: rec.fin ? rec.fin.slice(0,16) : '' })
+  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio?.slice(0,16) || '', fin: rec.fin ? rec.fin.slice(0,16) : '' })
 
   const saveEdit = () => {
     const rec = recs.find(r => r.id === editing.id)

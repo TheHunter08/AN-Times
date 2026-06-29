@@ -32,7 +32,7 @@ export default function PanelFichajes({ db, toast, saveDB, session }) {
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio) || a.id.localeCompare(b.id)), [recs, quickFilter, filterDate, filterEmp, search])
+  }).sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'') || a.id.localeCompare(b.id)), [recs, quickFilter, filterDate, filterEmp, search])
   const pagedFiltered = filtered.slice(0, pageSize)
 
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])

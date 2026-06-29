@@ -1375,7 +1375,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       if (!r.empName?.toLowerCase().includes(q) && !r.centro?.toLowerCase().includes(q)) return false
     }
     return true
-  }).sort((a,b) => b.inicio.localeCompare(a.inicio) || a.id.localeCompare(b.id)), [recs, quickFilter, filterDate, filterEmp, search])
+  }).sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'') || a.id.localeCompare(b.id)), [recs, quickFilter, filterDate, filterEmp, search])
   const pagedFiltered = filtered.slice(0, pageSize)
 
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
@@ -2324,9 +2324,9 @@ function PanelInformes({ db, toast, saveDB, session }) {
     if (to)   filtered = filtered.filter(r => (r.inicio?.slice(0,10) || '') <= to)
     if (!filtered.length) { toast('Sin datos para exportar'); return }
     if (agruparCentro) {
-      filtered.sort((a, b) => (a.centro||'').localeCompare(b.centro||'') || a.empName.localeCompare(b.empName) || a.inicio.localeCompare(b.inicio))
+      filtered.sort((a, b) => (a.centro||'').localeCompare(b.centro||'') || (a.empName||'').localeCompare(b.empName||'') || (a.inicio||'').localeCompare(b.inicio||''))
     } else {
-      filtered.sort((a, b) => a.inicio.localeCompare(b.inicio))
+      filtered.sort((a, b) => (a.inicio||'').localeCompare(b.inicio||''))
     }
     const periodo = from || to ? `${from||'inicio'} a ${to||'hoy'}` : filterMonth
     const title = [`Fichajes — ${empresa || 'TIMES INC'} — ${periodo}${agruparCentro ? ' (agrupado por centro)' : ''}`]
@@ -3687,7 +3687,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
   const pendRecs = recs.filter(r => r.fin && empIds.has(r.empId) && !r.aceptada)
-    .sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, 50)
+    .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, 50)
   const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
   const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
   const teamAus = [
@@ -3719,7 +3719,7 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     toast('Jornada aceptada', 3000, 'ok')
   }
 
-  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio.slice(0,16), fin: rec.fin ? rec.fin.slice(0,16) : '' })
+  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio?.slice(0,16) || '', fin: rec.fin ? rec.fin.slice(0,16) : '' })
 
   const saveEdit = () => {
     const rec = recs.find(r => r.id === editing.id)

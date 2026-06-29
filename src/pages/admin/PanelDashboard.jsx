@@ -332,7 +332,7 @@ export default function PanelDashboard({ db, toast, saveDB }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, showAllToday ? undefined : 5).map(r => {
+              {[...todayRecs].sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, showAllToday ? undefined : 5).map(r => {
                 const emp = emps.find(e => e.id === r.empId)
                 const isLive = !r.fin
                 const wm = r.fin ? Math.floor(recWorkSecs(r)/60) : null

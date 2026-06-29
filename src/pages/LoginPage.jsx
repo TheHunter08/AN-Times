@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
 import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin, recordFailedAttempt as recordFailed } from '../utils/pinSecurity.js'
+import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric, clearBiometric } from '../utils/webauthn.js'
 
 const EMAIL_LK_KEY = 'an_email_lk'
 const EMAIL_MAX_ATTEMPTS = 5
@@ -39,7 +40,6 @@ function recordEmailFailed() {
 function clearEmailLockout() {
   try { localStorage.removeItem(EMAIL_LK_KEY) } catch {}
 }
-import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric, clearBiometric } from '../utils/webauthn.js'
 
 export default function LoginPage() {
   const { db, setSession, setScreen, toast, saveDB } = useAppStore()
