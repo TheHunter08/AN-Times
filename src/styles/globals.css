@@ -8179,3 +8179,139 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
   font-size: 16px;
   font-weight: 700;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MODO CLARO — overrides globales para componentes v30
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Contenedor principal empleado (mobile: sin media query) ── */
+[data-theme="light"] #sEmp       { background: #F0F0F5; }
+[data-theme="light"] .emp-body   { background: #F0F0F5; }
+
+/* ── Jornada v30 — header ─────────────────────────────────── */
+[data-theme="light"] .v30-jor-header {
+  background: #fff;
+  border-bottom-color: rgba(0,0,0,.08);
+}
+[data-theme="light"] .v30-jor-title   { color: #09090B; }
+[data-theme="light"] .v30-jor-date    { color: rgba(0,0,0,.40); }
+[data-theme="light"] .v30-jor-badge   {
+  color: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.05);
+  border-color: rgba(0,0,0,.10);
+}
+
+/* ── Jornada v30 — stat pills ─────────────────────────────── */
+[data-theme="light"] .v30-jor-stats { background: #F4F4F6; }
+[data-theme="light"] .v30-jor-stat  {
+  background: #fff;
+  border-color: rgba(0,0,0,.08);
+}
+[data-theme="light"] .v30-jor-stat-val          { color: #09090B; }
+[data-theme="light"] .v30-jor-stat.orange .v30-jor-stat-val { color: #b45309; }
+[data-theme="light"] .v30-jor-stat.green  .v30-jor-stat-val { color: #059669; }
+[data-theme="light"] .v30-jor-stat-lbl          { color: rgba(0,0,0,.38); }
+
+/* ── Jornada v30 — total card ─────────────────────────────── */
+[data-theme="light"] .v30-jor-total {
+  background: #fff;
+  border-color: rgba(0,0,0,.08);
+}
+[data-theme="light"] .v30-jor-total-label { color: rgba(0,0,0,.38); }
+[data-theme="light"] .v30-jor-total-time  { color: #09090B; }
+[data-theme="light"] .v30-jor-meta        { border-top-color: rgba(0,0,0,.08); }
+[data-theme="light"] .v30-jor-meta-lbl   { color: rgba(0,0,0,.40); }
+
+/* ── Jornada v30 — botones PDF ────────────────────────────── */
+[data-theme="light"] .v30-jor-btn {
+  border-color: rgba(0,0,0,.12);
+  background: rgba(0,0,0,.04);
+  color: rgba(0,0,0,.60);
+}
+[data-theme="light"] .v30-jor-btn:active { background: rgba(0,0,0,.08); }
+
+/* ── Jornada v30 — weekly/monthly progress blocks ─────────── */
+[data-theme="light"] .v30-prog-block {
+  background: #fff;
+  border-color: rgba(0,0,0,.08);
+}
+[data-theme="light"] .v30-prog-label { color: rgba(0,0,0,.38); }
+
+/* ── Stat mini grid (ENTRADA/SALIDA/PAUSA/TOTAL) ──────────── */
+[data-theme="light"] .stat-card-premium,
+[data-theme="light"] .v3-stat-card {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.08) !important;
+}
+[data-theme="light"] .stat-lbl,
+[data-theme="light"] .v3-stat-label { color: rgba(0,0,0,.38) !important; }
+
+/* ── Vacaciones ────────────────────────────────────────────── */
+[data-theme="light"] .vac-wrap2 { background: #F4F4F6 !important; }
+[data-theme="light"] .vac-hero  {
+  background: linear-gradient(160deg, #ede9fe 0%, #dbeafe 60%, #F4F4F6 100%) !important;
+  border-bottom-color: rgba(0,0,0,.07) !important;
+}
+[data-theme="light"] .vac-stat-lbl { color: rgba(0,0,0,.40) !important; }
+
+/* ── Calendario ────────────────────────────────────────────── */
+[data-theme="light"] .cal-wrap,
+[data-theme="light"] .cal-month-grid-wrap { background: #F4F4F6 !important; }
+
+[data-theme="light"] .cal-month-header {
+  background: #fff !important;
+  border-bottom-color: rgba(0,0,0,.08) !important;
+}
+[data-theme="light"] .cal-month-title { color: #09090B !important; }
+
+[data-theme="light"] .cal-nav-btn {
+  background: rgba(0,0,0,.05) !important;
+  border-color: rgba(0,0,0,.10) !important;
+  color: rgba(0,0,0,.55) !important;
+}
+[data-theme="light"] .cal-dow-row {
+  background: #fff !important;
+  border-bottom-color: rgba(0,0,0,.06) !important;
+}
+[data-theme="light"] .cal-dow-cell             { color: rgba(0,0,0,.35) !important; }
+[data-theme="light"] .cal-day-num              { color: rgba(0,0,0,.65) !important; }
+[data-theme="light"] .cal-day.other-month .cal-day-num { color: rgba(0,0,0,.22) !important; }
+
+/* ── Bottom nav en modo claro ──────────────────────────────── */
+[data-theme="light"] .emp-nav {
+  background: rgba(255,255,255,.94) !important;
+  border-color: rgba(0,0,0,.09) !important;
+  border-top-color: rgba(0,0,0,.09) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06) !important;
+}
+[data-theme="light"] .emp-nav-label { color: rgba(0,0,0,.32) !important; }
+
+/* ── Desktop: hero card en modo claro ──────────────────────── */
+[data-theme="light"] .emp-dsk-content .v30-hero-card {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.09) !important;
+  box-shadow: 0 2px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04) !important;
+}
+
+/* ── Timeline de jornada (tl-prem-*) ──────────────────────── */
+[data-theme="light"] .tl-prem-item {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.07) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05) !important;
+}
+[data-theme="light"] .tl-prem-time  { color: rgba(0,0,0,.38) !important; }
+[data-theme="light"] .tl-prem-title { color: #09090B !important; }
+[data-theme="light"] .tl-prem-sub   { color: rgba(0,0,0,.38) !important; }
+
+/* ── Vacaciones: stats y lista ────────────────────────────── */
+[data-theme="light"] .vac-stats-row { background: #F4F4F6 !important; border-bottom-color: rgba(0,0,0,.06) !important; }
+[data-theme="light"] .vac-stat {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.08) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05) !important;
+}
+[data-theme="light"] .vac-list-item {
+  background: #fff !important;
+  border-color: rgba(0,0,0,.08) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05) !important;
+}

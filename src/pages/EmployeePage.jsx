@@ -2111,6 +2111,22 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
   const realRecs = recs.filter(r => !r.fin || recWorkSecs(r) >= 30)
   const o = recs.find(r => !r.fin)
 
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light'
+  const jT  = { bg: isLight ? '#fff'              : '#000',
+                card: isLight ? '#F4F4F6'          : '#0D0D14',
+                border: isLight ? 'rgba(0,0,0,.08)': 'rgba(255,255,255,.06)',
+                border2: isLight ? 'rgba(0,0,0,.08)': 'rgba(255,255,255,.07)',
+                text: isLight ? '#09090B'           : '#fff',
+                text2: isLight ? 'rgba(0,0,0,.40)'  : 'rgba(255,255,255,.35)',
+                text3: isLight ? 'rgba(0,0,0,.28)'  : 'rgba(255,255,255,.28)',
+                badge: isLight ? 'rgba(0,0,0,.05)'  : 'rgba(255,255,255,.07)',
+                badgeBorder: isLight ? 'rgba(0,0,0,.10)': 'rgba(255,255,255,.10)',
+                badgeText: isLight ? 'rgba(0,0,0,.45)' : 'rgba(255,255,255,.45)',
+                btn: isLight ? 'rgba(0,0,0,.04)'    : 'rgba(255,255,255,.04)',
+                btnBorder: isLight ? 'rgba(0,0,0,.10)': 'rgba(255,255,255,.10)',
+                btnText: isLight ? 'rgba(0,0,0,.60)' : 'rgba(255,255,255,.65)',
+              }
+
   const completedSecs = realRecs.filter(r => r.fin && r.closed).reduce((a, r) => a + recWorkSecs(r), 0)
   const liveSecs = o ? calcSecs(o).work : 0
   const totSecs = completedSecs + liveSecs
@@ -2596,58 +2612,58 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
     <>
     <PullToRefresh>
       {/* ── TIMES INC 3.0 — Jornada Header ──────────────── */}
-      <div className="jor-header" style={{ padding:'20px 20px 16px', background:'#000', borderBottom:'1px solid rgba(255,255,255,.06)', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="jor-header" style={{ padding:'20px 20px 16px', background:jT.bg, borderBottom:`1px solid ${jT.border}`, display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
-          <div style={{ fontSize:30, fontWeight:900, letterSpacing:'-1.5px', color:'#fff', lineHeight:1.1 }}>Mi Jornada</div>
-          <div style={{ fontSize:13, color:'rgba(255,255,255,.35)', marginTop:4, textTransform:'capitalize' }}>
+          <div style={{ fontSize:30, fontWeight:900, letterSpacing:'-1.5px', color:jT.text, lineHeight:1.1 }}>Mi Jornada</div>
+          <div style={{ fontSize:13, color:jT.text2, marginTop:4, textTransform:'capitalize' }}>
             {now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}
           </div>
         </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.10)', borderRadius:999, padding:'5px 13px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', marginTop:4 }}>
+        <div style={{ fontSize:10, color:jT.badgeText, background:jT.badge, border:`1px solid ${jT.badgeBorder}`, borderRadius:999, padding:'5px 13px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', marginTop:4 }}>
           Hoy
         </div>
       </div>
 
       {/* ── TIMES INC 3.0 — Stat Pills ───────────────────── */}
-      <div className="jor-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:'#000' }}>
-        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+      <div className="jor-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:jT.bg }}>
+        <div className="jor-kpi-card" style={{ background:jT.card, border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>{weekMin > WK ? '🔴' : '⏱️'}</div>
           <div style={{ fontSize:17, fontWeight:800, color: weekMin > WK ? '#fbbf24' : '#818cf8', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(Math.floor(weekMin))}</div>
-          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:jT.text3 }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
         </div>
-        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:'1px solid rgba(16,185,129,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+        <div className="jor-kpi-card" style={{ background:jT.card, border:'1px solid rgba(16,185,129,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>✅</div>
           <div style={{ fontSize:17, fontWeight:800, color:'#34d399', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(normMin)}</div>
-          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Normal hoy</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:jT.text3 }}>Normal hoy</div>
         </div>
-        <div className="jor-kpi-card" style={{ background:'#0D0D14', border:'1px solid rgba(245,158,11,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+        <div className="jor-kpi-card" style={{ background:jT.card, border:'1px solid rgba(245,158,11,.18)', borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>⚡</div>
           <div style={{ fontSize:17, fontWeight:800, color:'#fbbf24', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(extraMin)}</div>
-          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:'rgba(255,255,255,.28)' }}>Extra hoy</div>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:jT.text3 }}>Extra hoy</div>
         </div>
       </div>
 
       {/* ── TIMES INC 3.0 — Total card + Weekly chart ────── */}
       <div style={{ padding:'0 16px 12px' }}>
-        <div className="jor-total-card" style={{ background:'#0D0D14', border:'1px solid rgba(255,255,255,.07)', borderRadius:22, padding:'18px 18px 14px', marginBottom:0 }}>
+        <div className="jor-total-card" style={{ background:jT.card, border:`1px solid ${jT.border2}`, borderRadius:22, padding:'18px 18px 14px', marginBottom:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px' }}>Total trabajado hoy</div>
+            <div style={{ fontSize:11, color:jT.text2, fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px' }}>Total trabajado hoy</div>
             <div style={{ fontSize:11, fontWeight:700, color:'#818cf8', background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.25)', padding:'3px 10px', borderRadius:999 }}>
               {Math.round(totMin / (WD || 480) * 100)}%
             </div>
           </div>
-          <div style={{ fontSize:44, fontWeight:800, letterSpacing:'-2px', color:'#fff', fontVariantNumeric:'tabular-nums', lineHeight:1, marginBottom:14 }}>{mhm(totMin)}</div>
+          <div style={{ fontSize:44, fontWeight:800, letterSpacing:'-2px', color:jT.text, fontVariantNumeric:'tabular-nums', lineHeight:1, marginBottom:14 }}>{mhm(totMin)}</div>
 
           {/* Weekly mini bar chart */}
           <WeeklyBars db={db} u={u} timer={timer} />
 
-          <div style={{ display:'flex', flexDirection:'column', gap:8, paddingTop:12, borderTop:'1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, paddingTop:12, borderTop:`1px solid ${jT.border}` }}>
             {[
               { lbl:'Descansos', val: mhm(brkMin), color:'#fbbf24' },
               { lbl:'Mes actual', val: mhm(monthMin), color:'#2dd4bf' },
             ].map(({ lbl, val, color }) => (
               <div key={lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13 }}>
-                <span style={{ color:'rgba(255,255,255,.35)', fontWeight:500 }}>{lbl}</span>
+                <span style={{ color:jT.text2, fontWeight:500 }}>{lbl}</span>
                 <span style={{ fontWeight:700, color }}>{val}</span>
               </div>
             ))}
@@ -2658,15 +2674,15 @@ function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal, active
       {/* ── TIMES INC 3.0 — PDF export buttons ──────────── */}
       <div className="jor-pdf-row" style={{ padding:'0 16px 6px', display:'flex', gap:8, flexWrap:'wrap' }}>
         <button onClick={exportWeekPDF} disabled={generatingWeekPdf}
-          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingWeekPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:`1px solid ${jT.btnBorder}`, background:jT.btn, color:jT.btnText, fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingWeekPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
           {generatingWeekPdf ? <><span className="login-spinner" style={{ width:10,height:10,borderWidth:1.5,borderColor:'rgba(255,255,255,.1)',borderTopColor:'rgba(255,255,255,.5)',marginRight:5,display:'inline-block',verticalAlign:'middle' }}/>Generando…</> : <>📅 Semanal</>}
         </button>
         <button onClick={exportMonthPDF} disabled={generatingPdf}
-          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          style={{ flex:1, padding:'11px 10px', borderRadius:14, border:`1px solid ${jT.btnBorder}`, background:jT.btn, color:jT.btnText, fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity: generatingPdf ? 0.7 : 1, transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
           {generatingPdf ? <><span className="login-spinner" style={{ width:10,height:10,borderWidth:1.5,borderColor:'rgba(255,255,255,.1)',borderTopColor:'rgba(255,255,255,.5)',marginRight:5,display:'inline-block',verticalAlign:'middle' }}/>Generando…</> : <><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF firmado</>}
         </button>
         <button onClick={() => setShowRangeExport(v => !v)}
-          style={{ padding:'11px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,.10)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
+          style={{ padding:'11px 14px', borderRadius:14, border:`1px solid ${jT.btnBorder}`, background:jT.btn, color:jT.btnText, fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', transition:'all 120ms ease', WebkitTapHighlightColor:'transparent' }}>
           📆
         </button>
       </div>
