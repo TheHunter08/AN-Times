@@ -1330,6 +1330,20 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .prf-menu-arr { width: 16px; height: 16px; stroke: var(--text4); stroke-width: 2; fill: none; flex-shrink: 0; transition: transform .15s; }
 .prf-menu-item:hover .prf-menu-arr { transform: translateX(2px); }
 .prf-menu-item.danger .prf-menu-ico { background: var(--red-dim); }
+
+/* ── Perfil secciones ──────────────────────────────────────────────────── */
+.prf-section { margin: 0 16px 16px; }
+.prf-section-title { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; padding-left: 2px; }
+.prf-section-grid { display: flex; flex-direction: column; gap: 8px; }
+.prf-section-card { display: flex; align-items: center; gap: 14px; padding: 14px 14px; background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 14px; cursor: pointer; transition: background .15s, transform .1s; }
+.prf-section-card:active { transform: scale(.98); background: var(--bg-500); }
+.prf-section-ico { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.prf-section-ico svg { width: 18px; height: 18px; stroke: var(--primary-light); stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.prf-section-lbl { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
+.prf-section-arr { width: 16px; height: 16px; stroke: var(--text4); stroke-width: 2; fill: none; flex-shrink: 0; transition: transform .15s; }
+.prf-section-card:hover .prf-section-arr { transform: translateX(2px); }
+.prf-logout-card { border-color: rgba(239,68,68,.2); }
+.prf-logout-card:active { background: rgba(239,68,68,.08); }
 .prf-menu-item.danger .prf-menu-ico svg { stroke: var(--red); }
 .prf-menu-item.danger .prf-menu-lbl { color: var(--red); }
 

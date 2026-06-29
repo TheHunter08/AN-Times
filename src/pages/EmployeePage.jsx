@@ -3538,34 +3538,78 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
         )
       })()}
 
-      <div className="prf-menu">
-        {[
-          { icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>, label:'Información personal', onClick:()=>openModal('infoPersonal') },
-          { icon:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>, label:'Documentos', badge: pendingDocs, onClick:()=>openModal('documentos') },
-          { icon:<><circle cx="12" cy="8" r="6"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></>, label:'Logros', color:'rgba(245,158,11,.12)', stroke:'#f59e0b', onClick:()=>openModal('logros') },
-          { icon:<><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></>, label:'Temas', color:'rgba(139,92,246,.12)', stroke:'#8b5cf6', onClick:()=>openModal('temas') },
-          { icon:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>, label:'Configuración', onClick:()=>openModal('configuracion') },
-          { icon:<><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>, label:'Firma digital', color:'rgba(124,92,255,.12)', stroke:'#a78bfa', onClick:() => openModal('sign'), noFirma: !db.firmas?.[u?.id]?.main },
-        ].map(({ icon, label, color, stroke, onClick, badge, noFirma }) => (
-          <div key={label} className="prf-menu-item" onClick={onClick}>
-            <div className="prf-menu-ico" style={color ? { background:color } : {}}>
-              <svg viewBox="0 0 24 24" style={stroke ? { stroke } : {}}>{icon}</svg>
+      {/* Sección: Mi cuenta */}
+      <div className="prf-section">
+        <div className="prf-section-title">Mi cuenta</div>
+        <div className="prf-section-grid">
+          <div className="prf-section-card" onClick={() => openModal('infoPersonal')}>
+            <div className="prf-section-ico" style={{ background:'rgba(99,102,241,.15)' }}>
+              <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span className="prf-section-lbl">Información personal</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div className="prf-section-card" onClick={() => openModal('documentos')}>
+            <div className="prf-section-ico" style={{ background:'rgba(59,130,246,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#60a5fa' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <span className="prf-menu-lbl">{label}</span>
-              {noFirma && <div style={{ fontSize:10, color:'var(--orange)', fontWeight:600, marginTop:1 }}>Sin configurar — toca para añadir</div>}
+              <span className="prf-section-lbl">Documentos</span>
+              {pendingDocs > 0 && <div style={{ fontSize:10, color:'var(--orange)', fontWeight:600 }}>{pendingDocs} pendiente{pendingDocs > 1 ? 's' : ''} de firma</div>}
             </div>
-            {badge > 0 && <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', marginRight:4 }}>{badge}</span>}
-            {noFirma && <span style={{ fontSize:10, color:'var(--orange)', marginRight:6 }}>!</span>}
-            <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            {pendingDocs > 0 && <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', flexShrink:0 }}>{pendingDocs}</span>}
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
-        ))}
-        <div className="prf-menu-item danger" onClick={doLogout}>
-          <div className="prf-menu-ico">
-            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <div className="prf-section-card" onClick={() => openModal('sign')}>
+            <div className="prf-section-ico" style={{ background:'rgba(124,92,255,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#a78bfa' }}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <span className="prf-section-lbl">Firma digital</span>
+              {!db.firmas?.[u?.id]?.main && <div style={{ fontSize:10, color:'var(--orange)', fontWeight:600 }}>Sin configurar</div>}
+            </div>
+            {!db.firmas?.[u?.id]?.main && <span style={{ fontSize:16, color:'var(--orange)', flexShrink:0 }}>!</span>}
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
-          <span className="prf-menu-lbl">Cerrar sesión</span>
-          <svg className="prf-menu-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      {/* Sección: Personalización */}
+      <div className="prf-section">
+        <div className="prf-section-title">Personalización</div>
+        <div className="prf-section-grid">
+          <div className="prf-section-card" onClick={() => openModal('temas')}>
+            <div className="prf-section-ico" style={{ background:'rgba(139,92,246,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#8b5cf6' }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-2.6"/></svg>
+            </div>
+            <span className="prf-section-lbl">Temas y colores</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div className="prf-section-card" onClick={() => openModal('configuracion')}>
+            <div className="prf-section-ico" style={{ background:'rgba(14,165,233,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#38bdf8' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </div>
+            <span className="prf-section-lbl">Configuración</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div className="prf-section-card" onClick={() => openModal('logros')}>
+            <div className="prf-section-ico" style={{ background:'rgba(245,158,11,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#f59e0b' }}><circle cx="12" cy="8" r="6"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></svg>
+            </div>
+            <span className="prf-section-lbl">Logros</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Cerrar sesión */}
+      <div style={{ margin:'4px 16px 24px' }}>
+        <div className="prf-section-card prf-logout-card" onClick={doLogout}>
+          <div className="prf-section-ico" style={{ background:'rgba(239,68,68,.12)' }}>
+            <svg viewBox="0 0 24 24" style={{ stroke:'#ef4444' }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </div>
+          <span className="prf-section-lbl" style={{ color:'var(--danger)' }}>Cerrar sesión</span>
+          <svg className="prf-section-arr" viewBox="0 0 24 24" style={{ stroke:'var(--danger)' }}><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
 
