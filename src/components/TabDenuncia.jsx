@@ -41,7 +41,7 @@ const labelStyle = {
   fontWeight: 500,
 };
 
-export default function TabDenuncia({ db, u, toast, saveDB }) {
+export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
   // Form state
   const [tipo, setTipo] = useState('acoso');
   const [mensaje, setMensaje] = useState('');
@@ -93,6 +93,12 @@ export default function TabDenuncia({ db, u, toast, saveDB }) {
 
   return (
     <div style={{ padding: '16px', paddingBottom: '40px' }}>
+      {onBack && (
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'0 0 14px', fontSize:13, fontWeight:600 }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          Volver a Perfil
+        </button>
+      )}
       {/* Header */}
       <div
         style={{

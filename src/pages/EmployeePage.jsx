@@ -888,26 +888,7 @@ export default function EmployeePage() {
           {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
           {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
           {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-          {currentEmpTab === 'perfil' && (
-            <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
-              <div className="emp-dsk-perfil-tabs">
-                {[
-                  { id:'perfil',   label:'Perfil' },
-                  { id:'gastos',   label:'Gastos' },
-                  { id:'denuncia', label:'Denuncia' },
-                ].map(({ id, label }) => (
-                  <button key={id} type="button"
-                    className={`emp-dsk-perfil-tab${perfilSubTab === id ? ' on' : ''}`}
-                    onClick={() => setPerfilSubTab(id)}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {perfilSubTab === 'perfil'   && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
-              {perfilSubTab === 'gastos'   && <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} />}
-              {perfilSubTab === 'denuncia' && <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} />}
-            </div>
-          )}
+          {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
         </div>
       </div>
 
@@ -1005,20 +986,7 @@ export default function EmployeePage() {
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
         {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-        {currentEmpTab === 'perfil' && (
-          <>
-            <div className="emp-perfil-subtabs">
-              {[{id:'perfil',label:'Perfil'},{id:'gastos',label:'Gastos'},{id:'denuncia',label:'Denuncia'}].map(({id,label}) => (
-                <button key={id} type="button"
-                  className={`emp-perfil-subtab${perfilSubTab===id?' on':''}`}
-                  onClick={() => setPerfilSubTab(id)}>{label}</button>
-              ))}
-            </div>
-            {perfilSubTab === 'perfil'   && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} />}
-            {perfilSubTab === 'gastos'   && <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} />}
-            {perfilSubTab === 'denuncia' && <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} />}
-          </>
-        )}
+        {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
       </div>
 
       {/* Bottom nav */}
@@ -3419,7 +3387,10 @@ function TabCalendario({ db, u, calMonth, setCalMonth }) {
 }
 
 // ─── TAB PERFIL ────────────────────────────────────────────────────────────────
-function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
+function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilView = 'perfil', setPerfilView }) {
+  if (perfilView === 'gastos')   return <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
+  if (perfilView === 'denuncia') return <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
+
   if (!db.records) return (
     <div className="emp-tab active">
       <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
@@ -3537,6 +3508,27 @@ function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal }) {
           </div>
         )
       })()}
+
+      {/* Sección: Gastos y Denuncia */}
+      <div className="prf-section">
+        <div className="prf-section-title">Más opciones</div>
+        <div className="prf-section-grid">
+          <div className="prf-section-card" onClick={() => setPerfilView('gastos')}>
+            <div className="prf-section-ico" style={{ background:'rgba(16,185,129,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#34d399' }}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <span className="prf-section-lbl">Gastos</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div className="prf-section-card" onClick={() => setPerfilView('denuncia')}>
+            <div className="prf-section-ico" style={{ background:'rgba(99,102,241,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#a5b4fc' }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <span className="prf-section-lbl">Denuncia</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+      </div>
 
       {/* Sección: Mi cuenta */}
       <div className="prf-section">
