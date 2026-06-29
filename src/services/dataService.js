@@ -26,7 +26,7 @@ export function loadLocal() {
 }
 
 export function saveLocal(db) {
-  try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch {}
+  try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
 }
 
 // ── mergeDB ───────────────────────────────────────────────────────────────────
@@ -63,6 +63,8 @@ export function mergeDB(base, incoming) {
     audit:               incoming.audit                || [],
     correccionesFichaje: incoming.correccionesFichaje  || [],
     chats:               incoming.chats                || [],
+    gastos:              incoming.gastos               || [],
+    denuncias:           incoming.denuncias            || [],
     notisSent:           mergedNotisSent,
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
@@ -80,7 +82,8 @@ export async function cloudFetch() {
       .maybeSingle()
     if (error) return { ok: false, data: null, status: error.code || 'sb_error' }
     return { ok: true, data: data?.data || null, updatedAt: data?.updated_at || null }
-  } catch {
+  } catch (e) {
+    console.error('[cloudFetch] error:', e)
     return { ok: false, data: null, status: 'red' }
   }
 }
@@ -96,7 +99,8 @@ export async function cloudFetchTs() {
       .maybeSingle()
     if (error) return { ok: false, ts: null, status: error.code || 'sb_error' }
     return { ok: true, ts: data?.updated_at ? new Date(data.updated_at).getTime() : 0 }
-  } catch {
+  } catch (e) {
+    console.error('[cloudFetchTs] error:', e)
     return { ok: false, ts: null, status: 'red' }
   }
 }
@@ -165,7 +169,7 @@ async function _storeForBgSync(data) {
       }
       window.addEventListener('online', onOnline)
     }
-  } catch {}
+  } catch (e) { console.error('[_storeForBgSync] error:', e) }
 }
 
 async function _bgSyncFallback() {
@@ -178,8 +182,10 @@ async function _bgSyncFallback() {
     if (!error) {
       await _idbDel('pending')
       window.dispatchEvent(new CustomEvent('times-synced'))
+    } else {
+      console.error('[_bgSyncFallback] supabase error:', error)
     }
-  } catch {}
+  } catch (e) { console.error('[_bgSyncFallback] error:', e) }
 }
 
 function _clearBgSync() { _idbDel('pending') }
@@ -214,7 +220,8 @@ function _doCloudPush(db, onSuccess, onError) {
       onSuccess?.(payload)
       _drainQueue()
     })
-    .catch(() => {
+    .catch((e) => {
+      console.error('[cloudPush] error:', e)
       _pushFlight = false
       onError?.()
       if (_saveRetry < 5) {

@@ -121,6 +121,8 @@ export const INITIAL_DB = {
   audit: [],
   correccionesFichaje: [],
   chats: [],
+  gastos: [],
+  denuncias: [],
   notisSent: {},
   config: { adminEmails: ['ismael.angeles.c@live.com'] },
   _ts: 0

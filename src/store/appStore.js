@@ -108,7 +108,9 @@ export const useAppStore = create((set, get) => ({
       session: { user: null, isAdmin: false, isEnc: false, isJO: false },
       timer: { ws: 0, bs: 0, state: 'idle' },
       currentScreen: 'login',
-      currentEmpTab: 'inicio'
+      currentEmpTab: 'inicio',
+      activeModal: null,
+      modalData: null,
     })
   },
 
