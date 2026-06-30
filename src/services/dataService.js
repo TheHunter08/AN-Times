@@ -195,8 +195,10 @@ function _clearBgSync() { _idbDel('pending') }
 
 function _drainQueue() {
   if (_pushFlight || _pushQueue.length === 0) return
-  const { db, onSuccess, onError } = _pushQueue.shift()
-  _doCloudPush(db, onSuccess, onError)
+  const entry = _pushQueue.shift()
+  const freshDb = entry.db || JSON.parse(localStorage.getItem('an_times_v1') || 'null')
+  if (!freshDb) return
+  _doCloudPush(freshDb, entry.onSuccess, entry.onError)
 }
 
 function _doCloudPush(db, onSuccess, onError) {
@@ -229,7 +231,7 @@ function _doCloudPush(db, onSuccess, onError) {
       onError?.()
       if (_saveRetry < 5) {
         _saveRetry++
-        _pushQueue.unshift({ db, onSuccess, onError })
+        _pushQueue.unshift({ db: null, onSuccess, onError })
         // Backoff exponencial: 1s, 2s, 4s, 8s, 16s (máx 30s)
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
@@ -439,7 +441,7 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
 export function auditLog(db, action, detail, user) {
   try {
     const entry = {
-      id: Date.now().toString(36),
+      id: Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
       action, detail,
       ts: new Date().toISOString(),
       user: user || 'system'

@@ -1,6 +1,7 @@
 // API endpoint: POST /api/sendpush — envía Web Push a un usuario via Supabase.
 // Formato ESM porque package.json tiene "type": "module".
 import webpush from 'web-push'
+import { timingSafeEqual } from 'crypto'
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
 const _rl = new Map()
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
     if (!PUSH_SECRET) return res.status(500).json({ error: 'Server misconfigured: PUSH_SECRET not set' })
     const authHeader = req.headers['authorization'] || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-    if (token !== PUSH_SECRET) return res.status(401).json({ error: 'Unauthorized' })
+    if (!token || token.length !== PUSH_SECRET.length || !timingSafeEqual(Buffer.from(token), Buffer.from(PUSH_SECRET))) return res.status(401).json({ error: 'Unauthorized' })
 
     if (allowedOrigin) {
       const origin = req.headers.origin || ''

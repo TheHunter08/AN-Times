@@ -109,9 +109,7 @@ async function sendWhatsApp(phone, message, empName) {
 }
 
 export default async function handler(req, res) {
-  const isCronInvocation = req.headers['x-vercel-cron'] === '1'
-  if (!isCronInvocation) {
-    if (!CRON_SECRET) return res.status(500).json({ error: 'Server misconfigured: CRON_SECRET not set' })
+  if (CRON_SECRET) {
     const token = (req.headers['authorization'] || '').replace('Bearer ', '')
     if (token !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
   }
@@ -304,6 +302,6 @@ export default async function handler(req, res) {
 
   } catch (e) {
     console.error('[cron-reminders] fatal', e)
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -84,7 +84,9 @@ export const vacData = (empId, db) => {
   const sd = new Date(emp.startDate || emp.fechaAlta || new Date().toISOString().slice(0, 10))
   const n = new Date()
   let m = (n.getFullYear() - sd.getFullYear()) * 12 + (n.getMonth() - sd.getMonth())
-  if (n.getDate() < sd.getDate()) m--
+  const sdDay = sd.getDate()
+  const lastDayOfMonth = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()
+  if (sdDay <= lastDayOfMonth && n.getDate() < sdDay) m--
   m = Math.max(0, m)
   const gen = parseFloat((m * VPM).toFixed(1))
   const countDays = v => {
@@ -130,14 +132,16 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
   const weeklyTarget  = weeklyH  * 60
   const monthlyTarget = monthlyH * 60
 
+  const localMonth = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
   const recs = (records || []).filter(r =>
-    r && r.empId === empId && r.fin && typeof r.inicio === 'string' && r.inicio.startsWith(monthKey)
+    r && r.empId === empId && r.fin && typeof r.inicio === 'string' && localMonth(r.inicio) === monthKey
   )
 
   // Agrupar por semana ISO (lunes como inicio — wkStart ya gestiona domingos)
   const byWeek = new Map()
   for (const r of recs) {
-    const ws = wkStart(r.inicio).toISOString().slice(0, 10)
+    const d = wkStart(r.inicio)
+    const ws = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     byWeek.set(ws, (byWeek.get(ws) || 0) + calcMin(r))
   }
 

@@ -52,7 +52,7 @@ export const useAppStore = create((set, get) => ({
         return
       }
       set({ syncError: null })
-      if (tsResult.ts && db._ts && tsResult.ts <= db._ts) {
+      if (tsResult.ts && get().db._ts && tsResult.ts <= get().db._ts) {
         set({ syncStatus: 'synced', lastSyncTime: Date.now() })
         return
       }

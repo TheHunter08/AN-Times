@@ -233,6 +233,7 @@ export default function EmployeePage() {
   // Color de acento personal del empleado (override brand color when logged in)
   useEffect(() => {
     if (u?.accentColor) applyBrandColor(u.accentColor)
+    return () => { if (typeof removeBrandColor === 'function') removeBrandColor() }
   }, [u?.accentColor])
 
   // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
@@ -280,7 +281,7 @@ export default function EmployeePage() {
       })
       setGeoPrompt(inRange ? { obraName: inRange.nombre } : null)
     }
-    geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, () => {}, { enableHighAccuracy: false, maximumAge: 60000 })
+    geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, (err) => { console.warn('[geo] watchPosition error:', err.code, err.message) }, { enableHighAccuracy: false, maximumAge: 60000 })
     return () => { if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current) }
   }, [u?.id])
 
@@ -506,7 +507,6 @@ export default function EmployeePage() {
             const freshRec = dbRef.current.records.find(r => r.id === stale.id)
             if (!freshRec || freshRec.fin) return
             markSent(acKey)
-            dirty = false  // guardado junto con records a continuación
             const closeTime = new Date().toISOString()
             const breaks2 = [...(freshRec.breaks || [])]
             const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
@@ -695,7 +695,8 @@ export default function EmployeePage() {
         navigator.geolocation.getCurrentPosition(
           pos => {
             const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
-            const updated = dbRef.current.records.map(r => r.id === stopId ? { ...r, locFin } : r)
+            const freshRecords = useAppStore.getState().db.records
+            const updated = freshRecords.map(r => r.id === stopId ? { ...r, locFin } : r)
             useAppStore.getState().saveDB({ records: updated })
           },
           () => {},
@@ -3842,6 +3843,7 @@ function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
   const [fi, setFi] = useState('')
   const [ff, setFf] = useState('')
   const [motivo, setMotivo] = useState('')
+  useEffect(() => { if (!visible) { setFi(''); setFf(''); setMotivo('') } }, [visible])
   useModalBack(visible, onClose)
   if (!visible) return null
 
