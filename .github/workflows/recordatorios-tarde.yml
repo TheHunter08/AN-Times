@@ -21,8 +21,7 @@ jobs:
       - name: Llamar cron recordatorios
         run: |
           # Fallback a la URL de producción si el secret no está configurado
-          APP_URL="${VERCEL_APP_URL:-https://an-times.vercel.app}"
-          APP_URL="${APP_URL// /}"
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://an-times.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           echo "Llamando a: $APP_URL/api/cron-reminders"
           STATUS=$(curl -s -o /tmp/cron_resp.txt -w "%{http_code}" \
             -X GET "$APP_URL/api/cron-reminders" \

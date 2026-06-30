@@ -21,9 +21,9 @@ jobs:
           # Use secret if valid, otherwise fall back to hardcoded value
           SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
           SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
-          # Strip any accidental whitespace
-          SB_URL="${SB_URL// /}"
-          SB_ANON="${SB_ANON// /}"
+          # Strip BOM, carriage return, newline and spaces (handles copy-paste artefacts in secrets)
+          SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           DATE=$(date +%Y-%m-%d)
 
           echo "Backing up app_data..."
@@ -65,6 +65,8 @@ jobs:
         run: |
           SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
           SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+          SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
             -X PATCH \
