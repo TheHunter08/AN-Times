@@ -16,8 +16,8 @@ jobs:
         run: |
           _raw_url="${{ secrets.VITE_SB_URL }}"
           _raw_anon="${{ secrets.VITE_SB_ANON }}"
-          SB_URL=$(printf '%s' "${_raw_url:-https://eyyhlcvpyiorpdnvqsll.supabase.co}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          SB_ANON=$(printf '%s' "${_raw_anon:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          SB_URL=$(printf '%s' "${_raw_url:?VITE_SB_URL secret is required}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          SB_ANON=$(printf '%s' "${_raw_anon:?VITE_SB_ANON secret is required}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
 
           echo "=== Supabase keepalive — $(date -u) ==="
 

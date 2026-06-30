@@ -29,6 +29,31 @@ export function saveLocal(db) {
   try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
 }
 
+// ── _unionById helper ─────────────────────────────────────────────────────────
+// Merges two arrays by `id` field (union). Base items come first, incoming
+// overwrites by id, new incoming items are appended. If incoming is empty but
+// base has items, base is preserved (prevents silent data loss on concurrent writes).
+function _unionById(base, incoming) {
+  const b = Array.isArray(base) ? base : []
+  const i = Array.isArray(incoming) ? incoming : []
+
+  // If incoming is empty, keep base (don't replace with empty array)
+  if (i.length === 0) return b
+
+  // If base is empty, just return incoming
+  if (b.length === 0) return i
+
+  // Fallback: if items don't have `id` fields, return incoming as-is
+  if ((b.length > 0 && b[0].id === undefined) || (i.length > 0 && i[0].id === undefined)) {
+    return i
+  }
+
+  const map = new Map()
+  for (const item of b) map.set(item.id, item)
+  for (const item of i) map.set(item.id, item)
+  return [...map.values()]
+}
+
 // ── mergeDB ───────────────────────────────────────────────────────────────────
 export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
@@ -51,23 +76,23 @@ export function mergeDB(base, incoming) {
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
     records:             (incoming.records?.length > 0)    ? incoming.records.filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())) : base.records,
-    vacaciones:          incoming.vacaciones           || [],
-    medicos:             incoming.medicos              || [],
-    ausencias:           incoming.ausencias            || [],
-    mensajes:            incoming.mensajes             || [],
-    notis:               incoming.notis                || [],
-    cierres:             incoming.cierres              || [],
+    vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones),
+    medicos:             _unionById(base.medicos,             incoming.medicos),
+    ausencias:           _unionById(base.ausencias,           incoming.ausencias),
+    mensajes:            _unionById(base.mensajes,            incoming.mensajes),
+    notis:               _unionById(base.notis,               incoming.notis),
+    cierres:             _unionById(base.cierres,             incoming.cierres),
     monthSnapshots:      incoming.monthSnapshots       || {},
     firmas:              incoming.firmas               || {},
-    documentos:          incoming.documentos           || [],
-    audit:               incoming.audit                || [],
-    correccionesFichaje: incoming.correccionesFichaje  || [],
-    chats:               incoming.chats                || [],
-    gastos:              incoming.gastos               || [],
-    denuncias:           incoming.denuncias            || [],
-    wellbeing:           incoming.wellbeing            || [],
-    turnos:              incoming.turnos               || [],
-    anomalias_vistas:    incoming.anomalias_vistas     || [],
+    documentos:          _unionById(base.documentos,          incoming.documentos),
+    audit:               _unionById(base.audit,               incoming.audit),
+    correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje),
+    chats:               _unionById(base.chats,               incoming.chats),
+    gastos:              _unionById(base.gastos,              incoming.gastos),
+    denuncias:           _unionById(base.denuncias,           incoming.denuncias),
+    wellbeing:           _unionById(base.wellbeing,           incoming.wellbeing),
+    turnos:              _unionById(base.turnos,              incoming.turnos),
+    anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas),
     notisSent:           mergedNotisSent,
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
@@ -423,8 +448,6 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
   const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
   try {
     const headers = { 'Content-Type': 'application/json' }
-    const secret = import.meta.env.VITE_PUSH_SECRET
-    if (secret) headers['Authorization'] = `Bearer ${secret}`
     const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')

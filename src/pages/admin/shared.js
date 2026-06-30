@@ -1,7 +1,5 @@
 export async function callSendPushAll(titleText, bodyText, targetValue) {
   const headers = { 'Content-Type': 'application/json' }
-  const secret = import.meta.env.VITE_PUSH_SECRET
-  if (secret) headers['Authorization'] = `Bearer ${secret}`
   const tgt = (targetValue === 'all' || targetValue === 'activos') ? targetValue : { role: targetValue }
   const res = await fetch('/api/send-push-all', {
     method: 'POST', headers,

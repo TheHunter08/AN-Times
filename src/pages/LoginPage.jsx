@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { signInEmail, signInGoogle, resetPassword, updatePassword, isAuthReady, onAuthStateChange, signOut as authSignOut } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
-import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin, recordFailedAttempt as recordFailed } from '../utils/pinSecurity.js'
+import { isPinHashed, needsRehash, verifyPin, getLockoutState, recordFailedAttempt, clearLockout, PIN_MAX_ATTEMPTS, hashPin } from '../utils/pinSecurity.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric, registerBiometric, clearBiometric } from '../utils/webauthn.js'
 
 const EMAIL_LK_KEY = 'an_email_lk'
@@ -97,7 +97,7 @@ export default function LoginPage() {
     if (!emp) return
 
     const update = () => {
-      const lk = getLockoutState(emp.id)
+      const lk = getLockoutState(emp.id, db)
       if (!lk.locked) { setErr(''); return false }
       const secs = lk.remainingSecs || 0
       const m = Math.floor(secs / 60)
@@ -207,7 +207,7 @@ export default function LoginPage() {
     const emp = (db.employees || []).find(e => e.id === selectedEmpId)
     if (!emp) return
 
-    const lkState = getLockoutState(emp.id)
+    const lkState = getLockoutState(emp.id, db)
     if (lkState.locked) {
       const secs = lkState.remainingSecs || 0
       const m = Math.floor(secs / 60); const s = secs % 60
@@ -230,7 +230,8 @@ export default function LoginPage() {
     if (opId2 !== opIdRef.current) return  // resultado obsoleto, descartar
 
     if (ok) {
-      clearLockout(emp.id)
+      const clearedLockouts = clearLockout(emp.id, db)
+      saveDB({ pinLockouts: clearedLockouts })
       // Migrar PIN en texto plano → hash automáticamente; también guardar pinLen si faltaba
       if (!isPinHashed(emp.pin) || !emp.pinLen) {
         const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
@@ -242,7 +243,8 @@ export default function LoginPage() {
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin mostrar error
     } else {
-      const lk = recordFailedAttempt(emp.id)
+      const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db)
+      if (lockoutData) saveDB({ pinLockouts: lockoutData })
       setShaking(true)
       if (lk.locked) {
         const secs = lk.remainingSecs || 0

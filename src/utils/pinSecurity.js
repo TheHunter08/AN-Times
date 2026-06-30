@@ -3,7 +3,6 @@
 
 const MAX_ATTEMPTS  = 5
 const LOCKOUT_MS    = 5 * 60 * 1000   // 5 minutos
-const LK_KEY        = (id) => `an_lk_${id}`
 const PBKDF2_ITER   = 100_000
 const SALT_HEX_LEN  = 32              // 16 bytes → 32 hex chars
 
@@ -78,11 +77,11 @@ export async function verifyPin(inputPin, storedPin, userId) {
 // ── Lockout ───────────────────────────────────────────────────────────────────
 
 /** Estado actual de bloqueo para un empleado */
-export function getLockoutState(empId) {
+export function getLockoutState(empId, db) {
   try {
-    const raw = localStorage.getItem(LK_KEY(empId))
-    if (!raw) return { locked: false, attempts: 0 }
-    const d = JSON.parse(raw)
+    const lockouts = db?.pinLockouts || {}
+    const d = lockouts[empId]
+    if (!d) return { locked: false, attempts: 0 }
     if (d.until) {
       const remaining = d.until - Date.now()
       if (remaining > 0) return {
@@ -92,29 +91,29 @@ export function getLockoutState(empId) {
         remainingMin: Math.ceil(remaining / 60000),
         remainingSecs: Math.floor(remaining / 1000),
       }
-      localStorage.removeItem(LK_KEY(empId))
-      return { locked: false, attempts: 0 }
+      return { locked: false, attempts: 0, expired: true }
     }
     return { locked: false, attempts: d.attempts || 0 }
   } catch { return { locked: false, attempts: 0 } }
 }
 
-/** Registra un intento fallido y devuelve el nuevo estado */
-export function recordFailedAttempt(empId) {
-  try {
-    const state = getLockoutState(empId)
-    if (state.locked) return state
-    const attempts = (state.attempts || 0) + 1
-    if (attempts >= MAX_ATTEMPTS) {
-      localStorage.setItem(LK_KEY(empId), JSON.stringify({ until: Date.now() + LOCKOUT_MS }))
-      return { locked: true, remainingMin: Math.ceil(LOCKOUT_MS / 60000) }
-    }
-    localStorage.setItem(LK_KEY(empId), JSON.stringify({ attempts }))
-    return { locked: false, attempts, remaining: MAX_ATTEMPTS - attempts }
-  } catch { return { locked: false, attempts: 0 } }
+/** Registra un intento fallido y devuelve el nuevo estado + lockoutData para guardar */
+export function recordFailedAttempt(empId, db) {
+  const state = getLockoutState(empId, db)
+  if (state.locked) return { state, lockoutData: null }
+  const attempts = (state.attempts || 0) + 1
+  const lockouts = { ...(db?.pinLockouts || {}) }
+  if (attempts >= MAX_ATTEMPTS) {
+    lockouts[empId] = { until: Date.now() + LOCKOUT_MS }
+    return { state: { locked: true, remainingMin: Math.ceil(LOCKOUT_MS / 60000) }, lockoutData: lockouts }
+  }
+  lockouts[empId] = { attempts }
+  return { state: { locked: false, attempts, remaining: MAX_ATTEMPTS - attempts }, lockoutData: lockouts }
 }
 
-/** Limpia el contador de intentos tras login correcto */
-export function clearLockout(empId) {
-  try { localStorage.removeItem(LK_KEY(empId)) } catch {}
+/** Limpia el contador de intentos tras login correcto — devuelve lockouts actualizado */
+export function clearLockout(empId, db) {
+  const lockouts = { ...(db?.pinLockouts || {}) }
+  delete lockouts[empId]
+  return lockouts
 }

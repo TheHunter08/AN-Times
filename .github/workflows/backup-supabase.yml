@@ -18,9 +18,8 @@ jobs:
     steps:
       - name: Download app_data snapshot
         run: |
-          # Use secret if valid, otherwise fall back to hardcoded value
-          SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
-          SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+          SB_URL="${VITE_SB_URL:?VITE_SB_URL secret is required}"
+          SB_ANON="${VITE_SB_ANON:?VITE_SB_ANON secret is required}"
           # Strip BOM, carriage return, newline and spaces (handles copy-paste artefacts in secrets)
           SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
@@ -63,8 +62,8 @@ jobs:
 
       - name: Keepalive write — evita pausa Supabase Free
         run: |
-          SB_URL="${VITE_SB_URL:-https://eyyhlcvpyiorpdnvqsll.supabase.co}"
-          SB_ANON="${VITE_SB_ANON:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I}"
+          SB_URL="${VITE_SB_URL:?VITE_SB_URL secret is required}"
+          SB_ANON="${VITE_SB_ANON:?VITE_SB_ANON secret is required}"
           SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
