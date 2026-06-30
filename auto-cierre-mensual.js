@@ -44,7 +44,7 @@ async function sendPush(empId, title, body) {
     await fetch(PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: empId, title, body, tag: 'cierre', url: '/?go=emp:perfil' }),
+      body: JSON.stringify({ userId: empId, title, body, tag: 'cierre', url: '/?go=emp:perfil' }),
     })
   } catch (e) {
     console.warn(`Push a ${empId} falló:`, e.message)

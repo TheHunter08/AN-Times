@@ -188,8 +188,8 @@ export default function AdminPage() {
       let perm = Notification.permission
       if (perm === 'default') perm = await Notification.requestPermission()
       if (perm === 'granted') {
-        if (uid) pushSubscribe(uid, VAPID_PUB)
-        if (!isEncargado) pushSubscribe('__admin__', VAPID_PUB)
+        if (uid) await pushSubscribe(uid, VAPID_PUB)
+        if (!isEncargado) await pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
     return () => clearTimeout(t)
