@@ -19,11 +19,12 @@ export const useAppStore = create((set, get) => ({
     return newDB
   },
 
-  saveDB: (partial) => {
+  saveDB: (partialOrFn) => {
     // Usar updater de Zustand para leer siempre el estado más reciente,
     // evitando sobrescrituras cuando dos saves se encadenan rápido o llega un sync de realtime
     let merged
     set(state => {
+      const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
       if (merged.audit?.length > 300) {
         const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -62,6 +63,14 @@ export const useAppStore = create((set, get) => ({
       const merged = mergeDB(get().db, data)
       saveLocal(merged)
       set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
+      // Re-validate session against fresh data
+      const ses = get().session
+      if (ses?.user?.id) {
+        const stillActive = (merged.employees || []).some(e => e.id === ses.user.id && !e.baja)
+        if (!stillActive) {
+          get().logout()
+        }
+      }
     } finally {
       set({ dbLoading: false })
     }

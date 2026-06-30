@@ -38,8 +38,9 @@ const _vpub = toB64Url(process.env.VAPID_PUBLIC)
 const _vprv = toB64Url(process.env.VAPID_PRIVATE)
 const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
 const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : null
-const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+if (!SB_URL || !SB_ANON) console.error('[sendpush] VITE_SB_URL / VITE_SB_ANON not set')
 const PUSH_SECRET   = process.env.PUSH_SECRET
 
 let _loadError = null
@@ -101,10 +102,12 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
     if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' })
 
-    if (!PUSH_SECRET) return res.status(500).json({ error: 'Server misconfigured: PUSH_SECRET not set' })
     const authHeader = req.headers['authorization'] || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-    if (!token || token.length !== PUSH_SECRET.length || !timingSafeEqual(Buffer.from(token), Buffer.from(PUSH_SECRET))) return res.status(401).json({ error: 'Unauthorized' })
+    const hasValidToken = PUSH_SECRET && token && token.length === PUSH_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(PUSH_SECRET))
+    const hasValidOrigin = allowedOrigin && req.headers.origin
+    // Server-to-server calls: require PUSH_SECRET. Browser calls: require valid origin.
+    if (!hasValidToken && !hasValidOrigin) return res.status(401).json({ error: 'Unauthorized' })
 
     if (allowedOrigin) {
       const origin = req.headers.origin || ''

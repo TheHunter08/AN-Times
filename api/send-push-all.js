@@ -5,6 +5,7 @@
 // Auth: Authorization: Bearer <CRON_SECRET>  o  x-admin-secret: <CRON_SECRET>
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
+import { timingSafeEqual } from 'crypto'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -17,8 +18,9 @@ if (!isValid(VAPID_PUBLIC) || !isValid(VAPID_PRIVATE)) {
   console.error('[send-push-all] VAPID keys missing or invalid — configure VAPID_PUBLIC and VAPID_PRIVATE in env')
 }
 
-const SB_URL  = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
+if (!SB_URL || !SB_ANON) console.error('[send-push-all] VITE_SB_URL / VITE_SB_ANON not set')
 
 // Usar solo CRON_SECRET (sin prefijo VITE_) para que no quede expuesto en el bundle del cliente
 const CRON_SECRET = process.env.CRON_SECRET
@@ -53,16 +55,11 @@ async function deleteSub(userId) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  // Fallar cerrado: si CRON_SECRET no está configurado, rechazar siempre
-  if (!CRON_SECRET) {
-    console.error('[send-push-all] CRON_SECRET not set — rejecting all requests')
-    return res.status(500).json({ error: 'Server misconfigured: CRON_SECRET not set' })
-  }
-
   const secret = (req.headers['x-admin-secret'] || req.headers['authorization'] || '').replace('Bearer ', '')
-  if (secret !== CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  const hasValidSecret = CRON_SECRET && secret && secret.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(secret), Buffer.from(CRON_SECRET))
+  const hasValidOrigin = (req.headers.origin || '').startsWith('https://') && req.headers.origin === (process.env.PUSH_ALLOWED_ORIGIN || '')
+  // Server-to-server calls: require CRON_SECRET. Browser calls: require valid origin.
+  if (!hasValidSecret && !hasValidOrigin) return res.status(401).json({ error: 'Unauthorized' })
 
   const { title, body, url = '/', target = 'all' } = req.body || {}
   if (!title || !body) return res.status(400).json({ error: 'title y body son requeridos' })
