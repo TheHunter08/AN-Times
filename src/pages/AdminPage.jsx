@@ -42,6 +42,7 @@ const ENC_PAGES = [
 ]
 
 const JO_PAGES = [
+  { id:'miobra',  label:'Mi Obra' },
   ...PAGES,
   { id:'validar',  label:'Validar Horas' },
 ]
