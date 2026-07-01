@@ -876,8 +876,17 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   const assignVac = () => {
     if (!vacForm.empId || !vacForm.fechaInicio || !vacForm.fechaFin) { toast('Selecciona empleado y fechas'); return }
     if (vacForm.fechaFin < vacForm.fechaInicio) { toast('La fecha fin no puede ser anterior al inicio', 3500, 'err'); return }
+    const solapa = (db.vacaciones || []).some(v =>
+      v.empId === vacForm.empId && v.estado !== 'rechazada' &&
+      vacForm.fechaInicio <= v.fechaFin && vacForm.fechaFin >= v.fechaInicio
+    )
+    if (solapa) { toast('Ya existe una solicitud de vacaciones que se solapa con esas fechas', 4000, 'err'); return }
     const emp = emps.find(e => e.id === vacForm.empId)
     const dias = Math.round((new Date(vacForm.fechaFin + 'T00:00:00') - new Date(vacForm.fechaInicio + 'T00:00:00')) / 86400000) + 1
+    const disponibles = vacData(vacForm.empId, db).available
+    if (dias > disponibles) {
+      toast(`⚠️ ${emp?.name || 'El empleado'} solo tiene ${disponibles} días disponibles (asignando ${dias})`, 5000, 'warn')
+    }
     const item = {
       id: gid(), empId: vacForm.empId, empName: emp?.name || '',
       fechaInicio: vacForm.fechaInicio, fechaFin: vacForm.fechaFin, dias,

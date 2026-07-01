@@ -107,7 +107,7 @@ async function run() {
     const breakMs   = (r.breakSecs || 0) * 1000
     const workSecs  = Math.max(0, Math.floor((workMs - breakMs) / 1000))
     closedIds.add(r.id)
-    return { ...r, fin: closeTime, workSecs, closed: true, autoClosedAt: new Date().toISOString() }
+    return { ...r, fin: closeTime, workSecs, closed: true, autoClosedAt: new Date().toISOString(), _upd: new Date().toISOString() }
   })
 
   const newDB = { ...db, records: updatedRecords, _ts: now }
