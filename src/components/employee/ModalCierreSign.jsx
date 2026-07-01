@@ -11,7 +11,9 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente')
+  // Un cierre "desactualizado" (fichajes editados/borrados tras generarlo) no debe
+  // poder firmarse hasta que el admin/JO lo regenere con los datos reales actuales.
+  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !c.desactualizado)
   const selCierre = pendingCierres[selIdx] || null
 
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])

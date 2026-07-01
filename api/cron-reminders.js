@@ -238,7 +238,7 @@ export default async function handler(req, res) {
 
       // ── 5. Cierre mensual pendiente (≥9h, una vez al día) ──────────────────
       if (nowH >= 9) {
-        const pendCierres = cierres.filter(c => c.empId === emp.id && c.estado === 'pendiente')
+        const pendCierres = cierres.filter(c => c.empId === emp.id && c.estado === 'pendiente' && !c.desactualizado)
         if (pendCierres.length > 0) {
           const key = 'an_cierre_' + emp.id
           if (notisSent[key] !== today) {

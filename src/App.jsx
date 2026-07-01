@@ -4,6 +4,7 @@ import { ToastContainer } from './components/Toast.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
+import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -238,6 +239,7 @@ function ScreenLoader() {
 function GlobalConfirm() {
   const confirmDialog = useAppStore(s => s.confirmDialog)
   const closeConfirm  = useAppStore(s => s.closeConfirm)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(() => confirmDialog && closeConfirm())
   if (!confirmDialog) return null
   return (
     <div onClick={closeConfirm} style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,.45)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' }}>
@@ -245,14 +247,14 @@ function GlobalConfirm() {
         style={{ width:'100%', maxWidth:480, padding:'24px 20px 32px',
           background:'var(--bg-700)', borderRadius:'20px 20px 0 0',
           border:'1px solid var(--border2)', boxShadow:'0 -8px 40px rgba(0,0,0,.5)',
-          animation:'slideUp .2s cubic-bezier(.16,1,.3,1)' }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:'var(--border3)', margin:'0 auto 20px' }} />
+          animation:'slideUp .2s cubic-bezier(.16,1,.3,1)', ...modalStyle }}>
+        <div className="modal-drag" {...dragHandlers} style={{ width:36, height:4 }} />
         <div style={{ fontSize:15, fontWeight:600, color:'var(--text)', marginBottom:24, textAlign:'center', lineHeight:1.5 }}>
           {confirmDialog.msg}
         </div>
         <div style={{ display:'flex', gap:10 }}>
-          <button className="btn btn-secondary" style={{ flex:1, padding:'13px' }} onClick={closeConfirm}>Cancelar</button>
-          <button className="btn btn-danger"    style={{ flex:1, padding:'13px' }} onClick={() => { confirmDialog.onConfirm(); closeConfirm() }}>Confirmar</button>
+          <button className="btn btn-secondary" style={{ flex:1, padding:'13px' }} onClick={() => { try { navigator.vibrate?.(8) } catch {}; closeConfirm() }}>Cancelar</button>
+          <button className="btn btn-danger"    style={{ flex:1, padding:'13px' }} onClick={() => { try { navigator.vibrate?.([15,40,15]) } catch {}; confirmDialog.onConfirm(); closeConfirm() }}>Confirmar</button>
         </div>
       </div>
     </div>

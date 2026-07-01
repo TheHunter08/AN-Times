@@ -113,7 +113,7 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
       {/* Cierres mensuales pendientes de firma */}
       {(() => {
-        const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
+        const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente' && !c.desactualizado)
         if (!pendingCierres.length) return null
         return (
           <div onClick={() => openModal('cierreSign')} style={{ margin:'0 0 14px', padding:'12px 16px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r-lg)', cursor:'pointer', display:'flex', alignItems:'center', gap:12 }}>

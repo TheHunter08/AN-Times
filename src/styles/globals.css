@@ -1709,14 +1709,19 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   flex-direction: column;
   gap: 12px;
 }
-.emp-card-top { display: flex; align-items: center; gap: 10px; }
+.emp-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.emp-card-top .badge { flex-shrink: 0; margin-top: 2px; }
 .emp-card-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 50%; margin-top: 1px;
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 15px; color: #fff; flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
-.emp-card-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.emp-card-name {
+  font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .emp-card-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
 .emp-card-body { display: flex; flex-direction: column; gap: 6px; }
 .emp-card-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }

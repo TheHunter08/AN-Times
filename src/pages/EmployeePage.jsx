@@ -380,7 +380,7 @@ export default function EmployeePage() {
       }
 
       // 6. Cierre mensual pendiente (una vez al día a partir de las 9h)
-      const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente')
+      const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente' && !c.desactualizado)
       if (pendCierres.length > 0) {
         const key = 'an_cierre_' + u.id
         if (!hasSent(key, todayStr) && hh >= 9) {

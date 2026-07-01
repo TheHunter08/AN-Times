@@ -28,6 +28,23 @@ const downloadDataUrl = (dataUrl, filename) => {
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
 }
 
+// Un cierre "pendiente" es una foto fija de las horas en el momento en que se generó.
+// Si se edita/borra un fichaje de ese mes antes de que el empleado firme, marcamos el
+// cierre como desactualizado en vez de solo avisar con un toast que desaparece — la UI
+// de Informes/Validar Horas lo muestra con un badge distinto y obliga a regenerarlo.
+const flagStaleCierre = (cierresList, empId, inicio) => {
+  const mes = inicio?.slice(0, 7)
+  let flagged = false
+  const updated = (cierresList || []).map(c => {
+    if (c.empId === empId && c.mes === mes && c.estado === 'pendiente' && !c.desactualizado) {
+      flagged = true
+      return { ...c, desactualizado: true }
+    }
+    return c
+  })
+  return { cierres: updated, flagged }
+}
+
 const PanelDashboard = lazy(() => import('./admin/PanelDashboard.jsx'))
 const PanelTurnos    = lazy(() => import('./admin/PanelTurnos.jsx'))
 const PanelAnomalias = lazy(() => import('./admin/PanelAnomalias.jsx'))
@@ -577,23 +594,15 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
   const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
 
-  // Un cierre "pendiente" es una foto fija de las horas en el momento en que se generó.
-  // Si se edita/borra un fichaje de ese mes antes de que el empleado firme, el PDF que
-  // firmará ya no coincidirá con los registros reales — avisamos, sin bloquear.
-  const pendingCierreWarning = (empId, inicio) => {
-    const mes = inicio?.slice(0, 7)
-    const c = (db.cierres || []).find(c => c.empId === empId && c.mes === mes && c.estado === 'pendiente')
-    return c ? ` ⚠️ Este mes ya tiene un cierre generado pendiente de firma — no se actualizará solo, revísalo en Informes.` : ''
-  }
-
   const confirmDelete = () => {
     if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
     const rec = (db.records||[]).find(r => r.id === deletingId)
     const motivo = delMotivo.trim()
     const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit })
+    const { cierres, flagged } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false }
+    saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit, cierres })
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    const warn = rec ? pendingCierreWarning(rec.empId, rec.inicio) : ''
+    const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
     toast('Fichaje eliminado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setDeletingId(null); setDelMotivo('')
   }
@@ -617,10 +626,11 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       return { ...rec, inicio: newInicio, fin: newFin, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    saveDB({ records: updated, audit: withAudit.audit })
+    const { cierres, flagged } = flagStaleCierre(db.cierres || [], r.empId, r.inicio)
+    saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     setEditModal(null)
-    const warn = pendingCierreWarning(r.empId, r.inicio)
+    const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
     toast('Fichaje actualizado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
   }
 
@@ -1891,6 +1901,21 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
+  // Refresca un cierre desactualizado (fichajes editados/borrados tras generarlo) con
+  // los datos reales actuales y limpia el aviso — el empleado ya puede firmarlo sin miedo.
+  const regenerarCierre = (cierre, e, totalMin, days) => {
+    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(cierre.mes))
+    const updated = (db.cierres || []).map(c => c.id === cierre.id ? {
+      ...c, totalMin, dias: days, desactualizado: false, pdfData: null,
+      records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 })),
+      regeneradoAt: new Date().toISOString(), regeneradoPor: session?.user?.name || 'Admin',
+    } : c)
+    const withAudit = auditLog(db, 'Cierre regenerado', `${e.name} · ${cierre.mes}`, session?.user?.name || 'Admin')
+    saveDB({ cierres: updated, audit: withAudit.audit })
+    queuePush(e.id, '📋 Cierre mensual actualizado', `Tu resumen de ${cierre.mes} se actualizó y ya puedes firmarlo.`, 'cierre', '/?go=emp:perfil')
+    toast('Cierre regenerado', 3000, 'ok')
+  }
+
   const downloadCierrePDF = async (cierre) => {
     const filename = `cierre-${cierre.mes}-${(cierre.empName||'').replace(/\s+/g,'_')}.pdf`
     if (cierre.pdfData) { downloadDataUrl(cierre.pdfData, filename); return }
@@ -1985,10 +2010,14 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                   <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
                     {cierre ? (
                       <>
-                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
-                          {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente firma'}
+                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':cierre.desactualizado?'badge-red':'badge-orange'}`}>
+                          {cierre.estado === 'firmado' ? '✓ Firmado' : cierre.desactualizado ? '⚠️ Desactualizado' : '⏳ Pendiente firma'}
                         </span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
+                        {cierre.desactualizado ? (
+                          <button className="btn btn-danger btn-sm" onClick={() => regenerarCierre(cierre, e, totalMin, days)}>Regenerar</button>
+                        ) : (
+                          <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
+                        )}
                       </>
                     ) : (
                       <button className="btn btn-primary btn-sm" onClick={() => generarCierre(e, totalMin, days)} disabled={!days || procesandoCierre.has(e.id)}>
@@ -3090,11 +3119,10 @@ function PanelMiObra({ db, toast, saveDB, session }) {
       return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
-    saveDB({ records: updated, audit: withAudit.audit })
+    const { cierres, flagged } = flagStaleCierre(db.cierres, rec.empId, rec.inicio)
+    saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} corrigió tu jornada del ${fds(editing.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    const mesRec = rec.inicio?.slice(0, 7)
-    const cierrePend = (db.cierres || []).find(c => c.empId === rec.empId && c.mes === mesRec && c.estado === 'pendiente')
-    const warn = cierrePend ? ' ⚠️ Este mes ya tiene un cierre pendiente de firma — no se actualiza solo.' : ''
+    const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — pide que lo regeneren en Informes.' : ''
     toast('Jornada modificada' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setEditing(null)
   }
@@ -4038,6 +4066,19 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     setProcesandoCierreJO(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
+  const regenerarCierreJO = (cierre, e, totalMin, days) => {
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(cierre.mes))
+    const updated = (db.cierres || []).map(c => c.id === cierre.id ? {
+      ...c, totalMin, dias: days, desactualizado: false, pdfData: null,
+      records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 })),
+      regeneradoAt: new Date().toISOString(), regeneradoPor: session?.user?.name || 'Jefe de Obra',
+    } : c)
+    const withAudit = auditLog(db, 'Cierre regenerado', `${e.name} · ${cierre.mes}`, session?.user?.name || 'Jefe de Obra')
+    saveDB({ cierres: updated, audit: withAudit.audit })
+    queuePush(e.id, '📋 Cierre mensual actualizado', `Tu resumen de ${cierre.mes} se actualizó y ya puedes firmarlo.`, 'cierre', '/?go=emp:perfil')
+    toast('Cierre regenerado', 3000, 'ok')
+  }
+
   const generarTodosJO = () => {
     const nuevos = []
     rows.forEach(({ e, totalMin, days }) => {
@@ -4144,10 +4185,14 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
                   <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
                     {cierre ? (
                       <>
-                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
-                          {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente'}
+                        <span className={`badge ${cierre.estado==='firmado'?'badge-green':cierre.desactualizado?'badge-red':'badge-orange'}`}>
+                          {cierre.estado === 'firmado' ? '✓ Firmado' : cierre.desactualizado ? '⚠️ Desactualizado' : '⏳ Pendiente'}
                         </span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
+                        {cierre.desactualizado ? (
+                          <button className="btn btn-danger btn-sm" onClick={() => regenerarCierreJO(cierre, e, totalMin, days)}>Regenerar</button>
+                        ) : (
+                          <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
+                        )}
                       </>
                     ) : (
                       <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days || procesandoCierreJO.has(e.id)}>
