@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { gid } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 
-export default function ComunicadoWidget({ db, toast, saveDB }) {
+export function ComunicadoWidget({ db, toast, saveDB }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')

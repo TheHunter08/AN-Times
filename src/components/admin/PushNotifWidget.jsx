@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { callSendPushAll, showPushToast } from './shared.js'
+import { callSendPushAll, showPushToast } from '../../utils/pushAll.js'
 
-export default function PushNotifWidget({ db, toast }) {
+export function PushNotifWidget({ db, toast }) {
   const [open, setOpen]       = useState(false)
   const [target, setTarget]   = useState('all')
   const [title, setTitle]     = useState('')

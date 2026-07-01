@@ -17,7 +17,7 @@ try {
 // VAPID: saneamos espacios, normalizamos a base64url y validamos
 // que tenga formato correcto. Si la env var llega malformada (whitespace,
 // comillas, padding incorrecto), caemos al fallback hardcoded.
-const _VAPID_FALLBACK = 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
+const _VAPID_FALLBACK = 'BDUAj_e2GIAI_La_suiybArrHJteFKm6_GbR3ni8t0y9NEgc71yNHFqoL1JX6e4Wf8Iu9OTUy1rt2CrESWp8o_8'
 const _sanitizeVapid = (s) => (s || '')
   .replace(/\s+/g, '')          // quita espacios/newlines/tabs
   .replace(/^["']|["']$/g, '')  // quita comillas envolventes

@@ -9,9 +9,25 @@ import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
+import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
+import { callSendPushAll, showPushToast } from '../utils/pushAll.js'
+import { NavIcon } from '../components/admin/NavIcon.jsx'
+import { SyncBadge } from '../components/admin/SyncBadge.jsx'
+import { toggleTheme } from '../utils/userConfig.js'
+import { PushNotifWidget } from '../components/admin/PushNotifWidget.jsx'
+import { ComunicadoWidget } from '../components/admin/ComunicadoWidget.jsx'
+import { buildHeatmap, Heatmap } from '../components/admin/Heatmap.jsx'
+import { LiveTimerCell, CtrlCard } from '../components/admin/CtrlCard.jsx'
 
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
+const downloadDataUrl = (dataUrl, filename) => {
+  const a = document.createElement('a')
+  a.href = dataUrl; a.download = filename
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+}
+
+const PanelDashboard = lazy(() => import('./admin/PanelDashboard.jsx'))
 const PanelTurnos    = lazy(() => import('./admin/PanelTurnos.jsx'))
 const PanelAnomalias = lazy(() => import('./admin/PanelAnomalias.jsx'))
 const PanelGastos    = lazy(() => import('./admin/PanelGastos.jsx'))
@@ -46,62 +62,6 @@ const JO_PAGES = [
   ...PAGES,
   { id:'validar',  label:'Validar Horas' },
 ]
-
-const NAV_ICONS = {
-  ajustes:     <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
-  dashboard:   <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
-  control:     <><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></>,
-  fichajes:    <><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></>,
-  solicitudes: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
-  empleados:   <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-  informes:    <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></>,
-  obras:       <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
-  documentos:  <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></>,
-  auditoria:   <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
-  mensajes:    <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
-  miobra:      <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
-  validar:     <><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
-  turnos:      <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="9" y2="15"/><line x1="15" y1="15" x2="15" y2="15"/></>,
-  gastos:      <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-  anomalias:   <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
-  denuncias:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
-}
-
-function NavIcon({ id, size = 17 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      {NAV_ICONS[id] || null}
-    </svg>
-  )
-}
-
-// ── Helper compartido para envío push masivo ──────────────────────────────────
-// Usado por el modal de topbar y por PushNotifWidget para evitar duplicar lógica
-async function callSendPushAll(titleText, bodyText, targetValue) {
-  const headers = { 'Content-Type': 'application/json' }
-  const tgt = (targetValue === 'all' || targetValue === 'activos') ? targetValue : { role: targetValue }
-  const res = await fetch('/api/send-push-all', {
-    method: 'POST', headers,
-    body: JSON.stringify({ title: titleText, body: bodyText, url: '/', target: tgt })
-  })
-  const json = await res.json().catch(() => ({}))
-  return { ok: res.ok, status: res.status, ...json }
-}
-
-function showPushToast(json, toast) {
-  if (!json.ok) {
-    toast('Error: ' + (json.error || json.status), 4000, 'err')
-  } else if (json.sent === 0 && (json.noSub ?? 0) > 0) {
-    toast(`Ningún empleado tiene push activado (${json.noSub} sin suscripción)`, 4000, 'warn')
-  } else {
-    const extra = [
-      json.failed > 0 ? `${json.failed} fallaron` : '',
-      json.noSub  > 0 ? `${json.noSub} sin push`  : '',
-    ].filter(Boolean).join(' · ')
-    toast(`Enviado a ${json.sent ?? 0} empleado${json.sent !== 1 ? 's' : ''}${extra ? ` · ${extra}` : ''}`, 3000, 'ok')
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const { db, session, currentAdminPage, setAdminPage, saveDB, toast, setScreen, logout, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
@@ -402,7 +362,6 @@ export default function AdminPage() {
         <div className="adm-main" ref={admMainRef}>
           {isJefeObra ? (
             <>
-              {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} saveDB={saveDB} />}
               {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -416,6 +375,7 @@ export default function AdminPage() {
               {currentAdminPage === 'miobra'      && <PanelMiObra      db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'validar'     && <PanelValidarHoras db={db} toast={toast} saveDB={saveDB} session={session} />}
               <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
+                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -429,7 +389,6 @@ export default function AdminPage() {
             </>
           ) : (
             <>
-              {currentAdminPage === 'dashboard'   && <PanelDashboard   db={db} toast={toast} saveDB={saveDB} />}
               {currentAdminPage === 'control'     && <PanelControl     db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'fichajes'    && <PanelFichajes    db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'solicitudes' && <PanelSolicitudes db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -441,6 +400,7 @@ export default function AdminPage() {
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
               {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
               <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
+                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -473,728 +433,6 @@ export default function AdminPage() {
   )
 }
 
-function SyncBadge() {
-  const syncStatus = useAppStore(s => s.syncStatus)
-  const syncError  = useAppStore(s => s.syncError)
-  const isNoConfig = syncError === 'no_config'
-  const color = syncStatus === 'synced' ? 'var(--green)'
-    : syncStatus === 'syncing' ? 'var(--orange)'
-    : isNoConfig ? 'var(--text3)'
-    : 'var(--danger)'
-  const label = syncStatus === 'synced' ? 'Sincronizado'
-    : syncStatus === 'syncing' ? 'Guardando…'
-    : isNoConfig ? 'Solo local'
-    : 'Sin conexión'
-  return (
-    <div style={{ fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:4, color }}>
-      <span style={{ width:6, height:6, borderRadius:'50%', background:'currentColor', flexShrink:0 }} />
-      {label}
-    </div>
-  )
-}
-
-function toggleTheme() {
-  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
-  if (next === 'dark') document.documentElement.removeAttribute('data-theme')
-  else document.documentElement.setAttribute('data-theme', 'light')
-  try { localStorage.setItem('theme', next) } catch {}
-}
-
-// ─── PANEL DASHBOARD ──────────────────────────────────────────────────────────
-function PanelDashboard({ db, toast, saveDB }) {
-  const { setAdminPage } = useAppStore()
-  const [showAllLive, setShowAllLive] = useState(false)
-  const [showAllToday, setShowAllToday] = useState(false)
-  const now = new Date()
-  const todayStr = today()
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-  const recs = db.records || []
-
-  const liveRecs = recs.filter(r => !r.fin)
-  const todayRecs = recs.filter(r => r.inicio?.startsWith(todayStr))
-  const checkedIn = new Set(liveRecs.map(r => r.empId)).size
-
-  const ws = wkStart(now)
-  const wsStr = ws.toISOString().slice(0, 10)
-  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
-  const weekRecs = useMemo(() => {
-    const wsDate = new Date(wsStr)
-    return recs.filter(r => r.fin && r.inicio && new Date(r.inicio) >= wsDate)
-  }, [recs, wsStr])
-  const weekMin = useMemo(() => weekRecs.reduce((s, r) => s + calcMin(r), 0), [weekRecs])
-  const monthMin = useMemo(() => recs.filter(r => r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0), [recs, mk])
-  const lastMonthMin = useMemo(() => recs.filter(r => r.fin && r.inicio?.startsWith(lastMk)).reduce((s, r) => s + calcMin(r), 0), [recs, lastMk])
-  const monthTrend = lastMonthMin > 0 ? Math.round((monthMin - lastMonthMin) / lastMonthMin * 100) : null
-
-  const vacPend = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
-  const vacHoy = (db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).length
-
-  const heat = useMemo(() => buildHeatmap(recs, emps.length), [recs, emps.length])
-  const recentAudit = useMemo(() => (db.audit || []).slice(-5).reverse(), [db.audit])
-
-  const obraHours = useMemo(() => {
-    const map = {}
-    recs.filter(r => r.fin && r.inicio?.startsWith(mk)).forEach(r => {
-      const obra = r.centro || r.obra || 'Sin centro'
-      map[obra] = (map[obra] || 0) + calcMin(r)
-    })
-    return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0,6)
-  }, [recs, mk])
-
-  const last7Hours = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now); d.setDate(d.getDate() - (6 - i))
-      const ds = d.toISOString().slice(0, 10)
-      return recs.filter(r => r.fin && r.inicio?.startsWith(ds)).reduce((s, r) => s + calcMin(r), 0) / 60
-    })
-  }, [recs])
-
-  return (
-    <div className="adm-panel">
-      <div className="adm-panel-header">
-        <div>
-          <h1 className="adm-panel-title gradient-text">Dashboard</h1>
-          <div className="adm-panel-sub" style={{ marginTop:2, textTransform:'capitalize' }}>{now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <SyncBadge />
-        </div>
-      </div>
-
-      {vacPend > 0 && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r)', marginBottom:16, cursor:'pointer' }} onClick={() => setAdminPage('solicitudes')}>
-          <span style={{ fontSize:18 }}>🌴</span>
-          <span style={{ fontSize:13, fontWeight:600, color:'var(--orange)' }}>{vacPend} solicitud{vacPend>1?'es':''} de vacaciones pendiente{vacPend>1?'s':''} de revisión</span>
-          <span style={{ marginLeft:'auto', fontSize:11, color:'var(--text3)', fontWeight:600 }}>→ Solicitudes</span>
-        </div>
-      )}
-
-      <div className="adm-kpi-grid stagger-in">
-        {(() => {
-          // Absentismo hoy: % de empleados (no de baja, no de vacaciones) sin fichaje hoy
-          const enVacacionesHoy = new Set((db.vacaciones || []).filter(v => v.estado === 'aprobada' && todayStr >= v.fechaInicio && todayStr <= v.fechaFin).map(v => v.empId))
-          const esperados = emps.filter(e => !enVacacionesHoy.has(e.id))
-          const ficharonHoy = new Set(todayRecs.map(r => r.empId))
-          const ausentes = esperados.filter(e => !ficharonHoy.has(e.id)).length
-          const absentismo = esperados.length ? Math.round(ausentes / esperados.length * 100) : 0
-          // Productividad: horas reales del mes vs objetivo (WD * 20 días por empleado activo)
-          const objetivoMes = emps.length * WD * 20
-          const productividad = objetivoMes ? Math.round(monthMin / objetivoMes * 100) : 0
-          const docsPend = (db.documentos || []).filter(d => !d.firma).length
-          return [
-          { label:'Activos ahora',     val: `${checkedIn}/${emps.length}`, ico:'👥', glowColor:'#4ade80', trend: checkedIn > 0 ? `${checkedIn} trabajando` : 'Nadie activo', trendDir: checkedIn > 0 ? 'up' : 'neu' },
-          { label:'Horas hoy',         val: mhm(todayRecs.reduce((s,r)=>s+(r.fin?calcMin(r):calcSecs(r).work/60),0)|0), ico:'⏱️', glowColor:'#60a5fa', trend: `${todayRecs.length} fichaje${todayRecs.length!==1?'s':''}`, trendDir:'neu', spark: last7Hours },
-          { label:'Horas este mes',    val: mhm(monthMin),                 ico:'📅', glowColor:'#fbbf24', trend: monthTrend != null ? (monthTrend >= 0 ? `↑ +${monthTrend}% vs mes ant.` : `↓ ${monthTrend}% vs mes ant.`) : 'Mes en curso', trendDir: monthTrend >= 0 ? 'up' : 'down', spark: last7Hours },
-          { label:'Absentismo hoy',    val: `${absentismo}%`,              ico:'📉', glowColor:'#f87171', trend: ausentes > 0 ? `${ausentes} sin fichar` : 'Todos presentes', trendDir: absentismo > 0 ? 'down' : 'up' },
-          { label:'Productividad',     val: `${productividad}%`,           ico: productividad > 100 ? '🔥' : '⚡', glowColor: productividad > 100 ? '#f59e0b' : '#a78bfa', trend: productividad > 100 ? `+${productividad - 100}% extra` : productividad >= 90 ? 'En objetivo' : 'Bajo objetivo', trendDir: productividad > 100 ? 'up' : productividad >= 90 ? 'up' : 'down' },
-          { label:'Docs. pendientes',  val: String(docsPend),              ico:'✍️', glowColor:'#22d3ee', trend: vacPend > 0 ? `🌴 ${vacPend} vac. pend.` : (docsPend > 0 ? 'Por firmar' : 'Al día'), trendDir: docsPend > 0 ? 'down' : 'up' },
-          ]
-        })().map(({ label, val, ico, glowColor, trend, trendDir, spark }) => (
-          <div key={label} className="adm-kpi-card">
-            <div className="adm-kpi-glow" style={{ background: glowColor }} />
-            <div className="adm-kpi-icon">{ico}</div>
-            <div className="adm-kpi-val">{val}</div>
-            <div className="adm-kpi-label">{label}</div>
-            {spark && (() => {
-              const mx = Math.max(...spark, 0.1)
-              return (
-                <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:20, marginTop:4, marginBottom:2 }}>
-                  {spark.map((v, i) => (
-                    <div key={i} style={{ flex:1, borderRadius:2, background: i === 6 ? glowColor : 'rgba(255,255,255,.18)', height: Math.max(3, Math.round((v / mx) * 20)), transition:'height .3s' }} />
-                  ))}
-                </div>
-              )
-            })()}
-            <div className={`adm-kpi-trend ${trendDir}`}>{trend}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Geo-fencing alerts today */}
-      {(() => {
-        const geoRecs = todayRecs.filter(r => r.geoAlert)
-        if (!geoRecs.length) return null
-        return (
-          <div className="geo-alerts-panel stagger-in">
-            <div className="geo-alerts-header">
-              <span style={{ fontSize:16 }}>⚠️</span>
-              <span>Alertas de ubicación hoy</span>
-              <span className="geo-alerts-count">{geoRecs.length}</span>
-            </div>
-            {geoRecs.map(r => {
-              const emp = emps.find(e => e.id === r.empId)
-              const severity = r.geoAlert.dist > r.geoAlert.radio * 2 ? 'high' : 'med'
-              return (
-                <div key={r.id} className={`geo-alert-row geo-alert-${severity}`}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-                    <div style={{ width:32, height:32, borderRadius:'50%', background: severity==='high' ? 'rgba(239,68,68,.15)' : 'rgba(245,158,11,.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
-                      {severity === 'high' ? '🔴' : '🟠'}
-                    </div>
-                    <div style={{ minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emp?.name || r.empName}</div>
-                      <div style={{ fontSize:11, color:'var(--text3)', marginTop:1 }}>{r.centro} · {new Date(r.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color: severity==='high' ? 'var(--red)' : 'var(--orange)' }}>{r.geoAlert.dist}m fuera</span>
-                    <span style={{ fontSize:10, color:'var(--text4)' }}>(radio {r.geoAlert.radio}m)</span>
-                    {r.locInicio && (
-                      <a href={`https://www.openstreetmap.org/?mlat=${r.locInicio.lat}&mlon=${r.locInicio.lng}&zoom=17`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize:11, color:'var(--primary-light)', textDecoration:'none', fontWeight:600, whiteSpace:'nowrap' }}>
-                        Ver mapa ↗
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      })()}
-
-      {/* Anomaly detection panel */}
-      {(() => {
-        const allRecs = db.records || []
-        const anomalies = []
-
-        // 1. Jornadas abiertas de días anteriores
-        allRecs.filter(r => !r.fin && r.inicio && r.inicio.slice(0,10) < todayStr).forEach(r => {
-          const emp = emps.find(e => e.id === r.empId)
-          if (!emp) return
-          const elMin = Math.floor((Date.now() - new Date(r.inicio).getTime()) / 60000)
-          anomalies.push({ id: r.id + '_open', tipo: 'open', emp, rec: r, label: 'Jornada abierta', sub: `${emp.name} · iniciada ${r.inicio.slice(0,10)} · ${mhm(elMin)} sin cerrar`, severity: 'high' })
-        })
-
-        // 2. Jornadas muy cortas (< 15 min) en últimos 3 días
-        const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0,10)
-        allRecs.filter(r => r.fin && r.inicio >= threeDaysAgo).forEach(r => {
-          const mins = calcMin(r)
-          if (mins > 0 && mins < 15) {
-            const emp = emps.find(e => e.id === r.empId)
-            if (!emp) return
-            anomalies.push({ id: r.id + '_short', tipo: 'short', emp, rec: r, label: 'Jornada muy corta', sub: `${emp.name} · ${r.inicio.slice(0,10)} · solo ${mhm(mins)}`, severity: 'med' })
-          }
-        })
-
-        // 3. Fichaje a hora inusual hoy (antes de 05:30 o después de 23:00)
-        todayRecs.forEach(r => {
-          const h = new Date(r.inicio).getHours()
-          if (h < 5 || h >= 23) {
-            const emp = emps.find(e => e.id === r.empId)
-            if (!emp) return
-            anomalies.push({ id: r.id + '_hour', tipo: 'hour', emp, rec: r, label: 'Hora inusual', sub: `${emp.name} fichó a las ${new Date(r.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}`, severity: 'med' })
-          }
-        })
-
-        // 4. Doble fichaje mismo día
-        const todayEmpCounts = {}
-        todayRecs.forEach(r => { todayEmpCounts[r.empId] = (todayEmpCounts[r.empId] || 0) + 1 })
-        Object.entries(todayEmpCounts).filter(([, c]) => c > 1).forEach(([empId, count]) => {
-          const emp = emps.find(e => e.id === empId)
-          if (!emp) return
-          anomalies.push({ id: empId + '_double', tipo: 'double', emp, rec: null, label: 'Doble fichaje', sub: `${emp.name} · ${count} entradas hoy`, severity: 'med' })
-        })
-
-        if (!anomalies.length) return null
-        const sevColor = { high: 'var(--red)', med: 'var(--orange)' }
-        const sevBg    = { high: 'rgba(239,68,68,.1)', med: 'rgba(245,158,11,.08)' }
-        return (
-          <div className="geo-alerts-panel stagger-in" style={{ borderLeftColor:'var(--primary-light)' }}>
-            <div className="geo-alerts-header">
-              <span style={{ fontSize:16 }}>🤖</span>
-              <span>Anomalías detectadas</span>
-              <span className="geo-alerts-count" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{anomalies.length}</span>
-            </div>
-            {anomalies.map(a => (
-              <div key={a.id} className="geo-alert-row" style={{ background: sevBg[a.severity] }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-                  <div style={{ width:32, height:32, borderRadius:'50%', background: a.emp?.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                    {(a.emp?.initials || a.emp?.name?.slice(0,2) || '?').toUpperCase()}
-                  </div>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color: sevColor[a.severity] }}>{a.label}</div>
-                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.sub}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
-
-      {/* Live workers + Today activity */}
-      <div className="dash-2col stagger-in">
-        {/* Working now */}
-        <div className="dash-widget card-lift">
-          <div className="dash-widget-header">
-            <div className="dash-widget-title" style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span className="live-indicator" />
-              Trabajando ahora
-            </div>
-            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-              {vacHoy > 0 && <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, background:'rgba(0,212,255,.1)', color:'var(--teal)' }}>🌴 {vacHoy} vac.</span>}
-              <span className="dash-widget-badge" style={{ background:'var(--green-dim)', color:'var(--green)' }}>{liveRecs.length}</span>
-            </div>
-          </div>
-          {!liveRecs.length ? (
-            <div className="empty-premium" style={{ padding:'20px 0' }}>
-              <div className="empty-premium-icon" style={{ width:44, height:44, borderRadius:12 }}>
-                <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-              </div>
-              <div style={{ fontSize:12, color:'var(--text4)' }}>Nadie trabajando ahora</div>
-            </div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {(showAllLive ? liveRecs : liveRecs.slice(0,5)).map(r => {
-                const emp = emps.find(e => e.id === r.empId)
-                const t = calcSecs(r)
-                return (
-                  <div key={r.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:32, height:32, borderRadius:'50%', background: emp?.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                      {(emp?.initials||emp?.name?.slice(0,2)||'?').toUpperCase()}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emp?.name?.split(' ')[0] || r.empName}</div>
-                      <div style={{ fontSize:10, color:'var(--text3)', marginTop:1 }}>{r.centro || '—'}</div>
-                    </div>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--green)', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>{mhm(Math.floor(t.work/60))}</div>
-                  </div>
-                )
-              })}
-              {liveRecs.length > 5 && (
-                <button onClick={() => setShowAllLive(v => !v)}
-                  style={{ fontSize:11, color:'var(--primary-light)', background:'none', border:'none', cursor:'pointer', padding:'4px 0', fontFamily:'inherit', textAlign:'left', fontWeight:600 }}>
-                  {showAllLive ? 'Ver menos' : `Ver todos (${liveRecs.length})`}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Recent fichajes */}
-        <div className="dash-widget card-lift">
-          <div className="dash-widget-header">
-            <div className="dash-widget-title">Fichajes de hoy</div>
-            <span className="dash-widget-badge" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{todayRecs.length}</span>
-          </div>
-          {!todayRecs.length ? (
-            <div className="empty-premium" style={{ padding:'20px 0' }}>
-              <div className="empty-premium-icon" style={{ width:44, height:44, borderRadius:12 }}>
-                <svg viewBox="0 0 24 24" style={{ width:20, height:20 }}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
-              </div>
-              <div style={{ fontSize:12, color:'var(--text4)' }}>Sin fichajes hoy</div>
-            </div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, showAllToday ? undefined : 5).map(r => {
-                const emp = emps.find(e => e.id === r.empId)
-                const isLive = !r.fin
-                const wm = r.fin ? Math.floor(recWorkSecs(r)/60) : null
-                return (
-                  <div key={r.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'var(--bg-600)', borderRadius:8, border:'1px solid var(--border)' }}>
-                    <div style={{ width:28, height:28, borderRadius:'50%', background: emp?.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                      {(emp?.initials||emp?.name?.slice(0,2)||'?').toUpperCase()}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:11, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.empName?.split(' ')[0]}</div>
-                      <div style={{ fontSize:10, color:'var(--text3)', fontVariantNumeric:'tabular-nums' }}>{ftime(r.inicio)}{r.fin ? ` → ${ftime(r.fin)}` : ''}</div>
-                    </div>
-                    {isLive ? (
-                      <div style={{ width:7, height:7, borderRadius:'50%', background:'var(--green)', flexShrink:0, boxShadow:'0 0 6px var(--green)' }} />
-                    ) : (
-                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text3)', flexShrink:0 }}>{mhm(wm)}</div>
-                    )}
-                  </div>
-                )
-              })}
-              {todayRecs.length > 5 && (
-                <button onClick={() => setShowAllToday(v => !v)}
-                  style={{ fontSize:11, color:'var(--primary-light)', background:'none', border:'none', cursor:'pointer', padding:'4px 0', fontFamily:'inherit', textAlign:'left', fontWeight:600 }}>
-                  {showAllToday ? 'Ver menos' : `Ver todos (${todayRecs.length})`}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {obraHours.length > 0 && (
-        <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
-          <div className="dash-widget-header">
-            <div className="dash-widget-title">Horas por obra este mes</div>
-            <span className="dash-widget-badge" style={{ background:'var(--primary-dim)', color:'var(--primary-light)' }}>{obraHours.length}</span>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {(() => {
-              const maxMin = obraHours[0]?.[1] || 1
-              return obraHours.map(([obra, min]) => (
-                <div key={obra} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <div style={{ fontSize:11, fontWeight:600, minWidth:120, maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text2)' }}>{obra}</div>
-                  <div style={{ flex:1, height:6, background:'var(--bg-400)', borderRadius:3, overflow:'hidden' }}>
-                    <div style={{ height:'100%', borderRadius:3, background:'linear-gradient(90deg, var(--primary), var(--accent2))', width:`${Math.round(min/maxMin*100)}%`, transition:'width .6s' }} />
-                  </div>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--primary-light)', minWidth:40, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{mhm(min)}</div>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Heatmap */}
-      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
-        <div className="dash-widget-header">
-          <div className="dash-widget-title">Actividad (últimas 12 semanas)</div>
-        </div>
-        <Heatmap data={heat} />
-      </div>
-
-      {/* Month vs last month comparison */}
-      {lastMonthMin > 0 && (
-        <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
-          <div className="dash-widget-header">
-            <div className="dash-widget-title">Comparativa mensual</div>
-            {monthTrend !== null && (
-              <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20,
-                background: monthTrend >= 0 ? 'var(--green-dim)' : 'var(--red-dim)',
-                color: monthTrend >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                {monthTrend >= 0 ? '+' : ''}{monthTrend}% vs mes anterior
-              </span>
-            )}
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            {[
-              { label: prevDate.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: lastMonthMin, color:'var(--text3)', bar:'var(--bg-400)' },
-              { label: now.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: monthMin, color:'var(--primary-light)', bar:'linear-gradient(90deg,var(--primary),var(--accent))' },
-            ].map(({ label, val, color, bar }) => {
-              const pct = Math.round(val / Math.max(monthMin, lastMonthMin, 1) * 100)
-              return (
-                <div key={label}>
-                  <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', marginBottom:4 }}>{label}</div>
-                  <div style={{ fontSize:20, fontWeight:800, color, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>{mhm(val)}</div>
-                  <div className="progress-track">
-                    <div className="progress-fill" style={{ width: pct + '%', background: bar }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Quick actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
-        {[
-          { label:'Nuevo fichaje', ico:'⏱️', page:'fichajes', color:'var(--primary-dim)', accent:'var(--primary-light)' },
-          { label:'Ver solicitudes', ico:'🌴', page:'solicitudes', color:'var(--orange-dim)', accent:'var(--orange)' },
-          { label:'Generar informe', ico:'📊', page:'informes', color:'var(--green-dim)', accent:'var(--green)' },
-        ].map(({ label, ico, page, color, accent }) => (
-          <button key={page} onClick={() => setAdminPage(page)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:'14px 8px', background:color, border:`1px solid ${accent}22`, borderRadius:'var(--r-lg)', cursor:'pointer', transition:'transform .15s, box-shadow .15s', WebkitTapHighlightColor:'transparent' }}
-            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow=`0 6px 16px ${accent}33` }}
-            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='' }}>
-            <span style={{ fontSize:22 }}>{ico}</span>
-            <span style={{ fontSize:11, fontWeight:700, color: accent, textAlign:'center', lineHeight:1.2 }}>{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Recent audit */}
-      {recentAudit.length > 0 && (
-        <div className="dash-widget card-lift">
-          <div className="dash-widget-header">
-            <div className="dash-widget-title">Actividad reciente</div>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {recentAudit.map((a, i) => (
-              <div key={i} className="audit-row">
-                <div className="audit-ico">📝</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, fontWeight:600 }}>{a.action}</div>
-                  <div style={{ fontSize:11, color:'var(--text3)' }}>{a.user} · {a.ts ? new Date(a.ts).toLocaleString('es-ES', { hour:'2-digit', minute:'2-digit', month:'short', day:'numeric' }) : ''}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <ComunicadoWidget db={db} toast={toast} saveDB={saveDB} />
-      <PushNotifWidget db={db} toast={toast} />
-    </div>
-  )
-}
-
-function PushNotifWidget({ db, toast }) {
-  const [open, setOpen]       = useState(false)
-  const [target, setTarget]   = useState('all')
-  const [title, setTitle]     = useState('')
-  const [body, setBody]       = useState('')
-  const [sending, setSending] = useState(false)
-  const [lastResult, setLastResult] = useState(null)
-
-  const permStatus = 'Notification' in window ? Notification.permission : 'unsupported'
-
-  const send = async () => {
-    if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
-    setSending(true)
-    setLastResult(null)
-    try {
-      const json = await callSendPushAll(title.trim(), body.trim(), target)
-      setLastResult(json)
-      showPushToast(json, toast)
-      if (json.ok) { setTitle(''); setBody(''); setOpen(false) }
-    } catch(e) {
-      setLastResult({ ok: false, error: e.message })
-      toast('Error de red al enviar push', 3000, 'error')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <div className="dash-widget card-lift" style={{ marginTop:12 }}>
-      <div className="dash-widget-header">
-        <div className="dash-widget-title">📢 Push Masivo</div>
-        <button className="btn btn-primary btn-sm" onClick={() => setOpen(o => !o)}>
-          {open ? 'Cancelar' : '+ Enviar'}
-        </button>
-      </div>
-      {!open && (
-        <div style={{ fontSize:11, color:'var(--text4)', marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
-          <span>Notificación masiva — llega al móvil aunque esté bloqueado</span>
-          <span style={{ color: permStatus === 'granted' ? 'var(--green)' : permStatus === 'denied' ? 'var(--danger)' : 'var(--orange)' }}>
-            Este dispositivo: {permStatus === 'granted' ? '✓ Push activado' : permStatus === 'denied' ? '✗ Push bloqueado — actívalo en ajustes del navegador' : '⚠ Push no solicitado'}
-          </span>
-          {lastResult && (
-            <span style={{ color: lastResult.ok ? 'var(--green)' : 'var(--danger)' }}>
-              Último envío: {lastResult.ok
-                ? `✓ ${lastResult.sent ?? 0} enviados${lastResult.failed > 0 ? `, ${lastResult.failed} fallaron` : ''}${lastResult.noSub > 0 ? `, ${lastResult.noSub} sin suscripción` : ''}`
-                : `✗ ${lastResult.error || 'error'}`}
-            </span>
-          )}
-        </div>
-      )}
-      {open && (
-        <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
-          <select value={target} onChange={e => setTarget(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }}>
-            <option value="all">Todos los empleados</option>
-            <option value="activos">Activos ahora (fichados)</option>
-            <option value="jefe_obra">Solo jefes de obra</option>
-            <option value="encargado">Solo encargados</option>
-            <option value="empleado">Solo empleados base</option>
-          </select>
-          <input placeholder="Título (máx 80 caracteres)…" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
-          <textarea placeholder="Mensaje (máx 200 caracteres)…" maxLength={200} value={body} onChange={e => setBody(e.target.value)} rows={2}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'none', fontFamily:'inherit' }} />
-          <div style={{ fontSize:10, color:'var(--text4)', textAlign:'right' }}>
-            {title.length}/80 · {body.length}/200
-          </div>
-          <button className="btn btn-primary btn-sm" disabled={sending || !title.trim() || !body.trim()} onClick={send}>
-            {sending ? 'Enviando…' : '📢 Enviar notificación masiva'}
-          </button>
-          <div style={{ fontSize:10, color:'var(--text4)', lineHeight:1.5 }}>
-            Solo llega a empleados con la app abierta alguna vez y permisos concedidos.
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ComunicadoWidget({ db, toast, saveDB }) {
-  const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [sending, setSending] = useState(false)
-
-  const send = async () => {
-    if (!title.trim() || !body.trim()) { toast('Completa título y mensaje'); return }
-    setSending(true)
-    const msg = { id: gid(), from: 'admin', title: title.trim(), body: body.trim(), to: 'all', ts: new Date().toISOString() }
-    const withAudit = auditLog(db, 'Comunicado enviado', msg.title, 'Admin')
-    saveDB({ mensajes: [...(db.mensajes||[]), msg], audit: withAudit.audit })
-    await queuePush('__all__', '📢 ' + msg.title, msg.body, 'comunicado', '/?tab=inicio')
-    toast('Comunicado enviado a todos los empleados', 3000, 'ok')
-    setSending(false)
-    setTitle(''); setBody(''); setOpen(false)
-  }
-
-  const mensajes = (db.mensajes || []).slice(-5).reverse()
-
-  return (
-    <div className="dash-widget card-lift" style={{ marginTop:16 }}>
-      <div className="dash-widget-header">
-        <div className="dash-widget-title">📢 Comunicados</div>
-        <button className="btn btn-primary btn-sm" onClick={() => setOpen(o => !o)}>
-          {open ? 'Cancelar' : '+ Nuevo'}
-        </button>
-      </div>
-      {open && (
-        <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
-          <input placeholder="Título del comunicado..." value={title} onChange={e => setTitle(e.target.value)}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13 }} />
-          <textarea placeholder="Mensaje para todos los empleados..." value={body} onChange={e => setBody(e.target.value)} rows={3}
-            style={{ borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'8px 12px', fontSize:13, resize:'vertical', fontFamily:'inherit' }} />
-          <button className="btn btn-primary btn-sm" disabled={sending} onClick={send}>{sending ? 'Enviando…' : 'Enviar a todos'}</button>
-        </div>
-      )}
-      {mensajes.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop: open ? 14 : 0 }}>
-          {mensajes.map(m => (
-            <div key={m.id} style={{ padding:'10px 12px', background:'var(--bg-600)', borderRadius:8, border:'1px solid var(--border)', borderLeft:'3px solid var(--primary)' }}>
-              <div style={{ fontSize:12, fontWeight:700, marginBottom:2 }}>{m.title}</div>
-              <div style={{ fontSize:11, color:'var(--text3)' }}>{m.body}</div>
-              <div style={{ fontSize:10, color:'var(--text4)', marginTop:4 }}>{m.ts ? new Date(m.ts).toLocaleString('es-ES') : ''}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {!mensajes.length && !open && (
-        <div style={{ fontSize:12, color:'var(--text4)', textAlign:'center', padding:'12px 0' }}>Sin comunicados enviados aún</div>
-      )}
-    </div>
-  )
-}
-
-function buildHeatmap(recs, empCount) {
-  const map = {}
-  const now = new Date()
-  for (let i = 83; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i)
-    const k = d.toISOString().slice(0,10)
-    map[k] = { count: 0, min: 0 }
-  }
-  recs.filter(r => r.fin && r.inicio).forEach(r => {
-    const k = r.inicio.slice(0,10)
-    if (map[k]) { map[k].count++; map[k].min += calcMin(r) }
-  })
-  return Object.entries(map).map(([date, v]) => ({ date, ...v }))
-}
-
-function Heatmap({ data }) {
-  const max = Math.max(1, ...data.map(d => d.count))
-  const weeks = []
-  for (let i = 0; i < data.length; i += 7) weeks.push(data.slice(i, i+7))
-
-  return (
-    <div style={{ overflowX:'auto', paddingBottom:4 }}>
-      <div style={{ display:'flex', gap:3 }}>
-        {weeks.map((week, wi) => (
-          <div key={wi} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            {week.map(({ date, count, min }) => {
-              const pct = count / max
-              const alpha = pct < 0.01 ? 0 : Math.max(0.15, pct)
-              return (
-                <div key={date} title={`${date}: ${count} fichajes · ${mhm(Math.floor(min))}`}
-                  style={{ width:12, height:12, borderRadius:2, flexShrink:0,
-                    background: alpha < 0.01 ? 'var(--bg-500)' : `rgba(108,99,255,${alpha})`,
-                    border: alpha > 0 ? '1px solid rgba(108,99,255,.2)' : '1px solid var(--border)' }} />
-              )
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Celda de tiempo con tick propio (tabla de control live)
-function LiveTimerCell({ rec }) {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!rec) return
-    const iv = setInterval(() => setTick(t => t + 1), 5000)
-    return () => clearInterval(iv)
-  }, [rec?.id])
-  if (!rec) return <>—</>
-  const t = calcSecs(rec)
-  return <>{mhm(Math.floor(t.work / 60))}</>
-}
-
-// Componente de tarjeta con su propio tick — evita re-render de toda la grid cada 5s
-function CtrlCard({ e, live, todayMin, force, startJornada, toggleDescanso }) {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 5000)
-    return () => clearInterval(iv)
-  }, [])
-  const t = live ? calcSecs(live) : null
-  const isWorking = live && !live.enDescanso
-  const isBreak = live && live.enDescanso
-  const elapsedMin = live ? Math.floor((Date.now() - new Date(live.inicio).getTime()) / 60000) : 0
-  const hasBreak = live?.breaks?.length > 0
-  const fatiguaAlert = isWorking && elapsedMin >= 600 && !hasBreak
-  const dailyTarget = (e.horasSemanales || WK) / 5 * 60
-  const workedMin = t ? Math.floor(t.work / 60) : todayMin
-  const pct = workedMin ? Math.min(100, Math.round(workedMin / dailyTarget * 100)) : 0
-  const over = workedMin > dailyTarget
-
-  return (
-    <div className={`ctrl-card${isWorking ? ' working' : isBreak ? ' on-break' : ''}`}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-        <div className="ctrl-avatar" style={{ background:e.color||'var(--primary)' }}>
-          {(e.initials||e.name.slice(0,2)).toUpperCase()}
-          <div className="ctrl-dot" style={{ background: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--bg-500)', boxShadow: isWorking?'0 0 8px var(--green)':isBreak?'0 0 8px var(--orange)':'none' }} />
-        </div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:1, display:'flex', alignItems:'center', gap:5 }}>
-            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{live?.centro || e.centroTrabajo || '—'}</span>
-            {live?.locInicio && (
-              <span title={`GPS: ${live.locInicio.lat?.toFixed(4)}, ${live.locInicio.lng?.toFixed(4)}`}
-                style={{ flexShrink:0, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:8, background:'rgba(6,182,212,.12)', color:'var(--teal)', border:'1px solid rgba(6,182,212,.25)' }}>
-                GPS ✓
-              </span>
-            )}
-            {fatiguaAlert && (
-              <span style={{ flexShrink:0, fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:8, background:'rgba(239,68,68,.15)', color:'var(--danger)', border:'1px solid rgba(239,68,68,.3)' }}>
-                ⚠️ +10h sin pausa
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div style={{ textAlign:'center', marginBottom:12 }}>
-        <div className="counter-val" style={{ fontSize:30, fontWeight:800, letterSpacing:'-1px', color: isWorking?'var(--green)':isBreak?'var(--orange)':'var(--text3)' }}>
-          {t ? mhm(Math.floor(t.work/60)) : '—'}
-        </div>
-        <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
-          {isWorking ? `Entrada: ${ftime(live.inicio)}` : isBreak ? 'En descanso' : todayMin>0 ? `Hoy: ${mhm(todayMin)}` : 'Sin jornada hoy'}
-        </div>
-        {workedMin > 0 && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text4)', marginBottom:3 }}>
-              <span>Jornada diaria</span>
-              <span style={{ color: over ? 'var(--orange)' : 'var(--text3)', fontWeight:700 }}>{pct}%{over ? ' ↑extra' : ''}</span>
-            </div>
-            <div style={{ height:4, background:'var(--bg-400)', borderRadius:2 }}>
-              <div style={{ height:'100%', borderRadius:2, background: over ? 'var(--orange)' : 'var(--green)', width: pct + '%', transition:'width .6s' }} />
-            </div>
-          </div>
-        )}
-      </div>
-      {live ? (
-        <div style={{ display:'flex', gap:6 }}>
-          <button className="btn btn-sm btn-secondary" style={{ flex:1, fontSize:11 }} onClick={() => toggleDescanso(live)}>
-            {live.enDescanso ? '▶ Continuar' : '⏸ Pausa'}
-          </button>
-          <button className="btn btn-sm btn-danger" style={{ flex:1, fontSize:11 }} onClick={() => force(live)}>■ Fin</button>
-        </div>
-      ) : (
-        <button className="btn btn-sm btn-primary" style={{ width:'100%', fontSize:11 }} onClick={() => startJornada(e)}>
-          ▶ Iniciar jornada
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── PANEL CONTROL LIVE ───────────────────────────────────────────────────────
 function PanelControl({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
@@ -2292,6 +1530,8 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const [to, setTo] = useState('')
   const [procesandoCierre, setProcesandoCierre] = useState(new Set())
   const [agruparCentro, setAgruparCentro] = useState(false)
+  const [generandoPdf, setGenerandoPdf] = useState(null) // id del cierre en curso, o 'consolidado'
+  const empresaNombreCfg = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
   const recs = db.records || []
   const emps = (db.employees || []).filter(e => !e.baja)
   const now = new Date()
@@ -2568,23 +1808,33 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
-  const downloadCierrePDF = (cierre, emp) => {
-    const mes = new Date(cierre.mes + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-    const rowsHtml = (cierre.records_snapshot || []).map(r => {
-      const m = Math.floor((r.workSecs||0)/60)
-      const d = new Date(r.inicio)
-      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
-    }).join('')
-    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
-<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{body{padding:20px}}</style>
-</head><body>
-<h1>Cierre de jornada mensual · ${mes}</h1>
-<h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
-<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-<div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
-${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
-<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma obra</div></div>
-</body></html>`)
+  const downloadCierrePDF = async (cierre) => {
+    const filename = `cierre-${cierre.mes}-${(cierre.empName||'').replace(/\s+/g,'_')}.pdf`
+    if (cierre.pdfData) { downloadDataUrl(cierre.pdfData, filename); return }
+    setGenerandoPdf(cierre.id)
+    try {
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre, empresa: empresaNombreCfg })
+      downloadDataUrl(dataUrl, filename)
+    } catch (e) {
+      toast('Error al generar el PDF: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
+  }
+
+  const finalizarMesCierres = async () => {
+    const cierresMes = (db.cierres || []).filter(c => c.mes === filterMonth)
+    if (!cierresMes.length) { toast('No hay cierres generados para este mes'); return }
+    setGenerandoPdf('consolidado')
+    try {
+      const { dataUrl } = await buildCierreConsolidadoPDF({ cierres: cierresMes, mes: filterMonth, empresa: empresaNombreCfg })
+      downloadDataUrl(dataUrl, `cierre-consolidado-${filterMonth}.pdf`)
+      toast('PDF consolidado generado', 3000, 'ok')
+    } catch (e) {
+      toast('Error al generar el PDF consolidado: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
   }
 
   const TABS = [
@@ -2626,10 +1876,15 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
           <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
             📋 <strong>Cierre mensual</strong> — Genera el resumen y envíalo al empleado para firma digital. Cumple con la Ley de Control Horario (RDL 8/2019). El empleado recibirá una notificación para firmar.
           </div>
-          <button className="btn btn-primary" style={{ width:'100%', marginBottom:16 }} onClick={generarTodosCierres}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Generar cierres para todos ({rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===filterMonth) && r.days>0).length} pendientes)
-          </button>
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <button className="btn btn-primary" style={{ flex:1 }} onClick={generarTodosCierres}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Generar cierres para todos ({rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===filterMonth) && r.days>0).length} pendientes)
+            </button>
+            <button className="btn btn-secondary" onClick={finalizarMesCierres} disabled={generandoPdf === 'consolidado' || !(db.cierres||[]).some(c => c.mes===filterMonth)}>
+              {generandoPdf === 'consolidado' ? 'Generando…' : '📄 Finalizar mes'}
+            </button>
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {rows.map(({ e, totalMin, days, diff, weeklyH }) => {
               const cierre = (db.cierres || []).find(c => c.empId === e.id && c.mes === filterMonth)
@@ -2650,7 +1905,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                         <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
                           {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente firma'}
                         </span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre, e)}>PDF</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
                       </>
                     ) : (
                       <button className="btn btn-primary btn-sm" onClick={() => generarCierre(e, totalMin, days)} disabled={!days || procesandoCierre.has(e.id)}>
@@ -2678,7 +1933,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                         <div style={{ fontSize:13, fontWeight:600 }}>{c.empName} · {c.mes}</div>
                         <div style={{ fontSize:11, color:'var(--text3)' }}>Firmado {new Date(c.firma?.firmadoAt).toLocaleDateString('es-ES')} · {mhm(c.totalMin)}</div>
                       </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c, emp)}>PDF</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)} disabled={generandoPdf === c.id}>{generandoPdf === c.id ? '…' : 'PDF'}</button>
                     </div>
                   )
                 })}
@@ -4280,6 +3535,30 @@ function PanelAuditoria({ db }) {
 // ─── PANEL AJUSTES ────────────────────────────────────────────────────────────
 const COLOR_PRESETS = ['#6C63FF','#2563EB','#7c3aed','#0891b2','#059669','#dc2626','#d97706','#db2777']
 
+function TimeList({ label, desc, times, onChange }) {
+  const add    = ()    => onChange([...times, '09:00'])
+  const remove = i     => onChange(times.filter((_, idx) => idx !== i))
+  const update = (i,v) => onChange(times.map((t, idx) => idx === i ? v : t))
+  return (
+    <div>
+      <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, textTransform:'uppercase', letterSpacing:.8 }}>{label}</div>
+      {desc && <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, opacity:.7 }}>{desc}</div>}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+        {times.map((t, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-500)', borderRadius:10, padding:'6px 10px', border:'1px solid var(--border)' }}>
+            <input type="time" value={t} onChange={e => update(i, e.target.value)}
+              style={{ background:'none', border:'none', color:'var(--text)', fontSize:14, fontWeight:700, cursor:'pointer', outline:'none', width:80 }} />
+            {times.length > 1 &&
+              <button onClick={() => remove(i)} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', fontSize:13, padding:0, lineHeight:1 }}>✕</button>
+            }
+          </div>
+        ))}
+        <button className="btn btn-secondary btn-sm" onClick={add} style={{ fontSize:12 }}>+ Hora</button>
+      </div>
+    </div>
+  )
+}
+
 function PanelAjustes({ db, toast, saveDB, session }) {
   const cfg = db.config || {}
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
@@ -4290,6 +3569,12 @@ function PanelAjustes({ db, toast, saveDB, session }) {
   const [usarFestivosMadrid, setUsarFestivosMadrid] = useState(cfg.usarFestivosMadrid !== false)
   const [newFestivoFecha, setNewFestivoFecha] = useState('')
   const [newFestivoNombre, setNewFestivoNombre] = useState('')
+  const [reminders, setReminders] = useState({
+    entrada:   cfg.reminders?.entrada?.length ? cfg.reminders.entrada : ['08:30'],
+    salida:    cfg.reminders?.salida?.length  ? cfg.reminders.salida  : ['20:00'],
+    semanal:   cfg.reminders?.semanal?.length ? cfg.reminders.semanal : ['17:00'],
+    alertHoras: cfg.reminders?.alertHoras ?? 10,
+  })
   const [saving, setSaving] = useState(false)
   const backupRef = useRef(null)
 
@@ -4332,7 +3617,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     setSaving(true)
     const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
     const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
-    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid }
+    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid, reminders }
     const withAudit = auditLog(db, 'Configuración guardada', companyName || 'Ajustes', session?.user?.name || 'Admin')
     saveDB({ config, audit: withAudit.audit })
     toast('Ajustes guardados', 3000, 'ok')
@@ -4456,6 +3741,43 @@ function PanelAjustes({ db, toast, saveDB, session }) {
         </div>
       </div>
 
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">🔔 Recordatorios automáticos</div>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:18, marginTop:4 }}>
+          <TimeList
+            label="Recordatorio de entrada"
+            desc="Se envía si el empleado no ha fichado aún a esa hora (L–V)"
+            times={reminders.entrada}
+            onChange={v => setReminders(r => ({ ...r, entrada: v }))}
+          />
+          <TimeList
+            label="Recordatorio de salida olvidada"
+            desc="Se envía si el empleado tiene la jornada abierta a esa hora"
+            times={reminders.salida}
+            onChange={v => setReminders(r => ({ ...r, salida: v }))}
+          />
+          <TimeList
+            label="Resumen semanal (viernes)"
+            desc="Envía el resumen de horas de la semana cada viernes a esa hora"
+            times={reminders.semanal}
+            onChange={v => setReminders(r => ({ ...r, semanal: v }))}
+          />
+          <div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, textTransform:'uppercase', letterSpacing:.8 }}>Alerta jornada muy larga</div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, opacity:.7 }}>Avisa al admin si un empleado lleva más de X horas con la jornada abierta</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <input type="number" min="1" max="24" step="0.5"
+                value={reminders.alertHoras}
+                onChange={e => setReminders(r => ({ ...r, alertHoras: parseFloat(e.target.value) || 10 }))}
+                style={{ width:80, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text)', padding:'6px 12px', fontSize:14, fontWeight:700 }} />
+              <span style={{ fontSize:13, color:'var(--text2)' }}>horas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <button className="btn btn-primary" disabled={saving} onClick={save} style={{ width:'100%', padding:'14px' }}>
         {saving ? 'Guardando…' : '✓ Guardar ajustes'}
       </button>
@@ -4574,17 +3896,8 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     return { e, totalMin, days, diff }
   })
 
-  const printHtml = (html) => {
-    const iframe = document.createElement('iframe')
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0'
-    document.body.appendChild(iframe)
-    const doc = iframe.contentDocument || iframe.contentWindow.document
-    doc.open(); doc.write(html); doc.close()
-    setTimeout(() => {
-      try { iframe.contentWindow.focus(); iframe.contentWindow.print() } catch {}
-      setTimeout(() => { try { document.body.removeChild(iframe) } catch {} }, 4000)
-    }, 350)
-  }
+  const [generandoPdf, setGenerandoPdf] = useState(null) // id del cierre en curso, o 'consolidado'
+  const empresaNombreJO = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
 
   const generarCierreJO = (e, totalMin, days) => {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
@@ -4624,23 +3937,33 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     toast(`✅ ${nuevos.length} cierre${nuevos.length!==1?'s':''} generado${nuevos.length!==1?'s':''}`)
   }
 
-  const downloadCierrePDF = (cierre) => {
-    const mes = new Date(cierre.mes + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-    const rowsHtml = (cierre.records_snapshot || []).map(r => {
-      const m = Math.floor((r.workSecs||0)/60)
-      const d = new Date(r.inicio)
-      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
-    }).join('')
-    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
-<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{body{padding:20px}}</style>
-</head><body>
-<h1>Cierre de jornada mensual · ${mes}</h1>
-<h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
-<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-<div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
-${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
-<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma jefe de obra</div></div>
-</body></html>`)
+  const downloadCierrePDF = async (cierre) => {
+    const filename = `cierre-${cierre.mes}-${(cierre.empName||'').replace(/\s+/g,'_')}.pdf`
+    if (cierre.pdfData) { downloadDataUrl(cierre.pdfData, filename); return }
+    setGenerandoPdf(cierre.id)
+    try {
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre, empresa: empresaNombreJO })
+      downloadDataUrl(dataUrl, filename)
+    } catch (e) {
+      toast('Error al generar el PDF: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
+  }
+
+  const finalizarMesJO = async () => {
+    const cierresMes = (db.cierres || []).filter(c => c.mes === selMonth && emps.some(e => e.id === c.empId))
+    if (!cierresMes.length) { toast('No hay cierres generados para este mes'); return }
+    setGenerandoPdf('consolidado')
+    try {
+      const { dataUrl } = await buildCierreConsolidadoPDF({ cierres: cierresMes, mes: selMonth, empresa: empresaNombreJO })
+      downloadDataUrl(dataUrl, `cierre-consolidado-${selMonth}.pdf`)
+      toast('PDF consolidado generado', 3000, 'ok')
+    } catch (e) {
+      toast('Error al generar el PDF consolidado: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
   }
 
   const pendientes = rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===selMonth) && r.days>0).length
@@ -4669,10 +3992,15 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
             📋 <strong>Validar horas</strong> — Genera el cierre mensual y envíaselo a tus empleados para firma digital. Obras: <strong>{joObras.join(', ')}</strong>
           </div>
 
-          <button className="btn btn-primary" style={{ width:'100%', marginBottom:16 }} onClick={generarTodosJO} disabled={!pendientes}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Enviar cierre a todos ({pendientes} pendientes)
-          </button>
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <button className="btn btn-primary" style={{ flex:1 }} onClick={generarTodosJO} disabled={!pendientes}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Enviar cierre a todos ({pendientes} pendientes)
+            </button>
+            <button className="btn btn-secondary" onClick={finalizarMesJO} disabled={generandoPdf === 'consolidado' || !(db.cierres||[]).some(c => c.mes===selMonth && emps.some(e=>e.id===c.empId))}>
+              {generandoPdf === 'consolidado' ? 'Generando…' : '📄 Finalizar mes'}
+            </button>
+          </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {rows.map(({ e, totalMin, days, diff }) => {
@@ -4695,7 +4023,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                         <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
                           {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente'}
                         </span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)}>PDF</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
                       </>
                     ) : (
                       <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days}>
@@ -4720,7 +4048,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                       <div style={{ fontSize:13, fontWeight:600 }}>{c.empName} · {c.mes}</div>
                       <div style={{ fontSize:11, color:'var(--text3)' }}>Firmado {new Date(c.firma?.firmadoAt).toLocaleDateString('es-ES')} · {mhm(c.totalMin)}</div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)}>PDF</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)} disabled={generandoPdf === c.id}>{generandoPdf === c.id ? '…' : 'PDF'}</button>
                   </div>
                 ))}
               </div>

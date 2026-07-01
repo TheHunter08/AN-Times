@@ -1,51 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, mhm, p2, ftime, calcSecs, calcMin, wkStart, recWorkSecs } from '../../utils/time.js'
+import { today, wkStart, p2, calcMin, calcSecs, mhm, ftime, recWorkSecs } from '../../utils/time.js'
 import { WD } from '../../config/constants.js'
-import ComunicadoWidget from './ComunicadoWidget.jsx'
-import PushNotifWidget from './PushNotifWidget.jsx'
-
-function buildHeatmap(recs, empCount) {
-  const map = {}
-  const now = new Date()
-  for (let i = 83; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i)
-    const k = d.toISOString().slice(0,10)
-    map[k] = { count: 0, min: 0 }
-  }
-  recs.filter(r => r.fin && r.inicio).forEach(r => {
-    const k = r.inicio.slice(0,10)
-    if (map[k]) { map[k].count++; map[k].min += calcMin(r) }
-  })
-  return Object.entries(map).map(([date, v]) => ({ date, ...v }))
-}
-
-function Heatmap({ data }) {
-  const max = Math.max(1, ...data.map(d => d.count))
-  const weeks = []
-  for (let i = 0; i < data.length; i += 7) weeks.push(data.slice(i, i+7))
-
-  return (
-    <div style={{ overflowX:'auto', paddingBottom:4 }}>
-      <div style={{ display:'flex', gap:3 }}>
-        {weeks.map((week, wi) => (
-          <div key={wi} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-            {week.map(({ date, count, min }) => {
-              const pct = count / max
-              const alpha = pct < 0.01 ? 0 : Math.max(0.15, pct)
-              return (
-                <div key={date} title={`${date}: ${count} fichajes · ${mhm(Math.floor(min))}`}
-                  style={{ width:12, height:12, borderRadius:2, flexShrink:0,
-                    background: alpha < 0.01 ? 'var(--bg-500)' : `rgba(108,99,255,${alpha})`,
-                    border: alpha > 0 ? '1px solid rgba(108,99,255,.2)' : '1px solid var(--border)' }} />
-              )
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+import { buildHeatmap, Heatmap } from '../../components/admin/Heatmap.jsx'
+import { ComunicadoWidget } from '../../components/admin/ComunicadoWidget.jsx'
+import { PushNotifWidget } from '../../components/admin/PushNotifWidget.jsx'
+import { SyncBadge } from '../../components/admin/SyncBadge.jsx'
 
 export default function PanelDashboard({ db, toast, saveDB }) {
   const { setAdminPage } = useAppStore()
@@ -53,7 +13,7 @@ export default function PanelDashboard({ db, toast, saveDB }) {
   const [showAllToday, setShowAllToday] = useState(false)
   const now = new Date()
   const todayStr = today()
-  const emps = (db.employees || []).filter(e => !e.baja)
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
 
   const liveRecs = recs.filter(r => !r.fin)
@@ -67,7 +27,7 @@ export default function PanelDashboard({ db, toast, saveDB }) {
   const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
   const weekRecs = useMemo(() => {
     const wsDate = new Date(wsStr)
-    return recs.filter(r => r.fin && new Date(r.inicio) >= wsDate)
+    return recs.filter(r => r.fin && r.inicio && new Date(r.inicio) >= wsDate)
   }, [recs, wsStr])
   const weekMin = useMemo(() => weekRecs.reduce((s, r) => s + calcMin(r), 0), [weekRecs])
   const monthMin = useMemo(() => recs.filter(r => r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0), [recs, mk])
@@ -103,6 +63,9 @@ export default function PanelDashboard({ db, toast, saveDB }) {
         <div>
           <h1 className="adm-panel-title gradient-text">Dashboard</h1>
           <div className="adm-panel-sub" style={{ marginTop:2, textTransform:'capitalize' }}>{now.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <SyncBadge />
         </div>
       </div>
 
@@ -332,7 +295,7 @@ export default function PanelDashboard({ db, toast, saveDB }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[...todayRecs].sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, showAllToday ? undefined : 5).map(r => {
+              {[...todayRecs].sort((a,b) => b.inicio.localeCompare(a.inicio)).slice(0, showAllToday ? undefined : 5).map(r => {
                 const emp = emps.find(e => e.id === r.empId)
                 const isLive = !r.fin
                 const wm = r.fin ? Math.floor(recWorkSecs(r)/60) : null
@@ -413,7 +376,7 @@ export default function PanelDashboard({ db, toast, saveDB }) {
               { label: prevDate.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: lastMonthMin, color:'var(--text3)', bar:'var(--bg-400)' },
               { label: now.toLocaleDateString('es-ES', { month:'short', year:'numeric' }), val: monthMin, color:'var(--primary-light)', bar:'linear-gradient(90deg,var(--primary),var(--accent))' },
             ].map(({ label, val, color, bar }) => {
-              const pct = Math.round(val / Math.max(monthMin, lastMonthMin) * 100)
+              const pct = Math.round(val / Math.max(monthMin, lastMonthMin, 1) * 100)
               return (
                 <div key={label}>
                   <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', marginBottom:4 }}>{label}</div>

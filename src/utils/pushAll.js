@@ -1,3 +1,4 @@
+// Helper compartido para envío push masivo — usado por el modal de topbar y por PushNotifWidget
 export async function callSendPushAll(titleText, bodyText, targetValue) {
   const headers = { 'Content-Type': 'application/json' }
   const tgt = (targetValue === 'all' || targetValue === 'activos') ? targetValue : { role: targetValue }
