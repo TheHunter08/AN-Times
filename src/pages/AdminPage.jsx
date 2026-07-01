@@ -385,7 +385,8 @@ export default function AdminPage() {
             </>
           ) : isEncargado ? (
             <>
-              {currentAdminPage === 'miobra'   && <PanelMiObra  db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'miobra'   && <PanelMiObra   db={db} toast={toast} saveDB={saveDB} session={session} />}
+              {currentAdminPage === 'fichajes' && <PanelFichajes db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'mensajes' && <PanelMensajes db={db} toast={toast} saveDB={saveDB} session={session} />}
             </>
           ) : (
