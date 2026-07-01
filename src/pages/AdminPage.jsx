@@ -846,6 +846,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
 function PanelSolicitudes({ db, toast, saveDB, session }) {
   const [solTab, setSolTab] = useState('vacaciones')
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
+  const [vacForm, setVacForm] = useState({ empId:'', fechaInicio:today(), fechaFin:today(), motivo:'' })
   const [rejecting, setRejecting] = useState(null)  // id de vacación pendiente de rechazar
   const [rejMotivo, setRejMotivo] = useState('')
   const [editCorrId, setEditCorrId] = useState(null)
@@ -869,6 +870,28 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
       queuePush(v.empId, noti.action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
     }
     toast(estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
+  }
+
+  // Alta directa de vacaciones (admin / jefe de obra) — quedan aprobadas de inmediato,
+  // sin pasar por el flujo de solicitud+aprobación del empleado. Días naturales (no laborables).
+  const assignVac = () => {
+    if (!vacForm.empId || !vacForm.fechaInicio || !vacForm.fechaFin) { toast('Selecciona empleado y fechas'); return }
+    if (vacForm.fechaFin < vacForm.fechaInicio) { toast('La fecha fin no puede ser anterior al inicio', 3500, 'err'); return }
+    const emp = emps.find(e => e.id === vacForm.empId)
+    const dias = Math.round((new Date(vacForm.fechaFin + 'T00:00:00') - new Date(vacForm.fechaInicio + 'T00:00:00')) / 86400000) + 1
+    const item = {
+      id: gid(), empId: vacForm.empId, empName: emp?.name || '',
+      fechaInicio: vacForm.fechaInicio, fechaFin: vacForm.fechaFin, dias,
+      motivo: vacForm.motivo || 'Vacaciones asignadas', estado: 'aprobada',
+      ts: new Date().toISOString(), resolvedAt: new Date().toISOString(),
+      asignadaPor: session?.user?.name || 'Admin'
+    }
+    const withAudit = auditLog(db, 'Vacaciones asignadas', `${item.empName} · ${fds(item.fechaInicio)} → ${fds(item.fechaFin)} (${dias}d)`, session?.user?.name || 'Admin')
+    const noti = { id: gid(), empId: vacForm.empId, action: '🌴 Vacaciones asignadas', detail: `${fds(item.fechaInicio)} → ${fds(item.fechaFin)}`, ts: new Date().toISOString(), leido: false }
+    saveDB({ vacaciones: [...(db.vacaciones || []), item], audit: withAudit.audit, notis: [...(db.notis || []), noti] })
+    queuePush(vacForm.empId, noti.action, noti.detail, 'vacaciones', '/?go=emp:vacaciones')
+    setVacForm(f => ({ ...f, empId:'', motivo:'' }))
+    toast('Vacaciones asignadas — no podrá fichar esos días', 3500, 'ok')
   }
 
   const allAus = [
@@ -1015,6 +1038,38 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
 
       {solTab === 'vacaciones' && (
         <>
+          {/* Alta directa de vacaciones */}
+          <div className="dash-widget" style={{ marginBottom:20 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Asignar vacaciones a un empleado</div>
+            <div className="field-row">
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Empleado</label>
+                <select value={vacForm.empId} onChange={e => setVacForm(f => ({ ...f, empId:e.target.value }))}>
+                  <option value="">Selecciona empleado</option>
+                  {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Motivo (opcional)</label>
+                <input value={vacForm.motivo} onChange={e => setVacForm(f => ({ ...f, motivo:e.target.value }))} placeholder="Vacaciones de verano…" />
+              </div>
+            </div>
+            <div className="field-row" style={{ marginTop:10 }}>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha inicio</label>
+                <input type="date" value={vacForm.fechaInicio} onChange={e => setVacForm(f => ({ ...f, fechaInicio:e.target.value }))} />
+              </div>
+              <div className="field" style={{ marginBottom:0 }}>
+                <label>Fecha fin</label>
+                <input type="date" value={vacForm.fechaFin} min={vacForm.fechaInicio} onChange={e => setVacForm(f => ({ ...f, fechaFin:e.target.value }))} />
+              </div>
+            </div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginTop:10, marginBottom:14 }}>
+              Días naturales (incluye fines de semana). Quedan aprobadas al instante y el empleado no podrá fichar hasta que terminen.
+            </div>
+            <button className="btn btn-primary" onClick={assignVac} style={{ width:'100%' }}>🌴 Asignar vacaciones</button>
+          </div>
+
           {pend.length > 0 && (
             <>
               <div className="section-header">Pendientes de revisión</div>

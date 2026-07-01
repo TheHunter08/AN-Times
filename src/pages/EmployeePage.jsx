@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
-import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart } from '../utils/time.js'
+import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds } from '../utils/time.js'
 import { VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
@@ -502,6 +502,14 @@ export default function EmployeePage() {
   const doStart = () => {
     if (timer.state !== 'idle') return
     if (activeModal === 'selCentro' || startingRef.current) return
+    const todayStr = today()
+    const activeVac = (db.vacaciones || []).find(v =>
+      v.empId === u?.id && v.estado === 'aprobada' && v.fechaInicio <= todayStr && v.fechaFin >= todayStr
+    )
+    if (activeVac) {
+      toast(`🌴 Estás de vacaciones hasta el ${fds(activeVac.fechaFin)}. No puedes fichar hasta que terminen.`, 5000, 'warn')
+      return
+    }
     startingRef.current = true
     setTimeout(() => { startingRef.current = false }, 10000)
     const cs = db.centrosTrabajo || []
