@@ -75,7 +75,7 @@ export function mergeDB(base, incoming) {
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
-    records:             (incoming.records?.length > 0)    ? incoming.records.filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())) : base.records,
+    records:             _unionById(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
     vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones),
     medicos:             _unionById(base.medicos,             incoming.medicos),
     ausencias:           _unionById(base.ausencias,           incoming.ausencias),
@@ -94,6 +94,7 @@ export function mergeDB(base, incoming) {
     turnos:              _unionById(base.turnos,              incoming.turnos),
     anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas),
     notisSent:           mergedNotisSent,
+    pinLockouts:         { ...(incoming.pinLockouts || {}), ...(base.pinLockouts || {}) },
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
   }

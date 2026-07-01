@@ -127,6 +127,7 @@ export const INITIAL_DB = {
   turnos: [],
   anomalias_vistas: [],
   notisSent: {},
+  pinLockouts: {},
   config: { adminEmails: ['ismael.angeles.c@live.com'] },
   _ts: 0
 }
