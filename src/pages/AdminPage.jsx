@@ -538,8 +538,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const [filterDate, setFilterDate] = useState('')
   const [filterEmp, setFilterEmp] = useState('')
   const [quickFilter, setQuickFilter] = useState('mes')
-  const [editingRec, setEditingRec] = useState(null) // { id, field: 'inicio'|'fin', value }
-  const [editMotivo, setEditMotivo] = useState('')
+  const [editModal, setEditModal] = useState(null) // { id, inicio, fin, motivo }
   const [deletingId, setDeletingId] = useState(null)
   const [delMotivo, setDelMotivo] = useState('')
   const [pageSize, setPageSize] = useState(100)
@@ -585,6 +584,31 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     toast('Fichaje eliminado')
     setDeletingId(null); setDelMotivo('')
+  }
+
+  const openEditModal = (r) => setEditModal({ id: r.id, inicio: r.inicio?.slice(0,16) || '', fin: r.fin?.slice(0,16) || '', motivo: '' })
+
+  const saveEditModal = () => {
+    if (!editModal.motivo?.trim()) { toast('Indica el motivo del cambio', 3500, 'err'); return }
+    const r = (db.records||[]).find(rec => rec.id === editModal.id)
+    if (!r) return
+    const motivo = editModal.motivo.trim()
+    const newInicio = new Date(editModal.inicio).toISOString()
+    const newFin = editModal.fin ? new Date(editModal.fin).toISOString() : r.fin
+    if (newFin && newInicio >= newFin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
+    const empRecs = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
+    if (empRecs.some(rec => newInicio < rec.fin && (newFin || newInicio) > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
+    const updated = (db.records||[]).map(rec => {
+      if (rec.id !== r.id) return rec
+      const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin })
+      const corr = { campo:'inicio+fin', antes: `${ftime(rec.inicio)}–${ftime(rec.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
+      return { ...rec, inicio: newInicio, fin: newFin, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
+    })
+    const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
+    saveDB({ records: updated, audit: withAudit.audit })
+    queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    setEditModal(null)
+    toast('Fichaje actualizado', 3000, 'ok')
   }
 
   const downloadCSV = () => {
@@ -693,94 +717,15 @@ function PanelFichajes({ db, toast, saveDB, session }) {
               </div>
               <div className="fich-block">
                 <span className="fich-block-lbl">Entrada</span>
-                <span className="fich-block-val">
-                    {editingRec?.id === r.id && editingRec?.field === 'inicio' ? (
-                      <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'stretch', minWidth:180 }}>
-                        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                          <input type="datetime-local" defaultValue={r.inicio?.slice(0,16) || ''} id="edit-rec-input"
-                            style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit', width:155 }} />
-                        </div>
-                        <input type="text" placeholder="Motivo del cambio (obligatorio)" value={editMotivo} maxLength={200}
-                          onChange={e => setEditMotivo(e.target.value)}
-                          style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit' }} />
-                        <div style={{ display:'flex', gap:4 }}>
-                          <button className="btn btn-sm btn-primary" style={{ fontSize:10, padding:'3px 8px', flex:1 }} disabled={!editMotivo.trim()}
-                            onClick={() => {
-                              const val = document.getElementById('edit-rec-input').value
-                              if (!val) return
-                              const newInicio = new Date(val).toISOString()
-                              if (r.fin && newInicio >= r.fin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
-                              const empRecs = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
-                              if (empRecs.some(rec => newInicio < rec.fin && (r.fin || newInicio) > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
-                              const motivo = editMotivo.trim()
-                              const updated = (db.records||[]).map(rec => {
-                                if (rec.id !== r.id) return rec
-                                const t2 = calcSecs({ ...rec, inicio: newInicio })
-                                const corr = { campo:'inicio', antes: rec.inicio, despues: newInicio, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
-                                return { ...rec, inicio: newInicio, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
-                              })
-                              const withAudit = auditLog(db, 'Hora entrada editada', `${r.empName}: ${ftime(r.inicio)} → ${ftime(newInicio)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-                              saveDB({ records: updated, audit: withAudit.audit })
-                              queuePush(r.empId, '✏️ Hora de entrada corregida', `${session?.user?.name || 'Un responsable'} corrigió tu entrada del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-                              setEditingRec(null); setEditMotivo('')
-                              toast('Hora de entrada actualizada', 3000, 'ok')
-                            }}>✓ Guardar</button>
-                          <button className="btn btn-sm btn-secondary" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => { setEditingRec(null); setEditMotivo('') }}>✕</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span style={{ cursor:'pointer', textDecoration:'underline dotted', textUnderlineOffset:2, display:'inline-flex', alignItems:'center', gap:3 }}
-                        title={r.correcciones?.length ? `Editado ${r.correcciones.length}x — última: ${r.correcciones[r.correcciones.length-1].motivo}` : 'Click para editar'}
-                        onClick={() => { setEditingRec({ id:r.id, field:'inicio' }); setEditMotivo('') }}>
-                        {ftime(r.inicio)}
-                        {r.correcciones?.some(c => c.campo === 'inicio') && <span style={{ fontSize:9, color:'var(--orange)' }}>✏️</span>}
-                      </span>
-                    )}
-                </span>
+                <span className="fich-block-val">{ftime(r.inicio)}</span>
               </div>
               <div className="fich-block">
                 <span className="fich-block-lbl">Salida</span>
-                <span className="fich-block-val">
-                    {editingRec?.id === r.id && editingRec?.field === 'fin' ? (
-                      <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'stretch', minWidth:180 }}>
-                        <input type="datetime-local" defaultValue={r.fin?.slice(0,16)} id="edit-rec-fin-input"
-                          style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit', width:155 }} />
-                        <input type="text" placeholder="Motivo del cambio (obligatorio)" value={editMotivo} maxLength={200}
-                          onChange={e => setEditMotivo(e.target.value)}
-                          style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid var(--border2)', background:'var(--bg-500)', color:'var(--text)', fontFamily:'inherit' }} />
-                        <div style={{ display:'flex', gap:4 }}>
-                          <button className="btn btn-sm btn-primary" style={{ fontSize:10, padding:'3px 8px', flex:1 }} disabled={!editMotivo.trim()}
-                            onClick={() => {
-                              const val = document.getElementById('edit-rec-fin-input').value
-                              if (!val) return
-                              const newFin = new Date(val).toISOString()
-                              if (newFin <= r.inicio) { toast('La salida debe ser posterior a la entrada', 3500, 'err'); return }
-                              const empRecs2 = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
-                              if (empRecs2.some(rec => r.inicio < rec.fin && newFin > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
-                              const motivo = editMotivo.trim()
-                              const updated = (db.records||[]).map(rec => {
-                                if (rec.id !== r.id) return rec
-                                const t2 = calcSecs({ ...rec, fin: newFin })
-                                const corr = { campo:'fin', antes: rec.fin, despues: newFin, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
-                                return { ...rec, fin: newFin, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
-                              })
-                              const withAudit = auditLog(db, 'Hora salida editada', `${r.empName}: ${ftime(r.fin)} → ${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-                              saveDB({ records: updated, audit: withAudit.audit })
-                              queuePush(r.empId, '✏️ Hora de salida corregida', `${session?.user?.name || 'Un responsable'} corrigió tu salida del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-                              setEditingRec(null); setEditMotivo('')
-                              toast('Hora de salida actualizada', 3000, 'ok')
-                            }}>✓ Guardar</button>
-                          <button className="btn btn-sm btn-secondary" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => { setEditingRec(null); setEditMotivo('') }}>✕</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span style={{ cursor:'pointer', textDecoration:'underline dotted', textUnderlineOffset:2, display:'inline-flex', alignItems:'center', gap:3 }}
-                        title={r.correcciones?.length ? `Editado ${r.correcciones.length}x — última: ${r.correcciones[r.correcciones.length-1].motivo}` : 'Click para editar'}
-                        onClick={() => { setEditingRec({ id:r.id, field:'fin' }); setEditMotivo('') }}>
-                        {ftime(r.fin)}
-                        {r.correcciones?.some(c => c.campo === 'fin') && <span style={{ fontSize:9, color:'var(--orange)' }}>✏️</span>}
-                      </span>
-                    )}
+                <span className="fich-block-val" style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+                  {ftime(r.fin)}
+                  {r.correcciones?.length > 0 && (
+                    <span style={{ fontSize:9, color:'var(--orange)' }} title={`Editado ${r.correcciones.length}x — última: ${r.correcciones[r.correcciones.length-1].motivo}`}>✏️</span>
+                  )}
                 </span>
               </div>
               <div className="fich-block">
@@ -818,7 +763,10 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                       ) : r.fin ? <span style={{ fontSize:10, color:'var(--text4)' }}>⏹ —</span> : null}
                 </div>
               </div>
-              <button className="btn btn-sm btn-danger" onClick={() => { setDeletingId(r.id); setDelMotivo('') }}>✕</button>
+              <div style={{ display:'flex', gap:6 }}>
+                <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(r)}>✏️ Editar</button>
+                <button className="btn btn-sm btn-danger" onClick={() => { setDeletingId(r.id); setDelMotivo('') }}>✕</button>
+              </div>
             </div>
           )
         })}
@@ -842,6 +790,31 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           <button className="btn btn-secondary" onClick={() => setPageSize(s => s + 100)}>
             Ver más ({filtered.length - pageSize} restantes)
           </button>
+        </div>
+      )}
+
+      {editModal && (
+        <div className="modal-ov center" onClick={() => setEditModal(null)}>
+          <div className="modal center-modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380, width:'calc(100% - 32px)' }}>
+            <h2 style={{ margin:'0 0 16px', fontSize:16 }}>Editar fichaje</h2>
+            <div className="field" style={{ marginBottom:12 }}>
+              <label>ENTRADA</label>
+              <input type="datetime-local" value={editModal.inicio} onChange={e => setEditModal(m => ({ ...m, inicio:e.target.value }))} />
+            </div>
+            <div className="field" style={{ marginBottom:12 }}>
+              <label>SALIDA</label>
+              <input type="datetime-local" value={editModal.fin} onChange={e => setEditModal(m => ({ ...m, fin:e.target.value }))} />
+            </div>
+            <div className="field" style={{ marginBottom:16 }}>
+              <label>MOTIVO DEL CAMBIO (obligatorio)</label>
+              <input type="text" maxLength={200} placeholder="Ej: olvidó fichar la salida…"
+                value={editModal.motivo || ''} onChange={e => setEditModal(m => ({ ...m, motivo:e.target.value }))} />
+            </div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={() => setEditModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={!editModal.motivo?.trim()} onClick={saveEditModal}>Guardar</button>
+            </div>
+          </div>
         </div>
       )}
 
