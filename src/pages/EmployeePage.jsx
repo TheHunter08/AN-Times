@@ -415,7 +415,7 @@ export default function EmployeePage() {
             const closeTime = new Date().toISOString()
             const breaks2 = [...(freshRec.breaks || [])]
             const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
-            const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime }
+            const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime, _upd: closeTime }
             const snapshot = dbRef.current.records
             const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
             const dbWithAudit = auditLog(dbRef.current, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
@@ -550,7 +550,8 @@ export default function EmployeePage() {
     const rec = {
       id: gid(), empId: u.id, empName: u.name, empresa: u.empresa || '',
       centro, inicio: new Date().toISOString(), fin: null,
-      workSecs: 0, breakSecs: 0, enDescanso: false, bStartTs: null, breaks: [], closed: false
+      workSecs: 0, breakSecs: 0, enDescanso: false, bStartTs: null, breaks: [], closed: false,
+      _upd: new Date().toISOString()
     }
     if (pendingGPS) rec.locInicio = pendingGPS
     // Geofencing: warn if employee is outside the obra's defined radius
@@ -585,7 +586,7 @@ export default function EmployeePage() {
       let enDescanso = o.enDescanso
       let bStartTs = o.bStartTs
       if (enDescanso && bStartTs) { breaks.push({ start: bStartTs, end: now }); enDescanso = false; bStartTs = null }
-      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true }
+      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true, _upd: now }
       const t = calcSecs(closed)
       closed.workSecs = t.work; closed.breakSecs = t.brk
       const records = db.records.map(r => r.id === o.id ? closed : r)
@@ -621,11 +622,11 @@ export default function EmployeePage() {
     let updated
     if (o.enDescanso) {
       const breaks = [...(o.breaks || []), { start: o.bStartTs, end: now }]
-      updated = { ...o, breaks, breakSecs: calcSecs({ ...o, breaks }).brk, enDescanso: false, bStartTs: null }
+      updated = { ...o, breaks, breakSecs: calcSecs({ ...o, breaks }).brk, enDescanso: false, bStartTs: null, _upd: now }
       try { navigator.vibrate(10) } catch {}
       toast('▶️ Descanso finalizado')
     } else {
-      updated = { ...o, enDescanso: true, bStartTs: now }
+      updated = { ...o, enDescanso: true, bStartTs: now, _upd: now }
       try { navigator.vibrate(10) } catch {}
       toast('⏸️ Descanso iniciado')
     }

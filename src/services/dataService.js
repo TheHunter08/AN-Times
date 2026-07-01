@@ -54,6 +54,28 @@ function _unionById(base, incoming) {
   return [...map.values()]
 }
 
+// ── _mergeRecords ──────────────────────────────────────────────────────────────
+// Igual que _unionById, pero para `records` no basta con "incoming gana": si el
+// empleado cerró jornada o marcó descanso en modo oficina (offline) y el pull de
+// reconexión llega antes de que el push offline confirme, el remoto (viejo) pisaría
+// el cierre/descanso local. Por eso comparamos `_upd` y nos quedamos con el más nuevo.
+function _mergeRecords(base, incoming) {
+  const b = Array.isArray(base) ? base : []
+  const i = Array.isArray(incoming) ? incoming : []
+  if (i.length === 0) return b
+  if (b.length === 0) return i
+  const map = new Map()
+  for (const item of b) map.set(item.id, item)
+  for (const item of i) {
+    const cur = map.get(item.id)
+    if (!cur) { map.set(item.id, item); continue }
+    const curTs  = cur._upd  ? Date.parse(cur._upd)  : 0
+    const itemTs = item._upd ? Date.parse(item._upd) : 0
+    if (itemTs >= curTs) map.set(item.id, item)
+  }
+  return [...map.values()]
+}
+
 // ── mergeDB ───────────────────────────────────────────────────────────────────
 export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
@@ -75,7 +97,7 @@ export function mergeDB(base, incoming) {
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
-    records:             _unionById(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
+    records:             _mergeRecords(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
     vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones),
     medicos:             _unionById(base.medicos,             incoming.medicos),
     ausencias:           _unionById(base.ausencias,           incoming.ausencias),

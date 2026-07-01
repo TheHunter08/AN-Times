@@ -376,8 +376,13 @@ export default function App() {
     // Cuando vuelva internet: marcar sync y refrescar (con delay para que BG sync empuje primero)
     const onOnline = () => {
       useAppStore.setState(s => s.offlinePending ? { syncStatus: 'syncing' } : {})
-      // Delay: let Background Sync push offline data before pulling from server
-      setTimeout(() => { if (navigator.onLine) fetchDB() }, 3000)
+      // Delay: let Background Sync push offline data before pulling from server.
+      // Si aún hay cambios locales sin subir (offlinePending), no tirar del servidor
+      // todavía — el evento times-synced/BG_SYNC_DONE hará el fetchDB en cuanto el
+      // push offline se confirme, evitando pisar un cierre/descanso hecho en modo oficina.
+      setTimeout(() => {
+        if (navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+      }, 3000)
     }
     window.addEventListener('online', onOnline)
     return () => {
