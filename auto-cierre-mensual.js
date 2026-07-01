@@ -3,6 +3,7 @@
 // y envía notificación push para que los firmen.
 
 import { createHash } from 'crypto'
+import { buildCierreIndividualPDF } from './src/utils/cierrePdf.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -76,6 +77,7 @@ async function main() {
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const cierres = db.cierres || []
   const records = db.records || []
+  const empresa = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
 
   const nuevos = []
   for (const e of emps) {
@@ -89,7 +91,7 @@ async function main() {
       continue
     }
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    nuevos.push({
+    const cierre = {
       id: gid(),
       empId: e.id,
       empName: e.name,
@@ -103,7 +105,15 @@ async function main() {
       records_snapshot: eRecs.map(r => ({
         inicio: r.inicio, fin: r.fin, centro: r.centro, workSecs: r.workSecs || 0,
       })),
-    })
+    }
+    try {
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre, empresa })
+      cierre.pdfData = dataUrl
+      console.log(`  ${e.name}: PDF generado`)
+    } catch (err) {
+      console.warn(`  ${e.name}: no se pudo generar el PDF —`, err.message)
+    }
+    nuevos.push(cierre)
   }
 
   if (!nuevos.length) {

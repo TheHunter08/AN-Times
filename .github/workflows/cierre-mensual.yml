@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - run: npm install pdf-lib --no-save
       - name: Generar cierres del mes anterior
         env:
           VITE_SB_URL: ${{ secrets.VITE_SB_URL }}

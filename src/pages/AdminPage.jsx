@@ -576,6 +576,15 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
   const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
 
+  // Un cierre "pendiente" es una foto fija de las horas en el momento en que se generó.
+  // Si se edita/borra un fichaje de ese mes antes de que el empleado firme, el PDF que
+  // firmará ya no coincidirá con los registros reales — avisamos, sin bloquear.
+  const pendingCierreWarning = (empId, inicio) => {
+    const mes = inicio?.slice(0, 7)
+    const c = (db.cierres || []).find(c => c.empId === empId && c.mes === mes && c.estado === 'pendiente')
+    return c ? ` ⚠️ Este mes ya tiene un cierre generado pendiente de firma — no se actualizará solo, revísalo en Informes.` : ''
+  }
+
   const confirmDelete = () => {
     if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
     const rec = (db.records||[]).find(r => r.id === deletingId)
@@ -583,7 +592,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
     saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit })
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    toast('Fichaje eliminado')
+    const warn = rec ? pendingCierreWarning(rec.empId, rec.inicio) : ''
+    toast('Fichaje eliminado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setDeletingId(null); setDelMotivo('')
   }
 
@@ -609,7 +619,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     saveDB({ records: updated, audit: withAudit.audit })
     queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     setEditModal(null)
-    toast('Fichaje actualizado', 3000, 'ok')
+    const warn = pendingCierreWarning(r.empId, r.inicio)
+    toast('Fichaje actualizado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
   }
 
   const downloadCSV = () => {
@@ -3070,7 +3081,10 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     const withAudit = auditLog(db, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
     saveDB({ records: updated, audit: withAudit.audit })
     queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} corrigió tu jornada del ${fds(editing.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    toast('Jornada modificada', 3000, 'ok')
+    const mesRec = rec.inicio?.slice(0, 7)
+    const cierrePend = (db.cierres || []).find(c => c.empId === rec.empId && c.mes === mesRec && c.estado === 'pendiente')
+    const warn = cierrePend ? ' ⚠️ Este mes ya tiene un cierre pendiente de firma — no se actualiza solo.' : ''
+    toast('Jornada modificada' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setEditing(null)
   }
 
