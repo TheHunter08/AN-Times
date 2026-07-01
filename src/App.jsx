@@ -373,10 +373,12 @@ export default function App() {
     window.addEventListener('times-synced', onSynced)
     const onSaveFailed = () => useAppStore.getState().toast('No se pudo guardar tras varios intentos. Comprueba la conexión.', 5000, 'err')
     window.addEventListener('times-save-failed', onSaveFailed)
-    // Cuando vuelva internet, marcar para re-sync
-    const onOnline = () => useAppStore.setState(s =>
-      s.offlinePending ? { syncStatus: 'syncing' } : {}
-    )
+    // Cuando vuelva internet: marcar sync y refrescar (con delay para que BG sync empuje primero)
+    const onOnline = () => {
+      useAppStore.setState(s => s.offlinePending ? { syncStatus: 'syncing' } : {})
+      // Delay: let Background Sync push offline data before pulling from server
+      setTimeout(() => { if (navigator.onLine) fetchDB() }, 3000)
+    }
     window.addEventListener('online', onOnline)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
