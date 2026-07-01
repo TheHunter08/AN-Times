@@ -40,25 +40,44 @@ async function sbDeletePushSub(userId) {
   }).catch(() => {})
 }
 
+async function sbMarkSent(current, key, value) {
+  if (!current) return
+  const merged = { ...current, notisSent: { ...(current.notisSent || {}), [key]: value }, _ts: Date.now() }
+  await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method: 'PATCH',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ data: merged, updated_at: new Date().toISOString() })
+  }).catch(e => console.warn('sbMarkSent error', e.message))
+}
+
 async function run() {
   const now         = new Date()
   const madridFmt   = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit' })
   const madridHFmt  = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', weekday:'long' })
   const madridHHFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', hour:'numeric', hour12: false })
+  const madridMMFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', minute:'numeric' })
   const todayStr    = madridFmt.format(now)
   const weekday     = madridHFmt.format(now)
   const hh          = parseInt(madridHHFmt.format(now))
+  const mm          = parseInt(madridMMFmt.format(now))
+  const slotMin     = mm < 30 ? 0 : 30 // el workflow corre a :00 y :30
 
   console.log(`Madrid: ${now.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} | Día: ${weekday}`)
 
-  const [db] = await Promise.all([sbReadData()])
-  const semanalTimes = db?.config?.reminders?.semanal?.length
+  const db = await sbReadData()
+  if (!db) { console.log('No se pudo leer Supabase.'); return }
+
+  const semanalTimes = db.config?.reminders?.semanal?.length
     ? db.config.reminders.semanal
     : ['17:00']
-  const matchHour = semanalTimes.some(t => parseInt(t.split(':')[0]) === hh)
+  // Coincide si la hora configurada cae en la misma franja de 30 min que se está ejecutando ahora
+  const matched = semanalTimes.find(t => {
+    const [th, tm] = t.split(':').map(Number)
+    return th === hh && (tm < 30 ? 0 : 30) === slotMin
+  })
 
-  if (!weekday.toLowerCase().includes('fri') || !matchHour) {
-    console.log(`No es viernes o no coincide hora (${hh}:xx vs [${semanalTimes}]) — nada que hacer.`)
+  if (!weekday.toLowerCase().includes('fri') || !matched) {
+    console.log(`No es viernes o no coincide franja (${hh}:${p2(slotMin)} vs [${semanalTimes}]) — nada que hacer.`)
     return
   }
 
@@ -68,9 +87,14 @@ async function run() {
   monday.setDate(todayDate.getDate() - (dow === 0 ? 6 : dow - 1))
   const mondayStr = madridFmt.format(monday)
 
+  const dedupKey = `an_weekly_${mondayStr}_${matched.replace(':', '')}`
+  if (db.notisSent?.[dedupKey]) {
+    console.log(`Resumen ya enviado para esta franja (${matched}) — nada que hacer.`)
+    return
+  }
+
   console.log(`Semana: ${mondayStr} → ${todayStr}`)
 
-  if (!db) { console.log('No se pudo leer Supabase.'); return }
   const pushSubs = await sbReadPushSubs()
 
   const employees = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
@@ -127,6 +151,7 @@ async function run() {
     }
   }
 
+  await sbMarkSent(db, dedupKey, true)
   console.log(`✓ Resumen semanal enviado a ${enviados}/${employees.length} empleados`)
 }
 

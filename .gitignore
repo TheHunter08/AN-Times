@@ -4,5 +4,7 @@ functions/node_modules/
 *.log
 .env
 .env.local
+.env.vercel
 dist/
 .vercel
+test-results/
