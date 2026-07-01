@@ -169,14 +169,19 @@ export default async function handler(req, res) {
 
       // ── 1. Recordatorio de fichaje ──────────────────────────────────────────
       {
-        const remTime = emp.reminderTime || '08:30'
-        const [rh, rm] = safeTimeSplit(remTime, '08:30')
-        const key = 'an_rem_' + emp.id
-        if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {
-          schedule(emp, sub, key, today,
-            '⏰ Recordatorio de fichaje',
-            '¿Has fichado hoy? No olvides registrar tu jornada laboral.',
-            'reminder-fichar', '/?tab=inicio')
+        const entradaTimes = db.config?.reminders?.entrada?.length
+          ? db.config.reminders.entrada
+          : (emp.reminderTime ? [emp.reminderTime] : ['08:30'])
+        for (const remTime of entradaTimes) {
+          const [rh, rm] = safeTimeSplit(remTime, '08:30')
+          const slot = remTime.replace(':', '')
+          const key  = `an_rem_${emp.id}_${slot}`
+          if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {
+            schedule(emp, sub, key, today,
+              '⏰ Recordatorio de fichaje',
+              '¿Has fichado hoy? No olvides registrar tu jornada laboral.',
+              'reminder-fichar', '/?tab=inicio')
+          }
         }
       }
 
@@ -197,16 +202,21 @@ export default async function handler(req, res) {
 
       // ── 3. Salida olvidada ──────────────────────────────────────────────────
       if (openRec) {
-        const salidaT = emp.salidaTime || cfgSalidaTime
-        const [sh, sm] = safeTimeSplit(salidaT, '21:00')
-        const key = 'an_salida_' + openRec.id
-        if (!notisSent[key] && ((nowH - sh) * 60 + (nowM - sm)) >= 0) {
-          const elapsedMin = Math.floor((nowMs - new Date(openRec.inicio).getTime()) / 60000)
-          const hh = Math.floor(elapsedMin / 60), mm2 = Math.floor(elapsedMin % 60)
-          schedule(emp, sub, key, '1',
-            '🔔 ¿Olvidaste fichar la salida?',
-            `Llevas ${hh}h ${p2(mm2)}m con la jornada abierta. ¿Ya has terminado?`,
-            'jornada', '/?tab=jornada')
+        const salidaTimes = db.config?.reminders?.salida?.length
+          ? db.config.reminders.salida
+          : [emp.salidaTime || cfgSalidaTime || '21:00']
+        for (const salidaT of salidaTimes) {
+          const [sh, sm] = safeTimeSplit(salidaT, '21:00')
+          const slot = salidaT.replace(':', '')
+          const key  = `an_salida_${openRec.id}_${slot}`
+          if (!notisSent[key] && ((nowH - sh) * 60 + (nowM - sm)) >= 0) {
+            const elapsedMin = Math.floor((nowMs - new Date(openRec.inicio).getTime()) / 60000)
+            const hh2 = Math.floor(elapsedMin / 60), mm2 = Math.floor(elapsedMin % 60)
+            schedule(emp, sub, key, '1',
+              '🔔 ¿Olvidaste fichar la salida?',
+              `Llevas ${hh2}h ${p2(mm2)}m con la jornada abierta. ¿Ya has terminado?`,
+              'jornada', '/?tab=jornada')
+          }
         }
       }
 
@@ -239,9 +249,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── 6. Alerta a admin/JO: jornada abierta > 10h ────────────────────────
+    // ── 6. Alerta a admin/JO: jornada abierta > umbral configurable ───────────
     {
-      const ALERT_MIN = 600 // 10 horas
+      const ALERT_MIN = Math.round((db.config?.reminders?.alertHoras ?? 10) * 60)
       const allEmps = db.employees || []
       const longRecs = records.filter(r => {
         if (r.fin) return false

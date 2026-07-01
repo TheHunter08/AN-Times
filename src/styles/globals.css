@@ -5453,10 +5453,17 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 
 /* ── Reloj: en pantallas muy estrechas, ocultar descripción del tiempo
    para que el pill no desplace los segundos ──────────────────────── */
-@media (max-width: 375px) {
-  .v3-weather-desc { display: none; }
-  .v30-hc-hm { font-size: 50px !important; letter-spacing: -4px !important; }
-  .v30-hc-sec { font-size: 23px !important; }
+/* En móvil (< 640px) ocultar la descripción del clima para que no
+   se solape con el reloj — solo mostrar icono + temperatura */
+.v3-weather-desc { display: none; }
+@media (min-width: 640px) {
+  .v3-weather-desc { display: inline; }
+}
+
+/* En móvil (< 600px) reducir fuente del reloj para evitar solapamiento */
+@media (max-width: 600px) {
+  .v30-hc-hm { font-size: 48px !important; letter-spacing: -4px !important; }
+  .v30-hc-sec { font-size: 22px !important; }
 }
 
 /* ── Clock (old, kept for compat) ───────────────────────────── */

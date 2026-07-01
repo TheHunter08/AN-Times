@@ -3,6 +3,30 @@ import { auditLog } from '../../services/dataService.js'
 
 const COLOR_PRESETS = ['#6C63FF','#2563EB','#7c3aed','#0891b2','#059669','#dc2626','#d97706','#db2777']
 
+function TimeList({ label, desc, times, onChange }) {
+  const add    = ()    => onChange([...times, '09:00'])
+  const remove = i     => onChange(times.filter((_, idx) => idx !== i))
+  const update = (i,v) => onChange(times.map((t, idx) => idx === i ? v : t))
+  return (
+    <div>
+      <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, textTransform:'uppercase', letterSpacing:.8 }}>{label}</div>
+      {desc && <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, opacity:.7 }}>{desc}</div>}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+        {times.map((t, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-500)', borderRadius:10, padding:'6px 10px', border:'1px solid var(--border)' }}>
+            <input type="time" value={t} onChange={e => update(i, e.target.value)}
+              style={{ background:'none', border:'none', color:'var(--text)', fontSize:14, fontWeight:700, cursor:'pointer', outline:'none', width:80 }} />
+            {times.length > 1 &&
+              <button onClick={() => remove(i)} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', fontSize:13, padding:0, lineHeight:1 }}>✕</button>
+            }
+          </div>
+        ))}
+        <button className="btn btn-secondary btn-sm" onClick={add} style={{ fontSize:12 }}>+ Hora</button>
+      </div>
+    </div>
+  )
+}
+
 export default function PanelAjustes({ db, toast, saveDB, session }) {
   const cfg = db.config || {}
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
@@ -13,6 +37,12 @@ export default function PanelAjustes({ db, toast, saveDB, session }) {
   const [usarFestivosMadrid, setUsarFestivosMadrid] = useState(cfg.usarFestivosMadrid !== false)
   const [newFestivoFecha, setNewFestivoFecha] = useState('')
   const [newFestivoNombre, setNewFestivoNombre] = useState('')
+  const [reminders, setReminders] = useState({
+    entrada:   cfg.reminders?.entrada?.length ? cfg.reminders.entrada : ['08:30'],
+    salida:    cfg.reminders?.salida?.length  ? cfg.reminders.salida  : ['20:00'],
+    semanal:   cfg.reminders?.semanal?.length ? cfg.reminders.semanal : ['17:00'],
+    alertHoras: cfg.reminders?.alertHoras ?? 10,
+  })
   const [saving, setSaving] = useState(false)
   const backupRef = useRef(null)
 
@@ -54,7 +84,7 @@ export default function PanelAjustes({ db, toast, saveDB, session }) {
     setSaving(true)
     const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
     const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
-    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid }
+    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid, reminders }
     const withAudit = auditLog(db, 'Configuración guardada', companyName || 'Ajustes', session?.user?.name || 'Admin')
     saveDB({ config, audit: withAudit.audit })
     toast('Ajustes guardados', 3000, 'ok')
@@ -171,6 +201,43 @@ export default function PanelAjustes({ db, toast, saveDB, session }) {
                 <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--primary)' }} />
                 Chip
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+        <div className="dash-widget-header">
+          <div className="dash-widget-title">🔔 Recordatorios automáticos</div>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:18, marginTop:4 }}>
+          <TimeList
+            label="Recordatorio de entrada"
+            desc="Se envía si el empleado no ha fichado aún a esa hora (L–V)"
+            times={reminders.entrada}
+            onChange={v => setReminders(r => ({ ...r, entrada: v }))}
+          />
+          <TimeList
+            label="Recordatorio de salida olvidada"
+            desc="Se envía si el empleado tiene la jornada abierta a esa hora"
+            times={reminders.salida}
+            onChange={v => setReminders(r => ({ ...r, salida: v }))}
+          />
+          <TimeList
+            label="Resumen semanal (viernes)"
+            desc="Envía el resumen de horas de la semana cada viernes a esa hora"
+            times={reminders.semanal}
+            onChange={v => setReminders(r => ({ ...r, semanal: v }))}
+          />
+          <div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, textTransform:'uppercase', letterSpacing:.8 }}>Alerta jornada muy larga</div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, opacity:.7 }}>Avisa al admin si un empleado lleva más de X horas con la jornada abierta</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <input type="number" min="1" max="24" step="0.5"
+                value={reminders.alertHoras}
+                onChange={e => setReminders(r => ({ ...r, alertHoras: parseFloat(e.target.value) || 10 }))}
+                style={{ width:80, borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-500)', color:'var(--text)', padding:'6px 12px', fontSize:14, fontWeight:700 }} />
+              <span style={{ fontSize:13, color:'var(--text2)' }}>horas</span>
             </div>
           </div>
         </div>

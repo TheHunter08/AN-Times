@@ -2,10 +2,9 @@ name: Resumen Semanal
 
 on:
   schedule:
-    # Viernes 17:00 Madrid (15:00 UTC verano CEST, 16:00 UTC invierno CET)
-    # Doble disparo para cubrir el cambio horario
-    - cron: '0 15 * * 5'
-    - cron: '0 16 * * 5'
+    # Cada hora de 07:00 a 20:00 UTC los viernes
+    # La hora exacta se configura en el panel de Ajustes → Recordatorios → Resumen semanal
+    - cron: '0 7-20 * * 5'
   workflow_dispatch:
 
 jobs:

@@ -51,8 +51,14 @@ async function run() {
 
   console.log(`Madrid: ${now.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} | Día: ${weekday}`)
 
-  if (!weekday.toLowerCase().includes('fri') || hh < 16 || hh >= 19) {
-    console.log('No es viernes tarde (16:00-19:00) — nada que hacer.')
+  const [db] = await Promise.all([sbReadData()])
+  const semanalTimes = db?.config?.reminders?.semanal?.length
+    ? db.config.reminders.semanal
+    : ['17:00']
+  const matchHour = semanalTimes.some(t => parseInt(t.split(':')[0]) === hh)
+
+  if (!weekday.toLowerCase().includes('fri') || !matchHour) {
+    console.log(`No es viernes o no coincide hora (${hh}:xx vs [${semanalTimes}]) — nada que hacer.`)
     return
   }
 
@@ -64,8 +70,8 @@ async function run() {
 
   console.log(`Semana: ${mondayStr} → ${todayStr}`)
 
-  const [db, pushSubs] = await Promise.all([sbReadData(), sbReadPushSubs()])
   if (!db) { console.log('No se pudo leer Supabase.'); return }
+  const pushSubs = await sbReadPushSubs()
 
   const employees = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const records   = db.records || []
