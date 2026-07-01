@@ -438,7 +438,6 @@ function PanelControl({ db, toast, saveDB, session }) {
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
-  const [view, setView] = useState('cards')
 
   // Pre-compute todayMin per employee (avoids O(n²) filter inside render)
   const todayMinMap = useMemo(() => {
@@ -503,11 +502,6 @@ function PanelControl({ db, toast, saveDB, session }) {
             {liveRecs.length} activos / {emps.length} totales
           </div>
         </div>
-        <div className="pill-tabs">
-          {[['cards','Cards'],['tabla','Tabla']].map(([v,l]) => (
-            <button key={v} className={`pill-tab${view===v?' active':''}`} onClick={() => setView(v)}>{l}</button>
-          ))}
-        </div>
       </div>
 
       {!liveRecs.length && (
@@ -520,65 +514,19 @@ function PanelControl({ db, toast, saveDB, session }) {
         </div>
       )}
 
-      {view === 'cards' && (
-        <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
-          {emps.map(e => (
-            <CtrlCard
-              key={e.id}
-              e={e}
-              live={liveRecs.find(r => r.empId === e.id)}
-              todayMin={todayMinMap[e.id] || 0}
-              force={force}
-              startJornada={startJornada}
-              toggleDescanso={toggleDescanso}
-            />
-          ))}
-        </div>
-      )}
-
-      {view === 'tabla' && (
-        <div className="adm-table-wrap">
-          <table className="adm-table">
-            <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Tiempo</th><th>Estado</th><th></th></tr></thead>
-            <tbody>
-              {emps.map(e => {
-                const live = liveRecs.find(r => r.empId === e.id)
-                const fichoHoy = !live && (todayMinMap[e.id] || 0) > 0
-                return (
-                  <tr key={e.id} style={{ opacity: live ? 1 : fichoHoy ? 0.7 : 0.4 }}>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        <div style={{ width:28, height:28, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
-                          {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                        </div>
-                        {e.name}
-                      </div>
-                    </td>
-                    <td style={{ color:'var(--text3)', fontSize:12 }}>{live?.centro || e.centroTrabajo || '—'}</td>
-                    <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>{live ? ftime(live.inicio) : '—'}</td>
-                    <td style={{ fontWeight:700, fontVariantNumeric:'tabular-nums' }}><LiveTimerCell rec={live} /></td>
-                    <td>
-                      {live ? <span className={`badge ${live.enDescanso?'badge-orange':'badge-green'}`}>{live.enDescanso?'⏸ Descanso':'▶ Trabajando'}</span>
-                           : fichoHoy ? <span className="badge badge-blue">✓ Fichó hoy</span>
-                           : <span className="badge">Sin fichar</span>}
-                    </td>
-                    <td>
-                      {live ? (
-                        <div style={{ display:'flex', gap:6 }}>
-                          <button className="btn btn-sm btn-secondary" style={{ fontSize:11 }} onClick={() => toggleDescanso(live)}>{live.enDescanso ? '▶' : '⏸'}</button>
-                          <button className="btn btn-sm btn-danger" style={{ fontSize:11 }} onClick={() => force(live)}>■ Fin</button>
-                        </div>
-                      ) : (
-                        <button className="btn btn-sm btn-primary" style={{ fontSize:11 }} onClick={() => startJornada(e)}>▶ Iniciar</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+        {emps.map(e => (
+          <CtrlCard
+            key={e.id}
+            e={e}
+            live={liveRecs.find(r => r.empId === e.id)}
+            todayMin={todayMinMap[e.id] || 0}
+            force={force}
+            startJornada={startJornada}
+            toggleDescanso={toggleDescanso}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -2050,38 +1998,48 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
               Exportar Excel
             </button>
           </div>
-        <div className="adm-table-wrap">
-          <table className="adm-table">
-            <thead><tr><th>Empleado</th><th>Días</th><th>Total mes</th><th>Contratadas</th><th>Diferencia</th><th>Vac. disp.</th><th></th></tr></thead>
-            <tbody>
-              {rows.map(({ e, totalMin, diff, days, vac, expected, weeklyH }) => (
-                <tr key={e.id}>
-                  <td>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:26, height:26, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                        {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                      </div>
-                      {e.name}
-                    </div>
-                  </td>
-                  <td>{days}</td>
-                  <td style={{ fontWeight:700 }}>{mhm(totalMin)}</td>
-                  <td style={{ color:'var(--text3)' }}>{mhm(expected)}<span style={{ fontSize:10, marginLeft:4, opacity:.7 }}>({weeklyH}h/sem)</span></td>
-                  <td style={{ fontWeight:700, color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {diff >= 0 ? '+' : ''}{mhm(Math.abs(diff))}
-                  </td>
-                  <td>{vac.available}d</td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" title="Descargar PDF nómina" onClick={() => downloadNominaPDF({ e, totalMin, days })}>
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                      PDF
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {!rows.length ? (
+          <div className="empty-premium">
+            <div className="empty-premium-icon">📊</div>
+            <div className="empty-premium-title">Sin datos este mes</div>
+          </div>
+        ) : (
+        <div className="emp-grid stagger-in">
+          {rows.map(({ e, totalMin, diff, days, vac, expected, weeklyH }) => (
+            <div key={e.id} className="emp-card card-lift">
+              <div className="emp-card-top">
+                <div className="emp-card-avatar" style={{ background: e.color || 'var(--primary)' }}>
+                  {(e.initials || e.name.slice(0, 2)).toUpperCase()}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div className="emp-card-name">{e.name}</div>
+                  <div className="emp-card-sub">{days} días trabajados</div>
+                </div>
+                <span className="badge" style={{ color: diff >= 0 ? 'var(--green)' : 'var(--red)', background: diff >= 0 ? 'var(--green-dim)' : 'var(--red-dim)' }}>
+                  {diff >= 0 ? '+' : ''}{mhm(Math.abs(diff))}
+                </span>
+              </div>
+              <div className="emp-card-body">
+                <div className="emp-card-row">
+                  <span className="emp-card-row-lbl">Total mes</span>
+                  <span className="emp-card-row-val">{mhm(totalMin)}</span>
+                </div>
+                <div className="emp-card-row">
+                  <span className="emp-card-row-lbl">Contratadas</span>
+                  <span className="emp-card-row-val">{mhm(expected)} <span style={{ fontSize:10, opacity:.7 }}>({weeklyH}h/sem)</span></span>
+                </div>
+                <div className="emp-card-row">
+                  <span className="emp-card-row-lbl">Vacaciones disp.</span>
+                  <span className="emp-card-row-val">{vac.available}d</span>
+                </div>
+              </div>
+              <div className="emp-card-actions">
+                <button className="btn btn-sm btn-secondary" onClick={() => downloadNominaPDF({ e, totalMin, days })}>📄 PDF nómina</button>
+              </div>
+            </div>
+          ))}
         </div>
+        )}
         </div>
       )}
 
