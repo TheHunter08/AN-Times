@@ -54,6 +54,7 @@ const PAGES = [
 // Un "encargado" no es administrador: solo ve y gestiona la jornada de su obra asignada
 const ENC_PAGES = [
   { id:'miobra',   label:'Mi Obra' },
+  { id:'fichajes', label:'Fichajes' },
   { id:'mensajes', label:'Mensajes' },
 ]
 
@@ -536,12 +537,20 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const [search, setSearch] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterEmp, setFilterEmp] = useState('')
-  const [quickFilter, setQuickFilter] = useState('')
+  const [quickFilter, setQuickFilter] = useState('mes')
   const [editingRec, setEditingRec] = useState(null) // { id, field: 'inicio'|'fin', value }
   const [editMotivo, setEditMotivo] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
+  const [delMotivo, setDelMotivo] = useState('')
   const [pageSize, setPageSize] = useState(100)
-  const emps = (db.employees || []).filter(e => !e.isAdmin)
-  const recs = (db.records || []).filter(r => r.fin)
+
+  // Un encargado solo ve/gestiona los fichajes de su(s) obra(s) asignada(s)
+  const isEncargado = session?.isEnc && !session?.isJO
+  const misCentros = session?.user?.obrasAsignadas || []
+  const emps = (db.employees || []).filter(e => !e.isAdmin &&
+    (!isEncargado || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+  const empIds = useMemo(() => new Set(emps.map(e => e.id)), [emps])
+  const recs = (db.records || []).filter(r => r.fin && (!isEncargado || empIds.has(r.empId)))
   const now = new Date()
   const todayStr = today()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
@@ -567,14 +576,15 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const totalWork = useMemo(() => filtered.reduce((s,r) => s + Math.floor(recWorkSecs(r)/60), 0), [filtered])
   const totalBreak = useMemo(() => filtered.reduce((s,r) => s + Math.floor((r.breakSecs||0)/60), 0), [filtered])
 
-  const { showConfirm } = useAppStore()
-  const del = (id) => {
-    showConfirm('¿Eliminar este fichaje?', () => {
-      const rec = (db.records||[]).find(r => r.id === id)
-      const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''}`, session?.user?.name || 'Admin')
-      saveDB({ records: (db.records||[]).filter(r => r.id !== id), audit: withAudit.audit })
-      toast('Fichaje eliminado')
-    })
+  const confirmDelete = () => {
+    if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
+    const rec = (db.records||[]).find(r => r.id === deletingId)
+    const motivo = delMotivo.trim()
+    const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
+    saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit })
+    if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    toast('Fichaje eliminado')
+    setDeletingId(null); setDelMotivo('')
   }
 
   const downloadCSV = () => {
@@ -676,6 +686,10 @@ function PanelFichajes({ db, toast, saveDB, session }) {
               <div className="fich-id">
                 <div className="fich-name">{r.empName}</div>
                 <div className="fich-sub">{r.centro || 'Sin centro'}</div>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">Día</span>
+                <span className="fich-block-val">{fds(r.inicio)}</span>
               </div>
               <div className="fich-block">
                 <span className="fich-block-lbl">Entrada</span>
@@ -804,7 +818,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                       ) : r.fin ? <span style={{ fontSize:10, color:'var(--text4)' }}>⏹ —</span> : null}
                 </div>
               </div>
-              <button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button>
+              <button className="btn btn-sm btn-danger" onClick={() => { setDeletingId(r.id); setDelMotivo('') }}>✕</button>
             </div>
           )
         })}
@@ -828,6 +842,25 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           <button className="btn btn-secondary" onClick={() => setPageSize(s => s + 100)}>
             Ver más ({filtered.length - pageSize} restantes)
           </button>
+        </div>
+      )}
+
+      {deletingId && (
+        <div className="modal-ov center" onClick={() => { setDeletingId(null); setDelMotivo('') }}>
+          <div className="modal center-modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380, width:'calc(100% - 32px)' }}>
+            <h2 style={{ margin:'0 0 12px', fontSize:16 }}>Eliminar fichaje</h2>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:14 }}>Esta acción no se puede deshacer. El empleado recibirá un aviso.</div>
+            <div className="field" style={{ marginBottom:16 }}>
+              <label>MOTIVO (obligatorio)</label>
+              <input type="text" autoFocus maxLength={200} placeholder="Ej: fichaje duplicado, prueba errónea…"
+                value={delMotivo} onChange={e => setDelMotivo(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') confirmDelete() }} />
+            </div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={() => { setDeletingId(null); setDelMotivo('') }}>Cancelar</button>
+              <button className="btn btn-danger" disabled={!delMotivo.trim()} onClick={confirmDelete}>Eliminar</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
