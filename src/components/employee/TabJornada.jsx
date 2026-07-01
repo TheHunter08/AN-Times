@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { today, calcSecs, calcMin, recWorkSecs, wkStart, p2, mhm, ftime, s2t, monthlyExtras } from '../../utils/time.js'
 import { WD, WK } from '../../config/constants.js'
-import { makePrintableSignature } from '../../utils/pdfSign.js'
+import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
 import { PomodoroWidget } from './PomodoroWidget.jsx'
 import { WeeklyBars } from './WeeklyBars.jsx'
 import { HistorialReciente } from './HistorialReciente.jsx'
@@ -95,8 +95,9 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
       const pdfDoc = await PDFDocument.create()
       const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-      const safe = s => String(s ?? '').replace(/[^\x00-\xFF]/g,'?')
-      const PW = 595, PH = 842, ML = 35, MR = 35, CW = PW - ML - MR
+      const safe = pdfSafe
+      const { W: PW, H: PH } = PDF_PAGE
+      const ML = 35, MR = 35, CW = PW - ML - MR
       const COLS = [
         { label:'Fecha', w:72 }, { label:'Entrada', w:52 }, { label:'Salida', w:52 },
         { label:'Centro / Obra', w:279 }, { label:'Horas netas', w:70 },
@@ -156,6 +157,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
     setGeneratingPdf(true)
     try {
       const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      const colors = pdfColors(rgb)
       const now2 = new Date()
       const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
       const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
@@ -168,11 +170,10 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
 
       // Helper: fecha local (no UTC) para mostrar en PDF
       const localDate = iso => { const d = new Date(iso); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}` }
-      // Helper: limpia caracteres fuera de WinAnsi que hacen crash en pdf-lib con Helvetica
-      const safe = s => String(s ?? '').replace(/✓/g,'OK').replace(/✔/g,'OK').replace(/⚠/g,'(!)').replace(/−/g,'-').replace(/—/g,'-').replace(/[^\x00-\xFF]/g,'?')
+      const safe = pdfSafe
 
       // ─ Layout constants ────────────────────────────────────────────
-      const PW = 595, PH = 842       // A4 portrait
+      const { W: PW, H: PH } = PDF_PAGE
       const ML = 35, MR = 35        // margins left/right
       const CW = PW - ML - MR       // 525 content width
       const COLS = [
@@ -183,41 +184,24 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
         { label:'Horas netas',        w: 70 },
       ]
       const ROW_H = 15, HEAD_H = 17, SIG_AREA = 110
-
-      // ─ Colors ──────────────────────────────────────────────────────
-      const cPri    = rgb(0.36,0.38,0.82)
-      const cPriLt  = rgb(0.94,0.93,1.0)
-      const cDark   = rgb(0.10,0.10,0.15)
-      const cGray   = rgb(0.55,0.55,0.60)
-      const cLtGray = rgb(0.96,0.96,0.98)
-      const cBorder = rgb(0.82,0.82,0.88)
-      const cWhite  = rgb(1,1,1)
-      const cGreen  = rgb(0.10,0.62,0.46)
+      const cPri = colors.pri, cPriLt = colors.priLt, cDark = colors.dark, cGray = colors.gray
+      const cLtGray = colors.ltGray, cBorder = colors.border, cWhite = colors.white, cGreen = colors.green
 
       // ─ Page helpers ────────────────────────────────────────────────
       let page, y, pageNum = 0
 
       const newPage = () => {
-        page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
-        // header strip
-        page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(safe(u.empresa || 'Obra'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
-        page.drawText('REGISTRO DE JORNADA LABORAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
+        pageNum++
         const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
-        page.drawText(safe(`Trabajador: ${u.name}   .   Mes: ${monthName}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
-        page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
-        y -= 74
+        ;({ page, y } = addReportPage(pdfDoc, {
+          ml:ML, mr:MR, cw:CW, pw:PW, ph:PH, pageNum, colors, fontR, fontB,
+          empresa: u.empresa || 'Obra',
+          title: 'REGISTRO DE JORNADA LABORAL',
+          subtitle: `Trabajador: ${u.name}   .   Mes: ${monthName}   .   Obras: ${obras}`,
+        }))
       }
 
-      const tableHeader = () => {
-        let xc = ML
-        page.drawRectangle({ x:ML, y:y-HEAD_H, width:CW, height:HEAD_H, color:cPri })
-        COLS.forEach(c => {
-          page.drawText(c.label, { x:xc+4, y:y-HEAD_H+5, size:7.5, font:fontB, color:cWhite, maxWidth:c.w-6 })
-          xc += c.w
-        })
-        y -= HEAD_H
-      }
+      const tableHeader = () => { y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H }) }
 
       // ─ Cover page ─────────────────────────────────────────────────
       const cover = pdfDoc.addPage([PW, PH])
@@ -267,20 +251,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
         const wm = Math.floor(recWorkSecs(r) / 60)
         const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '-'
         const vals = [ localDate(r.inicio), ftime(r.inicio), r.fin ? ftime(r.fin) : '-', centroObra, mhm(wm) ]
-
-        page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
-        page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
-
-        let xc = ML
-        vals.forEach((v, ci) => {
-          const isHours = ci === 4
-          page.drawText(safe(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
-          xc += COLS[ci].w
-        })
-        // vertical separators
-        let xs = ML
-        COLS.forEach((c,ci) => { if(ci<COLS.length-1) { page.drawLine({ start:{x:xs+c.w,y:y}, end:{x:xs+c.w,y:y-ROW_H}, thickness:0.3, color:cBorder }); xs+=c.w } })
-        y -= ROW_H
+        y = drawTableDataRow(page, { ml:ML, cw:CW, y, vals, cols:COLS, striped: i%2!==0, colors, fontR, fontB, highlightIdx:4, rowH:ROW_H })
       })
 
       // ─ Total + resumen vs objetivo (regla TIMES INC: 160h/mes, extras semanales >40h) ─────
@@ -305,61 +276,25 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
       page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:6.5, font:fontB, color:cGray })
 
       const firma = db.firmas?.[u?.id]?.main
-      if (firma?.data) {
-        try {
-          const printable = await makePrintableSignature(firma.data)
-          const b64 = printable.split(',')[1]
-          const bin = atob(b64)
-          const bytes = new Uint8Array(bin.length)
-          for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i)
-          const sigImg = await pdfDoc.embedPng(bytes.buffer)
-          const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
-          page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
-          page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
-          page.drawText(safe(`${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}`), { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
-          page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
-        } catch {
-          page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
-          page.drawText(safe(u.name), { x:ML, y:y-73, size:7, font:fontR, color:cGray })
-        }
-      } else {
-        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
-        page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
-        page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
-        page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
-        page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
-      }
+      await drawSignatureBlock(pdfDoc, page, {
+        x:ML, y, width:130, colors, fontR, fontB,
+        signatureDataUrl: firma?.data,
+        label: firma?.data ? `${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}` : u.name,
+        sublabel: firma?.data ? 'Firma verificada' : null,
+        richMissing: true, missingLabel: 'Sin firma digital', missingDetail: 'Configurala en Perfil > Firma digital',
+      })
 
       // ─ Firma del responsable (jefe de obra de la misma obra) ─────
-      const joEmp = u.obrasAsignadas?.length
-        ? (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja && e.obrasAsignadas?.some(o => u.obrasAsignadas.includes(o)))
-        : (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja)
-      const responsableFirma = (joEmp ? db.firmas?.[joEmp.id]?.main : null) || db.firmas?.['admin']?.main
-      const responsableNombre = joEmp ? safe(joEmp.name) : 'Jefe de Obra / Responsable'
+      const { firma: responsableFirma, nombre: responsableNombre } = findResponsableFirma(db, u)
       page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
-      if (responsableFirma?.data) {
-        try {
-          const printable2 = await makePrintableSignature(responsableFirma.data)
-          const b642 = printable2.split(',')[1]
-          const bin2 = atob(b642)
-          const bytes2 = new Uint8Array(bin2.length)
-          for (let i=0; i<bin2.length; i++) bytes2[i] = bin2.charCodeAt(i)
-          const sigImg2 = await pdfDoc.embedPng(bytes2.buffer)
-          const sigW2 = 130, sigH2 = sigW2 * (sigImg2.height / sigImg2.width)
-          page.drawImage(sigImg2, { x:ML+CW/2, y:y-18-sigH2, width:sigW2, height:sigH2 })
-          page.drawLine({ start:{x:ML+CW/2,y:y-22-sigH2}, end:{x:ML+CW/2+170,y:y-22-sigH2}, thickness:0.5, color:cGray })
-          page.drawText(responsableNombre, { x:ML+CW/2, y:y-31-sigH2, size:6.5, font:fontR, color:cGray, maxWidth:170 })
-        } catch {}
-      } else {
-        page.drawLine({ start:{x:ML+CW/2,y:y-65}, end:{x:ML+CW/2+170,y:y-65}, thickness:0.5, color:cGray })
-        page.drawText(responsableNombre, { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
-      }
+      await drawSignatureBlock(pdfDoc, page, {
+        x:ML+CW/2, y, width:130, colors, fontR, fontB,
+        signatureDataUrl: responsableFirma?.data,
+        label: responsableNombre,
+      })
 
       // ─ Legal footer ───────────────────────────────────────────────
-      page.drawText(
-        'Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.',
-        { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW }
-      )
+      drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
 
       // ─ Save & show ────────────────────────────────────────────────
       const pdfBytes = await pdfDoc.save()
@@ -377,6 +312,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
     setGeneratingWeekPdf(true)
     try {
       const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      const colors = pdfColors(rgb)
       const now2 = new Date()
       const ws2 = wkStart(now2)
       const weekRecs2 = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= ws2).sort((a,b) => a.inicio.localeCompare(b.inicio))
@@ -387,9 +323,8 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
       const fontR   = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontB   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
       const localDate = iso => { const d = new Date(iso); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}` }
-      const safe = s => String(s ?? '').replace(/[^\x00-\xFF]/g,'?')
 
-      const PW = 595, PH = 842
+      const { W: PW, H: PH } = PDF_PAGE
       const ML = 35, MR = 35
       const CW = PW - ML - MR
       const COLS = [
@@ -400,59 +335,34 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
         { label:'Horas netas', w: 70 },
       ]
       const ROW_H = 15, HEAD_H = 17, SIG_AREA = 110
-      const cPri    = rgb(0.36,0.38,0.82)
-      const cPriLt  = rgb(0.94,0.93,1.0)
-      const cDark   = rgb(0.10,0.10,0.15)
-      const cGray   = rgb(0.55,0.55,0.60)
-      const cLtGray = rgb(0.96,0.96,0.98)
-      const cBorder = rgb(0.82,0.82,0.88)
-      const cWhite  = rgb(1,1,1)
-      const cGreen  = rgb(0.10,0.62,0.46)
+      const cPri = colors.pri, cGray = colors.gray, cGreen = colors.green
 
       let page, y, pageNum = 0
       const newPage = () => {
-        page = pdfDoc.addPage([PW, PH]); pageNum++; y = PH - 30
-        page.drawRectangle({ x:ML, y:y-64, width:CW, height:64, color:cPriLt, borderColor:cPri, borderWidth:0.8 })
-        page.drawText(safe(u.empresa || 'Obra'), { x:ML+10, y:y-18, size:10, font:fontB, color:cPri })
-        page.drawText('REGISTRO DE JORNADA LABORAL - INFORME SEMANAL', { x:ML+10, y:y-31, size:8.5, font:fontB, color:cDark })
+        pageNum++
         const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
-        page.drawText(safe(`Trabajador: ${u.name}   .   ${weekLabel}   .   Obras: ${obras}`), { x:ML+10, y:y-44, size:7.5, font:fontR, color:cGray, maxWidth:CW-80 })
-        page.drawText(`Pág. ${pageNum}   ·   ${new Date().toLocaleDateString('es-ES')}`, { x:PW-MR-85, y:y-18, size:7.5, font:fontR, color:cGray })
-        y -= 74
+        ;({ page, y } = addReportPage(pdfDoc, {
+          ml:ML, mr:MR, cw:CW, pw:PW, ph:PH, pageNum, colors, fontR, fontB,
+          empresa: u.empresa || 'Obra',
+          title: 'REGISTRO DE JORNADA LABORAL - INFORME SEMANAL',
+          subtitle: `Trabajador: ${u.name}   .   ${weekLabel}   .   Obras: ${obras}`,
+        }))
       }
-      const tableHeader = () => {
-        let xc = ML
-        page.drawRectangle({ x:ML, y:y-HEAD_H, width:CW, height:HEAD_H, color:cPri })
-        COLS.forEach(c => {
-          page.drawText(c.label, { x:xc+4, y:y-HEAD_H+5, size:7.5, font:fontB, color:cWhite, maxWidth:c.w-6 })
-          xc += c.w
-        })
-        y -= HEAD_H
-      }
+      const tableHeader = () => { y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H }) }
       newPage(); tableHeader()
       weekRecs2.forEach((r, i) => {
         if (y - ROW_H < 35 + SIG_AREA) { newPage(); tableHeader() }
         const wm = Math.floor(recWorkSecs(r) / 60)
         const centroObra = [r.centro, r.obra].filter(Boolean).join(' / ') || u.centroTrabajo || '-'
         const vals = [ localDate(r.inicio), ftime(r.inicio), r.fin ? ftime(r.fin) : '-', centroObra, mhm(wm) ]
-        page.drawRectangle({ x:ML, y:y-ROW_H, width:CW, height:ROW_H, color: i%2===0 ? cWhite : cLtGray })
-        page.drawLine({ start:{x:ML, y:y-ROW_H}, end:{x:ML+CW, y:y-ROW_H}, thickness:0.3, color:cBorder })
-        let xc = ML
-        vals.forEach((v, ci) => {
-          const isHours = ci === 4
-          page.drawText(safe(v), { x:xc+4, y:y-ROW_H+4, size:7.5, font: isHours?fontB:fontR, color: isHours?cPri:cDark, maxWidth:COLS[ci].w-8 })
-          xc += COLS[ci].w
-        })
-        let xs = ML
-        COLS.forEach((c,ci) => { if(ci<COLS.length-1) { page.drawLine({ start:{x:xs+c.w,y:y}, end:{x:xs+c.w,y:y-ROW_H}, thickness:0.3, color:cBorder }); xs+=c.w } })
-        y -= ROW_H
+        y = drawTableDataRow(page, { ml:ML, cw:CW, y, vals, cols:COLS, striped: i%2!==0, colors, fontR, fontB, highlightIdx:4, rowH:ROW_H })
       })
       if (y - 40 < 35 + SIG_AREA) { newPage() }
       const targetMin2 = weekRecs2.length * 480
       const diffMin2 = totalMin2 - targetMin2
       const diffSign = diffMin2 >= 0 ? '+' : ''
-      const cDiff = diffMin2 >= 0 ? cGreen : rgb(0.87,0.27,0.27)
-      page.drawRectangle({ x:ML, y:y-40, width:CW, height:40, color:cPriLt, borderColor:cPri, borderWidth:0.6 })
+      const cDiff = diffMin2 >= 0 ? cGreen : colors.red
+      page.drawRectangle({ x:ML, y:y-40, width:CW, height:40, color:colors.priLt, borderColor:cPri, borderWidth:0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${weekRecs2.length} jornada${weekRecs2.length!==1?'s':''} registrada${weekRecs2.length!==1?'s':''}`, { x:ML+8, y:y-14, size:8.5, font:fontB, color:cPri })
       page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x:ML+8, y:y-30, size:7.5, font:fontR, color:cDiff, maxWidth:CW-16 })
       y -= 48
@@ -460,55 +370,22 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
       y -= 10
       page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:6.5, font:fontB, color:cGray })
       const firma = db.firmas?.[u?.id]?.main
-      if (firma?.data) {
-        try {
-          const printable = await makePrintableSignature(firma.data)
-          const b64 = printable.split(',')[1]
-          const bin = atob(b64)
-          const bytes = new Uint8Array(bin.length)
-          for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i)
-          const sigImg = await pdfDoc.embedPng(bytes.buffer)
-          const sigW = 130, sigH = sigW * (sigImg.height / sigImg.width)
-          page.drawImage(sigImg, { x:ML, y:y-18-sigH, width:sigW, height:sigH })
-          page.drawLine({ start:{x:ML,y:y-22-sigH}, end:{x:ML+170,y:y-22-sigH}, thickness:0.5, color:cGray })
-          page.drawText(safe(`${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}`), { x:ML, y:y-31-sigH, size:6.5, font:fontR, color:cGray, maxWidth:260 })
-          page.drawText('Firma verificada', { x:ML+175, y:y-25-sigH, size:7, font:fontB, color:cGreen })
-        } catch {
-          page.drawLine({ start:{x:ML,y:y-65}, end:{x:ML+170,y:y-65}, thickness:0.5, color:cGray })
-          page.drawText(safe(u.name), { x:ML, y:y-73, size:7, font:fontR, color:cGray })
-        }
-      } else {
-        page.drawRectangle({ x:ML, y:y-16-70, width:170, height:70, color:cLtGray, borderColor:rgb(0.87,0.27,0.27), borderWidth:0.5 })
-        page.drawText('(!) Sin firma digital', { x:ML+10, y:y-32, size:7.5, font:fontB, color:rgb(0.87,0.27,0.27) })
-        page.drawText('Configurala en Perfil > Firma digital', { x:ML+10, y:y-44, size:6.5, font:fontR, color:cGray })
-        page.drawLine({ start:{x:ML,y:y-16-70+10}, end:{x:ML+170,y:y-16-70+10}, thickness:0.5, color:cBorder })
-        page.drawText(safe(u.name), { x:ML, y:y-16-70+4, size:6.5, font:fontR, color:cGray })
-      }
+      await drawSignatureBlock(pdfDoc, page, {
+        x:ML, y, width:130, colors, fontR, fontB,
+        signatureDataUrl: firma?.data,
+        label: firma?.data ? `${u.name}   .   Firmado digitalmente   .   ${new Date().toLocaleString('es-ES')}` : u.name,
+        sublabel: firma?.data ? 'Firma verificada' : null,
+        richMissing: true, missingLabel: 'Sin firma digital', missingDetail: 'Configurala en Perfil > Firma digital',
+      })
       // ─ Firma del responsable (jefe de obra de la misma obra) ─────
-      const joEmpW = u.obrasAsignadas?.length
-        ? (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja && e.obrasAsignadas?.some(o => u.obrasAsignadas.includes(o)))
-        : (db.employees || []).find(e => e.role === 'jefe_obra' && !e.baja)
-      const responsableFirmaW = (joEmpW ? db.firmas?.[joEmpW.id]?.main : null) || db.firmas?.['admin']?.main
-      const responsableNombreW = joEmpW ? safe(joEmpW.name) : 'Jefe de Obra / Responsable'
+      const { firma: responsableFirmaW, nombre: responsableNombreW } = findResponsableFirma(db, u)
       page.drawText('FIRMA DEL RESPONSABLE', { x:ML+CW/2, y:y-11, size:6.5, font:fontB, color:cGray })
-      if (responsableFirmaW?.data) {
-        try {
-          const p2r = await makePrintableSignature(responsableFirmaW.data)
-          const b64r = p2r.split(',')[1]
-          const binr = atob(b64r)
-          const bytesr = new Uint8Array(binr.length)
-          for (let i=0; i<binr.length; i++) bytesr[i] = binr.charCodeAt(i)
-          const sigImgR = await pdfDoc.embedPng(bytesr.buffer)
-          const sigWR = 130, sigHR = sigWR * (sigImgR.height / sigImgR.width)
-          page.drawImage(sigImgR, { x:ML+CW/2, y:y-18-sigHR, width:sigWR, height:sigHR })
-          page.drawLine({ start:{x:ML+CW/2,y:y-22-sigHR}, end:{x:ML+CW/2+170,y:y-22-sigHR}, thickness:0.5, color:cGray })
-          page.drawText(responsableNombreW, { x:ML+CW/2, y:y-31-sigHR, size:6.5, font:fontR, color:cGray, maxWidth:170 })
-        } catch {}
-      } else {
-        page.drawLine({ start:{x:ML+CW/2,y:y-65}, end:{x:ML+CW/2+170,y:y-65}, thickness:0.5, color:cGray })
-        page.drawText(responsableNombreW, { x:ML+CW/2, y:y-73, size:6.5, font:fontR, color:cGray })
-      }
-      page.drawText('Documento generado automaticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.', { x:ML, y:28, size:5.5, font:fontR, color:cGray, maxWidth:CW })
+      await drawSignatureBlock(pdfDoc, page, {
+        x:ML+CW/2, y, width:130, colors, fontR, fontB,
+        signatureDataUrl: responsableFirmaW?.data,
+        label: responsableNombreW,
+      })
+      drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type:'application/pdf' })
       setInformeBlob(blob)
