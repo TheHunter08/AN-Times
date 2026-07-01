@@ -3,11 +3,13 @@ import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { gid, mhm } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
+import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 
 // ─── FIRMA DE CIERRE MENSUAL (empleado) ────────────────────────────────────────
 export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
+  const [firmando, setFirmando] = useState(false)
   const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente')
   const selCierre = pendingCierres[selIdx] || null
 
@@ -16,16 +18,26 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   useModalBack(visible, onClose)
   if (!visible || !selCierre) return null
 
-  const firmar = () => {
+  const firmar = async () => {
     const signatureData = getSignatureData()
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
+    setFirmando(true)
     const firmadoAt = new Date().toISOString()
-    const updatedCierres = (db.cierres || []).map(ci => ci.id === selCierre.id
-      ? { ...ci, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } } : ci)
+    const firmado = { ...selCierre, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } }
+    let pdfData = null
+    try {
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
+      pdfData = dataUrl
+    } catch (e) {
+      console.warn('[cierre] No se pudo generar el PDF firmado:', e)
+    }
+    const cierreFinal = pdfData ? { ...firmado, pdfData } : firmado
+    const updatedCierres = (db.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci)
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
     saveDB({ cierres: updatedCierres, notis:[...(db.notis||[]), noti] })
     queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
     toast('Cierre mensual firmado correctamente', 3000, 'ok')
+    setFirmando(false)
     onClose()
   }
 
@@ -67,8 +79,8 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
           {...handlers} />
         <button className="btn btn-secondary btn-sm" onClick={clearCanvas} style={{ marginBottom:14 }}>Borrar</button>
         <div className="modal-btns">
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={firmar}>✅ Firmar y enviar</button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={firmando}>Cancelar</button>
+          <button className="btn btn-primary" onClick={firmar} disabled={firmando}>{firmando ? 'Generando PDF…' : '✅ Firmar y enviar'}</button>
         </div>
       </div>
     </div>

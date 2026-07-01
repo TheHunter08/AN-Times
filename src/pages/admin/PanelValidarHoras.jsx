@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import { mhm, p2, gid, calcMin } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
+import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../../utils/cierrePdf.js'
 
-const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+const downloadDataUrl = (dataUrl, filename) => {
+  const a = document.createElement('a')
+  a.href = dataUrl; a.download = filename
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+}
 
 export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   const now = new Date()
   const [selMonth, setSelMonth] = useState(`${now.getFullYear()}-${p2(now.getMonth()+1)}`)
+  const [generandoPdf, setGenerandoPdf] = useState(null) // id del cierre en proceso, o 'consolidado'
+  const empresa = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
 
   const joObras = session?.user?.obrasAsignadas || []
   const recs = db.records || []
@@ -26,18 +33,6 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
     const diff = totalMin - expected
     return { e, totalMin, days, diff }
   })
-
-  const printHtml = (html) => {
-    const iframe = document.createElement('iframe')
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0'
-    document.body.appendChild(iframe)
-    const doc = iframe.contentDocument || iframe.contentWindow.document
-    doc.open(); doc.write(html); doc.close()
-    setTimeout(() => {
-      try { iframe.contentWindow.focus(); iframe.contentWindow.print() } catch {}
-      setTimeout(() => { try { document.body.removeChild(iframe) } catch {} }, 4000)
-    }, 350)
-  }
 
   const generarCierreJO = (e, totalMin, days) => {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
@@ -77,23 +72,33 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
     toast(`✅ ${nuevos.length} cierre${nuevos.length!==1?'s':''} generado${nuevos.length!==1?'s':''}`)
   }
 
-  const downloadCierrePDF = (cierre) => {
-    const mes = new Date(cierre.mes + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-    const rowsHtml = (cierre.records_snapshot || []).map(r => {
-      const m = Math.floor((r.workSecs||0)/60)
-      const d = new Date(r.inicio)
-      return `<tr><td>${d.toLocaleDateString('es-ES')}</td><td>${esc(r.centro||'—')}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${mhm(m)}</td></tr>`
-    }).join('')
-    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cierre ${mes} · ${esc(cierre.empName)}</title>
-<style>body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:700px;margin:0 auto}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;font-weight:400;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 12px;text-align:left;border-bottom:2px solid #ccc}td{padding:8px 12px;border-bottom:1px solid #eee}.total{font-weight:700;font-size:15px;margin-top:16px}.sign-box{margin-top:40px;display:flex;gap:60px}.sign-line{flex:1;border-top:1px solid #888;padding-top:6px;font-size:12px;color:#555}@media print{body{padding:20px}}</style>
-</head><body>
-<h1>Cierre de jornada mensual · ${mes}</h1>
-<h2>${esc(cierre.empName)} · Generado el ${new Date(cierre.generadoAt).toLocaleDateString('es-ES')}</h2>
-<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Horas</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-<div class="total">Total: ${mhm(cierre.totalMin)} · ${cierre.dias} día(s) trabajado(s)</div>
-${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por ${esc(cierre.empName)} · ${new Date(cierre.firma.firmadoAt).toLocaleString('es-ES')}<br><img src="${cierre.firma.signatureData}" style="height:60px;margin-top:8px;border:1px solid #ccc;border-radius:4px"></div>` : ''}
-<div class="sign-box"><div class="sign-line">Firma empleado</div><div class="sign-line">Firma jefe de obra</div></div>
-</body></html>`)
+  const downloadCierrePDF = async (cierre) => {
+    const filename = `cierre-${cierre.mes}-${(cierre.empName||'').replace(/\s+/g,'_')}.pdf`
+    if (cierre.pdfData) { downloadDataUrl(cierre.pdfData, filename); return }
+    setGenerandoPdf(cierre.id)
+    try {
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre, empresa })
+      downloadDataUrl(dataUrl, filename)
+    } catch (e) {
+      toast('Error al generar el PDF: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
+  }
+
+  const finalizarMes = async () => {
+    const cierresMes = (db.cierres || []).filter(c => c.mes === selMonth && emps.some(e => e.id === c.empId))
+    if (!cierresMes.length) { toast('No hay cierres generados para este mes'); return }
+    setGenerandoPdf('consolidado')
+    try {
+      const { dataUrl } = await buildCierreConsolidadoPDF({ cierres: cierresMes, mes: selMonth, empresa })
+      downloadDataUrl(dataUrl, `cierre-consolidado-${selMonth}.pdf`)
+      toast('PDF consolidado generado', 3000, 'ok')
+    } catch (e) {
+      toast('Error al generar el PDF consolidado: ' + (e?.message || e), 5000, 'err')
+    } finally {
+      setGenerandoPdf(null)
+    }
   }
 
   const pendientes = rows.filter(r => !(db.cierres||[]).find(c => c.empId===r.e.id && c.mes===selMonth) && r.days>0).length
@@ -122,10 +127,15 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
             📋 <strong>Validar horas</strong> — Genera el cierre mensual y envíaselo a tus empleados para firma digital. Obras: <strong>{joObras.join(', ')}</strong>
           </div>
 
-          <button className="btn btn-primary" style={{ width:'100%', marginBottom:16 }} onClick={generarTodosJO} disabled={!pendientes}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Enviar cierre a todos ({pendientes} pendientes)
-          </button>
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <button className="btn btn-primary" style={{ flex:1 }} onClick={generarTodosJO} disabled={!pendientes}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Enviar cierre a todos ({pendientes} pendientes)
+            </button>
+            <button className="btn btn-secondary" onClick={finalizarMes} disabled={generandoPdf === 'consolidado' || !(db.cierres||[]).some(c => c.mes===selMonth && emps.some(e=>e.id===c.empId))}>
+              {generandoPdf === 'consolidado' ? 'Generando…' : '📄 Finalizar mes'}
+            </button>
+          </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {rows.map(({ e, totalMin, days, diff }) => {
@@ -148,7 +158,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                         <span className={`badge ${cierre.estado==='firmado'?'badge-green':'badge-orange'}`}>
                           {cierre.estado === 'firmado' ? '✓ Firmado' : '⏳ Pendiente'}
                         </span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)}>PDF</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
                       </>
                     ) : (
                       <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days}>
@@ -173,7 +183,7 @@ ${cierre.firma ? `<div style="margin-top:24px"><b>Firmado digitalmente</b> por $
                       <div style={{ fontSize:13, fontWeight:600 }}>{c.empName} · {c.mes}</div>
                       <div style={{ fontSize:11, color:'var(--text3)' }}>Firmado {new Date(c.firma?.firmadoAt).toLocaleDateString('es-ES')} · {mhm(c.totalMin)}</div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)}>PDF</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(c)} disabled={generandoPdf === c.id}>{generandoPdf === c.id ? '…' : 'PDF'}</button>
                   </div>
                 ))}
               </div>
