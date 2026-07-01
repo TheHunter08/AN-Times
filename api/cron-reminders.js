@@ -162,6 +162,7 @@ export default async function handler(req, res) {
     }
 
     for (const emp of employees) {
+     try {
       const sub = subMap.get(emp.id)
       const empRecs = records.filter(r => r.empId === emp.id)
       const openRec = empRecs.find(r => !r.fin)
@@ -175,7 +176,7 @@ export default async function handler(req, res) {
           : (emp.reminderTime ? [emp.reminderTime] : ['08:30'])
         for (const remTime of entradaTimes) {
           const [rh, rm] = safeTimeSplit(remTime, '08:30')
-          const slot = remTime.replace(':', '')
+          const slot = String(remTime || '').replace(':', '')
           const key  = `an_rem_${emp.id}_${slot}`
           if (notisSent[key] !== today && !hasFichado && ((nowH - rh) * 60 + (nowM - rm)) >= 0) {
             schedule(emp, sub, key, today,
@@ -208,7 +209,7 @@ export default async function handler(req, res) {
           : [emp.salidaTime || cfgSalidaTime || '21:00']
         for (const salidaT of salidaTimes) {
           const [sh, sm] = safeTimeSplit(salidaT, '21:00')
-          const slot = salidaT.replace(':', '')
+          const slot = String(salidaT || '').replace(':', '')
           const key  = `an_salida_${openRec.id}_${slot}`
           if (!notisSent[key] && ((nowH - sh) * 60 + (nowM - sm)) >= 0) {
             const elapsedMin = Math.floor((nowMs - new Date(openRec.inicio).getTime()) / 60000)
@@ -248,6 +249,12 @@ export default async function handler(req, res) {
           }
         }
       }
+     } catch (e) {
+       // Aislar el fallo a este empleado: un registro/reminder malformado no debe
+       // tumbar el cron entero (antes un solo dato inválido devolvía 500 y ningún
+       // empleado recibía recordatorio).
+       console.error(`[cron-reminders] error procesando empleado ${emp.id}:`, e.message)
+     }
     }
 
     // ── 6. Alerta a admin/JO: jornada abierta > umbral configurable ───────────

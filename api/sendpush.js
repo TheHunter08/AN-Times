@@ -36,7 +36,7 @@ const isValidVapidPub = s => /^[A-Za-z0-9\-_]{86,90}$/.test(s)
 const isValidVapidPrv = s => /^[A-Za-z0-9\-_]{42,46}$/.test(s)
 const _vpub = toB64Url(process.env.VAPID_PUBLIC)
 const _vprv = toB64Url(process.env.VAPID_PRIVATE)
-const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : 'BJLsu9gt57Oa3uflEpMVUfRXgawp49vhtgdMjU6nzb9zOjWgSxIxuuFQVe6z_uiNXNPUwbCPqUHUoZk_iVmjNfQ'
+const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : null
 const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
@@ -44,8 +44,8 @@ if (!SB_URL || !SB_ANON) console.error('[sendpush] VITE_SB_URL / VITE_SB_ANON no
 const PUSH_SECRET   = process.env.PUSH_SECRET
 
 let _loadError = null
-if (!VAPID_PRIVATE) {
-  _loadError = 'VAPID_PRIVATE env var no configurada'
+if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+  _loadError = 'VAPID_PUBLIC/VAPID_PRIVATE env var no configurada o inválida'
   console.error('[sendpush] FATAL:', _loadError)
 } else {
   try {
