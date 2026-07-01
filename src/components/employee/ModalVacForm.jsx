@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { vacData, gid, fds } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 
@@ -9,6 +10,7 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
   const [motivo, setMotivo] = useState('')
   useEffect(() => { if (!visible) { setFi(''); setFf(''); setMotivo('') } }, [visible])
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
 
   const submit = () => {
@@ -29,8 +31,8 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
+        <div className="modal-drag" {...dragHandlers} />
         <h2>🌴 Solicitar vacaciones</h2>
         <div className="field-row">
           <div className="field"><label>Desde</label><input type="date" value={fi} onChange={e => setFi(e.target.value)} /></div>

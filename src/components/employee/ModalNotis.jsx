@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 
 export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const [search, setSearch] = useState('')
@@ -10,6 +11,7 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
     .filter(n => !search || (n.action||'').toLowerCase().includes(search.toLowerCase()) || (n.detail||'').toLowerCase().includes(search.toLowerCase()))
   const mensajes = (db.mensajes || []).filter(m => m.to === 'all' || m.to === u?.id).slice(-10).reverse()
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
   const markRead = () => {
     const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
@@ -25,8 +27,8 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   }
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
+        <div className="modal-drag" {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
           <h2 style={{ margin:0 }}>🔔 Notificaciones</h2>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { getCfg, setCfg, toggleTheme } from '../../utils/userConfig.js'
 import { queuePush, pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
@@ -15,6 +16,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
 
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
 
   const save = () => {
@@ -47,8 +49,8 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:400 }}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:400, ...modalStyle }}>
+        <div className="modal-drag" {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <h2 style={{ margin:0, fontSize:18 }}>Configuración</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>

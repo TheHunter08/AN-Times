@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 
 export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
@@ -12,6 +13,7 @@ export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
   useEffect(() => { if (mode === 'draw') initCanvas() }, [mode])
 
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
 
   const save = () => {
@@ -26,8 +28,8 @@ export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480, ...modalStyle }}>
+        <div className="modal-drag" {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <h2 style={{ margin:0, fontSize:18 }}>Firma digital</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>

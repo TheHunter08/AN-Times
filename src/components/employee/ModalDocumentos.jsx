@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { gid } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { DocPreview } from '../DocPreview.jsx'
@@ -13,6 +14,10 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   // no el modal completo. closeRef en useModalBack se actualiza cada render
   // por lo que siempre captura el estado actual de viewing/signing.
   useModalBack(visible, () => {
+    if (viewing || signing) { setViewing(null); setSigning(null) }
+    else onClose()
+  })
+  const { dragHandlers, modalStyle } = useSwipeDismiss(() => {
     if (viewing || signing) { setViewing(null); setSigning(null) }
     else onClose()
   })
@@ -81,8 +86,8 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div className="modal-ov" onClick={(signing || viewing) ? undefined : onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560, ...modalStyle }}>
+        <div className="modal-drag" {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
           {(viewing || signing) && (
             <button onClick={() => { setViewing(null); setSigning(null) }} style={{ background:'var(--bg-500)', border:'1px solid var(--border)', color:'var(--text2)', width:32, height:32, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>

@@ -446,7 +446,12 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
   max-height: 90vh;
   padding-bottom: 20px;
 }
-.modal-drag { width: 48px; height: 5px; background: var(--border3); border-radius: 3px; margin: 0 auto 18px; }
+.modal-drag {
+  width: 48px; height: 5px; background: var(--border3); border-radius: 3px;
+  background-clip: content-box;
+  margin: -10px auto 8px; padding: 14px 30px;
+  touch-action: none; cursor: grab;
+}
 .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; letter-spacing: -.2px; }
 .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
 .modal-btns button { flex: 1; }

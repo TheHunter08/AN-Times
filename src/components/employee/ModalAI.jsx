@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { aiAnswer, AI_CHIPS } from '../../utils/aiAssistant.js'
 
 export function ModalAI({ visible, db, u, onClose }) {
@@ -13,6 +14,7 @@ export function ModalAI({ visible, db, u, onClose }) {
   }, [msgs, thinking])
 
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
 
   const ask = (q) => {
@@ -36,8 +38,8 @@ export function ModalAI({ visible, db, u, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, ...modalStyle }}>
+        <div className="modal-drag" {...dragHandlers} />
 
         {/* Header estilo asistente */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

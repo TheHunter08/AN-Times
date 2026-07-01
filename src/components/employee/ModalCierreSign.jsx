@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { gid, mhm } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
@@ -16,6 +17,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
 
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible || !selCierre) return null
 
   const firmar = async () => {
@@ -43,8 +45,8 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
+        <div className="modal-drag" {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
           <h2 style={{ margin:0, fontSize:16 }}>📋 Cierre mensual · {selCierre.mes}</h2>
           {pendingCierres.length > 1 && (

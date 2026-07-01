@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 
 export function ModalSelCentro({ visible, data, onConfirm, onClose }) {
   const [sel, setSel] = useState('')
   useEffect(() => { if (data?.current) setSel(data.current) }, [data])
   useModalBack(visible, onClose)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag" />
+      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
+        <div className="modal-drag" {...dragHandlers} />
         <h2>📍 Seleccionar centro de trabajo</h2>
         <div className="field">
           <label>Centro</label>

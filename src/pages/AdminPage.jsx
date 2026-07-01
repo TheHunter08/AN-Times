@@ -7,6 +7,7 @@ import { WD, WK, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
 import { useModalBack } from '../hooks/useModalBack.js'
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
 import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
@@ -2787,6 +2788,7 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState('todos')
   const [viewing, setViewing] = useState(null)
+  const { dragHandlers: viewingDragHandlers, modalStyle: viewingModalStyle } = useSwipeDismiss(() => setViewing(null))
   const viewingPushed = useRef(false)
   useEffect(() => {
     if (!viewing) {
@@ -3012,8 +3014,8 @@ function PanelDocumentos({ db, toast, saveDB, session }) {
 
       {viewing && (
         <div className="modal-ov" onClick={() => setViewing(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
-            <div className="modal-drag" />
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560, ...viewingModalStyle }}>
+            <div className="modal-drag" {...viewingDragHandlers} />
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
               <button onClick={() => setViewing(null)} style={{ background:'var(--bg-500)', border:'1px solid var(--border)', color:'var(--text2)', width:32, height:32, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
