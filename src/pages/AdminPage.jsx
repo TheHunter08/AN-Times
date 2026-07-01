@@ -1602,6 +1602,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [procesandoCierre, setProcesandoCierre] = useState(new Set())
+  const procesandoCierreRef = useRef(new Set())
   const [agruparCentro, setAgruparCentro] = useState(false)
   const [generandoPdf, setGenerandoPdf] = useState(null) // id del cierre en curso, o 'consolidado'
   const empresaNombreCfg = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
@@ -1864,9 +1865,16 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
   }
 
   const generarCierre = (e, totalMin, days) => {
-    if (procesandoCierre.has(e.id)) return
+    if (procesandoCierreRef.current.has(e.id)) return
+    procesandoCierreRef.current.add(e.id)
     setProcesandoCierre(s => new Set([...s, e.id]))
     const mes = filterMonth
+    if ((db.cierres || []).find(c => c.empId === e.id && c.mes === mes)) {
+      procesandoCierreRef.current.delete(e.id)
+      setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })
+      toast('Ya existe un cierre para este empleado y mes', 3000, 'warn')
+      return
+    }
     const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(mes))
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes,
@@ -1878,6 +1886,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
     saveDB({ cierres: [...(db.cierres||[]), cierre] })
     queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mes} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
     toast(`✅ Cierre enviado a ${e.name}`)
+    procesandoCierreRef.current.delete(e.id)
     setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
@@ -3674,6 +3683,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     alertHoras: cfg.reminders?.alertHoras ?? 10,
   })
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const backupRef = useRef(null)
 
   const exportBackup = () => {
@@ -3712,6 +3722,8 @@ function PanelAjustes({ db, toast, saveDB, session }) {
   }, [primaryColor])
 
   const save = () => {
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
     const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
@@ -3720,6 +3732,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     saveDB({ config, audit: withAudit.audit })
     toast('Ajustes guardados', 3000, 'ok')
     setSaving(false)
+    setTimeout(() => { savingRef.current = false }, 600)
   }
 
   const reset = () => {
@@ -3996,8 +4009,17 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
 
   const [generandoPdf, setGenerandoPdf] = useState(null) // id del cierre en curso, o 'consolidado'
   const empresaNombreJO = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
+  const procesandoCierreJORef = useRef(new Set())
+  const [procesandoCierreJO, setProcesandoCierreJO] = useState(new Set())
 
   const generarCierreJO = (e, totalMin, days) => {
+    if (procesandoCierreJORef.current.has(e.id)) return
+    if ((db.cierres || []).find(c => c.empId === e.id && c.mes === selMonth)) {
+      toast('Ya existe un cierre para este empleado y mes', 3000, 'warn')
+      return
+    }
+    procesandoCierreJORef.current.add(e.id)
+    setProcesandoCierreJO(s => new Set([...s, e.id]))
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes: selMonth,
@@ -4010,6 +4032,8 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     const mesLabel = new Date(selMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
     queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
     toast(`✅ Cierre enviado a ${e.name}`)
+    procesandoCierreJORef.current.delete(e.id)
+    setProcesandoCierreJO(s => { const n = new Set(s); n.delete(e.id); return n })
   }
 
   const generarTodosJO = () => {
@@ -4124,7 +4148,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
                         <button className="btn btn-secondary btn-sm" onClick={() => downloadCierrePDF(cierre)} disabled={generandoPdf === cierre.id}>{generandoPdf === cierre.id ? '…' : 'PDF'}</button>
                       </>
                     ) : (
-                      <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days}>
+                      <button className="btn btn-primary btn-sm" onClick={() => generarCierreJO(e, totalMin, days)} disabled={!days || procesandoCierreJO.has(e.id)}>
                         Enviar cierre
                       </button>
                     )}
