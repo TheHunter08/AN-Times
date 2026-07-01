@@ -709,20 +709,29 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
       </div>
-      <div className="adm-table-wrap">
-        <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>Centro</th><th>Entrada</th><th>Salida</th><th>Trabajo</th><th>Descanso</th><th>GPS</th><th></th></tr></thead>
-          <tbody>
-            {pagedFiltered.map(r => {
-              const wm = Math.floor(recWorkSecs(r)/60)
-              const bm = Math.floor((r.breakSecs||0)/60)
-              const over = wm > WD
-              const loc = r.locInicio
-              return (
-                <tr key={r.id}>
-                  <td>{r.empName}</td>
-                  <td style={{ color:'var(--text3)', fontSize:12 }}>{r.centro || '—'}</td>
-                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>
+      {!pagedFiltered.length ? (
+        <div className="empty-premium">
+          <div className="empty-premium-icon">🗂️</div>
+          <div className="empty-premium-title">Sin resultados</div>
+          <div className="empty-premium-sub">Prueba a cambiar los filtros de búsqueda.</div>
+        </div>
+      ) : (
+      <div className="fich-list stagger-in">
+        {pagedFiltered.map(r => {
+          const wm = Math.floor(recWorkSecs(r)/60)
+          const bm = Math.floor((r.breakSecs||0)/60)
+          const over = wm > WD
+          const loc = r.locInicio
+          return (
+            <div key={r.id} className="fich-card">
+              <div className="fich-avatar">{(r.empName || '?').slice(0,2).toUpperCase()}</div>
+              <div className="fich-id">
+                <div className="fich-name">{r.empName}</div>
+                <div className="fich-sub">{r.centro || 'Sin centro'}</div>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">Entrada</span>
+                <span className="fich-block-val">
                     {editingRec?.id === r.id && editingRec?.field === 'inicio' ? (
                       <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'stretch', minWidth:180 }}>
                         <div style={{ display:'flex', gap:4, alignItems:'center' }}>
@@ -765,8 +774,11 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                         {r.correcciones?.some(c => c.campo === 'inicio') && <span style={{ fontSize:9, color:'var(--orange)' }}>✏️</span>}
                       </span>
                     )}
-                  </td>
-                  <td style={{ fontVariantNumeric:'tabular-nums', fontSize:12 }}>
+                </span>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">Salida</span>
+                <span className="fich-block-val">
                     {editingRec?.id === r.id && editingRec?.field === 'fin' ? (
                       <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'stretch', minWidth:180 }}>
                         <input type="datetime-local" defaultValue={r.fin?.slice(0,16)} id="edit-rec-fin-input"
@@ -807,11 +819,19 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                         {r.correcciones?.some(c => c.campo === 'fin') && <span style={{ fontSize:9, color:'var(--orange)' }}>✏️</span>}
                       </span>
                     )}
-                  </td>
-                  <td style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</td>
-                  <td style={{ color:'var(--text3)', fontSize:12 }}>{mhm(bm)}</td>
-                  <td>
-                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                </span>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">Trabajo</span>
+                <span className="fich-block-val" style={{ fontWeight:700, color: over ? 'var(--orange)' : undefined }}>{mhm(wm)}</span>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">Descanso</span>
+                <span className="fich-block-val">{mhm(bm)}</span>
+              </div>
+              <div className="fich-block">
+                <span className="fich-block-lbl">GPS</span>
+                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                       {loc ? (
                         <a href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}&zoom=17`}
                           target="_blank" rel="noopener noreferrer"
@@ -834,28 +854,27 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                           <span style={{ fontSize:9, color:'var(--text4)' }}>salida</span>
                         </a>
                       ) : r.fin ? <span style={{ fontSize:10, color:'var(--text4)' }}>⏹ —</span> : null}
-                    </div>
-                  </td>
-                  <td><button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button></td>
-                </tr>
-              )
-            })}
-            {!pagedFiltered.length && <tr><td colSpan={8} className="empty">Sin resultados</td></tr>}
-          </tbody>
-          {filtered.length > 0 && (
-            <tfoot>
-              <tr style={{ background:'var(--bg-500)' }}>
-                <td colSpan={4} style={{ fontWeight:700, fontSize:12, color:'var(--text3)', padding:'8px 14px' }}>
-                  Total ({filtered.length} registros)
-                </td>
-                <td style={{ fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums' }}>{mhm(totalWork)}</td>
-                <td style={{ fontWeight:700, color:'var(--text3)', fontVariantNumeric:'tabular-nums', fontSize:12 }}>{mhm(totalBreak)}</td>
-                <td /><td />
-              </tr>
-            </tfoot>
-          )}
-        </table>
+                </div>
+              </div>
+              <button className="btn btn-sm btn-danger" onClick={() => del(r.id)}>✕</button>
+            </div>
+          )
+        })}
       </div>
+      )}
+      {filtered.length > 0 && (
+        <div className="fich-card" style={{ marginTop:4, background:'var(--bg-500)', fontWeight:700 }}>
+          <div className="fich-id" style={{ fontSize:12, color:'var(--text3)' }}>Total ({filtered.length} registros)</div>
+          <div className="fich-block">
+            <span className="fich-block-lbl">Trabajo</span>
+            <span className="fich-block-val" style={{ fontWeight:800, color:'var(--primary-light)' }}>{mhm(totalWork)}</span>
+          </div>
+          <div className="fich-block">
+            <span className="fich-block-lbl">Descanso</span>
+            <span className="fich-block-val">{mhm(totalBreak)}</span>
+          </div>
+        </div>
+      )}
       {filtered.length > pageSize && (
         <div style={{ textAlign:'center', marginTop:14 }}>
           <button className="btn btn-secondary" onClick={() => setPageSize(s => s + 100)}>
@@ -1527,50 +1546,49 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
         </div>
       )}
 
-      <div className="adm-table-wrap">
-        <table className="adm-table">
-          <thead><tr><th>Empleado</th><th>PIN</th><th>Rol</th><th>Obra</th><th>Alta</th><th></th></tr></thead>
-          <tbody>
-            {emps.length === 0 && (
-              <tr><td colSpan={6}>
-                <div style={{ padding:'40px 20px', textAlign:'center', color:'var(--text3)' }}>
-                  <div style={{ fontSize:36, marginBottom:12 }}>👷</div>
-                  <div style={{ fontSize:15, fontWeight:700, color:'var(--text2)', marginBottom:6 }}>Sin empleados {empSearch ? 'con ese filtro' : 'todavía'}</div>
-                  <div style={{ fontSize:13, marginBottom:16 }}>{empSearch ? 'Prueba otra búsqueda.' : 'Crea el primer empleado con el botón "+ Nuevo".'}</div>
-                  {!empSearch && <button className="btn btn-primary btn-sm" onClick={openNew}>+ Añadir empleado</button>}
+      {emps.length === 0 ? (
+        <div className="empty-premium">
+          <div className="empty-premium-icon">👷</div>
+          <div className="empty-premium-title">Sin empleados {empSearch ? 'con ese filtro' : 'todavía'}</div>
+          <div className="empty-premium-sub">{empSearch ? 'Prueba otra búsqueda.' : 'Crea el primer empleado con el botón "+ Nuevo".'}</div>
+          {!empSearch && <button className="btn btn-primary btn-sm" style={{ marginTop:12 }} onClick={openNew}>+ Añadir empleado</button>}
+        </div>
+      ) : (
+        <div className="emp-grid stagger-in">
+          {emps.map(e => (
+            <div key={e.id} className="emp-card card-lift" style={{ opacity: e.baja ? 0.5 : 1 }}>
+              <div className="emp-card-top">
+                <div className="emp-card-avatar" style={{ background: e.color || 'var(--primary)' }}>
+                  {(e.initials || e.name.slice(0, 2)).toUpperCase()}
                 </div>
-              </td></tr>
-            )}
-            {emps.map(e => (
-              <tr key={e.id} style={{ opacity: e.baja ? 0.4 : 1 }}>
-                <td>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{ width:28, height:28, borderRadius:'50%', background: e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
-                      {(e.initials||e.name.slice(0,2)).toUpperCase()}
-                    </div>
-                    <span>{e.name}</span>
-                  </div>
-                </td>
-                <td style={{ fontFamily:'monospace', letterSpacing:2 }}>{'•'.repeat(e.pinLen || (e.pin?.length <= 6 ? e.pin?.length : 4) || 4)}</td>
-                <td>
-                  <span className={`badge${e.role==='encargado'?' badge-purple':e.role==='jefe_obra'?' badge-blue':''}`}>
-                    {e.role==='encargado'?'⭐ Enc.':e.role==='jefe_obra'?'🏗️ JO':'👷 Emp'}
-                  </span>
-                </td>
-                <td style={{ color:'var(--text3)', fontSize:12 }}>{e.empresa || '—'}</td>
-                <td style={{ color:'var(--text3)', fontSize:12 }}>{e.fechaAlta || '—'}</td>
-                <td>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(e)}>✏️</button>
-                    <button className="btn btn-sm btn-secondary" title="Generar QR de acceso" onClick={() => setQrEmp(e)}>QR</button>
-                    {!e.baja && <button className="btn btn-sm btn-danger" onClick={() => del(e.id)}>Baja</button>}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div className="emp-card-name">{e.name}</div>
+                  <div className="emp-card-sub">{e.empresa || 'Sin obra asignada'}</div>
+                </div>
+                <span className={`badge${e.role==='encargado'?' badge-purple':e.role==='jefe_obra'?' badge-blue':''}`}>
+                  {e.role==='encargado'?'⭐ Enc.':e.role==='jefe_obra'?'🏗️ JO':'👷 Emp'}
+                </span>
+              </div>
+              <div className="emp-card-body">
+                <div className="emp-card-row">
+                  <span className="emp-card-row-lbl">PIN</span>
+                  <span className="emp-card-row-val" style={{ fontFamily:'monospace', letterSpacing:2 }}>{'•'.repeat(e.pinLen || (e.pin?.length <= 6 ? e.pin?.length : 4) || 4)}</span>
+                </div>
+                <div className="emp-card-row">
+                  <span className="emp-card-row-lbl">Alta</span>
+                  <span className="emp-card-row-val">{e.fechaAlta || '—'}</span>
+                </div>
+                {e.baja && <div className="emp-card-row"><span className="badge badge-red">Baja</span></div>}
+              </div>
+              <div className="emp-card-actions">
+                <button className="btn btn-sm btn-secondary" onClick={() => openEdit(e)}>✏️ Editar</button>
+                <button className="btn btn-sm btn-secondary" title="Generar QR de acceso" onClick={() => setQrEmp(e)}>QR</button>
+                {!e.baja && <button className="btn btn-sm btn-danger" onClick={() => del(e.id)}>Baja</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Modal QR ─────────────────────────────────────────────── */}
       {qrEmp && (
