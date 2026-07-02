@@ -1493,8 +1493,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .ai-typing span:nth-child(3) { animation-delay: .36s; }
 @keyframes aiTyping { 0%,60%,100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
-/* Control cards (admin) */
-.ctrl-card { background: var(--bg-600); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+/* Control cards (admin) — layout real vive en la regla ".ctrl-card" de más abajo
+   ("Premium status card for Control Live"); esta solo quedaba por compatibilidad
+   y su display:flex rompía el layout vertical de CtrlCard.jsx con nombres largos. */
 .sol-item  { background: var(--bg-600); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 10px; }
 .sol-acts  { display: flex; gap: 6px; flex-wrap: wrap; }
 .erow { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }

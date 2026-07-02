@@ -607,13 +607,14 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const [delMotivo, setDelMotivo] = useState('')
   const [pageSize, setPageSize] = useState(100)
 
-  // Un encargado solo ve/gestiona los fichajes de su(s) obra(s) asignada(s)
-  const isEncargado = session?.isEnc && !session?.isJO
+  // Un encargado o jefe de obra solo ve/gestiona los fichajes de los centros de
+  // trabajo que tiene asignados — solo el admin ve todos los centros sin filtrar.
+  const isScoped = !!(session?.isEnc || session?.isJO)
   const misCentros = session?.user?.obrasAsignadas || []
   const emps = (db.employees || []).filter(e => !e.isAdmin &&
-    (!isEncargado || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+    (!isScoped || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
   const empIds = useMemo(() => new Set(emps.map(e => e.id)), [emps])
-  const recs = (db.records || []).filter(r => r.fin && (!isEncargado || empIds.has(r.empId)))
+  const recs = (db.records || []).filter(r => r.fin && (!isScoped || empIds.has(r.empId)))
   const now = new Date()
   const todayStr = today()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
@@ -912,6 +913,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
 
 // ─── PANEL SOLICITUDES ────────────────────────────────────────────────────────
 function PanelSolicitudes({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const [solTab, setSolTab] = useState('vacaciones')
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
   const [vacForm, setVacForm] = useState({ empId:'', fechaInicio:today(), fechaFin:today(), motivo:'' })
@@ -938,6 +940,16 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
       queuePush(v.empId, noti.action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
     }
     toast(estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
+  }
+
+  const delVac = (id) => {
+    const v = (db.vacaciones || []).find(x => x.id === id)
+    showConfirm(`¿Eliminar estas vacaciones${v?.empName ? ' de ' + v.empName : ''}? El empleado podrá volver a fichar esos días.`, () => {
+      const withAudit = auditLog(db, 'Vacaciones eliminadas', v?.empName || '', session?.user?.name || 'Admin')
+      saveDB({ vacaciones: (db.vacaciones || []).filter(x => x.id !== id), audit: withAudit.audit })
+      if (v?.empId) queuePush(v.empId, 'Vacaciones canceladas', `Tus vacaciones ${v.fechaInicio ? fds(v.fechaInicio) + ' → ' + fds(v.fechaFin) : ''} han sido eliminadas por el administrador.`, 'vacaciones', '/?go=emp:vacaciones')
+      toast('Vacaciones eliminadas')
+    })
   }
 
   // Alta directa de vacaciones (admin / jefe de obra) — quedan aprobadas de inmediato,
@@ -1070,6 +1082,11 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
             <div style={{ display:'flex', gap:6 }}>
               <button className="btn btn-sm btn-primary" onClick={() => act(v.id, 'aprobada')}>✓</button>
               <button className="btn btn-sm btn-danger" onClick={() => { setRejecting(v.id); setRejMotivo('') }}>✗</button>
+            </div>
+          )}
+          {v.estado !== 'pendiente' && (
+            <div style={{ display:'flex', gap:6 }}>
+              <button className="btn btn-sm btn-secondary" title="Eliminar" onClick={() => delVac(v.id)}>🗑️</button>
             </div>
           )}
           {rejecting === v.id && (
@@ -1846,54 +1863,29 @@ function PanelInformes({ db, toast, saveDB, session }) {
     }, 350)
   }
 
-  const downloadNominaPDF = ({ e, totalMin, days }) => {
-    const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
-      .sort((a, b) => a.inicio.localeCompare(b.inicio))
-    const mes = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-    const ausEmp = (db.ausencias || []).filter(a => a.empId === e.id && (a.fechaInicio || a.fecha || '').startsWith(filterMonth.slice(0,7)))
-    const vacEmp = (db.vacaciones || []).filter(v => v.empId === e.id && v.estado === 'aprobada' && (v.fechaInicio || '').slice(0,7) === filterMonth)
-    const vacDiasTotal = vacEmp.reduce((s, v) => {
-      if (v.fechaInicio && v.fechaFin) return s + Math.round((new Date(v.fechaFin+'T00:00:00') - new Date(v.fechaInicio+'T00:00:00')) / 86400000) + 1
-      return s + (v.dias || 0)
-    }, 0)
-    const rowsHtml = eRecs.map(r => {
-      const wm = Math.floor(recWorkSecs(r) / 60)
-      const d = new Date(r.inicio), fin = new Date(r.fin)
-      return `<tr><td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td><td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${fin.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td><td>${esc(r.centro||'—')}</td><td>${mhm(wm)}</td></tr>`
-    }).join('')
-    printHtml(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${mes} · ${esc(e.name)}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:750px;margin:0 auto}
-h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;color:#666;font-weight:400;margin:0 0 24px}
-.meta{display:flex;gap:32px;margin-bottom:24px;padding:14px 18px;background:#f8f8f8;border-radius:8px;font-size:13px}
-.meta span{color:#555}.meta strong{display:block;font-size:15px;color:#111;margin-top:2px}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}
-th{background:#f0f0f0;padding:9px 12px;text-align:left;border-bottom:2px solid #ddd;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-td{padding:8px 12px;border-bottom:1px solid #eee}tr:last-child td{border-bottom:none}
-.total-row{font-weight:700;background:#f8f8f8;font-size:14px}
-.sign{display:flex;gap:48px;margin-top:48px}.sign-box{flex:1;border-top:1px solid #999;padding-top:8px;font-size:12px;color:#666}
-.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;margin-left:8px}
-.b-ok{background:#dcfce7;color:#166534}.b-warn{background:#fef9c3;color:#854d0e}
-footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}
-@media print{body{padding:20px}}</style></head><body>
-<h1>${esc(e.name)} <span class="badge ${totalMin >= (e.horasSemanales||WK)*4*0.9 ? 'b-ok':'b-warn'}">${mhm(totalMin)}</span></h1>
-<h2>Nómina de horas · ${mes}</h2>
-<div class="meta">
-  <div><span>Obra</span><strong>${esc(e.empresa||'—')}</strong></div>
-  <div><span>Centro</span><strong>${esc(e.centroTrabajo||'—')}</strong></div>
-  <div><span>Jornada</span><strong>${e.horasSemanales||WK}h/sem</strong></div>
-  <div><span>Días trabajados</span><strong>${days}</strong></div>
-</div>
-<table><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Centro</th><th>Horas</th></tr></thead>
-<tbody>${rowsHtml}</tbody>
-<tfoot><tr class="total-row"><td colspan="4">Total horas trabajadas</td><td>${mhm(totalMin)}</td></tr></tfoot></table>
-<div class="meta" style="gap:24px">
-  <div><span>Vacaciones aprobadas</span><strong>${vacDiasTotal} días</strong></div>
-  <div><span>Ausencias/bajas</span><strong>${ausEmp.length} registro${ausEmp.length!==1?'s':''}</strong></div>
-</div>
-<div class="sign"><div class="sign-box">Firma empleado<br><br><br>_________________________<br>${esc(e.name)}</div>
-<div class="sign-box">Firma obra<br><br><br>_________________________<br>Representante</div></div>
-<footer><span>Generado: ${new Date().toLocaleString('es-ES')}</span><span>TIMES INC · Registro de jornada laboral</span></footer>
-</body></html>`)
+  // PDF de horas trabajadas ese mes (no es una nómina/documento de pago — solo el
+  // detalle de horas fichadas). Reutiliza el mismo generador pdf-lib que los cierres,
+  // como un cierre "de solo lectura" no persistido, para tener el mismo formato/calidad.
+  const [generandoHorasPdf, setGenerandoHorasPdf] = useState(null)
+  const downloadHorasMesPDF = async ({ e, totalMin, days }) => {
+    setGenerandoHorasPdf(e.id)
+    try {
+      const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
+        .sort((a, b) => a.inicio.localeCompare(b.inicio))
+      const cierreEfimero = {
+        empId: e.id, empName: e.name, mes: filterMonth,
+        generadoPor: session?.user?.name || 'Admin',
+        generadoAt: new Date().toISOString(),
+        totalMin, dias: days, estado: 'informativo', firma: null,
+        records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 })),
+      }
+      const { dataUrl } = await buildCierreIndividualPDF({ cierre: cierreEfimero, empresa: empresaNombreCfg })
+      downloadDataUrl(dataUrl, `horas-${filterMonth}-${(e.name||'').replace(/\s+/g,'_')}.pdf`)
+    } catch (err) {
+      toast('Error al generar el PDF: ' + (err?.message || err), 5000, 'err')
+    } finally {
+      setGenerandoHorasPdf(null)
+    }
   }
 
   const generarTodosCierres = () => {
@@ -2147,7 +2139,7 @@ footer{margin-top:32px;font-size:11px;color:#aaa;border-top:1px solid #eee;paddi
                 </div>
               </div>
               <div className="emp-card-actions">
-                <button className="btn btn-sm btn-secondary" onClick={() => downloadNominaPDF({ e, totalMin, days })}>📄 PDF nómina</button>
+                <button className="btn btn-sm btn-secondary" disabled={generandoHorasPdf === e.id} onClick={() => downloadHorasMesPDF({ e, totalMin, days })}>{generandoHorasPdf === e.id ? '…' : '📄 PDF horas del mes'}</button>
               </div>
             </div>
           ))}
@@ -4067,11 +4059,14 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
   const now = new Date()
   const [selMonth, setSelMonth] = useState(`${now.getFullYear()}-${p2(now.getMonth()+1)}`)
 
+  // Los centros de trabajo son lo que realmente importa para acotar el equipo del
+  // jefe de obra — "obrasAsignadas" en un empleado normal casi nunca está poblado
+  // (ese campo es para encargados/JO), así que hay que comparar por centroTrabajo.
   const joObras = session?.user?.obrasAsignadas || []
   const recs = db.records || []
 
   const emps = (db.employees || []).filter(e =>
-    !e.baja && !e.isAdmin && e.obrasAsignadas?.some(o => joObras.includes(o))
+    !e.baja && !e.isAdmin && (joObras.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => joObras.includes(o)))
   )
 
   const rows = emps.map(e => {

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { gid, today, fds } from '../../utils/time.js'
-import { auditLog } from '../../services/dataService.js'
+import { auditLog, queuePush } from '../../services/dataService.js'
 
 const p2 = n => String(n).padStart(2, '0')
 
@@ -97,6 +97,10 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     }
     const withAudit = auditLog(db, 'Turno guardado', `${emp?.name || empId} - ${fecha}`, who)
     saveDB({ turnos: newTurnos, audit: withAudit.audit })
+    if (empId) {
+      const tipoTxt = form.tipo === 'libre' ? 'Libre' : `${form.horaInicio}–${form.horaFin}`
+      queuePush(empId, '📅 Turno publicado', `${who} te asignó un turno el ${fds(fecha)}: ${tipoTxt}${form.centro ? ' · ' + form.centro : ''}.`, 'turno', '/?tab=turnos')
+    }
     setModal(null)
     toast('Turno guardado', 2500, 'ok')
   }
@@ -107,6 +111,7 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     const newTurnos = turnos.filter(t => t.id !== existing.id)
     const withAudit = auditLog(db, 'Turno eliminado', `${existing.empName} - ${existing.fecha}`, who)
     saveDB({ turnos: newTurnos, audit: withAudit.audit })
+    if (existing.empId) queuePush(existing.empId, '📅 Turno eliminado', `${who} eliminó tu turno del ${fds(existing.fecha)}.`, 'turno', '/?tab=turnos')
     setModal(null)
     toast('Turno eliminado')
   }
@@ -125,6 +130,10 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     if (!newOnes.length) { toast('Esta semana ya tiene turnos de la anterior', 3000, 'warn'); return }
     const withAudit = auditLog(db, 'Semana copiada', `${newOnes.length} turnos`, who)
     saveDB({ turnos: [...turnos, ...newOnes], audit: withAudit.audit })
+    const empIdsAvisados = [...new Set(newOnes.map(t => t.empId).filter(Boolean))]
+    empIdsAvisados.forEach(empId => {
+      queuePush(empId, '📅 Cuadrante publicado', `${who} publicó tus turnos de la semana del ${fds(weekDates[0])}.`, 'turno', '/?tab=turnos')
+    })
     toast(`${newOnes.length} turnos copiados`, 3000, 'ok')
   }
 

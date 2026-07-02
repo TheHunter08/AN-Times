@@ -44,8 +44,6 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
   const totSecs = completedSecs + liveSecs
   const totMin = Math.floor(totSecs / 60)
   const brkMin = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
-  const extraMin = Math.max(0, totMin - WD)
-  const normMin = Math.min(totMin, WD)
 
   const now = new Date()
   const ws = wkStart(now)
@@ -56,6 +54,13 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
+  // Horas extra reales: solo cuentan al superar 40h/semana (Estatuto de los Trabajadores),
+  // no por pasar de 8h en un día. "Extra hoy" es solo la parte de hoy que empuja la
+  // semana por encima de 40h — si la semana aún no llega a 40h, hoy cuenta como normal
+  // aunque haya sido un día largo.
+  const weekMinAntes = Math.max(0, weekMin - totMin)
+  const extraMin = Math.max(0, weekMin - WK) - Math.max(0, weekMinAntes - WK)
+  const normMin = Math.max(0, totMin - extraMin)
 
   const monthMin = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0),

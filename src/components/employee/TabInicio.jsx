@@ -61,7 +61,6 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const empWK = (u.horasSemanales || WK / 60) * 60                  // minutos/semana
   const pct = Math.min(100, Math.round(totMin / empWD * 100))
   const remainMin = Math.max(0, empWD - totMin)
-  const extraMin = Math.max(0, totMin - empWD)
 
   const entradaRec = realRecs[0]
   const salidaRec = [...realRecs].reverse().find(r => r.fin && r.closed)
@@ -77,6 +76,9 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
   const weekPct = Math.min(100, Math.round(weekMin / empWK * 100))
+  // Horas extra reales: solo cuentan al superar 40h/semana (Estatuto de los Trabajadores),
+  // no por pasar de la jornada diaria — antes se marcaba "extra" solo por hacer >8h en un día.
+  const extraMin = Math.max(0, weekMin - WK)
   const lastWeekMin = useMemo(() => {
     const lws = new Date(wsStr); lws.setDate(lws.getDate() - 7)
     const lwe = new Date(wsStr)
