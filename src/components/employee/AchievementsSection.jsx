@@ -1,5 +1,21 @@
 import { useMemo, useEffect } from 'react'
-import { calcMin } from '../../utils/time.js'
+import { calcMin, p2 } from '../../utils/time.js'
+
+// Clave YYYY-MM en huso local (igual que today() en time.js) — no usar
+// toISOString().slice(0,7), que da el mes en UTC y puede desfasarse un día
+// para usuarios lejos de UTC.
+function localMonthKey(d = new Date()) { return `${d.getFullYear()}-${p2(d.getMonth() + 1)}` }
+
+function workdaysSoFarInMonth(mk, ref = new Date()) {
+  const [y, m] = mk.split('-').map(Number)
+  let n = 0
+  const d = new Date(y, m - 1, 1)
+  while (d <= ref) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) n++
+    d.setDate(d.getDate() + 1)
+  }
+  return n
+}
 
 const ACHIEVEMENTS = [
   { id:'a1', icon:'🌱', title:'Primera jornada', desc:'Primera jornada completada', check:(r)=>r.filter(x=>x.fin).length>=1 },
@@ -12,6 +28,18 @@ const ACHIEVEMENTS = [
   { id:'a8', icon:'💪', title:'Centurión', desc:'100h en un mes', check:(r)=>{const m={};r.filter(x=>x.fin&&x.inicio).forEach(x=>{const k=x.inicio.slice(0,7);m[k]=(m[k]||0)+calcMin(x)});return Object.values(m).some(v=>v>=6000)} },
   { id:'a9', icon:'⏰', title:'Siempre puntual', desc:'5 días antes de las 09:30', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=570}).length>=5 },
   { id:'a10', icon:'🌅', title:'Madrugador', desc:'3 veces antes de las 08:00', check:(r)=>r.filter(x=>{if(!x.fin||!x.inicio)return false;const d=new Date(x.inicio);return d.getHours()*60+d.getMinutes()<=480}).length>=3 },
+  { id:'a11', icon:'🎯', title:'Cero olvidos', desc:'Ningún fichaje cerrado automáticamente este mes', check:(r)=>{
+    const mk = localMonthKey()
+    const monthRecs = r.filter(x=>x.inicio?.startsWith(mk))
+    return monthRecs.length>0 && !monthRecs.some(x=>x.autoClosedAt)
+  } },
+  { id:'a12', icon:'📆', title:'Mes perfecto', desc:'Todos los días laborables fichados este mes, sin olvidos', check:(r)=>{
+    const mk = localMonthKey()
+    const expected = workdaysSoFarInMonth(mk)
+    const monthRecs = r.filter(x=>x.inicio?.startsWith(mk))
+    const workedDays = new Set(monthRecs.filter(x=>x.fin&&(x.workSecs||0)>=1800).map(x=>x.inicio.slice(0,10))).size
+    return expected>=5 && workedDays>=expected && monthRecs.length>0 && !monthRecs.some(x=>x.autoClosedAt)
+  } },
 ]
 
 export function AchievementsSection({ myRecs, streak, u, saveDB, db }) {

@@ -12,6 +12,7 @@ import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
 import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { exportInspeccionXLSX, buildInspeccionHTML } from '../utils/inspeccionExport.js'
+import { resizeImageToDataUrl } from '../utils/imageResize.js'
 import { callSendPushAll, showPushToast } from '../utils/pushAll.js'
 import { NavIcon } from '../components/admin/NavIcon.jsx'
 import { SyncBadge } from '../components/admin/SyncBadge.jsx'
@@ -20,6 +21,7 @@ import { PushNotifWidget } from '../components/admin/PushNotifWidget.jsx'
 import { ComunicadoWidget } from '../components/admin/ComunicadoWidget.jsx'
 import { buildHeatmap, Heatmap } from '../components/admin/Heatmap.jsx'
 import { LiveTimerCell, CtrlCard } from '../components/admin/CtrlCard.jsx'
+import { MapaObra } from '../components/admin/MapaObra.jsx'
 
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
@@ -289,24 +291,28 @@ export default function AdminPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <div className="adm-logo" style={{ flexShrink:0 }}>
-            <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
-              <defs>
-                <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="var(--accent)"/>
-                  <stop offset="100%" stopColor="var(--primary)"/>
-                </linearGradient>
-                <linearGradient id="admLogoAccent" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="var(--secondary)"/>
-                  <stop offset="100%" stopColor="var(--teal)"/>
-                </linearGradient>
-              </defs>
-              <rect width="44" height="44" rx="10" fill="url(#admLogoBg)"/>
-              <rect x="11.5" y="14.5" width="21" height="4.4" rx="2.2" fill="white"/>
-              <rect x="19.8" y="14.5" width="4.4" height="15.5" rx="2.2" fill="white"/>
-              <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#admLogoAccent)" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="30" cy="19.8" r="1.1" fill="url(#admLogoAccent)"/>
-            </svg>
-            <span className="adm-logo-text">TIMES INC</span>
+            {db.config?.companyLogo ? (
+              <img src={db.config.companyLogo} alt={db.config?.companyName || 'Logo'} style={{ width:20, height:20, objectFit:'contain', borderRadius:5 }} />
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
+                <defs>
+                  <linearGradient id="admLogoBg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="var(--accent)"/>
+                    <stop offset="100%" stopColor="var(--primary)"/>
+                  </linearGradient>
+                  <linearGradient id="admLogoAccent" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="var(--secondary)"/>
+                    <stop offset="100%" stopColor="var(--teal)"/>
+                  </linearGradient>
+                </defs>
+                <rect width="44" height="44" rx="10" fill="url(#admLogoBg)"/>
+                <rect x="11.5" y="14.5" width="21" height="4.4" rx="2.2" fill="white"/>
+                <rect x="19.8" y="14.5" width="4.4" height="15.5" rx="2.2" fill="white"/>
+                <path d="M 30 19.8 A 7.2 7.2 0 1 1 26.8 27" fill="none" stroke="url(#admLogoAccent)" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="30" cy="19.8" r="1.1" fill="url(#admLogoAccent)"/>
+              </svg>
+            )}
+            <span className="adm-logo-text">{db.config?.companyName || 'TIMES INC'}</span>
           </div>
           <div className="adm-page-title" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{actPanel.label}</div>
           {activeNow > 0 && (
@@ -510,9 +516,16 @@ export default function AdminPage() {
 
 function PanelControl({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
+  const [vista, setVista] = useState('lista') // 'lista' | 'mapa'
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
+
+  const liveEmpsForMap = useMemo(() => liveRecs.map(r => {
+    const e = emps.find(x => x.id === r.empId)
+    if (!e || !r.locInicio) return null
+    return { id: e.id, name: e.name, initials: (e.initials || e.name.slice(0, 2)).toUpperCase(), lat: r.locInicio.lat, lng: r.locInicio.lng, enDescanso: !!r.enDescanso }
+  }).filter(Boolean), [liveRecs, emps])
 
   // Pre-compute todayMin per employee (avoids O(n²) filter inside render)
   const todayMinMap = useMemo(() => {
@@ -577,9 +590,24 @@ function PanelControl({ db, toast, saveDB, session }) {
             {liveRecs.length} activos / {emps.length} totales
           </div>
         </div>
+        <div style={{ display:'flex', gap:6, background:'var(--bg-600)', borderRadius:10, padding:3 }}>
+          {[['lista','☰ Lista'],['mapa','🗺️ Mapa']].map(([v,lbl]) => (
+            <button key={v} onClick={() => setVista(v)}
+              style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', fontSize:12, fontWeight:700,
+                background: vista===v ? 'var(--primary)' : 'transparent', color: vista===v ? '#fff' : 'var(--text3)' }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {!liveRecs.length && (
+      {vista === 'mapa' && (
+        <div style={{ marginBottom:16 }}>
+          <MapaObra obras={db.obras || []} liveEmps={liveEmpsForMap} />
+        </div>
+      )}
+
+      {vista === 'lista' && !liveRecs.length && (
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'rgba(96,116,138,.08)', border:'1px solid var(--border)', borderRadius:'var(--r)', marginBottom:16 }}>
           <span style={{ fontSize:16 }}>😴</span>
           <div>
@@ -589,20 +617,22 @@ function PanelControl({ db, toast, saveDB, session }) {
         </div>
       )}
 
-      <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
-        {emps.map(e => (
-          <CtrlCard
-            key={e.id}
-            e={e}
-            live={liveRecs.find(r => r.empId === e.id)}
-            todayMin={todayMinMap[e.id] || 0}
-            wdMin={db.config?.wdMin}
-            force={force}
-            startJornada={startJornada}
-            toggleDescanso={toggleDescanso}
-          />
-        ))}
-      </div>
+      {vista === 'lista' && (
+        <div className="stagger-in" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+          {emps.map(e => (
+            <CtrlCard
+              key={e.id}
+              e={e}
+              live={liveRecs.find(r => r.empId === e.id)}
+              todayMin={todayMinMap[e.id] || 0}
+              wdMin={db.config?.wdMin}
+              force={force}
+              startJornada={startJornada}
+              toggleDescanso={toggleDescanso}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -3718,6 +3748,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
   const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
   const [companyCif,   setCompanyCif]   = useState(cfg.companyCif || '')
+  const [logoUploading, setLogoUploading] = useState(false)
   const [wdHoras, setWdHoras] = useState(cfg.wdMin ? String(Math.round(cfg.wdMin / 60 * 100) / 100) : '8')
   const [wkHoras, setWkHoras] = useState(cfg.wkMin ? String(Math.round(cfg.wkMin / 60 * 100) / 100) : '40')
   const [festivosExtra, setFestivosExtra] = useState(cfg.festivosExtra || {})
@@ -3793,6 +3824,32 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     toast('Color restablecido', 2000, 'ok')
   }
 
+  // El logo se guarda al momento (no espera al botón "Guardar ajustes"): es una
+  // operación de archivo, y perderla si el admin navega antes de guardar sería
+  // una mala sorpresa.
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 256, 0.88)
+      saveDB({ config: { ...(db.config || {}), companyLogo: dataUrl } })
+      toast('Logo actualizado', 2500, 'ok')
+    } catch (err) {
+      toast('No se pudo procesar la imagen: ' + (err?.message || err), 4000, 'err')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  const removeLogo = () => {
+    const config = { ...(db.config || {}) }
+    delete config.companyLogo
+    saveDB({ config })
+    toast('Logo eliminado', 2000, 'ok')
+  }
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -3807,6 +3864,26 @@ function PanelAjustes({ db, toast, saveDB, session }) {
           <div className="dash-widget-title">🏗️ Obras</div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+            <div style={{ width:60, height:60, borderRadius:14, background:'var(--bg-600)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+              {db.config?.companyLogo
+                ? <img src={db.config.companyLogo} alt="Logo empresa" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+                : <span style={{ fontSize:22, opacity:.35 }}>🏢</span>}
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Logo de la empresa</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <label className="btn btn-secondary btn-sm" style={{ cursor:'pointer' }}>
+                  {logoUploading ? 'Procesando…' : (db.config?.companyLogo ? 'Cambiar' : 'Subir logo')}
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={logoUploading} style={{ display:'none' }} />
+                </label>
+                {db.config?.companyLogo && (
+                  <button className="btn btn-ghost btn-sm" style={{ color:'var(--red)' }} onClick={removeLogo}>Quitar</button>
+                )}
+              </div>
+              <div style={{ fontSize:10, color:'var(--text4)', marginTop:5 }}>Aparece en la pantalla de acceso y en el menú. Se ajusta automáticamente.</div>
+            </div>
+          </div>
           <div style={{ display:'flex', gap:12 }}>
             <div style={{ flex:2 }}>
               <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>

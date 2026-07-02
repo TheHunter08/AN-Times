@@ -5343,6 +5343,58 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
   flex-shrink: 0;
 }
 
+/* Burst de confirmación — check que se dibuja y un anillo que se expande al
+   fichar entrada/salida/pausa, para que el gesto más repetido del día se
+   sienta premium en vez de solo un toast que aparece y desaparece. */
+.v30-burst {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+.v30-burst-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--green);
+  opacity: 0;
+  animation: v30BurstRing .6s cubic-bezier(.16,1,.3,1) forwards;
+}
+.v30-burst.brk .v30-burst-ring { border-color: var(--orange); }
+.v30-burst-check {
+  width: 64px;
+  height: 64px;
+  color: var(--green);
+  filter: drop-shadow(0 0 10px rgba(16,185,129,.6));
+}
+.v30-burst.brk .v30-burst-check { color: var(--orange); filter: drop-shadow(0 0 10px rgba(245,158,11,.6)); }
+.v30-burst-check path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: v30BurstCheck .38s ease-out .05s forwards;
+}
+.v30-burst-check-wrap {
+  animation: v30BurstScale .55s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+@keyframes v30BurstRing {
+  0%   { transform: scale(.7); opacity: .9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes v30BurstCheck {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes v30BurstScale {
+  0%   { transform: scale(.4); opacity: 0; }
+  40%  { transform: scale(1.1); opacity: 1; }
+  70%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
 /* Spinning conic-gradient ring — contained within btn-area */
 .v30-hc-glow {
   position: absolute;

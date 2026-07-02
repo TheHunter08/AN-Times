@@ -20,6 +20,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const [bioOfferVisible, setBioOfferVisible] = useState(false)
   const [bioOfferLoading, setBioOfferLoading] = useState(false)
   const [showParteVoz, setShowParteVoz] = useState(false)
+  const [burst, setBurst] = useState(null) // 'start' | 'stop' | 'break' | null
   // Memo: TabInicio re-renderiza cada segundo via timer; evitar refiltrar listas grandes
   const recs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
@@ -120,9 +121,20 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const ARC_C = 2 * Math.PI * ARC_R
   const arcOffset = ARC_C * (1 - pct / 100)
 
+  const triggerBurst = (kind, pattern) => {
+    try { navigator.vibrate(pattern) } catch {}
+    setBurst(kind)
+    setTimeout(() => setBurst(null), 650)
+  }
+
   const handleMainBtn = () => {
-    if (timer.state === 'idle') doStart()
-    else doStop()
+    if (timer.state === 'idle') { triggerBurst('start', [18, 40, 18]); doStart() }
+    else { triggerBurst('stop', [22, 60, 22, 60, 45]); doStop() }
+  }
+
+  const handleBreakBtn = () => {
+    triggerBurst('break', timer.state === 'break' ? [12, 30, 12] : [30])
+    doBreak()
   }
 
   const statusClass = timer.state === 'idle' ? 'idle' : timer.state === 'break' ? 'break' : ''
@@ -166,7 +178,6 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             <button
               className={`v30-hc-btn${timer.state === 'break' ? ' brk' : timer.state !== 'idle' ? ' live' : ''}`}
               onClick={() => {
-                try { navigator.vibrate([12]) } catch {}
                 if (showTip) { try { localStorage.setItem('an_tip_fichar','1') } catch {}; setShowTip(false) }
                 handleMainBtn()
               }}
@@ -180,6 +191,16 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                 {timer.state === 'idle' ? 'INICIAR' : timer.state === 'break' ? 'PAUSADO' : 'PARAR'}
               </span>
             </button>
+            {burst && (
+              <div className={`v30-burst${burst === 'break' ? ' brk' : ''}`}>
+                <div className="v30-burst-ring" />
+                <div className="v30-burst-check-wrap">
+                  <svg viewBox="0 0 24 24" className="v30-burst-check" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12.5 L9.5 18 L20 5" />
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tip / live status — just below button, above stats */}
@@ -196,7 +217,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
           {/* Break toggle — when active */}
           {timer.state !== 'idle' && (
-            <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={doBreak}>
+            <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={handleBreakBtn}>
               {timer.state === 'break' ? '▶  Reanudar trabajo' : '⏸  Iniciar descanso'}
             </button>
           )}

@@ -430,11 +430,13 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="login-logo-row" onClick={handleLogoTap}>
           <div className="login-logo-icon">
-            <LogoSVG />
+            {db.config?.companyLogo
+              ? <img src={db.config.companyLogo} alt={db.config?.companyName || 'Logo'} style={{ width:'100%', height:'100%', objectFit:'contain', borderRadius:12 }} />
+              : <LogoSVG />}
           </div>
           <div className="login-logo-text">
-            <div className="login-logo-name">TIMES <span>INC</span></div>
-            <div className="login-logo-sub">Control de jornada laboral</div>
+            <div className="login-logo-name">{db.config?.companyName ? db.config.companyName : <>TIMES <span>INC</span></>}</div>
+            <div className="login-logo-sub">{db.config?.companyName ? 'Powered by TIMES INC' : 'Control de jornada laboral'}</div>
           </div>
         </div>
 
