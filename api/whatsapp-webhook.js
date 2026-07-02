@@ -9,22 +9,46 @@
 //   WHATSAPP_PHONE_ID       → ya existe
 //   WHATSAPP_VERIFY_TOKEN   → nuevo. Cadena que tú eliges (p.ej. un UUID) y que
 //                              pegas también en Meta al configurar el webhook.
+//   WHATSAPP_WEBHOOK_SECRET → nuevo. Otra cadena que tú eliges, se añade como
+//                              query param a la URL del webhook (ver abajo). Sin
+//                              esto, el endpoint RECHAZA todas las peticiones —
+//                              es la única forma de evitar que cualquiera que
+//                              adivine esta URL pueda fichar entrada/salida en
+//                              nombre de cualquier empleado sabiendo su teléfono.
+//                              (No usamos la firma HMAC de Meta porque verificarla
+//                              exige el cuerpo crudo byte a byte, que este runtime
+//                              de Vercel no expone de forma fiable; un secreto en
+//                              la URL es igual de válido y mucho más simple.)
 //
 // Alta en Meta (cuando tengas la cuenta WhatsApp Business verificada):
-//   1. Meta for Developers → tu app → WhatsApp → Configuration → Webhook
-//   2. Callback URL: https://<tu-dominio>/api/whatsapp-webhook
-//   3. Verify token: el mismo valor que pongas en WHATSAPP_VERIFY_TOKEN
-//   4. Suscribirse al campo "messages"
+//   1. Genera un secreto: node -e "console.log(require('crypto').randomUUID())"
+//      y guárdalo como WHATSAPP_WEBHOOK_SECRET en Vercel.
+//   2. Meta for Developers → tu app → WhatsApp → Configuration → Webhook
+//   3. Callback URL: https://<tu-dominio>/api/whatsapp-webhook?secret=<ese-mismo-valor>
+//   4. Verify token: el mismo valor que pongas en WHATSAPP_VERIFY_TOKEN
+//   5. Suscribirse al campo "messages"
 // ─────────────────────────────────────────────────────────────────────────────
+import { timingSafeEqual } from 'crypto'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
-const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
-const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
-const WA_TOKEN       = process.env.WHATSAPP_TOKEN
-const WA_PHONE_ID    = process.env.WHATSAPP_PHONE_ID
-const VERIFY_TOKEN   = process.env.WHATSAPP_VERIFY_TOKEN
+const SB_URL          = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON         = cleanEnv(process.env.VITE_SB_ANON)
+const WA_TOKEN        = process.env.WHATSAPP_TOKEN
+const WA_PHONE_ID     = process.env.WHATSAPP_PHONE_ID
+const VERIFY_TOKEN    = process.env.WHATSAPP_VERIFY_TOKEN
+const WEBHOOK_SECRET  = process.env.WHATSAPP_WEBHOOK_SECRET
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+
+function isAuthorizedRequest(req) {
+  if (!WEBHOOK_SECRET) return false
+  const provided = String(req.query?.secret || '')
+  if (!provided) return false
+  const a = Buffer.from(provided)
+  const b = Buffer.from(WEBHOOK_SECRET)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
 
 // Dedupe en memoria: Meta puede reintentar el mismo webhook si no respondemos
 // rápido con 200. No es persistente entre cold starts, pero cubre el caso común.
@@ -161,6 +185,11 @@ export async function handleMessage(db, emp, text) {
 }
 
 export default async function handler(req, res) {
+  // Sin WHATSAPP_WEBHOOK_SECRET configurado (o si no coincide), el endpoint
+  // rechaza cualquier petición — incluida la verificación GET. Fallar cerrado:
+  // mientras no se dé de alta en Meta, este endpoint no debe aceptar nada.
+  if (!isAuthorizedRequest(req)) return res.status(403).send('Forbidden')
+
   // Verificación del webhook (Meta hace un GET al configurarlo)
   if (req.method === 'GET') {
     const mode = req.query['hub.mode']

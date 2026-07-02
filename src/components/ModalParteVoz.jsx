@@ -38,6 +38,7 @@ export function ModalParteVoz({ visible, db, autor, saveDB, toast, onClose }) {
   }
 
   function startListening() {
+    if (recRef.current) return // ya hay un reconocimiento activo — un doble-tap rápido no debe duplicarlo
     const SR = getSpeechRecognition()
     if (!SR) { toast('Tu navegador no soporta dictado por voz — escribe el parte a mano', 3500, 'warn'); return }
     baseTextRef.current = text ? text + ' ' : ''
@@ -58,9 +59,15 @@ export function ModalParteVoz({ visible, db, autor, saveDB, toast, onClose }) {
     rec.onerror = () => stopListening()
     rec.onend = () => setListening(false)
     recRef.current = rec
-    rec.start()
-    setListening(true)
-    try { navigator.vibrate(10) } catch {}
+    try {
+      rec.start()
+      setListening(true)
+      try { navigator.vibrate(10) } catch {}
+    } catch {
+      // InvalidStateError u otro fallo síncrono al arrancar — no dejar el ref colgado
+      recRef.current = null
+      setListening(false)
+    }
   }
 
   const generar = () => {
