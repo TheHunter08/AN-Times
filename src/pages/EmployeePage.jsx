@@ -54,8 +54,11 @@ export default function EmployeePage() {
   const [showWellbeing, setShowWellbeing] = useState(false)
   const [wellbeingRecId, setWellbeingRecId] = useState(null)
   const [geoPrompt, setGeoPrompt] = useState(null) // { obraName, dist }
+  const [geoExitPrompt, setGeoExitPrompt] = useState(null) // { obraName, recId }
   const geoWatchRef = useRef(null)
   const geoDismissedRef = useRef(false)
+  const geoWasInsideRef = useRef(null)     // rec.id de la jornada que estuvo dentro del radio
+  const geoExitDismissedRef = useRef(null) // rec.id cuyo aviso de salida se descartó
   const [showConfetti, setShowConfetti] = useState(false)
   const [perfilSubTab, setPerfilSubTab] = useState('perfil') // 'perfil' | 'gastos' | 'denuncia'
   // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
@@ -167,23 +170,54 @@ export default function EmployeePage() {
   }, [timer.state])
 
 
-  // ── Geofencing: auto-prompt when employee enters obra radius ──────────────
+  // ── Geofencing: aviso al entrar (iniciar jornada) y al salir (fichar salida) ──
   useEffect(() => {
     if (!u?.id || !navigator.geolocation) return
     const obras = (dbRef.current?.obras || []).filter(o => o.coords && o.radio)
     if (!obras.length) return
+    const distTo = (lat, lng, o) => {
+      const R = 6371e3
+      const φ1 = lat * Math.PI/180, φ2 = o.coords.lat * Math.PI/180
+      const Δφ = (o.coords.lat - lat) * Math.PI/180, Δλ = (o.coords.lng - lng) * Math.PI/180
+      const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
+      return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    }
     const checkPos = (pos) => {
-      if (geoDismissedRef.current) return
-      const hasOpenRec = (dbRef.current?.records || []).some(r => r.empId === u.id && !r.fin)
-      if (hasOpenRec) { setGeoPrompt(null); return }
       const lat = pos.coords.latitude, lng = pos.coords.longitude
-      const inRange = obras.find(o => {
-        const R = 6371e3
-        const φ1 = lat * Math.PI/180, φ2 = o.coords.lat * Math.PI/180
-        const Δφ = (o.coords.lat - lat) * Math.PI/180, Δλ = (o.coords.lng - lng) * Math.PI/180
-        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2
-        return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= (o.radio || 200)
-      })
+      const openRec = (dbRef.current?.records || []).find(r => r.empId === u.id && !r.fin)
+
+      if (openRec) {
+        setGeoPrompt(null)
+        // Aviso de SALIDA: la obra de la jornada abierta (por nombre de centro, o si no,
+        // la obra con geovalla más cercana). Histéresis de radio+150m para evitar que el
+        // vaivén del GPS dispare falsos avisos en el borde del radio.
+        const obra = obras.find(o => o.nombre === openRec.centro)
+          || obras.reduce((best, o) => {
+               const d = distTo(lat, lng, o)
+               return !best || d < best.d ? { o, d } : best
+             }, null)?.o
+        if (!obra) return
+        const dist = distTo(lat, lng, obra)
+        const radio = obra.radio || 200
+        if (dist <= radio) {
+          geoWasInsideRef.current = openRec.id
+          setGeoExitPrompt(null)
+        } else if (dist > radio + Math.max(150, radio * 0.5)
+                   && geoWasInsideRef.current === openRec.id
+                   && geoExitDismissedRef.current !== openRec.id) {
+          setGeoExitPrompt(prev => prev?.recId === openRec.id ? prev : (() => {
+            try { navigator.vibrate([120, 60, 120]) } catch {}
+            return { obraName: obra.nombre, recId: openRec.id }
+          })())
+        }
+        return
+      }
+
+      // Sin jornada abierta: aviso de ENTRADA (comportamiento original)
+      setGeoExitPrompt(null)
+      geoWasInsideRef.current = null
+      if (geoDismissedRef.current) return
+      const inRange = obras.find(o => distTo(lat, lng, o) <= (o.radio || 200))
       setGeoPrompt(inRange ? { obraName: inRange.nombre } : null)
     }
     geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, (err) => { console.warn('[geo] watchPosition error:', err.code, err.message) }, { enableHighAccuracy: false, maximumAge: 60000 })
@@ -797,6 +831,14 @@ export default function EmployeePage() {
             <button onClick={() => { geoDismissedRef.current = true; setGeoPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer' }}>×</button>
           </div>
         )}
+        {geoExitPrompt && (
+          <div style={{ background:'rgba(245,158,11,.15)', borderBottom:'1px solid rgba(245,158,11,.35)', padding:'10px 20px', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+            <span style={{ fontSize:18 }}>🚶</span>
+            <span style={{ flex:1, fontSize:13, color:'var(--orange)' }}>Te estás alejando de <strong>{geoExitPrompt.obraName}</strong> con la jornada abierta — ¿fichar salida?</span>
+            <button onClick={() => { setGeoExitPrompt(null); doStop() }} style={{ background:'var(--orange)', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Fichar salida</button>
+            <button onClick={() => { geoExitDismissedRef.current = geoExitPrompt.recId; setGeoExitPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer' }}>×</button>
+          </div>
+        )}
         <div className="emp-dsk-content" ref={empBodyRef}>
           {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} />}
           {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
@@ -891,6 +933,14 @@ export default function EmployeePage() {
           <span style={{ flex:1, fontSize:12, color:'var(--primary-light)' }}>Cerca de <strong>{geoPrompt.obraName}</strong> — ¿iniciar jornada?</span>
           <button onClick={handleGeoStart} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:11, fontWeight:700, cursor:'pointer' }}>Iniciar</button>
           <button onClick={() => { geoDismissedRef.current = true; setGeoPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer', lineHeight:1 }}>×</button>
+        </div>
+      )}
+      {geoExitPrompt && (
+        <div style={{ background:'rgba(245,158,11,.15)', borderBottom:'1px solid rgba(245,158,11,.35)', padding:'8px 14px', display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:16 }}>🚶</span>
+          <span style={{ flex:1, fontSize:12, color:'var(--orange)' }}>Te alejas de <strong>{geoExitPrompt.obraName}</strong> — ¿fichar salida?</span>
+          <button onClick={() => { setGeoExitPrompt(null); doStop() }} style={{ background:'var(--orange)', color:'#fff', border:'none', borderRadius:8, padding:'5px 12px', fontSize:11, fontWeight:700, cursor:'pointer' }}>Fichar salida</button>
+          <button onClick={() => { geoExitDismissedRef.current = geoExitPrompt.recId; setGeoExitPrompt(null) }} style={{ background:'none', border:'none', color:'var(--text4)', fontSize:18, cursor:'pointer', lineHeight:1 }}>×</button>
         </div>
       )}
 

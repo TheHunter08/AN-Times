@@ -11,6 +11,7 @@ import { useSwipeDismiss } from '../hooks/useSwipeDismiss.js'
 import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { hashPin, isPinHashed } from '../utils/pinSecurity.js'
 import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
+import { exportInspeccionXLSX, buildInspeccionHTML } from '../utils/inspeccionExport.js'
 import { callSendPushAll, showPushToast } from '../utils/pushAll.js'
 import { NavIcon } from '../components/admin/NavIcon.jsx'
 import { SyncBadge } from '../components/admin/SyncBadge.jsx'
@@ -1589,6 +1590,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
               </div>
             </div>
             <div className="field"><label>Fecha alta</label><input type="date" value={form.fechaAlta||''} onChange={e => setForm(f=>({...f,fechaAlta:e.target.value,startDate:e.target.value}))} /></div>
+            <div className="field"><label>DNI / NIE</label><input value={form.dni||''} maxLength={12} placeholder="12345678A" onChange={e => setForm(f=>({...f,dni:e.target.value.toUpperCase().slice(0,12)}))} /></div>
           </div>
           <div className="field-row">
             <div className="field">
@@ -2549,68 +2551,29 @@ function PanelInformes({ db, toast, saveDB, session }) {
           </div>
 
           {/* Informe oficial inspección de trabajo */}
-          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div style={{ fontSize:14, fontWeight:700 }}>Registro oficial — Inspección de Trabajo</div>
-            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
-              Formato RDL 8/2019 con todos los empleados, entrada/salida diaria y firmas. Listo para imprimir o guardar como PDF.
+          <div className="dash-widget" style={{ display:'flex', flexDirection:'column', gap:10, border:'1px solid rgba(245,158,11,.35)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:16 }}>⚖️</span>
+              <div style={{ fontSize:14, fontWeight:700 }}>Registro oficial — Inspección de Trabajo</div>
             </div>
-            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => {
-              const mesNombre2 = new Date(filterMonth + '-01').toLocaleDateString('es-ES', { month:'long', year:'numeric' })
-              const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
-              const empresaNombre = empresa || '—'
-              let rowsHtml = ''
-              empsActivos.forEach(e => {
-                const eRecs = (db.records || []).filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(filterMonth))
-                  .sort((a, b) => a.inicio.localeCompare(b.inicio))
-                if (!eRecs.length) {
-                  rowsHtml += `<tr><td>${esc(e.name)}</td><td colspan="4" style="color:#999;text-align:center">Sin registros este mes</td></tr>`
-                  return
-                }
-                eRecs.forEach((r, i) => {
-                  const wm = Math.floor((r.workSecs > 0 ? r.workSecs : Math.max(0, (new Date(r.fin) - new Date(r.inicio))/1000 - (r.breakSecs||0))) / 60)
-                  const bm = Math.floor((r.breakSecs||0)/60)
-                  const d = new Date(r.inicio)
-                  rowsHtml += `<tr>
-                    ${i === 0 ? `<td rowspan="${eRecs.length}" style="font-weight:600;vertical-align:top;border-right:2px solid #ddd">${esc(e.name)}</td>` : ''}
-                    <td>${d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</td>
-                    <td>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
-                    <td>${new Date(r.fin).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</td>
-                    <td style="text-align:center">${bm > 0 ? `${Math.floor(bm/60)}h ${p2(bm%60)}m` : '—'}</td>
-                    <td style="font-weight:600">${Math.floor(wm/60)}h ${p2(wm%60)}m</td>
-                  </tr>`
-                })
-              })
-              printHtml(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Registro de jornada ${mesNombre2} · ${esc(empresaNombre)}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;font-size:13px}
-h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;color:#555;font-weight:400;margin:0 0 20px}
-.meta{display:flex;gap:24px;background:#f8f8f8;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12px}
-.meta div span{display:block;color:#888;font-size:11px}
-table{width:100%;border-collapse:collapse}th{background:#1a1a2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover td{background:#f9fafb}
-.sign{margin-top:48px;display:flex;gap:64px}.sign-box{flex:1;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#666}
-footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
-@media print{button{display:none}}</style></head><body>
-<h1>Registro de control de jornada laboral</h1>
-<h2>${esc(empresaNombre)} · ${mesNombre2}</h2>
-<div class="meta">
-  <div><span>Obra</span>${esc(empresaNombre)}</div>
-  <div><span>Período</span>${mesNombre2}</div>
-  <div><span>Generado</span>${new Date().toLocaleDateString('es-ES')}</div>
-  <div><span>Empleados</span>${empsActivos.length}</div>
-</div>
-<table><thead><tr><th>Empleado</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Descanso</th><th>Horas netas</th></tr></thead>
-<tbody>${rowsHtml}</tbody></table>
-<div class="sign">
-  <div class="sign-box">Representante legal de la obra<br><br><br>________________________<br><span style="font-size:10px">${esc(empresaNombre)}</span></div>
-  <div class="sign-box">Sello obra<br><br><br>________________________</div>
-</div>
-<footer><span>Documento generado por AN-Times · Control horario RDL 8/2019</span><span>${new Date().toLocaleDateString('es-ES')}</span></footer>
-</body></html>`)
-            }}>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Descargar registro oficial PDF
-            </button>
+            <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+              Registro diario de jornada conforme al <strong>art. 34.9 ET (RD-ley 8/2019)</strong>: una hoja por empleado con el mes completo día a día, CIF de la empresa, DNI del trabajador, pausas, horas extra y espacio de firmas. Conservación obligatoria: 4 años.
+              {!db.config?.companyCif && <div style={{ marginTop:6, color:'var(--orange)' }}>⚠ Falta el CIF de la empresa — configúralo en Ajustes para que el informe sea completo.</div>}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn btn-secondary" style={{ flex:1 }} onClick={async () => {
+                const r = await exportInspeccionXLSX(db, filterMonth)
+                if (r.ok) toast(`Registro oficial descargado (${r.count} empleados)`, 3000, 'ok')
+                else toast('No hay empleados activos', 3000, 'warn')
+              }}>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Excel oficial
+              </button>
+              <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => printHtml(buildInspeccionHTML(db, filterMonth))}>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight:6 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                PDF con firmas
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -3754,6 +3717,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
   const cfg = db.config || {}
   const [primaryColor, setPrimaryColor] = useState(cfg.primaryColor || '#6C63FF')
   const [companyName,  setCompanyName]  = useState(cfg.companyName  || db.empresas?.[0] || '')
+  const [companyCif,   setCompanyCif]   = useState(cfg.companyCif || '')
   const [wdHoras, setWdHoras] = useState(cfg.wdMin ? String(Math.round(cfg.wdMin / 60 * 100) / 100) : '8')
   const [wkHoras, setWkHoras] = useState(cfg.wkMin ? String(Math.round(cfg.wkMin / 60 * 100) / 100) : '40')
   const [festivosExtra, setFestivosExtra] = useState(cfg.festivosExtra || {})
@@ -3811,7 +3775,7 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     setSaving(true)
     const wdMin = Math.round(parseFloat(wdHoras || '8') * 60) || 480
     const wkMin = Math.round(parseFloat(wkHoras || '40') * 60) || 2400
-    const config = { ...cfg, primaryColor, companyName, wdMin, wkMin, festivosExtra, usarFestivosMadrid, reminders }
+    const config = { ...cfg, primaryColor, companyName, companyCif: companyCif.trim().toUpperCase(), wdMin, wkMin, festivosExtra, usarFestivosMadrid, reminders }
     const withAudit = auditLog(db, 'Configuración guardada', companyName || 'Ajustes', session?.user?.name || 'Admin')
     saveDB({ config, audit: withAudit.audit })
     toast('Ajustes guardados', 3000, 'ok')
@@ -3843,10 +3807,17 @@ function PanelAjustes({ db, toast, saveDB, session }) {
           <div className="dash-widget-title">🏗️ Obras</div>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:4 }}>
-          <div>
-            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>
-            <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de obra'}
-              style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+          <div style={{ display:'flex', gap:12 }}>
+            <div style={{ flex:2 }}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>Nombre visible en la app</div>
+              <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={db.empresas?.[0] || 'Nombre de obra'}
+                style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:1 }}>CIF empresa</div>
+              <input value={companyCif} maxLength={12} onChange={e => setCompanyCif(e.target.value.toUpperCase())} placeholder="B12345678"
+                style={{ width:'100%', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', padding:'10px 14px', fontSize:14, boxSizing:'border-box' }} />
+            </div>
           </div>
           <div style={{ display:'flex', gap:12 }}>
             <div style={{ flex:1 }}>
