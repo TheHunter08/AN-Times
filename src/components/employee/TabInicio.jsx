@@ -8,6 +8,7 @@ import { queuePush } from '../../services/dataService.js'
 import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed, dismissBioOffer } from '../../utils/webauthn.js'
 import { WeatherCard } from './WeatherCard.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
+import { ModalParteVoz } from '../ModalParteVoz.jsx'
 
 export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast }) {
   const { setEmpTab } = useAppStore()
@@ -18,6 +19,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   })
   const [bioOfferVisible, setBioOfferVisible] = useState(false)
   const [bioOfferLoading, setBioOfferLoading] = useState(false)
+  const [showParteVoz, setShowParteVoz] = useState(false)
   // Memo: TabInicio re-renderiza cada segundo via timer; evitar refiltrar listas grandes
   const recs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
@@ -466,11 +468,16 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
           return (
             <div style={{ padding:'0 16px 12px' }}>
-              <div className="sec-label">
-                Mi equipo hoy
-                <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)', textTransform:'none', letterSpacing:0 }}>
-                  {liveCount} activo{liveCount !== 1 ? 's' : ''}
+              <div className="sec-label" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  Mi equipo hoy
+                  <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)', textTransform:'none', letterSpacing:0 }}>
+                    {liveCount} activo{liveCount !== 1 ? 's' : ''}
+                  </span>
                 </span>
+                <button onClick={() => setShowParteVoz(true)} style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:20, padding:'4px 10px', cursor:'pointer', display:'flex', alignItems:'center', gap:4, textTransform:'none', letterSpacing:0 }}>
+                  🎙️ Parte de trabajo
+                </button>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {teamEmps.map(e => {
@@ -523,6 +530,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
         })()}
 
       </div>
+      <ModalParteVoz visible={showParteVoz} db={db} autor={u.name} saveDB={saveDB} toast={toast} onClose={() => setShowParteVoz(false)} />
     </PullToRefresh>
   )
 }

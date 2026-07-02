@@ -9,6 +9,37 @@ export const AI_CHIPS = [
   '¿Cuándo cobro vacaciones?',
 ]
 
+// Resumen en texto plano de los datos reales del empleado — usado como contexto
+// "grounding" para el modelo IA local (localAI.js), para que no invente cifras.
+export function buildAIContext(db, u) {
+  if (!u) return 'Sin sesión de empleado activa.'
+  const now = new Date()
+  const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`
+  const mine = (db.records || []).filter(r => r.empId === u.id)
+  const fin = mine.filter(r => r.fin)
+  const ws = wkStart(now)
+  const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
+  const monthMin = fin.filter(r => r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  const mExt = monthlyExtras(db.records, u.id, mk)
+  const vac = vacData(u.id, db)
+  const todayStr = today()
+  const emps = (db.employees || []).filter(e => !e.baja)
+  const ficharonHoy = new Set((db.records || []).filter(r => r.inicio?.startsWith(todayStr)).map(r => r.empId))
+  const sinFichar = emps.filter(e => !ficharonHoy.has(e.id)).map(e => e.name)
+  return [
+    `Empleado: ${u.name}`,
+    `Horas trabajadas esta semana: ${mhm(weekMin)} (objetivo ${mhm(WK)})`,
+    `Horas trabajadas este mes: ${mhm(monthMin)}`,
+    `Horas extra netas este mes: ${mhm(mExt.netExtraMin || 0)}`,
+    mExt.deficitMin > 0 ? `Déficit este mes: ${mhm(mExt.deficitMin)}` : null,
+    `Vacaciones disponibles: ${vac.available} días (${vac.generated} generados, ${vac.used} usados)`,
+    (u.role === 'encargado' || u.role === 'jefe_obra' || u.isAdmin)
+      ? (sinFichar.length ? `Empleados sin fichar hoy: ${sinFichar.join(', ')}` : 'Todo el equipo ha fichado hoy')
+      : null,
+    `Fecha de hoy: ${todayStr}`,
+  ].filter(Boolean).join('\n')
+}
+
 export function aiAnswer(q, db, u) {
   const ql = q.toLowerCase()
   const now = new Date()

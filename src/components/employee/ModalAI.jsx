@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
-import { aiAnswer, AI_CHIPS } from '../../utils/aiAssistant.js'
+import { aiAnswer, buildAIContext, AI_CHIPS } from '../../utils/aiAssistant.js'
+import { isWebGPUSupported, hasLocalAIConsent, setLocalAIConsent, loadLocalModel, isLocalModelReady, askLocalModel } from '../../utils/localAI.js'
 
 export function ModalAI({ visible, db, u, onClose }) {
   const [msgs, setMsgs] = useState([])
@@ -9,20 +10,65 @@ export function ModalAI({ visible, db, u, onClose }) {
   const [thinking, setThinking] = useState(false)
   const chatRef = useRef(null)
 
+  // Estado de la IA local (offline real): 'off' | 'consent' | 'loading' | 'ready' | 'error'
+  const [localAIState, setLocalAIState] = useState(() =>
+    isLocalModelReady() ? 'ready' : (hasLocalAIConsent() && isWebGPUSupported() ? 'idle' : 'off'))
+  const [localAIProgress, setLocalAIProgress] = useState({ progress: 0, text: '' })
+  const webgpuOk = isWebGPUSupported()
+
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [msgs, thinking])
+
+  // Si el usuario ya dio consentimiento en una sesión anterior, recarga el modelo
+  // en silencio (los pesos ya están cacheados por el navegador — es rápido).
+  useEffect(() => {
+    if (localAIState !== 'idle') return
+    let cancelled = false
+    setLocalAIState('loading')
+    loadLocalModel(p => { if (!cancelled) setLocalAIProgress(p) })
+      .then(() => { if (!cancelled) setLocalAIState('ready') })
+      .catch(() => { if (!cancelled) setLocalAIState('off') })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
 
-  const ask = (q) => {
+  const startLocalAI = async () => {
+    setLocalAIConsent(true)
+    setLocalAIState('loading')
+    try {
+      await loadLocalModel(p => setLocalAIProgress(p))
+      setLocalAIState('ready')
+    } catch (e) {
+      console.error('[localAI] load error', e)
+      setLocalAIState('error')
+    }
+  }
+
+  const ask = async (q) => {
     const text = (q || input).trim()
     if (!text || thinking) return
     setInput('')
     setMsgs(m => [...m, { role: 'user', text }])
     setThinking(true)
+    if (localAIState === 'ready') {
+      try {
+        const ans = await askLocalModel(text, buildAIContext(db, u))
+        setThinking(false)
+        setMsgs(m => [...m, { role: 'bot', text: ans, local: true }])
+        try { navigator.vibrate(6) } catch {}
+      } catch (e) {
+        console.error('[localAI] chat error', e)
+        const ans = aiAnswer(text, db, u)
+        setThinking(false)
+        setMsgs(m => [...m, { role: 'bot', text: ans }])
+      }
+      return
+    }
     setTimeout(() => {
       const ans = aiAnswer(text, db, u)
       setThinking(false)
@@ -45,11 +91,42 @@ export function ModalAI({ visible, db, u, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{ width: 40, height: 40, borderRadius: 14, background: 'linear-gradient(135deg,#2563EB,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 4px 14px rgba(37,99,235,.4)' }}>✨</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-.3px' }}>Times AI</div>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              Times AI
+              {localAIState === 'ready' && (
+                <span title="Modelo IA local activo — funciona sin conexión" style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8, background: 'rgba(16,185,129,.15)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)' }}>IA OFFLINE</span>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: 'var(--text3)' }}>Asistente de jornada · datos en vivo</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }} aria-label="Cerrar">×</button>
         </div>
+
+        {/* IA local: invitación / progreso de descarga */}
+        {localAIState === 'off' && webgpuOk && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-600)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+            <span style={{ fontSize: 18 }}>🧠</span>
+            <div style={{ flex: 1, fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+              Activa <strong style={{ color: 'var(--text2)' }}>IA avanzada offline</strong>: un modelo real en tu móvil, funciona sin conexión tras descargarlo una vez (~400MB, recomendado con wifi).
+            </div>
+            <button className="btn btn-sm btn-secondary" onClick={startLocalAI} style={{ flexShrink: 0 }}>Activar</button>
+          </div>
+        )}
+        {localAIState === 'loading' && (
+          <div style={{ background: 'var(--bg-600)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
+              {localAIProgress.text || 'Descargando modelo IA local…'} {localAIProgress.progress > 0 ? `${Math.round(localAIProgress.progress * 100)}%` : ''}
+            </div>
+            <div style={{ height: 4, background: 'var(--bg-400)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: 'var(--primary)', width: `${Math.round((localAIProgress.progress || 0.03) * 100)}%`, transition: 'width .4s' }} />
+            </div>
+          </div>
+        )}
+        {localAIState === 'error' && (
+          <div style={{ fontSize: 11, color: 'var(--orange)', background: 'var(--orange-dim)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
+            No se pudo cargar la IA local en este dispositivo. Sigo respondiendo con el asistente estándar.
+          </div>
+        )}
 
         {/* Chat */}
         <div className="ai-chat" ref={chatRef} style={{ maxHeight: '42vh' }}>

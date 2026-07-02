@@ -6,11 +6,13 @@ import { buildHeatmap, Heatmap } from '../../components/admin/Heatmap.jsx'
 import { ComunicadoWidget } from '../../components/admin/ComunicadoWidget.jsx'
 import { PushNotifWidget } from '../../components/admin/PushNotifWidget.jsx'
 import { SyncBadge } from '../../components/admin/SyncBadge.jsx'
+import { ModalParteVoz } from '../../components/ModalParteVoz.jsx'
 
-export default function PanelDashboard({ db, toast, saveDB }) {
+export default function PanelDashboard({ db, toast, saveDB, session }) {
   const { setAdminPage } = useAppStore()
   const [showAllLive, setShowAllLive] = useState(false)
   const [showAllToday, setShowAllToday] = useState(false)
+  const [showParteVoz, setShowParteVoz] = useState(false)
   const now = new Date()
   const todayStr = today()
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
@@ -393,13 +395,14 @@ export default function PanelDashboard({ db, toast, saveDB }) {
       )}
 
       {/* Quick actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
         {[
           { label:'Nuevo fichaje', ico:'⏱️', page:'fichajes', color:'var(--primary-dim)', accent:'var(--primary-light)' },
           { label:'Ver solicitudes', ico:'🌴', page:'solicitudes', color:'var(--orange-dim)', accent:'var(--orange)' },
           { label:'Generar informe', ico:'📊', page:'informes', color:'var(--green-dim)', accent:'var(--green)' },
+          { label:'Parte de trabajo', ico:'🎙️', page:null, color:'rgba(239,68,68,.1)', accent:'#EF4444' },
         ].map(({ label, ico, page, color, accent }) => (
-          <button key={page} onClick={() => setAdminPage(page)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:'14px 8px', background:color, border:`1px solid ${accent}22`, borderRadius:'var(--r-lg)', cursor:'pointer', transition:'transform .15s, box-shadow .15s', WebkitTapHighlightColor:'transparent' }}
+          <button key={label} onClick={() => page ? setAdminPage(page) : setShowParteVoz(true)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:'14px 8px', background:color, border:`1px solid ${accent}22`, borderRadius:'var(--r-lg)', cursor:'pointer', transition:'transform .15s, box-shadow .15s', WebkitTapHighlightColor:'transparent' }}
             onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow=`0 6px 16px ${accent}33` }}
             onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='' }}>
             <span style={{ fontSize:22 }}>{ico}</span>
@@ -407,6 +410,45 @@ export default function PanelDashboard({ db, toast, saveDB }) {
           </button>
         ))}
       </div>
+
+      <ModalParteVoz visible={showParteVoz} db={db} autor={session?.user?.name || 'Admin'} saveDB={saveDB} toast={toast} onClose={() => setShowParteVoz(false)} />
+
+      {/* Últimos partes de trabajo */}
+      {(db.partesTrabajo || []).length > 0 && (
+        <div className="dash-widget card-lift" style={{ marginBottom:20 }}>
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">🎙️ Últimos partes de trabajo</div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {[...(db.partesTrabajo || [])].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,4).map(p => (
+              <div key={p.id} style={{ background:'var(--bg-600)', borderRadius:10, padding:'10px 12px', border: p.discrepancias?.length ? '1px solid rgba(245,158,11,.3)' : '1px solid transparent' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:11, color:'var(--text3)', marginBottom:4 }}>
+                  <span>{p.autor} · {p.fecha}{p.obraNombre ? ` · ${p.obraNombre}` : ''}</span>
+                  <span style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    {p.discrepancias?.length > 0 && <span style={{ color:'var(--orange)', fontWeight:700 }}>⚠ {p.discrepancias.length}</span>}
+                    <button
+                      onClick={() => saveDB({ partesTrabajo: (db.partesTrabajo || []).filter(x => x.id !== p.id) })}
+                      style={{ background:'none', border:'none', color:'var(--text4)', fontSize:14, cursor:'pointer', padding:0, lineHeight:1 }}
+                      aria-label="Eliminar parte"
+                      title="Eliminar parte"
+                    >×</button>
+                  </span>
+                </div>
+                <div style={{ fontSize:12, color:'var(--text2)' }}>
+                  {p.resumen || p.textoOriginal.slice(0,140)}
+                </div>
+                {(p.ausencias?.length > 0 || p.incidencias?.length > 0) && (
+                  <div style={{ fontSize:11, color:'var(--text4)', marginTop:4 }}>
+                    {p.ausencias?.length > 0 && `${p.ausencias.length} ausencia${p.ausencias.length!==1?'s':''}`}
+                    {p.ausencias?.length > 0 && p.incidencias?.length > 0 && ' · '}
+                    {p.incidencias?.length > 0 && `${p.incidencias.length} incidencia${p.incidencias.length!==1?'s':''}`}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent audit */}
       {recentAudit.length > 0 && (

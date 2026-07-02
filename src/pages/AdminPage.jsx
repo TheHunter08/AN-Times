@@ -449,7 +449,7 @@ export default function AdminPage() {
               {currentAdminPage === 'miobra'      && <PanelMiObra      db={db} toast={toast} saveDB={saveDB} session={session} />}
               {currentAdminPage === 'validar'     && <PanelValidarHoras db={db} toast={toast} saveDB={saveDB} session={session} />}
               <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
-                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} />}
+                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -475,7 +475,7 @@ export default function AdminPage() {
               {currentAdminPage === 'auditoria'   && <PanelAuditoria   db={db} />}
               {currentAdminPage === 'ajustes'     && <PanelAjustes     db={db} toast={toast} saveDB={saveDB} session={session} />}
               <Suspense fallback={<div className="adm-panel" style={{padding:32,color:'var(--text3)'}}>Cargando…</div>}>
-                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} />}
+                {currentAdminPage === 'dashboard' && <PanelDashboard db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}

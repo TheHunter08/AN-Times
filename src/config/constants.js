@@ -125,6 +125,7 @@ export const INITIAL_DB = {
   denuncias: [],
   wellbeing: [],
   turnos: [],
+  partesTrabajo: [],
   anomalias_vistas: [],
   notisSent: {},
   pinLockouts: {},

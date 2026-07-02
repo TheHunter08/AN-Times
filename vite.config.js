@@ -18,6 +18,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src/pwa',
       filename: 'sw.js',
+      injectManifest: {
+        // El chunk de la IA local (@mlc-ai/web-llm) pesa varios MB y solo se descarga
+        // si el usuario activa explícitamente "IA avanzada offline" — no forma parte
+        // del app shell, así que no debe precachearse con el resto de la PWA.
+        globIgnores: ['**/localai-*.js', '**/localAI.worker-*.js'],
+      },
       manifest: {
         id: '/',
         name: 'TIMES INC',
@@ -103,6 +109,7 @@ export default defineConfig({
           pdf:       ['pdf-lib'],
           excel:     ['xlsx'],
           supabase:  ['@supabase/supabase-js'],
+          localai:   ['@mlc-ai/web-llm'],
         }
       }
     }
