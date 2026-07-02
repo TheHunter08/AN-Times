@@ -14,6 +14,7 @@ export function ModalAI({ visible, db, u, onClose }) {
   const [localAIState, setLocalAIState] = useState(() =>
     isLocalModelReady() ? 'ready' : (hasLocalAIConsent() && isWebGPUSupported() ? 'idle' : 'off'))
   const [localAIProgress, setLocalAIProgress] = useState({ progress: 0, text: '' })
+  const [localAIError, setLocalAIError] = useState('')
   const webgpuOk = isWebGPUSupported()
 
   useEffect(() => {
@@ -22,13 +23,21 @@ export function ModalAI({ visible, db, u, onClose }) {
 
   // Si el usuario ya dio consentimiento en una sesión anterior, recarga el modelo
   // en silencio (los pesos ya están cacheados por el navegador — es rápido).
+  // Antes, un fallo aquí (p.ej. el CSP bloqueando la descarga) volvía a 'off' en
+  // silencio sin avisar — parecía que la IA local "no hacía nada". Ahora se
+  // muestra el error real y se puede reintentar.
   useEffect(() => {
     if (localAIState !== 'idle') return
     let cancelled = false
     setLocalAIState('loading')
     loadLocalModel(p => { if (!cancelled) setLocalAIProgress(p) })
       .then(() => { if (!cancelled) setLocalAIState('ready') })
-      .catch(() => { if (!cancelled) setLocalAIState('off') })
+      .catch(e => {
+        if (cancelled) return
+        console.error('[localAI] load error', e)
+        setLocalAIError(e?.message || String(e))
+        setLocalAIState('error')
+      })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -40,11 +49,14 @@ export function ModalAI({ visible, db, u, onClose }) {
   const startLocalAI = async () => {
     setLocalAIConsent(true)
     setLocalAIState('loading')
+    setLocalAIError('')
+    setLocalAIProgress({ progress: 0, text: '' })
     try {
       await loadLocalModel(p => setLocalAIProgress(p))
       setLocalAIState('ready')
     } catch (e) {
       console.error('[localAI] load error', e)
+      setLocalAIError(e?.message || String(e))
       setLocalAIState('error')
     }
   }
@@ -115,16 +127,20 @@ export function ModalAI({ visible, db, u, onClose }) {
         {localAIState === 'loading' && (
           <div style={{ background: 'var(--bg-600)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-              {localAIProgress.text || 'Descargando modelo IA local…'} {localAIProgress.progress > 0 ? `${Math.round(localAIProgress.progress * 100)}%` : ''}
+              {localAIProgress.text || 'Preparando IA local…'} {localAIProgress.progress > 0 ? `${Math.round(localAIProgress.progress * 100)}%` : ''}
             </div>
             <div style={{ height: 4, background: 'var(--bg-400)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ height: '100%', background: 'var(--primary)', width: `${Math.round((localAIProgress.progress || 0.03) * 100)}%`, transition: 'width .4s' }} />
+              <div style={{ height: '100%', background: 'var(--primary)', width: `${Math.max(3, Math.round((localAIProgress.progress || 0) * 100))}%`, transition: 'width .3s ease-out' }} />
             </div>
           </div>
         )}
         {localAIState === 'error' && (
-          <div style={{ fontSize: 11, color: 'var(--orange)', background: 'var(--orange-dim)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
-            No se pudo cargar la IA local en este dispositivo. Sigo respondiendo con el asistente estándar.
+          <div style={{ background: 'var(--orange-dim)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--orange)', marginBottom: 4 }}>
+              No se pudo cargar la IA local. Sigo respondiendo con el asistente estándar mientras tanto.
+            </div>
+            {localAIError && <div style={{ fontSize: 10, color: 'var(--text4)', marginBottom: 8, wordBreak: 'break-word' }}>{localAIError}</div>}
+            <button className="btn btn-sm btn-secondary" onClick={startLocalAI}>Reintentar</button>
           </div>
         )}
 
