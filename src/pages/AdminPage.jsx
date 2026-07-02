@@ -21,7 +21,7 @@ import { PushNotifWidget } from '../components/admin/PushNotifWidget.jsx'
 import { ComunicadoWidget } from '../components/admin/ComunicadoWidget.jsx'
 import { buildHeatmap, Heatmap } from '../components/admin/Heatmap.jsx'
 import { LiveTimerCell, CtrlCard } from '../components/admin/CtrlCard.jsx'
-import { MapaObra } from '../components/admin/MapaObra.jsx'
+const MapaObra = lazy(() => import('../components/admin/MapaObra.jsx').then(m => ({ default: m.MapaObra })))
 
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
@@ -603,7 +603,9 @@ function PanelControl({ db, toast, saveDB, session }) {
 
       {vista === 'mapa' && (
         <div style={{ marginBottom:16 }}>
-          <MapaObra obras={db.obras || []} liveEmps={liveEmpsForMap} />
+          <Suspense fallback={<div style={{ height:420, borderRadius:'var(--r-lg)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)', fontSize:12 }}>Cargando mapa…</div>}>
+            <MapaObra obras={db.obras || []} liveEmps={liveEmpsForMap} />
+          </Suspense>
         </div>
       )}
 
@@ -1447,6 +1449,11 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
     const q = empSearch.toLowerCase()
     return allEmps.filter(e => e.name?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q) || e.empresa?.toLowerCase().includes(q) || e.centroTrabajo?.toLowerCase().includes(q))
   }, [allEmps, empSearch])
+  // Con plantillas grandes, renderizar cientos de tarjetas de golpe se nota en
+  // el scroll — igual que en Fichajes, se pagina y se amplía bajo demanda.
+  const [empPageSize, setEmpPageSize] = useState(60)
+  useEffect(() => { setEmpPageSize(60) }, [empSearch])
+  const pagedEmps = useMemo(() => emps.slice(0, empPageSize), [emps, empPageSize])
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
@@ -1649,7 +1656,7 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
         </div>
       ) : (
         <div className="emp-grid stagger-in">
-          {emps.map(e => (
+          {pagedEmps.map(e => (
             <div key={e.id} className="emp-card card-lift" style={{ opacity: e.baja ? 0.5 : 1 }}>
               <div className="emp-card-top">
                 <div className="emp-card-avatar" style={{ background: e.color || 'var(--primary)' }}>
@@ -1681,6 +1688,14 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {emps.length > pagedEmps.length && (
+        <div style={{ textAlign:'center', marginTop:16 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setEmpPageSize(s => s + 60)}>
+            Ver más ({emps.length - pagedEmps.length} restantes)
+          </button>
         </div>
       )}
 
@@ -3669,6 +3684,9 @@ function PanelAuditoria({ db }) {
     if (auditUser && a.user !== auditUser) return false
     return true
   })
+  const [auditPageSize, setAuditPageSize] = useState(80)
+  useEffect(() => { setAuditPageSize(80) }, [auditQ, auditUser])
+  const pagedFiltered = filtered.slice(0, auditPageSize)
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -3699,7 +3717,7 @@ function PanelAuditoria({ db }) {
             <div className="empty-premium-sub">{audit.length ? 'Prueba con otros filtros' : 'Las acciones del sistema se registrarán aquí automáticamente'}</div>
           </div>
         )}
-        {filtered.map((a, i) => (
+        {pagedFiltered.map((a, i) => (
           <div key={i} className="audit-row-premium">
             <div className="audit-dot" style={{ background: getColor(a.action) }} />
             <div style={{ flex:1, minWidth:0 }}>
@@ -3712,6 +3730,13 @@ function PanelAuditoria({ db }) {
           </div>
         ))}
       </div>
+      {filtered.length > pagedFiltered.length && (
+        <div style={{ textAlign:'center', marginTop:16 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setAuditPageSize(s => s + 80)}>
+            Ver más ({filtered.length - pagedFiltered.length} restantes)
+          </button>
+        </div>
+      )}
     </div>
   )
 }
