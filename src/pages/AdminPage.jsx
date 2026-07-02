@@ -35,14 +35,23 @@ const downloadDataUrl = (dataUrl, filename) => {
 const flagStaleCierre = (cierresList, empId, inicio) => {
   const mes = inicio?.slice(0, 7)
   let flagged = false
+  let staleCierre = null
   const updated = (cierresList || []).map(c => {
     if (c.empId === empId && c.mes === mes && c.estado === 'pendiente' && !c.desactualizado) {
       flagged = true
+      staleCierre = c
       return { ...c, desactualizado: true }
     }
     return c
   })
-  return { cierres: updated, flagged }
+  return { cierres: updated, flagged, staleCierre }
+}
+
+// Avisa por push a quien generó el cierre (si es un JO/encargado con dispositivo propio)
+// de que quedó desactualizado, sin esperar a que entre al panel a verlo.
+const notifyStaleCierre = (staleCierre, editorId) => {
+  if (!staleCierre?.generadoPorId || staleCierre.generadoPorId === editorId) return
+  queuePush(staleCierre.generadoPorId, '⚠️ Cierre desactualizado', `El cierre de ${staleCierre.empName} (${staleCierre.mes}) que generaste cambió tras editarse un fichaje. Regénéralo antes de que firme.`, 'cierre', '/?tab=informes')
 }
 
 // Deslizar hacia la izquierda revela "Eliminar" (gesto nativo tipo Mail de iOS).
@@ -646,9 +655,10 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const rec = (db.records||[]).find(r => r.id === deletingId)
     const motivo = delMotivo.trim()
     const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    const { cierres, flagged } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false }
+    const { cierres, flagged, staleCierre } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false, staleCierre: null }
     saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit, cierres })
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    if (flagged) notifyStaleCierre(staleCierre, session?.user?.id)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
     toast('Fichaje eliminado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setDeletingId(null); setDelMotivo('')
@@ -673,9 +683,10 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       return { ...rec, inicio: newInicio, fin: newFin, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    const { cierres, flagged } = flagStaleCierre(db.cierres || [], r.empId, r.inicio)
+    const { cierres, flagged, staleCierre } = flagStaleCierre(db.cierres || [], r.empId, r.inicio)
     saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    if (flagged) notifyStaleCierre(staleCierre, session?.user?.id)
     setEditModal(null)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
     toast('Fichaje actualizado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
@@ -1901,6 +1912,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
       nuevos.push({
         id: gid(), empId: e.id, empName: e.name, mes,
         generadoPor: session?.user?.name || 'Admin',
+        generadoPorId: session?.user?.id || null,
         generadoAt: new Date().toISOString(),
         totalMin, dias: eRecs.length, estado: 'pendiente', firma: null,
         records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
@@ -1930,6 +1942,7 @@ function PanelInformes({ db, toast, saveDB, session }) {
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes,
       generadoPor: session?.user?.name || 'Admin',
+      generadoPorId: session?.user?.id || null,
       generadoAt: new Date().toISOString(),
       totalMin, dias: days, estado: 'pendiente', firma: null,
       records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
@@ -3159,9 +3172,10 @@ function PanelMiObra({ db, toast, saveDB, session }) {
       return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
-    const { cierres, flagged } = flagStaleCierre(db.cierres, rec.empId, rec.inicio)
+    const { cierres, flagged, staleCierre } = flagStaleCierre(db.cierres, rec.empId, rec.inicio)
     saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} corrigió tu jornada del ${fds(editing.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    if (flagged) notifyStaleCierre(staleCierre, enc.id)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — pide que lo regeneren en Informes.' : ''
     toast('Jornada modificada' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setEditing(null)
@@ -4097,6 +4111,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes: selMonth,
       generadoPor: session?.user?.name || 'Jefe de Obra',
+      generadoPorId: session?.user?.id || null,
       generadoAt: new Date().toISOString(),
       totalMin, dias: days, estado: 'pendiente', firma: null,
       records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
@@ -4131,6 +4146,7 @@ function PanelValidarHoras({ db, toast, saveDB, session }) {
       nuevos.push({
         id: gid(), empId: e.id, empName: e.name, mes: selMonth,
         generadoPor: session?.user?.name || 'Jefe de Obra',
+        generadoPorId: session?.user?.id || null,
         generadoAt: new Date().toISOString(),
         totalMin, dias: days, estado: 'pendiente', firma: null,
         records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))

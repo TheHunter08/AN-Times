@@ -464,23 +464,63 @@ function _pushDedupHit(to, tag, title, body) {
   } catch { return false }
 }
 
+// Cola persistente para pushes que fallan por falta de conexión del propio
+// emisor (admin/JO offline al fichar/asignar). Sin esto el push se perdía en
+// silencio (solo console.error) y el destinatario nunca se enteraba.
+const PUSH_QUEUE_KEY = '__pushqueue__'
+const PUSH_QUEUE_MAX = 30
+
+function _enqueueFailedPush(item) {
+  try {
+    const raw = localStorage.getItem(PUSH_QUEUE_KEY)
+    const queue = raw ? JSON.parse(raw) : []
+    queue.push({ ...item, ts: Date.now() })
+    while (queue.length > PUSH_QUEUE_MAX) queue.shift()
+    localStorage.setItem(PUSH_QUEUE_KEY, JSON.stringify(queue))
+  } catch {}
+}
+
 export async function queuePush(to, title, body, tag = 'times', url = '/') {
   if (_pushDedupHit(to, tag, title, body)) {
     return { ok: true, deduped: true }
   }
   const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
+  const payload = { to, title, body, tag, url: safeUrl }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    _enqueueFailedPush(payload)
+    return { ok: false, queued: true }
+  }
   try {
     const headers = { 'Content-Type': 'application/json' }
     const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       console.error('[PUSH] sendpush error', res.status, text)
+      _enqueueFailedPush(payload)
       return { ok: false, status: res.status, error: text }
     }
     return await res.json().catch(() => ({ ok: true }))
   } catch(e) {
     console.error('[PUSH] queuePush fetch error', e)
+    _enqueueFailedPush(payload)
     return { ok: false, status: 'network', error: e.message }
+  }
+}
+
+// Reintenta los pushes que fallaron por conexión. Se llama al recuperar
+// internet (evento 'online') y al arrancar la app.
+export async function flushPushQueue() {
+  let queue
+  try {
+    const raw = localStorage.getItem(PUSH_QUEUE_KEY)
+    queue = raw ? JSON.parse(raw) : []
+  } catch { return }
+  if (!queue.length) return
+  localStorage.removeItem(PUSH_QUEUE_KEY)
+  for (const item of queue) {
+    // Descarta reintentos con más de 24h: la notificación ya no es relevante.
+    if (Date.now() - (item.ts || 0) > 24 * 60 * 60 * 1000) continue
+    await queuePush(item.to, item.title, item.body, item.tag, item.url)
   }
 }
 

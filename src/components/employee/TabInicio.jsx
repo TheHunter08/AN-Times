@@ -3,7 +3,7 @@ import { useAppStore } from '../../store/appStore.js'
 import { useClock } from '../../hooks/useClock.js'
 import { today, calcSecs, calcMin, recWorkSecs, ftime, mhm, p2, wkStart, monthlyExtras, gid, s2t } from '../../utils/time.js'
 import { calcStreak, calcWorkPattern, streakLabel } from '../../utils/streaks.js'
-import { WK } from '../../config/constants.js'
+import { WK, WM } from '../../config/constants.js'
 import { queuePush } from '../../services/dataService.js'
 import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed, dismissBioOffer } from '../../utils/webauthn.js'
 import { WeatherCard } from './WeatherCard.jsx'
@@ -93,7 +93,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     () => monthlyExtras(db.records, u.id, mk),
     [db.records, u.id, mk]
   )
-  const monthPct = Math.min(100, Math.round(monthMin / 9600 * 100))
+  const monthPct = Math.min(100, Math.round(monthMin / WM * 100))
 
   // "Mi equipo" data — precomputado para evitar O(n²) cada segundo en encargados
   const teamData = useMemo(() => {

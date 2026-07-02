@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
+import { flushPushQueue } from './services/dataService.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -385,8 +386,10 @@ export default function App() {
       setTimeout(() => {
         if (navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
       }, 3000)
+      flushPushQueue()
     }
     window.addEventListener('online', onOnline)
+    flushPushQueue()
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)

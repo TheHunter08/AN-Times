@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { gid, today, fds } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
+import { useAppStore } from '../../store/appStore.js'
 
 const p2 = n => String(n).padStart(2, '0')
 
@@ -43,7 +44,15 @@ const TIPO_LABELS = {
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+// Vacaciones aprobadas del empleado que cubren esa fecha, si las hay.
+function vacacionEnFecha(db, empId, fecha) {
+  return (db.vacaciones || []).find(v =>
+    v.empId === empId && v.estado === 'aprobada' && v.fechaInicio <= fecha && fecha <= v.fechaFin
+  )
+}
+
 export default function PanelTurnos({ db, toast, saveDB, session }) {
+  const { showConfirm } = useAppStore()
   const [weekOffset, setWeekOffset] = useState(0)
   const [modal, setModal] = useState(null) // { empId, fecha, turno|null }
   const [form, setForm] = useState({ horaInicio: '08:00', horaFin: '17:00', tipo: 'normal', centro: '', notas: '' })
@@ -83,9 +92,7 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     setModal({ empId, fecha, existing: existing || null })
   }
 
-  const saveTurno = () => {
-    if (!form.horaInicio || !form.horaFin) { toast('Indica hora inicio y fin', 3000, 'err'); return }
-    if (form.horaFin <= form.horaInicio && form.tipo !== 'libre') { toast('La hora de fin debe ser posterior al inicio', 3000, 'err'); return }
+  const doSaveTurno = () => {
     const { empId, fecha, existing } = modal
     const emp = emps.find(e => e.id === empId)
     const newTurno = { id: existing?.id || gid(), empId, empName: emp?.name || '', fecha, horaInicio: form.horaInicio, horaFin: form.horaFin, tipo: form.tipo, centro: form.centro, notas: form.notas }
@@ -105,6 +112,19 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     toast('Turno guardado', 2500, 'ok')
   }
 
+  const saveTurno = () => {
+    if (!form.horaInicio || !form.horaFin) { toast('Indica hora inicio y fin', 3000, 'err'); return }
+    if (form.horaFin <= form.horaInicio && form.tipo !== 'libre') { toast('La hora de fin debe ser posterior al inicio', 3000, 'err'); return }
+    const { empId, fecha } = modal
+    const emp = emps.find(e => e.id === empId)
+    const vac = form.tipo !== 'libre' ? vacacionEnFecha(db, empId, fecha) : null
+    if (vac) {
+      showConfirm(`${emp?.name || 'Este empleado'} está de vacaciones aprobadas ese día (${fds(vac.fechaInicio)} → ${fds(vac.fechaFin)}). ¿Publicar el turno igualmente?`, doSaveTurno)
+      return
+    }
+    doSaveTurno()
+  }
+
   const deleteTurno = () => {
     const { existing } = modal
     if (!existing) { setModal(null); return }
@@ -120,21 +140,23 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     const prevWeekDates = Array.from({ length: 7 }, (_, i) => isoDate(addDays(addDays(monday, -7), i)))
     const prevTurnos = turnos.filter(t => prevWeekDates.includes(t.fecha))
     if (!prevTurnos.length) { toast('No hay turnos en la semana anterior', 3000, 'warn'); return }
+    let skippedVac = 0
     const newOnes = prevTurnos.map(t => {
       const dayIdx = prevWeekDates.indexOf(t.fecha)
       const newFecha = weekDates[dayIdx]
       const existing = turnoMap[`${t.empId}__${newFecha}`]
       if (existing) return null
+      if (t.tipo !== 'libre' && vacacionEnFecha(db, t.empId, newFecha)) { skippedVac++; return null }
       return { ...t, id: gid(), fecha: newFecha }
     }).filter(Boolean)
-    if (!newOnes.length) { toast('Esta semana ya tiene turnos de la anterior', 3000, 'warn'); return }
+    if (!newOnes.length) { toast(skippedVac ? 'Todos esos turnos caen en vacaciones aprobadas' : 'Esta semana ya tiene turnos de la anterior', 3000, 'warn'); return }
     const withAudit = auditLog(db, 'Semana copiada', `${newOnes.length} turnos`, who)
     saveDB({ turnos: [...turnos, ...newOnes], audit: withAudit.audit })
     const empIdsAvisados = [...new Set(newOnes.map(t => t.empId).filter(Boolean))]
     empIdsAvisados.forEach(empId => {
       queuePush(empId, '📅 Cuadrante publicado', `${who} publicó tus turnos de la semana del ${fds(weekDates[0])}.`, 'turno', '/?tab=turnos')
     })
-    toast(`${newOnes.length} turnos copiados`, 3000, 'ok')
+    toast(`${newOnes.length} turnos copiados${skippedVac ? ` (${skippedVac} omitidos por vacaciones)` : ''}`, 3000, 'ok')
   }
 
   // Total hours per day (only normal/guardia)
@@ -230,11 +252,13 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
                 </td>
                 {weekDates.map(fecha => {
                   const t = turnoMap[`${emp.id}__${fecha}`]
+                  const vac = vacacionEnFecha(db, emp.id, fecha)
                   return (
                     <td key={fecha} style={{ padding: '3px 4px', textAlign: 'center' }}>
                       <button
                         onClick={() => openModal(emp.id, fecha)}
                         style={{
+                          position: 'relative',
                           width: '100%',
                           minHeight: 52,
                           borderRadius: 8,
@@ -249,8 +273,11 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
                           gap: 1,
                           transition: 'all .15s',
                         }}
-                        title={t ? `${TIPO_LABELS[t.tipo || 'normal']} · ${t.horaInicio}–${t.horaFin}${t.notas ? ' · ' + t.notas : ''}` : 'Sin turno – clic para añadir'}
+                        title={`${t ? `${TIPO_LABELS[t.tipo || 'normal']} · ${t.horaInicio}–${t.horaFin}${t.notas ? ' · ' + t.notas : ''}` : 'Sin turno – clic para añadir'}${vac ? ' · 🌴 De vacaciones' : ''}`}
                       >
+                        {vac && (
+                          <span style={{ position: 'absolute', top: 2, right: 3, fontSize: 10 }}>🌴</span>
+                        )}
                         {t ? (
                           <>
                             <span style={{ fontSize: 10, fontWeight: 700, color: TIPO_COLORS[t.tipo || 'normal'] }}>
