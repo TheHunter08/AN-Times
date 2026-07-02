@@ -2,8 +2,9 @@ name: Anomaly Detector – Jornadas sin cerrar
 
 on:
   schedule:
-    # 23:00 Madrid (21:00 UTC invierno / 22:00 UTC verano)
-    - cron: '0 21 * * *'
+    # ~23:00-24:00 Madrid. Antes había dos entradas (21h/22h UTC) pensadas para
+    # invierno/verano, pero cron no distingue estaciones — las dos se ejecutaban
+    # SIEMPRE, duplicando la descarga completa de app_data cada noche sin razón.
     - cron: '0 22 * * *'
   workflow_dispatch:
 

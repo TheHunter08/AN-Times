@@ -2,9 +2,10 @@ name: Resumen Semanal
 
 on:
   schedule:
-    # Cada 30 min de 07:00 a 20:00 UTC los viernes
-    # La hora exacta se configura en el panel de Ajustes → Recordatorios → Resumen semanal
-    - cron: '0,30 7-20 * * 5'
+    # Cada hora en punto de 07:00 a 20:00 UTC los viernes (antes cada 30 min:
+    # 28 descargas completas de app_data solo ese día para un aviso que no es
+    # urgente al minuto). La hora exacta se configura en Ajustes → Recordatorios.
+    - cron: '0 7-20 * * 5'
   workflow_dispatch:
 
 jobs:
