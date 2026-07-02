@@ -272,6 +272,7 @@ function _doCloudPush(db, onSuccess, onError) {
       _saveRetry = 0
       _clearBgSync()
       onSuccess?.(payload)
+      _broadcastUpdate(payload._ts)
       _drainQueue()
     })
     .catch((e) => {
@@ -308,6 +309,14 @@ export function scheduleSave(db, onSuccess, onError, delay = 0) {
 }
 
 // ── Supabase Realtime con auto-reconexión ────────────────────────────────────
+// IMPORTANTE: usa 'broadcast' (mensaje ligero, unos bytes) en vez de
+// 'postgres_changes'. postgres_changes reenvía la FILA COMPLETA (el JSON de
+// toda la app) a cada cliente conectado en cada guardado — con varios
+// empleados con la app abierta a la vez, cada fichaje se multiplicaba por N
+// clientes y disparaba el consumo de ancho de banda de salida de Supabase.
+// Con broadcast, cada cliente solo recibe "algo cambió a las X" y decide si
+// le hace falta descargar algo con el mismo chequeo de timestamp que ya
+// usaba fetchDB() — el dato completo solo viaja una vez, hacia quien lo pide.
 let _realtimeChannel = null
 let _realtimeRetry   = 0
 let _realtimeTimer   = null
@@ -316,18 +325,14 @@ export function startRealtime(currentGetDB, onUpdate) {
   if (!supabase) return
   stopRealtime()
   _realtimeChannel = supabase
-    .channel('app_data_rt')
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` },
-      (payload) => {
-        const incoming = payload.new?.data
-        if (!incoming) return
-        const local = currentGetDB()
-        if (incoming._ts != null && local._ts != null && incoming._ts <= local._ts) return
-        _realtimeRetry = 0
-        onUpdate?.(incoming)
-      }
-    )
+    .channel('app_data_rt', { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'updated' }, ({ payload }) => {
+      const remoteTs = payload?.ts
+      const local = currentGetDB()
+      if (remoteTs != null && local._ts != null && remoteTs <= local._ts) return
+      _realtimeRetry = 0
+      onUpdate?.()
+    })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         _realtimeRetry = 0
@@ -345,6 +350,15 @@ export function stopRealtime() {
   clearTimeout(_realtimeTimer)
   if (_realtimeChannel) { supabase?.removeChannel(_realtimeChannel); _realtimeChannel = null }
   _realtimeRetry = 0
+}
+
+// Aviso ligero de que app_data cambió — lo llama _doCloudPush tras guardar con
+// éxito. Si el canal no está suscrito (realtime no arrancado en esta pestaña,
+// o desconectado), no pasa nada grave: el sondeo de seguridad en App.jsx
+// (fetchDB periódico) acaba trayendo el cambio de todas formas.
+function _broadcastUpdate(ts) {
+  // send() es async — un try/catch no basta, hay que atrapar el rechazo de la promesa
+  try { _realtimeChannel?.send({ type: 'broadcast', event: 'updated', payload: { ts } })?.catch(() => {}) } catch {}
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────

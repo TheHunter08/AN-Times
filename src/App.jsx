@@ -390,12 +390,22 @@ export default function App() {
     }
     window.addEventListener('online', onOnline)
     flushPushQueue()
+    // Sondeo de seguridad: los cron jobs del servidor (recordatorios, auto-cierre...)
+    // escriben directo en Supabase sin pasar por el broadcast de realtime, así que
+    // sus cambios no llegan al instante a las pestañas abiertas. fetchDB() ya
+    // comprueba el timestamp antes de traer nada (unos bytes si no hay cambios),
+    // así que este intervalo no pesa — solo evita quedarse desactualizado mucho
+    // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+    }, 3 * 60 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
       window.removeEventListener('times-synced', onSynced)
       window.removeEventListener('times-save-failed', onSaveFailed)
       window.removeEventListener('online', onOnline)
+      clearInterval(pollInterval)
     }
   }, [])
 

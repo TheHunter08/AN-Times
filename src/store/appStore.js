@@ -77,14 +77,13 @@ export const useAppStore = create((set, get) => ({
   },
 
   // ── Realtime Supabase ────────────────────────────────────────────────
+  // El broadcast solo trae un aviso ("algo cambió"), no los datos — al
+  // recibirlo pedimos los datos con fetchDB(), que ya sabe no descargar nada
+  // si resulta que no hay nada nuevo (comprueba el timestamp primero).
   initRealtime: () => {
     startRealtime(
       () => get().db,
-      (incoming) => {
-        const merged = mergeDB(get().db, incoming)
-        saveLocal(merged)
-        set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
-      }
+      () => { get().fetchDB() }
     )
   },
   stopRealtime,
