@@ -64,19 +64,36 @@ function SwipeToDelete({ children, onDelete }) {
   const [swipeX, setSwipeX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const startX = useRef(0)
+  const startY = useRef(0)
   const active = useRef(false)
+  // Hasta que el gesto no demuestre ser claramente horizontal, no tocamos
+  // swipeX — así un scroll vertical con algo de deriva lateral (lo normal en
+  // iOS) no desplaza la fila a medias y la deja en un estado raro.
+  const axisLocked = useRef(null) // null=indeciso | 'x' | 'y'
 
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; active.current = true; setDragging(true) }
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    startY.current = e.touches[0].clientY
+    active.current = true
+    axisLocked.current = null
+    setDragging(true)
+  }
   const onTouchMove = (e) => {
     if (!active.current) return
-    const d = e.touches[0].clientX - startX.current
-    if (d < 0) setSwipeX(Math.max(d, -96))
+    const dx = e.touches[0].clientX - startX.current
+    const dy = e.touches[0].clientY - startY.current
+    if (axisLocked.current === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return // deadzone: aún no está claro qué quiere el usuario
+      axisLocked.current = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y'
+    }
+    if (axisLocked.current !== 'x') return // gesto vertical: se lo dejamos al scroll nativo, no tocamos swipeX
+    if (dx < 0) setSwipeX(Math.max(dx, -96))
   }
   const onTouchEnd = () => {
     if (!active.current) return
     active.current = false
     setDragging(false)
-    if (swipeX < -72) { try { navigator.vibrate?.(10) } catch {}; onDelete() }
+    if (axisLocked.current === 'x' && swipeX < -72) { try { navigator.vibrate?.(10) } catch {}; onDelete() }
     setSwipeX(0)
   }
 
@@ -1055,26 +1072,36 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
   const VacRow = ({ v }) => {
     const [swipeX, setSwipeX] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
-    const swipeRef = useRef({ startX: 0, active: false })
+    // { active, axis: null|'x'|'y' } — sin bloqueo de eje, un scroll vertical con
+    // algo de deriva lateral podía leerse como swipe y aprobar/rechazar una
+    // solicitud sin que el usuario lo quisiera. Ver mismo fix en SwipeToDelete.
+    const swipeRef = useRef({ startX: 0, startY: 0, active: false, axis: null })
 
     const onTouchStart = (e) => {
       if (v.estado !== 'pendiente') return
-      swipeRef.current = { startX: e.touches[0].clientX, active: true }
+      swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, active: true, axis: null }
       setIsDragging(true)
     }
     const onTouchMove = (e) => {
       if (!swipeRef.current.active) return
       const dx = e.touches[0].clientX - swipeRef.current.startX
+      const dy = e.touches[0].clientY - swipeRef.current.startY
+      if (swipeRef.current.axis === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+        swipeRef.current.axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y'
+      }
+      if (swipeRef.current.axis !== 'x') return
       setSwipeX(Math.max(-100, Math.min(100, dx)))
     }
     const onTouchEnd = () => {
       if (!swipeRef.current.active) return
+      const wasHorizontal = swipeRef.current.axis === 'x'
       swipeRef.current.active = false
       setIsDragging(false)
-      if (swipeX > 75) {
+      if (wasHorizontal && swipeX > 75) {
         act(v.id, 'aprobada')
         try { navigator.vibrate(15) } catch {}
-      } else if (swipeX < -75) {
+      } else if (wasHorizontal && swipeX < -75) {
         setRejecting(v.id); setRejMotivo('')
         try { navigator.vibrate(10) } catch {}
       }

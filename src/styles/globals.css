@@ -1213,7 +1213,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .adm-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .adm-topbar { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 56px; padding-top: var(--safe-top); border-bottom: 1px solid var(--border); background: var(--bg-700); flex-shrink: 0; }
 .adm-title { font-size: 15px; font-weight: 700; flex: 1; letter-spacing: -.2px; }
-.adm-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; min-height: 0; }
+.adm-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 16px; min-height: 0; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); flex-shrink: 0; transition: background .3s; }
 .sync-dot.ok { background: var(--green); }
 .adm-topbtn { width: 34px; height: 34px; background: var(--bg-500); border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
