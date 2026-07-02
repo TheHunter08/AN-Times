@@ -17,6 +17,10 @@ function todayYMD() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function fmt(n) {
+  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -346,7 +350,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
                       flexShrink: 0,
                     }}
                   >
-                    €{g.importe.toFixed(2)}
+                    €{fmt(g.importe)}
                   </span>
                 </div>
 
@@ -399,9 +403,9 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
           }}
         >
           Este mes:{' '}
-          <span style={{ color: 'var(--green)', fontWeight: 700 }}>€{aprobadosMes.toFixed(2)} aprobados</span>
+          <span style={{ color: 'var(--green)', fontWeight: 700 }}>€{fmt(aprobadosMes)} aprobados</span>
           {' · '}
-          <span style={{ color: '#f59e0b', fontWeight: 700 }}>€{pendientesMes.toFixed(2)} pendientes</span>
+          <span style={{ color: '#f59e0b', fontWeight: 700 }}>€{fmt(pendientesMes)} pendientes</span>
         </div>
       )}
     </div>

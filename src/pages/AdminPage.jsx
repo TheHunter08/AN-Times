@@ -45,6 +45,51 @@ const flagStaleCierre = (cierresList, empId, inicio) => {
   return { cierres: updated, flagged }
 }
 
+// Deslizar hacia la izquierda revela "Eliminar" (gesto nativo tipo Mail de iOS).
+// Los botones explícitos existentes se mantienen intactos — esto es un atajo
+// adicional, no un reemplazo, así que no rompe nada para quien no lo use.
+function SwipeToDelete({ children, onDelete }) {
+  const [swipeX, setSwipeX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const active = useRef(false)
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; active.current = true; setDragging(true) }
+  const onTouchMove = (e) => {
+    if (!active.current) return
+    const d = e.touches[0].clientX - startX.current
+    if (d < 0) setSwipeX(Math.max(d, -96))
+  }
+  const onTouchEnd = () => {
+    if (!active.current) return
+    active.current = false
+    setDragging(false)
+    if (swipeX < -72) { try { navigator.vibrate?.(10) } catch {}; onDelete() }
+    setSwipeX(0)
+  }
+
+  return (
+    <div style={{ position:'relative', borderRadius:'var(--r)', overflow:'hidden' }}>
+      <div style={{
+        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'flex-end',
+        paddingRight:24, background:'var(--danger)', opacity: swipeX < -20 ? Math.min(1, -swipeX / 96) : 0,
+        transition: dragging ? 'none' : 'opacity .2s', pointerEvents:'none',
+      }}>
+        <span style={{ color:'#fff', fontWeight:700, fontSize:13 }}>🗑️ Eliminar</span>
+      </div>
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
+        style={{
+          transform:`translateX(${swipeX}px)`, transition: dragging ? 'none' : 'transform .25s cubic-bezier(.16,1,.3,1)',
+          touchAction:'pan-y', // el navegador solo gestiona scroll vertical — el swipe horizontal es nuestro y no dispara "volver atrás"
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 const PanelDashboard = lazy(() => import('./admin/PanelDashboard.jsx'))
 const PanelTurnos    = lazy(() => import('./admin/PanelTurnos.jsx'))
 const PanelAnomalias = lazy(() => import('./admin/PanelAnomalias.jsx'))
@@ -728,7 +773,8 @@ function PanelFichajes({ db, toast, saveDB, session }) {
           const over = wm > WD
           const loc = r.locInicio
           return (
-            <div key={r.id} className="fich-card">
+            <SwipeToDelete key={r.id} onDelete={() => { setDeletingId(r.id); setDelMotivo('') }}>
+            <div className="fich-card">
               <div className="fich-avatar">{(r.empName || '?').slice(0,2).toUpperCase()}</div>
               <div className="fich-id">
                 <div className="fich-name">{r.empName}</div>
@@ -791,6 +837,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
                 <button className="btn btn-sm btn-danger" onClick={() => { setDeletingId(r.id); setDelMotivo('') }}>✕</button>
               </div>
             </div>
+            </SwipeToDelete>
           )
         })}
       </div>
@@ -1000,7 +1047,7 @@ function PanelSolicitudes({ db, toast, saveDB, session }) {
         {/* Card */}
         <div
           className={`sol-card${v.estado==='pendiente'?' pending':v.estado==='aprobada'?' approved':' rejected'}`}
-          style={{ flexWrap:'wrap', transform:`translateX(${swipeX}px)`, transition: isDragging ? 'none' : 'transform .3s cubic-bezier(.16,1,.3,1)', marginBottom:0, position:'relative', zIndex:1 }}
+          style={{ flexWrap:'wrap', transform:`translateX(${swipeX}px)`, transition: isDragging ? 'none' : 'transform .3s cubic-bezier(.16,1,.3,1)', marginBottom:0, position:'relative', zIndex:1, touchAction: v.estado==='pendiente' ? 'pan-y' : undefined }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}

@@ -28,6 +28,8 @@ const ESTADO_BG = {
   rechazado: 'rgba(239,68,68,.12)',
 }
 
+const fmt = (n) => Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 export default function PanelGastos({ db, toast, saveDB, session }) {
   const [tab, setTab] = useState('pendiente')
   const [filterEmp, setFilterEmp] = useState('')
@@ -69,7 +71,7 @@ export default function PanelGastos({ db, toast, saveDB, session }) {
       id: gid(),
       empId: gasto.empId,
       action: 'Gasto aprobado',
-      detail: `${gasto.concepto} — ${Number(gasto.importe).toFixed(2)} €`,
+      detail: `${gasto.concepto} — ${fmt(gasto.importe)} €`,
       ts: new Date().toISOString(),
       leido: false,
     }
@@ -109,15 +111,13 @@ export default function PanelGastos({ db, toast, saveDB, session }) {
     [employees, gastos]
   )
 
-  const fmt = (n) => Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Gestión de Gastos</h1>
           <div className="adm-panel-sub" style={{ marginTop: 2 }}>
-            {counts.pendiente} pendientes · {totalPendiente.toFixed(2)} € por aprobar
+            {counts.pendiente} pendientes · {fmt(totalPendiente)} € por aprobar
           </div>
         </div>
       </div>
