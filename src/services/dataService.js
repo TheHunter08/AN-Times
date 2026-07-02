@@ -480,11 +480,10 @@ function _enqueueFailedPush(item) {
   } catch {}
 }
 
-export async function queuePush(to, title, body, tag = 'times', url = '/') {
-  if (_pushDedupHit(to, tag, title, body)) {
-    return { ok: true, deduped: true }
-  }
-  const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
+// Envío real, sin pasar por el dedupe (usado tanto por el envío normal como
+// por los reintentos de la cola — un reintento NUNCA debe poder "deduplicarse"
+// contra su propio intento fallido original).
+async function _doSendPush(to, title, body, tag, safeUrl) {
   const payload = { to, title, body, tag, url: safeUrl }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     _enqueueFailedPush(payload)
@@ -507,8 +506,18 @@ export async function queuePush(to, title, body, tag = 'times', url = '/') {
   }
 }
 
+export async function queuePush(to, title, body, tag = 'times', url = '/') {
+  if (_pushDedupHit(to, tag, title, body)) {
+    return { ok: true, deduped: true }
+  }
+  const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
+  return _doSendPush(to, title, body, tag, safeUrl)
+}
+
 // Reintenta los pushes que fallaron por conexión. Se llama al recuperar
-// internet (evento 'online') y al arrancar la app.
+// internet (evento 'online') y al arrancar la app. Bypasa el dedupe: el intento
+// original ya quedó registrado en el mapa de dedupe aunque fallara, así que
+// pasar por queuePush() aquí lo marcaría como "duplicado" y se perdería para siempre.
 export async function flushPushQueue() {
   let queue
   try {
@@ -520,7 +529,7 @@ export async function flushPushQueue() {
   for (const item of queue) {
     // Descarta reintentos con más de 24h: la notificación ya no es relevante.
     if (Date.now() - (item.ts || 0) > 24 * 60 * 60 * 1000) continue
-    await queuePush(item.to, item.title, item.body, item.tag, item.url)
+    await _doSendPush(item.to, item.title, item.body, item.tag, item.url)
   }
 }
 
