@@ -16,7 +16,7 @@ export function LiveTimerCell({ rec }) {
 }
 
 // Componente de tarjeta con su propio tick — evita re-render de toda la grid cada 5s
-export function CtrlCard({ e, live, todayMin, force, startJornada, toggleDescanso }) {
+export function CtrlCard({ e, live, todayMin, wdMin, force, startJornada, toggleDescanso }) {
   const [, setTick] = useState(0)
   useEffect(() => {
     const iv = setInterval(() => setTick(t => t + 1), 5000)
@@ -28,7 +28,10 @@ export function CtrlCard({ e, live, todayMin, force, startJornada, toggleDescans
   const elapsedMin = live ? Math.floor((Date.now() - new Date(live.inicio).getTime()) / 60000) : 0
   const hasBreak = live?.breaks?.length > 0
   const fatiguaAlert = isWorking && elapsedMin >= 600 && !hasBreak
-  const dailyTarget = (e.horasSemanales || WK) / 5 * 60
+  // e.horasSemanales llega en HORAS; WK y wdMin ya están en MINUTOS — antes el
+  // fallback mezclaba unidades y daba un objetivo diario absurdo (~480h) cuando
+  // el empleado no tenía horasSemanales seteado (pct siempre ~0%, over nunca saltaba).
+  const dailyTarget = e.horasSemanales ? (e.horasSemanales * 60) / 5 : (wdMin || WK / 5)
   const workedMin = t ? Math.floor(t.work / 60) : todayMin
   const pct = workedMin ? Math.min(100, Math.round(workedMin / dailyTarget * 100)) : 0
   const over = workedMin > dailyTarget

@@ -44,6 +44,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
   const totSecs = completedSecs + liveSecs
   const totMin = Math.floor(totSecs / 60)
   const brkMin = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
+  const wdEfectivo = db.config?.wdMin || WD
 
   const now = new Date()
   const ws = wkStart(now)
@@ -443,7 +444,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
             <div style={{ fontSize:11, color:jT.text2, fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px' }}>Total trabajado hoy</div>
             <div style={{ fontSize:11, fontWeight:700, color:'#818cf8', background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.25)', padding:'3px 10px', borderRadius:999 }}>
-              {Math.round(totMin / (WD || 480) * 100)}%
+              {Math.round(totMin / (wdEfectivo || 480) * 100)}%
             </div>
           </div>
           <div style={{ fontSize:44, fontWeight:800, letterSpacing:'-2px', color:jT.text, fontVariantNumeric:'tabular-nums', lineHeight:1, marginBottom:14 }}>{mhm(totMin)}</div>
@@ -545,7 +546,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
             })}
             {/* Estimated end */}
             {o && (() => {
-              const estEnd = new Date(new Date(o.inicio).getTime() + WD * 60000)
+              const estEnd = new Date(new Date(o.inicio).getTime() + wdEfectivo * 60000)
               const estHH = p2(estEnd.getHours()), estMM = p2(estEnd.getMinutes())
               return (
                 <div className="tl-prem-item" style={{ opacity: .4 }}>

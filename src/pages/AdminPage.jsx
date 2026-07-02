@@ -586,6 +586,7 @@ function PanelControl({ db, toast, saveDB, session }) {
             e={e}
             live={liveRecs.find(r => r.empId === e.id)}
             todayMin={todayMinMap[e.id] || 0}
+            wdMin={db.config?.wdMin}
             force={force}
             startJornada={startJornada}
             toggleDescanso={toggleDescanso}
@@ -771,7 +772,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
         {pagedFiltered.map(r => {
           const wm = Math.floor(recWorkSecs(r)/60)
           const bm = Math.floor((r.breakSecs||0)/60)
-          const over = wm > WD
+          const over = wm > (db.config?.wdMin || WD)
           const loc = r.locInicio
           return (
             <SwipeToDelete key={r.id} onDelete={() => { setDeletingId(r.id); setDelMotivo('') }}>

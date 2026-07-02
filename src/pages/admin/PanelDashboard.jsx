@@ -85,8 +85,9 @@ export default function PanelDashboard({ db, toast, saveDB }) {
           const ficharonHoy = new Set(todayRecs.map(r => r.empId))
           const ausentes = esperados.filter(e => !ficharonHoy.has(e.id)).length
           const absentismo = esperados.length ? Math.round(ausentes / esperados.length * 100) : 0
-          // Productividad: horas reales del mes vs objetivo (WD * 20 días por empleado activo)
-          const objetivoMes = emps.length * WD * 20
+          // Productividad: horas reales del mes vs objetivo (jornada diaria configurable * 20 días por empleado activo)
+          const wdEfectivo = db.config?.wdMin || WD
+          const objetivoMes = emps.length * wdEfectivo * 20
           const productividad = objetivoMes ? Math.round(monthMin / objetivoMes * 100) : 0
           const docsPend = (db.documentos || []).filter(d => !d.firma).length
           return [
