@@ -18,73 +18,12 @@ import { NavIcon } from '../components/admin/NavIcon.jsx'
 import { SyncBadge } from '../components/admin/SyncBadge.jsx'
 import { toggleTheme } from '../utils/userConfig.js'
 import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
+import { esc, downloadDataUrl, flagStaleCierre, flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '../utils/adminHelpers.js'
 import { PushNotifWidget } from '../components/admin/PushNotifWidget.jsx'
 import { ComunicadoWidget } from '../components/admin/ComunicadoWidget.jsx'
 import { buildHeatmap, Heatmap } from '../components/admin/Heatmap.jsx'
 import { LiveTimerCell, CtrlCard } from '../components/admin/CtrlCard.jsx'
 const MapaObra = lazy(() => import('../components/admin/MapaObra.jsx').then(m => ({ default: m.MapaObra })))
-
-const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-
-const downloadDataUrl = (dataUrl, filename) => {
-  const a = document.createElement('a')
-  a.href = dataUrl; a.download = filename
-  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-}
-
-// Un cierre "pendiente" es una foto fija de las horas en el momento en que se generó.
-// Si se edita/borra un fichaje de ese mes antes de que el empleado firme, marcamos el
-// cierre como desactualizado en vez de solo avisar con un toast que desaparece — la UI
-// de Informes/Validar Horas lo muestra con un badge distinto y obliga a regenerarlo.
-const flagStaleCierre = (cierresList, empId, inicio) => {
-  const mes = inicio?.slice(0, 7)
-  let flagged = false
-  let staleCierre = null
-  const updated = (cierresList || []).map(c => {
-    if (c.empId === empId && c.mes === mes && c.estado === 'pendiente' && !c.desactualizado) {
-      flagged = true
-      staleCierre = c
-      return { ...c, desactualizado: true }
-    }
-    return c
-  })
-  return { cierres: updated, flagged, staleCierre }
-}
-
-// Igual que flagStaleCierre, pero para una edición que puede mover el fichaje
-// de mes: si inicio original y nuevo caen en meses distintos, hay que marcar
-// como desactualizado el cierre de AMBOS meses (el que pierde horas y el que
-// las gana), no solo el original.
-const flagStaleCierreForEdit = (cierresList, empId, oldInicio, newInicio) => {
-  const r1 = flagStaleCierre(cierresList, empId, oldInicio)
-  const mesOld = oldInicio?.slice(0, 7), mesNew = newInicio?.slice(0, 7)
-  if (mesNew === mesOld) return { cierres: r1.cierres, flagged: r1.flagged, staleCierres: r1.flagged ? [r1.staleCierre] : [] }
-  const r2 = flagStaleCierre(r1.cierres, empId, newInicio)
-  const staleCierres = [r1.flagged && r1.staleCierre, r2.flagged && r2.staleCierre].filter(Boolean)
-  return { cierres: r2.cierres, flagged: r1.flagged || r2.flagged, staleCierres }
-}
-
-// Recorta cada pausa al nuevo rango [inicio, fin] del fichaje editado —
-// evita que una pausa con timestamps del rango original (p.ej. si el admin
-// mueve el fichaje a otra franja horaria) quede fuera de la nueva jornada y
-// descuadre el cálculo de horas trabajadas (podría incluso llegar a 0).
-const clipBreaksToWindow = (breaks, inicio, fin) => {
-  const s = new Date(inicio).getTime(), e = new Date(fin).getTime()
-  return (breaks || []).reduce((out, b) => {
-    if (!b.start || !b.end) return out
-    const bs = Math.max(new Date(b.start).getTime(), s)
-    const be = Math.min(new Date(b.end).getTime(), e)
-    if (be > bs) out.push({ ...b, start: new Date(bs).toISOString(), end: new Date(be).toISOString() })
-    return out
-  }, [])
-}
-
-// Avisa por push a quien generó el cierre (si es un JO/encargado con dispositivo propio)
-// de que quedó desactualizado, sin esperar a que entre al panel a verlo.
-const notifyStaleCierre = (staleCierre, editorId) => {
-  if (!staleCierre?.generadoPorId || staleCierre.generadoPorId === editorId) return
-  queuePush(staleCierre.generadoPorId, '⚠️ Cierre desactualizado', `El cierre de ${staleCierre.empName} (${staleCierre.mes}) que generaste cambió tras editarse un fichaje. Regénéralo antes de que firme.`, 'cierre', '/?tab=informes')
-}
 
 // Deslizar hacia la izquierda revela "Eliminar" (gesto nativo tipo Mail de iOS).
 // Los botones explícitos existentes se mantienen intactos — esto es un atajo
