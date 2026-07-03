@@ -254,26 +254,32 @@ async function _storeForBgSync(data) {
   } catch (e) { console.error('[_storeForBgSync] error:', e) }
 }
 
+// Intenta guardar hot+cold en filas separadas. Si la fila fría falla (RLS o
+// la fila no existe todavía en la BD), reintenta metiendo todo el payload en
+// la fila caliente para no perder datos — la sincronización principal no se
+// bloquea por un problema en la fila secundaria.
+async function _upsertHotCold(payload) {
+  const { hot, cold } = _splitHotCold(payload)
+  const nowIso = new Date().toISOString()
+  const [hotRes, coldRes] = await Promise.all([
+    supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
+    supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso }),
+  ])
+  if (hotRes.error) throw hotRes.error
+  if (coldRes.error) {
+    console.warn('[cloudPush] cold row failed, fallback to full payload in hot row:', coldRes.error?.message)
+    const { error: fbErr } = await supabase.from(TABLE).upsert({ id: ROW_ID, data: payload, updated_at: nowIso })
+    if (fbErr) throw fbErr
+  }
+}
+
 async function _bgSyncFallback() {
   try {
     const data = await _idbGet('pending')
     if (!data || !supabase) return
-    const { hot, cold } = _splitHotCold(data)
-    const nowIso = new Date().toISOString()
-    // Igual que en _doCloudPush: las dos filas tienen que guardarse las dos para
-    // dar el pendiente por sincronizado y borrarlo de IDB — si no, un fallo en la
-    // fila fría se perdía sin más al no comprobarse su resultado.
-    const [hotRes, coldRes] = await Promise.all([
-      supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
-      supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso }),
-    ])
-    const error = hotRes.error || coldRes.error
-    if (!error) {
-      await _idbDel('pending')
-      window.dispatchEvent(new CustomEvent('times-synced'))
-    } else {
-      console.error('[_bgSyncFallback] supabase error:', error)
-    }
+    await _upsertHotCold(data)
+    await _idbDel('pending')
+    window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) { console.error('[_bgSyncFallback] error:', e) }
 }
 
@@ -300,22 +306,9 @@ function _doCloudPush(db, onSuccess, onError) {
     return
   }
 
-  const { hot, cold } = _splitHotCold(payload)
-  const nowIso = new Date().toISOString()
-
-  // Las dos filas deben guardarse las dos para considerar el guardado un éxito.
-  // Antes solo se comprobaba el resultado de la fila principal (hot) y la fría
-  // se guardaba "a ver qué pasa" — si esta fallaba (p.ej. un gasto o denuncia),
-  // la app igual mostraba "guardado" y el dato se perdía en silencio, sin
-  // reintento ni aviso. Reutiliza la misma cola de reintento/offline para ambas.
-  Promise.all([
-    supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
-    supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso }),
-  ])
-    .then(([hotRes, coldRes]) => {
+  _upsertHotCold(payload)
+    .then(() => {
       _pushFlight = false
-      if (hotRes.error) throw hotRes.error
-      if (coldRes.error) throw coldRes.error
       _saveRetry = 0
       _clearBgSync()
       onSuccess?.(payload)
