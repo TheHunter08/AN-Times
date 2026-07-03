@@ -289,17 +289,27 @@ async function _idbPut(key, value) {
   })
 }
 
+// Datos "fríos" (gastos/denuncias/wellbeing/anomalias_vistas) viven en la fila 3,
+// separados de la fila principal — ver dataService.js _splitHotCold(). Se
+// duplica aquí porque el service worker no puede importar ese módulo.
+const _COLD_KEYS = ['gastos', 'denuncias', 'wellbeing', 'anomalias_vistas']
+function _splitHotCold(data) {
+  const cold = {}
+  const hot = { ...data }
+  for (const k of _COLD_KEYS) { cold[k] = data[k]; delete hot[k] }
+  return { hot, cold }
+}
+
 async function _bgSync() {
   const data = await _idbGet('pending')
   if (!data) return
-  const res = await fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1`, {
-    method: 'PATCH',
-    headers: {
-      apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`,
-      'Content-Type': 'application/json', Prefer: 'return=minimal'
-    },
-    body: JSON.stringify({ data, updated_at: new Date().toISOString() })
-  })
+  const { hot, cold } = _splitHotCold(data)
+  const nowIso = new Date().toISOString()
+  const headers = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+  const [res] = await Promise.all([
+    fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1`, { method: 'PATCH', headers, body: JSON.stringify({ data: hot, updated_at: nowIso }) }),
+    fetch(`${_SB_URL}/rest/v1/app_data?id=eq.3`, { method: 'PATCH', headers, body: JSON.stringify({ data: cold, updated_at: nowIso }) }).catch(() => {}),
+  ])
   if (!res.ok && res.status !== 409) throw new Error(`bgSync failed: ${res.status}`)
   await _idbDel('pending')
   const cs = await self.clients.matchAll({ type: 'window' })

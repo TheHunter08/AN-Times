@@ -9,6 +9,20 @@ export const supabase = (SB_URL && SB_ANON)
 const TABLE      = 'app_data'
 const PUSH_TABLE = 'push_subs'
 const ROW_ID     = 1
+// Fila 2 ya se usa para archivo mensual (ver archive-records.js). Fila 3: datos
+// "fríos" — solo los lee un panel dedicado cada uno, nunca dashboards, badges
+// globales ni los scripts de cron/webhook — así que separarlos de la fila
+// principal aligera lo que se descarga en cada sincronización normal y en
+// cada consulta de los cron jobs (que ni siquiera necesitan tocar esta fila).
+const COLD_ROW_ID = 3
+const COLD_KEYS = ['gastos', 'denuncias', 'wellbeing', 'anomalias_vistas']
+
+function _splitHotCold(db) {
+  const cold = {}
+  const hot = { ...db }
+  for (const k of COLD_KEYS) { cold[k] = db[k]; delete hot[k] }
+  return { hot, cold }
+}
 
 // ── Local storage ─────────────────────────────────────────────────────────────
 export function loadLocal() {
@@ -124,33 +138,45 @@ export function mergeDB(base, incoming) {
 }
 
 // ── Supabase fetch (descarga datos completos) ─────────────────────────────────
+// Trae la fila principal (hot) y la fría (gastos/denuncias/wellbeing/anomalias_vistas)
+// y las fusiona en un único objeto — el resto de la app sigue viendo un `db`
+// normal, sin enterarse de que ahora vive repartido en dos filas.
 export async function cloudFetch() {
   if (!supabase) return { ok: false, data: null, status: 'no_config' }
   try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select('data, updated_at')
-      .eq('id', ROW_ID)
-      .maybeSingle()
-    if (error) return { ok: false, data: null, status: error.code || 'sb_error' }
-    return { ok: true, data: data?.data || null, updatedAt: data?.updated_at || null }
+    const [hotRes, coldRes] = await Promise.all([
+      supabase.from(TABLE).select('data, updated_at').eq('id', ROW_ID).maybeSingle(),
+      supabase.from(TABLE).select('data, updated_at').eq('id', COLD_ROW_ID).maybeSingle(),
+    ])
+    if (hotRes.error) return { ok: false, data: null, status: hotRes.error.code || 'sb_error' }
+    // La fila fría puede no existir todavía (primera vez) — no es un error, solo "sin datos fríos".
+    const hotData = hotRes.data?.data || null
+    const coldData = coldRes.error ? null : (coldRes.data?.data || null)
+    if (!hotData) return { ok: true, data: null, updatedAt: null }
+    const merged = { ...hotData, ...coldData }
+    const updatedAts = [hotRes.data?.updated_at, coldRes.data?.updated_at].filter(Boolean)
+    const latestUpdatedAt = updatedAts.sort().slice(-1)[0] || hotRes.data?.updated_at || null
+    return { ok: true, data: merged, updatedAt: latestUpdatedAt }
   } catch (e) {
     console.error('[cloudFetch] error:', e)
     return { ok: false, data: null, status: 'red' }
   }
 }
 
-// ── Supabase fetch ligero: solo updated_at (~50 bytes) ───────────────────────
+// ── Supabase fetch ligero: solo updated_at (~50 bytes por fila) ──────────────
+// Devuelve el más reciente de los dos — si cualquiera de las dos filas cambió,
+// hace falta un fetch completo.
 export async function cloudFetchTs() {
   if (!supabase) return { ok: false, ts: null, status: 'no_config' }
   try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select('updated_at')
-      .eq('id', ROW_ID)
-      .maybeSingle()
-    if (error) return { ok: false, ts: null, status: error.code || 'sb_error' }
-    return { ok: true, ts: data?.updated_at ? new Date(data.updated_at).getTime() : 0 }
+    const [hotRes, coldRes] = await Promise.all([
+      supabase.from(TABLE).select('updated_at').eq('id', ROW_ID).maybeSingle(),
+      supabase.from(TABLE).select('updated_at').eq('id', COLD_ROW_ID).maybeSingle(),
+    ])
+    if (hotRes.error) return { ok: false, ts: null, status: hotRes.error.code || 'sb_error' }
+    const hotTs = hotRes.data?.updated_at ? new Date(hotRes.data.updated_at).getTime() : 0
+    const coldTs = (!coldRes.error && coldRes.data?.updated_at) ? new Date(coldRes.data.updated_at).getTime() : 0
+    return { ok: true, ts: Math.max(hotTs, coldTs) }
   } catch (e) {
     console.error('[cloudFetchTs] error:', e)
     return { ok: false, ts: null, status: 'red' }
@@ -228,9 +254,13 @@ async function _bgSyncFallback() {
   try {
     const data = await _idbGet('pending')
     if (!data || !supabase) return
-    const { error } = await supabase
-      .from(TABLE)
-      .upsert({ id: ROW_ID, data, updated_at: new Date().toISOString() })
+    const { hot, cold } = _splitHotCold(data)
+    const nowIso = new Date().toISOString()
+    const [{ error }] = await Promise.all([
+      supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
+      supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso })
+        .then(({ error: coldErr }) => { if (coldErr) console.error('[_bgSyncFallback] fila fría error:', coldErr) }),
+    ])
     if (!error) {
       await _idbDel('pending')
       window.dispatchEvent(new CustomEvent('times-synced'))
@@ -263,9 +293,19 @@ function _doCloudPush(db, onSuccess, onError) {
     return
   }
 
+  const { hot, cold } = _splitHotCold(payload)
+  const nowIso = new Date().toISOString()
+
+  // La fila fría (gastos/denuncias/wellbeing/anomalias_vistas) se guarda en paralelo,
+  // pero su fallo no bloquea el flujo principal de reintento/offline — esos datos
+  // cambian poco y no son tan críticos como para complicar la cola de reintentos
+  // ya probada, pensada para los fichajes.
+  supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso })
+    .then(({ error }) => { if (error) console.error('[cloudPush] fila fría error:', error) })
+
   supabase
     .from(TABLE)
-    .upsert({ id: ROW_ID, data: payload, updated_at: new Date().toISOString() })
+    .upsert({ id: ROW_ID, data: hot, updated_at: nowIso })
     .then(({ error }) => {
       _pushFlight = false
       if (error) throw error
