@@ -12,9 +12,11 @@ import { Calendar } from './pages/Calendar.js'
 import type { CalendarDay } from './pages/Calendar.js'
 import { Stats } from './pages/Stats.js'
 import { Settings, SettingsField } from './pages/Settings.js'
+import { useDashboardData } from './hooks/useDashboardData.js'
 
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: '◧' },
+  { id: 'dashboard-real', label: 'Dashboard (real)', icon: '⬢' },
   { id: 'fichajes', label: 'Fichajes', icon: '◷' },
   { id: 'calendario', label: 'Calendario', icon: '▦' },
   { id: 'stats', label: 'Estadísticas', icon: '◎' },
@@ -30,6 +32,14 @@ function buildWeeks(): CalendarDay[][] {
   }
   if (week.length) weeks.push(week)
   return weeks
+}
+
+// Demuestra que ui-v2 puede consumir datos reales del store existente
+// (solo lectura, vía useDashboardData) — es el paso previo necesario
+// antes de cualquier switch de rutas real (Fase 5).
+function DashboardReal() {
+  const data = useDashboardData()
+  return <Dashboard {...data} />
 }
 
 function PreviewApp() {
@@ -62,6 +72,7 @@ function PreviewApp() {
           ]}
         />
       )}
+      {active === 'dashboard-real' && <DashboardReal />}
       {active === 'fichajes' && (
         <Timesheets
           search={search}
