@@ -7703,19 +7703,19 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 .adm-kpi-card {
   background: #080811 !important;
   border: 1px solid rgba(255,255,255,.075) !important;
-  border-radius: 22px !important; padding: 18px 16px 16px !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,.055) inset, 0 4px 22px rgba(0,0,0,.32) !important;
-  transition: transform .12s, box-shadow .12s !important;
+  border-radius: 26px !important; padding: 24px 22px 20px !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.055) inset, 0 6px 28px rgba(0,0,0,.36) !important;
+  transition: transform .16s cubic-bezier(.16,1,.3,1), box-shadow .16s !important;
 }
 .adm-kpi-card:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,.055) inset, 0 8px 32px rgba(0,0,0,.4) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.055) inset, 0 12px 40px rgba(0,0,0,.45) !important;
 }
-.adm-kpi-val { font-size: 32px !important; font-weight: 900 !important; letter-spacing: -1.8px !important; }
+.adm-kpi-val { font-size: 38px !important; font-weight: 900 !important; letter-spacing: -2px !important; }
 .adm-kpi-lbl {
-  font-size: 10px !important; font-weight: 700 !important;
-  letter-spacing: .8px !important; text-transform: uppercase !important;
-  color: rgba(255,255,255,.32) !important;
+  font-size: 10.5px !important; font-weight: 700 !important;
+  letter-spacing: 1px !important; text-transform: uppercase !important;
+  color: rgba(255,255,255,.34) !important;
 }
 .dash-widget {
   background: #080811 !important;
