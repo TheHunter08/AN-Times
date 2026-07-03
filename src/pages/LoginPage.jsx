@@ -435,8 +435,8 @@ export default function LoginPage() {
               : <LogoSVG />}
           </div>
           <div className="login-logo-text">
-            <div className="login-logo-name">{db.config?.companyName ? db.config.companyName : <>TIMES <span>INC</span></>}</div>
-            <div className="login-logo-sub">{db.config?.companyName ? 'Powered by TIMES INC' : 'Control de jornada laboral'}</div>
+            <div className="login-logo-name">TIMES <span>INC</span></div>
+            <div className="login-logo-sub">Control de jornada laboral</div>
           </div>
         </div>
 
