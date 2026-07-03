@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.84",
@@ -30,9 +31,12 @@
   "devDependencies": {
     "@playwright/test": "^1.61.0",
     "@resvg/resvg-js": "^2.6.2",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@vite-pwa/assets-generator": "^0.2.6",
     "@vitejs/plugin-react": "^4.3.4",
     "sharp": "^0.35.1",
+    "typescript": "^6.0.3",
     "vite": "^5.4.2",
     "vite-plugin-pwa": "^0.21.1",
     "vitest": "^4.1.9",
