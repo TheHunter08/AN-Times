@@ -915,7 +915,7 @@ export default function EmployeePage() {
 
       {/* Notificaciones push v3 */}
       {showNotifBanner && (
-        <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(37,99,235,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
+        <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(59,91,255,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
           <div className="v3-notif-banner-icon">🔔</div>
           <div className="v3-notif-banner-text">
             <div className="v3-notif-banner-title">Activa las notificaciones</div>
