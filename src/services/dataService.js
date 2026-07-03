@@ -383,8 +383,8 @@ export function startRealtime(currentGetDB, onUpdate) {
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         _realtimeRetry = 0
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        // Reconexión exponencial: máx 60s
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        // Reconexión exponencial: máx 60s. CLOSED ocurre cuando Android suspende la red.
         clearTimeout(_realtimeTimer)
         const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 60000)
         _realtimeRetry++

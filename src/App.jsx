@@ -290,11 +290,20 @@ export default function App() {
   useEffect(() => {
     fetchDB()
     initRealtime()
+    // Al arrancar: pedir al SW que suba cualquier dato IDB pendiente de sesiones anteriores
+    // (Android puede matar la app mientras hay datos offline sin sincronizar)
+    if (navigator.onLine) {
+      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
+    }
     // El canal Realtime de Supabase gestiona actualizaciones en vivo.
     // El polling queda solo para cuando la pestaña vuelve a estar visible (app en segundo plano).
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       fetchDB()
+      // Reiniciar Realtime: Android mata la conexión WS al pasar a segundo plano
+      initRealtime()
+      // Forzar sync de datos pendientes en IDB (Android puede haber matado el BG sync)
+      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
       // iOS PWA: forzar check de SW al volver al primer plano (la app puede estar suspendida horas)
       navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
     }
@@ -376,17 +385,18 @@ export default function App() {
     window.addEventListener('times-synced', onSynced)
     const onSaveFailed = () => useAppStore.getState().toast('No se pudo guardar tras varios intentos. Comprueba la conexión.', 5000, 'err')
     window.addEventListener('times-save-failed', onSaveFailed)
-    // Cuando vuelva internet: marcar sync y refrescar (con delay para que BG sync empuje primero)
+    // Cuando vuelva internet: sincronizar inmediatamente
     const onOnline = () => {
       useAppStore.setState(s => s.offlinePending ? { syncStatus: 'syncing' } : {})
-      // Delay: let Background Sync push offline data before pulling from server.
-      // Si aún hay cambios locales sin subir (offlinePending), no tirar del servidor
-      // todavía — el evento times-synced/BG_SYNC_DONE hará el fetchDB en cuanto el
-      // push offline se confirme, evitando pisar un cierre/descanso hecho en modo oficina.
+      // Subir cola en memoria + IDB pendiente (Android puede haber matado el proceso)
+      flushPushQueue()
+      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
+      // Reiniciar Realtime: Android cierra el WS al perder señal
+      initRealtime()
+      // Delay: esperar a que los cambios offline suban antes de bajar del servidor
       setTimeout(() => {
         if (navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
-      }, 3000)
-      flushPushQueue()
+      }, 2000)
     }
     window.addEventListener('online', onOnline)
     flushPushQueue()
@@ -450,7 +460,7 @@ export default function App() {
       if (!('periodicSync' in reg)) return
       navigator.permissions.query({ name: 'periodic-background-sync' }).then(perm => {
         if (perm.state === 'granted') {
-          reg.periodicSync.register('periodic-sync-data', { minInterval: 24 * 60 * 60 * 1000 }).catch(() => {})
+          reg.periodicSync.register('periodic-sync-data', { minInterval: 60 * 60 * 1000 }).catch(() => {})
         }
       }).catch(() => {})
     }).catch(() => {})
