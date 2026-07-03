@@ -9,7 +9,6 @@ import { typeScale } from '../design-system/typography.js'
 export interface TimesheetRow {
   id: string
   name: string
-  color?: string
   centro: string
   day: string
   entrada: string
@@ -30,7 +29,7 @@ export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
       key: 'name', header: 'Empleado', width: '220px',
       render: r => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar name={r.name} color={r.color} size={30} />
+          <Avatar name={r.name} size={30} />
           <div>
             <div style={{ fontWeight: 700 }}>{r.name}</div>
             <div style={{ fontSize: 11, color: colors.text[500] }}>{r.centro}</div>

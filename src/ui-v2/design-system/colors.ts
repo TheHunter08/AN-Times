@@ -46,6 +46,14 @@ export const colors = {
     default: 'rgba(255,255,255,0.10)',
     strong: 'rgba(255,255,255,0.16)',
   },
+  // Paleta curada para avatares/identidad por persona — deliberadamente sin
+  // verde (reservado para estados de éxito) y centrada en la familia
+  // índigo/violeta/azulado, con un par de tonos cálidos de contraste para
+  // que la lista no se sienta monocroma. Nunca se usa el color "libre"
+  // que un empleado tuviera guardado del sistema anterior.
+  avatarPalette: [
+    '#3B5BFF', '#7C3AED', '#0EA5E9', '#6366F1', '#C026D3', '#0891B2', '#DB2777', '#8B5CF6',
+  ],
 } as const
 
 export type ColorToken = typeof colors

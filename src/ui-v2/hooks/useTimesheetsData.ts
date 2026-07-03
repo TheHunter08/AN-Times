@@ -13,12 +13,7 @@ interface DbRecord {
   inicio?: string
   fin?: string | null
 }
-interface DbEmployee {
-  id: string
-  color?: string
-}
 interface Db {
-  employees?: DbEmployee[]
   records?: DbRecord[]
   config?: { wdMin?: number }
 }
@@ -28,7 +23,6 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
   const wdMin = db.config?.wdMin || 480
 
   return useMemo(() => {
-    const empColor = new Map((db.employees || []).map(e => [e.id, e.color]))
     const recs = (db.records || []).filter(r => r.fin).slice(-40).reverse()
     const q = search.trim().toLowerCase()
     return recs
@@ -38,7 +32,6 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
         return {
           id: r.id,
           name: r.empName || '—',
-          color: empColor.get(r.empId),
           centro: r.centro || 'Sin centro',
           day: fds(r.inicio),
           entrada: ftime(r.inicio),
@@ -47,5 +40,5 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
           over: workedMin > wdMin,
         }
       })
-  }, [db.records, db.employees, search, wdMin])
+  }, [db.records, search, wdMin])
 }
