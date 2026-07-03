@@ -57,9 +57,13 @@ function _unionById(base, incoming) {
   // If base is empty, just return incoming
   if (b.length === 0) return i
 
-  // Fallback: if items don't have `id` fields, return incoming as-is
-  if ((b.length > 0 && b[0].id === undefined) || (i.length > 0 && i[0].id === undefined)) {
-    return i
+  // Fallback para arrays de valores simples (ej. anomalias_vistas: IDs sueltos,
+  // no objetos) — antes esto devolvía `incoming` tal cual, descartando lo que
+  // hubiera solo en `base` (p.ej. una anomalía marcada como vista offline que
+  // aún no había llegado al remoto se "desmarcaba" sola en el siguiente merge).
+  if ((b.length > 0 && (b[0] === null || typeof b[0] !== 'object')) ||
+      (i.length > 0 && (i[0] === null || typeof i[0] !== 'object'))) {
+    return [...new Set([...b, ...i])]
   }
 
   const map = new Map()
