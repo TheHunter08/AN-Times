@@ -256,11 +256,14 @@ async function _bgSyncFallback() {
     if (!data || !supabase) return
     const { hot, cold } = _splitHotCold(data)
     const nowIso = new Date().toISOString()
-    const [{ error }] = await Promise.all([
+    // Igual que en _doCloudPush: las dos filas tienen que guardarse las dos para
+    // dar el pendiente por sincronizado y borrarlo de IDB — si no, un fallo en la
+    // fila fría se perdía sin más al no comprobarse su resultado.
+    const [hotRes, coldRes] = await Promise.all([
       supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
-      supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso })
-        .then(({ error: coldErr }) => { if (coldErr) console.error('[_bgSyncFallback] fila fría error:', coldErr) }),
+      supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso }),
     ])
+    const error = hotRes.error || coldRes.error
     if (!error) {
       await _idbDel('pending')
       window.dispatchEvent(new CustomEvent('times-synced'))
@@ -296,19 +299,19 @@ function _doCloudPush(db, onSuccess, onError) {
   const { hot, cold } = _splitHotCold(payload)
   const nowIso = new Date().toISOString()
 
-  // La fila fría (gastos/denuncias/wellbeing/anomalias_vistas) se guarda en paralelo,
-  // pero su fallo no bloquea el flujo principal de reintento/offline — esos datos
-  // cambian poco y no son tan críticos como para complicar la cola de reintentos
-  // ya probada, pensada para los fichajes.
-  supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso })
-    .then(({ error }) => { if (error) console.error('[cloudPush] fila fría error:', error) })
-
-  supabase
-    .from(TABLE)
-    .upsert({ id: ROW_ID, data: hot, updated_at: nowIso })
-    .then(({ error }) => {
+  // Las dos filas deben guardarse las dos para considerar el guardado un éxito.
+  // Antes solo se comprobaba el resultado de la fila principal (hot) y la fría
+  // se guardaba "a ver qué pasa" — si esta fallaba (p.ej. un gasto o denuncia),
+  // la app igual mostraba "guardado" y el dato se perdía en silencio, sin
+  // reintento ni aviso. Reutiliza la misma cola de reintento/offline para ambas.
+  Promise.all([
+    supabase.from(TABLE).upsert({ id: ROW_ID, data: hot, updated_at: nowIso }),
+    supabase.from(TABLE).upsert({ id: COLD_ROW_ID, data: cold, updated_at: nowIso }),
+  ])
+    .then(([hotRes, coldRes]) => {
       _pushFlight = false
-      if (error) throw error
+      if (hotRes.error) throw hotRes.error
+      if (coldRes.error) throw coldRes.error
       _saveRetry = 0
       _clearBgSync()
       onSuccess?.(payload)

@@ -305,12 +305,19 @@ async function _bgSync() {
   if (!data) return
   const { hot, cold } = _splitHotCold(data)
   const nowIso = new Date().toISOString()
-  const headers = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
-  const [res] = await Promise.all([
-    fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1`, { method: 'PATCH', headers, body: JSON.stringify({ data: hot, updated_at: nowIso }) }),
-    fetch(`${_SB_URL}/rest/v1/app_data?id=eq.3`, { method: 'PATCH', headers, body: JSON.stringify({ data: cold, updated_at: nowIso }) }).catch(() => {}),
+  // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la
+  // primera vez — un PATCH sobre una fila inexistente no crea nada ni da error,
+  // así que el dato se perdería en silencio. upsert la crea si hace falta.
+  const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
+  const [hotRes, coldRes] = await Promise.all([
+    fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
+    fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
   ])
-  if (!res.ok && res.status !== 409) throw new Error(`bgSync failed: ${res.status}`)
+  // Las dos tienen que ir bien para dar el pendiente por sincronizado — si no,
+  // un fallo en la fila fría (gastos/denuncias/...) se perdía sin más.
+  if ((!hotRes.ok && hotRes.status !== 409) || (!coldRes.ok && coldRes.status !== 409)) {
+    throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status}`)
+  }
   await _idbDel('pending')
   const cs = await self.clients.matchAll({ type: 'window' })
   cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
