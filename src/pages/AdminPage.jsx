@@ -1509,6 +1509,10 @@ function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal,
         if (dup) { toast('PIN ya está en uso'); return }
       }
     }
+    if (form.telefono && form.telefono.trim()) {
+      const dupPhone = (db.employees||[]).find(e => e.id !== form.id && !e.baja && e.telefono && e.telefono === form.telefono)
+      if (dupPhone) { toast(`Ese WhatsApp ya está en uso por ${dupPhone.name}`); return }
+    }
     let finalPin = form.pin
     let pinLen
     if (isNewPin) {
