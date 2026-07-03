@@ -652,17 +652,17 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* Floating glass navigation — estilo Apple Music / Arc Browser */
 .emp-nav {
   position: fixed;
-  left: 14px; right: 14px;
-  bottom: 14px;
+  left: 16px; right: 16px;
+  bottom: 18px;
   display: flex; align-items: center; justify-content: space-around;
-  background: rgba(12,12,20,0.88);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  background: rgba(14,14,22,0.86);
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
   border: 1px solid rgba(255,255,255,0.09);
-  border-top: 1px solid rgba(255,255,255,0.12);
+  border-top: 1px solid rgba(255,255,255,0.13);
   border-radius: var(--r-pill);
-  padding: 10px 4px;
-  box-shadow: 0 12px 40px rgba(0,0,0,.70), 0 4px 12px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.07);
+  padding: 12px 6px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.72), 0 4px 14px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08);
   transform: translate3d(0,0,0); will-change: transform;
   z-index: 50;
 }
