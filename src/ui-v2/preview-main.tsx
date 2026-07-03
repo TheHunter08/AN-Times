@@ -1,41 +1,104 @@
 // Arnés de previsualización aislado para ui-v2 — NO forma parte de la app
 // real, no se importa desde main.jsx/App.jsx. Sirve solo para verificar
-// visualmente los componentes nuevos con datos de ejemplo mientras se
-// construyen, sin tocar la aplicación en producción.
+// visualmente los componentes/pantallas nuevas con datos de ejemplo
+// mientras se construyen, sin tocar la aplicación en producción.
+import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { StrictMode } from 'react'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
+import { Timesheets } from './pages/Timesheets.js'
+import { Calendar } from './pages/Calendar.js'
+import type { CalendarDay } from './pages/Calendar.js'
+import { Stats } from './pages/Stats.js'
+import { Settings, SettingsField } from './pages/Settings.js'
+
+const PAGES = [
+  { id: 'dashboard', label: 'Dashboard', icon: '◧' },
+  { id: 'fichajes', label: 'Fichajes', icon: '◷' },
+  { id: 'calendario', label: 'Calendario', icon: '▦' },
+  { id: 'stats', label: 'Estadísticas', icon: '◎' },
+  { id: 'ajustes', label: 'Ajustes', icon: '⚙' },
+]
+
+function buildWeeks(): CalendarDay[][] {
+  const weeks: CalendarDay[][] = []
+  let week: CalendarDay[] = [{ day: 0 }, { day: 0 }]
+  for (let d = 1; d <= 31; d++) {
+    week.push({ day: d, status: d === 3 ? 'today' : d % 7 === 0 ? 'off' : d % 3 === 0 ? 'partial' : 'complete' })
+    if (week.length === 7) { weeks.push(week); week = [] }
+  }
+  if (week.length) weeks.push(week)
+  return weeks
+}
 
 function PreviewApp() {
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <span>◧</span> },
-    { id: 'fichajes', label: 'Fichajes', icon: <span>◷</span> },
-    { id: 'empleados', label: 'Empleados', icon: <span>◍</span> },
-  ]
+  const [active, setActive] = useState('dashboard')
+  const [search, setSearch] = useState('')
+  const [name, setName] = useState('Gecama')
+
   return (
     <AppShell
-      navItems={navItems}
-      activeNav="dashboard"
-      onSelectNav={() => {}}
+      navItems={PAGES.map(p => ({ id: p.id, label: p.label, icon: <span>{p.icon}</span> }))}
+      activeNav={active}
+      onSelectNav={setActive}
       sidebarHeader={<div style={{ fontWeight: 800, fontSize: 14 }}>TIMES INC</div>}
-      pageTitle="Dashboard"
+      pageTitle={PAGES.find(p => p.id === active)?.label ?? ''}
       breadcrumb="ui-v2 preview"
     >
-      <Dashboard
-        greeting="Buenas tardes, Ismael 👋"
-        kpis={[
-          { label: 'Activos ahora', value: '3/8' },
-          { label: 'Horas hoy', value: '31h 00m', delta: { text: '+4%', tone: 'up' } },
-          { label: 'Horas este mes', value: '138h 01m', delta: { text: '-40%', tone: 'down' } },
-          { label: 'Productividad', value: '10%', delta: { text: 'bajo objetivo', tone: 'flat' } },
-        ]}
-        activity={[
-          { id: '1', text: 'Franklin fichó salida — 5h 31m', time: 'hace 12 min', tone: 'green' },
-          { id: '2', text: 'Robin solicitó vacaciones', time: 'hace 1 h', tone: 'purple' },
-          { id: '3', text: 'Documento pendiente de firma', time: 'hace 2 h', tone: 'orange' },
-        ]}
-      />
+      {active === 'dashboard' && (
+        <Dashboard
+          greeting="Buenas tardes, Ismael 👋"
+          kpis={[
+            { label: 'Activos ahora', value: '3/8' },
+            { label: 'Horas hoy', value: '31h 00m', delta: { text: '+4%', tone: 'up' } },
+            { label: 'Horas este mes', value: '138h 01m', delta: { text: '-40%', tone: 'down' } },
+            { label: 'Productividad', value: '10%', delta: { text: 'bajo objetivo', tone: 'flat' } },
+          ]}
+          activity={[
+            { id: '1', text: 'Franklin fichó salida — 5h 31m', time: 'hace 12 min', tone: 'green' },
+            { id: '2', text: 'Robin solicitó vacaciones', time: 'hace 1 h', tone: 'purple' },
+            { id: '3', text: 'Documento pendiente de firma', time: 'hace 2 h', tone: 'orange' },
+          ]}
+        />
+      )}
+      {active === 'fichajes' && (
+        <Timesheets
+          search={search}
+          onSearchChange={setSearch}
+          rows={[
+            { id: '1', name: 'Robin Maximo Santana', centro: 'Telecomunicaciones', day: '3 jul 2026', entrada: '06:07', salida: '11:35', worked: '5h 28m' },
+            { id: '2', name: 'Franklin Lisandro Nuñez', centro: 'Telecomunicaciones', day: '3 jul 2026', entrada: '06:04', salida: '11:35', worked: '5h 31m' },
+            { id: '3', name: 'Carlos Alberto Peña', centro: 'Telecomunicaciones', day: '3 jul 2026', entrada: '06:01', salida: '10:02', worked: '9h 12m', over: true },
+          ]}
+        />
+      )}
+      {active === 'calendario' && (
+        <Calendar monthLabel="Julio 2026" weeks={buildWeeks()} onPrev={() => {}} onNext={() => {}} />
+      )}
+      {active === 'stats' && (
+        <Stats
+          title="Estadísticas"
+          bars={[
+            { label: 'Lun', value: 70 }, { label: 'Mar', value: 85 }, { label: 'Mié', value: 60, tone: 'orange' },
+            { label: 'Jue', value: 90, tone: 'green' }, { label: 'Vie', value: 40, tone: 'orange' }, { label: 'Sáb', value: 10 }, { label: 'Dom', value: 0 },
+          ]}
+          comparison={[
+            { label: 'Horas totales', value: '138h', deltaTone: 'down' },
+            { label: 'Puntualidad', value: '94%', deltaTone: 'up' },
+            { label: 'Ausentismo', value: '2%', deltaTone: 'down' },
+          ]}
+        />
+      )}
+      {active === 'ajustes' && (
+        <Settings
+          saving={false}
+          onSave={() => {}}
+          sections={[
+            { id: 'general', title: 'Empresa', description: 'Datos básicos de la organización', content: <SettingsField label="Nombre" value={name} onChange={setName} /> },
+          ]}
+        />
+      )}
     </AppShell>
   )
 }
