@@ -313,24 +313,38 @@ async function _bgSync() {
     fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
     fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
   ])
-  // Las dos tienen que ir bien para dar el pendiente por sincronizado — si no,
-  // un fallo en la fila fría (gastos/denuncias/...) se perdía sin más.
-  if ((!hotRes.ok && hotRes.status !== 409) || (!coldRes.ok && coldRes.status !== 409)) {
-    throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status}`)
+  if (!hotRes.ok && hotRes.status !== 409) {
+    throw new Error(`bgSync failed: hot=${hotRes.status}`)
+  }
+  // Si solo falla la fila fría (RLS, fila aún no creada, etc.) no bloqueamos
+  // todo el sync — igual que en dataService.js, reintentamos metiendo el
+  // payload completo en la fila caliente para no perder la jornada/fichaje.
+  if (!coldRes.ok && coldRes.status !== 409) {
+    const fbRes = await fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
+    if (!fbRes.ok && fbRes.status !== 409) {
+      throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
+    }
   }
   await _idbDel('pending')
   const cs = await self.clients.matchAll({ type: 'window' })
   cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
 }
 
+// Ejecuta _bgSync() y, si falla, avisa a los clientes abiertos — así el banner
+// de sincronización se muestra en vez de fallar en silencio para siempre
+// (antes solo el listener 'sync' avisaba; FORCE_SYNC tragaba el error).
+async function _bgSyncNotify() {
+  try {
+    await _bgSync()
+  } catch (err) {
+    const cs = await self.clients.matchAll({ type: 'window' })
+    cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
+  }
+}
+
 // ─── BACKGROUND SYNC (One-off: cuando recupera red) ────────────────────────────
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') event.waitUntil(
-    _bgSync().catch(async (err) => {
-      const cs = await self.clients.matchAll({ type: 'window' })
-      cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
-    })
-  )
+  if (event.tag === 'sync-data') event.waitUntil(_bgSyncNotify())
 })
 
 // ─── PERIODIC BACKGROUND SYNC (V3 Premium — sincroniza aunque la app esté cerrada) ──
@@ -351,7 +365,7 @@ self.addEventListener('message', (event) => {
   if (type === 'SKIP_WAITING') self.skipWaiting()
 
   // La app pide hacer sync manual ahora
-  if (type === 'FORCE_SYNC') event.waitUntil(_bgSync().catch(() => {}))
+  if (type === 'FORCE_SYNC') event.waitUntil(_bgSyncNotify())
 
   // El banner in-app ya se ha mostrado: cerrar la notificación OS para no duplicar
   if (type === 'PUSH_DISMISS' && event.data?.tag) {

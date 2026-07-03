@@ -61,6 +61,12 @@ export const useAppStore = create((set, get) => ({
       if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
       if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
       const merged = mergeDB(get().db, data)
+      // El `_ts` embebido en el JSON puede venir "viejo" (p.ej. tras un guardado
+      // offline, donde se fijó al momento del guardado, no al de la sincronización
+      // real). Si nos quedamos solo con ese valor, tsResult.ts (el updated_at real
+      // de la fila) sigue siendo mayor en cada fetchDB() futuro y la app repite un
+      // fetch+merge completo sin fin en vez de usar el atajo de la línea de arriba.
+      if (tsResult.ts && tsResult.ts > merged._ts) merged._ts = tsResult.ts
       saveLocal(merged)
       set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
       // Re-validate session against fresh data
