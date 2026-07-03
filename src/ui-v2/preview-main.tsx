@@ -13,11 +13,13 @@ import type { CalendarDay } from './pages/Calendar.js'
 import { Stats } from './pages/Stats.js'
 import { Settings, SettingsField } from './pages/Settings.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
+import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: '◧' },
   { id: 'dashboard-real', label: 'Dashboard (real)', icon: '⬢' },
   { id: 'fichajes', label: 'Fichajes', icon: '◷' },
+  { id: 'fichajes-real', label: 'Fichajes (real)', icon: '⬢' },
   { id: 'calendario', label: 'Calendario', icon: '▦' },
   { id: 'stats', label: 'Estadísticas', icon: '◎' },
   { id: 'ajustes', label: 'Ajustes', icon: '⚙' },
@@ -40,6 +42,12 @@ function buildWeeks(): CalendarDay[][] {
 function DashboardReal() {
   const data = useDashboardData()
   return <Dashboard {...data} />
+}
+
+function TimesheetsReal() {
+  const [search, setSearch] = useState('')
+  const rows = useTimesheetsData(search)
+  return <Timesheets rows={rows} search={search} onSearchChange={setSearch} />
 }
 
 function PreviewApp() {
@@ -73,6 +81,7 @@ function PreviewApp() {
         />
       )}
       {active === 'dashboard-real' && <DashboardReal />}
+      {active === 'fichajes-real' && <TimesheetsReal />}
       {active === 'fichajes' && (
         <Timesheets
           search={search}
