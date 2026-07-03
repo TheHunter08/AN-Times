@@ -97,14 +97,14 @@ input, textarea, [contenteditable="true"], .selectable {
   --glass-border: rgba(255,255,255,0.08);
   --glass-blur:   28px;
 
-  /* ── Radius — Premium rounded (Apple-tier) */
-  --r:     14px;
-  --r-xs:  8px;
-  --r-sm:  10px;
-  --r-lg:  18px;
-  --r-xl:  22px;
-  --r-2xl: 28px;
-  --r-3xl: 36px;
+  /* ── Radius — v5: aún más suave, más "continuo" (macOS/iOS style) */
+  --r:     16px;
+  --r-xs:  9px;
+  --r-sm:  12px;
+  --r-lg:  22px;
+  --r-xl:  26px;
+  --r-2xl: 32px;
+  --r-3xl: 40px;
   --r-pill: 999px;
 
   /* ── Safe areas */
