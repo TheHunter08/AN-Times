@@ -50,6 +50,34 @@ const flagStaleCierre = (cierresList, empId, inicio) => {
   return { cierres: updated, flagged, staleCierre }
 }
 
+// Igual que flagStaleCierre, pero para una edición que puede mover el fichaje
+// de mes: si inicio original y nuevo caen en meses distintos, hay que marcar
+// como desactualizado el cierre de AMBOS meses (el que pierde horas y el que
+// las gana), no solo el original.
+const flagStaleCierreForEdit = (cierresList, empId, oldInicio, newInicio) => {
+  const r1 = flagStaleCierre(cierresList, empId, oldInicio)
+  const mesOld = oldInicio?.slice(0, 7), mesNew = newInicio?.slice(0, 7)
+  if (mesNew === mesOld) return { cierres: r1.cierres, flagged: r1.flagged, staleCierres: r1.flagged ? [r1.staleCierre] : [] }
+  const r2 = flagStaleCierre(r1.cierres, empId, newInicio)
+  const staleCierres = [r1.flagged && r1.staleCierre, r2.flagged && r2.staleCierre].filter(Boolean)
+  return { cierres: r2.cierres, flagged: r1.flagged || r2.flagged, staleCierres }
+}
+
+// Recorta cada pausa al nuevo rango [inicio, fin] del fichaje editado —
+// evita que una pausa con timestamps del rango original (p.ej. si el admin
+// mueve el fichaje a otra franja horaria) quede fuera de la nueva jornada y
+// descuadre el cálculo de horas trabajadas (podría incluso llegar a 0).
+const clipBreaksToWindow = (breaks, inicio, fin) => {
+  const s = new Date(inicio).getTime(), e = new Date(fin).getTime()
+  return (breaks || []).reduce((out, b) => {
+    if (!b.start || !b.end) return out
+    const bs = Math.max(new Date(b.start).getTime(), s)
+    const be = Math.min(new Date(b.end).getTime(), e)
+    if (be > bs) out.push({ ...b, start: new Date(bs).toISOString(), end: new Date(be).toISOString() })
+    return out
+  }, [])
+}
+
 // Avisa por push a quien generó el cierre (si es un JO/encargado con dispositivo propio)
 // de que quedó desactualizado, sin esperar a que entre al panel a verlo.
 const notifyStaleCierre = (staleCierre, editorId) => {
@@ -728,15 +756,16 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     if (empRecs.some(rec => newInicio < rec.fin && (newFin || newInicio) > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
     const updated = (db.records||[]).map(rec => {
       if (rec.id !== r.id) return rec
-      const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin })
+      const breaks = newFin ? clipBreaksToWindow(rec.breaks, newInicio, newFin) : (rec.breaks || [])
+      const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin, breaks })
       const corr = { campo:'inicio+fin', antes: `${ftime(rec.inicio)}–${ftime(rec.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
-      return { ...rec, inicio: newInicio, fin: newFin, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
+      return { ...rec, inicio: newInicio, fin: newFin, breaks, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    const { cierres, flagged, staleCierre } = flagStaleCierre(db.cierres || [], r.empId, r.inicio)
+    const { cierres, flagged, staleCierres } = flagStaleCierreForEdit(db.cierres || [], r.empId, r.inicio, newInicio)
     saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    if (flagged) notifyStaleCierre(staleCierre, session?.user?.id)
+    staleCierres.forEach(sc => notifyStaleCierre(sc, session?.user?.id))
     setEditModal(null)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
     toast('Fichaje actualizado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
@@ -3205,16 +3234,17 @@ function PanelMiObra({ db, toast, saveDB, session }) {
     if (newFin && newInicio >= newFin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
     const updated = recs.map(r => {
       if (r.id !== editing.id) return r
-      const closed = { ...r, inicio: newInicio, fin: newFin }
+      const breaks = newFin ? clipBreaksToWindow(r.breaks, newInicio, newFin) : (r.breaks || [])
+      const closed = { ...r, inicio: newInicio, fin: newFin, breaks }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
       const corr = { campo:'inicio+fin', antes: `${ftime(r.inicio)}–${ftime(r.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: enc.name, ts: new Date().toISOString() }
       return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
     })
     const withAudit = auditLog(db, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
-    const { cierres, flagged, staleCierre } = flagStaleCierre(db.cierres, rec.empId, rec.inicio)
+    const { cierres, flagged, staleCierres } = flagStaleCierreForEdit(db.cierres, rec.empId, rec.inicio, newInicio)
     saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} corrigió tu jornada del ${fds(editing.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
-    if (flagged) notifyStaleCierre(staleCierre, enc.id)
+    staleCierres.forEach(sc => notifyStaleCierre(sc, enc.id))
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — pide que lo regeneren en Informes.' : ''
     toast('Jornada modificada' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
     setEditing(null)
