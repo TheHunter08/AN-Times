@@ -30,6 +30,16 @@ export function AppShell({
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', background: colors.bg[800], color: colors.text[900], fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
+      {/* Grano sutil sobre todo el shell — el detalle que separa un fondo
+          negro plano ("de plantilla") de una superficie con textura real,
+          igual que hacen Linear/Vercel/Arc. Opacidad mínima a propósito. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed', inset: 0, zIndex: 50, pointerEvents: 'none', opacity: .035, mixBlendMode: 'overlay',
+          backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
       {!isMobile && (
         <Sidebar items={navItems} active={activeNav} onSelect={onSelectNav} header={sidebarHeader} footer={sidebarFooter} />
       )}
@@ -71,8 +81,12 @@ export function AppShell({
               aquí como profundidad discreta en vez de un plano negro sin textura */}
           <div style={{ position: 'fixed', top: -120, right: -120, width: 420, height: 420, borderRadius: '50%', background: `radial-gradient(circle, ${colors.primary.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .5, zIndex: 0 }} />
           <div style={{ position: 'fixed', bottom: -160, left: 260, width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${colors.accent.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .35, zIndex: 0 }} />
-          <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+          <div key={activeNav} className="uiv2-page-enter" style={{ position: 'relative', zIndex: 1 }}>{children}</div>
         </main>
+        <style>{`
+          @keyframes uiv2PageEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          .uiv2-page-enter { animation: uiv2PageEnter 280ms cubic-bezier(0.16, 1, 0.3, 1); }
+        `}</style>
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import { Card } from '../components/Card.js'
+import { AreaChart } from '../components/AreaChart.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
@@ -16,39 +17,13 @@ export interface StatsProps {
   comparison?: { label: string; value: string; deltaTone: 'up' | 'down' }[]
 }
 
-const toneColor = { primary: colors.primary.base, green: colors.semantic.green, orange: colors.semantic.orange }
-
 export function Stats({ title, bars, comparison }: StatsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900 }}>
       <PageTitle>{title}</PageTitle>
 
       <Card title="Comparativa semanal">
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 170, paddingTop: 20 }}>
-          {bars.map(b => (
-            <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', position: 'relative' }}>
-                {b.value > 0 && (
-                  <span style={{ position: 'absolute', top: `calc(${100 - Math.max(6, b.value)}% - 18px)`, left: '50%', transform: 'translateX(-50%)', fontSize: 10.5, fontWeight: 700, color: colors.text[500], whiteSpace: 'nowrap' }}>
-                    {b.value}%
-                  </span>
-                )}
-                <div
-                  className="uiv2-stat-bar"
-                  style={{
-                    width: '100%',
-                    height: `${Math.max(6, b.value)}%`,
-                    borderRadius: '8px 8px 3px 3px',
-                    background: `linear-gradient(180deg, ${toneColor[b.tone ?? 'primary']} 0%, transparent 140%)`,
-                    transition: transition(['opacity']),
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: colors.text[500] }}>{b.label}</span>
-            </div>
-          ))}
-        </div>
-        <style>{`.uiv2-stat-bar:hover { opacity: .8; }`}</style>
+        <AreaChart data={bars} height={190} color={colors.primary.base} />
       </Card>
 
       {comparison && (
@@ -56,16 +31,18 @@ export function Stats({ title, bars, comparison }: StatsProps) {
           {comparison.map(c => (
             <div
               key={c.label}
+              className="uiv2-stat-kpi"
               style={{
-                background: colors.bg[600],
+                background: `linear-gradient(160deg, ${colors.bg[500]} 0%, ${colors.bg[600]} 70%)`,
                 border: `1px solid ${colors.border.subtle}`,
                 borderRadius: radius.xl,
                 padding: 18,
+                transition: transition(['transform', 'border-color']),
               }}
             >
               <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500], marginBottom: 8 }}>{c.label}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-.5px' }}>{c.value}</span>
+                <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-.6px' }}>{c.value}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: c.deltaTone === 'up' ? colors.semantic.green : colors.semantic.red }}>
                   {c.deltaTone === 'up' ? '↑' : '↓'}
                 </span>
@@ -74,6 +51,7 @@ export function Stats({ title, bars, comparison }: StatsProps) {
           ))}
         </div>
       )}
+      <style>{`.uiv2-stat-kpi:hover { transform: translateY(-2px); border-color: ${colors.border.default}; }`}</style>
     </div>
   )
 }
