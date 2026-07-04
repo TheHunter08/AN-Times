@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { Card } from '../components/Card.js'
 import { Badge } from '../components/Badge.js'
+import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
-import { typeScale } from '../design-system/typography.js'
 import { transition } from '../design-system/animations.js'
 
 export type KpiTone = 'primary' | 'accent' | 'cyan' | 'amber'
@@ -45,9 +45,7 @@ export function Dashboard({ greeting, kpis, activity, quickActions }: DashboardP
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
       <div>
-        <div style={{ fontSize: typeScale.h1.size, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking, color: colors.text[900] }}>
-          {greeting}
-        </div>
+        <PageTitle>{greeting}</PageTitle>
       </div>
 
       {quickActions && <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{quickActions}</div>}

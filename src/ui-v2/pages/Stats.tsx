@@ -1,7 +1,7 @@
 import { Card } from '../components/Card.js'
+import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
-import { typeScale } from '../design-system/typography.js'
 import { transition } from '../design-system/animations.js'
 
 export interface StatsBar {
@@ -21,7 +21,7 @@ const toneColor = { primary: colors.primary.base, green: colors.semantic.green, 
 export function Stats({ title, bars, comparison }: StatsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900 }}>
-      <div style={{ fontSize: typeScale.h1.size, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking }}>{title}</div>
+      <PageTitle>{title}</PageTitle>
 
       <Card title="Comparativa semanal">
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 170, paddingTop: 20 }}>

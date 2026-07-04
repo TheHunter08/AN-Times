@@ -1,7 +1,7 @@
 import { Card } from '../components/Card.js'
+import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
-import { typeScale } from '../design-system/typography.js'
 import { transition } from '../design-system/animations.js'
 
 export interface CalendarDay {
@@ -27,7 +27,7 @@ export function Calendar({ monthLabel, weeks, onPrev, onNext }: CalendarProps) {
   return (
     <div style={{ maxWidth: 660 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ fontSize: typeScale.h1.size, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking }}>{monthLabel}</div>
+        <PageTitle>{monthLabel}</PageTitle>
         <div style={{ display: 'flex', gap: 6 }}>
           {([['‹', onPrev], ['›', onNext]] as const).map(([label, fn]) => (
             <button

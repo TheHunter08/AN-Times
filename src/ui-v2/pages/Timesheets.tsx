@@ -3,8 +3,8 @@ import { Badge } from '../components/Badge.js'
 import { Search } from '../components/Search.js'
 import { Table } from '../components/Table.js'
 import type { TableColumn } from '../components/Table.js'
+import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors.js'
-import { typeScale } from '../design-system/typography.js'
 
 export interface TimesheetRow {
   id: string
@@ -49,11 +49,11 @@ export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1100 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: typeScale.h1.size, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking }}>Fichajes</div>
+        <PageTitle>Fichajes</PageTitle>
         <Search placeholder="Buscar empleado o centro…" value={search} onChange={e => onSearchChange(e.target.value)} />
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <Badge tone="green">{rows.length} registros</Badge>
+        <Badge tone="purple">{rows.length} registros</Badge>
       </div>
       <Table columns={columns} rows={rows} rowKey={r => r.id} emptyLabel="Sin fichajes en este rango" />
     </div>
