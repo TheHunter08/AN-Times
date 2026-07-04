@@ -2519,13 +2519,13 @@ function PanelInformes({ db, toast, saveDB, session }) {
             {obraRows.map(({ obra, empData, totalMins, assignedCount }) => {
               const pct = Math.round(totalMins / maxObraMin * 100)
               return (
-                <div key={obra} className="card-lift" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'16px 18px' }}>
+                <div key={obra.id || obra.nombre} className="card-lift" style={{ background:'var(--bg-700)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'16px 18px' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
                     <div style={{ width:38, height:38, borderRadius:10, background:'var(--primary-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:15, fontWeight:700, marginBottom:1 }}>{obra}</div>
+                      <div style={{ fontSize:15, fontWeight:700, marginBottom:1 }}>{obra.nombre}</div>
                       <div style={{ fontSize:11, color:'var(--text3)' }}>{assignedCount} empleado{assignedCount!==1?'s':''} asignado{assignedCount!==1?'s':''}</div>
                     </div>
                     <div style={{ fontSize:22, fontWeight:800, color:'var(--primary-light)', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>{mhm(totalMins)}</div>
