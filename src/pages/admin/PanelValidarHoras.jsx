@@ -1,6 +1,9 @@
 import { useState, useRef } from 'react'
 import { gid, p2, mhm, calcMin } from '../../utils/time.js'
+import { WK } from '../../config/constants.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
+import { downloadDataUrl } from '../../utils/adminHelpers.js'
+import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../../utils/cierrePdf.js'
 
 export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   const now = new Date()

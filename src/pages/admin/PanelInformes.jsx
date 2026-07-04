@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { mhm, p2, calcMin, gid, sortedEmps, recWorkSecs, monthlyExtras, vacData } from '../../utils/time.js'
+import { WK } from '../../config/constants.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { downloadDataUrl } from '../../utils/adminHelpers.js'
 import { buildCierreIndividualPDF, buildCierreConsolidadoPDF } from '../../utils/cierrePdf.js'
