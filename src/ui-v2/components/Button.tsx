@@ -21,12 +21,7 @@ const sizeStyles: Record<Size, { padding: string; fontSize: string }> = {
 }
 
 const variantStyles: Record<Variant, CSSProperties> = {
-  primary: {
-    background: `linear-gradient(135deg, ${colors.primary.base} 0%, ${colors.accent.base} 130%)`,
-    color: '#fff',
-    border: 'none',
-    boxShadow: `0 4px 16px ${colors.primary.glow}, inset 0 1px 0 rgba(255,255,255,.18)`,
-  },
+  primary:   { background: colors.primary.base, color: '#fff', border: 'none' },
   secondary: { background: 'rgba(255,255,255,.06)', color: colors.text[700], border: `1px solid ${colors.border.default}` },
   ghost:     { background: 'transparent', color: colors.text[500], border: `1px solid ${colors.border.subtle}` },
   danger:    { background: 'rgba(239,68,68,.12)', color: colors.semantic.red, border: '1px solid rgba(239,68,68,.2)' },
@@ -64,8 +59,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {icon}
       {children}
       <style>{`
-        .uiv2-btn:active { transform: scale(.96); }
-        .uiv2-btn-primary:hover { filter: brightness(1.08); box-shadow: 0 6px 22px ${colors.primary.glow}, inset 0 1px 0 rgba(255,255,255,.22); }
+        .uiv2-btn:active { transform: scale(.97); }
+        .uiv2-btn-primary:hover { filter: brightness(1.1); }
         .uiv2-btn-secondary:hover { background: rgba(255,255,255,.1) !important; }
         .uiv2-btn-ghost:hover { background: rgba(255,255,255,.05) !important; color: ${colors.text[900]} !important; }
       `}</style>

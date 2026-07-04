@@ -63,25 +63,19 @@ function KpiCard({ kpi, tone }: { kpi: KPI; tone: KpiTone }) {
     <div
       className="uiv2-kpi-card"
       style={{
-        position: 'relative',
-        overflow: 'hidden',
-        background: `linear-gradient(160deg, ${colors.bg[500]} 0%, ${colors.bg[600]} 65%)`,
+        background: colors.bg[600],
         border: `1px solid ${colors.border.subtle}`,
-        borderRadius: radius['2xl'],
-        padding: 20,
-        transition: transition(['transform', 'box-shadow', 'border-color']),
+        borderRadius: radius.lg,
+        padding: '16px 18px',
+        transition: transition(['border-color']),
       }}
     >
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent }} />
-      <div style={{ position: 'absolute', top: -30, right: -30, width: 90, height: 90, borderRadius: '50%', background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)`, pointerEvents: 'none' }} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, position: 'relative' }}>
-        <div style={{ width: 30, height: 30, borderRadius: radius.sm, background: `${accent}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, fontSize: 14 }}>
-          {kpi.icon ?? '◆'}
-        </div>
-        {kpi.delta && <span style={{ fontSize: 11, fontWeight: 700, color: deltaColor[kpi.delta.tone] }}>{kpi.delta.text}</span>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: accent }} />
+        {kpi.delta && <span style={{ fontSize: 11, fontWeight: 600, color: deltaColor[kpi.delta.tone] }}>{kpi.delta.text}</span>}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-1.4px', color: colors.text[900], fontVariantNumeric: 'tabular-nums', position: 'relative' }}>{kpi.value}</div>
-      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500], marginTop: 5, position: 'relative' }}>{kpi.label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.6px', color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{kpi.value}</div>
+      <div style={{ fontSize: 11.5, color: colors.text[500], marginTop: 4 }}>{kpi.label}</div>
     </div>
   )
 }
@@ -152,7 +146,7 @@ export function Dashboard({ greeting, kpis, activity, team, trend, quickActions 
       </div>
 
       <style>{`
-        .uiv2-kpi-card:hover { transform: translateY(-2px); border-color: ${colors.border.default}; }
+        .uiv2-kpi-card:hover { border-color: ${colors.border.default}; }
         .uiv2-activity-row:hover, .uiv2-team-row:hover { background: rgba(255,255,255,.03); }
       `}</style>
     </div>

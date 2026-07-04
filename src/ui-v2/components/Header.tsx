@@ -28,9 +28,7 @@ export function Header({ title, breadcrumb, actions }: HeaderProps) {
         {breadcrumb && <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500], marginBottom: 3 }}>{breadcrumb}</div>}
         <div
           style={{
-            fontSize: 18, fontWeight: 800, letterSpacing: '-.4px',
-            background: `linear-gradient(135deg, ${colors.text[900]} 30%, ${colors.primary.light} 130%)`,
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            fontSize: 15, fontWeight: 600, letterSpacing: '-.2px', color: colors.text[900],
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >

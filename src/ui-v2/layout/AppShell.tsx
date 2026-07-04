@@ -76,11 +76,7 @@ export function AppShell({
             </>
           }
         />
-        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 28, position: 'relative' }}>
-          {/* Resplandor ambiental de fondo — misma identidad que login/hero, aplicada
-              aquí como profundidad discreta en vez de un plano negro sin textura */}
-          <div style={{ position: 'fixed', top: -120, right: -120, width: 420, height: 420, borderRadius: '50%', background: `radial-gradient(circle, ${colors.primary.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .5, zIndex: 0 }} />
-          <div style={{ position: 'fixed', bottom: -160, left: 260, width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${colors.accent.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .35, zIndex: 0 }} />
+        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '32px 36px', position: 'relative' }}>
           <div key={activeNav} className="uiv2-page-enter" style={{ position: 'relative', zIndex: 1 }}>{children}</div>
         </main>
         <style>{`
