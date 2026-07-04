@@ -20,7 +20,7 @@ export function WelcomeSlides() {
   const SLIDES = [
     {
       emoji: '⏱️',
-      color: '#2563EB',
+      color: '#3B5BFF',
       title: 'Registra tu jornada',
       sub: 'Ficha entrada y salida desde tu móvil. Tu historial siempre disponible, en cualquier lugar.',
     },

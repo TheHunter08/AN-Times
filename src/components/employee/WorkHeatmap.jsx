@@ -31,10 +31,10 @@ export function WorkHeatmap({ records, empId }) {
   const color = (mins, future) => {
     if (future) return 'transparent'
     if (mins === 0) return 'var(--bg-500)'
-    if (mins < 120) return 'rgba(37,99,235,.25)'
-    if (mins < 300) return 'rgba(37,99,235,.5)'
-    if (mins < 450) return 'rgba(37,99,235,.75)'
-    return 'rgba(37,99,235,.95)'
+    if (mins < 120) return 'rgba(59,91,255,.25)'
+    if (mins < 300) return 'rgba(59,91,255,.5)'
+    if (mins < 450) return 'rgba(59,91,255,.75)'
+    return 'rgba(59,91,255,.95)'
   }
 
   return (

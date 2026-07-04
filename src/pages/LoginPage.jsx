@@ -777,9 +777,9 @@ function LogoSVG() {
     <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
       <defs>
         <linearGradient id="lgLogin" x1="0" y1="0" x2="44" y2="44">
-          <stop offset="0%" stopColor="#7C5CFF" />
-          <stop offset="55%" stopColor="#5E6AD2" />
-          <stop offset="100%" stopColor="#3B4BD6" />
+          <stop offset="0%" stopColor="#7C93FF" />
+          <stop offset="55%" stopColor="#5568F0" />
+          <stop offset="100%" stopColor="#3B5BFF" />
         </linearGradient>
         <linearGradient id="lgAccent" x1="0" y1="0" x2="44" y2="44">
           <stop offset="0%" stopColor="#7DF9FF" />

@@ -171,7 +171,8 @@ export async function handleMessage(db, emp, text) {
     if (!openRec) return { reply: 'No tienes ninguna jornada abierta.', changed: false }
     if (!openRec.enDescanso) return { reply: 'No estás en pausa ahora mismo.', changed: false }
     const breaks = [...(openRec.breaks || []), { start: openRec.bStartTs, end: now }]
-    db.records = records.map(r => r.id === openRec.id ? { ...r, enDescanso: false, bStartTs: null, breaks } : r)
+    const breakSecs = breaks.reduce((s, b) => s + Math.max(0, Math.floor((new Date(b.end || now).getTime() - new Date(b.start).getTime()) / 1000)), 0)
+    db.records = records.map(r => r.id === openRec.id ? { ...r, enDescanso: false, bStartTs: null, breaks, breakSecs } : r)
     return { reply: '▶ Jornada reanudada.', changed: true }
   }
 

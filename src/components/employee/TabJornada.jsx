@@ -421,7 +421,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
 
       {/* ── TIMES INC 3.0 — Stat Pills ───────────────────── */}
       <div className="jor-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'14px 16px', background:jT.bg }}>
-        <div className="jor-kpi-card" style={{ background:jT.card, border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(37,99,235,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+        <div className="jor-kpi-card" style={{ background:jT.card, border:`1px solid ${weekMin > WK ? 'rgba(245,158,11,.22)' : 'rgba(59,91,255,.22)'}`, borderRadius:18, padding:'14px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
           <div style={{ fontSize:18, marginBottom:2 }}>{weekMin > WK ? '🔴' : '⏱️'}</div>
           <div style={{ fontSize:17, fontWeight:800, color: weekMin > WK ? '#fbbf24' : '#818cf8', fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'-0.5px' }}>{mhm(Math.floor(weekMin))}</div>
           <div style={{ fontSize:9, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:jT.text3 }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
