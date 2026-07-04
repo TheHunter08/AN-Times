@@ -14,15 +14,16 @@ import { Stats } from './pages/Stats.js'
 import { Settings, SettingsField } from './pages/Settings.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
+import { IconGrid, IconClock, IconCalendar, IconChart, IconSettings } from './components/Icons.js'
 
 const PAGES = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◧' },
-  { id: 'dashboard-real', label: 'Dashboard (real)', icon: '⬢' },
-  { id: 'fichajes', label: 'Fichajes', icon: '◷' },
-  { id: 'fichajes-real', label: 'Fichajes (real)', icon: '⬢' },
-  { id: 'calendario', label: 'Calendario', icon: '▦' },
-  { id: 'stats', label: 'Estadísticas', icon: '◎' },
-  { id: 'ajustes', label: 'Ajustes', icon: '⚙' },
+  { id: 'dashboard', label: 'Dashboard', icon: <IconGrid /> },
+  { id: 'dashboard-real', label: 'Dashboard (real)', icon: <IconGrid /> },
+  { id: 'fichajes', label: 'Fichajes', icon: <IconClock /> },
+  { id: 'fichajes-real', label: 'Fichajes (real)', icon: <IconClock /> },
+  { id: 'calendario', label: 'Calendario', icon: <IconCalendar /> },
+  { id: 'stats', label: 'Estadísticas', icon: <IconChart /> },
+  { id: 'ajustes', label: 'Ajustes', icon: <IconSettings /> },
 ]
 
 function buildWeeks(): CalendarDay[][] {

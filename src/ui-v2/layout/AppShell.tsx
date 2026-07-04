@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Sidebar } from '../components/Sidebar.js'
 import type { SidebarItem } from '../components/Sidebar.js'
 import { Header } from '../components/Header.js'
+import { IconMenu } from '../components/Icons.js'
 import { colors } from '../design-system/colors.js'
 
 export interface AppShellProps {
@@ -46,7 +47,7 @@ export function AppShell({
           <div style={{ flex: 1, background: 'rgba(0,0,0,.5)' }} onClick={() => setMobileNavOpen(false)} />
         </div>
       )}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <Header
           title={pageTitle}
           breadcrumb={breadcrumb}
@@ -56,17 +57,21 @@ export function AppShell({
                 <button
                   onClick={() => setMobileNavOpen(o => !o)}
                   aria-label="Menú"
-                  style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], cursor: 'pointer' }}
+                  style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  ☰
+                  <IconMenu width={16} height={16} />
                 </button>
               )}
               {headerActions}
             </>
           }
         />
-        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 24 }}>
-          {children}
+        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 28, position: 'relative' }}>
+          {/* Resplandor ambiental de fondo — misma identidad que login/hero, aplicada
+              aquí como profundidad discreta en vez de un plano negro sin textura */}
+          <div style={{ position: 'fixed', top: -120, right: -120, width: 420, height: 420, borderRadius: '50%', background: `radial-gradient(circle, ${colors.primary.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .5, zIndex: 0 }} />
+          <div style={{ position: 'fixed', bottom: -160, left: 260, width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${colors.accent.glow} 0%, transparent 70%)`, pointerEvents: 'none', opacity: .35, zIndex: 0 }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
         </main>
       </div>
     </div>

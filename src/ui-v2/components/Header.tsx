@@ -13,16 +13,29 @@ export function Header({ title, breadcrumb, actions }: HeaderProps) {
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12,
-        height: 64,
-        padding: '0 22px',
-        background: colors.bg[700],
+        height: 66,
+        padding: '0 26px',
+        background: `${colors.bg[700]}cc`,
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         borderBottom: `1px solid ${colors.border.subtle}`,
         flexShrink: 0,
+        position: 'relative',
+        zIndex: 2,
       }}
     >
       <div style={{ minWidth: 0 }}>
-        {breadcrumb && <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 2 }}>{breadcrumb}</div>}
-        <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.3px', color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        {breadcrumb && <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500], marginBottom: 3 }}>{breadcrumb}</div>}
+        <div
+          style={{
+            fontSize: 18, fontWeight: 800, letterSpacing: '-.4px',
+            background: `linear-gradient(135deg, ${colors.text[900]} 30%, ${colors.primary.light} 130%)`,
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {title}
+        </div>
       </div>
       {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}</div>}
     </header>
