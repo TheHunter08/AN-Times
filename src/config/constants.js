@@ -101,7 +101,7 @@ export const FESTIVOS_MADRID_2026 = FESTIVOS_MADRID
 
 export const INITIAL_DB = {
   empresas: ['Soluciones Mata'],
-  obras: ['Soluciones Mata'],
+  obras: [{ id: 'o1', nombre: 'Soluciones Mata', direccion: '', estado: 'activa', createdAt: '2024-01-01' }],
   centrosTrabajo: ['Obra Principal', 'Oficina Central', 'Almacén'],
   employees: [
     { id: 'admin', name: 'Administrador', empresa: 'Soluciones Mata', pin: '', color: '#5aa9e6', initials: 'AD', startDate: '2024-01-01', email: '', isAdmin: true },
