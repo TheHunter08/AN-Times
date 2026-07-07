@@ -383,7 +383,15 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message', onMsg)
     window.addEventListener('push-deeplink', onDeepLink)
     window.addEventListener('times-synced', onSynced)
-    const onSaveFailed = () => useAppStore.getState().toast('No se pudo guardar tras varios intentos. Comprueba la conexión.', 5000, 'err')
+    // El evento se dispara cuando cloudPush agota sus reintentos — pero eso
+    // solo significa que aún no llegó al servidor. El dato YA está guardado
+    // en el dispositivo (saveLocal, síncrono, antes de intentar la red) y
+    // queda en cola para sincronizar solo en cuanto mejore la señal
+    // (_storeForBgSync + Background Sync del service worker). El aviso
+    // anterior ("No se pudo guardar…") era falso y alarmaba a los
+    // empleados con poca cobertura haciéndoles creer que su fichaje se
+    // había perdido cuando en realidad estaba a salvo.
+    const onSaveFailed = () => useAppStore.getState().toast('Poca cobertura: tus datos están guardados en el dispositivo y se sincronizarán solos en cuanto mejore la señal.', 6000, 'warn')
     window.addEventListener('times-save-failed', onSaveFailed)
     // Cuando vuelva internet: sincronizar inmediatamente
     const onOnline = () => {

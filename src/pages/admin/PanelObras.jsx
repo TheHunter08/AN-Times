@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import QRCode from 'qrcode'
 import { useAppStore } from '../../store/appStore.js'
 import { gid, today } from '../../utils/time.js'
 import { auditLog } from '../../services/dataService.js'
+import { encodeCentroQR } from '../../utils/qr.js'
 
 export default function PanelObras({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
@@ -12,6 +14,13 @@ export default function PanelObras({ db, toast, saveDB, session }) {
   const [editName, setEditName] = useState('')
   const [expandedObra, setExpandedObra] = useState(null)
   const [geoCapturing, setGeoCapturing] = useState(null)
+  const [qrCentro, setQrCentro] = useState(null)
+  const qrCanvasRef = useRef(null)
+
+  useEffect(() => {
+    if (!qrCentro || !qrCanvasRef.current) return
+    QRCode.toCanvas(qrCanvasRef.current, encodeCentroQR(qrCentro), { width: 240, margin: 2, color: { dark: '#0d0d18', light: '#ffffff' } }).catch(() => {})
+  }, [qrCentro])
 
   const obras = db.obras || []
   const centros = db.centrosTrabajo || []
@@ -235,11 +244,29 @@ export default function PanelObras({ db, toast, saveDB, session }) {
                     {(db.records||[]).filter(r=>r.centro===c&&r.fin).length} fichajes registrados
                   </div>
                 </div>
+                <button className="btn btn-sm" onClick={() => setQrCentro(c)}>QR</button>
                 <button className="btn btn-sm btn-danger" onClick={() => delCentro(c)}>✕</button>
               </div>
             ))}
           </div>
         </>
+      )}
+
+      {qrCentro && (
+        <div className="modal-ov" onClick={() => setQrCentro(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>QR de fichaje</h2>
+              <button onClick={() => setQrCentro(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{qrCentro}</div>
+            <canvas ref={qrCanvasRef} style={{ borderRadius: 'var(--r)', background: '#fff', padding: 8 }} />
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 14 }}>
+              Imprime este código y colócalo en el centro de trabajo. Los empleados lo escanean desde "Fichar con QR" para marcar entrada y salida.
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 16, width: '100%' }} onClick={() => window.print()}>Imprimir</button>
+          </div>
+        </div>
       )}
     </div>
   )

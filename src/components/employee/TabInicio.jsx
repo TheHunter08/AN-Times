@@ -10,7 +10,7 @@ import { WeatherCard } from './WeatherCard.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
 import { ModalParteVoz } from '../ModalParteVoz.jsx'
 
-export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast }) {
+export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast, onOpenQRScan }) {
   const { setEmpTab } = useAppStore()
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
@@ -219,6 +219,35 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           {timer.state !== 'idle' && (
             <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={handleBreakBtn}>
               {timer.state === 'break' ? '▶  Reanudar trabajo' : '⏸  Iniciar descanso'}
+            </button>
+          )}
+
+          {/* Fichar con QR — ficha tu propia entrada/salida escaneando el
+              QR del centro de trabajo. */}
+          {onOpenQRScan && (
+            <button className="v30-break-btn" onClick={onOpenQRScan} style={{ marginTop: timer.state !== 'idle' ? 8 : 0 }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
+                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none" />
+              </svg>
+              Fichar con QR
+            </button>
+          )}
+
+          {/* Botón dedicado y visible para que un jefe de obra o encargado
+              fiche a un empleado de su equipo escaneando su QR personal,
+              estando físicamente donde ese empleado esté (no depende del
+              centro/obra del que ficha). Antes compartía botón con "Fichar
+              con QR" y quedaba escondido; ahora es su propia acción, clara
+              desde el primer vistazo. Misma lógica de destino
+              (handleQRScan en EmployeePage.jsx) — solo cambia la entrada. */}
+          {onOpenQRScan && (u.role === 'jefe_obra' || u.role === 'encargado') && (
+            <button className="v30-break-btn" onClick={onOpenQRScan} style={{ marginTop: 8 }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              Fichar a un empleado
             </button>
           )}
 
