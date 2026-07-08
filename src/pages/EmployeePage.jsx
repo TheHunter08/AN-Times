@@ -653,9 +653,6 @@ export default function EmployeePage() {
     }))
     try { navigator.vibrate(15) } catch {}
     toast('Jornada iniciada en ' + centro, 3000, 'ok')
-    // Wellbeing check-in after clock-in
-    setWellbeingRecId(rec.id)
-    setShowWellbeing(true)
   }, [u, db, pendingGPS, closeModal, saveDB, toast])
 
   // Fichaje de entrada vía QR — mismas comprobaciones que doStart (jornada
