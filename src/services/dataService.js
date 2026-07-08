@@ -512,6 +512,17 @@ function _broadcastUpdate(ts) {
 // Exportado para que App.jsx pueda notificar a otros clientes tras un BG_SYNC_DONE del SW
 export function broadcastSync(ts) { _broadcastUpdate(ts) }
 
+// Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED:
+// Si IDB está vacío sale inmediatamente (sin red). Si tiene datos, los sube.
+export async function uploadPendingIfAny() {
+  if (!supabase) return
+  try {
+    const data = await _idbGet('pending')
+    if (!data) return
+    await _bgSyncFallback()
+  } catch {}
+}
+
 // ── Push notifications ────────────────────────────────────────────────────────
 const VAPID_KEY_STORAGE = 'an_times_vapid_key'
 
