@@ -245,14 +245,12 @@ let _onlineListenerPending = false
 async function _storeForBgSync(data) {
   try {
     await _idbSet('pending', data)
-    const sw = await navigator.serviceWorker?.ready
-    let registered = false
-    if (sw && 'sync' in sw) {
-      try { await sw.sync.register('sync-data'); registered = true } catch {}
-    }
-    // Fallback: listener 'online' si no hay Background Sync API o si el registro falla.
-    // Se añade como máximo uno a la vez (guard _onlineListenerPending).
-    if (!registered && !_onlineListenerPending) {
+    // Fast-path: listener 'online' para cuando la app está abierta.
+    // Background Sync API solo dispara cuando el navegador decide reconectar en
+    // background (puede tardar, o solo ocurrir al cerrar la app). El listener
+    // 'online' cubre el caso habitual: el usuario recupera cobertura con la app abierta.
+    // Guard _onlineListenerPending evita acumular múltiples listeners en guardados repetidos.
+    if (!_onlineListenerPending) {
       _onlineListenerPending = true
       const onOnline = async () => {
         _onlineListenerPending = false
@@ -260,6 +258,12 @@ async function _storeForBgSync(data) {
         await _bgSyncFallback()
       }
       window.addEventListener('online', onOnline)
+    }
+    // Slow-path: Background Sync para cuando la app está cerrada.
+    // Si el listener 'online' ya sincronizó, el SW encuentra IDB vacía y sale sin hacer nada.
+    const sw = await navigator.serviceWorker?.ready
+    if (sw && 'sync' in sw) {
+      try { await sw.sync.register('sync-data') } catch {}
     }
   } catch (e) { console.error('[_storeForBgSync] error:', e) }
 }
