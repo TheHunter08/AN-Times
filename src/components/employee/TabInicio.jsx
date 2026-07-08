@@ -102,10 +102,12 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const teamData = useMemo(() => {
     if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
     const isJO = u.role === 'jefe_obra'
+    const encCentros = u.obrasAsignadas || []
     const teamEmps = (db.employees || []).filter(e =>
       !e.isAdmin && !e.baja && e.id !== u.id &&
-      (isJO || !u.obrasAsignadas?.length ||
-        u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
+      (isJO || !encCentros.length ||
+        encCentros.includes(e.centroTrabajo) ||
+        (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
     )
     if (!teamEmps.length) return null
     const todayRecords = (db.records || []).filter(r => r.inicio?.startsWith(todayStr))
@@ -480,7 +482,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           const teamStartJornada = (e) => {
             if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
             const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
-            saveDB({ records: [...recs, newRec] })
+            saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
             queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
             toast('Jornada iniciada', 2500, 'ok')
           }
@@ -498,7 +500,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
               queuePush(rec.empId, '⏸ Descanso iniciado', `${u.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
               toast('Descanso iniciado', 2500, 'ok')
             }
-            saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+            saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? updated : r) }))
           }
 
           const teamForceClose = (rec) => {
@@ -509,7 +511,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
             const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
             const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-            saveDB({ records: recs.map(r => r.id === rec.id ? closed : r) })
+            saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r) }))
             queuePush(rec.empId, '⏹ Jornada finalizada', `${u.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
             toast('Jornada finalizada', 2500, 'ok')
           }
