@@ -7,8 +7,8 @@ import { flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '.
 export default function PanelMiObra({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
   const enc = session.user
-  const misCentros = enc?.obrasAsignadas || []
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && (misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+  const misCentros = [...new Set([...(enc?.obrasAsignadas || []), ...(enc?.centroTrabajo ? [enc.centroTrabajo] : [])])]
+  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && e.id !== enc?.id && (!misCentros.length || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
   const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))

@@ -102,7 +102,9 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const teamData = useMemo(() => {
     if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
     const isJO = u.role === 'jefe_obra'
-    const encCentros = u.obrasAsignadas || []
+    // Centros gestionados = obrasAsignadas + el propio centroTrabajo del encargado.
+    // Así funciona aunque el admin solo haya rellenado uno de los dos campos.
+    const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
     const teamEmps = (db.employees || []).filter(e =>
       !e.isAdmin && !e.baja && e.id !== u.id &&
       (isJO || !encCentros.length ||

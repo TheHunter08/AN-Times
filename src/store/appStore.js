@@ -72,12 +72,17 @@ export const useAppStore = create((set, get) => ({
       if (tsResult.ts && tsResult.ts > merged._ts) merged._ts = tsResult.ts
       saveLocal(merged)
       set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
-      // Re-validate session against fresh data
+      // Re-validate session against fresh data y refrescar user con datos actualizados
+      // (e.g. obrasAsignadas cambiadas por el admin sin que el encargado haya vuelto a logearse)
       const ses = get().session
       if (ses?.user?.id) {
-        const stillActive = (merged.employees || []).some(e => e.id === ses.user.id && !e.baja)
-        if (!stillActive) {
+        const freshEmp = (merged.employees || []).find(e => e.id === ses.user.id)
+        if (!freshEmp || freshEmp.baja) {
           get().logout()
+        } else {
+          const updatedSes = { ...ses, user: freshEmp }
+          set({ session: updatedSes })
+          try { localStorage.setItem('an_times_ses', JSON.stringify(updatedSes)) } catch {}
         }
       }
     } finally {

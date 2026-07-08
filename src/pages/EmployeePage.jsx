@@ -787,7 +787,7 @@ export default function EmployeePage() {
       }
       if (empId === u.id) { toast('Este es tu propio QR — usa "Fichar con QR" para tu jornada', 4000, 'warn'); return }
       const isJO = u.role === 'jefe_obra'
-      const encCentros = u.obrasAsignadas || []
+      const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
       const emp = (db.employees || []).find(e =>
         e.id === empId && !e.isAdmin && !e.baja &&
         (isJO || !encCentros.length || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
