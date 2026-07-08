@@ -787,9 +787,10 @@ export default function EmployeePage() {
       }
       if (empId === u.id) { toast('Este es tu propio QR — usa "Fichar con QR" para tu jornada', 4000, 'warn'); return }
       const isJO = u.role === 'jefe_obra'
+      const encCentros = u.obrasAsignadas || []
       const emp = (db.employees || []).find(e =>
         e.id === empId && !e.isAdmin && !e.baja &&
-        (isJO || !u.obrasAsignadas?.length || u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
+        (isJO || !encCentros.length || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
       )
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
       const todayQR = today()

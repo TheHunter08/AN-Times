@@ -1,5 +1,5 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
-import { registerRoute, NavigationRoute } from 'workbox-routing'
+import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
@@ -44,18 +44,19 @@ registerRoute(
   )
 )
 
-// Offline fallback para navegación sin cache hit
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode !== 'navigate') return
-  event.respondWith(
-    fetch(event.request).catch(async () => {
-      const cached = await caches.match('/index.html')
-      if (cached) return cached
-      return new Response('<h1>Sin conexión</h1><p>TIMES INC funciona offline. Reconectando…</p>', {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' }
-      })
+// Offline fallback para navegación sin cache hit.
+// setCatchHandler (no un fetch listener manual) evita el doble respondWith:
+// NavigationRoute ya llama a event.respondWith() internamente vía Workbox router;
+// un segundo respondWith() en un fetch listener manual lanzaba InvalidStateError.
+setCatchHandler(async ({ event }) => {
+  if (event.request.mode === 'navigate') {
+    const cached = await caches.match('/index.html')
+    if (cached) return cached
+    return new Response('<h1>Sin conexión</h1><p>TIMES INC funciona offline. Reconectando…</p>', {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
     })
-  )
+  }
+  return Response.error()
 })
 
 // ─── ASSETS ESTÁTICOS ─────────────────────────────────────────────────────────
@@ -300,34 +301,41 @@ function _splitHotCold(data) {
   return { hot, cold }
 }
 
+let _bgSyncFlight = false
 async function _bgSync() {
-  const data = await _idbGet('pending')
-  if (!data) return
-  const { hot, cold } = _splitHotCold(data)
-  const nowIso = new Date().toISOString()
-  // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la
-  // primera vez — un PATCH sobre una fila inexistente no crea nada ni da error,
-  // así que el dato se perdería en silencio. upsert la crea si hace falta.
-  const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
-  const [hotRes, coldRes] = await Promise.all([
-    fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
-    fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
-  ])
-  if (!hotRes.ok && hotRes.status !== 409) {
-    throw new Error(`bgSync failed: hot=${hotRes.status}`)
-  }
-  // Si solo falla la fila fría (RLS, fila aún no creada, etc.) no bloqueamos
-  // todo el sync — igual que en dataService.js, reintentamos metiendo el
-  // payload completo en la fila caliente para no perder la jornada/fichaje.
-  if (!coldRes.ok && coldRes.status !== 409) {
-    const fbRes = await fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
-    if (!fbRes.ok && fbRes.status !== 409) {
-      throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
+  if (_bgSyncFlight) return
+  _bgSyncFlight = true
+  try {
+    const data = await _idbGet('pending')
+    if (!data) return
+    const { hot, cold } = _splitHotCold(data)
+    const nowIso = new Date().toISOString()
+    // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la
+    // primera vez — un PATCH sobre una fila inexistente no crea nada ni da error,
+    // así que el dato se perdería en silencio. upsert la crea si hace falta.
+    const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
+    const [hotRes, coldRes] = await Promise.all([
+      fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
+      fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
+    ])
+    if (!hotRes.ok && hotRes.status !== 409) {
+      throw new Error(`bgSync failed: hot=${hotRes.status}`)
     }
+    // Si solo falla la fila fría (RLS, fila aún no creada, etc.) no bloqueamos
+    // todo el sync — igual que en dataService.js, reintentamos metiendo el
+    // payload completo en la fila caliente para no perder la jornada/fichaje.
+    if (!coldRes.ok && coldRes.status !== 409) {
+      const fbRes = await fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
+      if (!fbRes.ok && fbRes.status !== 409) {
+        throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
+      }
+    }
+    await _idbDel('pending')
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
+  } finally {
+    _bgSyncFlight = false
   }
-  await _idbDel('pending')
-  const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
 }
 
 // Ejecuta _bgSync() y, si falla, avisa a los clientes abiertos — así el banner
