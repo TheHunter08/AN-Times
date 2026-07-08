@@ -10,7 +10,7 @@ import { WeatherCard } from './WeatherCard.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
 import { ModalParteVoz } from '../ModalParteVoz.jsx'
 
-export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast }) {
+export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast, onOpenQRScan }) {
   const { setEmpTab } = useAppStore()
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
@@ -102,10 +102,14 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const teamData = useMemo(() => {
     if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
     const isJO = u.role === 'jefe_obra'
+    // Centros gestionados = obrasAsignadas + el propio centroTrabajo del encargado.
+    // Así funciona aunque el admin solo haya rellenado uno de los dos campos.
+    const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
     const teamEmps = (db.employees || []).filter(e =>
       !e.isAdmin && !e.baja && e.id !== u.id &&
-      (isJO || !u.obrasAsignadas?.length ||
-        u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
+      (isJO || !encCentros.length ||
+        encCentros.includes(e.centroTrabajo) ||
+        (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
     )
     if (!teamEmps.length) return null
     const todayRecords = (db.records || []).filter(r => r.inicio?.startsWith(todayStr))
@@ -219,6 +223,33 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           {timer.state !== 'idle' && (
             <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={handleBreakBtn}>
               {timer.state === 'break' ? '▶  Reanudar trabajo' : '⏸  Iniciar descanso'}
+            </button>
+          )}
+
+          {/* Mostrar mi QR — el empleado muestra su QR personal para que
+              el encargado/admin lo escanee desde PanelControl o PanelMiObra. */}
+          <button className="v30-break-btn" onClick={() => openModal('miQR')} style={{ marginTop: timer.state !== 'idle' ? 8 : 0 }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
+              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none" />
+            </svg>
+            Mostrar mi QR
+          </button>
+
+          {/* Botón dedicado y visible para que un jefe de obra o encargado
+              fiche a un empleado de su equipo escaneando su QR personal,
+              estando físicamente donde ese empleado esté (no depende del
+              centro/obra del que ficha). Antes compartía botón con "Fichar
+              con QR" y quedaba escondido; ahora es su propia acción, clara
+              desde el primer vistazo. Misma lógica de destino
+              (handleQRScan en EmployeePage.jsx) — solo cambia la entrada. */}
+          {onOpenQRScan && (u.role === 'jefe_obra' || u.role === 'encargado') && (
+            <button className="v30-break-btn" onClick={onOpenQRScan} style={{ marginTop: 8 }}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              Fichar a un empleado
             </button>
           )}
 
@@ -453,7 +484,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           const teamStartJornada = (e) => {
             if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
             const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
-            saveDB({ records: [...recs, newRec] })
+            saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
             queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
             toast('Jornada iniciada', 2500, 'ok')
           }
@@ -471,7 +502,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
               queuePush(rec.empId, '⏸ Descanso iniciado', `${u.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
               toast('Descanso iniciado', 2500, 'ok')
             }
-            saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+            saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? updated : r) }))
           }
 
           const teamForceClose = (rec) => {
@@ -482,7 +513,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
             const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
             const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-            saveDB({ records: recs.map(r => r.id === rec.id ? closed : r) })
+            saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r) }))
             queuePush(rec.empId, '⏹ Jornada finalizada', `${u.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
             toast('Jornada finalizada', 2500, 'ok')
           }

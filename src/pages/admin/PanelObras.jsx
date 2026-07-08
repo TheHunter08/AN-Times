@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import QRCode from 'qrcode'
 import { useAppStore } from '../../store/appStore.js'
 import { gid, today } from '../../utils/time.js'
 import { auditLog } from '../../services/dataService.js'
+import { encodeCentroQR } from '../../utils/qr.js'
 
 export default function PanelObras({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
@@ -12,6 +14,13 @@ export default function PanelObras({ db, toast, saveDB, session }) {
   const [editName, setEditName] = useState('')
   const [expandedObra, setExpandedObra] = useState(null)
   const [geoCapturing, setGeoCapturing] = useState(null)
+  const [qrCentro, setQrCentro] = useState(null)
+  const qrCanvasRef = useRef(null)
+
+  useEffect(() => {
+    if (!qrCentro || !qrCanvasRef.current) return
+    QRCode.toCanvas(qrCanvasRef.current, encodeCentroQR(qrCentro), { width: 240, margin: 2, color: { dark: '#0d0d18', light: '#ffffff' } }).catch(() => {})
+  }, [qrCentro])
 
   const obras = db.obras || []
   const centros = db.centrosTrabajo || []
@@ -30,9 +39,11 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const delObra = (id) => {
     showConfirm('¿Eliminar esta obra?', () => {
-      const o = obras.find(x => x.id === id)
-      const withAudit = auditLog(db, 'Obra eliminada', o?.nombre || '', who)
-      saveDB({ obras: obras.filter(o => o.id !== id), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const o = (freshDb.obras || []).find(x => x.id === id)
+        const wA = auditLog(freshDb, 'Obra eliminada', o?.nombre || '', who)
+        return { obras: (freshDb.obras || []).filter(o => o.id !== id), audit: wA.audit }
+      })
       toast('Obra eliminada')
       if (expandedObra === id) setExpandedObra(null)
     })
@@ -45,9 +56,11 @@ export default function PanelObras({ db, toast, saveDB, session }) {
       pos => {
         setGeoCapturing(null)
         const coords = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), acc: Math.round(pos.coords.accuracy) }
-        const updated = obras.map(o => o.id === obraId ? { ...o, coords } : o)
-        const withAudit = auditLog(db, 'Geofence configurado', obras.find(o => o.id === obraId)?.nombre || '', who)
-        saveDB({ obras: updated, audit: withAudit.audit })
+        saveDB(freshDb => {
+          const nombre = (freshDb.obras || []).find(o => o.id === obraId)?.nombre || ''
+          const wA = auditLog(freshDb, 'Geofence configurado', nombre, who)
+          return { obras: (freshDb.obras || []).map(o => o.id === obraId ? { ...o, coords } : o), audit: wA.audit }
+        })
         toast('📍 Ubicación GPS guardada', 3000, 'ok')
       },
       () => { setGeoCapturing(null); toast('No se pudo obtener GPS', 3000, 'err') },
@@ -67,8 +80,7 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const clearGeo = (obraId) => {
     showConfirm('¿Quitar la geovalla de esta obra?', () => {
-      const updated = obras.map(o => o.id === obraId ? { ...o, coords: undefined, radio: undefined } : o)
-      saveDB({ obras: updated })
+      saveDB(freshDb => ({ obras: (freshDb.obras || []).map(o => o.id === obraId ? { ...o, coords: undefined, radio: undefined } : o) }))
       toast('Geovalla eliminada')
     })
   }
@@ -85,8 +97,10 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const delCentro = (c) => {
     showConfirm(`¿Eliminar "${c}"?`, () => {
-      const withAudit = auditLog(db, 'Centro de trabajo eliminado', c, who)
-      saveDB({ centrosTrabajo: centros.filter(x => x !== c), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Centro de trabajo eliminado', c, who)
+        return { centrosTrabajo: (freshDb.centrosTrabajo || []).filter(x => x !== c), audit: wA.audit }
+      })
       toast('Centro eliminado')
     })
   }
@@ -235,11 +249,29 @@ export default function PanelObras({ db, toast, saveDB, session }) {
                     {(db.records||[]).filter(r=>r.centro===c&&r.fin).length} fichajes registrados
                   </div>
                 </div>
+                <button className="btn btn-sm" onClick={() => setQrCentro(c)}>QR</button>
                 <button className="btn btn-sm btn-danger" onClick={() => delCentro(c)}>✕</button>
               </div>
             ))}
           </div>
         </>
+      )}
+
+      {qrCentro && (
+        <div className="modal-ov" onClick={() => setQrCentro(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>QR de fichaje</h2>
+              <button onClick={() => setQrCentro(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{qrCentro}</div>
+            <canvas ref={qrCanvasRef} style={{ borderRadius: 'var(--r)', background: '#fff', padding: 8 }} />
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 14 }}>
+              Imprime este código y colócalo en el centro de trabajo. Los empleados lo escanean desde "Fichar con QR" para marcar entrada y salida.
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 16, width: '100%' }} onClick={() => window.print()}>Imprimir</button>
+          </div>
+        </div>
       )}
     </div>
   )

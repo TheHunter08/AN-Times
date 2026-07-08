@@ -181,6 +181,13 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
             {!db.firmas?.[u?.id]?.main && <span style={{ fontSize:16, color:'var(--orange)', flexShrink:0 }}>!</span>}
             <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
+          <div className="prf-section-card" onClick={() => openModal('miQR')}>
+            <div className="prf-section-ico" style={{ background:'rgba(16,185,129,.15)' }}>
+              <svg viewBox="0 0 24 24" style={{ stroke:'#34d399' }}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="#34d399" stroke="none"/></svg>
+            </div>
+            <span className="prf-section-lbl">Mi código QR</span>
+            <svg className="prf-section-arr" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
         </div>
       </div>
 

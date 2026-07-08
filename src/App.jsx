@@ -151,11 +151,12 @@ function UpdateBanner() {
 }
 
 function SyncBanner() {
-  const syncStatus    = useAppStore(s => s.syncStatus)
-  const syncError     = useAppStore(s => s.syncError)
-  const lastSyncTime  = useAppStore(s => s.lastSyncTime)
-  const fetchDB       = useAppStore(s => s.fetchDB)
-  const currentScreen = useAppStore(s => s.currentScreen)
+  const syncStatus     = useAppStore(s => s.syncStatus)
+  const syncError      = useAppStore(s => s.syncError)
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const lastSyncTime   = useAppStore(s => s.lastSyncTime)
+  const fetchDB        = useAppStore(s => s.fetchDB)
+  const currentScreen  = useAppStore(s => s.currentScreen)
   const [retrying, setRetrying] = useState(false)
 
   const handleRetry = useCallback(async () => {
@@ -164,7 +165,11 @@ function SyncBanner() {
     setRetrying(false)
   }, [fetchDB])
 
+  // En pantalla de empleado, OfflineBanner ya muestra "Modo Oficina" con datos
+  // pendientes — suprimir SyncBanner para evitar dos banners simultáneos.
+  // En admin no hay OfflineBanner, así que SyncBanner sigue mostrándose allí.
   if (syncStatus !== 'error' || currentScreen === 'login') return null
+  if (offlinePending && currentScreen === 'emp') return null
   if (syncError === 'no_config') return null
 
   const sinceText = lastSyncTime
@@ -200,7 +205,7 @@ function SyncBanner() {
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
-const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil']
+const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'perfil']
 
 function applyDeepLink(url) {
   try {
@@ -295,22 +300,32 @@ export default function App() {
     if (navigator.onLine) {
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
     }
-    // El canal Realtime de Supabase gestiona actualizaciones en vivo.
-    // El polling queda solo para cuando la pestaña vuelve a estar visible (app en segundo plano).
-    const onVisible = () => {
+
+    // onResume: refresca datos y WebSocket cuando la PWA vuelve al primer plano.
+    // Se dispara desde tres fuentes porque cada plataforma usa un evento diferente:
+    //   - visibilitychange: Chrome/Firefox/Android WebView
+    //   - pageshow:         iOS PWA standalone (visibilitychange no siempre dispara)
+    //   - focus:            Android PWA cuando otra app volvía al frente
+    // Throttle 2s para que los tres no lancen tres fetchDB() simultáneos.
+    let _resumeTs = 0
+    const onResume = () => {
       if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - _resumeTs < 2000) return
+      _resumeTs = now
       fetchDB()
-      // Reiniciar Realtime: Android mata la conexión WS al pasar a segundo plano
       initRealtime()
-      // Forzar sync de datos pendientes en IDB (Android puede haber matado el BG sync)
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-      // iOS PWA: forzar check de SW al volver al primer plano (la app puede estar suspendida horas)
       navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
     }
-    document.addEventListener('visibilitychange', onVisible)
+    document.addEventListener('visibilitychange', onResume)
+    window.addEventListener('pageshow', onResume)
+    window.addEventListener('focus', onResume)
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('visibilitychange', onResume)
+      window.removeEventListener('pageshow', onResume)
+      window.removeEventListener('focus', onResume)
       stopRealtime()
     }
   }, [])
@@ -370,8 +385,8 @@ export default function App() {
     const onMsg = (event) => {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
       if (event.data?.type === 'BG_SYNC_DONE') {
+        useAppStore.setState({ offlinePending: false, syncStatus: 'syncing' })
         fetchDB()
-        useAppStore.setState({ offlinePending: false })
       }
       if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
     }
@@ -383,7 +398,15 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message', onMsg)
     window.addEventListener('push-deeplink', onDeepLink)
     window.addEventListener('times-synced', onSynced)
-    const onSaveFailed = () => useAppStore.getState().toast('No se pudo guardar tras varios intentos. Comprueba la conexión.', 5000, 'err')
+    // El evento se dispara cuando cloudPush agota sus reintentos — pero eso
+    // solo significa que aún no llegó al servidor. El dato YA está guardado
+    // en el dispositivo (saveLocal, síncrono, antes de intentar la red) y
+    // queda en cola para sincronizar solo en cuanto mejore la señal
+    // (_storeForBgSync + Background Sync del service worker). El aviso
+    // anterior ("No se pudo guardar…") era falso y alarmaba a los
+    // empleados con poca cobertura haciéndoles creer que su fichaje se
+    // había perdido cuando en realidad estaba a salvo.
+    const onSaveFailed = () => useAppStore.getState().toast('Poca cobertura: tus datos están guardados en el dispositivo y se sincronizarán solos en cuanto mejore la señal.', 6000, 'warn')
     window.addEventListener('times-save-failed', onSaveFailed)
     // Cuando vuelva internet: sincronizar inmediatamente
     const onOnline = () => {
@@ -408,7 +431,7 @@ export default function App() {
     // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
-    }, 3 * 60 * 1000)
+    }, 30 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)

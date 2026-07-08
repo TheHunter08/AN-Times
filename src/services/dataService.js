@@ -280,19 +280,33 @@ async function _idbDel(key) {
   } catch {}
 }
 
+// Guard para no acumular múltiples listeners 'online' en navegadores sin
+// Background Sync API (el timer guarda cada 30s, _storeForBgSync se llama
+// en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
+let _onlineListenerPending = false
+
 async function _storeForBgSync(data) {
   try {
     await _idbSet('pending', data)
-    const sw = await navigator.serviceWorker?.ready
-    if (sw && 'sync' in sw) {
-      await sw.sync.register('sync-data')
-    } else {
-      // Fallback: escuchar online y sync manual
+    // Fast-path: listener 'online' para cuando la app está abierta.
+    // Background Sync API solo dispara cuando el navegador decide reconectar en
+    // background (puede tardar, o solo ocurrir al cerrar la app). El listener
+    // 'online' cubre el caso habitual: el usuario recupera cobertura con la app abierta.
+    // Guard _onlineListenerPending evita acumular múltiples listeners en guardados repetidos.
+    if (!_onlineListenerPending) {
+      _onlineListenerPending = true
       const onOnline = async () => {
+        _onlineListenerPending = false
         window.removeEventListener('online', onOnline)
         await _bgSyncFallback()
       }
       window.addEventListener('online', onOnline)
+    }
+    // Slow-path: Background Sync para cuando la app está cerrada.
+    // Si el listener 'online' ya sincronizó, el SW encuentra IDB vacía y sale sin hacer nada.
+    const sw = await navigator.serviceWorker?.ready
+    if (sw && 'sync' in sw) {
+      try { await sw.sync.register('sync-data') } catch {}
     }
   } catch (e) { console.error('[_storeForBgSync] error:', e) }
 }
@@ -335,14 +349,29 @@ async function _mergeWithServer(localPayload) {
 
 async function _bgSyncFallback() {
   try {
+    // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
+    // Sin el retry, si _onlineListenerPending ya fue limpiado y el push falla,
+    // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
+    if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const data = await _idbGet('pending')
     if (!data || !supabase) return
+    // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
+    // (ocurre cuando el timer guardó con éxito justo antes del evento online),
+    // limpiar IDB y salir — ya está sincronizado.
+    try {
+      const local = JSON.parse(localStorage.getItem('an_times_v1') || 'null')
+      if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); return }
+    } catch {}
     const merged = await _mergeWithServer(data)
     await _upsertHotCold(merged)
     saveLocal(merged)
     await _idbDel('pending')
     window.dispatchEvent(new CustomEvent('times-synced'))
-  } catch (e) { console.error('[_bgSyncFallback] error:', e) }
+  } catch (e) {
+    console.error('[_bgSyncFallback] error:', e)
+    // Avisar a la app para que el banner no quede atascado en "Sincronizando…"
+    window.dispatchEvent(new CustomEvent('times-save-failed'))
+  }
 }
 
 function _clearBgSync() { _idbDel('pending') }
@@ -373,6 +402,7 @@ function _doCloudPush(db, onSuccess, onError) {
     .then((merged) => {
       _pushFlight = false
       _saveRetry = 0
+      _onlineListenerPending = false
       _clearBgSync()
       saveLocal(merged)
       onSuccess?.(merged)
@@ -383,6 +413,10 @@ function _doCloudPush(db, onSuccess, onError) {
       console.error('[cloudPush] error:', e)
       _pushFlight = false
       onError?.()
+      // Guardar en IDB desde el primer fallo: si el usuario cierra la app
+      // durante los reintentos, el SW Background Sync puede completar la
+      // sincronización sin necesidad de que la app esté abierta.
+      _storeForBgSync(payload)
       if (_saveRetry < 5) {
         _saveRetry++
         _pushQueue.unshift({ db: null, onSuccess, onError })
@@ -391,7 +425,6 @@ function _doCloudPush(db, onSuccess, onError) {
         setTimeout(() => _drainQueue(), delay)
       } else {
         _saveRetry = 0
-        _storeForBgSync(payload)
         window.dispatchEvent(new CustomEvent('times-save-failed'))
       }
     })

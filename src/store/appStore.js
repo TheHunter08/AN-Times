@@ -32,7 +32,10 @@ export const useAppStore = create((set, get) => ({
         merged.audit = recent.length >= 50 ? recent : merged.audit.slice(-300)
       }
       saveLocal(merged)
-      return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: !navigator.onLine }
+      // offlinePending: true si no hay red, o si ya había un guardado pendiente anterior
+      // (evita que el timer cada 30s lo resetee a false en señal débil, lo que hacía
+      // parpadear el banner "Modo Oficina" entre cada tick de guardado).
+      return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: state.offlinePending || !navigator.onLine }
     })
     cloudPush(merged,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
@@ -78,12 +81,17 @@ export const useAppStore = create((set, get) => ({
       if (tsResult.ts && tsResult.ts > merged._ts) merged._ts = tsResult.ts
       saveLocal(merged)
       set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
-      // Re-validate session against fresh data
+      // Re-validate session against fresh data y refrescar user con datos actualizados
+      // (e.g. obrasAsignadas cambiadas por el admin sin que el encargado haya vuelto a logearse)
       const ses = get().session
       if (ses?.user?.id) {
-        const stillActive = (merged.employees || []).some(e => e.id === ses.user.id && !e.baja)
-        if (!stillActive) {
+        const freshEmp = (merged.employees || []).find(e => e.id === ses.user.id)
+        if (!freshEmp || freshEmp.baja) {
           get().logout()
+        } else {
+          const updatedSes = { ...ses, user: freshEmp }
+          set({ session: updatedSes })
+          try { localStorage.setItem('an_times_ses', JSON.stringify(updatedSes)) } catch {}
         }
       }
     } finally {

@@ -75,9 +75,11 @@ export default function PanelDocumentos({ db, toast, saveDB, session }) {
 
   const del = (id) => {
     showConfirm('¿Eliminar este documento?', () => {
-      const doc = docs.find(d => d.id === id)
-      const withAudit = auditLog(db, 'Documento eliminado', doc?.titulo || '', who)
-      saveDB({ documentos: docs.filter(d => d.id !== id), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const doc = (freshDb.documentos || []).find(d => d.id === id)
+        const wA = auditLog(freshDb, 'Documento eliminado', doc?.titulo || '', who)
+        return { documentos: (freshDb.documentos || []).filter(d => d.id !== id), audit: wA.audit }
+      })
       toast('Documento eliminado')
     })
   }

@@ -6,9 +6,16 @@ import { flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '.
 
 export default function PanelMiObra({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
-  const enc = session.user
-  const misCentros = enc?.obrasAsignadas || []
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && (misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+  // Leer siempre desde db.employees para tener datos frescos aunque session.user
+  // sea un snapshot del momento del login (p.ej. el admin asignó obra después).
+  const encRaw = session.user
+  const enc = encRaw ? ((db.employees || []).find(e => e.id === encRaw.id) || encRaw) : null
+  const misCentros = [...new Set([...(enc?.obrasAsignadas || []), ...(enc?.centroTrabajo ? [enc.centroTrabajo] : [])])]
+  // Sin restricción de centros → mismo comportamiento que TabInicio: muestra todos.
+  const emps = (db.employees || []).filter(e =>
+    !e.baja && !e.isAdmin && e.id !== enc?.id &&
+    (!misCentros.length || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o)))
+  )
   const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
@@ -38,9 +45,10 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
 
   const aceptar = (rec) => {
-    const updated = recs.map(r => r.id === rec.id ? { ...r, aceptada: true, aceptadaPor: enc.name, aceptadaAt: new Date().toISOString() } : r)
-    const withAudit = auditLog(db, 'Jornada aceptada', `${rec.empName} · ${fds(rec.inicio)}`, enc.name)
-    saveDB({ records: updated, audit: withAudit.audit })
+    saveDB(freshDb => {
+      const wA = auditLog(freshDb, 'Jornada aceptada', `${rec.empName} · ${fds(rec.inicio)}`, enc.name)
+      return { records: (freshDb.records || []).map(r => r.id === rec.id ? { ...r, aceptada: true, aceptadaPor: enc.name, aceptadaAt: new Date().toISOString() } : r), audit: wA.audit }
+    })
     queuePush(rec.empId, '✅ Jornada validada', `Tu jornada del ${fds(rec.inicio)} ha sido validada por ${enc.name}.`, 'jornada', '/?tab=jornada')
     toast('Jornada aceptada', 3000, 'ok')
   }
@@ -77,8 +85,10 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     const alreadyOpen = liveRecs.find(r => r.empId === e.id)
     if (alreadyOpen) { toast('Este empleado ya tiene una jornada abierta', 3000, 'warn'); return }
     const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || misCentros[0] || '', breaks: [], workSecs: 0, creadoPor: enc.name, _upd: new Date().toISOString() }
-    const withAudit = auditLog(db, 'Jornada iniciada por encargado', e.name, enc.name)
-    saveDB({ records: [...recs, newRec], audit: withAudit.audit })
+    saveDB(freshDb => {
+      const wA = auditLog(freshDb, 'Jornada iniciada por encargado', e.name, enc.name)
+      return { records: [...(freshDb.records || []), newRec], audit: wA.audit }
+    })
     queuePush(e.id, '▶ Jornada iniciada', `${enc.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
     toast('Jornada iniciada', 3000, 'ok')
   }
@@ -96,7 +106,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       queuePush(rec.empId, '⏸ Descanso iniciado', `${enc.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso iniciado', 3000, 'ok')
     }
-    saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+    saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? updated : r) }))
   }
 
   const forceClose = (rec) => {
@@ -106,8 +116,10 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
       const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, _upd: now }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-      const withAudit = auditLog(db, 'Jornada finalizada por encargado', rec.empName, enc.name)
-      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Jornada finalizada por encargado', rec.empName, enc.name)
+        return { records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r), audit: wA.audit }
+      })
       queuePush(rec.empId, '⏹ Jornada finalizada', `${enc.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
       toast('Jornada finalizada', 3000, 'ok')
     })
@@ -129,7 +141,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const delAus = (id, tipo) => {
     const key = tipo === 'medico' ? 'medicos' : 'ausencias'
     showConfirm('¿Eliminar esta ausencia?', () => {
-      saveDB({ [key]: (db[key] || []).filter(a => a.id !== id) })
+      saveDB(freshDb => ({ [key]: (freshDb[key] || []).filter(a => a.id !== id) }))
       toast('Ausencia eliminada')
     })
   }
@@ -137,30 +149,24 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const actCorr = (id, estado) => {
     const corr = (db.correccionesFichaje || []).find(c => c.id === id)
     if (!corr) return
-    let newRecords = db.records || []
-    if (estado === 'aprobada') {
-      newRecords = newRecords.map(r => {
-        if (r.id !== corr.recId) return r
-        const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin, _upd: new Date().toISOString() }
-        const t = calcSecs(updated)
-        return { ...updated, workSecs: t.work, breakSecs: t.brk }
-      })
-    }
-    const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: enc.name } : c)
     const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
-    const withAuditEnc = auditLog(db, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, enc.name)
-    saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis || []), noti], audit: withAuditEnc.audit })
+    saveDB(freshDb => {
+      let newRecords = freshDb.records || []
+      if (estado === 'aprobada') {
+        newRecords = newRecords.map(r => {
+          if (r.id !== corr.recId) return r
+          const breaks = corr.propFin ? clipBreaksToWindow(r.breaks, corr.propInicio, corr.propFin) : (r.breaks || [])
+          const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin, breaks, _upd: new Date().toISOString() }
+          const t = calcSecs(updated)
+          return { ...updated, workSecs: t.work, breakSecs: t.brk }
+        })
+      }
+      const corrUpdated = (freshDb.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: enc.name } : c)
+      const wA = auditLog(freshDb, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, enc.name)
+      return { correccionesFichaje: corrUpdated, records: newRecords, notis: [...(freshDb.notis || []), noti], audit: wA.audit }
+    })
     queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
     toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
-  }
-
-  if (!misCentros.length) {
-    return (
-      <div className="adm-panel">
-        <div className="adm-panel-header"><h1 className="adm-panel-title">Mi obra</h1></div>
-        <div className="empty">No tienes ninguna obra/centro de trabajo asignado. Pide al administrador que te asigne uno en Empleados.</div>
-      </div>
-    )
   }
 
   const Badge = ({ n }) => n > 0 ? <span style={{ minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'0 4px', marginLeft:5 }}>{n}</span> : null
@@ -170,7 +176,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Mi obra</h1>
-          <div className="adm-panel-sub">{misCentros.join(', ')} · {emps.length} empleado{emps.length !== 1 ? 's' : ''}</div>
+          <div className="adm-panel-sub">{misCentros.length ? misCentros.join(', ') : 'Todos los centros'} · {emps.length} empleado{emps.length !== 1 ? 's' : ''}</div>
         </div>
         {(pendRecs.length + correcsPend.length) > 0 && (
           <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.25)' }}>

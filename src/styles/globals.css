@@ -8463,3 +8463,24 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 }
 [data-theme="light"] .v3-pattern-title       { color: rgba(0,0,0,.65) !important; }
 [data-theme="light"] .v3-pattern-sub         { color: rgba(0,0,0,.38) !important; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TAB TRANSITION — fade suave con leve desplazamiento vertical (sin translateX
+   que rompe iOS scroll). Easing spring para que se sienta orgánico.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes tabFadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.emp-tab.active {
+  animation: tabFadeSlideIn .28s cubic-bezier(.16,1,.3,1) !important;
+}
+.emp-body[data-dir="right"] .emp-tab.active {
+  animation: tabFadeSlideIn .28s cubic-bezier(.16,1,.3,1) !important;
+}
+.emp-body[data-dir="left"] .emp-tab.active {
+  animation: tabFadeSlideIn .28s cubic-bezier(.16,1,.3,1) !important;
+}
