@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/appStore.js'
 import { today, mhm, ftime, fds, calcSecs, gid, vacData } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { SwipeToDelete } from '../../components/admin/SwipeToDelete.jsx'
+import { clipBreaksToWindow } from '../../utils/adminHelpers.js'
 
 export default function PanelSolicitudes({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
@@ -371,23 +372,25 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
         const actCorr = (id, estado, overrideInicio, overrideFin) => {
           const corr = (db.correccionesFichaje || []).find(c => c.id === id)
           if (!corr) return
-          let newRecords = db.records || []
-          if (estado === 'aprobada') {
-            const finalInicio = overrideInicio || corr.propInicio
-            const finalFin = overrideFin || corr.propFin
-            newRecords = newRecords.map(r => {
-              if (r.id !== corr.recId) return r
-              const updated = { ...r, inicio: finalInicio, fin: finalFin }
-              const t = calcSecs(updated)
-              return { ...updated, workSecs: t.work, breakSecs: t.brk }
-            })
-          }
-          const finalInicioLabel = overrideInicio || corr.propInicio
-          const finalFinLabel = overrideFin || corr.propFin
-          const updated = (db.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin', finalInicio: finalInicioLabel, finalFin: finalFinLabel } : c)
+          const who = session?.user?.name || 'Admin'
+          const finalInicio = overrideInicio || corr.propInicio
+          const finalFin = overrideFin || corr.propFin
           const noti = { id: gid(), empId: corr.empId, action: estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail: corr.motivo || '', ts: new Date().toISOString(), leido: false }
-          const withAudit = auditLog(db, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, session?.user?.name || 'Admin')
-          saveDB({ correccionesFichaje: updated, records: newRecords, notis: [...(db.notis||[]), noti], audit: withAudit.audit })
+          saveDB(freshDb => {
+            let newRecords = freshDb.records || []
+            if (estado === 'aprobada') {
+              newRecords = newRecords.map(r => {
+                if (r.id !== corr.recId) return r
+                const breaks = finalFin ? clipBreaksToWindow(r.breaks, finalInicio, finalFin) : (r.breaks || [])
+                const updated = { ...r, inicio: finalInicio, fin: finalFin, breaks }
+                const t = calcSecs(updated)
+                return { ...updated, workSecs: t.work, breakSecs: t.brk }
+              })
+            }
+            const corrUpdated = (freshDb.correccionesFichaje || []).map(c => c.id === id ? { ...c, estado, resolvedAt: new Date().toISOString(), resolvedBy: who, finalInicio, finalFin } : c)
+            const wA = auditLog(freshDb, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who)
+            return { correccionesFichaje: corrUpdated, records: newRecords, notis: [...(freshDb.notis || []), noti], audit: wA.audit }
+          })
           queuePush(corr.empId, noti.action, `Tu solicitud de corrección ha sido ${estado === 'aprobada' ? 'aprobada' : 'rechazada'}.`, 'correccion', '/?tab=jornada')
           toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
           setEditCorrId(null)

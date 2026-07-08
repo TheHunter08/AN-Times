@@ -56,9 +56,11 @@ export default function PanelObras({ db, toast, saveDB, session }) {
       pos => {
         setGeoCapturing(null)
         const coords = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), acc: Math.round(pos.coords.accuracy) }
-        const updated = obras.map(o => o.id === obraId ? { ...o, coords } : o)
-        const withAudit = auditLog(db, 'Geofence configurado', obras.find(o => o.id === obraId)?.nombre || '', who)
-        saveDB({ obras: updated, audit: withAudit.audit })
+        saveDB(freshDb => {
+          const nombre = (freshDb.obras || []).find(o => o.id === obraId)?.nombre || ''
+          const wA = auditLog(freshDb, 'Geofence configurado', nombre, who)
+          return { obras: (freshDb.obras || []).map(o => o.id === obraId ? { ...o, coords } : o), audit: wA.audit }
+        })
         toast('📍 Ubicación GPS guardada', 3000, 'ok')
       },
       () => { setGeoCapturing(null); toast('No se pudo obtener GPS', 3000, 'err') },

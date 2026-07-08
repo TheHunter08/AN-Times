@@ -112,7 +112,7 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
 
   const saveTurno = () => {
     if (!form.horaInicio || !form.horaFin) { toast('Indica hora inicio y fin', 3000, 'err'); return }
-    if (form.horaFin <= form.horaInicio && form.tipo !== 'libre') { toast('La hora de fin debe ser posterior al inicio', 3000, 'err'); return }
+    if (form.horaFin === form.horaInicio && form.tipo !== 'libre') { toast('La hora de inicio y fin no pueden ser iguales', 3000, 'err'); return }
     const { empId, fecha } = modal
     const emp = emps.find(e => e.id === empId)
     const vac = form.tipo !== 'libre' ? vacacionEnFecha(db, empId, fecha) : null

@@ -33,8 +33,10 @@ export default function PanelControl({ db, toast, saveDB, session }) {
   const startJornada = (e) => {
     if (liveRecs.find(r => r.empId === e.id)) { toast('Ya tiene jornada abierta', 3000, 'warn'); return }
     const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: adminName }
-    const withAudit = auditLog(db, 'Jornada iniciada por admin', e.name, adminName)
-    saveDB({ records: [...recs, newRec], audit: withAudit.audit })
+    saveDB(freshDb => {
+      const wA = auditLog(freshDb, 'Jornada iniciada por admin', e.name, adminName)
+      return { records: [...(freshDb.records || []), newRec], audit: wA.audit }
+    })
     queuePush(e.id, '▶ Jornada iniciada', `${adminName} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
     toast(`Jornada iniciada — ${e.name.split(' ')[0]}`, 3000, 'ok')
   }
@@ -52,7 +54,7 @@ export default function PanelControl({ db, toast, saveDB, session }) {
       queuePush(rec.empId, '⏸ Descanso iniciado', `${adminName} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso iniciado', 3000, 'ok')
     }
-    saveDB({ records: recs.map(r => r.id === rec.id ? updated : r) })
+    saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? updated : r) }))
   }
 
   const force = (rec) => {
