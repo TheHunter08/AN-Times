@@ -296,10 +296,13 @@ export default function App() {
     fetchDB()
     initRealtime()
     // Al arrancar: pedir al SW que suba cualquier dato IDB pendiente de sesiones anteriores
-    // (Android puede matar la app mientras hay datos offline sin sincronizar)
-    if (navigator.onLine) {
-      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-    }
+    // (iOS/Android puede matar la app mientras hay datos offline sin sincronizar).
+    // Usamos serviceWorker.ready en vez de controller?.postMessage porque controller
+    // puede ser null en el instante del arranque (el SW aún no ha reclamado la página
+    // con clients.claim()) — el mensaje se perdería en silencio.
+    navigator.serviceWorker?.ready.then(reg => {
+      if (navigator.onLine) reg.active?.postMessage({ type: 'FORCE_SYNC' })
+    }).catch(() => {})
 
     // onResume: refresca datos y WebSocket cuando la PWA vuelve al primer plano.
     // Se dispara desde tres fuentes porque cada plataforma usa un evento diferente:

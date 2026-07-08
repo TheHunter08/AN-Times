@@ -284,6 +284,7 @@ async function _idbDel(key) {
 // Background Sync API (el timer guarda cada 30s, _storeForBgSync se llama
 // en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
 let _onlineListenerPending = false
+let _bgSyncRetries = 0
 
 async function _storeForBgSync(data) {
   try {
@@ -354,23 +355,32 @@ async function _bgSyncFallback() {
     // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
     if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const data = await _idbGet('pending')
-    if (!data || !supabase) return
+    if (!data || !supabase) { _bgSyncRetries = 0; return }
     // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
     // (ocurre cuando el timer guardó con éxito justo antes del evento online),
     // limpiar IDB y salir — ya está sincronizado.
     try {
       const local = JSON.parse(localStorage.getItem('an_times_v1') || 'null')
-      if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); return }
+      if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); _bgSyncRetries = 0; return }
     } catch {}
     const merged = await _mergeWithServer(data)
     await _upsertHotCold(merged)
     saveLocal(merged)
     await _idbDel('pending')
+    _bgSyncRetries = 0
     window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) {
     console.error('[_bgSyncFallback] error:', e)
-    // Avisar a la app para que el banner no quede atascado en "Sincronizando…"
-    window.dispatchEvent(new CustomEvent('times-save-failed'))
+    // Reintentar hasta 3 veces (5s, 10s, 15s) antes de mostrar el toast de error.
+    // Cubre el caso donde Supabase tarda en responder justo al reconectar y el
+    // listener 'online' ya fue eliminado (no volvería a dispararse tras el fallo).
+    if (_bgSyncRetries < 3) {
+      _bgSyncRetries++
+      setTimeout(_bgSyncFallback, _bgSyncRetries * 5000)
+    } else {
+      _bgSyncRetries = 0
+      window.dispatchEvent(new CustomEvent('times-save-failed'))
+    }
   }
 }
 
