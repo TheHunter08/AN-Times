@@ -96,14 +96,12 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
     const { empId, fecha, existing } = modal
     const emp = emps.find(e => e.id === empId)
     const newTurno = { id: existing?.id || gid(), empId, empName: emp?.name || '', fecha, horaInicio: form.horaInicio, horaFin: form.horaFin, tipo: form.tipo, centro: form.centro, notas: form.notas }
-    let newTurnos
-    if (existing) {
-      newTurnos = turnos.map(t => t.id === existing.id ? newTurno : t)
-    } else {
-      newTurnos = [...turnos, newTurno]
-    }
-    const withAudit = auditLog(db, 'Turno guardado', `${emp?.name || empId} - ${fecha}`, who)
-    saveDB({ turnos: newTurnos, audit: withAudit.audit })
+    saveDB(freshDb => {
+      const freshTurnos = freshDb.turnos || []
+      const newTurnos = existing ? freshTurnos.map(t => t.id === existing.id ? newTurno : t) : [...freshTurnos, newTurno]
+      const wA = auditLog(freshDb, 'Turno guardado', `${emp?.name || empId} - ${fecha}`, who)
+      return { turnos: newTurnos, audit: wA.audit }
+    })
     if (empId) {
       const tipoTxt = form.tipo === 'libre' ? 'Libre' : `${form.horaInicio}–${form.horaFin}`
       queuePush(empId, '📅 Turno publicado', `${who} te asignó un turno el ${fds(fecha)}: ${tipoTxt}${form.centro ? ' · ' + form.centro : ''}.`, 'turno', '/?tab=turnos')
@@ -128,9 +126,10 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
   const deleteTurno = () => {
     const { existing } = modal
     if (!existing) { setModal(null); return }
-    const newTurnos = turnos.filter(t => t.id !== existing.id)
-    const withAudit = auditLog(db, 'Turno eliminado', `${existing.empName} - ${existing.fecha}`, who)
-    saveDB({ turnos: newTurnos, audit: withAudit.audit })
+    saveDB(freshDb => {
+      const wA = auditLog(freshDb, 'Turno eliminado', `${existing.empName} - ${existing.fecha}`, who)
+      return { turnos: (freshDb.turnos || []).filter(t => t.id !== existing.id), audit: wA.audit }
+    })
     if (existing.empId) queuePush(existing.empId, '📅 Turno eliminado', `${who} eliminó tu turno del ${fds(existing.fecha)}.`, 'turno', '/?tab=turnos')
     setModal(null)
     toast('Turno eliminado')

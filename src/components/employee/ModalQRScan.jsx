@@ -3,16 +3,18 @@ import jsQR from 'jsqr'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 
-// Escaneo de QR con la cámara del dispositivo — decodifica cada frame con
-// jsQR sobre un <canvas> oculto. Sin librerías de UI de cámara: un <video>
-// + requestAnimationFrame es suficiente y no añade peso significativo.
 export function ModalQRScan({ visible, onScan, onClose }) {
-  const videoRef = useRef(null)
-  const canvasRef = useRef(null)
-  const streamRef = useRef(null)
-  const rafRef = useRef(null)
-  const scannedRef = useRef(false)
+  const videoRef    = useRef(null)
+  const canvasRef   = useRef(null)
+  const streamRef   = useRef(null)
+  const rafRef      = useRef(null)
+  const scannedRef  = useRef(false)
+  // Ref para onScan: evita que el efecto de cámara se reinicie cada vez
+  // que el padre re-renderiza y genera una nueva referencia de función.
+  const onScanRef   = useRef(onScan)
   const [error, setError] = useState(null)
+
+  useEffect(() => { onScanRef.current = onScan }, [onScan])
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
@@ -23,7 +25,19 @@ export function ModalQRScan({ visible, onScan, onClose }) {
     setError(null)
     let cancelled = false
 
-    navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
+    // Fix: mediaDevices es undefined en HTTP (contexto no seguro).
+    // Encadenar .then() directamente sobre undefined lanzaría TypeError síncrono
+    // que escapa al .catch(). Se comprueba antes de encadenar.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('La cámara requiere una conexión segura (HTTPS) o permisos de cámara.')
+      return
+    }
+
+    // Dimensiones previas del canvas — solo se reasignan al cambiar de resolución,
+    // ya que asignar canvas.width aunque sea el mismo valor resetea el buffer.
+    let lastW = 0, lastH = 0
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       .then(stream => {
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
         streamRef.current = stream
@@ -32,20 +46,24 @@ export function ModalQRScan({ visible, onScan, onClose }) {
           videoRef.current.play().catch(() => {})
         }
         const tick = () => {
-          const video = videoRef.current
+          const video  = videoRef.current
           const canvas = canvasRef.current
           if (!video || !canvas || scannedRef.current) return
           if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
+            if (video.videoWidth !== lastW || video.videoHeight !== lastH) {
+              lastW = video.videoWidth
+              lastH = video.videoHeight
+              canvas.width  = lastW
+              canvas.height = lastH
+            }
             const ctx = canvas.getContext('2d')
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            ctx.drawImage(video, 0, 0, lastW, lastH)
+            const imageData = ctx.getImageData(0, 0, lastW, lastH)
             const code = jsQR(imageData.data, imageData.width, imageData.height)
             if (code?.data) {
               scannedRef.current = true
               try { navigator.vibrate?.(20) } catch {}
-              onScan(code.data)
+              onScanRef.current(code.data)
               return
             }
           }
@@ -61,7 +79,7 @@ export function ModalQRScan({ visible, onScan, onClose }) {
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
-  }, [visible, onScan])
+  }, [visible]) // onScan se consume vía ref — no va en deps
 
   if (!visible) return null
 

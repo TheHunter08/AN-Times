@@ -32,7 +32,10 @@ export const useAppStore = create((set, get) => ({
         merged.audit = recent.length >= 50 ? recent : merged.audit.slice(-300)
       }
       saveLocal(merged)
-      return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: !navigator.onLine }
+      // offlinePending: true si no hay red, o si ya había un guardado pendiente anterior
+      // (evita que el timer cada 30s lo resetee a false en señal débil, lo que hacía
+      // parpadear el banner "Modo Oficina" entre cada tick de guardado).
+      return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: state.offlinePending || !navigator.onLine }
     })
     cloudPush(merged,
       () => set({ syncStatus: 'synced', offlinePending: false }),

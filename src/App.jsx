@@ -151,11 +151,12 @@ function UpdateBanner() {
 }
 
 function SyncBanner() {
-  const syncStatus    = useAppStore(s => s.syncStatus)
-  const syncError     = useAppStore(s => s.syncError)
-  const lastSyncTime  = useAppStore(s => s.lastSyncTime)
-  const fetchDB       = useAppStore(s => s.fetchDB)
-  const currentScreen = useAppStore(s => s.currentScreen)
+  const syncStatus     = useAppStore(s => s.syncStatus)
+  const syncError      = useAppStore(s => s.syncError)
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const lastSyncTime   = useAppStore(s => s.lastSyncTime)
+  const fetchDB        = useAppStore(s => s.fetchDB)
+  const currentScreen  = useAppStore(s => s.currentScreen)
   const [retrying, setRetrying] = useState(false)
 
   const handleRetry = useCallback(async () => {
@@ -164,7 +165,11 @@ function SyncBanner() {
     setRetrying(false)
   }, [fetchDB])
 
+  // En pantalla de empleado, OfflineBanner ya muestra "Modo Oficina" con datos
+  // pendientes — suprimir SyncBanner para evitar dos banners simultáneos.
+  // En admin no hay OfflineBanner, así que SyncBanner sigue mostrándose allí.
   if (syncStatus !== 'error' || currentScreen === 'login') return null
+  if (offlinePending && currentScreen === 'emp') return null
   if (syncError === 'no_config') return null
 
   const sinceText = lastSyncTime
@@ -200,7 +205,7 @@ function SyncBanner() {
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
-const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil']
+const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'perfil']
 
 function applyDeepLink(url) {
   try {
@@ -370,8 +375,8 @@ export default function App() {
     const onMsg = (event) => {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
       if (event.data?.type === 'BG_SYNC_DONE') {
+        useAppStore.setState({ offlinePending: false, syncStatus: 'syncing' })
         fetchDB()
-        useAppStore.setState({ offlinePending: false })
       }
       if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
     }

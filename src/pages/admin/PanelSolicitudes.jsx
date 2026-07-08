@@ -37,8 +37,10 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
   const delVac = (id) => {
     const v = (db.vacaciones || []).find(x => x.id === id)
     showConfirm(`¿Eliminar estas vacaciones${v?.empName ? ' de ' + v.empName : ''}? El empleado podrá volver a fichar esos días.`, () => {
-      const withAudit = auditLog(db, 'Vacaciones eliminadas', v?.empName || '', session?.user?.name || 'Admin')
-      saveDB({ vacaciones: (db.vacaciones || []).filter(x => x.id !== id), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Vacaciones eliminadas', v?.empName || '', session?.user?.name || 'Admin')
+        return { vacaciones: (freshDb.vacaciones || []).filter(x => x.id !== id), audit: wA.audit }
+      })
       if (v?.empId) queuePush(v.empId, 'Vacaciones canceladas', `Tus vacaciones ${v.fechaInicio ? fds(v.fechaInicio) + ' → ' + fds(v.fechaFin) : ''} han sido eliminadas por el administrador.`, 'vacaciones', '/?go=emp:vacaciones')
       toast('Vacaciones eliminadas')
     })

@@ -106,8 +106,10 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
       const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-      const withAudit = auditLog(db, 'Jornada finalizada por encargado', rec.empName, enc.name)
-      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Jornada finalizada por encargado', rec.empName, enc.name)
+        return { records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r), audit: wA.audit }
+      })
       queuePush(rec.empId, '⏹ Jornada finalizada', `${enc.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
       toast('Jornada finalizada', 3000, 'ok')
     })
@@ -129,7 +131,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const delAus = (id, tipo) => {
     const key = tipo === 'medico' ? 'medicos' : 'ausencias'
     showConfirm('¿Eliminar esta ausencia?', () => {
-      saveDB({ [key]: (db[key] || []).filter(a => a.id !== id) })
+      saveDB(freshDb => ({ [key]: (freshDb[key] || []).filter(a => a.id !== id) }))
       toast('Ausencia eliminada')
     })
   }

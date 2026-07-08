@@ -734,7 +734,10 @@ export default function PanelInformes({ db, toast, saveDB, session }) {
 
       {/* Por Obra tab */}
       {tab === 'obras' && (() => {
-        const obras = db.obras || []
+        // Compatibilidad con el formato antiguo donde db.obras era un array de
+        // strings en vez de objetos — coercionar a objeto para que obra.nombre
+        // siempre esté definido y los filtros por obrasAsignadas funcionen.
+        const obras = (db.obras || []).map(o => typeof o === 'string' ? { nombre: o } : o)
         const allEmps = sortedEmps(db).filter(e => !e.baja)
         const obraRows = obras.map(obra => {
           const assigned = allEmps.filter(e => (e.obrasAsignadas || []).includes(obra.nombre))

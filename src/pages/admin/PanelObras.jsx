@@ -39,9 +39,11 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const delObra = (id) => {
     showConfirm('¿Eliminar esta obra?', () => {
-      const o = obras.find(x => x.id === id)
-      const withAudit = auditLog(db, 'Obra eliminada', o?.nombre || '', who)
-      saveDB({ obras: obras.filter(o => o.id !== id), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const o = (freshDb.obras || []).find(x => x.id === id)
+        const wA = auditLog(freshDb, 'Obra eliminada', o?.nombre || '', who)
+        return { obras: (freshDb.obras || []).filter(o => o.id !== id), audit: wA.audit }
+      })
       toast('Obra eliminada')
       if (expandedObra === id) setExpandedObra(null)
     })
@@ -76,8 +78,7 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const clearGeo = (obraId) => {
     showConfirm('¿Quitar la geovalla de esta obra?', () => {
-      const updated = obras.map(o => o.id === obraId ? { ...o, coords: undefined, radio: undefined } : o)
-      saveDB({ obras: updated })
+      saveDB(freshDb => ({ obras: (freshDb.obras || []).map(o => o.id === obraId ? { ...o, coords: undefined, radio: undefined } : o) }))
       toast('Geovalla eliminada')
     })
   }
@@ -94,8 +95,10 @@ export default function PanelObras({ db, toast, saveDB, session }) {
 
   const delCentro = (c) => {
     showConfirm(`¿Eliminar "${c}"?`, () => {
-      const withAudit = auditLog(db, 'Centro de trabajo eliminado', c, who)
-      saveDB({ centrosTrabajo: centros.filter(x => x !== c), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Centro de trabajo eliminado', c, who)
+        return { centrosTrabajo: (freshDb.centrosTrabajo || []).filter(x => x !== c), audit: wA.audit }
+      })
       toast('Centro eliminado')
     })
   }

@@ -64,8 +64,10 @@ export default function PanelControl({ db, toast, saveDB, session }) {
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
       const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-      const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, adminName)
-      saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
+      saveDB(freshDb => {
+        const wA = auditLog(freshDb, 'Jornada cerrada forzosamente', rec.empName, adminName)
+        return { records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r), audit: wA.audit }
+      })
       queuePush(rec.empId, '⏱️ Jornada cerrada', `${adminName} ha cerrado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')
       toast('Jornada cerrada forzosamente', 3000, 'ok')
     })

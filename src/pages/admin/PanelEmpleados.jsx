@@ -98,10 +98,12 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
   const del = (id) => {
     showConfirm('¿Dar de baja a este empleado? Esta acción se puede revertir desde el perfil.', () => {
       try { navigator.vibrate(20) } catch {}
-      const emp = (db.employees||[]).find(e => e.id === id)
-      const emps2 = (db.employees||[]).map(e => e.id === id ? { ...e, baja:true, fechaBaja: today() } : e)
-      const withAudit = auditLog(db, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
-      saveDB({ employees: emps2, audit: withAudit.audit })
+      saveDB(freshDb => {
+        const emp = (freshDb.employees || []).find(e => e.id === id)
+        const emps2 = (freshDb.employees || []).map(e => e.id === id ? { ...e, baja: true, fechaBaja: today() } : e)
+        const wA = auditLog(freshDb, 'Empleado dado de baja', emp?.name || '', session?.user?.name || 'Admin')
+        return { employees: emps2, audit: wA.audit }
+      })
       toast('Empleado dado de baja')
     })
   }

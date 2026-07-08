@@ -8464,32 +8464,6 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 [data-theme="light"] .v3-pattern-title       { color: rgba(0,0,0,.65) !important; }
 [data-theme="light"] .v3-pattern-sub         { color: rgba(0,0,0,.38) !important; }
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   NAV ICON-ONLY — sin etiquetas de texto, botones cuadrados centrados
-   ══════════════════════════════════════════════════════════════════════════════ */
-
-/* Sin texto debajo: reducir gap y hacer el botón más compacto y centrado */
-.emp-nav-item {
-  gap: 0 !important;
-  padding: 10px 6px !important;
-  font-size: 0 !important; /* por si quedara algún texto rezagado */
-}
-.emp-nav-item svg {
-  width: 24px !important;
-  height: 24px !important;
-}
-/* El pill de fondo activo se centra ahora verticalmente en el icono */
-.emp-nav-item.on::before {
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  left: 50% !important;
-  width: 46px !important;
-  height: 36px !important;
-}
-/* El indicador de jornada activa encima del icono */
-.emp-nav-item.on::after {
-  top: 6px !important;
-}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    TAB TRANSITION — fade suave con leve desplazamiento vertical (sin translateX

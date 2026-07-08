@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 
 export function OfflineBanner() {
@@ -8,6 +8,9 @@ export function OfflineBanner() {
   const [realOffline, setRealOffline] = useState(() => !navigator.onLine)
   const [retrying, setRetrying] = useState(false)
   const [justSynced, setJustSynced] = useState(false)
+  // Rastrea si hubo al menos un momento offline en esta sesión para
+  // que el flash "Sincronizado ✓" solo aparezca al reconectar, no al cargar
+  const wasOfflineRef = useRef(!navigator.onLine)
 
   useEffect(() => {
     const on  = () => setRealOffline(false)
@@ -17,14 +20,23 @@ export function OfflineBanner() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
   }, [])
 
-  // Flash "Sincronizado ✓" cuando vuelve a synced desde offline
+  // "Sin red real": navigator.onLine puede ser true aunque no haya internet
+  // (WiFi sin datos, señal débil). En ese caso saveDB pone syncStatus:'error'
+  // + offlinePending:true. Lo tratamos igual que offline real.
+  const isEffectivelyOffline = realOffline || syncStatus === 'offline' || (offlinePending && syncStatus === 'error')
+
+  // Marca que estuvimos offline para mostrar el flash "Sincronizado ✓" al reconectar
   useEffect(() => {
-    if (syncStatus === 'synced' && offlinePending === false && justSynced === false) return
-    if (syncStatus === 'synced') {
-      setJustSynced(true)
-      const t = setTimeout(() => setJustSynced(false), 3000)
-      return () => clearTimeout(t)
-    }
+    if (isEffectivelyOffline) wasOfflineRef.current = true
+  }, [isEffectivelyOffline])
+
+  // Flash "Sincronizado ✓" solo al volver de offline
+  useEffect(() => {
+    if (syncStatus !== 'synced' || !wasOfflineRef.current) return
+    wasOfflineRef.current = false
+    setJustSynced(true)
+    const t = setTimeout(() => setJustSynced(false), 3000)
+    return () => clearTimeout(t)
   }, [syncStatus])
 
   const handleRetry = async () => {
@@ -34,8 +46,8 @@ export function OfflineBanner() {
     setRetrying(false)
   }
 
-  // Modo Oficina: offline con datos pendientes
-  if (realOffline || syncStatus === 'offline') {
+  // Modo Oficina: sin red (real o efectiva) con datos pendientes
+  if (isEffectivelyOffline) {
     return (
       <div className="offline-v3 offline-v3--office">
         <span style={{ fontSize:16 }}>📡</span>
@@ -59,6 +71,7 @@ export function OfflineBanner() {
     )
   }
 
+  // offlinePending con syncStatus distinto de 'error' → reintentando activamente
   if (offlinePending) {
     return (
       <div className="offline-v3 offline-v3--pending">

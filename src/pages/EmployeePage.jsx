@@ -83,6 +83,10 @@ export default function EmployeePage() {
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   const dbRef = useRef(db)
   const geoAbortRef = useRef(false)
+  // Contador de generación: cada nueva solicitud GPS incrementa el nonce y
+  // captura su valor. El callback solo procede si el nonce sigue siendo el
+  // actual — invalida automáticamente callbacks de solicitudes anteriores.
+  const geoNonceRef = useRef(0)
   const startingRef = useRef(false)
   const breakingRef = useRef(false)
   const notisRunningRef = useRef(false)
@@ -245,7 +249,7 @@ export default function EmployeePage() {
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
   const currentTabRef = useRef(currentEmpTab)
-  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'mensajes', 'perfil', 'turnos', 'gastos', 'denuncia']
+  const TAB_ORDER = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'perfil']
   useEffect(() => {
     const prev = prevTabRef.current
     if (prev !== currentEmpTab && empBodyRef.current) {
@@ -293,7 +297,7 @@ export default function EmployeePage() {
     const params = new URLSearchParams(window.location.search)
     const tab = params.get('tab')
     const go = params.get('go')
-    const VALID = ['inicio','jornada','vacaciones','calendario','mensajes','perfil']
+    const VALID = ['inicio','jornada','vacaciones','calendario','turnos','perfil']
     if (tab && VALID.includes(tab)) {
       setEmpTab(tab)
       window.history.replaceState({}, '', window.location.pathname)
@@ -551,29 +555,38 @@ export default function EmployeePage() {
   )
 
   // === TIMER ACTIONS ===
-  const doStart = () => {
-    if (timer.state !== 'idle') return
-    if (activeModal === 'selCentro' || startingRef.current) return
+
+  // Precondiciones comunes a doStart y doStartWithCentro — centralizar aquí
+  // garantiza que cualquier nueva regla (periodo cerrado, bloqueo admin, etc.)
+  // se aplique a ambos flujos de fichaje sin tener que actualizar dos sitios.
+  const checkFichajePreconditions = useCallback(() => {
+    if (timer.state !== 'idle' || startingRef.current) return false
     const todayStr = today()
     const activeVac = (db.vacaciones || []).find(v =>
       v.empId === u?.id && v.estado === 'aprobada' && v.fechaInicio <= todayStr && v.fechaFin >= todayStr
     )
     if (activeVac) {
       toast(`🌴 Estás de vacaciones hasta el ${fds(activeVac.fechaFin)}. No puedes fichar hasta que terminen.`, 5000, 'warn')
-      return
+      return false
     }
+    return true
+  }, [timer.state, db.vacaciones, u?.id, toast])
+
+  const doStart = () => {
+    if (!checkFichajePreconditions()) return
+    if (activeModal === 'selCentro') return
     startingRef.current = true
     setTimeout(() => { startingRef.current = false }, STARTING_LOCK_MS)
     const cs = db.centrosTrabajo || []
     openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
-    // Get GPS — geoAbortRef discards the result if modal is closed before it resolves
     geoAbortRef.current = false
+    const myNonce = ++geoNonceRef.current
     setPendingGPS(null)
     setGpsStatus('pending')
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
-          if (geoAbortRef.current) return
+          if (geoAbortRef.current || geoNonceRef.current !== myNonce) return
           const lat = +pos.coords.latitude.toFixed(5)
           const lng = +pos.coords.longitude.toFixed(5)
           if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
@@ -581,7 +594,7 @@ export default function EmployeePage() {
             setGpsStatus('ok')
           }
         },
-        () => { if (!geoAbortRef.current) setGpsStatus('fail') },
+        () => { if (!geoAbortRef.current && geoNonceRef.current === myNonce) setGpsStatus('fail') },
         GEO_OPTS
       )
     }
@@ -634,10 +647,10 @@ export default function EmployeePage() {
         }
       }
     }
-    const newDB = { ...db, records: [...db.records, rec] }
-    // Update employee's centroTrabajo
-    const emps = newDB.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
-    saveDB({ records: newDB.records, employees: emps })
+    saveDB(freshDb => ({
+      records: [...freshDb.records, rec],
+      employees: freshDb.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
+    }))
     try { navigator.vibrate(15) } catch {}
     toast('Jornada iniciada en ' + centro, 3000, 'ok')
     // Wellbeing check-in after clock-in
@@ -650,18 +663,13 @@ export default function EmployeePage() {
   // código escaneado en vez de un desplegable, y confirmarCentro se llama
   // con el resultado del GPS recién resuelto (ver comentario más arriba).
   const doStartWithCentro = useCallback((centro) => {
-    if (timer.state !== 'idle' || startingRef.current) return
-    const todayStr = today()
-    const activeVac = (db.vacaciones || []).find(v =>
-      v.empId === u?.id && v.estado === 'aprobada' && v.fechaInicio <= todayStr && v.fechaFin >= todayStr
-    )
-    if (activeVac) {
-      toast(`🌴 Estás de vacaciones hasta el ${fds(activeVac.fechaFin)}. No puedes fichar hasta que terminen.`, 5000, 'warn')
-      return
-    }
+    if (!checkFichajePreconditions()) return
     startingRef.current = true
     setTimeout(() => { startingRef.current = false }, STARTING_LOCK_MS)
     geoAbortRef.current = false
+    // Nonce propio: invalida cualquier callback GPS del flujo manual (doStart)
+    // que pudiera estar aún en vuelo, sin depender de geoAbortRef compartido.
+    const myNonce = ++geoNonceRef.current
     setPendingGPS(null)
     if (!navigator.geolocation) {
       setGpsStatus('fail')
@@ -671,7 +679,7 @@ export default function EmployeePage() {
     setGpsStatus('pending')
     navigator.geolocation.getCurrentPosition(
       pos => {
-        if (geoAbortRef.current) return
+        if (geoNonceRef.current !== myNonce) return
         const lat = +pos.coords.latitude.toFixed(5)
         const lng = +pos.coords.longitude.toFixed(5)
         if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)) {
@@ -685,13 +693,13 @@ export default function EmployeePage() {
         }
       },
       () => {
-        if (geoAbortRef.current) return
+        if (geoNonceRef.current !== myNonce) return
         setGpsStatus('fail')
         confirmarCentro(centro, 'fail', null)
       },
       GEO_OPTS
     )
-  }, [timer.state, db, u, toast, confirmarCentro])
+  }, [checkFichajePreconditions, confirmarCentro])
 
   const doStop = useCallback(() => {
     const o = openRec()
@@ -705,8 +713,7 @@ export default function EmployeePage() {
       const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true, _upd: now }
       const t = calcSecs(closed)
       closed.workSecs = t.work; closed.breakSecs = t.brk
-      const records = db.records.map(r => r.id === o.id ? closed : r)
-      saveDB({ records })
+      saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? closed : r) }))
       try { navigator.vibrate([15, 50, 30]) } catch {}
       toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
       setShowConfetti(true)
@@ -717,9 +724,9 @@ export default function EmployeePage() {
         navigator.geolocation.getCurrentPosition(
           pos => {
             const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
-            const freshRecords = useAppStore.getState().db.records
-            const updated = freshRecords.map(r => r.id === stopId ? { ...r, locFin } : r)
-            useAppStore.getState().saveDB({ records: updated })
+            useAppStore.getState().saveDB(freshDb => ({
+              records: freshDb.records.map(r => r.id === stopId ? { ...r, locFin } : r)
+            }))
           },
           () => {},
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
@@ -746,9 +753,8 @@ export default function EmployeePage() {
       try { navigator.vibrate(10) } catch {}
       toast('⏸️ Descanso iniciado')
     }
-    const records = db.records.map(r => r.id === o.id ? updated : r)
-    saveDB({ records })
-  }, [db, openRec, saveDB, toast])
+    saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? updated : r) }))
+  }, [openRec, saveDB, toast])
 
   // Fichaje por QR — dos formatos posibles según lo que se escanea:
   // 1) QR de centro de trabajo → ficha tu propia entrada/salida (igual que
@@ -792,7 +798,7 @@ export default function EmployeePage() {
       const recs = db.records || []
       if (recs.some(r => r.empId === emp.id && !r.fin)) { toast(`${emp.name} ya tiene jornada abierta`, 3000, 'warn'); return }
       const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
-      saveDB({ records: [...recs, newRec] })
+      saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
       queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
       toast(`Jornada iniciada para ${emp.name}`, 3000, 'ok')
       return
@@ -862,7 +868,6 @@ export default function EmployeePage() {
     { id:'jornada',    label:'Jornada',     icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></> },
     { id:'vacaciones', label:'Vacaciones',  icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
     { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
-    { id:'mensajes',   label:'Mensajes',   icon:<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>, badge: chatUnread },
     { id:'turnos',     label:'Turnos',     icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="15" y2="15"/></> },
     { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
   ]
@@ -976,7 +981,7 @@ export default function EmployeePage() {
       </div>
 
       <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
-      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={closeModal} />
+      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />
       <ModalQRScan visible={qrScanOpen} onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />
       <ModalMyQR visible={activeModal==='miQR'} u={u} onClose={closeModal} />
       <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />
@@ -1089,7 +1094,6 @@ export default function EmployeePage() {
           { id:'jornada',    label:'Jornada',    icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>, live: timer.state !== 'idle' },
           { id:'vacaciones', label:'Vacaciones', icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><path d="M12 3c0 0 4 4 4 8s-4 8-4 8"/><path d="M12 3c0 0-4 4-4 8s4 8 4 8"/></> },
           { id:'calendario', label:'Calendario', icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
-          { id:'mensajes',   label:'Mensajes',   icon:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>, badge: chatUnread },
           { id:'turnos',     label:'Turnos',     icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="15" x2="15" y2="15"/></> },
           { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
         ].map(({ id, label, icon, extra, badge, live }) => (
@@ -1099,13 +1103,14 @@ export default function EmployeePage() {
               {badge > 0 && <span style={{ position:'absolute', top:-4, right:-6, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px' }}>{badge}</span>}
               {live && !badge && <span style={{ position:'absolute', top:-3, right:-4, width:8, height:8, borderRadius:'50%', background:'var(--green)', border:'2px solid var(--bg-800)', animation:'livePing 2s ease-in-out infinite' }} />}
             </span>
+            {label}
           </button>
         ))}
       </div>
 
       {/* Modals */}
       <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
-      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={closeModal} />
+      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />
       <ModalQRScan visible={qrScanOpen} onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />
       <ModalMyQR visible={activeModal==='miQR'} u={u} onClose={closeModal} />
       <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />

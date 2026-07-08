@@ -20,6 +20,9 @@ export function decodeEmployeeQR(text) {
   if (typeof text !== 'string') return null
   try {
     const url = new URL(text)
+    // Solo aceptar QRs del mismo origen para evitar que un QR de terceros
+    // con ?emp= en su URL se trate como credencial de empleado válida.
+    if (url.origin !== window.location.origin) return null
     return url.searchParams.get('emp') || null
   } catch {
     return null
