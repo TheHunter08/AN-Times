@@ -6,9 +6,16 @@ import { flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '.
 
 export default function PanelMiObra({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
-  const enc = session.user
+  // Leer siempre desde db.employees para tener datos frescos aunque session.user
+  // sea un snapshot del momento del login (p.ej. el admin asignó obra después).
+  const encRaw = session.user
+  const enc = encRaw ? ((db.employees || []).find(e => e.id === encRaw.id) || encRaw) : null
   const misCentros = [...new Set([...(enc?.obrasAsignadas || []), ...(enc?.centroTrabajo ? [enc.centroTrabajo] : [])])]
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin && e.id !== enc?.id && (!misCentros.length || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o))))
+  // Sin restricción de centros → mismo comportamiento que TabInicio: muestra todos.
+  const emps = (db.employees || []).filter(e =>
+    !e.baja && !e.isAdmin && e.id !== enc?.id &&
+    (!misCentros.length || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o)))
+  )
   const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
@@ -162,15 +169,6 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     toast(estado === 'aprobada' ? 'Corrección aplicada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
 
-  if (!misCentros.length) {
-    return (
-      <div className="adm-panel">
-        <div className="adm-panel-header"><h1 className="adm-panel-title">Mi obra</h1></div>
-        <div className="empty">No tienes ninguna obra/centro de trabajo asignado. Pide al administrador que te asigne uno en Empleados.</div>
-      </div>
-    )
-  }
-
   const Badge = ({ n }) => n > 0 ? <span style={{ minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'0 4px', marginLeft:5 }}>{n}</span> : null
 
   return (
@@ -178,7 +176,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       <div className="adm-panel-header">
         <div>
           <h1 className="adm-panel-title gradient-text">Mi obra</h1>
-          <div className="adm-panel-sub">{misCentros.join(', ')} · {emps.length} empleado{emps.length !== 1 ? 's' : ''}</div>
+          <div className="adm-panel-sub">{misCentros.length ? misCentros.join(', ') : 'Todos los centros'} · {emps.length} empleado{emps.length !== 1 ? 's' : ''}</div>
         </div>
         {(pendRecs.length + correcsPend.length) > 0 && (
           <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.25)' }}>
