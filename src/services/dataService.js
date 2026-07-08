@@ -366,6 +366,7 @@ async function _bgSyncFallback() {
     const merged = await _mergeWithServer(data)
     await _upsertHotCold(merged)
     saveLocal(merged)
+    _broadcastUpdate(merged._ts)
     await _idbDel('pending')
     _bgSyncRetries = 0
     window.dispatchEvent(new CustomEvent('times-synced'))
@@ -507,6 +508,9 @@ function _broadcastUpdate(ts) {
   // send() es async — un try/catch no basta, hay que atrapar el rechazo de la promesa
   try { _realtimeChannel?.send({ type: 'broadcast', event: 'updated', payload: { ts } })?.catch(() => {}) } catch {}
 }
+
+// Exportado para que App.jsx pueda notificar a otros clientes tras un BG_SYNC_DONE del SW
+export function broadcastSync(ts) { _broadcastUpdate(ts) }
 
 // ── Push notifications ────────────────────────────────────────────────────────
 const VAPID_KEY_STORAGE = 'an_times_vapid_key'
