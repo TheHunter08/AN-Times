@@ -300,9 +300,78 @@ function _splitHotCold(data) {
   return { hot, cold }
 }
 
+// Merge seguro para el guardado — versión mínima duplicada de dataService.js
+// (_mergeForPush/_unionById/_mergeRecords; el service worker no puede importar
+// ese módulo). Antes de subir el pendiente offline, primero se trae lo que haya
+// en el servidor y se fusiona por id — evita que este dispositivo borre
+// fichajes de otros empleados o cierres de jornada hechos por un encargado
+// mientras este dispositivo aún estaba sin conexión.
+function _unionByIdSW(base, incoming) {
+  const b = Array.isArray(base) ? base : []
+  const i = Array.isArray(incoming) ? incoming : []
+  if (i.length === 0) return b
+  if (b.length === 0) return i
+  if ((b.length > 0 && (b[0] === null || typeof b[0] !== 'object')) ||
+      (i.length > 0 && (i[0] === null || typeof i[0] !== 'object'))) {
+    return [...new Set([...b, ...i])]
+  }
+  const map = new Map()
+  for (const item of b) map.set(item.id, item)
+  for (const item of i) map.set(item.id, item)
+  return [...map.values()]
+}
+
+function _mergeRecordsSW(base, incoming) {
+  const b = Array.isArray(base) ? base : []
+  const i = Array.isArray(incoming) ? incoming : []
+  if (i.length === 0) return b
+  if (b.length === 0) return i
+  const map = new Map()
+  for (const item of b) map.set(item.id, item)
+  for (const item of i) {
+    const cur = map.get(item.id)
+    if (!cur) { map.set(item.id, item); continue }
+    const curTs  = cur._upd  ? Date.parse(cur._upd)  : 0
+    const itemTs = item._upd ? Date.parse(item._upd) : 0
+    if (itemTs >= curTs) map.set(item.id, item)
+  }
+  return [...map.values()]
+}
+
+const _LIST_KEYS = ['empresas', 'obras', 'centrosTrabajo', 'employees', 'vacaciones', 'medicos', 'ausencias', 'mensajes', 'notis', 'cierres', 'documentos', 'audit', 'correccionesFichaje', 'chats', 'gastos', 'denuncias', 'wellbeing', 'turnos', 'partesTrabajo', 'anomalias_vistas']
+const _MAP_KEYS  = ['monthSnapshots', 'firmas', 'notisSent', 'pinLockouts', 'config']
+
+function _mergeForPushSW(server, local) {
+  if (!server) return local
+  const out = { ...local }
+  for (const k of _LIST_KEYS) out[k] = _unionByIdSW(server[k], local[k])
+  out.records = _mergeRecordsSW(server.records, (local.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())))
+  for (const k of _MAP_KEYS) out[k] = { ...(server[k] || {}), ...(local[k] || {}) }
+  return out
+}
+
+async function _fetchServerData() {
+  const headers = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}` }
+  try {
+    const [hotRes, coldRes] = await Promise.all([
+      fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers }),
+      fetch(`${_SB_URL}/rest/v1/app_data?id=eq.3&select=data`, { headers }),
+    ])
+    if (!hotRes.ok) return null
+    const hotArr = await hotRes.json().catch(() => [])
+    const hotData = hotArr?.[0]?.data
+    if (!hotData) return null
+    const coldArr = coldRes.ok ? await coldRes.json().catch(() => []) : []
+    const coldData = coldArr?.[0]?.data || {}
+    return { ...hotData, ...coldData }
+  } catch { return null }
+}
+
 async function _bgSync() {
-  const data = await _idbGet('pending')
-  if (!data) return
+  const pending = await _idbGet('pending')
+  if (!pending) return
+  const server = await _fetchServerData()
+  const data = _mergeForPushSW(server, pending)
   const { hot, cold } = _splitHotCold(data)
   const nowIso = new Date().toISOString()
   // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la

@@ -644,7 +644,7 @@ export default function EmployeePage() {
           pos => {
             const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
             const freshRecords = useAppStore.getState().db.records
-            const updated = freshRecords.map(r => r.id === stopId ? { ...r, locFin } : r)
+            const updated = freshRecords.map(r => r.id === stopId ? { ...r, locFin, _upd: new Date().toISOString() } : r)
             useAppStore.getState().saveDB({ records: updated })
           },
           () => {},

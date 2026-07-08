@@ -35,7 +35,16 @@ export const useAppStore = create((set, get) => ({
       return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: !navigator.onLine }
     })
     cloudPush(merged,
-      () => set({ syncStatus: 'synced', offlinePending: false }),
+      // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
+      // en dataService.js) y devuelve ese resultado reconciliado — lo incorporamos
+      // aquí para que la UI local también vea al instante cualquier dato que otro
+      // dispositivo hubiera guardado mientras tanto (p. ej. un fichaje de otro
+      // empleado, o un cierre de jornada hecho por un encargado).
+      (reconciled) => set(state => ({
+        db: reconciled ? mergeDB(state.db, reconciled) : state.db,
+        syncStatus: 'synced',
+        offlinePending: false
+      })),
       () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
     )
     return merged

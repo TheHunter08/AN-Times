@@ -32,7 +32,7 @@ export default function PanelControl({ db, toast, saveDB, session }) {
 
   const startJornada = (e) => {
     if (liveRecs.find(r => r.empId === e.id)) { toast('Ya tiene jornada abierta', 3000, 'warn'); return }
-    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: adminName }
+    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: adminName, _upd: new Date().toISOString() }
     const withAudit = auditLog(db, 'Jornada iniciada por admin', e.name, adminName)
     saveDB({ records: [...recs, newRec], audit: withAudit.audit })
     queuePush(e.id, '▶ Jornada iniciada', `${adminName} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
@@ -44,11 +44,11 @@ export default function PanelControl({ db, toast, saveDB, session }) {
     let updated
     if (rec.enDescanso) {
       const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
-      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk, _upd: now }
       queuePush(rec.empId, '▶ Descanso finalizado', `${adminName} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso finalizado', 3000, 'ok')
     } else {
-      updated = { ...rec, enDescanso: true, bStartTs: now }
+      updated = { ...rec, enDescanso: true, bStartTs: now, _upd: now }
       queuePush(rec.empId, '⏸ Descanso iniciado', `${adminName} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso iniciado', 3000, 'ok')
     }
@@ -62,7 +62,7 @@ export default function PanelControl({ db, toast, saveDB, session }) {
       const now = new Date().toISOString()
       const breaks = [...(rec.breaks || [])]
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
-      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, _upd: now }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
       const withAudit = auditLog(db, 'Jornada cerrada forzosamente', rec.empName, adminName)
       saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })

@@ -33,8 +33,14 @@ export function useTimer() {
         const brk     = secs.brk
         saveTickRef.current = setTimeout(() => {
           const { db: fresh, saveDB: sd } = useAppStore.getState()
+          const current = fresh.records.find(r => r.id === recId)
+          // Si el registro ya se cerró (el propio empleado, un encargado u otro
+          // dispositivo) entre que se tomó esta instantánea y que se guarda, no la
+          // apliquemos — pisaría las horas finales reales con un valor "en vivo"
+          // desactualizado y de menor duración.
+          if (!current || current.fin) return
           const records = fresh.records.map(r =>
-            r.id === recId ? { ...r, workSecs: work, breakSecs: brk } : r
+            r.id === recId ? { ...r, workSecs: work, breakSecs: brk, _upd: new Date().toISOString() } : r
           )
           sd({ records })
         }, 5000)

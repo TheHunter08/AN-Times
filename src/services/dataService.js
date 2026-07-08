@@ -141,6 +141,49 @@ export function mergeDB(base, incoming) {
   }
 }
 
+// ── Merge seguro para el guardado (push) ──────────────────────────────────────
+// mergeDB() está pensado para "bajar del servidor y fusionar con lo local": para
+// listas como employees/obras/empresas usa "si incoming trae algo, ese gana
+// entero" — correcto al descargar (el servidor manda), pero al SUBIR sería al
+// revés: si lo tratamos como incoming=local, cualquier elemento que el servidor
+// tuviera y este cliente aún no hubiera descargado (un fichaje offline de otro
+// empleado, un cierre de jornada de un encargado) se borraría sin más. Aquí
+// usamos unión por id en todos los campos — nunca se pierde nada de ninguno de
+// los dos lados, solo se resuelve por id qué versión concreta gana.
+function _mergeForPush(serverData, localPayload) {
+  if (!serverData) return localPayload
+  const s = serverData, l = localPayload
+  return {
+    ...l,
+    empresas:            _unionById(s.empresas,            l.empresas),
+    obras:               _unionById(s.obras,               l.obras),
+    centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
+    employees:           _unionById(s.employees,           l.employees),
+    records:             _mergeRecords(s.records, (l.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
+    vacaciones:          _unionById(s.vacaciones,          l.vacaciones),
+    medicos:             _unionById(s.medicos,             l.medicos),
+    ausencias:           _unionById(s.ausencias,           l.ausencias),
+    mensajes:            _unionById(s.mensajes,            l.mensajes),
+    notis:               _unionById(s.notis,               l.notis),
+    cierres:             _unionById(s.cierres,             l.cierres),
+    monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
+    firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
+    documentos:          _unionById(s.documentos,          l.documentos),
+    audit:               _unionById(s.audit,               l.audit),
+    correccionesFichaje: _unionById(s.correccionesFichaje, l.correccionesFichaje),
+    chats:               _unionById(s.chats,               l.chats),
+    gastos:              _unionById(s.gastos,              l.gastos),
+    denuncias:           _unionById(s.denuncias,           l.denuncias),
+    wellbeing:           _unionById(s.wellbeing,           l.wellbeing),
+    turnos:              _unionById(s.turnos,              l.turnos),
+    partesTrabajo:       _unionById(s.partesTrabajo,       l.partesTrabajo),
+    anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas),
+    notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
+    pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
+    config:              { ...(s.config || {}), ...(l.config || {}) },
+  }
+}
+
 // ── Supabase fetch (descarga datos completos) ─────────────────────────────────
 // Trae la fila principal (hot) y la fría (gastos/denuncias/wellbeing/anomalias_vistas)
 // y las fusiona en un único objeto — el resto de la app sigue viendo un `db`
@@ -273,11 +316,30 @@ async function _upsertHotCold(payload) {
   }
 }
 
+// Antes de escribir, trae la verdad actual del servidor y fusiona el pendiente
+// local sobre ella (ver _mergeForPush). Sin esto, cada guardado sobrescribe la
+// fila entera con la foto local — si otro dispositivo (otro empleado, un
+// encargado) guardó algo mientras tanto que este cliente todavía no había
+// descargado, ese cambio se borraba en silencio (p. ej. un fichaje offline
+// recién subido, o un cierre de jornada hecho por un encargado).
+async function _mergeWithServer(localPayload) {
+  try {
+    const { ok, data } = await cloudFetch()
+    if (!ok || !data) return localPayload
+    return _mergeForPush(data, localPayload)
+  } catch (e) {
+    console.warn('[_mergeWithServer] fetch falló, se sube solo lo local:', e)
+    return localPayload
+  }
+}
+
 async function _bgSyncFallback() {
   try {
     const data = await _idbGet('pending')
     if (!data || !supabase) return
-    await _upsertHotCold(data)
+    const merged = await _mergeWithServer(data)
+    await _upsertHotCold(merged)
+    saveLocal(merged)
     await _idbDel('pending')
     window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) { console.error('[_bgSyncFallback] error:', e) }
@@ -306,13 +368,15 @@ function _doCloudPush(db, onSuccess, onError) {
     return
   }
 
-  _upsertHotCold(payload)
-    .then(() => {
+  _mergeWithServer(payload)
+    .then(merged => _upsertHotCold(merged).then(() => merged))
+    .then((merged) => {
       _pushFlight = false
       _saveRetry = 0
       _clearBgSync()
-      onSuccess?.(payload)
-      _broadcastUpdate(payload._ts)
+      saveLocal(merged)
+      onSuccess?.(merged)
+      _broadcastUpdate(merged._ts)
       _drainQueue()
     })
     .catch((e) => {

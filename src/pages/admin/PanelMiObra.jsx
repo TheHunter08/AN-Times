@@ -58,7 +58,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     const updated = recs.map(r => {
       if (r.id !== editing.id) return r
       const breaks = newFin ? clipBreaksToWindow(r.breaks, newInicio, newFin) : (r.breaks || [])
-      const closed = { ...r, inicio: newInicio, fin: newFin, breaks }
+      const closed = { ...r, inicio: newInicio, fin: newFin, breaks, _upd: new Date().toISOString() }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
       const corr = { campo:'inicio+fin', antes: `${ftime(r.inicio)}–${ftime(r.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: enc.name, ts: new Date().toISOString() }
       return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
@@ -76,7 +76,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const startJornada = (e) => {
     const alreadyOpen = liveRecs.find(r => r.empId === e.id)
     if (alreadyOpen) { toast('Este empleado ya tiene una jornada abierta', 3000, 'warn'); return }
-    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || misCentros[0] || '', breaks: [], workSecs: 0, creadoPor: enc.name }
+    const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || misCentros[0] || '', breaks: [], workSecs: 0, creadoPor: enc.name, _upd: new Date().toISOString() }
     const withAudit = auditLog(db, 'Jornada iniciada por encargado', e.name, enc.name)
     saveDB({ records: [...recs, newRec], audit: withAudit.audit })
     queuePush(e.id, '▶ Jornada iniciada', `${enc.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
@@ -88,11 +88,11 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     let updated
     if (rec.enDescanso) {
       const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
-      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+      updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk, _upd: now }
       queuePush(rec.empId, '▶ Descanso finalizado', `${enc.name} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso finalizado', 3000, 'ok')
     } else {
-      updated = { ...rec, enDescanso: true, bStartTs: now }
+      updated = { ...rec, enDescanso: true, bStartTs: now, _upd: now }
       queuePush(rec.empId, '⏸ Descanso iniciado', `${enc.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
       toast('Descanso iniciado', 3000, 'ok')
     }
@@ -104,7 +104,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       const now = new Date().toISOString()
       const breaks = [...(rec.breaks || [])]
       if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
-      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+      const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, _upd: now }
       const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
       const withAudit = auditLog(db, 'Jornada finalizada por encargado', rec.empName, enc.name)
       saveDB({ records: recs.map(r => r.id === rec.id ? closed : r), audit: withAudit.audit })
@@ -141,7 +141,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     if (estado === 'aprobada') {
       newRecords = newRecords.map(r => {
         if (r.id !== corr.recId) return r
-        const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin }
+        const updated = { ...r, inicio: corr.propInicio, fin: corr.propFin, _upd: new Date().toISOString() }
         const t = calcSecs(updated)
         return { ...updated, workSecs: t.work, breakSecs: t.brk }
       })

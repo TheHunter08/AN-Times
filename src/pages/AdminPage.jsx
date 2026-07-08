@@ -586,7 +586,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
       const breaks = newFin ? clipBreaksToWindow(rec.breaks, newInicio, newFin) : (rec.breaks || [])
       const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin, breaks })
       const corr = { campo:'inicio+fin', antes: `${ftime(rec.inicio)}–${ftime(rec.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
-      return { ...rec, inicio: newInicio, fin: newFin, breaks, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr] }
+      return { ...rec, inicio: newInicio, fin: newFin, breaks, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr], _upd: new Date().toISOString() }
     })
     const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
     const { cierres, flagged, staleCierres } = flagStaleCierreForEdit(db.cierres || [], r.empId, r.inicio, newInicio)
