@@ -326,7 +326,7 @@ async function _bgSync() {
     }
   }
   await _idbDel('pending')
-  const cs = await self.clients.matchAll({ type: 'window' })
+  const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
   cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
 }
 
@@ -337,7 +337,7 @@ async function _bgSyncNotify() {
   try {
     await _bgSync()
   } catch (err) {
-    const cs = await self.clients.matchAll({ type: 'window' })
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
   }
 }

@@ -285,8 +285,10 @@ async function _upsertHotCold(payload) {
 
 async function _bgSyncFallback() {
   try {
-    // Si hay un push normal en vuelo, él ya se encarga — no pisar con datos viejos de IDB.
-    if (_pushFlight) return
+    // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
+    // Sin el retry, si _onlineListenerPending ya fue limpiado y el push falla,
+    // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
+    if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const data = await _idbGet('pending')
     if (!data || !supabase) return
     // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
@@ -299,7 +301,11 @@ async function _bgSyncFallback() {
     await _upsertHotCold(data)
     await _idbDel('pending')
     window.dispatchEvent(new CustomEvent('times-synced'))
-  } catch (e) { console.error('[_bgSyncFallback] error:', e) }
+  } catch (e) {
+    console.error('[_bgSyncFallback] error:', e)
+    // Avisar a la app para que el banner no quede atascado en "Sincronizando…"
+    window.dispatchEvent(new CustomEvent('times-save-failed'))
+  }
 }
 
 function _clearBgSync() { _idbDel('pending') }

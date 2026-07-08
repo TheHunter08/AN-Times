@@ -792,6 +792,9 @@ export default function EmployeePage() {
         (isJO || !u.obrasAsignadas?.length || u.obrasAsignadas.some(obra => e.obrasAsignadas?.includes(obra)))
       )
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
+      const todayQR = today()
+      const empVac = (db.vacaciones || []).find(v => v.empId === emp.id && v.estado === 'aprobada' && v.fechaInicio <= todayQR && v.fechaFin >= todayQR)
+      if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
       const recs = db.records || []
       if (recs.some(r => r.empId === emp.id && !r.fin)) { toast(`${emp.name} ya tiene jornada abierta`, 3000, 'warn'); return }
       const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
