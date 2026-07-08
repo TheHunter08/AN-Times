@@ -222,17 +222,15 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             </button>
           )}
 
-          {/* Fichar con QR — ficha tu propia entrada/salida escaneando el
-              QR del centro de trabajo. */}
-          {onOpenQRScan && (
-            <button className="v30-break-btn" onClick={onOpenQRScan} style={{ marginTop: timer.state !== 'idle' ? 8 : 0 }}>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
-                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none" />
-              </svg>
-              Fichar con QR
-            </button>
-          )}
+          {/* Mostrar mi QR — el empleado muestra su QR personal para que
+              el encargado/admin lo escanee desde PanelControl o PanelMiObra. */}
+          <button className="v30-break-btn" onClick={() => openModal('miQR')} style={{ marginTop: timer.state !== 'idle' ? 8 : 0 }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
+              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none" />
+            </svg>
+            Mostrar mi QR
+          </button>
 
           {/* Botón dedicado y visible para que un jefe de obra o encargado
               fiche a un empleado de su equipo escaneando su QR personal,
