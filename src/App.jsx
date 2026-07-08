@@ -300,22 +300,32 @@ export default function App() {
     if (navigator.onLine) {
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
     }
-    // El canal Realtime de Supabase gestiona actualizaciones en vivo.
-    // El polling queda solo para cuando la pestaña vuelve a estar visible (app en segundo plano).
-    const onVisible = () => {
+
+    // onResume: refresca datos y WebSocket cuando la PWA vuelve al primer plano.
+    // Se dispara desde tres fuentes porque cada plataforma usa un evento diferente:
+    //   - visibilitychange: Chrome/Firefox/Android WebView
+    //   - pageshow:         iOS PWA standalone (visibilitychange no siempre dispara)
+    //   - focus:            Android PWA cuando otra app volvía al frente
+    // Throttle 2s para que los tres no lancen tres fetchDB() simultáneos.
+    let _resumeTs = 0
+    const onResume = () => {
       if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - _resumeTs < 2000) return
+      _resumeTs = now
       fetchDB()
-      // Reiniciar Realtime: Android mata la conexión WS al pasar a segundo plano
       initRealtime()
-      // Forzar sync de datos pendientes en IDB (Android puede haber matado el BG sync)
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-      // iOS PWA: forzar check de SW al volver al primer plano (la app puede estar suspendida horas)
       navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
     }
-    document.addEventListener('visibilitychange', onVisible)
+    document.addEventListener('visibilitychange', onResume)
+    window.addEventListener('pageshow', onResume)
+    window.addEventListener('focus', onResume)
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('visibilitychange', onResume)
+      window.removeEventListener('pageshow', onResume)
+      window.removeEventListener('focus', onResume)
       stopRealtime()
     }
   }, [])
@@ -421,7 +431,7 @@ export default function App() {
     // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
-    }, 3 * 60 * 1000)
+    }, 30 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
