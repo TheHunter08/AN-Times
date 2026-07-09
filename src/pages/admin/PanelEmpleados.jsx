@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { useAppStore } from '../../store/appStore.js'
 import { today, mhm, p2, calcMin, gid, sortedEmps } from '../../utils/time.js'
 import { auditLog } from '../../services/dataService.js'
-import { hashPin, isPinHashed } from '../../utils/pinSecurity.js'
+import { hashPin, isPinHashed, verifyPin } from '../../utils/pinSecurity.js'
 
 export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModal, activeModal, modalData, session }) {
   const allEmps = sortedEmps(db)
@@ -47,15 +47,24 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
     const isNewPin = form.pin && form.pin.length >= 4
     if (!editEmp && !isNewPin) { toast('PIN de mínimo 4 dígitos'); return }
     if (form.pin && form.pin.length > 0 && form.pin.length < 4) { toast('PIN de mínimo 4 dígitos'); return }
+    // Leer el estado más fresco disponible: saveEmp es async y hashPin/verifyPin
+    // usan PBKDF2 real (no instantáneo) — usar el `db` capturado en el render
+    // aquí y en el guardado final podía perder cambios concurrentes llegados
+    // durante esa espera (p.ej. otro admin editando la lista de empleados).
+    const freshDb = useAppStore.getState().db
     if (isNewPin) {
-      for (const e of (db.employees||[])) {
-        if (e.id === form.id) continue
-        const dup = isPinHashed(e.pin) ? (await hashPin(form.pin, e.id)) === e.pin : e.pin === form.pin
+      for (const e of (freshDb.employees||[])) {
+        if (e.id === form.id || e.baja) continue
+        // verifyPin (no volver a hashear con hashPin): hashPin genera una sal
+        // aleatoria nueva en cada llamada, así que comparar su resultado contra
+        // el hash ya guardado (con su propia sal distinta) nunca coincidía — el
+        // aviso de "PIN ya en uso" nunca saltaba aunque el PIN fuera idéntico.
+        const dup = isPinHashed(e.pin) ? await verifyPin(form.pin, e.pin, e.id) : e.pin === form.pin
         if (dup) { toast('PIN ya está en uso'); return }
       }
     }
     if (form.telefono && form.telefono.trim()) {
-      const dupPhone = (db.employees||[]).find(e => e.id !== form.id && !e.baja && e.telefono && e.telefono === form.telefono)
+      const dupPhone = (freshDb.employees||[]).find(e => e.id !== form.id && !e.baja && e.telefono && e.telefono === form.telefono)
       if (dupPhone) { toast(`Ese WhatsApp ya está en uso por ${dupPhone.name}`); return }
     }
     let finalPin = form.pin
@@ -64,32 +73,34 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
       pinLen = form.pin.length
       finalPin = await hashPin(form.pin, form.id)
     } else if (editEmp) {
-      const existing = (db.employees||[]).find(e => e.id === editEmp)
+      const existing = (freshDb.employees||[]).find(e => e.id === editEmp)
       finalPin = existing?.pin || ''
       pinLen = existing?.pinLen
     }
     const updatedForm = { ...form, pin: finalPin, ...(pinLen !== undefined ? { pinLen } : {}) }
     if (!updatedForm.empresa?.trim()) updatedForm.empresa = 'Sin asignar'
-    const emps2 = editEmp
-      ? (db.employees||[]).map(e => e.id === editEmp ? updatedForm : e)
-      : [...(db.employees||[]), updatedForm]
-    const auditAction = editEmp
-      ? (isNewPin ? 'Empleado actualizado (PIN cambiado)' : 'Empleado actualizado')
-      : 'Empleado creado'
-    const withAudit = auditLog(db, auditAction, form.name, session?.user?.name || 'Admin')
-    // Auto welcome message for new employees
-    const extraData = {}
-    if (!editEmp) {
-      const welcomeMsg = {
-        id: gid(), from: 'admin', to: updatedForm.id,
-        text: `¡Bienvenido/a a TIMES INC, ${updatedForm.name.split(' ')[0]}! 👋\nHas sido dado de alta en el sistema. Usa tu PIN para acceder y registrar tu jornada diaria. Si tienes dudas, escríbeme aquí.`,
-        ts: Date.now(), leido: false
+    saveDB(latestDb => {
+      const emps2 = editEmp
+        ? (latestDb.employees||[]).map(e => e.id === editEmp ? updatedForm : e)
+        : [...(latestDb.employees||[]), updatedForm]
+      const auditAction = editEmp
+        ? (isNewPin ? 'Empleado actualizado (PIN cambiado)' : 'Empleado actualizado')
+        : 'Empleado creado'
+      const withAudit = auditLog(latestDb, auditAction, form.name, session?.user?.name || 'Admin')
+      // Auto welcome message for new employees
+      const extraData = {}
+      if (!editEmp) {
+        const welcomeMsg = {
+          id: gid(), from: 'admin', to: updatedForm.id,
+          text: `¡Bienvenido/a a TIMES INC, ${updatedForm.name.split(' ')[0]}! 👋\nHas sido dado de alta en el sistema. Usa tu PIN para acceder y registrar tu jornada diaria. Si tienes dudas, escríbeme aquí.`,
+          ts: Date.now(), leido: false
+        }
+        extraData.chats = [...(latestDb.chats || []), welcomeMsg]
+        const noti = { id: gid(), empId: updatedForm.id, action: '¡Bienvenido/a!', detail: 'Ya puedes acceder con tu PIN', ts: Date.now(), leido: false }
+        extraData.notis = [...(latestDb.notis || []), noti]
       }
-      extraData.chats = [...(db.chats || []), welcomeMsg]
-      const noti = { id: gid(), empId: updatedForm.id, action: '¡Bienvenido/a!', detail: 'Ya puedes acceder con tu PIN', ts: Date.now(), leido: false }
-      extraData.notis = [...(db.notis || []), noti]
-    }
-    saveDB({ employees: emps2, audit: withAudit.audit, ...extraData })
+      return { employees: emps2, audit: withAudit.audit, ...extraData }
+    })
     toast(editEmp ? '✅ Empleado actualizado' : '✅ Empleado creado')
     setShowForm(false)
   }

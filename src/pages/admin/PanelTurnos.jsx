@@ -166,8 +166,12 @@ export default function PanelTurnos({ db, toast, saveDB, session }) {
         if (t.fecha !== fecha || t.tipo === 'libre') return
         const [h1, m1] = (t.horaInicio || '00:00').split(':').map(Number)
         const [h2, m2] = (t.horaFin || '00:00').split(':').map(Number)
-        const diff = (h2 * 60 + m2) - (h1 * 60 + m1)
-        if (diff > 0) mins += diff
+        let diff = (h2 * 60 + m2) - (h1 * 60 + m1)
+        // Turno que cruza medianoche (p.ej. guardia 22:00–06:00): diff sale
+        // negativo y antes se descartaba entero, mostrando 0h para ese día
+        // aunque el turno estuviera correctamente guardado.
+        if (diff <= 0) diff += 24 * 60
+        mins += diff
       })
       return mins
     })

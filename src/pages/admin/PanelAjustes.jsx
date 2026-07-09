@@ -119,7 +119,11 @@ function PanelAjustes({ db, toast, saveDB, session }) {
     setLogoUploading(true)
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256, 0.88)
-      saveDB({ config: { ...(db.config || {}), companyLogo: dataUrl } })
+      // freshDb, no db de cierre: redimensionar la imagen es async y puede
+      // tardar un momento perceptible — si en ese margen llega un cambio de
+      // config desde otro dispositivo, un saveDB con el db capturado antes del
+      // await lo sobrescribía por completo.
+      saveDB(freshDb => ({ config: { ...(freshDb.config || {}), companyLogo: dataUrl } }))
       toast('Logo actualizado', 2500, 'ok')
     } catch (err) {
       toast('No se pudo procesar la imagen: ' + (err?.message || err), 4000, 'err')
