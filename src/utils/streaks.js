@@ -1,18 +1,25 @@
+import { localDateStr } from './time.js'
+
+// workedDays y el recorrido día a día deben usar la misma fecha LOCAL en ambos
+// lados — r.inicio se guarda en UTC (new Date().toISOString()), así que
+// .slice(0,10) sobre él (y .toISOString().slice(0,10) sobre el Date que
+// recorre hacia atrás) puede archivar un fichaje de madrugada bajo el día UTC
+// anterior, rompiendo o inflando la racha real del empleado.
 export function calcStreak(records, empId, todayDate) {
   const workedDays = new Set(
     (records || [])
       .filter(r => r.empId === empId && r.fin && (r.workSecs || 0) >= 1800)
-      .map(r => r.inicio?.slice(0, 10))
+      .map(r => r.inicio ? localDateStr(new Date(r.inicio)) : null)
       .filter(Boolean)
   )
   let count = 0
-  const d = new Date(todayDate)
+  const d = new Date(todayDate + 'T00:00:00')
   if (!workedDays.has(todayDate)) {
     d.setDate(d.getDate() - 1)
     while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1)
   }
   while (count < 400) {
-    const ds = d.toISOString().slice(0, 10)
+    const ds = localDateStr(d)
     if (!workedDays.has(ds)) break
     count++
     d.setDate(d.getDate() - 1)

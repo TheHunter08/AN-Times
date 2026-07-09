@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react'
-import { vacData, p2, calcMin, mhm } from '../../utils/time.js'
+import { vacData, p2, calcMin, mhm, today, localDateStr } from '../../utils/time.js'
+import { calcStreak } from '../../utils/streaks.js'
 import { applyBrandColor } from '../../utils/webauthn.js'
 import TabGastos from '../TabGastos.jsx'
 import TabDenuncia from '../TabDenuncia.jsx'
@@ -45,21 +46,18 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
   const yearStr = `${now.getFullYear()}-`
   const yearRecs = myRecs.filter(r => r.inicio?.startsWith(yearStr))
   const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
-  const yearDays = new Set(yearRecs.map(r => r.inicio.slice(0, 10))).size
+  // localDateStr, no r.inicio.slice(0,10): inicio se guarda en UTC, esto cuenta
+  // días distintos en hora local (un fichaje de madrugada no debe archivarse
+  // bajo el día UTC anterior).
+  const yearDays = new Set(yearRecs.map(r => localDateStr(new Date(r.inicio)))).size
   const dayMap = {}
-  myRecs.forEach(r => { if (!r.inicio) return; const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
+  myRecs.forEach(r => { if (!r.inicio) return; const d = localDateStr(new Date(r.inicio)); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
   const recordMin = Math.max(0, ...Object.values(dayMap).filter(Boolean))
-  let streak = 0
-  const sd = new Date(now)
-  for (let i = 0; i < 90; i++) {
-    const ds = sd.toISOString().slice(0,10)
-    const isWeekend = sd.getDay() === 0 || sd.getDay() === 6
-    if (!isWeekend) {
-      if (dayMap[ds]) streak++
-      else if (i > 0) break
-    }
-    sd.setDate(sd.getDate() - 1)
-  }
+  // calcStreak (utils/streaks.js), no una tercera reimplementación inline: había
+  // tres cálculos de racha distintos en la app (aquí, en ModalLogros y en
+  // Inicio) que podían mostrar números diferentes al mismo empleado en el mismo
+  // instante — y ésta en concreto heredaba el mismo bug UTC/local de las otras.
+  const streak = calcStreak(db.records, u.id, today())
 
   return (
     <PullToRefresh>

@@ -66,8 +66,12 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     })
   ), [db.medicos, u.id])
 
+  // lds(new Date(r.inicio)), no r.inicio.startsWith(dateStr): inicio se guarda en
+  // UTC, dateStr es local — un fichaje de madrugada podía contar sus horas en la
+  // celda del día (vía workedMap, que sí usa lds) pero devolver "Sin registros"
+  // al tocar esa misma celda, porque startsWith comparaba con el día UTC.
   const getDayRecs = dateStr =>
-    (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(dateStr) && r.fin)
+    (db.records || []).filter(r => r.empId === u.id && r.inicio && lds(new Date(r.inicio)) === dateStr && r.fin)
 
   const getDayStatus = (ds, date) => {
     const dow = date.getDay()

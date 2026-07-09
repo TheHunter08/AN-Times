@@ -1,5 +1,6 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
-import { calcMin, today } from '../../utils/time.js'
+import { today } from '../../utils/time.js'
+import { calcStreak } from '../../utils/streaks.js'
 import { AchievementsSection } from './AchievementsSection.jsx'
 import { WorkHeatmap } from './WorkHeatmap.jsx'
 
@@ -7,16 +8,11 @@ export function ModalLogros({ visible, db, u, onClose, saveDB }) {
   useModalBack(visible, onClose)
   if (!visible) return null
   const myRecs = (db.records || []).filter(r => r.empId === u.id && r.fin)
-  const todayStr = today()
-  const dayMap = {}
-  myRecs.forEach(r => { if (!r.inicio) return; const d = r.inicio.slice(0,10); dayMap[d] = (dayMap[d]||0) + calcMin(r) })
-  let streak = 0
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(); d.setDate(d.getDate() - i)
-    const ds = d.toISOString().slice(0,10)
-    if (ds === todayStr && !dayMap[ds]) continue
-    if (dayMap[ds]) streak++; else break
-  }
+  // Antes reimplementaba la racha aquí mismo sin saltar fines de semana (a
+  // diferencia de calcStreak, que sí lo hace) — la racha se "rompía" cada
+  // sábado y no coincidía con el número que el mismo empleado ve en Inicio o
+  // Perfil, además de bloquear en la práctica los logros de racha (3/7/30 días).
+  const streak = calcStreak(db.records, u.id, today())
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', flexDirection:'column', background:'var(--bg-800)' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 12px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>

@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import { calcMin, mhm } from '../../utils/time.js'
+import { calcMin, mhm, localDateStr } from '../../utils/time.js'
 
 export function WorkHeatmap({ records, empId }) {
   const dayMap = useMemo(() => {
     const m = {}
     ;(records || []).filter(r => r.empId === empId && r.fin && r.inicio).forEach(r => {
-      const d = r.inicio.slice(0, 10); m[d] = (m[d] || 0) + calcMin(r)
+      const d = localDateStr(new Date(r.inicio)); m[d] = (m[d] || 0) + calcMin(r)
     })
     return m
   }, [records, empId])
@@ -20,7 +20,10 @@ export function WorkHeatmap({ records, empId }) {
       for (let d = 0; d < 7; d++) {
         const dt = new Date(start)
         dt.setDate(dt.getDate() + w * 7 + d)
-        const ds = dt.toISOString().slice(0, 10)
+        // localDateStr (no toISOString().slice(0,10)): dt ya está en medianoche
+        // LOCAL — toISOString() la desplaza al día UTC anterior en España,
+        // desfasando el heatmap entero un día hacia atrás, siempre.
+        const ds = localDateStr(dt)
         col.push({ ds, mins: dayMap[ds] || 0, future: dt > now })
       }
       result.push(col)
