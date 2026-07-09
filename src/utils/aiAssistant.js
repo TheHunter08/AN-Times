@@ -1,4 +1,4 @@
-import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm } from './time.js'
+import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm, localDateStr } from './time.js'
 import { WD, WK } from '../config/constants.js'
 
 export const AI_CHIPS = [
@@ -19,7 +19,11 @@ export function buildAIContext(db, u) {
   const fin = mine.filter(r => r.fin)
   const ws = wkStart(now)
   const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
-  const monthMin = fin.filter(r => r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  // localDateStr (no r.inicio?.startsWith(mk)): inicio se guarda en UTC, mk es
+  // local — un fichaje de madrugada del día 1 del mes se quedaba fuera de
+  // "horas trabajadas este mes" y además desincronizaba monthMin de
+  // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
+  const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const mExt = monthlyExtras(db.records, u.id, mk)
   const vac = vacData(u.id, db)
   const todayStr = today()
@@ -53,7 +57,11 @@ export function aiAnswer(q, db, u) {
   const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
   const prevWeekMin = fin.filter(r => { const d = new Date(r.inicio); return d >= prevWs && d < ws }).reduce((s, r) => s + calcMin(r), 0)
 
-  const monthMin = fin.filter(r => r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  // localDateStr (no r.inicio?.startsWith(mk)): inicio se guarda en UTC, mk es
+  // local — un fichaje de madrugada del día 1 del mes se quedaba fuera de
+  // "horas trabajadas este mes" y además desincronizaba monthMin de
+  // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
+  const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   // Regla TIMES INC: extras = semanas >40h, descontando déficit hasta 160h/mes
   const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0 }
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }

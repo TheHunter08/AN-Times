@@ -4,7 +4,7 @@
 // con identificación de empresa (CIF) y trabajador (DNI), entrada/salida,
 // pausas, totales y espacio de firmas. Excel (una hoja por empleado) y HTML
 // imprimible (una página por empleado).
-import { calcMin, recWorkSecs, mhm, p2, monthlyExtras } from './time.js'
+import { calcMin, recWorkSecs, mhm, p2, monthlyExtras, localDateStr } from './time.js'
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -19,8 +19,13 @@ const ftimeShort = iso => {
 function buildEmpDays(db, emp, month) {
   const [y, mo] = month.split('-').map(Number)
   const daysInMonth = new Date(y, mo, 0).getDate()
+  // localDateStr (no r.inicio?.startsWith(month/dateStr)): inicio se guarda en
+  // UTC, month/dateStr son locales — un fichaje entre las 00:00 y la 1-2h
+  // (según DST) hora local caía bajo el día/mes UTC anterior, desapareciendo
+  // de este registro oficial (o, si ocurría el día 1 del mes, de todo el
+  // informe) — documento con valor probatorio ante Inspección de Trabajo.
   const recs = (db.records || [])
-    .filter(r => r.empId === emp.id && r.fin && r.inicio?.startsWith(month))
+    .filter(r => r.empId === emp.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(month))
     .sort((a, b) => a.inicio.localeCompare(b.inicio))
   const vacs = (db.vacaciones || []).filter(v => v.empId === emp.id && v.estado === 'aprobada')
 
@@ -28,7 +33,7 @@ function buildEmpDays(db, emp, month) {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${month}-${p2(d)}`
     const dow = new Date(dateStr + 'T00:00:00').getDay()
-    const dayRecs = recs.filter(r => r.inicio.startsWith(dateStr))
+    const dayRecs = recs.filter(r => localDateStr(new Date(r.inicio)) === dateStr)
     const enVacaciones = vacs.some(v => v.fechaInicio <= dateStr && dateStr <= v.fechaFin)
     if (dayRecs.length) {
       const workMin = dayRecs.reduce((s, r) => s + calcMin(r), 0)
