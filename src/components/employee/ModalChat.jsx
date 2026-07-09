@@ -18,7 +18,7 @@ export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   useEffect(() => {
     if (!visible || !u) return
     const hasUnread = chats.some(m => m.from === adminId && m.to === u.id && !m.leido)
-    if (hasUnread) saveDB({ chats: chats.map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) })
+    if (hasUnread) saveDB(freshDb => ({ chats: (freshDb.chats || []).map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) }))
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 80)
   }, [visible, chats.length])
 
@@ -29,7 +29,7 @@ export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
     const t = text.trim()
     if (!t) return
     const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
-    saveDB({ chats: [...chats, msg] })
+    saveDB(freshDb => ({ chats: [...(freshDb.chats || []), msg] }))
     queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
     setText('')
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)

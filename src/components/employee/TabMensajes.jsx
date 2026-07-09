@@ -16,7 +16,7 @@ export function TabMensajes({ db, u, toast, saveDB }) {
   useEffect(() => {
     const hasUnread = chats.some(m => m.from === adminId && m.to === u.id && !m.leido)
     if (hasUnread) {
-      saveDB({ chats: chats.map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) })
+      saveDB(freshDb => ({ chats: (freshDb.chats || []).map(m => m.from === adminId && m.to === u.id ? { ...m, leido: true } : m) }))
     }
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
   }, [conv.length])
@@ -28,7 +28,7 @@ export function TabMensajes({ db, u, toast, saveDB }) {
     const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false, estado: 'enviando' }
     setText('')
     try {
-      saveDB({ chats: [...chats, msg] })
+      saveDB(freshDb => ({ chats: [...(freshDb.chats || []), msg] }))
       queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
       setTimeout(() => { setSending(false) }, 300)
     } catch {

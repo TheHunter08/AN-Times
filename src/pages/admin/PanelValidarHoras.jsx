@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { gid, p2, mhm, calcMin } from '../../utils/time.js'
+import { gid, p2, mhm, calcMin, localDateStr } from '../../utils/time.js'
 import { WK } from '../../config/constants.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { downloadDataUrl } from '../../utils/adminHelpers.js'
@@ -20,9 +20,9 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   )
 
   const rows = emps.map(e => {
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(selMonth))
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const days = new Set(eRecs.map(r => r.inicio?.slice(0, 10)).filter(Boolean)).size
+    const days = new Set(eRecs.map(r => r.inicio ? localDateStr(new Date(r.inicio)) : null).filter(Boolean)).size
     const weeklyH = e.horasSemanales || (WK / 60)  // siempre en horas
     const expected = Math.round((weeklyH / 5) * days * 60)
     const diff = totalMin - expected
@@ -42,7 +42,7 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
     }
     procesandoCierreJORef.current.add(e.id)
     setProcesandoCierreJO(s => new Set([...s, e.id]))
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(selMonth))
     const cierre = {
       id: gid(), empId: e.id, empName: e.name, mes: selMonth,
       generadoPor: session?.user?.name || 'Jefe de Obra',
@@ -51,7 +51,7 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
       totalMin, dias: days, estado: 'pendiente', firma: null,
       records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 }))
     }
-    saveDB({ cierres: [...(db.cierres||[]), cierre] })
+    saveDB(freshDb => ({ cierres: [...(freshDb.cierres||[]), cierre] }))
     const mesLabel = new Date(selMonth+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
     queuePush(e.id, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')
     toast(`✅ Cierre enviado a ${e.name}`)
@@ -60,14 +60,16 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   }
 
   const regenerarCierreJO = (cierre, e, totalMin, days) => {
-    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(cierre.mes))
-    const updated = (db.cierres || []).map(c => c.id === cierre.id ? {
-      ...c, totalMin, dias: days, desactualizado: false, pdfData: null,
-      records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 })),
-      regeneradoAt: new Date().toISOString(), regeneradoPor: session?.user?.name || 'Jefe de Obra',
-    } : c)
-    const withAudit = auditLog(db, 'Cierre regenerado', `${e.name} · ${cierre.mes}`, session?.user?.name || 'Jefe de Obra')
-    saveDB({ cierres: updated, audit: withAudit.audit })
+    const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(cierre.mes))
+    saveDB(freshDb => {
+      const updated = (freshDb.cierres || []).map(c => c.id === cierre.id ? {
+        ...c, totalMin, dias: days, desactualizado: false, pdfData: null,
+        records_snapshot: eRecs.map(r => ({ inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:r.workSecs||0 })),
+        regeneradoAt: new Date().toISOString(), regeneradoPor: session?.user?.name || 'Jefe de Obra',
+      } : c)
+      const withAudit = auditLog(freshDb, 'Cierre regenerado', `${e.name} · ${cierre.mes}`, session?.user?.name || 'Jefe de Obra')
+      return { cierres: updated, audit: withAudit.audit }
+    })
     queuePush(e.id, '📋 Cierre mensual actualizado', `Tu resumen de ${cierre.mes} se actualizó y ya puedes firmarlo.`, 'cierre', '/?go=emp:perfil')
     toast('Cierre regenerado', 3000, 'ok')
   }
@@ -77,7 +79,7 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
     rows.forEach(({ e, totalMin, days }) => {
       if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === selMonth)) return
       if (!days) return
-      const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(selMonth))
+      const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(selMonth))
       nuevos.push({
         id: gid(), empId: e.id, empName: e.name, mes: selMonth,
         generadoPor: session?.user?.name || 'Jefe de Obra',
@@ -88,7 +90,7 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
       })
     })
     if (!nuevos.length) { toast('Todos los empleados ya tienen cierre o sin registros'); return }
-    saveDB({ cierres: [...(db.cierres||[]), ...nuevos] })
+    saveDB(freshDb => ({ cierres: [...(freshDb.cierres||[]), ...nuevos] }))
     nuevos.forEach(c => {
       const mesLabel = new Date(c.mes+'-01').toLocaleDateString('es-ES',{month:'long',year:'numeric'})
       queuePush(c.empId, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil')

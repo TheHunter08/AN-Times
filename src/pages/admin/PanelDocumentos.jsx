@@ -49,8 +49,10 @@ export default function PanelDocumentos({ db, toast, saveDB, session }) {
     const doc = { ...form, id: gid(), empName: emp?.name || '', createdAt: new Date().toISOString(), firma: null }
     if (fileData) { doc.fileData = fileData; doc.fileName = fileName }
     const noti = { id: gid(), empId: form.empId, action: `Nuevo documento pendiente de firma`, detail: `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo}`, ts: new Date().toISOString(), leido: false }
-    const withAudit = auditLog(db, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
-    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
+    saveDB(freshDb => {
+      const withAudit = auditLog(freshDb, 'Documento enviado', `${TIPO_LABELS[form.tipo]||form.tipo}: ${form.titulo} → ${doc.empName}`, who)
+      return { documentos: [...(freshDb.documentos||[]), doc], notis: [...(freshDb.notis||[]), noti], audit: withAudit.audit }
+    })
     queuePush(form.empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('Documento enviado al empleado', 3000, 'ok')
     setShowForm(false)
@@ -67,8 +69,10 @@ export default function PanelDocumentos({ db, toast, saveDB, session }) {
     if (already) { toast('Ya existe jornada para ese mes'); return }
     const doc = { id: gid(), empId, empName: emp.name, tipo:'jornada', titulo:`Jornada mensual ${mes}`, mes, url:'', createdAt: new Date().toISOString(), firma: null }
     const noti = { id: gid(), empId, action: 'Jornada mensual pendiente de firma', detail: `Necesitas firmar la jornada del mes ${mes}`, ts: new Date().toISOString(), leido: false }
-    const withAudit = auditLog(db, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
-    saveDB({ documentos: [...docs, doc], notis: [...(db.notis||[]), noti], audit: withAudit.audit })
+    saveDB(freshDb => {
+      const withAudit = auditLog(freshDb, 'Jornada enviada para firma', `${emp.name} · ${mes}`, who)
+      return { documentos: [...(freshDb.documentos||[]), doc], notis: [...(freshDb.notis||[]), noti], audit: withAudit.audit }
+    })
     queuePush(empId, noti.action, noti.detail, 'times-doc', '/?go=emp:documentos')
     toast('Jornada enviada para firma', 3000, 'ok')
   }

@@ -7,7 +7,17 @@ export default function PanelMensajes({ db, toast, saveDB, session }) {
   const [text, setText] = useState('')
   const bottomRef = useRef(null)
 
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+  // Encargado (no jefe_obra, que es admin completo): solo ve/escribe a su equipo,
+  // igual que PanelMiObra/PanelValidarHoras/PanelFichajes — sin esto veía y escribía
+  // a TODOS los empleados de la empresa, no solo los de su obra.
+  const isEncargado = session?.isEnc && !session?.isJO
+  const encRaw = session?.user
+  const enc = isEncargado && encRaw ? ((db.employees || []).find(e => e.id === encRaw.id) || encRaw) : null
+  const misCentros = enc ? [...new Set([...(enc.obrasAsignadas || []), ...(enc.centroTrabajo ? [enc.centroTrabajo] : [])])] : []
+  const emps = (db.employees || []).filter(e =>
+    !e.baja && !e.isAdmin &&
+    (!isEncargado || !misCentros.length || misCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => misCentros.includes(o)))
+  )
   const chats = db.chats || []
   const adminId = 'admin'
 
@@ -25,7 +35,7 @@ export default function PanelMensajes({ db, toast, saveDB, session }) {
     // Marcar mensajes del empleado como leídos
     const hasUnread = chats.some(m => m.from === selEmpId && m.to === adminId && !m.leido)
     if (hasUnread) {
-      saveDB({ chats: chats.map(m => m.from === selEmpId && m.to === adminId ? { ...m, leido: true } : m) })
+      saveDB(freshDb => ({ chats: (freshDb.chats || []).map(m => m.from === selEmpId && m.to === adminId ? { ...m, leido: true } : m) }))
     }
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)
   }, [selEmpId, chats.length])
@@ -34,7 +44,7 @@ export default function PanelMensajes({ db, toast, saveDB, session }) {
     const t = text.trim()
     if (!t || !selEmpId) return
     const msg = { id: gid(), from: adminId, to: selEmpId, text: t, ts: Date.now(), leido: false }
-    saveDB({ chats: [...chats, msg] })
+    saveDB(freshDb => ({ chats: [...(freshDb.chats || []), msg] }))
     queuePush(selEmpId, `Mensaje de ${session?.user?.name || 'Admin'}`, t, 'chat', '/?go=emp:mensajes')
     setText('')
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 50)

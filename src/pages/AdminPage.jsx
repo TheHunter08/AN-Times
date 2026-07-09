@@ -2,7 +2,7 @@
 import QRCode from 'qrcode'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
-import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras, toDatetimeLocal } from '../utils/time.js'
+import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras, toDatetimeLocal, localDateStr } from '../utils/time.js'
 import { WD, WK, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
@@ -538,14 +538,14 @@ function PanelFichajes({ db, toast, saveDB, session }) {
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
 
   const qs = {
-    hoy:    r => r.inicio?.startsWith(todayStr),
+    hoy:    r => r.inicio && localDateStr(new Date(r.inicio)) === todayStr,
     semana: r => r.inicio && new Date(r.inicio) >= wkStart(now),
-    mes:    r => r.inicio?.startsWith(mk),
+    mes:    r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk),
   }
 
   const filtered = useMemo(() => recs.filter(r => {
     if (quickFilter && qs[quickFilter] && !qs[quickFilter](r)) return false
-    if (!quickFilter && filterDate && !r.inicio?.startsWith(filterDate)) return false
+    if (!quickFilter && filterDate && !(r.inicio && localDateStr(new Date(r.inicio)) === filterDate)) return false
     if (filterEmp && r.empId !== filterEmp) return false
     if (search) {
       const q = search.toLowerCase()
@@ -562,9 +562,13 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
     const rec = (db.records||[]).find(r => r.id === deletingId)
     const motivo = delMotivo.trim()
-    const withAudit = auditLog(db, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    const { cierres, flagged, staleCierre } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false, staleCierre: null }
-    saveDB({ records: (db.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit, cierres })
+    let flagged = false, staleCierre = null
+    saveDB(freshDb => {
+      const fc = rec ? flagStaleCierre(freshDb.cierres || [], rec.empId, rec.inicio) : { cierres: freshDb.cierres, flagged: false, staleCierre: null }
+      flagged = fc.flagged; staleCierre = fc.staleCierre
+      const withAudit = auditLog(freshDb, 'Fichaje eliminado', `${rec?.empName || ''} · ${rec?.inicio?.slice(0,10) || ''} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
+      return { records: (freshDb.records||[]).filter(r => r.id !== deletingId), audit: withAudit.audit, cierres: fc.cierres }
+    })
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${session?.user?.name || 'Un responsable'} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     if (flagged) notifyStaleCierre(staleCierre, session?.user?.id)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — regénéralo en Informes antes de que firme.' : ''
@@ -584,16 +588,20 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     if (newFin && newInicio >= newFin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
     const empRecs = (db.records||[]).filter(rec => rec.empId === r.empId && rec.id !== r.id && rec.fin)
     if (empRecs.some(rec => newInicio < rec.fin && (newFin || newInicio) > rec.inicio)) { toast('La hora se solapa con otro fichaje', 3500, 'err'); return }
-    const updated = (db.records||[]).map(rec => {
-      if (rec.id !== r.id) return rec
-      const breaks = newFin ? clipBreaksToWindow(rec.breaks, newInicio, newFin) : (rec.breaks || [])
-      const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin, breaks })
-      const corr = { campo:'inicio+fin', antes: `${ftime(rec.inicio)}–${ftime(rec.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
-      return { ...rec, inicio: newInicio, fin: newFin, breaks, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr], _upd: new Date().toISOString() }
+    let flagged = false, staleCierres = []
+    saveDB(freshDb => {
+      const updated = (freshDb.records||[]).map(rec => {
+        if (rec.id !== r.id) return rec
+        const breaks = newFin ? clipBreaksToWindow(rec.breaks, newInicio, newFin) : (rec.breaks || [])
+        const t2 = calcSecs({ ...rec, inicio: newInicio, fin: newFin, breaks })
+        const corr = { campo:'inicio+fin', antes: `${ftime(rec.inicio)}–${ftime(rec.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: session?.user?.name || 'Admin', ts: new Date().toISOString() }
+        return { ...rec, inicio: newInicio, fin: newFin, breaks, workSecs: t2.work, breakSecs: t2.brk, correcciones: [...(rec.correcciones||[]), corr], _upd: new Date().toISOString() }
+      })
+      const withAudit = auditLog(freshDb, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
+      const fc = flagStaleCierreForEdit(freshDb.cierres || [], r.empId, r.inicio, newInicio)
+      flagged = fc.flagged; staleCierres = fc.staleCierres
+      return { records: updated, audit: withAudit.audit, cierres: fc.cierres }
     })
-    const withAudit = auditLog(db, 'Fichaje editado', `${r.empName}: ${ftime(r.inicio)}–${ftime(r.fin)} → ${ftime(newInicio)}–${ftime(newFin)} · Motivo: ${motivo}`, session?.user?.name || 'Admin')
-    const { cierres, flagged, staleCierres } = flagStaleCierreForEdit(db.cierres || [], r.empId, r.inicio, newInicio)
-    saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(r.empId, '✏️ Fichaje corregido', `${session?.user?.name || 'Un responsable'} corrigió tu fichaje del ${fds(r.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     staleCierres.forEach(sc => notifyStaleCierre(sc, session?.user?.id))
     setEditModal(null)
@@ -606,9 +614,9 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const rows = filtered.map(r => [
       r.empName || '',
       r.centro || '',
-      r.inicio?.slice(0,10) || '',
-      r.inicio?.slice(11,16) || '',
-      r.fin?.slice(11,16) || '',
+      r.inicio ? localDateStr(new Date(r.inicio)) : '',
+      r.inicio ? ftime(r.inicio) : '',
+      r.fin ? ftime(r.fin) : '',
       Math.floor(recWorkSecs(r)/60),
       Math.floor((r.breakSecs||0)/60)
     ])

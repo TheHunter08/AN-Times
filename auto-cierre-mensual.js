@@ -19,6 +19,12 @@ const SB_HEADERS = {
 
 const gid = () => createHash('sha1').update(Date.now() + Math.random().toString()).digest('hex').slice(0,12)
 
+// El runner de GitHub Actions corre en UTC, no en hora de España — a diferencia del
+// navegador (donde new Date().getHours() etc. ya son locales), aquí hay que forzar
+// explícitamente Europe/Madrid o un fichaje de madrugada (00:00-02:00 local) se cuela
+// en el mes UTC anterior y se queda fuera del cierre legal de ese mes.
+const madridDateStr = iso => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso))
+
 async function readDB() {
   const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_HEADERS })
   if (!res.ok) throw new Error(`DB read failed: ${res.status}`)
@@ -85,7 +91,7 @@ async function main() {
       console.log(`  ${e.name}: cierre ya existe, omitido`)
       continue
     }
-    const eRecs = records.filter(r => r.empId === e.id && r.fin && r.inicio.startsWith(mes))
+    const eRecs = records.filter(r => r.empId === e.id && r.fin && r.inicio && madridDateStr(r.inicio).startsWith(mes))
     if (!eRecs.length) {
       console.log(`  ${e.name}: sin registros en ${mes}, omitido`)
       continue

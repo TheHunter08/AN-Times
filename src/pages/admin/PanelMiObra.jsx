@@ -61,9 +61,13 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
     const rec = recs.find(r => r.id === deletingRec)
     const motivo = delMotivo.trim()
-    const { cierres, flagged, staleCierre } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false, staleCierre: null }
-    const withAudit = auditLog(db, 'Jornada eliminada por encargado', `${rec?.empName || ''} · ${rec ? fds(rec.inicio) : ''} · Motivo: ${motivo}`, enc.name)
-    saveDB({ records: (db.records || []).filter(r => r.id !== deletingRec), audit: withAudit.audit, cierres })
+    let flagged = false, staleCierre = null
+    saveDB(freshDb => {
+      const fc = rec ? flagStaleCierre(freshDb.cierres || [], rec.empId, rec.inicio) : { cierres: freshDb.cierres, flagged: false, staleCierre: null }
+      flagged = fc.flagged; staleCierre = fc.staleCierre
+      const withAudit = auditLog(freshDb, 'Jornada eliminada por encargado', `${rec?.empName || ''} · ${rec ? fds(rec.inicio) : ''} · Motivo: ${motivo}`, enc.name)
+      return { records: (freshDb.records || []).filter(r => r.id !== deletingRec), audit: withAudit.audit, cierres: fc.cierres }
+    })
     if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${enc.name} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     if (flagged) notifyStaleCierre(staleCierre, enc.id)
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado.' : ''
@@ -90,17 +94,21 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     const newInicio = new Date(editing.inicio).toISOString()
     const newFin = editing.fin ? new Date(editing.fin).toISOString() : rec.fin
     if (newFin && newInicio >= newFin) { toast('La entrada debe ser anterior a la salida', 3500, 'err'); return }
-    const updated = recs.map(r => {
-      if (r.id !== editing.id) return r
-      const breaks = newFin ? clipBreaksToWindow(r.breaks, newInicio, newFin) : (r.breaks || [])
-      const closed = { ...r, inicio: newInicio, fin: newFin, breaks, _upd: new Date().toISOString() }
-      const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
-      const corr = { campo:'inicio+fin', antes: `${ftime(r.inicio)}–${ftime(r.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: enc.name, ts: new Date().toISOString() }
-      return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
+    let flagged = false, staleCierres = []
+    saveDB(freshDb => {
+      const updated = (freshDb.records || []).map(r => {
+        if (r.id !== editing.id) return r
+        const breaks = newFin ? clipBreaksToWindow(r.breaks, newInicio, newFin) : (r.breaks || [])
+        const closed = { ...r, inicio: newInicio, fin: newFin, breaks, _upd: new Date().toISOString() }
+        const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
+        const corr = { campo:'inicio+fin', antes: `${ftime(r.inicio)}–${ftime(r.fin)}`, despues: `${ftime(newInicio)}–${ftime(newFin)}`, motivo, por: enc.name, ts: new Date().toISOString() }
+        return { ...closed, correcciones: [...(r.correcciones||[]), corr] }
+      })
+      const withAudit = auditLog(freshDb, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
+      const fc = flagStaleCierreForEdit(freshDb.cierres, rec.empId, rec.inicio, newInicio)
+      flagged = fc.flagged; staleCierres = fc.staleCierres
+      return { records: updated, audit: withAudit.audit, cierres: fc.cierres }
     })
-    const withAudit = auditLog(db, 'Jornada modificada', `${rec.empName} · ${fds(editing.inicio)} · Motivo: ${motivo}`, enc.name)
-    const { cierres, flagged, staleCierres } = flagStaleCierreForEdit(db.cierres, rec.empId, rec.inicio, newInicio)
-    saveDB({ records: updated, audit: withAudit.audit, cierres })
     queuePush(rec.empId, '✏️ Jornada modificada', `${enc.name} corrigió tu jornada del ${fds(editing.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
     staleCierres.forEach(sc => notifyStaleCierre(sc, enc.id))
     const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado — pide que lo regeneren en Informes.' : ''
@@ -158,7 +166,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     const emp = emps.find(e => e.id === ausForm.empId)
     const key  = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString(), registradoPor: enc.name }
-    saveDB({ [key]: [...(db[key] || []), item] })
+    saveDB(freshDb => ({ [key]: [...(freshDb[key] || []), item] }))
     const tipoLbl = ausForm.tipo === 'medico' ? 'Ausencia médica' : 'Ausencia'
     queuePush(ausForm.empId, `🗓️ ${tipoLbl} registrada`, `${enc.name} registró una ${tipoLbl.toLowerCase()} el ${ausForm.fechaInicio}.`, 'ausencia', '/?tab=calendario')
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
