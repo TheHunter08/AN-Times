@@ -17,6 +17,27 @@ function rateLimit(ip) {
   return entry.count > max
 }
 
+// ── Rate limiter aparte, mucho más estricto, para el broadcast a '__all__' ──
+// Este endpoint autentica peticiones de navegador solo por el header Origin,
+// que cualquier cliente no-navegador puede falsificar (curl, etc.) — no es
+// autenticación real de identidad/rol. Mientras no se sustituya por algo
+// verificable en servidor, limitar agresivamente el broadcast (una acción de
+// admin infrecuente en uso normal) reduce el daño de un abuso: como mucho
+// unos pocos intentos de spam a toda la plantilla por IP y por hora, en vez
+// de los 30/min que permite el límite general pensado para pushes individuales.
+const _rlAll = new Map()
+function rateLimitAll(ip) {
+  const now = Date.now()
+  const window = 60 * 60_000
+  const max = 5
+  const entry = _rlAll.get(ip) || { count: 0, reset: now + window }
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + window }
+  entry.count++
+  _rlAll.set(ip, entry)
+  if (_rlAll.size > 500) { for (const [k, v] of _rlAll) { if (now > v.reset) _rlAll.delete(k) } }
+  return entry.count > max
+}
+
 // ── Dedupe: si el mismo userId+tag+title+body llega en <5min, se ignora ──────
 const _dedupe = new Map()
 const _DEDUPE_TTL = 5 * 60 * 1000
@@ -132,6 +153,7 @@ export default async function handler(req, res) {
     const payload = JSON.stringify({ title, body: _body, tag: _tag, url: safeUrl })
 
     if (userId === '__all__') {
+      if (rateLimitAll(ip)) return res.status(429).json({ error: 'Too many broadcast requests' })
       const subs = await sbGetAll()
       await Promise.allSettled(subs.map(async sub => {
         try { await sendOne(sub, payload) }

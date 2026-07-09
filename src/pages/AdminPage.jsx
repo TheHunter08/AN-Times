@@ -68,9 +68,19 @@ const ENC_PAGES = [
   { id:'mensajes', label:'Mensajes' },
 ]
 
+// Un jefe de obra tampoco es administrador de la empresa — puede ver/gestionar
+// fichajes, empleados, turnos, obras, documentos, gastos y anomalías (sin
+// scoping por obra todavía, ver auditoría de permisos), pero NO tiene sentido
+// que vea Ajustes (incluye importar/exportar backup — sobrescribe TODA la
+// base de datos de la empresa), el canal de Denuncias (whistleblowing,
+// pensado para que ni el propio "administrador" pueda identificar al
+// denunciante) ni la Auditoría completa de acciones de otros admins/JOs.
+// Antes JO_PAGES hacía ...PAGES (spread de TODAS las páginas de admin), dando
+// acceso administrativo completo pese a que los comentarios de PanelFichajes/
+// PanelValidarHoras dicen explícitamente que un JO debe estar limitado a su obra.
 const JO_PAGES = [
   { id:'miobra',  label:'Mi Obra' },
-  ...PAGES,
+  ...PAGES.filter(p => !['ajustes', 'denuncias', 'auditoria'].includes(p.id)),
   { id:'validar',  label:'Validar Horas' },
 ]
 

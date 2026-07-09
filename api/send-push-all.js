@@ -27,6 +27,24 @@ const CRON_SECRET = process.env.CRON_SECRET
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
+// Este endpoint (broadcast a toda/parte de la plantilla) no tenía ningún
+// rate-limit — dado que la vía "browser" solo autentica por Origin (falsificable
+// por un cliente no-navegador, ver comprobación de auth más abajo), limitar
+// agresivamente por IP reduce el daño de un abuso mientras no se sustituya
+// por autenticación real verificable en servidor.
+const _rl = new Map()
+function rateLimit(ip) {
+  const now = Date.now()
+  const window = 60 * 60_000
+  const max = 5
+  const entry = _rl.get(ip) || { count: 0, reset: now + window }
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + window }
+  entry.count++
+  _rl.set(ip, entry)
+  if (_rl.size > 500) { for (const [k, v] of _rl) { if (now > v.reset) _rl.delete(k) } }
+  return entry.count > max
+}
+
 try {
   webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
 } catch (e) {
@@ -54,6 +72,9 @@ async function deleteSub(userId) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
+  if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' })
 
   const secret = (req.headers['x-admin-secret'] || req.headers['authorization'] || '').replace('Bearer ', '')
   const hasValidSecret = CRON_SECRET && secret && secret.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(secret), Buffer.from(CRON_SECRET))
