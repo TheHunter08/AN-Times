@@ -411,10 +411,21 @@ async function _mergeWithServer(localPayload, deleted) {
   }
 }
 
+// true solo mientras hay una petición de red realmente en vuelo (no durante la
+// espera del backoff entre reintentos) — evita que el sondeo rápido de
+// App.jsx (cada 8s mientras offlinePending) dispare una subida en paralelo
+// justo cuando ya hay una en curso: en señal débil, dos intentos compitiendo
+// a la vez por el mismo ancho de banda hace más probable que AMBOS fallen
+// por timeout, alargando aún más la sincronización.
+let _bgSyncFallbackFlight = false
+
 async function _bgSyncFallback() {
+  if (_bgSyncFallbackFlight) return
+  // Si hay un push normal en vuelo, esperar a que aterrice y reintentar
+  // (esto no cuenta como "en vuelo" propio, así que no toma el flag).
+  if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
+  _bgSyncFallbackFlight = true
   try {
-    // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
-    if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const stored = await _idbGet('pending')
     if (!stored || !supabase) { _bgSyncRetries = 0; return }
     const { payload: data, deleted } = stored
@@ -444,6 +455,8 @@ async function _bgSyncFallback() {
     // Reintentar hasta 3 veces (5s, 10s, 15s) antes de mostrar el toast de error.
     // Cubre el caso donde Supabase tarda en responder justo al reconectar y el
     // listener 'online' ya fue eliminado (no volvería a dispararse tras el fallo).
+    // El sondeo de App.jsx (cada 8s) es ahora el reintento principal — esta
+    // cadena interna es solo una red de seguridad adicional.
     if (_bgSyncRetries < 3) {
       _bgSyncRetries++
       setTimeout(_bgSyncFallback, _bgSyncRetries * 5000)
@@ -451,6 +464,8 @@ async function _bgSyncFallback() {
       _bgSyncRetries = 0
       window.dispatchEvent(new CustomEvent('times-save-failed'))
     }
+  } finally {
+    _bgSyncFallbackFlight = false
   }
 }
 

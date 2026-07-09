@@ -465,18 +465,21 @@ export default function App() {
     // comprueba el timestamp antes de traer nada (unos bytes si no hay cambios),
     // así que este intervalo no pesa — solo evita quedarse desactualizado mucho
     // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+    }, 30 * 1000)
     // Con cobertura débil, navigator.onLine puede quedarse en `true` todo el
     // rato (el radio sigue "conectado", solo que las peticiones fallan o hacen
     // timeout) — el evento 'online' del navegador nunca llega a dispararse
     // porque nunca hubo una transición real offline→online, así que
     // offlinePending se quedaba atascado en true indefinidamente hasta que el
-    // usuario reabriera la app o recuperase cobertura total. Reintentar aquí
-    // cada 30s mientras offlinePending sea true no depende de esa transición.
-    const pollInterval = setInterval(() => {
-      if (document.visibilityState !== 'visible' || !navigator.onLine) return
-      if (useAppStore.getState().offlinePending) uploadPendingIfAny()
-      else fetchDB()
-    }, 30 * 1000)
+    // usuario cerraba y reabría la app varias veces (cada apertura sí fuerza un
+    // intento, vía onResume). Intervalo dedicado y bastante más corto que el
+    // sondeo general de arriba para que el reintento automático sea, en la
+    // práctica, tan rápido como reabrir la app a mano.
+    const pendingRetryInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine && useAppStore.getState().offlinePending) uploadPendingIfAny()
+    }, 8 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
@@ -484,6 +487,7 @@ export default function App() {
       window.removeEventListener('times-save-failed', onSaveFailed)
       window.removeEventListener('online', onOnline)
       clearInterval(pollInterval)
+      clearInterval(pendingRetryInterval)
     }
   }, [])
 
