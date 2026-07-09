@@ -520,9 +520,10 @@ function _broadcastUpdate(ts) {
 export function broadcastSync(ts) { _broadcastUpdate(ts) }
 
 // Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED.
-// _bgSyncFallback ya comprueba IDB y sale inmediato si está vacío o no hay red.
+// NO guarda aquí si !navigator.onLine: _bgSyncFallback lo maneja con retry
+// (si quitamos el guard aquí pero no allá, nunca llegaría al retry interno).
 export function uploadPendingIfAny() {
-  if (!supabase || !navigator.onLine) return
+  if (!supabase) return
   _bgSyncFallback().catch(() => {})
 }
 
