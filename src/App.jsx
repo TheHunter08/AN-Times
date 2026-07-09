@@ -321,6 +321,7 @@ export default function App() {
       _resumeTs = now
       fetchDB()
       initRealtime()
+      if (navigator.onLine) uploadPendingIfAny()
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
       navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
     }

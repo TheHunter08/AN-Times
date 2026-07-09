@@ -351,18 +351,15 @@ async function _mergeWithServer(localPayload) {
 async function _bgSyncFallback() {
   try {
     // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
-    // Sin el retry, si _onlineListenerPending ya fue limpiado y el push falla,
-    // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
     if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const data = await _idbGet('pending')
-    if (!data || !supabase) { _bgSyncRetries = 0; return }
-    // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
-    // (ocurre cuando el timer guardó con éxito justo antes del evento online),
-    // limpiar IDB y salir — ya está sincronizado.
-    try {
-      const local = JSON.parse(localStorage.getItem('an_times_v1') || 'null')
-      if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); _bgSyncRetries = 0; return }
-    } catch {}
+    // Sin datos pendientes, sin Supabase, o sin red: nada que hacer
+    if (!data || !supabase || !navigator.onLine) { _bgSyncRetries = 0; return }
+    // NOTA: el timestamp guard que había aquí (local._ts > data._ts → exit) se eliminó.
+    // fetchDB() actualiza localStorage._ts al updated_at del servidor cuando baja datos
+    // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard
+    // interpretara "ya sincronizado" cuando en realidad solo habían llegado datos del admin.
+    // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
     const merged = await _mergeWithServer(data)
     await _upsertHotCold(merged)
     saveLocal(merged)
@@ -512,15 +509,11 @@ function _broadcastUpdate(ts) {
 // Exportado para que App.jsx pueda notificar a otros clientes tras un BG_SYNC_DONE del SW
 export function broadcastSync(ts) { _broadcastUpdate(ts) }
 
-// Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED:
-// Si IDB está vacío sale inmediatamente (sin red). Si tiene datos, los sube.
-export async function uploadPendingIfAny() {
-  if (!supabase) return
-  try {
-    const data = await _idbGet('pending')
-    if (!data) return
-    await _bgSyncFallback()
-  } catch {}
+// Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED.
+// _bgSyncFallback ya comprueba IDB y sale inmediato si está vacío o no hay red.
+export function uploadPendingIfAny() {
+  if (!supabase || !navigator.onLine) return
+  _bgSyncFallback().catch(() => {})
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────
