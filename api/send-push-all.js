@@ -78,7 +78,12 @@ export default async function handler(req, res) {
     if (target === 'all') {
       recipients = allEmps
     } else if (target === 'activos') {
-      const todayStr = new Date().toISOString().slice(0, 10)
+      // Fecha en huso horario de Madrid, no UTC (new Date().toISOString() shiftea
+      // el día en España) — igual que cron-reminders.js. En la ventana horaria
+      // donde UTC y Madrid caen en días distintos, "activos hoy" podía omitir o
+      // incluir empleados de forma incorrecta.
+      const nowSpain = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }))
+      const todayStr = `${nowSpain.getFullYear()}-${String(nowSpain.getMonth()+1).padStart(2,'0')}-${String(nowSpain.getDate()).padStart(2,'0')}`
       const activeIds = new Set(
         (db.records || []).filter(r => !r.fin && r.inicio?.startsWith(todayStr)).map(r => r.empId)
       )
@@ -89,7 +94,11 @@ export default async function handler(req, res) {
       const ids = new Set(target.empIds)
       recipients = allEmps.filter(e => ids.has(e.id))
     } else {
-      recipients = allEmps
+      // Un target no reconocido (typo, objeto malformado) antes caía aquí y
+      // terminaba enviando a TODA la plantilla en vez de fallar explícitamente
+      // — con la autenticación débil de este endpoint (ver más abajo), eso
+      // amplificaba el impacto de cualquier petición mal formada.
+      return res.status(400).json({ error: `target no reconocido: ${JSON.stringify(target)}` })
     }
 
     const safeUrl = (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) ? url : '/'

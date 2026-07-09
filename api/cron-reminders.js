@@ -11,6 +11,7 @@
 // duplicados entre el cron y el cliente (cuando la app está en background).
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
+import { timingSafeEqual } from 'crypto'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -110,10 +111,14 @@ async function sendWhatsApp(phone, message, empName) {
 }
 
 export default async function handler(req, res) {
-  if (CRON_SECRET) {
-    const token = (req.headers['authorization'] || '').replace('Bearer ', '')
-    if (token !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // Fail-closed: si CRON_SECRET no está configurado (p.ej. un despliegue con
+  // la env var ausente), antes el endpoint quedaba abierto a cualquiera en vez
+  // de rechazar — este cron dispara push/WhatsApp masivos y escribe en
+  // Supabase, así que un secreto ausente debe bloquear, no permitir.
+  if (!CRON_SECRET) return res.status(500).json({ error: 'CRON_SECRET no configurado' })
+  const token = (req.headers['authorization'] || '').replace('Bearer ', '')
+  const hasValidSecret = token.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
+  if (!hasValidSecret) return res.status(401).json({ error: 'Unauthorized' })
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
   if (_cronVapidError) return res.status(500).json({ error: _cronVapidError })
@@ -145,20 +150,25 @@ export default async function handler(req, res) {
     const subMap = new Map(subs.map(s => [s.user_id, s]))
 
     const toSend = []
-    const newKeys = {}
 
     const mkPayload = (title, body, tag, url = '/') =>
       JSON.stringify({ title, body, tag, url: (typeof url === 'string' && url.startsWith('/')) ? url : '/' })
 
     const waToSend = []
+    // newKeys ya no se usa para marcar "enviado" — solo se marca de verdad tras
+    // un envío que tuvo éxito (ver más abajo, tras los bucles de envío). Antes
+    // se marcaba aquí mismo, ANTES de intentar enviar nada: un fallo transitorio
+    // de red/push service perdía el recordatorio para siempre (la clave ya
+    // constaba como "enviada" y nunca se reintentaba, ni en el siguiente cron).
+    // Tampoco se marcaba cuando el empleado no tenía push ni teléfono — ahora
+    // simplemente no se programa nada para él y no se marca la clave.
     const schedule = (emp, sub, key, keyVal, title, body, tag, url) => {
       if (sub?.endpoint) {
-        toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url) })
+        toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url), key, keyVal })
       } else if (emp.telefono) {
         // Sin push sub → intentar WhatsApp como canal alternativo
         waToSend.push({ emp, message: `*${title}*\n${body}`, key, keyVal })
       }
-      newKeys[key] = keyVal
     }
 
     for (const emp of employees) {
@@ -288,13 +298,17 @@ export default async function handler(req, res) {
       }
     }
 
-    if (Object.keys(newKeys).length > 0) await markNotisSent(db, newKeys)
+    // Solo se marca como "enviado" (notisSent) lo que realmente se entregó — ver
+    // comentario junto a schedule() más arriba. successKeys se rellena aquí,
+    // DESPUÉS de intentar el envío real, no antes.
+    const successKeys = {}
 
     let sent = 0, failed = 0
-    for (const { emp, sub, payload } of toSend) {
+    for (const { emp, sub, payload, key, keyVal } of toSend) {
       try {
         await sendPush(sub, payload, emp.name)
         sent++
+        successKeys[key] = keyVal
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           await deleteSub(emp.id)
@@ -306,10 +320,12 @@ export default async function handler(req, res) {
     }
 
     let waSent = 0
-    for (const { emp, message } of waToSend) {
+    for (const { emp, message, key, keyVal } of waToSend) {
       const ok = await sendWhatsApp(emp.telefono, message, emp.name)
-      if (ok) waSent++
+      if (ok) { waSent++; successKeys[key] = keyVal }
     }
+
+    if (Object.keys(successKeys).length > 0) await markNotisSent(db, successKeys)
 
     const result = {
       ok: true, today, nowSpain: `${p2(nowH)}:${p2(nowM)}`,

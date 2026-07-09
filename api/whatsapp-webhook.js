@@ -71,11 +71,15 @@ async function getAppData() {
 }
 
 async function saveAppData(data) {
-  await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+  const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
     method: 'PATCH',
     headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ data, updated_at: new Date().toISOString() })
   })
+  // fetch() no lanza por un status de error HTTP, solo por fallo de red — sin
+  // comprobar r.ok, un PATCH rechazado por Supabase (400/500) se daba por
+  // guardado con éxito en silencio.
+  if (!r.ok) throw new Error(`saveAppData PATCH failed: ${r.status}`)
 }
 
 async function sendWhatsAppReply(to, message) {
@@ -232,7 +236,17 @@ export default async function handler(req, res) {
     }
 
     const { reply, changed } = await handleMessage(db, emp, msg.text?.body || '')
-    if (changed) await saveAppData(db)
+    if (changed) {
+      try {
+        await saveAppData(db)
+      } catch (saveErr) {
+        // Si el guardado falla, el empleado se quedaba sin fichaje Y sin ninguna
+        // respuesta (creía haber fichado). Avisar del fallo en vez de silencio.
+        console.error('[whatsapp-webhook] saveAppData failed', saveErr.message)
+        await sendWhatsAppReply(msg.from, '⚠️ No se pudo registrar tu fichaje por un problema temporal. Vuelve a intentarlo en un momento.')
+        return res.status(200).json({ ok: false, error: 'save failed', emp: emp.name })
+      }
+    }
     await sendWhatsAppReply(msg.from, reply)
 
     return res.status(200).json({ ok: true, emp: emp.name, changed })

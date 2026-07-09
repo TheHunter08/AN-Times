@@ -10,6 +10,8 @@
 //   3. Para producción: crea un System User permanente con token de larga duración
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { timingSafeEqual } from 'crypto'
+
 const PHONE_ID = process.env.WHATSAPP_PHONE_ID
 const TOKEN    = process.env.WHATSAPP_TOKEN
 const CRON_SECRET = process.env.CRON_SECRET
@@ -17,11 +19,17 @@ const CRON_SECRET = process.env.CRON_SECRET
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const isCron = req.headers['x-vercel-cron'] === '1'
-  if (!isCron && CRON_SECRET) {
-    const tok = (req.headers['authorization'] || '').replace('Bearer ', '')
-    if (tok !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // El header 'x-vercel-cron' NO es una firma verificada — cualquier cliente
+  // externo puede fijarlo a mano, así que nunca debe usarse como bypass de
+  // autenticación. Este endpoint no lo llama nada dentro del repo (cron-reminders.js
+  // y whatsapp-webhook.js tienen su propia función interna de envío), así que
+  // exigir siempre el secreto no rompe ningún flujo existente. Fail-closed si
+  // CRON_SECRET no está configurado — sin esto, un despliegue con la env var
+  // ausente dejaba el endpoint abierto a cualquiera.
+  if (!CRON_SECRET) return res.status(500).json({ error: 'CRON_SECRET no configurado' })
+  const tok = (req.headers['authorization'] || '').replace('Bearer ', '')
+  const hasValidSecret = tok.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(tok), Buffer.from(CRON_SECRET))
+  if (!hasValidSecret) return res.status(401).json({ error: 'Unauthorized' })
 
   if (!PHONE_ID || !TOKEN) {
     return res.status(503).json({ error: 'WHATSAPP_TOKEN / WHATSAPP_PHONE_ID no configurados' })
