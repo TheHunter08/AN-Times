@@ -10,7 +10,7 @@ import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 // timeout propio, esas sí podían quedarse colgadas indefinidamente. Con esto,
 // cualquier petición individual falla rápido y entra en el mismo camino de
 // reintento/cola offline que ya existe, en vez de bloquear la UI.
-const _FETCH_TIMEOUT_MS = 10000
+const _FETCH_TIMEOUT_MS = 6000
 function _timeoutFetch(url, options = {}) {
   if (options.signal) return fetch(url, options)
   const controller = new AbortController()
@@ -497,10 +497,15 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
       _storeForBgSync(payload, deleted)
-      if (_saveRetry < 5) {
+      // Solo 2 reintentos en primer plano (antes 5): el dato YA está a salvo en
+      // IDB desde la línea de arriba, así que insistir aquí solo añade tiempo de
+      // espera en pantalla sin más seguridad — en señal débil es mejor rendirse
+      // rápido y dejar que la cola de fondo (background sync / listener 'online')
+      // termine el trabajo sin bloquear al usuario.
+      if (_saveRetry < 2) {
         _saveRetry++
         _pushQueue.unshift({ db: null, deleted, onSuccess, onError })
-        // Backoff exponencial: 1s, 2s, 4s, 8s, 16s (máx 30s)
+        // Backoff: 1s, 2s
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
       } else {
