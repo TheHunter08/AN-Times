@@ -7,6 +7,29 @@ const storedSes = (() => {
   try { return JSON.parse(localStorage.getItem('an_times_ses') || 'null') } catch { return null }
 })()
 
+// Detecta qué ids (o valores, en arrays de strings) desaparecieron respecto al
+// estado anterior — son eliminaciones intencionadas del usuario (borrar un
+// fichaje, una ausencia, un gasto…). dataService.js las necesita para poder
+// BORRAR de verdad al fusionar con el servidor antes de subir: esa fusión usa
+// unión por id para no perder datos que otro dispositivo hubiera guardado y
+// este cliente aún no conociera, pero una unión SOLO puede añadir/actualizar,
+// nunca quitar — sin esto, cualquier elemento borrado "resucitaba" en el
+// siguiente guardado porque el servidor todavía lo tenía.
+function _diffDeleted(before, partial) {
+  if (!partial) return null
+  const out = {}
+  for (const key of Object.keys(partial)) {
+    const b = before?.[key], a = partial[key]
+    if (!Array.isArray(b) || !Array.isArray(a) || b.length === 0) continue
+    const isObjArr = b[0] && typeof b[0] === 'object' && b[0].id !== undefined
+    const removed = isObjArr
+      ? (() => { const aIds = new Set(a.map(x => x?.id)); return b.filter(x => x?.id !== undefined && !aIds.has(x.id)).map(x => x.id) })()
+      : (() => { const aSet = new Set(a); return b.filter(x => !aSet.has(x)) })()
+    if (removed.length) out[key] = removed
+  }
+  return Object.keys(out).length ? out : null
+}
+
 export const useAppStore = create((set, get) => ({
   // ── DB ──────────────────────────────────────────────────────────────
   db: loadLocal(),
@@ -23,8 +46,10 @@ export const useAppStore = create((set, get) => ({
     // Usar updater de Zustand para leer siempre el estado más reciente,
     // evitando sobrescrituras cuando dos saves se encadenan rápido o llega un sync de realtime
     let merged
+    let deleted
     set(state => {
       const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
+      deleted = _diffDeleted(state.db, partial)
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
       if (merged.audit?.length > 300) {
         const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -37,7 +62,7 @@ export const useAppStore = create((set, get) => ({
       // parpadear el banner "Modo Oficina" entre cada tick de guardado).
       return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: state.offlinePending || !navigator.onLine }
     })
-    cloudPush(merged,
+    cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
       // en dataService.js) y devuelve ese resultado reconciliado — lo incorporamos
       // aquí para que la UI local también vea al instante cualquier dato que otro

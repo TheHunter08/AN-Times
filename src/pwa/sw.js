@@ -342,12 +342,21 @@ function _mergeRecordsSW(base, incoming) {
 const _LIST_KEYS = ['empresas', 'obras', 'centrosTrabajo', 'employees', 'vacaciones', 'medicos', 'ausencias', 'mensajes', 'notis', 'cierres', 'documentos', 'audit', 'correccionesFichaje', 'chats', 'gastos', 'denuncias', 'wellbeing', 'turnos', 'partesTrabajo', 'anomalias_vistas']
 const _MAP_KEYS  = ['monthSnapshots', 'firmas', 'notisSent', 'pinLockouts', 'config']
 
-function _mergeForPushSW(server, local) {
+function _mergeForPushSW(server, local, deleted) {
   if (!server) return local
   const out = { ...local }
   for (const k of _LIST_KEYS) out[k] = _unionByIdSW(server[k], local[k])
   out.records = _mergeRecordsSW(server.records, (local.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())))
   for (const k of _MAP_KEYS) out[k] = { ...(server[k] || {}), ...(local[k] || {}) }
+  // Una unión solo puede añadir/actualizar, nunca "quitar" — sin esto, un
+  // elemento borrado offline resucitaba porque el servidor todavía lo tenía.
+  if (deleted) {
+    for (const k of Object.keys(deleted)) {
+      if (!Array.isArray(out[k])) continue
+      const delSet = new Set(deleted[k])
+      out[k] = out[k].filter(item => !delSet.has(item && typeof item === 'object' ? item.id : item))
+    }
+  }
   return out
 }
 
@@ -373,10 +382,11 @@ async function _bgSync() {
   if (_bgSyncFlight) return
   _bgSyncFlight = true
   try {
-    const pending = await _idbGet('pending')
-    if (!pending) return
+    const stored = await _idbGet('pending')
+    if (!stored) return
+    const { payload: pending, deleted } = stored
     const server = await _fetchServerData()
-    const data = _mergeForPushSW(server, pending)
+    const data = _mergeForPushSW(server, pending, deleted)
     const { hot, cold } = _splitHotCold(data)
     const nowIso = new Date().toISOString()
     // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la

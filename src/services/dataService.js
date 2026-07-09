@@ -150,10 +150,16 @@ export function mergeDB(base, incoming) {
 // empleado, un cierre de jornada de un encargado) se borraría sin más. Aquí
 // usamos unión por id en todos los campos — nunca se pierde nada de ninguno de
 // los dos lados, solo se resuelve por id qué versión concreta gana.
-function _mergeForPush(serverData, localPayload) {
+//
+// Una unión, por diseño, solo puede añadir/actualizar — nunca "quitar" nada,
+// así que un elemento borrado localmente "resucitaría" porque el servidor
+// todavía lo tiene. `deleted` (calculado en appStore.js al comparar el estado
+// antes/después de cada saveDB) son los ids que el usuario borró a propósito
+// en este guardado — se eliminan del resultado ya fusionado, explícitamente.
+function _mergeForPush(serverData, localPayload, deleted) {
   if (!serverData) return localPayload
   const s = serverData, l = localPayload
-  return {
+  const out = {
     ...l,
     empresas:            _unionById(s.empresas,            l.empresas),
     obras:               _unionById(s.obras,               l.obras),
@@ -182,7 +188,23 @@ function _mergeForPush(serverData, localPayload) {
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
     config:              { ...(s.config || {}), ...(l.config || {}) },
   }
+  if (deleted) {
+    for (const key of Object.keys(deleted)) {
+      if (!Array.isArray(out[key])) continue
+      const delSet = new Set(deleted[key])
+      out[key] = out[key].filter(item => !delSet.has(item && typeof item === 'object' ? item.id : item))
+    }
+  }
+  return out
 }
+
+// Último updated_at de servidor que este cliente ha visto con certeza (por un
+// fetch propio o por su propio push). Deja que _mergeWithServer se salte la
+// descarga completa cuando sabe que nadie más ha escrito desde entonces — en
+// señal débil, cada round-trip de más se nota muchísimo en cuánto tarda en
+// verse sincronizado el modo sin conexión.
+let _lastKnownServerTs = 0
+function _noteServerTs(ts) { if (ts && ts > _lastKnownServerTs) _lastKnownServerTs = ts }
 
 // ── Supabase fetch (descarga datos completos) ─────────────────────────────────
 // Trae la fila principal (hot) y la fría (gastos/denuncias/wellbeing/anomalias_vistas)
@@ -203,6 +225,7 @@ export async function cloudFetch() {
     const merged = { ...hotData, ...coldData }
     const updatedAts = [hotRes.data?.updated_at, coldRes.data?.updated_at].filter(Boolean)
     const latestUpdatedAt = updatedAts.sort().slice(-1)[0] || hotRes.data?.updated_at || null
+    _noteServerTs(latestUpdatedAt ? new Date(latestUpdatedAt).getTime() : 0)
     return { ok: true, data: merged, updatedAt: latestUpdatedAt }
   } catch (e) {
     console.error('[cloudFetch] error:', e)
@@ -223,7 +246,9 @@ export async function cloudFetchTs() {
     if (hotRes.error) return { ok: false, ts: null, status: hotRes.error.code || 'sb_error' }
     const hotTs = hotRes.data?.updated_at ? new Date(hotRes.data.updated_at).getTime() : 0
     const coldTs = (!coldRes.error && coldRes.data?.updated_at) ? new Date(coldRes.data.updated_at).getTime() : 0
-    return { ok: true, ts: Math.max(hotTs, coldTs) }
+    const ts = Math.max(hotTs, coldTs)
+    _noteServerTs(ts)
+    return { ok: true, ts }
   } catch (e) {
     console.error('[cloudFetchTs] error:', e)
     return { ok: false, ts: null, status: 'red' }
@@ -285,9 +310,12 @@ async function _idbDel(key) {
 // en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
 let _onlineListenerPending = false
 
-async function _storeForBgSync(data) {
+async function _storeForBgSync(data, deleted) {
   try {
-    await _idbSet('pending', data)
+    // Se envuelve junto con `deleted` (ids borrados a propósito en este guardado)
+    // para que, cuando por fin se sincronice offline, sw.js/_bgSyncFallback puedan
+    // aplicar la eliminación real en vez de que la unión con el servidor la resucite.
+    await _idbSet('pending', { payload: data, deleted: deleted || null })
     // Fast-path: listener 'online' para cuando la app está abierta.
     // Background Sync API solo dispara cuando el navegador decide reconectar en
     // background (puede tardar, o solo ocurrir al cerrar la app). El listener
@@ -328,6 +356,10 @@ async function _upsertHotCold(payload) {
     const { error: fbErr } = await supabase.from(TABLE).upsert({ id: ROW_ID, data: payload, updated_at: nowIso })
     if (fbErr) throw fbErr
   }
+  // Tras un push con éxito, ya sabemos con certeza cuál es el updated_at del
+  // servidor (lo acabamos de fijar nosotros) — así el próximo guardado puede
+  // saltarse la descarga completa si nadie más ha escrito desde entonces.
+  _noteServerTs(new Date(nowIso).getTime())
 }
 
 // Antes de escribir, trae la verdad actual del servidor y fusiona el pendiente
@@ -336,11 +368,22 @@ async function _upsertHotCold(payload) {
 // encargado) guardó algo mientras tanto que este cliente todavía no había
 // descargado, ese cambio se borraba en silencio (p. ej. un fichaje offline
 // recién subido, o un cierre de jornada hecho por un encargado).
-async function _mergeWithServer(localPayload) {
+//
+// Optimización: si ya sabemos (por un fetch o push propio reciente) que nadie
+// más ha escrito desde entonces, nos ahorramos la descarga completa y subimos
+// directo — en señal débil, cada round-trip de más se nota mucho en cuánto
+// tarda en verse sincronizado el modo sin conexión al recuperar cobertura.
+async function _mergeWithServer(localPayload, deleted) {
   try {
+    // Capturar ANTES de llamar — cloudFetchTs() actualiza _lastKnownServerTs
+    // por su cuenta, así que comparar contra el valor ya actualizado
+    // convertiría este chequeo en un siempre-verdadero inútil.
+    const knownBefore = _lastKnownServerTs
+    const tsResult = await cloudFetchTs()
+    if (tsResult.ok && tsResult.ts && tsResult.ts <= knownBefore) return localPayload
     const { ok, data } = await cloudFetch()
     if (!ok || !data) return localPayload
-    return _mergeForPush(data, localPayload)
+    return _mergeForPush(data, localPayload, deleted)
   } catch (e) {
     console.warn('[_mergeWithServer] fetch falló, se sube solo lo local:', e)
     return localPayload
@@ -353,8 +396,9 @@ async function _bgSyncFallback() {
     // Sin el retry, si _onlineListenerPending ya fue limpiado y el push falla,
     // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
     if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
-    const data = await _idbGet('pending')
-    if (!data || !supabase) return
+    const pending = await _idbGet('pending')
+    if (!pending || !supabase) return
+    const { payload: data, deleted } = pending
     // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
     // (ocurre cuando el timer guardó con éxito justo antes del evento online),
     // limpiar IDB y salir — ya está sincronizado.
@@ -362,7 +406,7 @@ async function _bgSyncFallback() {
       const local = JSON.parse(localStorage.getItem('an_times_v1') || 'null')
       if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); return }
     } catch {}
-    const merged = await _mergeWithServer(data)
+    const merged = await _mergeWithServer(data, deleted)
     await _upsertHotCold(merged)
     saveLocal(merged)
     await _idbDel('pending')
@@ -381,10 +425,10 @@ function _drainQueue() {
   const entry = _pushQueue.shift()
   const freshDb = entry.db || JSON.parse(localStorage.getItem('an_times_v1') || 'null')
   if (!freshDb) return
-  _doCloudPush(freshDb, entry.onSuccess, entry.onError)
+  _doCloudPush(freshDb, entry.deleted, entry.onSuccess, entry.onError)
 }
 
-function _doCloudPush(db, onSuccess, onError) {
+function _doCloudPush(db, deleted, onSuccess, onError) {
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
@@ -393,11 +437,11 @@ function _doCloudPush(db, onSuccess, onError) {
   if (!navigator.onLine) {
     _pushFlight = false
     onError?.()
-    _storeForBgSync(payload)
+    _storeForBgSync(payload, deleted)
     return
   }
 
-  _mergeWithServer(payload)
+  _mergeWithServer(payload, deleted)
     .then(merged => _upsertHotCold(merged).then(() => merged))
     .then((merged) => {
       _pushFlight = false
@@ -416,10 +460,10 @@ function _doCloudPush(db, onSuccess, onError) {
       // Guardar en IDB desde el primer fallo: si el usuario cierra la app
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
-      _storeForBgSync(payload)
+      _storeForBgSync(payload, deleted)
       if (_saveRetry < 5) {
         _saveRetry++
-        _pushQueue.unshift({ db: null, onSuccess, onError })
+        _pushQueue.unshift({ db: null, deleted, onSuccess, onError })
         // Backoff exponencial: 1s, 2s, 4s, 8s, 16s (máx 30s)
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
@@ -430,19 +474,19 @@ function _doCloudPush(db, onSuccess, onError) {
     })
 }
 
-export function cloudPush(db, onSuccess, onError) {
+export function cloudPush(db, deleted, onSuccess, onError) {
   if (!supabase) { onError?.(); return }
   if (_pushFlight) {
-    _pushQueue.push({ db, onSuccess, onError })
+    _pushQueue.push({ db, deleted, onSuccess, onError })
     return
   }
-  _doCloudPush(db, onSuccess, onError)
+  _doCloudPush(db, deleted, onSuccess, onError)
 }
 
-export function scheduleSave(db, onSuccess, onError, delay = 0) {
+export function scheduleSave(db, deleted, onSuccess, onError, delay = 0) {
   saveLocal(db)
   clearTimeout(_saveTimer)
-  _saveTimer = setTimeout(() => cloudPush(db, onSuccess, onError), delay)
+  _saveTimer = setTimeout(() => cloudPush(db, deleted, onSuccess, onError), delay)
 }
 
 // ── Supabase Realtime con auto-reconexión ────────────────────────────────────
