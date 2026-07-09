@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
-import { flushPushQueue } from './services/dataService.js'
+import { flushPushQueue, broadcastSync, uploadPendingIfAny } from './services/dataService.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -296,10 +296,16 @@ export default function App() {
     fetchDB()
     initRealtime()
     // Al arrancar: pedir al SW que suba cualquier dato IDB pendiente de sesiones anteriores
-    // (Android puede matar la app mientras hay datos offline sin sincronizar)
-    if (navigator.onLine) {
-      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-    }
+    // (iOS/Android puede matar la app mientras hay datos offline sin sincronizar).
+    // Usamos serviceWorker.ready en vez de controller?.postMessage porque controller
+    // puede ser null en el instante del arranque (el SW aún no ha reclamado la página
+    // con clients.claim()) — el mensaje se perdería en silencio.
+    navigator.serviceWorker?.ready.then(reg => {
+      if (navigator.onLine) reg.active?.postMessage({ type: 'FORCE_SYNC' })
+    }).catch(() => {})
+    // Hilo principal: por si el proceso fue matado offline en iOS (sin Background Sync API).
+    // uploadPendingIfAny() comprueba IDB — sale inmediato si está vacío, sube si hay datos.
+    if (navigator.onLine) uploadPendingIfAny()
 
     // onResume: refresca datos y WebSocket cuando la PWA vuelve al primer plano.
     // Se dispara desde tres fuentes porque cada plataforma usa un evento diferente:
@@ -315,8 +321,17 @@ export default function App() {
       _resumeTs = now
       fetchDB()
       initRealtime()
-      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-      navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
+      // Intentar siempre (no solo si onLine): en iOS visibilitychange puede
+      // llegar antes de que navigator.onLine se actualice. El retry a 1.5s
+      // cubre ese caso (cuando la red ya existe pero onLine aún es false).
+      uploadPendingIfAny()
+      setTimeout(() => uploadPendingIfAny(), 1500)
+      // Usar serviceWorker.ready en vez de controller: en iOS el SW puede
+      // haber sido matado, controller es null y el mensaje se pierde en silencio.
+      navigator.serviceWorker?.ready.then(reg => {
+        reg.active?.postMessage({ type: 'FORCE_SYNC' })
+        reg.update().catch(() => {})
+      }).catch(() => {})
     }
     document.addEventListener('visibilitychange', onResume)
     window.addEventListener('pageshow', onResume)
@@ -386,9 +401,13 @@ export default function App() {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
       if (event.data?.type === 'BG_SYNC_DONE') {
         useAppStore.setState({ offlinePending: false, syncStatus: 'syncing' })
-        fetchDB()
+        fetchDB().then(() => broadcastSync(useAppStore.getState().db._ts))
       }
-      if (event.data?.type === 'BG_SYNC_FAILED') useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
+      if (event.data?.type === 'BG_SYNC_FAILED') {
+        useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })
+        // El SW falló — reintento desde hilo principal (cubre iOS sin Background Sync API)
+        setTimeout(() => uploadPendingIfAny(), 5000)
+      }
     }
     const onDeepLink = (event) => applyDeepLink(event.detail)
     const onSynced = () => {
@@ -411,7 +430,9 @@ export default function App() {
     // Cuando vuelva internet: sincronizar inmediatamente
     const onOnline = () => {
       useAppStore.setState(s => s.offlinePending ? { syncStatus: 'syncing' } : {})
-      // Subir cola en memoria + IDB pendiente (Android puede haber matado el proceso)
+      // Hilo principal: sube IDB pendiente directamente (clave para iOS sin BgSync API)
+      uploadPendingIfAny()
+      // SW: también intenta desde el service worker (Android, Chrome)
       flushPushQueue()
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
       // Reiniciar Realtime: Android cierra el WS al perder señal
@@ -419,7 +440,7 @@ export default function App() {
       // Delay: esperar a que los cambios offline suban antes de bajar del servidor
       setTimeout(() => {
         if (navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
-      }, 2000)
+      }, 3000)
     }
     window.addEventListener('online', onOnline)
     flushPushQueue()

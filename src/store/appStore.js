@@ -33,6 +33,10 @@ function _diffDeleted(before, partial) {
 export const useAppStore = create((set, get) => ({
   // ── DB ──────────────────────────────────────────────────────────────
   db: loadLocal(),
+  // Último updated_at conocido del servidor. SOLO se actualiza tras un fetchDB exitoso,
+  // nunca por guardados locales — evita que db._ts (inflado por Date.now()) bloquee la
+  // detección de cambios remotos en fetchDB y en el receptor de Realtime.
+  _serverTs: 0,
 
   setDB: db => set({ db }),
 
@@ -90,7 +94,10 @@ export const useAppStore = create((set, get) => ({
         return
       }
       set({ syncError: null })
-      if (tsResult.ts && get().db._ts && tsResult.ts <= get().db._ts) {
+      // Comparar contra _serverTs (no db._ts): db._ts puede estar inflado por
+      // Date.now() de guardados locales del encargado, haciendo que tsResult.ts
+      // (updated_at del servidor) parezca "más viejo" y se salte la descarga.
+      if (tsResult.ts && get()._serverTs && tsResult.ts <= get()._serverTs) {
         set({ syncStatus: 'synced', lastSyncTime: Date.now() })
         return
       }
@@ -98,14 +105,11 @@ export const useAppStore = create((set, get) => ({
       if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
       if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
       const merged = mergeDB(get().db, data)
-      // El `_ts` embebido en el JSON puede venir "viejo" (p.ej. tras un guardado
-      // offline, donde se fijó al momento del guardado, no al de la sincronización
-      // real). Si nos quedamos solo con ese valor, tsResult.ts (el updated_at real
-      // de la fila) sigue siendo mayor en cada fetchDB() futuro y la app repite un
-      // fetch+merge completo sin fin en vez de usar el atajo de la línea de arriba.
       if (tsResult.ts && tsResult.ts > merged._ts) merged._ts = tsResult.ts
       saveLocal(merged)
-      set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
+      // Actualizar _serverTs con el updated_at real del servidor para que la
+      // próxima comparación use un valor que no esté inflado por guardados locales.
+      set({ db: merged, _serverTs: tsResult.ts || Date.now(), syncStatus: 'synced', lastSyncTime: Date.now() })
       // Re-validate session against fresh data y refrescar user con datos actualizados
       // (e.g. obrasAsignadas cambiadas por el admin sin que el encargado haya vuelto a logearse)
       const ses = get().session
@@ -131,7 +135,8 @@ export const useAppStore = create((set, get) => ({
   initRealtime: () => {
     startRealtime(
       () => get().db,
-      () => { get().fetchDB() }
+      () => { get().fetchDB() },
+      () => get()._serverTs
     )
   },
   stopRealtime,

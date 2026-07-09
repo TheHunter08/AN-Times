@@ -309,6 +309,7 @@ async function _idbDel(key) {
 // Background Sync API (el timer guarda cada 30s, _storeForBgSync se llama
 // en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
 let _onlineListenerPending = false
+let _bgSyncRetries = 0
 
 async function _storeForBgSync(data, deleted) {
   try {
@@ -316,6 +317,9 @@ async function _storeForBgSync(data, deleted) {
     // para que, cuando por fin se sincronice offline, sw.js/_bgSyncFallback puedan
     // aplicar la eliminación real en vez de que la unión con el servidor la resucite.
     await _idbSet('pending', { payload: data, deleted: deleted || null })
+    // Badge rojo en el icono de la app: avisa al usuario de que hay datos pendientes.
+    // Se borra en _bgSyncFallback y en _bgSync del SW cuando la subida tiene éxito.
+    try { navigator.setAppBadge?.(1) } catch {}
     // Fast-path: listener 'online' para cuando la app está abierta.
     // Background Sync API solo dispara cuando el navegador decide reconectar en
     // background (puede tardar, o solo ocurrir al cerrar la app). El listener
@@ -393,28 +397,43 @@ async function _mergeWithServer(localPayload, deleted) {
 async function _bgSyncFallback() {
   try {
     // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
-    // Sin el retry, si _onlineListenerPending ya fue limpiado y el push falla,
-    // el IDB queda varado porque el listener 'online' no vuelve a dispararse.
     if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
-    const pending = await _idbGet('pending')
-    if (!pending || !supabase) return
-    const { payload: data, deleted } = pending
-    // Guard de timestamp: si localStorage ya tiene datos más nuevos que el IDB
-    // (ocurre cuando el timer guardó con éxito justo antes del evento online),
-    // limpiar IDB y salir — ya está sincronizado.
-    try {
-      const local = JSON.parse(localStorage.getItem('an_times_v1') || 'null')
-      if (local?._ts && data._ts && local._ts > data._ts) { await _idbDel('pending'); return }
-    } catch {}
+    const stored = await _idbGet('pending')
+    if (!stored || !supabase) { _bgSyncRetries = 0; return }
+    const { payload: data, deleted } = stored
+    // Sin red: puede que navigator.onLine aún no se haya actualizado (iOS resume).
+    // Reintento breve en vez de salir definitivamente.
+    if (!navigator.onLine) {
+      if (_bgSyncRetries < 2) { _bgSyncRetries++; setTimeout(_bgSyncFallback, 2000) }
+      else { _bgSyncRetries = 0 }
+      return
+    }
+    // NOTA: el timestamp guard que había aquí (local._ts > data._ts → exit) se eliminó.
+    // fetchDB() actualiza localStorage._ts al updated_at del servidor cuando baja datos
+    // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard
+    // interpretara "ya sincronizado" cuando en realidad solo habían llegado datos del admin.
+    // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
     const merged = await _mergeWithServer(data, deleted)
     await _upsertHotCold(merged)
+    merged._ts = Date.now()
     saveLocal(merged)
+    _broadcastUpdate(merged._ts)
     await _idbDel('pending')
+    try { navigator.clearAppBadge?.() } catch {}
+    _bgSyncRetries = 0
     window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) {
     console.error('[_bgSyncFallback] error:', e)
-    // Avisar a la app para que el banner no quede atascado en "Sincronizando…"
-    window.dispatchEvent(new CustomEvent('times-save-failed'))
+    // Reintentar hasta 3 veces (5s, 10s, 15s) antes de mostrar el toast de error.
+    // Cubre el caso donde Supabase tarda en responder justo al reconectar y el
+    // listener 'online' ya fue eliminado (no volvería a dispararse tras el fallo).
+    if (_bgSyncRetries < 3) {
+      _bgSyncRetries++
+      setTimeout(_bgSyncFallback, _bgSyncRetries * 5000)
+    } else {
+      _bgSyncRetries = 0
+      window.dispatchEvent(new CustomEvent('times-save-failed'))
+    }
   }
 }
 
@@ -502,15 +521,18 @@ let _realtimeChannel = null
 let _realtimeRetry   = 0
 let _realtimeTimer   = null
 
-export function startRealtime(currentGetDB, onUpdate) {
+export function startRealtime(currentGetDB, onUpdate, getServerTs) {
   if (!supabase) return
   stopRealtime()
   _realtimeChannel = supabase
     .channel('app_data_rt', { config: { broadcast: { self: false } } })
     .on('broadcast', { event: 'updated' }, ({ payload }) => {
       const remoteTs = payload?.ts
-      const local = currentGetDB()
-      if (remoteTs != null && local._ts != null && remoteTs <= local._ts) return
+      // Usar _serverTs (no local._ts): local._ts puede estar inflado por Date.now()
+      // de guardados locales del encargado, haciendo que broadcasts de empleados
+      // parezcan "ya conocidos" aunque el encargado nunca haya descargado esos datos.
+      const refTs = getServerTs ? getServerTs() : currentGetDB()._ts
+      if (remoteTs != null && refTs != null && refTs > 0 && remoteTs <= refTs) return
       _realtimeRetry = 0
       onUpdate?.()
     })
@@ -522,7 +544,7 @@ export function startRealtime(currentGetDB, onUpdate) {
         clearTimeout(_realtimeTimer)
         const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 60000)
         _realtimeRetry++
-        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate), delay)
+        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate, getServerTs), delay)
       }
     })
 }
@@ -540,6 +562,17 @@ export function stopRealtime() {
 function _broadcastUpdate(ts) {
   // send() es async — un try/catch no basta, hay que atrapar el rechazo de la promesa
   try { _realtimeChannel?.send({ type: 'broadcast', event: 'updated', payload: { ts } })?.catch(() => {}) } catch {}
+}
+
+// Exportado para que App.jsx pueda notificar a otros clientes tras un BG_SYNC_DONE del SW
+export function broadcastSync(ts) { _broadcastUpdate(ts) }
+
+// Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED.
+// NO guarda aquí si !navigator.onLine: _bgSyncFallback lo maneja con retry
+// (si quitamos el guard aquí pero no allá, nunca llegaría al retry interno).
+export function uploadPendingIfAny() {
+  if (!supabase) return
+  _bgSyncFallback().catch(() => {})
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────
