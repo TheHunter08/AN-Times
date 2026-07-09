@@ -20,6 +20,22 @@ export const ftimeInput = iso => {
   catch { return '' }
 }
 
+// Convierte un ISO en UTC (como los que genera new Date().toISOString(), que es
+// como se guardan inicio/fin en records) al formato local que espera
+// <input type="datetime-local">. NO usar iso.slice(0,16): eso recorta la hora
+// en UTC tal cual y el input la muestra como si fuera hora local — un
+// desfase igual al huso horario (1-2h en España). Sin este helper, abrir el
+// modal de "Modificar jornada" y guardar sin tocar nada desplazaba el
+// fichaje real del empleado esas mismas horas.
+export const toDatetimeLocal = iso => {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`
+  } catch { return '' }
+}
+
 export const fdate = iso => {
   if (!iso) return '—'
   try { return new Date(iso).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) }

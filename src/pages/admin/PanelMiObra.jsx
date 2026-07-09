@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, mhm, ftime, fds, calcSecs, calcMin, gid, recWorkSecs } from '../../utils/time.js'
+import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, recWorkSecs, toDatetimeLocal, monthlyExtras } from '../../utils/time.js'
+import { WK } from '../../config/constants.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
-import { flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '../../utils/adminHelpers.js'
+import { flagStaleCierre, flagStaleCierreForEdit, clipBreaksToWindow, notifyStaleCierre } from '../../utils/adminHelpers.js'
 
 export default function PanelMiObra({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
@@ -19,8 +20,14 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   const empIds = new Set(emps.map(e => e.id))
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin && empIds.has(r.empId))
-  const pendRecs = recs.filter(r => r.fin && empIds.has(r.empId) && !r.aceptada)
-    .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, 50)
+  // Antes solo se listaban las pendientes de aceptar — en cuanto el encargado/JO
+  // las aceptaba, desaparecían de aquí y ya no había forma de corregir un error
+  // detectado más tarde salvo yendo a Fichajes (admin). Ahora se listan todas las
+  // jornadas recientes del equipo, aceptadas o no, para poder modificar/eliminar
+  // cualquiera desde el mismo sitio.
+  const teamRecs = recs.filter(r => r.fin && empIds.has(r.empId))
+    .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, 100)
+  const pendRecs = teamRecs.filter(r => !r.aceptada)
   const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
   const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
   const teamAus = [
@@ -43,6 +50,22 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     return () => window.removeEventListener('popstate', onPop)
   }, [editing])
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
+  const [deletingRec, setDeletingRec] = useState(null)
+  const [delMotivo, setDelMotivo]     = useState('')
+
+  const confirmDeleteRecord = () => {
+    if (!delMotivo.trim()) { toast('Indica el motivo de la eliminación', 3500, 'err'); return }
+    const rec = recs.find(r => r.id === deletingRec)
+    const motivo = delMotivo.trim()
+    const { cierres, flagged, staleCierre } = rec ? flagStaleCierre(db.cierres || [], rec.empId, rec.inicio) : { cierres: db.cierres, flagged: false, staleCierre: null }
+    const withAudit = auditLog(db, 'Jornada eliminada por encargado', `${rec?.empName || ''} · ${rec ? fds(rec.inicio) : ''} · Motivo: ${motivo}`, enc.name)
+    saveDB({ records: (db.records || []).filter(r => r.id !== deletingRec), audit: withAudit.audit, cierres })
+    if (rec) queuePush(rec.empId, '🗑️ Fichaje eliminado', `${enc.name} eliminó tu fichaje del ${fds(rec.inicio)}: ${motivo}`, 'jornada', '/?tab=jornada')
+    if (flagged) notifyStaleCierre(staleCierre, enc.id)
+    const warn = flagged ? ' ⚠️ El cierre de ese mes quedó desactualizado.' : ''
+    toast('Fichaje eliminado' + warn, warn ? 6000 : 3000, warn ? 'warn' : 'ok')
+    setDeletingRec(null); setDelMotivo('')
+  }
 
   const aceptar = (rec) => {
     saveDB(freshDb => {
@@ -53,7 +76,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     toast('Jornada aceptada', 3000, 'ok')
   }
 
-  const startEdit = (rec) => setEditing({ id: rec.id, inicio: rec.inicio?.slice(0,16) || '', fin: rec.fin ? rec.fin.slice(0,16) : '', motivo:'' })
+  const startEdit = (rec) => setEditing({ id: rec.id, inicio: toDatetimeLocal(rec.inicio), fin: rec.fin ? toDatetimeLocal(rec.fin) : '', motivo:'' })
 
   const saveEdit = () => {
     if (!editing.motivo?.trim()) { toast('Indica el motivo del cambio', 3500, 'err'); return }
@@ -171,6 +194,25 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
 
   const Badge = ({ n }) => n > 0 ? <span style={{ minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'0 4px', marginLeft:5 }}>{n}</span> : null
 
+  // ── Revisión de horas del mes — mismo cálculo que Informes > Horas extra,
+  // pero accesible aquí para encargados (que no tienen acceso a Informes).
+  const [horasMonth, setHorasMonth] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${p2(n.getMonth()+1)}` })
+  const horasRows = emps.map(e => {
+    const weeklyH = e.horasSemanales || (WK / 60)
+    const monthlyH = e.horasMensuales || 160
+    const ex = monthlyExtras(recs, e.id, horasMonth, { weeklyH, monthlyH })
+    const days = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(horasMonth)).length
+    return {
+      e, days, weeklyH, monthlyH,
+      mMin: ex.workedMin,
+      mExpected: monthlyH * 60,
+      mExtra: ex.netExtraMin,
+      mDeficit: ex.deficitMin,
+      mWeeklyExtra: ex.weeklyExtraMin,
+      mShortfall: ex.shortfallMin,
+    }
+  })
+
   return (
     <div className="adm-panel">
       <div className="adm-panel-header">
@@ -189,6 +231,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
         {[
           ['live',        '🔴 En vivo',     liveRecs.length],
           ['jornadas',    '📋 Jornadas',    pendRecs.length],
+          ['horas',       '⏱️ Horas',       0],
           ['ausencias',   '🏥 Ausencias',   0],
           ['correcciones','✏️ Correcciones', correcsPend.length],
         ].map(([id, label, badge]) => (
@@ -243,19 +286,59 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
       {/* ── Tab: Jornadas ────────────────────────────────────────────────── */}
       {tab === 'jornadas' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {pendRecs.map(r => (
+          {teamRecs.map(r => (
             <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-600)', borderRadius:'var(--r)', border:'1px solid var(--border)', flexWrap:'wrap' }}>
               <div style={{ flex:1, minWidth:160 }}>
-                <div style={{ fontSize:13, fontWeight:700 }}>{r.empName}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ fontSize:13, fontWeight:700 }}>{r.empName}</div>
+                  <span className={`badge ${r.aceptada ? 'badge-green' : 'badge-orange'}`} style={{ fontSize:9 }}>{r.aceptada ? '✓ Aceptada' : '⏳ Pendiente'}</span>
+                </div>
                 <div style={{ fontSize:12, color:'var(--text3)' }}>{fds(r.inicio)} · {ftime(r.inicio)} → {ftime(r.fin)} · {mhm(Math.floor(recWorkSecs(r)/60))}</div>
               </div>
               <div style={{ display:'flex', gap:6 }}>
                 <button className="btn btn-sm btn-secondary" onClick={() => startEdit(r)}>Modificar</button>
-                <button className="btn btn-sm btn-primary"   onClick={() => aceptar(r)}>✓ Aceptar</button>
+                {!r.aceptada && <button className="btn btn-sm btn-primary" onClick={() => aceptar(r)}>✓ Aceptar</button>}
+                <button className="btn btn-sm btn-danger" onClick={() => { setDeletingRec(r.id); setDelMotivo('') }}>Eliminar</button>
               </div>
             </div>
           ))}
-          {!pendRecs.length && <div className="empty">Sin jornadas pendientes de aceptar</div>}
+          {!teamRecs.length && <div className="empty">Sin jornadas registradas en tu equipo</div>}
+        </div>
+      )}
+
+      {/* ── Tab: Horas (revisión de horas del equipo) ──────────────────────── */}
+      {tab === 'horas' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+            <input type="month" value={horasMonth} onChange={e => setHorasMonth(e.target.value)}
+              style={{ width:'auto', padding:'7px 12px', fontSize:13, borderRadius:8 }} />
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {horasRows.map(({ e, days, mMin, mExpected, mExtra, mDeficit, mWeeklyExtra, mShortfall }) => {
+              const compensated = mWeeklyExtra > 0 && mShortfall > 0
+              return (
+                <div key={e.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'var(--bg-700)', borderRadius:'var(--r)', border:`1px solid ${mExtra > 0 ? 'rgba(245,158,11,.25)' : mDeficit > 0 ? 'rgba(239,68,68,.2)' : 'var(--border)'}` }}>
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:e.color||'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    {(e.initials||e.name.slice(0,2)).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>
+                      {days}d · {mhm(mMin)} trabajadas · objetivo {mhm(Math.round(mExpected))}
+                      {compensated && <span style={{ marginLeft:6, color:'var(--text4)' }}>({mhm(Math.round(mWeeklyExtra))} sem. − {mhm(Math.round(mShortfall))} déf.)</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:'right', flexShrink:0 }}>
+                    {mExtra > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--orange)', fontVariantNumeric:'tabular-nums' }}>+{mhm(Math.round(mExtra))}</div>}
+                    {mDeficit > 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--red)', fontVariantNumeric:'tabular-nums' }}>−{mhm(Math.round(mDeficit))}</div>}
+                    {mExtra === 0 && mDeficit === 0 && <div style={{ fontSize:14, fontWeight:800, color:'var(--green)' }}>✓</div>}
+                    <div style={{ fontSize:10, color:'var(--text4)' }}>{mExtra > 0 ? 'extras' : mDeficit > 0 ? 'déficit' : 'al día'}</div>
+                  </div>
+                </div>
+              )
+            })}
+            {!horasRows.length && <div className="empty">Sin empleados asignados a tu obra</div>}
+          </div>
         </div>
       )}
 
@@ -385,6 +468,25 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
             <div className="modal-btns">
               <button className="btn btn-secondary" onClick={() => setEditing(null)}>Cancelar</button>
               <button className="btn btn-primary" disabled={!editing.motivo?.trim()} onClick={saveEdit}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingRec && (
+        <div className="modal-ov center" onClick={() => { setDeletingRec(null); setDelMotivo('') }}>
+          <div className="modal center-modal" onClick={e => e.stopPropagation()} style={{ maxWidth:380, width:'calc(100% - 32px)' }}>
+            <h2 style={{ margin:'0 0 12px', fontSize:16 }}>Eliminar jornada</h2>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:14 }}>Esta acción no se puede deshacer. El empleado recibirá un aviso.</div>
+            <div className="field" style={{ marginBottom:16 }}>
+              <label>MOTIVO (obligatorio)</label>
+              <input type="text" autoFocus maxLength={200} placeholder="Ej: fichaje duplicado, prueba errónea…"
+                value={delMotivo} onChange={e => setDelMotivo(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') confirmDeleteRecord() }} />
+            </div>
+            <div className="modal-btns">
+              <button className="btn btn-secondary" onClick={() => { setDeletingRec(null); setDelMotivo('') }}>Cancelar</button>
+              <button className="btn btn-danger" disabled={!delMotivo.trim()} onClick={confirmDeleteRecord}>Eliminar</button>
             </div>
           </div>
         </div>

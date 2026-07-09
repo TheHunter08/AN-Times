@@ -2,7 +2,7 @@
 import QRCode from 'qrcode'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAppStore } from '../store/appStore.js'
-import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras } from '../utils/time.js'
+import { today, mhm, p2, ftime, fds, calcSecs, calcMin, gid, vacData, wkStart, recWorkSecs, sortedEmps, monthlyExtras, toDatetimeLocal } from '../utils/time.js'
 import { WD, WK, VAPID_PUB } from '../config/constants.js'
 import { auditLog, queuePush, pushSubscribe } from '../services/dataService.js'
 import { DocPreview } from '../components/DocPreview.jsx'
@@ -569,7 +569,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     setDeletingId(null); setDelMotivo('')
   }
 
-  const openEditModal = (r) => setEditModal({ id: r.id, inicio: r.inicio?.slice(0,16) || '', fin: r.fin?.slice(0,16) || '', motivo: '' })
+  const openEditModal = (r) => setEditModal({ id: r.id, inicio: toDatetimeLocal(r.inicio), fin: toDatetimeLocal(r.fin), motivo: '' })
 
   const saveEditModal = () => {
     if (!editModal.motivo?.trim()) { toast('Indica el motivo del cambio', 3500, 'err'); return }

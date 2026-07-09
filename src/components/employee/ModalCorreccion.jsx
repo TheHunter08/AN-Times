@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
-import { gid, ftime } from '../../utils/time.js'
+import { gid, ftime, toDatetimeLocal } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 
 // ─── MODAL CORRECCIÓN ──────────────────────────────────────────────────────────
@@ -13,8 +13,8 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
 
   useEffect(() => {
     if (visible && rec) {
-      setInicio(rec.inicio ? rec.inicio.slice(0, 16) : '')
-      setFin(rec.fin ? rec.fin.slice(0, 16) : '')
+      setInicio(toDatetimeLocal(rec.inicio))
+      setFin(toDatetimeLocal(rec.fin))
       setMotivo('')
     }
   }, [visible, rec])

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, mhm, ftime, fds, calcSecs, gid, vacData } from '../../utils/time.js'
+import { today, mhm, ftime, fds, calcSecs, gid, vacData, toDatetimeLocal } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { SwipeToDelete } from '../../components/admin/SwipeToDelete.jsx'
 import { clipBreaksToWindow } from '../../utils/adminHelpers.js'
@@ -453,8 +453,8 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
                           onClick={() => {
                             if (editCorrId === c.id) { setEditCorrId(null); return }
                             setEditCorrId(c.id)
-                            setEditInicio(c.propInicio ? c.propInicio.slice(0,16) : '')
-                            setEditFin(c.propFin ? c.propFin.slice(0,16) : '')
+                            setEditInicio(toDatetimeLocal(c.propInicio))
+                            setEditFin(toDatetimeLocal(c.propFin))
                           }}>✎</button>
                         <button className="btn btn-sm btn-danger"  onClick={() => actCorr(c.id, 'rechazada')}>✕</button>
                       </div>
