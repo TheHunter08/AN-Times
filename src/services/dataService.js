@@ -289,6 +289,9 @@ let _bgSyncRetries = 0
 async function _storeForBgSync(data) {
   try {
     await _idbSet('pending', data)
+    // Badge rojo en el icono de la app: avisa al usuario de que hay datos pendientes.
+    // Se borra en _bgSyncFallback y en _bgSync del SW cuando la subida tiene éxito.
+    try { navigator.setAppBadge?.(1) } catch {}
     // Fast-path: listener 'online' para cuando la app está abierta.
     // Background Sync API solo dispara cuando el navegador decide reconectar en
     // background (puede tardar, o solo ocurrir al cerrar la app). El listener
@@ -372,6 +375,7 @@ async function _bgSyncFallback() {
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
     await _idbDel('pending')
+    try { navigator.clearAppBadge?.() } catch {}
     _bgSyncRetries = 0
     window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) {

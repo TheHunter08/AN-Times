@@ -181,6 +181,11 @@ self.addEventListener('push', (event) => {
       const focused = cs.find(c => c.focused) || cs.find(c => c.visibilityState === 'visible')
       if (focused) focused.postMessage({ type: 'PUSH_RECEIVED', title, body, tag, url })
     } catch {}
+
+    // 3) Aprovechar que iOS despertó el SW para subir datos offline pendientes.
+    //    En Android también ayuda si el push llega mientras la app está en segundo plano.
+    //    _bgSync() sale inmediatamente si IDB está vacío, sin coste.
+    try { await _bgSync() } catch {}
   })())
 })
 
@@ -402,6 +407,8 @@ async function _bgSync() {
       }
     }
     await _idbDel('pending')
+    // Borrar badge del icono de la app (si el navegador lo soporta)
+    try { await self.navigator?.clearAppBadge?.() } catch {}
     const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
   } finally {
@@ -420,6 +427,12 @@ async function _bgSyncNotify() {
     cs.forEach(c => c.postMessage({ type: 'BG_SYNC_FAILED', error: err?.message || 'unknown' }))
   }
 }
+
+// ─── RED RECUPERADA EN SW (Android background) ────────────────────────────────
+// WorkerGlobalScope sí expone el evento 'online'. En Chrome/Android el SW puede
+// seguir activo en segundo plano y recibir este evento sin que la app esté abierta.
+// En iOS el SW se suspende con la app (poco efecto), pero no tiene coste añadirlo.
+self.addEventListener('online', () => { _bgSync().catch(() => {}) })
 
 // ─── BACKGROUND SYNC (One-off: cuando recupera red) ────────────────────────────
 self.addEventListener('sync', (event) => {
