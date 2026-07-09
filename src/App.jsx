@@ -53,10 +53,14 @@ function InAppNotification() {
   )
 }
 
+// Bloquea toda la app hasta que se aplique la actualización — las versiones
+// deben ser obligatorias: un cliente desactualizado puede tener bugs ya
+// corregidos (p.ej. de cálculo de horas) que contaminen datos compartidos
+// con el resto del equipo, así que no se permite "cerrar y seguir usando"
+// la versión antigua como con un banner normal.
 function UpdateBanner() {
   const [waitingSW, setWaitingSW] = useState(null)
   const [applying, setApplying]   = useState(false)
-  const [dismissed, setDismissed] = useState(false)
   const reloading   = useRef(false)
   const waitingRef  = useRef(null)   // ref para evitar closure stale en setInterval
 
@@ -126,26 +130,37 @@ function UpdateBanner() {
     }, 8000)
   }
 
-  if (!waitingSW || dismissed) return null
+  if (!waitingSW) return null
   return (
     <div style={{
-      position:'fixed', zIndex:99999,
-      left:10, right:10,
-      bottom:'92px',
-      padding:'10px 12px',
-      background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff',
-      display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600,
-      borderRadius:14, boxShadow:'0 8px 32px rgba(108,99,255,.45)',
-      animation:'slideUp .25s cubic-bezier(.16,1,.3,1)'
+      position:'fixed', inset:0, zIndex:999999,
+      background:'rgba(8,8,18,.92)', backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20
     }}>
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      <span style={{ flex:1, minWidth:0 }}>{applying ? 'Actualizando…' : 'Nueva versión disponible'}</span>
-      {!applying && (
-        <>
-          <button onClick={apply} style={{ background:'rgba(255,255,255,.22)', border:'1px solid rgba(255,255,255,.35)', color:'#fff', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>Actualizar</button>
-          <button onClick={() => setDismissed(true)} aria-label="Cerrar" style={{ background:'none', border:'none', color:'rgba(255,255,255,.85)', cursor:'pointer', fontSize:18, lineHeight:1, padding:'2px 4px', flexShrink:0 }}>×</button>
-        </>
-      )}
+      <div style={{
+        width:'100%', maxWidth:360, textAlign:'center',
+        background:'var(--bg-700)', border:'1px solid var(--border2)', borderRadius:18,
+        padding:'30px 24px', boxShadow:'0 20px 60px rgba(0,0,0,.5)'
+      }}>
+        <div style={{
+          width:56, height:56, margin:'0 auto 16px', borderRadius:16,
+          background:'linear-gradient(135deg,#6C63FF,#5E6AD2)',
+          display:'flex', alignItems:'center', justifyContent:'center'
+        }}>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </div>
+        <div style={{ fontSize:17, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Actualización obligatoria</div>
+        <div style={{ fontSize:13, color:'var(--text3)', lineHeight:1.6, marginBottom:22 }}>
+          Hay una nueva versión de la app con correcciones importantes. No puedes seguir usándola hasta que actualices.
+        </div>
+        <button onClick={apply} disabled={applying} style={{
+          width:'100%', padding:'13px 16px', borderRadius:12, border:'none',
+          background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff',
+          fontSize:14, fontWeight:800, cursor: applying ? 'default' : 'pointer', opacity: applying ? .7 : 1
+        }}>
+          {applying ? 'Actualizando…' : 'Actualizar ahora'}
+        </button>
+      </div>
     </div>
   )
 }
