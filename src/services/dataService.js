@@ -467,15 +467,18 @@ let _realtimeChannel = null
 let _realtimeRetry   = 0
 let _realtimeTimer   = null
 
-export function startRealtime(currentGetDB, onUpdate) {
+export function startRealtime(currentGetDB, onUpdate, getServerTs) {
   if (!supabase) return
   stopRealtime()
   _realtimeChannel = supabase
     .channel('app_data_rt', { config: { broadcast: { self: false } } })
     .on('broadcast', { event: 'updated' }, ({ payload }) => {
       const remoteTs = payload?.ts
-      const local = currentGetDB()
-      if (remoteTs != null && local._ts != null && remoteTs <= local._ts) return
+      // Usar _serverTs (no local._ts): local._ts puede estar inflado por Date.now()
+      // de guardados locales del encargado, haciendo que broadcasts de empleados
+      // parezcan "ya conocidos" aunque el encargado nunca haya descargado esos datos.
+      const refTs = getServerTs ? getServerTs() : currentGetDB()._ts
+      if (remoteTs != null && refTs != null && refTs > 0 && remoteTs <= refTs) return
       _realtimeRetry = 0
       onUpdate?.()
     })
@@ -487,7 +490,7 @@ export function startRealtime(currentGetDB, onUpdate) {
         clearTimeout(_realtimeTimer)
         const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 60000)
         _realtimeRetry++
-        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate), delay)
+        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate, getServerTs), delay)
       }
     })
 }
