@@ -169,14 +169,10 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
             <div className="field"><label>Email</label><input type="email" value={form.email||''} maxLength={100} onChange={e => setForm(f=>({...f,email:e.target.value.slice(0,100)}))} /></div>
             <div className="field"><label>WhatsApp (ej: 34612345678)</label><input type="tel" value={form.telefono||''} maxLength={15} placeholder="34612345678" onChange={e => setForm(f=>({...f,telefono:e.target.value.replace(/\D/g,'').slice(0,15)}))} /></div>
             <div className="field"><label>Rol</label>
-              {/* Un jefe de obra no puede ascender a nadie (ni a sí mismo) a "Jefe de
-                  Obra" — solo el admin real puede crear ese rol. La opción se deja
-                  visible únicamente si el empleado que se edita YA lo era, para no
-                  romper el desplegable mostrando un valor sin opción seleccionable. */}
               <select value={form.role||'emp'} onChange={e => setForm(f=>({...f,role:e.target.value}))}>
                 <option value="emp">Empleado</option>
                 <option value="encargado">Encargado</option>
-                {(!session?.isJO || form.role === 'jefe_obra') && <option value="jefe_obra">Jefe de Obra</option>}
+                <option value="jefe_obra">Jefe de Obra</option>
               </select>
             </div>
           </div>
