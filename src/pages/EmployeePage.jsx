@@ -790,7 +790,7 @@ export default function EmployeePage() {
       const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
       const emp = (db.employees || []).find(e =>
         e.id === empId && !e.isAdmin && !e.baja &&
-        (isJO || !encCentros.length || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
+        (isJO || !encCentros.length || !e.centroTrabajo || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
       )
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
       const todayQR = today()
@@ -798,7 +798,7 @@ export default function EmployeePage() {
       if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
       const recs = db.records || []
       if (recs.some(r => r.empId === emp.id && !r.fin)) { toast(`${emp.name} ya tiene jornada abierta`, 3000, 'warn'); return }
-      const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
+      const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
       saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
       queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
       toast(`Jornada iniciada para ${emp.name}`, 3000, 'ok')

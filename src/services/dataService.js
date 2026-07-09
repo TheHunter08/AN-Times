@@ -362,6 +362,7 @@ async function _bgSyncFallback() {
     // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
     const merged = await _mergeWithServer(data)
     await _upsertHotCold(merged)
+    merged._ts = Date.now()
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
     await _idbDel('pending')

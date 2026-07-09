@@ -107,7 +107,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
     const teamEmps = (db.employees || []).filter(e =>
       !e.isAdmin && !e.baja && e.id !== u.id &&
-      (isJO || !encCentros.length ||
+      (isJO || !encCentros.length || !e.centroTrabajo ||
         encCentros.includes(e.centroTrabajo) ||
         (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
     )
@@ -483,7 +483,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
           const teamStartJornada = (e) => {
             if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
-            const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name }
+            const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
             saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
             queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
             toast('Jornada iniciada', 2500, 'ok')
