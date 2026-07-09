@@ -504,7 +504,14 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
   color: var(--text);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(12px);
-  white-space: nowrap;
+  /* Mensajes cortos (la mayoría) siguen en una línea gracias al max-width del
+     contenedor en max-content — pero un mensaje largo (p.ej. el aviso de poca
+     cobertura) necesita poder partirse en varias líneas: con nowrap se salía
+     del ancho de la pantalla y quedaba cortado, ilegible. */
+  white-space: normal;
+  max-width: min(320px, calc(100vw - 48px));
+  text-align: center;
+  line-height: 1.4;
   animation: toastIn .2s ease;
 }
 .toast.out { animation: toastOut .2s ease forwards; }

@@ -180,7 +180,7 @@ function SyncBanner() {
     setRetrying(false)
   }, [fetchDB])
 
-  // En pantalla de empleado, OfflineBanner ya muestra "Modo Oficina" con datos
+  // En pantalla de empleado, OfflineBanner ya muestra "Modo sin cobertura" con datos
   // pendientes — suprimir SyncBanner para evitar dos banners simultáneos.
   // En admin no hay OfflineBanner, así que SyncBanner sigue mostrándose allí.
   if (syncStatus !== 'error' || currentScreen === 'login') return null
@@ -465,8 +465,17 @@ export default function App() {
     // comprueba el timestamp antes de traer nada (unos bytes si no hay cambios),
     // así que este intervalo no pesa — solo evita quedarse desactualizado mucho
     // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
+    // Con cobertura débil, navigator.onLine puede quedarse en `true` todo el
+    // rato (el radio sigue "conectado", solo que las peticiones fallan o hacen
+    // timeout) — el evento 'online' del navegador nunca llega a dispararse
+    // porque nunca hubo una transición real offline→online, así que
+    // offlinePending se quedaba atascado en true indefinidamente hasta que el
+    // usuario reabriera la app o recuperase cobertura total. Reintentar aquí
+    // cada 30s mientras offlinePending sea true no depende de esa transición.
     const pollInterval = setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return
+      if (useAppStore.getState().offlinePending) uploadPendingIfAny()
+      else fetchDB()
     }, 30 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)

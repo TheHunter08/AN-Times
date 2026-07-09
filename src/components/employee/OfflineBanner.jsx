@@ -46,13 +46,13 @@ export function OfflineBanner() {
     setRetrying(false)
   }
 
-  // Modo Oficina: sin red (real o efectiva) con datos pendientes
+  // Modo sin cobertura: sin red (real o efectiva) con datos pendientes
   if (isEffectivelyOffline) {
     return (
       <div className="offline-v3 offline-v3--office">
         <span style={{ fontSize:16 }}>📡</span>
         <div className="offline-v3-text">
-          <div style={{ fontWeight:700 }}>Modo Oficina activo</div>
+          <div style={{ fontWeight:700 }}>Modo sin cobertura</div>
           <div className="offline-v3-sub">Fichajes guardados · Sincronizará al conectar</div>
         </div>
       </div>
