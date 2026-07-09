@@ -1,9 +1,14 @@
 export const p2 = n => String(n).padStart(2, '0')
 
-export const today = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`
-}
+// Fecha LOCAL de un Date como "YYYY-MM-DD" — NO usar d.toISOString().slice(0,10)
+// para esto: toISOString() convierte a UTC antes de formatear, así que una
+// medianoche local (p.ej. wkStart(), que fija setHours(0,0,0,0) en hora local)
+// cae en el día UTC anterior en España — desplaza cualquier "inicio de semana"
+// o "hoy" calculado así un día entero hacia atrás, contaminando el cómputo de
+// horas semanales/extra con el domingo anterior.
+export const localDateStr = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`
+
+export const today = () => localDateStr(new Date())
 
 export const mhm = m => { m = Math.max(0, Math.floor(m || 0)); return `${Math.floor(m/60)}h ${p2(m%60)}m` }
 export const s2t = s => `${p2(Math.floor(s/3600))}:${p2(Math.floor((s%3600)/60))}:${p2(s%60)}`

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
-import { today, calcSecs, calcMin, recWorkSecs, wkStart, p2, mhm, ftime, s2t, monthlyExtras } from '../../utils/time.js'
+import { today, calcSecs, calcMin, recWorkSecs, wkStart, p2, mhm, ftime, s2t, monthlyExtras, localDateStr } from '../../utils/time.js'
 import { WD, WK } from '../../config/constants.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
 import { PomodoroWidget } from './PomodoroWidget.jsx'
@@ -48,10 +48,16 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
 
   const now = new Date()
   const ws = wkStart(now)
-  const wsStr = ws.toISOString().slice(0, 10)
+  // localDateStr (no toISOString().slice(0,10)): ws ya está en medianoche LOCAL
+  // (wkStart hace setHours(0,0,0,0)) — toISOString() la convierte a UTC primero,
+  // desplazando la fecha un día atrás en España. Al reconstruir con "T00:00:00"
+  // (no como fecha-sola) se fuerza de nuevo el parseo en hora local, si no
+  // new Date("YYYY-MM-DD") se interpreta como medianoche UTC — casi 1 día
+  // entero de diferencia, arrastrando el domingo anterior a "esta semana".
+  const wsStr = localDateStr(ws)
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const weekRecs = useMemo(() => {
-    const wsDate = new Date(wsStr)
+    const wsDate = new Date(wsStr + 'T00:00:00')
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)

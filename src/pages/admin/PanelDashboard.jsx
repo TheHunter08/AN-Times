@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, wkStart, p2, calcMin, calcSecs, mhm, ftime, recWorkSecs } from '../../utils/time.js'
+import { today, wkStart, p2, calcMin, calcSecs, mhm, ftime, recWorkSecs, localDateStr } from '../../utils/time.js'
 import { WD } from '../../config/constants.js'
 import { buildHeatmap, Heatmap } from '../../components/admin/Heatmap.jsx'
 import { ComunicadoWidget } from '../../components/admin/ComunicadoWidget.jsx'
@@ -23,12 +23,17 @@ export default function PanelDashboard({ db, toast, saveDB, session }) {
   const checkedIn = new Set(liveRecs.map(r => r.empId)).size
 
   const ws = wkStart(now)
-  const wsStr = ws.toISOString().slice(0, 10)
+  // localDateStr (no toISOString().slice(0,10)): ws ya está en medianoche LOCAL
+  // (wkStart hace setHours(0,0,0,0)) — toISOString() la convierte a UTC primero,
+  // desplazando la fecha un día atrás en España. Al reconstruir con "T00:00:00"
+  // (no como fecha-sola) se fuerza de nuevo el parseo en hora local, si no
+  // new Date("YYYY-MM-DD") se interpreta como medianoche UTC.
+  const wsStr = localDateStr(ws)
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMk = `${prevDate.getFullYear()}-${p2(prevDate.getMonth()+1)}`
   const weekRecs = useMemo(() => {
-    const wsDate = new Date(wsStr)
+    const wsDate = new Date(wsStr + 'T00:00:00')
     return recs.filter(r => r.fin && r.inicio && new Date(r.inicio) >= wsDate)
   }, [recs, wsStr])
   const weekMin = useMemo(() => weekRecs.reduce((s, r) => s + calcMin(r), 0), [weekRecs])

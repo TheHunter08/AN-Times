@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { useClock } from '../../hooks/useClock.js'
-import { today, calcSecs, calcMin, recWorkSecs, ftime, mhm, p2, wkStart, monthlyExtras, gid, s2t } from '../../utils/time.js'
+import { today, calcSecs, calcMin, recWorkSecs, ftime, mhm, p2, wkStart, monthlyExtras, gid, s2t, localDateStr } from '../../utils/time.js'
 import { calcStreak, calcWorkPattern, streakLabel } from '../../utils/streaks.js'
 import { WK, WM } from '../../config/constants.js'
 import { queuePush } from '../../services/dataService.js'
@@ -71,10 +71,16 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
   const now = new Date()
   const ws = wkStart(now)
-  const wsStr = ws.toISOString().slice(0, 10)
+  // localDateStr (no toISOString().slice(0,10)): ws ya está en medianoche LOCAL
+  // (wkStart hace setHours(0,0,0,0)) — toISOString() la convierte a UTC primero,
+  // desplazando la fecha un día atrás en España. Al reconstruir con "T00:00:00"
+  // (no como fecha-sola) se fuerza de nuevo el parseo en hora local, si no
+  // new Date("YYYY-MM-DD") se interpreta como medianoche UTC — casi 1 día
+  // entero de diferencia, arrastrando el domingo anterior a "esta semana".
+  const wsStr = localDateStr(ws)
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
   const weekRecs = useMemo(() => {
-    const wsDate = new Date(wsStr)
+    const wsDate = new Date(wsStr + 'T00:00:00')
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
   const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
@@ -83,8 +89,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   // no por pasar de la jornada diaria — antes se marcaba "extra" solo por hacer >8h en un día.
   const extraMin = Math.max(0, weekMin - WK)
   const lastWeekMin = useMemo(() => {
-    const lws = new Date(wsStr); lws.setDate(lws.getDate() - 7)
-    const lwe = new Date(wsStr)
+    const lws = new Date(wsStr + 'T00:00:00'); lws.setDate(lws.getDate() - 7)
+    const lwe = new Date(wsStr + 'T00:00:00')
     return (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= lws && new Date(r.inicio) < lwe).reduce((s, r) => s + calcMin(r), 0)
   }, [db.records, u.id, wsStr])
   const monthRecs = useMemo(
@@ -494,11 +500,11 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             let updated
             if (rec.enDescanso) {
               const breaks = [...(rec.breaks || []), { start: rec.bStartTs, end: now }]
-              updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk }
+              updated = { ...rec, enDescanso: false, bStartTs: null, breaks, breakSecs: calcSecs({ ...rec, enDescanso: false, breaks }).brk, _upd: now }
               queuePush(rec.empId, '▶ Descanso finalizado', `${u.name} ha reanudado tu jornada.`, 'jornada', '/?tab=inicio')
               toast('Jornada reanudada', 2500, 'ok')
             } else {
-              updated = { ...rec, enDescanso: true, bStartTs: now }
+              updated = { ...rec, enDescanso: true, bStartTs: now, _upd: now }
               queuePush(rec.empId, '⏸ Descanso iniciado', `${u.name} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
               toast('Descanso iniciado', 2500, 'ok')
             }
@@ -511,7 +517,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             const now = new Date().toISOString()
             const breaks = [...(rec.breaks || [])]
             if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
-            const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true }
+            const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, _upd: now }
             const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
             saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r) }))
             queuePush(rec.empId, '⏹ Jornada finalizada', `${u.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')

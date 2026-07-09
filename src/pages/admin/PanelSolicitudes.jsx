@@ -382,7 +382,7 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
               newRecords = newRecords.map(r => {
                 if (r.id !== corr.recId) return r
                 const breaks = finalFin ? clipBreaksToWindow(r.breaks, finalInicio, finalFin) : (r.breaks || [])
-                const updated = { ...r, inicio: finalInicio, fin: finalFin, breaks }
+                const updated = { ...r, inicio: finalInicio, fin: finalFin, breaks, _upd: new Date().toISOString() }
                 const t = calcSecs(updated)
                 return { ...updated, workSecs: t.work, breakSecs: t.brk }
               })

@@ -1,4 +1,4 @@
-import { wkStart, calcMin } from '../../utils/time.js'
+import { wkStart, calcMin, localDateStr } from '../../utils/time.js'
 
 export function WeeklyBars({ db, u, timer }) {
   const DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -8,7 +8,7 @@ export function WeeklyBars({ db, u, timer }) {
   const bars = DAYS.map((label, i) => {
     const d = new Date(ws)
     d.setDate(d.getDate() + i)
-    const ds = d.toISOString().slice(0, 10)
+    const ds = localDateStr(d)
     let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(ds))
       .reduce((s, r) => s + calcMin(r), 0)
     if (i === dow && timer.state !== 'idle') min += Math.floor(timer.ws / 60)

@@ -24,10 +24,14 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
   // las aceptaba, desaparecían de aquí y ya no había forma de corregir un error
   // detectado más tarde salvo yendo a Fichajes (admin). Ahora se listan todas las
   // jornadas recientes del equipo, aceptadas o no, para poder modificar/eliminar
-  // cualquiera desde el mismo sitio.
-  const teamRecs = recs.filter(r => r.fin && empIds.has(r.empId))
+  // cualquiera desde el mismo sitio. Las pendientes NUNCA se recortan (aunque
+  // haya más de 100) — solo se limitan las ya aceptadas, para no ocultar en
+  // silencio una jornada sin validar detrás del límite de la lista.
+  const pendRecs = recs.filter(r => r.fin && empIds.has(r.empId) && !r.aceptada)
+    .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||''))
+  const acceptedRecent = recs.filter(r => r.fin && empIds.has(r.empId) && r.aceptada)
     .sort((a,b) => (b.inicio||'').localeCompare(a.inicio||'')).slice(0, 100)
-  const pendRecs = teamRecs.filter(r => !r.aceptada)
+  const teamRecs = [...pendRecs, ...acceptedRecent].sort((a,b) => (b.inicio||'').localeCompare(a.inicio||''))
   const correcsPend = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts)
   const correcsHist = (db.correccionesFichaje || []).filter(c => c.estado !== 'pendiente' && empIds.has(c.empId)).sort((a,b) => b.ts - a.ts).slice(0, 15)
   const teamAus = [
@@ -201,7 +205,9 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     const weeklyH = e.horasSemanales || (WK / 60)
     const monthlyH = e.horasMensuales || 160
     const ex = monthlyExtras(recs, e.id, horasMonth, { weeklyH, monthlyH })
-    const days = recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(horasMonth)).length
+    // Días distintos, no nº de fichajes — una jornada partida (mañana+tarde)
+    // son 2 registros el mismo día, no 2 días trabajados.
+    const days = new Set(recs.filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(horasMonth)).map(r => r.inicio.slice(0, 10))).size
     return {
       e, days, weeklyH, monthlyH,
       mMin: ex.workedMin,
