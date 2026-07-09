@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { gid } from '../utils/time.js';
+import { resizeImageToDataUrl } from '../utils/imageResize.js';
 
 const CATEGORIAS = ['dieta', 'transporte', 'material', 'otro'];
 
@@ -21,14 +22,6 @@ function fmt(n) {
   return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   const [open, setOpen] = useState(false);
@@ -58,15 +51,21 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   async function handleFoto(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 500 * 1024) {
-      toast && toast('La imagen no puede superar 500 KB', 'error');
+    // Límite generoso solo para no intentar procesar un archivo absurdo — el
+    // redimensionado real de abajo es lo que mantiene el tamaño guardado bajo,
+    // no este chequeo. Antes se guardaba el archivo original entero en base64
+    // (hasta 500KB) dentro del JSON único de la app — con varios gastos con
+    // foto, eso se acumula sin límite en localStorage/Supabase, y un fallo de
+    // cuota al guardar se tragaba en silencio (solo console.error).
+    if (file.size > 15 * 1024 * 1024) {
+      toast && toast('La imagen es demasiado grande', 'error');
       e.target.value = '';
       return;
     }
     try {
-      const b64 = await fileToBase64(file);
-      setFoto(b64);
-      setFotoPreview(b64);
+      const dataUrl = await resizeImageToDataUrl(file, 1200, 0.75);
+      setFoto(dataUrl);
+      setFotoPreview(dataUrl);
     } catch {
       toast && toast('Error al cargar la imagen', 'error');
     }
@@ -101,8 +100,14 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
         categoria,
         notas: notas.trim(),
       };
-      const updatedDB = { ...db, gastos: [...(db.gastos || []), nuevo] };
-      await saveDB(updatedDB);
+      // saveDB(partial) mínimo vía función de estado fresco, no el objeto db
+      // completo del cierre del render: saveDB calcula qué se "borró" comparando
+      // contra el estado más fresco del store, campo a campo — pasar aquí un
+      // `db` desactualizado (esta pantalla puede tardar unos segundos, con foto
+      // de por medio) hacía que CUALQUIER dato llegado por sync mientras tanto
+      // (un chat, otro gasto, una solicitud...) se interpretara como borrado a
+      // propósito y se eliminase de verdad del servidor al subir este gasto.
+      await saveDB(freshDb => ({ gastos: [...(freshDb.gastos || []), nuevo] }));
       toast && toast('Gasto enviado correctamente', 'success');
       resetForm();
       setOpen(false);

@@ -1,19 +1,26 @@
 import { useState } from 'react';
 import { gid } from '../utils/time.js';
 
+// value debe coincidir con las claves TIPO_LABELS/TIPO_COLORS de PanelDenuncias.jsx
+// (admin) — antes 'seguridad en obra' aquí vs 'seguridad' allí no casaban nunca,
+// así que esas denuncias mostraban el icono/color genérico en el panel del admin.
 const TIPOS = [
-  { value: 'acoso',            label: 'Acoso' },
-  { value: 'fraude',           label: 'Fraude' },
-  { value: 'seguridad en obra', label: 'Seguridad en obra' },
-  { value: 'discriminacion',   label: 'Discriminación' },
-  { value: 'otro',             label: 'Otro' },
+  { value: 'acoso',          label: 'Acoso' },
+  { value: 'fraude',         label: 'Fraude' },
+  { value: 'seguridad',      label: 'Seguridad en obra' },
+  { value: 'discriminacion', label: 'Discriminación' },
+  { value: 'otro',           label: 'Otro' },
 ];
 
+// estado debe coincidir con los valores que escribe PanelDenuncias.jsx (admin):
+// 'nueva' | 'en_proceso' | 'resuelta' — antes se comprobaba 'en revisión' (con
+// espacio y tilde), que nunca coincidía, así que el empleado veía el string
+// crudo "en_proceso" en vez de "En revisión".
 function estadoLabel(estado) {
-  if (estado === 'nueva')       return { text: 'Recibida',   color: '#f59e0b' };
-  if (estado === 'en revisión') return { text: 'En revisión', color: 'var(--primary-light)' };
-  if (estado === 'resuelta')    return { text: 'Resuelta',   color: 'var(--green)' };
-  return                               { text: estado,       color: 'var(--text3)' };
+  if (estado === 'nueva')      return { text: 'Recibida',    color: '#f59e0b' };
+  if (estado === 'en_proceso') return { text: 'En revisión', color: 'var(--primary-light)' };
+  if (estado === 'resuelta')   return { text: 'Resuelta',    color: 'var(--green)' };
+  return                              { text: estado,        color: 'var(--text3)' };
 }
 
 function genAnonId() {
@@ -73,8 +80,13 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
         estado: 'nueva',
         respuesta: null,
       };
-      const updatedDB = { ...db, denuncias: [...(db.denuncias || []), nueva] };
-      await saveDB(updatedDB);
+      // saveDB(partial) mínimo vía función de estado fresco, no el objeto db
+      // completo del cierre del render: saveDB calcula qué se "borró" comparando
+      // contra el estado más fresco del store, campo a campo — pasar aquí un
+      // `db` desactualizado hacía que CUALQUIER dato llegado por sync mientras
+      // tanto se interpretara como borrado a propósito y se eliminase de verdad
+      // del servidor al enviar esta denuncia.
+      await saveDB(freshDb => ({ denuncias: [...(freshDb.denuncias || []), nueva] }));
       setSubmittedCode(anonId);
       setMensaje('');
       setTipo('acoso');
