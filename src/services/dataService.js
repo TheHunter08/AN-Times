@@ -1,9 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 
+// Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
+// dejar una petición "colgada" en señal débil durante un minuto o más antes de
+// fallar — y como un guardado encadena varias peticiones seguidas (comprobar
+// timestamp, bajar datos, subir), el conjunto se sentía congelado en vez de
+// simplemente lento. El SW ya limita las lecturas (GET) a 8s con fallback a
+// caché, pero las escrituras (POST del upsert) no pasan por esa ruta — sin
+// timeout propio, esas sí podían quedarse colgadas indefinidamente. Con esto,
+// cualquier petición individual falla rápido y entra en el mismo camino de
+// reintento/cola offline que ya existe, en vez de bloquear la UI.
+const _FETCH_TIMEOUT_MS = 10000
+function _timeoutFetch(url, options = {}) {
+  if (options.signal) return fetch(url, options)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), _FETCH_TIMEOUT_MS)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
 export const supabase = (SB_URL && SB_ANON)
-  ? createClient(SB_URL, SB_ANON)
+  ? createClient(SB_URL, SB_ANON, { global: { fetch: _timeoutFetch } })
   : null
 
 const TABLE      = 'app_data'

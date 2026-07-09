@@ -221,7 +221,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       if (!key || !auth) return
 
       // 4. Actualizar en Supabase
-      await fetch(`${_SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
+      await _sbFetch(`${_SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: {
           apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`,
@@ -263,6 +263,16 @@ const _SB_URL  = 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const _IDB_NAME  = 'times-inc-sync'
 const _IDB_STORE = 'q'
+
+// Timeout explícito: estas peticiones las hace el propio SW directamente (no
+// pasan por su registerRoute, que solo intercepta peticiones de la página), así
+// que sin esto pueden quedarse colgadas indefinidamente en señal débil.
+const _SB_FETCH_TIMEOUT_MS = 10000
+function _sbFetch(url, options) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), _SB_FETCH_TIMEOUT_MS)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
 
 function _idbOpen() {
   return new Promise((res, rej) => {
@@ -371,8 +381,8 @@ async function _fetchServerData() {
   const headers = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}` }
   try {
     const [hotRes, coldRes] = await Promise.all([
-      fetch(`${_SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers }),
-      fetch(`${_SB_URL}/rest/v1/app_data?id=eq.3&select=data`, { headers }),
+      _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers }),
+      _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.3&select=data`, { headers }),
     ])
     if (!hotRes.ok) return null
     const hotArr = await hotRes.json().catch(() => [])
@@ -401,8 +411,8 @@ async function _bgSync() {
     // así que el dato se perdería en silencio. upsert la crea si hace falta.
     const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
     const [hotRes, coldRes] = await Promise.all([
-      fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
-      fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
+      _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
+      _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
     ])
     if (!hotRes.ok && hotRes.status !== 409) {
       throw new Error(`bgSync failed: hot=${hotRes.status}`)
@@ -411,7 +421,7 @@ async function _bgSync() {
     // todo el sync — igual que en dataService.js, reintentamos metiendo el
     // payload completo en la fila caliente para no perder la jornada/fichaje.
     if (!coldRes.ok && coldRes.status !== 409) {
-      const fbRes = await fetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
+      const fbRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
       if (!fbRes.ok && fbRes.status !== 409) {
         throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
       }
