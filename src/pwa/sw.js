@@ -88,9 +88,11 @@ registerRoute(
 )
 
 // ─── SUPABASE API ─────────────────────────────────────────────────────────────
-// NetworkFirst con timeout: funciona offline con datos cacheados
+// Solo cachear GETs — los writes (POST/PATCH upsert) nunca deben pasar por cache:
+// si el timeout de 8s se dispara en un POST, el SW devuelve respuesta vacía y el
+// upsert falla en silencio, dejando el fichaje atrapado en IDB para siempre.
 registerRoute(
-  ({ url }) => url.hostname.includes('supabase.co'),
+  ({ url, request }) => url.hostname.includes('supabase.co') && request.method === 'GET',
   new NetworkFirst({
     cacheName: 'supabase-api',
     networkTimeoutSeconds: 8,
