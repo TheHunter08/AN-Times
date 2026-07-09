@@ -353,8 +353,14 @@ async function _bgSyncFallback() {
     // Si hay un push normal en vuelo, esperar a que aterrice y reintentar.
     if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
     const data = await _idbGet('pending')
-    // Sin datos pendientes, sin Supabase, o sin red: nada que hacer
-    if (!data || !supabase || !navigator.onLine) { _bgSyncRetries = 0; return }
+    if (!data || !supabase) { _bgSyncRetries = 0; return }
+    // Sin red: puede que navigator.onLine aún no se haya actualizado (iOS resume).
+    // Reintento breve en vez de salir definitivamente.
+    if (!navigator.onLine) {
+      if (_bgSyncRetries < 2) { _bgSyncRetries++; setTimeout(_bgSyncFallback, 2000) }
+      else { _bgSyncRetries = 0 }
+      return
+    }
     // NOTA: el timestamp guard que había aquí (local._ts > data._ts → exit) se eliminó.
     // fetchDB() actualiza localStorage._ts al updated_at del servidor cuando baja datos
     // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard

@@ -321,9 +321,17 @@ export default function App() {
       _resumeTs = now
       fetchDB()
       initRealtime()
-      if (navigator.onLine) uploadPendingIfAny()
-      navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
-      navigator.serviceWorker?.ready.then(reg => reg.update().catch(() => {}))
+      // Intentar siempre (no solo si onLine): en iOS visibilitychange puede
+      // llegar antes de que navigator.onLine se actualice. El retry a 1.5s
+      // cubre ese caso (cuando la red ya existe pero onLine aún es false).
+      uploadPendingIfAny()
+      setTimeout(() => uploadPendingIfAny(), 1500)
+      // Usar serviceWorker.ready en vez de controller: en iOS el SW puede
+      // haber sido matado, controller es null y el mensaje se pierde en silencio.
+      navigator.serviceWorker?.ready.then(reg => {
+        reg.active?.postMessage({ type: 'FORCE_SYNC' })
+        reg.update().catch(() => {})
+      }).catch(() => {})
     }
     document.addEventListener('visibilitychange', onResume)
     window.addEventListener('pageshow', onResume)
