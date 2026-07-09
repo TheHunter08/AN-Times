@@ -60,13 +60,67 @@ export function saveLocal(db) {
   try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
 }
 
+// ── Tombstones ─────────────────────────────────────────────────────────────────
+// _diffDeleted (appStore.js) calcula, en cada saveDB, qué ids se borraron a
+// propósito en ESE guardado concreto — y _mergeForPush ya usa eso para no
+// resucitarlos al fusionar con el servidor ANTES de subir. Pero eso solo
+// protege la subida: mergeDB() (usado al DESCARGAR, en fetchDB) es una unión
+// pura por id sin ese contexto, así que si un fetchDB (sondeo, realtime, o
+// simplemente reabrir la app) llegaba ANTES de que el push del borrado
+// aterrizara en el servidor, el registro seguía existiendo en el servidor y
+// la unión lo volvía a meter en local — el borrado "no se quedaba pegado"
+// hasta que, por azar, un push posterior ganara la carrera. Aquí se guarda
+// un registro de "esto se borró a propósito, ignóralo si vuelve a aparecer"
+// con caducidad (por si el id se reutilizase alguna vez, aunque los ids son
+// aleatorios y eso no debería pasar), consultado tanto al descargar como al
+// subir — cubre ambas direcciones del mismo problema.
+const _TOMBSTONE_KEY = 'an_times_tombstones'
+const _TOMBSTONE_TTL_MS = 15 * 60 * 1000
+let _tombstones = (() => {
+  try { return JSON.parse(localStorage.getItem(_TOMBSTONE_KEY) || '{}') } catch { return {} }
+})()
+
+function _pruneTombstones() {
+  const now = Date.now()
+  for (const key of Object.keys(_tombstones)) {
+    for (const id of Object.keys(_tombstones[key])) {
+      if (_tombstones[key][id] < now) delete _tombstones[key][id]
+    }
+    if (!Object.keys(_tombstones[key]).length) delete _tombstones[key]
+  }
+}
+
+// Llamado desde appStore.js justo tras calcular `deleted` en cada saveDB.
+export function recordTombstones(deleted) {
+  if (!deleted) return
+  _pruneTombstones()
+  const now = Date.now()
+  for (const key of Object.keys(deleted)) {
+    if (!_tombstones[key]) _tombstones[key] = {}
+    for (const id of deleted[key]) _tombstones[key][id] = now + _TOMBSTONE_TTL_MS
+  }
+  try { localStorage.setItem(_TOMBSTONE_KEY, JSON.stringify(_tombstones)) } catch {}
+}
+
+function _applyTombstones(arr, tKey) {
+  const ids = tKey && _tombstones[tKey]
+  if (!ids || !arr.length) return arr
+  const now = Date.now()
+  return arr.filter(item => {
+    const id = item && typeof item === 'object' ? item.id : item
+    const exp = ids[id]
+    return !(exp && exp > now)
+  })
+}
+
 // ── _unionById helper ─────────────────────────────────────────────────────────
 // Merges two arrays by `id` field (union). Base items come first, incoming
 // overwrites by id, new incoming items are appended. If incoming is empty but
 // base has items, base is preserved (prevents silent data loss on concurrent writes).
-function _unionById(base, incoming) {
-  const b = Array.isArray(base) ? base : []
-  const i = Array.isArray(incoming) ? incoming : []
+function _unionById(base, incoming, tKey) {
+  let b = Array.isArray(base) ? base : []
+  let i = Array.isArray(incoming) ? incoming : []
+  if (tKey) { b = _applyTombstones(b, tKey); i = _applyTombstones(i, tKey) }
 
   // If incoming is empty, keep base (don't replace with empty array)
   if (i.length === 0) return b
@@ -94,9 +148,10 @@ function _unionById(base, incoming) {
 // empleado cerró jornada o marcó descanso en modo oficina (offline) y el pull de
 // reconexión llega antes de que el push offline confirme, el remoto (viejo) pisaría
 // el cierre/descanso local. Por eso comparamos `_upd` y nos quedamos con el más nuevo.
-function _mergeRecords(base, incoming) {
-  const b = Array.isArray(base) ? base : []
-  const i = Array.isArray(incoming) ? incoming : []
+function _mergeRecords(base, incoming, tKey) {
+  let b = Array.isArray(base) ? base : []
+  let i = Array.isArray(incoming) ? incoming : []
+  if (tKey) { b = _applyTombstones(b, tKey); i = _applyTombstones(i, tKey) }
   if (i.length === 0) return b
   if (b.length === 0) return i
   const map = new Map()
@@ -132,25 +187,25 @@ export function mergeDB(base, incoming) {
     obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
     centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
-    records:             _mergeRecords(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
-    vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones),
-    medicos:             _unionById(base.medicos,             incoming.medicos),
-    ausencias:           _unionById(base.ausencias,           incoming.ausencias),
-    mensajes:            _unionById(base.mensajes,            incoming.mensajes),
-    notis:               _unionById(base.notis,               incoming.notis),
-    cierres:             _unionById(base.cierres,             incoming.cierres),
+    records:             _mergeRecords(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())), 'records'),
+    vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones,          'vacaciones'),
+    medicos:             _unionById(base.medicos,             incoming.medicos,             'medicos'),
+    ausencias:           _unionById(base.ausencias,           incoming.ausencias,           'ausencias'),
+    mensajes:            _unionById(base.mensajes,            incoming.mensajes,            'mensajes'),
+    notis:               _unionById(base.notis,               incoming.notis,               'notis'),
+    cierres:             _unionById(base.cierres,             incoming.cierres,             'cierres'),
     monthSnapshots:      incoming.monthSnapshots       || {},
     firmas:              incoming.firmas               || {},
-    documentos:          _unionById(base.documentos,          incoming.documentos),
-    audit:               _unionById(base.audit,               incoming.audit),
-    correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje),
-    chats:               _unionById(base.chats,               incoming.chats),
-    gastos:              _unionById(base.gastos,              incoming.gastos),
-    denuncias:           _unionById(base.denuncias,           incoming.denuncias),
-    wellbeing:           _unionById(base.wellbeing,           incoming.wellbeing),
-    turnos:              _unionById(base.turnos,              incoming.turnos),
-    partesTrabajo:       _unionById(base.partesTrabajo,       incoming.partesTrabajo),
-    anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas),
+    documentos:          _unionById(base.documentos,          incoming.documentos,          'documentos'),
+    audit:               _unionById(base.audit,               incoming.audit,               'audit'),
+    correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje, 'correccionesFichaje'),
+    chats:               _unionById(base.chats,               incoming.chats,               'chats'),
+    gastos:              _unionById(base.gastos,              incoming.gastos,              'gastos'),
+    denuncias:           _unionById(base.denuncias,           incoming.denuncias,           'denuncias'),
+    wellbeing:           _unionById(base.wellbeing,           incoming.wellbeing,           'wellbeing'),
+    turnos:              _unionById(base.turnos,              incoming.turnos,              'turnos'),
+    partesTrabajo:       _unionById(base.partesTrabajo,       incoming.partesTrabajo,       'partesTrabajo'),
+    anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           mergedNotisSent,
     pinLockouts:         { ...(incoming.pinLockouts || {}), ...(base.pinLockouts || {}) },
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
@@ -181,26 +236,26 @@ function _mergeForPush(serverData, localPayload, deleted) {
     empresas:            _unionById(s.empresas,            l.empresas),
     obras:               _unionById(s.obras,               l.obras),
     centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
-    employees:           _unionById(s.employees,           l.employees),
-    records:             _mergeRecords(s.records, (l.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime()))),
-    vacaciones:          _unionById(s.vacaciones,          l.vacaciones),
-    medicos:             _unionById(s.medicos,             l.medicos),
-    ausencias:           _unionById(s.ausencias,           l.ausencias),
-    mensajes:            _unionById(s.mensajes,            l.mensajes),
-    notis:               _unionById(s.notis,               l.notis),
-    cierres:             _unionById(s.cierres,             l.cierres),
+    employees:           _unionById(s.employees,           l.employees,           'employees'),
+    records:             _mergeRecords(s.records, (l.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())), 'records'),
+    vacaciones:          _unionById(s.vacaciones,          l.vacaciones,          'vacaciones'),
+    medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
+    ausencias:           _unionById(s.ausencias,           l.ausencias,           'ausencias'),
+    mensajes:            _unionById(s.mensajes,            l.mensajes,            'mensajes'),
+    notis:               _unionById(s.notis,               l.notis,               'notis'),
+    cierres:             _unionById(s.cierres,             l.cierres,             'cierres'),
     monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
     firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
-    documentos:          _unionById(s.documentos,          l.documentos),
-    audit:               _unionById(s.audit,               l.audit),
-    correccionesFichaje: _unionById(s.correccionesFichaje, l.correccionesFichaje),
-    chats:               _unionById(s.chats,               l.chats),
-    gastos:              _unionById(s.gastos,              l.gastos),
-    denuncias:           _unionById(s.denuncias,           l.denuncias),
-    wellbeing:           _unionById(s.wellbeing,           l.wellbeing),
-    turnos:              _unionById(s.turnos,              l.turnos),
-    partesTrabajo:       _unionById(s.partesTrabajo,       l.partesTrabajo),
-    anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas),
+    documentos:          _unionById(s.documentos,          l.documentos,          'documentos'),
+    audit:               _unionById(s.audit,               l.audit,               'audit'),
+    correccionesFichaje: _unionById(s.correccionesFichaje, l.correccionesFichaje, 'correccionesFichaje'),
+    chats:               _unionById(s.chats,               l.chats,               'chats'),
+    gastos:              _unionById(s.gastos,              l.gastos,              'gastos'),
+    denuncias:           _unionById(s.denuncias,           l.denuncias,           'denuncias'),
+    wellbeing:           _unionById(s.wellbeing,           l.wellbeing,           'wellbeing'),
+    turnos:              _unionById(s.turnos,              l.turnos,              'turnos'),
+    partesTrabajo:       _unionById(s.partesTrabajo,       l.partesTrabajo,       'partesTrabajo'),
+    anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
     config:              { ...(s.config || {}), ...(l.config || {}) },

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones } from '../services/dataService.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
@@ -54,6 +54,10 @@ export const useAppStore = create((set, get) => ({
     set(state => {
       const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
       deleted = _diffDeleted(state.db, partial)
+      // Registrar tombstones ANTES de subir: si un fetchDB (sondeo/realtime) gana
+      // la carrera al push de este borrado, mergeDB ya sabe ignorar el id borrado
+      // en vez de resucitarlo desde el servidor (que todavía no se ha enterado).
+      recordTombstones(deleted)
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
       if (merged.audit?.length > 300) {
         const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
