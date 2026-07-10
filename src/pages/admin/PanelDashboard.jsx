@@ -59,8 +59,8 @@ export default function PanelDashboard({ db, toast, saveDB, session }) {
   const last7Hours = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now); d.setDate(d.getDate() - (6 - i))
-      const ds = d.toISOString().slice(0, 10)
-      return recs.filter(r => r.fin && r.inicio?.startsWith(ds)).reduce((s, r) => s + calcMin(r), 0) / 60
+      const ds = localDateStr(d)
+      return recs.filter(r => r.fin && r.inicio && localDateStr(new Date(r.inicio)) === ds).reduce((s, r) => s + calcMin(r), 0) / 60
     })
   }, [recs])
 

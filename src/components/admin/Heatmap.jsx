@@ -1,15 +1,15 @@
-import { calcMin, mhm } from '../../utils/time.js'
+import { calcMin, mhm, localDateStr } from '../../utils/time.js'
 
 export function buildHeatmap(recs, empCount) {
   const map = {}
   const now = new Date()
   for (let i = 83; i >= 0; i--) {
     const d = new Date(now); d.setDate(d.getDate() - i)
-    const k = d.toISOString().slice(0,10)
+    const k = localDateStr(d)
     map[k] = { count: 0, min: 0 }
   }
   recs.filter(r => r.fin && r.inicio).forEach(r => {
-    const k = r.inicio.slice(0,10)
+    const k = localDateStr(new Date(r.inicio))
     if (map[k]) { map[k].count++; map[k].min += calcMin(r) }
   })
   return Object.entries(map).map(([date, v]) => ({ date, ...v }))

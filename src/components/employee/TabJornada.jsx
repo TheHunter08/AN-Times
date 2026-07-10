@@ -81,7 +81,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [generatingWeekPdf, setGeneratingWeekPdf] = useState(false)
   const [showRangeExport, setShowRangeExport] = useState(false)
-  const nowIso = new Date().toISOString().slice(0, 10)
+  const nowIso = localDateStr(new Date())
   const [exportFrom, setExportFrom] = useState(nowIso.slice(0, 7) + '-01')
   const [exportTo, setExportTo] = useState(nowIso)
   const [generatingRangePdf, setGeneratingRangePdf] = useState(false)
@@ -589,11 +589,11 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
         const histDays = Array.from({ length: 30 }, (_, i) => {
           const d = new Date(now)
           d.setDate(d.getDate() - i - 1)
-          return d.toISOString().slice(0, 10)
+          return localDateStr(d)
         })
         const histWithRecs = histDays.map(ds => ({
           ds,
-          recs: (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(ds) && r.fin),
+          recs: (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin),
         })).filter(h => h.recs.length > 0)
         if (!histWithRecs.length) return null
         return (

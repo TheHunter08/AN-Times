@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { today, mhm, ftime, fds, calcSecs, gid, vacData, toDatetimeLocal } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
@@ -7,7 +7,18 @@ import { clipBreaksToWindow } from '../../utils/adminHelpers.js'
 
 export default function PanelSolicitudes({ db, toast, saveDB, session }) {
   const { showConfirm } = useAppStore()
-  const [solTab, setSolTab] = useState('vacaciones')
+  // Auto-select correcciones if there are pending corrections but no pending vacations
+  const [solTab, setSolTab] = useState(() => {
+    const hasPendCorr = (db.correccionesFichaje || []).some(c => c.estado === 'pendiente')
+    const hasPendVac  = (db.vacaciones || []).some(v => v.estado === 'pendiente')
+    return hasPendCorr && !hasPendVac ? 'correcciones' : 'vacaciones'
+  })
+  // Navigate to correct sub-tab when opened via push notification deeplink
+  useEffect(() => {
+    const handler = (e) => { if (e.detail?.panel === 'solicitudes' && e.detail?.tab) setSolTab(e.detail.tab) }
+    window.addEventListener('admin-panel-subtab', handler)
+    return () => window.removeEventListener('admin-panel-subtab', handler)
+  }, [])
   const [ausForm, setAusForm] = useState({ empId:'', tipo:'medico', fechaInicio:today(), fechaFin:today(), motivo:'' })
   const [vacForm, setVacForm] = useState({ empId:'', fechaInicio:today(), fechaFin:today(), motivo:'' })
   const [rejecting, setRejecting] = useState(null)  // id de vacación pendiente de rechazar

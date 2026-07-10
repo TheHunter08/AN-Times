@@ -37,16 +37,11 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
       estado: 'pendiente',
       ts: Date.now()
     }
-    const withAudit = auditLog(db,
-      'correccion_solicitada',
-      `Corrección fichaje ${rec.inicio.slice(0,10)}: ${motivo.trim()}`,
-      u.name
-    )
-    saveDB({
-      correccionesFichaje: [...(db.correccionesFichaje || []), corr],
-      audit: withAudit.audit
-    })
-    queuePush('__admin__', `✏️ Corrección de fichaje`, `${u.name} solicita corregir la jornada del ${rec.inicio.slice(0,10)}.`, 'correccion', '/?go=admin:solicitudes')
+    saveDB(freshDb => ({
+      correccionesFichaje: [...(freshDb.correccionesFichaje || []), corr],
+      audit: auditLog(freshDb, 'correccion_solicitada', `Corrección fichaje ${rec.inicio.slice(0,10)}: ${motivo.trim()}`, u.name).audit
+    }))
+    queuePush('__admin__', `✏️ Corrección de fichaje`, `${u.name} solicita corregir la jornada del ${rec.inicio.slice(0,10)}.`, 'correccion', '/?go=admin:solicitudes:correcciones')
     toast('Solicitud enviada al administrador', 3000, 'ok')
     setSending(false)
     onClose()
