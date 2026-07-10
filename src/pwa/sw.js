@@ -180,7 +180,9 @@ self.addEventListener('push', (event) => {
     }
 
     // 1) Mostrar notificación (requisito iOS Web Push — siempre, incluso duplicados)
-    await self.registration.showNotification(title, options)
+    // try/catch obligatorio: si showNotification lanza, el waitUntil rechaza y
+    // iOS puede terminar la suscripción push de forma permanente.
+    try { await self.registration.showNotification(title, options) } catch {}
 
     // 2) Avisar a clientes abiertos para banner in-app
     try {
@@ -409,7 +411,12 @@ async function _bgSync() {
   try {
     const stored = await _idbGet('pending')
     if (!stored) return false
-    const { payload: pending, deleted } = stored
+    // Compatibilidad con datos guardados antes del cambio de formato (fd6ecd4):
+    // el formato antiguo era el objeto raw; el nuevo es { payload, deleted }.
+    const isNewFmt = stored !== null && typeof stored === 'object' && 'payload' in stored
+    const pending = isNewFmt ? stored.payload : stored
+    const deleted = isNewFmt ? stored.deleted : undefined
+    if (!pending) return false
     const server = await _fetchServerData()
     const data = _mergeForPushSW(server, pending, deleted)
     const { hot, cold } = _splitHotCold(data)
@@ -533,8 +540,9 @@ async function _handleSyncPing() {
 // Nota: notificationclose NO se dispara al cerrar programáticamente con n.close().
 self.addEventListener('notificationclose', (event) => {
   if (event.notification.tag === 'sync-ping') {
-    // El usuario descartó activamente la notificación — esperar 2h antes de reintentar
-    _idbPut('sync_ping_user_dismissed', Date.now()).catch(() => {})
+    // event.waitUntil obligatorio: sin él el SW puede morir antes de que la
+    // escritura IDB termine, y el flag "usuario descartó" nunca se persiste.
+    event.waitUntil(_idbPut('sync_ping_user_dismissed', Date.now()).catch(() => {}))
   }
 })
 
