@@ -445,13 +445,23 @@ async function _bgSync() {
   }
 }
 
-// Handler especial para SYNC_PING: sincroniza en silencio y cierra la notificación sola.
-// iOS exige showNotification() en todo push handler — mostramos siempre con tag fijo
-// 'sync-ping' para que cada nueva reemplace la anterior (no se acumulan).
-// El cierre programático necesita un delay: iOS no registra la notificación en
-// getNotifications() de forma síncrona justo después de showNotification().
+// Handler especial para SYNC_PING enviado por el cron /api/sync-ping.
+//
+// Problema de fondo en iOS: no existe "silent push" en Web Push — iOS exige que
+// showNotification() se llame en todo push handler o termina la suscripción. Si
+// el usuario descartó la notificación anterior, la siguiente SYNC_PING crea una
+// nueva entrada en el centro de notificaciones aunque use el mismo tag (renotify:false
+// solo suprime el banner si el tag YA EXISTE; si fue descartado, es notif nueva).
+//
+// Estrategia:
+//   · Cuando no hay datos pendientes: mostrar vacía y cerrarla lo antes posible
+//     con reintentos cada 100→500→1500→4000ms — al menos uno debería funcionar
+//     antes de que el usuario abra el centro de notificaciones.
+//   · Cuando sí se sincronizaron datos: mostrar "✓ Fichaje sincronizado" con
+//     renotify:true (el usuario quiere ver esta), cerrar a los 8s.
+//   · Siempre cerrar notificaciones sync-ping previas primero.
 async function _handleSyncPing() {
-  // Cerrar cualquier notificación sync-ping anterior antes de procesar
+  // Cerrar cualquier sync-ping anterior (puede haber quedado si el close anterior falló)
   try {
     const prev = await self.registration.getNotifications({ tag: 'sync-ping' })
     prev.forEach(n => n.close())
@@ -460,28 +470,73 @@ async function _handleSyncPing() {
   let synced = false
   try { synced = await _bgSync() } catch {}
 
-  // Siempre mostrar con tag 'sync-ping' + silent=true + renotify=false:
-  // · tag fijo → cada nuevo reemplaza al anterior sin acumular
-  // · silent → sin sonido ni vibración
-  // · renotify:false → sin banner si ya hay una notif con este tag
-  await self.registration.showNotification('Times INC', {
-    body: synced ? '✓ Fichaje sincronizado' : '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: 'sync-ping',
-    silent: true,
-    renotify: false,
-    requireInteraction: false,
-  })
+  // ¿Descartó el usuario la notificación recientemente (< 2h)?
+  // Si es así y no hay datos reales que informar, acortamos al máximo los delays
+  // de cierre para que la notificación desaparezca antes de que la vea.
+  let userDismissedRecently = false
+  if (!synced) {
+    try {
+      const dismissed = await _idbGet('sync_ping_user_dismissed')
+      userDismissedRecently = !!(dismissed && Date.now() - dismissed < 2 * 60 * 60_000)
+    } catch {}
+  }
 
-  // iOS necesita tiempo para registrar la notificación antes de poder cerrarla.
-  // Sin este delay, getNotifications() devuelve array vacío y n.close() no se ejecuta.
-  await new Promise(r => setTimeout(r, 1500))
-  try {
-    const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
-    ns.forEach(n => n.close())
-  } catch {}
+  if (synced) {
+    // Datos subidos — notificación útil para el usuario, con sonido/banner
+    try {
+      await self.registration.showNotification('Times INC', {
+        body: '✓ Fichaje sincronizado',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'sync-ping',
+        silent: false,
+        renotify: true,
+        requireInteraction: false,
+      })
+    } catch {}
+    // Cerrar a los 8s — tiempo suficiente para que el usuario la vea
+    await new Promise(r => setTimeout(r, 8000))
+    try {
+      const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
+      ns.forEach(n => n.close())
+    } catch {}
+  } else {
+    // Sin datos pendientes — mostrar vacía (iOS exige showNotification) y cerrar ASAP.
+    // Múltiples intentos: iOS registra la notificación con retraso variable.
+    try {
+      await self.registration.showNotification('Times INC', {
+        body: '',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'sync-ping',
+        silent: true,
+        renotify: false,
+        requireInteraction: false,
+      })
+    } catch {}
+    // Reintentos agresivos — el primero a 100ms puede llegar antes de que iOS
+    // muestre la notificación al usuario; los siguientes son fallback.
+    // Si el usuario ya descartó antes, reducimos delays para ser aún más rápidos.
+    const delays = userDismissedRecently ? [50, 200, 800] : [100, 500, 1500, 4000]
+    for (const ms of delays) {
+      await new Promise(r => setTimeout(r, ms))
+      try {
+        const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
+        if (ns.length > 0) { ns.forEach(n => n.close()); break }
+      } catch {}
+    }
+  }
 }
+
+// Cuando el usuario descarta manualmente una notificación: guardar en IDB para
+// no volver a molestarle con ese tipo durante las próximas 2 horas.
+// Nota: notificationclose NO se dispara al cerrar programáticamente con n.close().
+self.addEventListener('notificationclose', (event) => {
+  if (event.notification.tag === 'sync-ping') {
+    // El usuario descartó activamente la notificación — esperar 2h antes de reintentar
+    _idbPut('sync_ping_user_dismissed', Date.now()).catch(() => {})
+  }
+})
 
 // Ejecuta _bgSync() y, si falla, avisa a los clientes abiertos — así el banner
 // de sincronización se muestra en vez de fallar en silencio para siempre
