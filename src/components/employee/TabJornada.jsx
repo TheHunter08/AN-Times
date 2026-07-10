@@ -607,7 +607,7 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
     {/* Informe in-app fullscreen overlay */}
     {informeUrl && (() => {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-      const dlName = `jornada-${new Date().toISOString().slice(0,7)}.pdf`
+      const dlName = `jornada-${today().slice(0,7)}.pdf`
       return (
         <div style={{ position:'fixed', inset:0, zIndex:300, background:'var(--bg-800)', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--bg-700)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>

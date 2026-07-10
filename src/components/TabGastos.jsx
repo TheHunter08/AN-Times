@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { gid } from '../utils/time.js';
+import { gid, today } from '../utils/time.js';
 import { resizeImageToDataUrl } from '../utils/imageResize.js';
 
 const CATEGORIAS = ['dieta', 'transporte', 'material', 'otro'];
@@ -15,7 +15,7 @@ function categoriaBadgeStyle() {
 }
 
 function todayYMD() {
-  return new Date().toISOString().slice(0, 10);
+  return today();
 }
 
 function fmt(n) {
@@ -39,7 +39,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
     .sort((a, b) => (b.ts||'').localeCompare(a.ts||''));
 
   // Monthly stats
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisMonth = today().slice(0, 7);
   const gastosEsteMes = misGastos.filter((g) => g.fecha.startsWith(thisMonth));
   const aprobadosMes = gastosEsteMes
     .filter((g) => g.estado === 'aprobado')
