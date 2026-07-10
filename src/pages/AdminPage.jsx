@@ -79,6 +79,7 @@ const JO_PAGES = [
 
 export default function AdminPage() {
   const { db, session, currentAdminPage, setAdminPage, saveDB, toast, setScreen, logout, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
+  const onlineCount = useAppStore(s => s.onlineCount)
   const [sideOpen, setSideOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
@@ -255,6 +256,12 @@ export default function AdminPage() {
           )}
         </div>
         <div className="adm-topbar-actions">
+          {onlineCount > 1 && (
+            <div title={`${onlineCount} usuarios con la app abierta`} style={{ fontSize:11, fontWeight:600, color:'var(--text3)', display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', boxShadow:'0 0 0 2px rgba(59,130,246,.25)', flexShrink:0 }} />
+              <span style={{ whiteSpace:'nowrap' }}>{onlineCount} online</span>
+            </div>
+          )}
           <SyncBadge />
           {!isEncargado && (
             <button className="adm-topbar-search" onClick={() => { setSearchOpen(true); setSearchQ('') }} title="Buscar (⌘K)" aria-label="Buscar empleados y registros">

@@ -24,10 +24,13 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
   const act = (id, estado, motivoRechazo) => {
     const v = (db.vacaciones||[]).find(x => x.id === id)
     const extra = estado === 'rechazada' && motivoRechazo ? { motivoRechazo } : {}
-    const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString(), ...extra } : v)
-    const withAudit = auditLog(db, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
+    const resolvedAt = new Date().toISOString()
     const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
-    saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
+    saveDB(freshDb => {
+      const updated = (freshDb.vacaciones||[]).map(x => x.id === id ? { ...x, estado, resolvedAt, ...extra } : x)
+      const withAudit = auditLog(freshDb, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
+      return { vacaciones: updated, audit: withAudit.audit, notis: [...(freshDb.notis||[]), noti] }
+    })
     if (v?.empId) {
       const pushBody = estado === 'rechazada' && motivoRechazo ? `${noti.detail} · ${motivoRechazo}` : noti.detail
       queuePush(v.empId, noti.action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
@@ -70,9 +73,11 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
       ts: new Date().toISOString(), resolvedAt: new Date().toISOString(),
       asignadaPor: session?.user?.name || 'Admin'
     }
-    const withAudit = auditLog(db, 'Vacaciones asignadas', `${item.empName} · ${fds(item.fechaInicio)} → ${fds(item.fechaFin)} (${dias}d)`, session?.user?.name || 'Admin')
     const noti = { id: gid(), empId: vacForm.empId, action: '🌴 Vacaciones asignadas', detail: `${fds(item.fechaInicio)} → ${fds(item.fechaFin)}`, ts: new Date().toISOString(), leido: false }
-    saveDB({ vacaciones: [...(db.vacaciones || []), item], audit: withAudit.audit, notis: [...(db.notis || []), noti] })
+    saveDB(freshDb => {
+      const withAudit = auditLog(freshDb, 'Vacaciones asignadas', `${item.empName} · ${fds(item.fechaInicio)} → ${fds(item.fechaFin)} (${dias}d)`, session?.user?.name || 'Admin')
+      return { vacaciones: [...(freshDb.vacaciones || []), item], audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
+    })
     queuePush(vacForm.empId, noti.action, noti.detail, 'vacaciones', '/?go=emp:vacaciones')
     setVacForm(f => ({ ...f, empId:'', motivo:'' }))
     toast('Vacaciones asignadas — no podrá fichar esos días', 3500, 'ok')

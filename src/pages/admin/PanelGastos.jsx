@@ -75,13 +75,14 @@ export default function PanelGastos({ db, toast, saveDB, session }) {
       ts: new Date().toISOString(),
       leido: false,
     }
-    const updated = gastos.map(g =>
-      g.id === gasto.id
-        ? { ...g, estado: 'aprobado', resolvedAt: new Date().toISOString(), resolvedBy: who }
-        : g
-    )
-    const withAudit = auditLog(db, 'Gasto aprobado', `${gasto.empName}: ${gasto.concepto} ${gasto.importe}€`, who)
-    saveDB({ gastos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
+    const resolvedAt = new Date().toISOString()
+    saveDB(freshDb => {
+      const updated = (freshDb.gastos || []).map(g =>
+        g.id === gasto.id ? { ...g, estado: 'aprobado', resolvedAt, resolvedBy: who } : g
+      )
+      const withAudit = auditLog(freshDb, 'Gasto aprobado', `${gasto.empName}: ${gasto.concepto} ${gasto.importe}€`, who)
+      return { gastos: updated, notis: [...(freshDb.notis || []), noti], audit: withAudit.audit }
+    })
     toast('Gasto aprobado', 3000, 'ok')
   }
 
@@ -94,13 +95,14 @@ export default function PanelGastos({ db, toast, saveDB, session }) {
       ts: new Date().toISOString(),
       leido: false,
     }
-    const updated = gastos.map(g =>
-      g.id === gasto.id
-        ? { ...g, estado: 'rechazado', resolvedAt: new Date().toISOString(), resolvedBy: who, motivoRechazo: motivo || '' }
-        : g
-    )
-    const withAudit = auditLog(db, 'Gasto rechazado', `${gasto.empName}: ${gasto.concepto}`, who)
-    saveDB({ gastos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
+    const resolvedAt = new Date().toISOString()
+    saveDB(freshDb => {
+      const updated = (freshDb.gastos || []).map(g =>
+        g.id === gasto.id ? { ...g, estado: 'rechazado', resolvedAt, resolvedBy: who, motivoRechazo: motivo || '' } : g
+      )
+      const withAudit = auditLog(freshDb, 'Gasto rechazado', `${gasto.empName}: ${gasto.concepto}`, who)
+      return { gastos: updated, notis: [...(freshDb.notis || []), noti], audit: withAudit.audit }
+    })
     setRejectingId(null)
     setRejectMotivo('')
     toast('Gasto rechazado', 3000, 'warn')

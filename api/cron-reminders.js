@@ -259,6 +259,30 @@ export default async function handler(req, res) {
           }
         }
       }
+
+      // ── 6. Resumen semanal (viernes 17:00-17:59, hora España) ──────────────
+      // Informa al empleado de sus horas totales de la semana.
+      if (now.getDay() === 5 && nowH === 17) {
+        const monOffset = now.getDay() === 0 ? 6 : now.getDay() - 1
+        const mon = new Date(now); mon.setDate(now.getDate() - monOffset)
+        const weekStartStr = `${mon.getFullYear()}-${p2(mon.getMonth()+1)}-${p2(mon.getDate())}`
+        const weekRecs = empRecs.filter(r => r.fin && r.inicio >= weekStartStr + 'T00:00:00')
+        const weekTotalMin = Math.floor(weekRecs.reduce((s, r) => {
+          const elapsed = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+          return s + Math.max(0, elapsed - Math.floor((r.breakSecs || 0) / 60))
+        }, 0))
+        if (weekTotalMin > 0) {
+          const key = `an_resumen_sem_${emp.id}_${today}`
+          if (!notisSent[key]) {
+            const hh = Math.floor(weekTotalMin / 60), mm = weekTotalMin % 60
+            const nota = weekTotalMin >= 2400 ? ' ✅' : weekTotalMin < 1920 ? ' · Por debajo del objetivo' : ''
+            schedule(emp, sub, key, today,
+              '📊 Tu semana en Times INC',
+              `Esta semana has trabajado ${hh}h ${p2(mm)}m.${nota}`,
+              'resumen-semanal', '/?tab=jornada')
+          }
+        }
+      }
      } catch (e) {
        // Aislar el fallo a este empleado: un registro/reminder malformado no debe
        // tumbar el cron entero (antes un solo dato inválido devolvía 500 y ningún
@@ -294,6 +318,69 @@ export default async function handler(req, res) {
                 'alert-10h', '/?go=admin:fichajes')
             }
           }
+        }
+      }
+    }
+
+    // ── 7. Alertas de convenio colectivo (a admins / jefes de obra) ───────────
+    // ET art. 34.3: máximo 9h ordinarias/día, 12h de descanso entre jornadas.
+    // Se notifica al admin una vez por infracción (clave por empId + fecha/jornada).
+    {
+      const WD_MAX_MIN = 540 // 9 h en minutos
+      const REST_MIN_H = 12  // 12 h de descanso entre jornadas
+      const admins = (db.employees || []).filter(e => !e.baja && (e.isAdmin || e.role === 'jefe_obra'))
+
+      for (const emp of employees) {
+        try {
+          const empRecs2 = records.filter(r => r.empId === emp.id)
+          const todayRecs2 = empRecs2.filter(r => r.inicio?.startsWith(today))
+
+          // 7a. Jornada diaria > 9 h
+          const todayTotalMin = Math.floor(todayRecs2.reduce((s, r) => {
+            const ini = new Date(r.inicio).getTime()
+            const fin = r.fin ? new Date(r.fin).getTime() : nowMs
+            return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
+          }, 0))
+          if (todayTotalMin > WD_MAX_MIN) {
+            for (const adm of admins) {
+              const admSub = subMap.get(adm.id)
+              const key = `an_conv9h_${adm.id}_${emp.id}_${today}`
+              if (!notisSent[key]) {
+                const hh = Math.floor(todayTotalMin / 60), mm2 = todayTotalMin % 60
+                schedule(adm, admSub, key, '1',
+                  '⚠️ Convenio: jornada > 9 h',
+                  `${emp.name} lleva ${hh}h ${p2(mm2)}m hoy (límite ET: 9 h ordinarias).`,
+                  'conv-9h', '/?go=admin:fichajes')
+              }
+            }
+          }
+
+          // 7b. Descanso < 12 h entre jornadas
+          const openRec2 = empRecs2.find(r => !r.fin)
+          if (openRec2) {
+            const prevSorted = empRecs2
+              .filter(r => r.fin && r.inicio < openRec2.inicio)
+              .sort((a, b) => b.fin.localeCompare(a.fin))
+            if (prevSorted.length > 0) {
+              const lastFinMs = new Date(prevSorted[0].fin).getTime()
+              const restH = (new Date(openRec2.inicio).getTime() - lastFinMs) / 3_600_000
+              if (restH < REST_MIN_H) {
+                for (const adm of admins) {
+                  const admSub = subMap.get(adm.id)
+                  const key = `an_conv12h_${emp.id}_${openRec2.id}`
+                  if (!notisSent[key]) {
+                    const rh = Math.floor(restH), rm = Math.floor((restH - rh) * 60)
+                    schedule(adm, admSub, key, '1',
+                      '⚠️ Convenio: descanso insuficiente',
+                      `${emp.name} descansó solo ${rh}h ${p2(rm)}m (mínimo legal: 12 h entre jornadas).`,
+                      'conv-12h', '/?go=admin:fichajes')
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`[cron-reminders] error convenio ${emp.id}:`, e.message)
         }
       }
     }

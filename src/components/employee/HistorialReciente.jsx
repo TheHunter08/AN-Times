@@ -36,21 +36,37 @@ export function HistorialReciente({ histWithRecs, openModal, u }) {
                 {recs.map(r => {
                   const wm = Math.floor(recWorkSecs(r) / 60)
                   return (
-                    <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', paddingTop:4, borderTop:'1px solid var(--border)', gap:8, flexWrap:'wrap' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                        <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
-                        {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
-                        {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(54,178,126,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                    <div key={r.id} style={{ paddingTop:4, borderTop:'1px solid var(--border)' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--text3)', gap:8, flexWrap:'wrap' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                          <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
+                          {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--orange-dim)', color:'var(--orange)', border:'1px solid rgba(245,158,11,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
+                          {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(54,178,126,.2)', textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
+                          <button
+                            onClick={() => openModal('correccion', { rec: r, empName: u?.name })}
+                            title="Solicitar corrección"
+                            style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 7px', cursor:'pointer', fontSize:10, color:'var(--text3)', fontFamily:'inherit', lineHeight:1.5 }}>
+                            ✏️
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
-                        <button
-                          onClick={() => openModal('correccion', { rec: r, empName: u?.name })}
-                          title="Solicitar corrección"
-                          style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 7px', cursor:'pointer', fontSize:10, color:'var(--text3)', fontFamily:'inherit', lineHeight:1.5 }}>
-                          ✏️
-                        </button>
-                      </div>
+                      {r.correcciones?.length > 0 && (
+                        <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
+                          {r.correcciones.map((c, ci) => (
+                            <div key={ci} style={{ fontSize:10, color:'var(--text4)', display:'flex', gap:5, alignItems:'flex-start', padding:'3px 6px', background:'var(--bg-500)', borderRadius:6, border:'1px solid var(--border)' }}>
+                              <span style={{ flexShrink:0 }}>✏️</span>
+                              <span>
+                                <strong style={{ color:'var(--text3)' }}>{c.por || 'Admin'}</strong>
+                                {c.antes && c.despues ? <> cambió de <em>{c.antes}</em> a <em>{c.despues}</em></> : ' modificó este fichaje'}
+                                {c.motivo ? <> — <em style={{ color:'var(--text3)' }}>"{c.motivo}"</em></> : null}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

@@ -542,7 +542,7 @@ export default function EmployeePage() {
   // App Badge API — muestra el contador de no leídas en el icono de la app instalada
   useEffect(() => {
     if (!u || !('setAppBadge' in navigator)) return
-    const total = (db.notis || []).filter(n => n.empId === u.id && !n.leido).length
+    const total = (db.notis || []).filter(n => n.empId === u.id && !n.leido && !n.deleted).length
     try {
       if (total > 0) navigator.setAppBadge(total)
       else navigator.clearAppBadge()
@@ -837,7 +837,7 @@ export default function EmployeePage() {
     [u.initials, u.name]
   )
   const vac = useMemo(() => vacData(u.id, db), [u.id, db.employees, db.vacaciones])
-  const unread = useMemo(() => (db.notis || []).filter(n => n.empId === u?.id && !n.leido).length, [db.notis, u?.id])
+  const unread = useMemo(() => (db.notis || []).filter(n => n.empId === u?.id && !n.leido && !n.deleted).length, [db.notis, u?.id])
   const chatUnread = useMemo(() => (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length, [db.chats, u?.id])
 
   const [greetHour, setGreetHour] = useState(new Date().getHours())
