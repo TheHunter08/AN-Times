@@ -315,12 +315,17 @@ export default function App() {
     // Usamos serviceWorker.ready en vez de controller?.postMessage porque controller
     // puede ser null en el instante del arranque (el SW aún no ha reclamado la página
     // con clients.claim()) — el mensaje se perdería en silencio.
+    // No se comprueba navigator.onLine antes de estas dos llamadas: en iOS es
+    // poco fiable (puede quedarse en `false` con red real disponible) y
+    // saltárselas dejaba datos pendientes de sesiones anteriores sin ni
+    // siquiera intentar subirse al arrancar. Ambas comprueban IDB primero y
+    // salen gratis si no hay nada pendiente.
     navigator.serviceWorker?.ready.then(reg => {
-      if (navigator.onLine) reg.active?.postMessage({ type: 'FORCE_SYNC' })
+      reg.active?.postMessage({ type: 'FORCE_SYNC' })
     }).catch(() => {})
     // Hilo principal: por si el proceso fue matado offline en iOS (sin Background Sync API).
     // uploadPendingIfAny() comprueba IDB — sale inmediato si está vacío, sube si hay datos.
-    if (navigator.onLine) uploadPendingIfAny()
+    uploadPendingIfAny()
 
     // onResume: refresca datos y WebSocket cuando la PWA vuelve al primer plano.
     // Se dispara desde tres fuentes porque cada plataforma usa un evento diferente:
@@ -454,7 +459,7 @@ export default function App() {
       initRealtime()
       // Delay: esperar a que los cambios offline suban antes de bajar del servidor
       setTimeout(() => {
-        if (navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+        if (!useAppStore.getState().offlinePending) fetchDB()
       }, 3000)
     }
     window.addEventListener('online', onOnline)
@@ -465,20 +470,24 @@ export default function App() {
     // comprueba el timestamp antes de traer nada (unos bytes si no hay cambios),
     // así que este intervalo no pesa — solo evita quedarse desactualizado mucho
     // rato esperando a que otro empleado haga algo que sí dispare el broadcast.
+    // No se comprueba navigator.onLine: en iOS es poco fiable (puede quedarse
+    // pegado en `false` con red real disponible), y fetchDB()/uploadPendingIfAny()
+    // ya son baratos y fallan rápido si de verdad no hay red.
     const pollInterval = setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine && !useAppStore.getState().offlinePending) fetchDB()
+      if (document.visibilityState === 'visible' && !useAppStore.getState().offlinePending) fetchDB()
     }, 30 * 1000)
-    // Con cobertura débil, navigator.onLine puede quedarse en `true` todo el
-    // rato (el radio sigue "conectado", solo que las peticiones fallan o hacen
-    // timeout) — el evento 'online' del navegador nunca llega a dispararse
-    // porque nunca hubo una transición real offline→online, así que
-    // offlinePending se quedaba atascado en true indefinidamente hasta que el
-    // usuario cerraba y reabría la app varias veces (cada apertura sí fuerza un
-    // intento, vía onResume). Intervalo dedicado y bastante más corto que el
-    // sondeo general de arriba para que el reintento automático sea, en la
-    // práctica, tan rápido como reabrir la app a mano.
+    // Con cobertura débil (o en iOS, donde navigator.onLine es especialmente
+    // poco fiable — puede quedarse pegado en `false` o en `true` sin reflejar
+    // la realidad), el evento 'online' del navegador puede no llegar a
+    // dispararse nunca, así que offlinePending se quedaba atascado en true
+    // indefinidamente hasta que el usuario cerraba y reabría la app varias
+    // veces (cada apertura sí fuerza un intento, vía onResume, sin comprobar
+    // onLine). Intervalo dedicado y bastante más corto que el sondeo general
+    // de arriba para que el reintento automático sea, en la práctica, tan
+    // rápido como reabrir la app a mano — y sin el gate de onLine, para que
+    // funcione igual en iOS que en cualquier otra plataforma.
     const pendingRetryInterval = setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine && useAppStore.getState().offlinePending) uploadPendingIfAny()
+      if (document.visibilityState === 'visible' && useAppStore.getState().offlinePending) uploadPendingIfAny()
     }, 8 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)

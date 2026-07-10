@@ -484,13 +484,14 @@ async function _bgSyncFallback() {
     const stored = await _idbGet('pending')
     if (!stored || !supabase) { _bgSyncRetries = 0; return }
     const { payload: data, deleted } = stored
-    // Sin red: puede que navigator.onLine aún no se haya actualizado (iOS resume).
-    // Reintento breve en vez de salir definitivamente.
-    if (!navigator.onLine) {
-      if (_bgSyncRetries < 2) { _bgSyncRetries++; setTimeout(_bgSyncFallback, 2000) }
-      else { _bgSyncRetries = 0 }
-      return
-    }
+    // NO se comprueba navigator.onLine aquí: en iOS es conocidamente poco fiable
+    // (puede quedarse pegado en `false` tras un cambio de red WiFi↔datos, o no
+    // reflejar nunca una señal débil real) — confiar en él para decidir si
+    // siquiera INTENTAR la petición dejaba fichajes en cola para siempre en
+    // esos dispositivos, sin que ningún intento real llegara a lanzarse.
+    // Se intenta directamente: si de verdad no hay red, la petición falla rápido
+    // (o al timeout de 6s de _timeoutFetch) y cae en el catch de abajo, que ya
+    // reintenta con backoff — mismo resultado, sin el falso negativo de iOS.
     // NOTA: el timestamp guard que había aquí (local._ts > data._ts → exit) se eliminó.
     // fetchDB() actualiza localStorage._ts al updated_at del servidor cuando baja datos
     // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard
@@ -539,14 +540,13 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
 
-  // Sin red: guardar en IDB inmediatamente para background sync (no reintentar)
-  if (!navigator.onLine) {
-    _pushFlight = false
-    onError?.()
-    _storeForBgSync(payload, deleted)
-    return
-  }
-
+  // NO se comprueba navigator.onLine aquí — ver el mismo razonamiento en
+  // _bgSyncFallback: en iOS puede quedarse pegado en `false` con red real
+  // disponible (señal débil, cambio WiFi↔datos), y confiar en él para saltar
+  // el intento de red directamente a la cola offline dejaba fichajes sin
+  // subir nunca en esos dispositivos — ni la app en primer plano lo
+  // reintentaba (todo pasaba a depender de Background Sync, que iOS no
+  // soporta) hasta que el usuario cerraba y reabría la app.
   _mergeWithServer(payload, deleted)
     .then(merged => _upsertHotCold(merged).then(() => merged))
     .then((merged) => {
