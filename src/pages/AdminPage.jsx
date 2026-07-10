@@ -636,7 +636,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `fichajes-${new Date().toISOString().slice(0,10)}.csv`
+    a.href = url; a.download = `fichajes-${localDateStr(new Date())}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast(`${rows.length} fichajes exportados`, 3000, 'ok')

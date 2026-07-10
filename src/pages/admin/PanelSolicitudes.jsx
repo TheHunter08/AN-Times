@@ -33,15 +33,20 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
   const emps = (db.employees || []).filter(e => !e.baja)
 
   const act = (id, estado, motivoRechazo) => {
-    const v = (db.vacaciones||[]).find(x => x.id === id)
+    const vStale = (db.vacaciones||[]).find(x => x.id === id)
     const extra = estado === 'rechazada' && motivoRechazo ? { motivoRechazo } : {}
-    const updated = (db.vacaciones||[]).map(v => v.id === id ? { ...v, estado, resolvedAt: new Date().toISOString(), ...extra } : v)
-    const withAudit = auditLog(db, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
-    const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
-    saveDB({ vacaciones: updated, audit: withAudit.audit, notis: [...(db.notis||[]), noti] })
-    if (v?.empId) {
-      const pushBody = estado === 'rechazada' && motivoRechazo ? `${noti.detail} · ${motivoRechazo}` : noti.detail
-      queuePush(v.empId, noti.action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
+    saveDB(freshDb => {
+      const v = (freshDb.vacaciones||[]).find(x => x.id === id)
+      const updated = (freshDb.vacaciones||[]).map(x => x.id === id ? { ...x, estado, resolvedAt: new Date().toISOString(), ...extra } : x)
+      const withAudit = auditLog(freshDb, estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', v?.empName || '', session?.user?.name || 'Admin')
+      const noti = { id: gid(), empId: v?.empId, action: estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas', detail: v ? `${fds(v.fechaInicio)} → ${fds(v.fechaFin)}` : '', ts: new Date().toISOString(), leido: false }
+      return { vacaciones: updated, audit: withAudit.audit, notis: [...(freshDb.notis||[]), noti] }
+    })
+    if (vStale?.empId) {
+      const detail = vStale.fechaInicio ? `${fds(vStale.fechaInicio)} → ${fds(vStale.fechaFin)}` : ''
+      const action = estado === 'aprobada' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas'
+      const pushBody = estado === 'rechazada' && motivoRechazo ? `${detail} · ${motivoRechazo}` : detail
+      queuePush(vStale.empId, action, pushBody, 'vacaciones', '/?go=emp:vacaciones')
     }
     toast(estado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
@@ -81,9 +86,16 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
       ts: new Date().toISOString(), resolvedAt: new Date().toISOString(),
       asignadaPor: session?.user?.name || 'Admin'
     }
-    const withAudit = auditLog(db, 'Vacaciones asignadas', `${item.empName} · ${fds(item.fechaInicio)} → ${fds(item.fechaFin)} (${dias}d)`, session?.user?.name || 'Admin')
     const noti = { id: gid(), empId: vacForm.empId, action: '🌴 Vacaciones asignadas', detail: `${fds(item.fechaInicio)} → ${fds(item.fechaFin)}`, ts: new Date().toISOString(), leido: false }
-    saveDB({ vacaciones: [...(db.vacaciones || []), item], audit: withAudit.audit, notis: [...(db.notis || []), noti] })
+    saveDB(freshDb => {
+      const solapa = (freshDb.vacaciones || []).some(v =>
+        v.empId === vacForm.empId && v.estado !== 'rechazada' &&
+        item.fechaInicio <= v.fechaFin && item.fechaFin >= v.fechaInicio
+      )
+      if (solapa) return {}
+      const withAudit = auditLog(freshDb, 'Vacaciones asignadas', `${item.empName} · ${fds(item.fechaInicio)} → ${fds(item.fechaFin)} (${dias}d)`, session?.user?.name || 'Admin')
+      return { vacaciones: [...(freshDb.vacaciones || []), item], audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
+    })
     queuePush(vacForm.empId, noti.action, noti.detail, 'vacaciones', '/?go=emp:vacaciones')
     setVacForm(f => ({ ...f, empId:'', motivo:'' }))
     toast('Vacaciones asignadas — no podrá fichar esos días', 3500, 'ok')
@@ -100,7 +112,7 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
     const emp = emps.find(e => e.id === ausForm.empId)
     const key = ausForm.tipo === 'medico' ? 'medicos' : 'ausencias'
     const item = { id: gid(), empId: ausForm.empId, empName: emp?.name || '', fechaInicio: ausForm.fechaInicio, fechaFin: ausForm.fechaFin || ausForm.fechaInicio, motivo: ausForm.motivo, ts: new Date().toISOString() }
-    saveDB({ [key]: [...(db[key]||[]), item] })
+    saveDB(freshDb => ({ [key]: [...(freshDb[key]||[]), item] }))
     const tipoLbl2 = ausForm.tipo === 'medico' ? 'Ausencia médica' : 'Ausencia'
     queuePush(ausForm.empId, `🗓️ ${tipoLbl2} registrada`, `Se ha registrado una ${tipoLbl2.toLowerCase()} el ${ausForm.fechaInicio}.`, 'ausencia', '/?tab=calendario')
     setAusForm(f => ({ ...f, empId:'', motivo:'' }))
@@ -109,7 +121,7 @@ export default function PanelSolicitudes({ db, toast, saveDB, session }) {
 
   const delAus = (id, tipo) => {
     const key = tipo === 'medico' ? 'medicos' : 'ausencias'
-    saveDB({ [key]: (db[key]||[]).filter(a => a.id !== id) })
+    saveDB(freshDb => ({ [key]: (freshDb[key]||[]).filter(a => a.id !== id) }))
     toast('Ausencia eliminada')
   }
 

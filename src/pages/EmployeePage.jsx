@@ -472,14 +472,15 @@ export default function EmployeePage() {
             const breaks2 = [...(freshRec.breaks || [])]
             const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
             const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime, _upd: closeTime }
-            const snapshot = dbRef.current.records
-            const updRecs = snapshot.map(r => r.id === freshRec.id ? closed2 : r)
-            const dbWithAudit = auditLog(dbRef.current, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
             const _msgAc = `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
             addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
-            const _notisToSave = [...(dbRef.current.notis || []), ...bellNotis]
+            const bellSnapshot = [...bellNotis]
             bellNotis.length = 0
-            saveDB({ records: updRecs, notisSent: { ...(dbRef.current.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: _notisToSave })
+            saveDB(latestDb => {
+              const updRecs = latestDb.records.map(r => r.id === freshRec.id ? closed2 : r)
+              const dbWithAudit = auditLog(latestDb, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
+              return { records: updRecs, notisSent: { ...(latestDb.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: [...(latestDb.notis || []), ...bellSnapshot] }
+            })
             sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
             return
           }
@@ -855,7 +856,7 @@ export default function EmployeePage() {
   const handleWellbeingSubmit = ({ mood, nota }) => {
     if (!mood || !wellbeingRecId) return
     const entry = { id: gid(), empId: u.id, mood, nota: nota || '', ts: new Date().toISOString(), recordId: wellbeingRecId }
-    saveDB({ wellbeing: [...(db.wellbeing || []), entry] })
+    saveDB(freshDb => ({ wellbeing: [...(freshDb.wellbeing || []), entry] }))
   }
 
   const handleGeoStart = () => {

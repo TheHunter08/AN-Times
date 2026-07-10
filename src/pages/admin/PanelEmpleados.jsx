@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import QRCode from 'qrcode'
 import { useAppStore } from '../../store/appStore.js'
-import { today, mhm, p2, calcMin, gid, sortedEmps } from '../../utils/time.js'
+import { today, mhm, p2, calcMin, gid, sortedEmps, localDateStr } from '../../utils/time.js'
 import { auditLog } from '../../services/dataService.js'
 import { hashPin, isPinHashed, verifyPin } from '../../utils/pinSecurity.js'
 
@@ -127,7 +127,7 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
     const title = [`Empleados — ${empNombre || 'TIMES INC'} — ${mk2}`]
     const headers = ['Nombre','Email','Rol','Obra','Centro trabajo','Alta','H/sem','H. trabajadas (mes actual)','H. trabajadas (dec.)','Estado']
     const dataRows = allEmps.map(e => {
-      const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio?.startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
+      const monthMin = (db.records||[]).filter(r => r.empId===e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk2)).reduce((s,r)=>s+calcMin(r),0)
       return [e.name, e.email||'', e.role||'emp', e.empresa||'', e.centroTrabajo||'', e.startDate||'', e.horasSemanales||40, mhm(monthMin), Math.round(monthMin/60*100)/100, e.baja?'Baja':'Activo']
     })
     const ws = XLSX.utils.aoa_to_sheet([title, [], headers, ...dataRows])
