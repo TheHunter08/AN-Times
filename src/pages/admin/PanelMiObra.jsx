@@ -39,7 +39,7 @@ export default function PanelMiObra({ db, toast, saveDB, session }) {
     ...(db.ausencias|| []).map(a => ({ ...a, tipoAus:'ausencia' })),
   ].filter(a => empIds.has(a.empId)).sort((a,b) => (b.fechaInicio||'').localeCompare(a.fechaInicio||'')).slice(0, 30)
 
-  const [tab, setTab]       = useState('live')
+  const [tab, setTab] = useState(() => correcsPend.length > 0 && !liveRecs.length ? 'correcciones' : 'live')
   const [editing, setEditing] = useState(null)
   const editingPushed = useRef(false)
   useEffect(() => {

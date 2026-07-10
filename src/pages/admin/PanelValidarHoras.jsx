@@ -9,15 +9,18 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   const now = new Date()
   const [selMonth, setSelMonth] = useState(`${now.getFullYear()}-${p2(now.getMonth()+1)}`)
 
-  // Los centros de trabajo son lo que realmente importa para acotar el equipo del
-  // jefe de obra — "obrasAsignadas" en un empleado normal casi nunca está poblado
-  // (ese campo es para encargados/JO), así que hay que comparar por centroTrabajo.
-  const joObras = session?.user?.obrasAsignadas || []
+  // Leer obrasAsignadas desde db.employees (no session) para reflejar cambios
+  // sin necesidad de re-login. Cuando joObras está vacío, el JO actúa como
+  // segundo administrador y tiene acceso a todos los empleados.
+  const joUser = (db.employees || []).find(e => e.id === session?.user?.id)
+  const joObras = joUser?.obrasAsignadas || session?.user?.obrasAsignadas || []
   const recs = db.records || []
 
-  const emps = (db.employees || []).filter(e =>
-    !e.baja && !e.isAdmin && (joObras.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => joObras.includes(o)))
-  )
+  const emps = (db.employees || []).filter(e => {
+    if (e.baja || e.isAdmin) return false
+    if (!joObras.length) return true  // acceso total cuando sin obras asignadas
+    return joObras.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => joObras.includes(o))
+  })
 
   const rows = emps.map(e => {
     const eRecs = recs.filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(selMonth))
@@ -145,13 +148,10 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
           style={{ width:'auto', padding:'7px 12px', fontSize:13, borderRadius:8 }} />
       </div>
 
-      {!joObras.length ? (
-        <div className="empty">No tienes obras asignadas. Contacta con el administrador.</div>
-      ) : (
-        <>
-          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
-            📋 <strong>Validar horas</strong> — Genera el cierre mensual y envíaselo a tus empleados para firma digital. Obras: <strong>{joObras.join(', ')}</strong>
-          </div>
+      <>
+        <div style={{ fontSize:12, color:'var(--text3)', marginBottom:16, padding:'12px 14px', background:'var(--primary-dim)', borderRadius:'var(--r)', border:'1px solid var(--primary-glow)', lineHeight:1.6 }}>
+          📋 <strong>Validar horas</strong> — Genera el cierre mensual y envíaselo a tus empleados para firma digital.{joObras.length > 0 && <> Obras: <strong>{joObras.join(', ')}</strong></>}
+        </div>
 
           <div style={{ display:'flex', gap:8, marginBottom:16 }}>
             <button className="btn btn-primary" style={{ flex:1 }} onClick={generarTodosJO} disabled={!pendientes}>
@@ -219,8 +219,7 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
               </div>
             </div>
           )}
-        </>
-      )}
+      </>
     </div>
   )
 }

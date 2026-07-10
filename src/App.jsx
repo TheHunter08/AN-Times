@@ -230,10 +230,11 @@ function applyDeepLink(url) {
     if (!go && !tab) return
     const { setScreen, setAdminPage, setEmpTab, openModal } = useAppStore.getState()
     if (go) {
-      const [screen, target] = go.split(':')
+      const [screen, target, subtab] = go.split(':')
       if (screen === 'admin') {
         setScreen('admin', true)
         if (target) setAdminPage(target)
+        if (subtab) window.dispatchEvent(new CustomEvent('admin-panel-subtab', { detail: { panel: target, tab: subtab } }))
       } else if (screen === 'emp') {
         setScreen('emp', true)
         if (target === 'documentos') { setEmpTab('perfil'); openModal('documentos') }

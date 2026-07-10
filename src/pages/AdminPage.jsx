@@ -163,7 +163,7 @@ export default function AdminPage() {
       if (perm === 'default') perm = await Notification.requestPermission()
       if (perm === 'granted') {
         if (uid) await pushSubscribe(uid, VAPID_PUB)
-        if (!isEncargado) await pushSubscribe('__admin__', VAPID_PUB)
+        await pushSubscribe('__admin__', VAPID_PUB)
       }
     }, 3000)
     return () => clearTimeout(t)
@@ -181,6 +181,15 @@ export default function AdminPage() {
 
   const pendingDocs = (db.documentos || []).filter(d => !d.firma).length
   const pendingVacs = (db.vacaciones || []).filter(v => v.estado === 'pendiente').length
+  const pendingCorrs = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente').length
+  // Pending corrections visible only to the encargado's assigned team
+  const encUser = isEncargado ? ((db.employees || []).find(e => e.id === session.user?.id) || session.user) : null
+  const encMisCentros = encUser ? [...new Set([...(encUser.obrasAsignadas || []), ...(encUser.centroTrabajo ? [encUser.centroTrabajo] : [])])] : []
+  const encEmpIds = isEncargado ? new Set((db.employees || []).filter(e =>
+    !e.baja && !e.isAdmin && e.id !== encUser?.id &&
+    (!encMisCentros.length || encMisCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encMisCentros.includes(o)))
+  ).map(e => e.id)) : new Set()
+  const pendingEncCorrs = (db.correccionesFichaje || []).filter(c => c.estado === 'pendiente' && encEmpIds.has(c.empId)).length
   const adminUnreadChats = (db.chats || []).filter(m => m.to === 'admin' && !m.leido).length
   const activeNow = (db.records || []).filter(r => !r.fin).length
 
@@ -354,8 +363,11 @@ export default function AdminPage() {
                 {p.id==='documentos' && pendingDocs > 0 && (
                   <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--orange)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingDocs}</span>
                 )}
-                {p.id==='solicitudes' && pendingVacs > 0 && (
-                  <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--danger)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingVacs}</span>
+                {p.id==='solicitudes' && (pendingVacs + pendingCorrs) > 0 && (
+                  <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--danger)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingVacs + pendingCorrs}</span>
+                )}
+                {p.id==='miobra' && pendingEncCorrs > 0 && (
+                  <span style={{ minWidth:18, height:18, borderRadius:9, background:'var(--danger)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>{pendingEncCorrs}</span>
                 )}
               </button>
             ))}
@@ -631,7 +643,7 @@ function PanelFichajes({ db, toast, saveDB, session }) {
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `fichajes-${new Date().toISOString().slice(0,10)}.csv`
+    a.href = url; a.download = `fichajes-${localDateStr(new Date())}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast(`${rows.length} fichajes exportados`, 3000, 'ok')
