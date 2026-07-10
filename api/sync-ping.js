@@ -36,22 +36,28 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 }
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
-const THREE_MIN = 3 * 60_000
+// Tiempo mínimo entre last_online y last_sync para considerar que puede haber datos offline.
+// 10 min evita pingar dispositivos activos que simplemente no tienen datos que subir.
+// El cron corre cada 15 min, así que un threshold de 10 min solo pinga dispositivos
+// que llevan al menos 10 min sin sincronizar aunque estuvieron online recientemente.
+const SYNC_LAG_THRESHOLD = 10 * 60_000
 
 async function getCandidateSubs() {
   if (!SB_URL || !SB_ANON) return []
-  // Dispositivos activos en los últimos 30 min
-  const thirtyMinAgo = new Date(Date.now() - 30 * 60_000).toISOString()
-  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync&last_online=gt.${thirtyMinAgo}`
+  // Dispositivos activos en los últimos 60 min (ventana más amplia para cubrir el ciclo de 15 min)
+  const sixtyMinAgo = new Date(Date.now() - 60 * 60_000).toISOString()
+  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync&last_online=gt.${sixtyMinAgo}`
   try {
     const r = await fetch(url, { headers: SB_H })
     if (!r.ok) { console.warn('[sync-ping] getPushSubs error', r.status); return [] }
     const subs = await r.json()
-    // Filtrar: sin last_sync o last_online > last_sync + 3min
+    // Filtrar: last_online supera a last_sync por más de SYNC_LAG_THRESHOLD
+    // Esto indica que el dispositivo estuvo online pero no sincronizó en ese periodo —
+    // posiblemente tenía datos guardados offline cuando se quedó sin señal.
     return subs.filter(s => {
       if (!s.last_online) return false
       if (!s.last_sync) return true
-      return new Date(s.last_online).getTime() > new Date(s.last_sync).getTime() + THREE_MIN
+      return new Date(s.last_online).getTime() > new Date(s.last_sync).getTime() + SYNC_LAG_THRESHOLD
     })
   } catch (e) { console.error('[sync-ping] fetch subs error:', e.message); return [] }
 }

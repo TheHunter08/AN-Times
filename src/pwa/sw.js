@@ -445,40 +445,42 @@ async function _bgSync() {
   }
 }
 
-// Handler especial para SYNC_PING: sincroniza en silencio y muestra una notificación
-// mínima solo si realmente había datos offline pendientes, que se cierra automáticamente.
-// iOS exige que TODO push handler llame a showNotification — si no había datos, mostramos
-// una notificación silenciosa con tag 'sync-ping' y la cerramos de inmediato.
+// Handler especial para SYNC_PING: sincroniza en silencio y cierra la notificación sola.
+// iOS exige showNotification() en todo push handler — mostramos siempre con tag fijo
+// 'sync-ping' para que cada nueva reemplace la anterior (no se acumulan).
+// El cierre programático necesita un delay: iOS no registra la notificación en
+// getNotifications() de forma síncrona justo después de showNotification().
 async function _handleSyncPing() {
+  // Cerrar cualquier notificación sync-ping anterior antes de procesar
+  try {
+    const prev = await self.registration.getNotifications({ tag: 'sync-ping' })
+    prev.forEach(n => n.close())
+  } catch {}
+
   let synced = false
   try { synced = await _bgSync() } catch {}
 
-  if (synced) {
-    // Mostrar notificación breve para confirmar — iOS la necesita obligatoriamente
-    await self.registration.showNotification('Times INC', {
-      body: '✓ Fichaje sincronizado',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: 'sync-ping',
-      silent: true,
-      requireInteraction: false,
-    })
-    // Cerrar inmediatamente: el usuario no necesita interactuar
+  // Siempre mostrar con tag 'sync-ping' + silent=true + renotify=false:
+  // · tag fijo → cada nuevo reemplaza al anterior sin acumular
+  // · silent → sin sonido ni vibración
+  // · renotify:false → sin banner si ya hay una notif con este tag
+  await self.registration.showNotification('Times INC', {
+    body: synced ? '✓ Fichaje sincronizado' : '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'sync-ping',
+    silent: true,
+    renotify: false,
+    requireInteraction: false,
+  })
+
+  // iOS necesita tiempo para registrar la notificación antes de poder cerrarla.
+  // Sin este delay, getNotifications() devuelve array vacío y n.close() no se ejecuta.
+  await new Promise(r => setTimeout(r, 1500))
+  try {
     const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
     ns.forEach(n => n.close())
-  } else {
-    // iOS exige siempre una notificación — mostrar y cerrar al instante
-    await self.registration.showNotification('Times INC', {
-      body: '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: 'sync-ping',
-      silent: true,
-      requireInteraction: false,
-    })
-    const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
-    ns.forEach(n => n.close())
-  }
+  } catch {}
 }
 
 // Ejecuta _bgSync() y, si falla, avisa a los clientes abiertos — así el banner
