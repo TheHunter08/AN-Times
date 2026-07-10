@@ -385,6 +385,36 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── 8. Aniversarios de contratación (a las 09:00, al admin) ─────────────
+    // Usa el campo startDate (fecha de alta) de cada empleado. Si el MM-DD
+    // de hoy coincide con el MM-DD del startDate y han pasado ≥ 1 año,
+    // se envía una notificación a los administradores.
+    if (nowH === 9) {
+      const todayMMDD  = today.slice(5) // 'MM-DD'
+      const adminsAniv = (db.employees || []).filter(e => !e.baja && (e.isAdmin || e.role === 'jefe_obra'))
+      for (const emp of employees) {
+        try {
+          if (!emp.startDate) continue
+          const empMMDD  = String(emp.startDate).slice(5) // 'MM-DD'
+          if (empMMDD !== todayMMDD) continue
+          const years = new Date().getFullYear() - parseInt(String(emp.startDate).slice(0, 4), 10)
+          if (years < 1) continue
+          for (const adm of adminsAniv) {
+            const admSub = subMap.get(adm.id)
+            const key = `an_aniv_${adm.id}_${emp.id}_${today}`
+            if (!notisSent[key]) {
+              schedule(adm, admSub, key, today,
+                `🎂 Aniversario de ${emp.name}`,
+                `Hoy cumple ${years} año${years > 1 ? 's' : ''} en la empresa. ¡Felicidades!`,
+                'aniversario', '/?go=admin:empleados')
+            }
+          }
+        } catch (e) {
+          console.error(`[cron-reminders] error aniversario ${emp.id}:`, e.message)
+        }
+      }
+    }
+
     // Solo se marca como "enviado" (notisSent) lo que realmente se entregó — ver
     // comentario junto a schedule() más arriba. successKeys se rellena aquí,
     // DESPUÉS de intentar el envío real, no antes.

@@ -42,6 +42,7 @@ const PanelTurnos    = lazy(() => import('./admin/PanelTurnos.jsx'))
 const PanelAnomalias = lazy(() => import('./admin/PanelAnomalias.jsx'))
 const PanelGastos    = lazy(() => import('./admin/PanelGastos.jsx'))
 const PanelDenuncias = lazy(() => import('./admin/PanelDenuncias.jsx'))
+const PanelPlanning  = lazy(() => import('./admin/PanelPlanning.jsx'))
 
 const PAGES = [
   { id:'dashboard',   label:'Dashboard' },
@@ -50,6 +51,7 @@ const PAGES = [
   { id:'solicitudes', label:'Solicitudes' },
   { id:'empleados',   label:'Empleados' },
   { id:'turnos',      label:'Turnos' },
+  { id:'planning',    label:'Planning' },
   { id:'informes',    label:'Informes' },
   { id:'mensajes',    label:'Mensajes' },
   { id:'obras',       label:'Obras' },
@@ -408,6 +410,7 @@ export default function AdminPage() {
                 {currentAdminPage === 'documentos' && <PanelDocumentos db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'dashboard'  && <PanelDashboard  db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'planning'  && <PanelPlanning  db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'denuncias' && <PanelDenuncias db={db} toast={toast} saveDB={saveDB} session={session} />}
@@ -436,6 +439,7 @@ export default function AdminPage() {
                 {currentAdminPage === 'documentos' && <PanelDocumentos db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'dashboard'  && <PanelDashboard  db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'turnos'    && <PanelTurnos    db={db} toast={toast} saveDB={saveDB} session={session} />}
+                {currentAdminPage === 'planning'  && <PanelPlanning  db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'gastos'    && <PanelGastos    db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'anomalias' && <PanelAnomalias db={db} toast={toast} saveDB={saveDB} session={session} />}
                 {currentAdminPage === 'denuncias' && <PanelDenuncias db={db} toast={toast} saveDB={saveDB} session={session} />}

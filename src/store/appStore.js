@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
@@ -171,6 +171,12 @@ export const useAppStore = create((set, get) => ({
     )
   },
   stopRealtime,
+
+  // ── postgres_changes Realtime ────────────────────────────────────────
+  initTableRealtime: () => {
+    startTableRealtime(() => get().fetchDB())
+  },
+  stopTableRealtime,
 
   // ── Presencia ────────────────────────────────────────────────────────
   // Número de sesiones activas en este momento (admins + empleados).

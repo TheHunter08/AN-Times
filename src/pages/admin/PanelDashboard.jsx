@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useAppStore } from '../../store/appStore.js'
-import { today, wkStart, p2, calcMin, calcSecs, mhm, ftime, recWorkSecs, localDateStr } from '../../utils/time.js'
-import { WD } from '../../config/constants.js'
+import { today, wkStart, p2, calcMin, calcSecs, mhm, ftime, recWorkSecs, localDateStr, monthlyExtras } from '../../utils/time.js'
+import { WD, WK } from '../../config/constants.js'
 import { buildHeatmap, Heatmap } from '../../components/admin/Heatmap.jsx'
 import { ComunicadoWidget } from '../../components/admin/ComunicadoWidget.jsx'
 import { PushNotifWidget } from '../../components/admin/PushNotifWidget.jsx'
@@ -46,6 +47,21 @@ export default function PanelDashboard({ db, toast, saveDB, session }) {
 
   const heat = useMemo(() => buildHeatmap(recs, emps.length), [recs, emps.length])
   const recentAudit = useMemo(() => (db.audit || []).slice(-5).reverse(), [db.audit])
+
+  // Horas normales vs extra por empleado (mes actual)
+  const extrasData = useMemo(() => {
+    return emps.slice(0, 10).map(e => {
+      const extras = monthlyExtras(recs, e.id, mk, {
+        weeklyH:  e.horasSemanales || (WK / 60),
+        monthlyH: (e.horasSemanales || (WK / 60)) * 4,
+      })
+      return {
+        name: (e.name || '').split(' ')[0],
+        normal: Math.round(Math.max(0, extras.workedMin - extras.netExtraMin) / 60 * 10) / 10,
+        extra:  Math.round(extras.netExtraMin / 60 * 10) / 10,
+      }
+    }).filter(d => d.normal > 0 || d.extra > 0)
+  }, [emps, recs, mk])
 
   const obraHours = useMemo(() => {
     const map = {}
@@ -451,6 +467,35 @@ export default function PanelDashboard({ db, toast, saveDB, session }) {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Extra hours bar chart */}
+      {extrasData.length > 0 && (
+        <div className="dash-widget card-lift" style={{ marginBottom: 20 }}>
+          <div className="dash-widget-header">
+            <div className="dash-widget-title">Horas normales vs extra este mes</div>
+            <span className="dash-widget-badge" style={{ background: 'var(--primary-dim)', color: 'var(--primary-light)' }}>{extrasData.length} emp.</span>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={extrasData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barCategoryGap="30%">
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text3)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: 'var(--text4)' }} axisLine={false} tickLine={false} unit="h" />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg-500)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                formatter={(val, name) => [`${val}h`, name === 'normal' ? 'Normal' : 'Extra']}
+                labelStyle={{ color: 'var(--text2)', fontWeight: 700 }}
+              />
+              <Bar dataKey="normal" stackId="a" fill="var(--primary)" radius={[0, 0, 4, 4]} name="normal" />
+              <Bar dataKey="extra"  stackId="a" fill="var(--orange)" radius={[4, 4, 0, 0]} name="extra">
+                {extrasData.map((_, i) => <Cell key={i} fill={extrasData[i].extra > 0 ? '#f59e0b' : 'transparent'} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--text3)' }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--primary)', display: 'inline-block' }} />Normal</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--text3)' }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--orange)', display: 'inline-block' }} />Extra</span>
           </div>
         </div>
       )}

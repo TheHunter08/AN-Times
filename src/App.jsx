@@ -299,9 +299,11 @@ function LoadingBar() {
 export default function App() {
   const currentScreen  = useAppStore(s => s.currentScreen)
   const fetchDB        = useAppStore(s => s.fetchDB)
-  const initRealtime   = useAppStore(s => s.initRealtime)
-  const stopRealtime   = useAppStore(s => s.stopRealtime)
-  const initPresence   = useAppStore(s => s.initPresence)
+  const initRealtime       = useAppStore(s => s.initRealtime)
+  const stopRealtime       = useAppStore(s => s.stopRealtime)
+  const initTableRealtime  = useAppStore(s => s.initTableRealtime)
+  const stopTableRealtime  = useAppStore(s => s.stopTableRealtime)
+  const initPresence       = useAppStore(s => s.initPresence)
   const primaryColor   = useAppStore(s => s.db?.config?.primaryColor)
   const toast          = useAppStore(s => s.toast)
 
@@ -323,6 +325,7 @@ export default function App() {
   useEffect(() => {
     fetchDB()
     initRealtime()
+    initTableRealtime()
     initPresence()
     // Al arrancar: pedir al SW que suba cualquier dato IDB pendiente de sesiones anteriores
     // (iOS/Android puede matar la app mientras hay datos offline sin sincronizar).
@@ -355,6 +358,7 @@ export default function App() {
       _resumeTs = now
       fetchDB()
       initRealtime()
+      initTableRealtime()
       // Intentar siempre (no solo si onLine): en iOS visibilitychange puede
       // llegar antes de que navigator.onLine se actualice. El retry a 1.5s
       // cubre ese caso (cuando la red ya existe pero onLine aún es false).
@@ -377,6 +381,7 @@ export default function App() {
       window.removeEventListener('pageshow', onResume)
       window.removeEventListener('focus', onResume)
       stopRealtime()
+      stopTableRealtime()
     }
   }, [])
 
@@ -473,6 +478,7 @@ export default function App() {
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
       // Reiniciar Realtime: Android cierra el WS al perder señal
       initRealtime()
+      initTableRealtime()
       sendHeartbeat()
       // Delay: esperar a que los cambios offline suban antes de bajar del servidor
       setTimeout(() => {

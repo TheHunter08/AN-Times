@@ -1,6 +1,15 @@
 import { mhm, p2 } from './time.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal } from './pdfReport.js'
 
+async function sha256Hex(str) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return null
+  }
+}
+
 function arrayBufferToBase64(buf) {
   let binary = ''
   const bytes = new Uint8Array(buf)
@@ -76,6 +85,14 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   })
 
   drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
+
+  // Hash de integridad SHA-256: firma los datos clave del documento
+  // para que inspección de trabajo pueda verificar que no ha sido alterado.
+  const hashInput = `${cierre.empId}|${cierre.mes}|${cierre.totalMin}|${recs.length}|${recs.map(r => r.id).join(',')}|${cierre.generadoAt || ''}`
+  const hash = await sha256Hex(hashInput)
+  if (hash) {
+    page.drawText(pdfSafe(`SHA-256: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
+  }
 
   const bytes = await pdfDoc.save()
   const dataUrl = 'data:application/pdf;base64,' + arrayBufferToBase64(bytes)

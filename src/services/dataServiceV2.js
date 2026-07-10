@@ -279,3 +279,35 @@ async function _syncToTables(db, deleted) {
     console.warn(`[v2] ${failures.length}/${ops.length} table ops failed (non-fatal)`)
   }
 }
+
+// ── postgres_changes: detecta cambios en tablas y dispara un re-fetch ────────
+// Complementa el canal broadcast con escucha directa en las tablas — cubre
+// cambios del cron, la API de migración y escrituras externas que no
+// pasen por el broadcast (p.ej. ediciones desde el dashboard de Supabase).
+//
+// Requisito: las tablas deben estar en la publicación de Realtime:
+//   ALTER PUBLICATION supabase_realtime ADD TABLE records;
+//   ALTER PUBLICATION supabase_realtime ADD TABLE employees;
+// (ver supabase/realtime.sql)
+let _tableRealtimeCh = null
+let _tableDebounce   = null
+
+export function startTableRealtime(onRefresh) {
+  if (!supabase) return
+  stopTableRealtime()
+  _tableRealtimeCh = supabase
+    .channel('db-table-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'records',   filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .subscribe()
+}
+
+export function stopTableRealtime() {
+  if (_tableRealtimeCh) { supabase?.removeChannel(_tableRealtimeCh); _tableRealtimeCh = null }
+  clearTimeout(_tableDebounce)
+}
+
+function _debouncedRefresh(fn) {
+  clearTimeout(_tableDebounce)
+  _tableDebounce = setTimeout(fn, 1500)
+}
