@@ -26,5 +26,12 @@ CREATE TABLE IF NOT EXISTS push_subs (
 ALTER TABLE push_subs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_rw" ON push_subs FOR ALL USING (true) WITH CHECK (true);
 
+-- Columnas para background sync ping (iOS/Android en segundo plano)
+-- last_online: cuándo el dispositivo reportó estar activo y online por última vez
+-- last_sync:   cuándo el dispositivo completó una sincronización con Supabase por última vez
+-- El cron /api/sync-ping envía un push a dispositivos donde last_online > last_sync + 3min
+ALTER TABLE push_subs ADD COLUMN IF NOT EXISTS last_online TIMESTAMPTZ;
+ALTER TABLE push_subs ADD COLUMN IF NOT EXISTS last_sync   TIMESTAMPTZ;
+
 -- Habilitar Realtime en app_data (necesario para sync instantáneo)
 ALTER PUBLICATION supabase_realtime ADD TABLE app_data;

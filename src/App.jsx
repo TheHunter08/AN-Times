@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
-import { flushPushQueue, broadcastSync, uploadPendingIfAny } from './services/dataService.js'
+import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat } from './services/dataService.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -352,6 +352,7 @@ export default function App() {
         reg.active?.postMessage({ type: 'FORCE_SYNC' })
         reg.update().catch(() => {})
       }).catch(() => {})
+      if (navigator.onLine) sendHeartbeat()
     }
     document.addEventListener('visibilitychange', onResume)
     window.addEventListener('pageshow', onResume)
@@ -457,6 +458,7 @@ export default function App() {
       navigator.serviceWorker?.controller?.postMessage({ type: 'FORCE_SYNC' })
       // Reiniciar Realtime: Android cierra el WS al perder señal
       initRealtime()
+      sendHeartbeat()
       // Delay: esperar a que los cambios offline suban antes de bajar del servidor
       setTimeout(() => {
         if (!useAppStore.getState().offlinePending) fetchDB()
@@ -489,6 +491,14 @@ export default function App() {
     const pendingRetryInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && useAppStore.getState().offlinePending) uploadPendingIfAny()
     }, 8 * 1000)
+    // Heartbeat para iOS background sync: actualiza push_subs.last_online cada 3 min
+    // mientras el empleado tiene la app abierta y hay red. El cron /api/sync-ping
+    // usa este timestamp para detectar dispositivos activos que podrían tener datos
+    // offline pendientes y les envía un push para despertar el Service Worker.
+    sendHeartbeat()
+    const heartbeatInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) sendHeartbeat()
+    }, 3 * 60 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)
@@ -497,6 +507,7 @@ export default function App() {
       window.removeEventListener('online', onOnline)
       clearInterval(pollInterval)
       clearInterval(pendingRetryInterval)
+      clearInterval(heartbeatInterval)
     }
   }, [])
 

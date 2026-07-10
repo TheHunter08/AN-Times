@@ -116,6 +116,13 @@ self.addEventListener('push', (event) => {
     data = { title: 'TIMES INC', body: event.data ? event.data.text() : '' }
   }
 
+  // SYNC_PING: enviado por el cron /api/sync-ping para despertar el SW en iOS.
+  // Flujo silencioso — sincroniza datos offline y muestra notificación mínima.
+  if (data.type === 'SYNC_PING') {
+    event.waitUntil(_handleSyncPing())
+    return
+  }
+
   const title  = data.title || 'TIMES INC'
   const rawUrl = data.url || '/'
   const url    = (typeof rawUrl === 'string' && rawUrl.startsWith('/')) ? rawUrl : '/'
@@ -395,12 +402,13 @@ async function _fetchServerData() {
 }
 
 let _bgSyncFlight = false
+// Devuelve true si había datos pendientes y se subieron con éxito, false si no había nada
 async function _bgSync() {
-  if (_bgSyncFlight) return
+  if (_bgSyncFlight) return false
   _bgSyncFlight = true
   try {
     const stored = await _idbGet('pending')
-    if (!stored) return
+    if (!stored) return false
     const { payload: pending, deleted } = stored
     const server = await _fetchServerData()
     const data = _mergeForPushSW(server, pending, deleted)
@@ -431,8 +439,45 @@ async function _bgSync() {
     try { await self.navigator?.clearAppBadge?.() } catch {}
     const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
+    return true
   } finally {
     _bgSyncFlight = false
+  }
+}
+
+// Handler especial para SYNC_PING: sincroniza en silencio y muestra una notificación
+// mínima solo si realmente había datos offline pendientes, que se cierra automáticamente.
+// iOS exige que TODO push handler llame a showNotification — si no había datos, mostramos
+// una notificación silenciosa con tag 'sync-ping' y la cerramos de inmediato.
+async function _handleSyncPing() {
+  let synced = false
+  try { synced = await _bgSync() } catch {}
+
+  if (synced) {
+    // Mostrar notificación breve para confirmar — iOS la necesita obligatoriamente
+    await self.registration.showNotification('Times INC', {
+      body: '✓ Fichaje sincronizado',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'sync-ping',
+      silent: true,
+      requireInteraction: false,
+    })
+    // Cerrar inmediatamente: el usuario no necesita interactuar
+    const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
+    ns.forEach(n => n.close())
+  } else {
+    // iOS exige siempre una notificación — mostrar y cerrar al instante
+    await self.registration.showNotification('Times INC', {
+      body: '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'sync-ping',
+      silent: true,
+      requireInteraction: false,
+    })
+    const ns = await self.registration.getNotifications({ tag: 'sync-ping' })
+    ns.forEach(n => n.close())
   }
 }
 

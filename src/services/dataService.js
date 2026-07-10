@@ -504,6 +504,7 @@ async function _bgSyncFallback() {
     _broadcastUpdate(merged._ts)
     await _idbDel('pending')
     try { navigator.clearAppBadge?.() } catch {}
+    _updateLastSync()
     _bgSyncRetries = 0
     window.dispatchEvent(new CustomEvent('times-synced'))
   } catch (e) {
@@ -557,6 +558,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       saveLocal(merged)
       onSuccess?.(merged)
       _broadcastUpdate(merged._ts)
+      _updateLastSync()
       _drainQueue()
     })
     .catch((e) => {
@@ -658,6 +660,36 @@ function _broadcastUpdate(ts) {
 
 // Exportado para que App.jsx pueda notificar a otros clientes tras un BG_SYNC_DONE del SW
 export function broadcastSync(ts) { _broadcastUpdate(ts) }
+
+// ── Heartbeat para background sync iOS ──────────────────────────────────────
+// Actualiza push_subs.last_online mientras el empleado tiene la app abierta y online.
+// El cron /api/sync-ping compara last_online con last_sync para detectar dispositivos
+// que podrían tener datos offline pendientes y les envía un push de wake-up.
+export async function sendHeartbeat() {
+  if (!navigator.onLine || !supabase) return
+  try {
+    const userId = await _idbGet('push_user_id')
+    if (!userId) return
+    supabase.from('push_subs')
+      .update({ last_online: new Date().toISOString() })
+      .eq('user_id', userId)
+      .then(() => {}).catch(() => {})
+  } catch {}
+}
+
+// Privado: marca last_sync tras una subida exitosa. El cron no enviará push
+// mientras last_sync sea reciente, evitando pings innecesarios.
+async function _updateLastSync() {
+  if (!supabase) return
+  try {
+    const userId = await _idbGet('push_user_id')
+    if (!userId) return
+    supabase.from('push_subs')
+      .update({ last_sync: new Date().toISOString() })
+      .eq('user_id', userId)
+      .then(() => {}).catch(() => {})
+  } catch {}
+}
 
 // Exportado para que App.jsx lo llame en arranque, reconexión y BG_SYNC_FAILED.
 // NO guarda aquí si !navigator.onLine: _bgSyncFallback lo maneja con retry
