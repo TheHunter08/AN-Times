@@ -677,9 +677,10 @@ export async function sendHeartbeat() {
   } catch {}
 }
 
-// Privado: marca last_sync tras una subida exitosa. El cron no enviará push
-// mientras last_sync sea reciente, evitando pings innecesarios.
-async function _updateLastSync() {
+// Marca last_sync tras una subida exitosa. El cron no enviará push mientras
+// last_sync sea reciente, evitando pings innecesarios. Exportado para que
+// App.jsx lo llame al recibir BG_SYNC_DONE del SW (app en primer plano).
+export async function _updateLastSync() {
   if (!supabase) return
   try {
     const userId = await _idbGet('push_user_id')

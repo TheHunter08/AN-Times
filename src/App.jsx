@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
-import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat } from './services/dataService.js'
+import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -423,6 +423,7 @@ export default function App() {
       if (event.data?.type === 'BG_SYNC_DONE') {
         useAppStore.setState({ offlinePending: false, syncStatus: 'syncing' })
         fetchDB().then(() => broadcastSync(useAppStore.getState().db._ts))
+        _updateLastSync()
       }
       if (event.data?.type === 'BG_SYNC_FAILED') {
         useAppStore.setState({ syncStatus: 'error', syncError: 'bg_sync' })

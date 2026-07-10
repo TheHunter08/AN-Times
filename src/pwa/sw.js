@@ -444,6 +444,22 @@ async function _bgSync() {
     await _idbDel('pending')
     // Borrar badge del icono de la app (si el navegador lo soporta)
     try { await self.navigator?.clearAppBadge?.() } catch {}
+    // Marcar last_sync en BD para que el cron no siga enviando SYNC_PING
+    // ahora que ya no hay datos pendientes. Se identifica por endpoint de
+    // suscripción (sin auth): mismo acceso anon que usa sync-ping.js para SELECT.
+    try {
+      const sub = await self.registration.pushManager.getSubscription()
+      if (sub) {
+        _sbFetch(
+          `${_SB_URL}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
+          {
+            method: 'PATCH',
+            headers: { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ last_sync: new Date().toISOString() }),
+          }
+        ).catch(() => {})
+      }
+    } catch {}
     const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
     return true
