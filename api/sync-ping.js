@@ -1,10 +1,10 @@
-// Vercel Cron: cada 5 minutos (ver vercel.json)
+// Vercel Cron: cada 5 minutos (ver vercel.json) — antes era cada 15 min.
 // Detecta dispositivos con datos offline pendientes (basándose en heartbeats)
 // y les envía un push SYNC_PING para despertar el Service Worker en iOS/Android.
 //
 // Un dispositivo "podría tener datos pendientes" si:
-//   - last_online reciente (activo en los últimos 30 min)
-//   - last_sync es null O last_online > last_sync + 3min
+//   - last_online reciente (activo en los últimos 60 min)
+//   - last_sync es null O last_online > last_sync + SYNC_LAG_THRESHOLD
 //     (el dispositivo estuvo activo pero no sincronizó desde entonces)
 //
 // El SW maneja SYNC_PING en el push handler (sw.js), ejecuta _bgSync() y

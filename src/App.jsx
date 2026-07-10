@@ -301,16 +301,29 @@ export default function App() {
   const fetchDB        = useAppStore(s => s.fetchDB)
   const initRealtime   = useAppStore(s => s.initRealtime)
   const stopRealtime   = useAppStore(s => s.stopRealtime)
+  const initPresence   = useAppStore(s => s.initPresence)
   const primaryColor   = useAppStore(s => s.db?.config?.primaryColor)
+  const toast          = useAppStore(s => s.toast)
 
   // Aplicar color de marca globalmente en cuanto carga (afecta login, empleado y admin)
   useEffect(() => {
     if (primaryColor) applyBrandColor(primaryColor)
   }, [primaryColor])
 
+  // Aviso cuando el servidor reconcilia datos de otro usuario con los nuestros
+  useEffect(() => {
+    const handler = (e) => {
+      const count = e.detail?.count || 1
+      toast(`Datos actualizados por otro usuario (${count} fichaje${count > 1 ? 's' : ''})`, 4500, 'warn')
+    }
+    window.addEventListener('times-conflict', handler)
+    return () => window.removeEventListener('times-conflict', handler)
+  }, [toast])
+
   useEffect(() => {
     fetchDB()
     initRealtime()
+    initPresence()
     // Al arrancar: pedir al SW que suba cualquier dato IDB pendiente de sesiones anteriores
     // (iOS/Android puede matar la app mientras hay datos offline sin sincronizar).
     // Usamos serviceWorker.ready en vez de controller?.postMessage porque controller
@@ -479,7 +492,7 @@ export default function App() {
     // ya son baratos y fallan rápido si de verdad no hay red.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && !useAppStore.getState().offlinePending) fetchDB()
-    }, 30 * 1000)
+    }, 15 * 1000)
     // Con cobertura débil (o en iOS, donde navigator.onLine es especialmente
     // poco fiable — puede quedarse pegado en `false` o en `true` sin reflejar
     // la realidad), el evento 'online' del navegador puede no llegar a

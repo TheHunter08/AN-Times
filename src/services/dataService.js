@@ -75,7 +75,7 @@ export function saveLocal(db) {
 // aleatorios y eso no debería pasar), consultado tanto al descargar como al
 // subir — cubre ambas direcciones del mismo problema.
 const _TOMBSTONE_KEY = 'an_times_tombstones'
-const _TOMBSTONE_TTL_MS = 15 * 60 * 1000
+const _TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 let _tombstones = (() => {
   try { return JSON.parse(localStorage.getItem(_TOMBSTONE_KEY) || '{}') } catch { return {} }
 })()
@@ -615,7 +615,7 @@ let _realtimeChannel = null
 let _realtimeRetry   = 0
 let _realtimeTimer   = null
 
-export function startRealtime(currentGetDB, onUpdate, getServerTs) {
+export function startRealtime(currentGetDB, onUpdate, getServerTs, onStatusChange) {
   if (!supabase) return
   stopRealtime()
   _realtimeChannel = supabase
@@ -626,19 +626,23 @@ export function startRealtime(currentGetDB, onUpdate, getServerTs) {
       // de guardados locales del encargado, haciendo que broadcasts de empleados
       // parezcan "ya conocidos" aunque el encargado nunca haya descargado esos datos.
       const refTs = getServerTs ? getServerTs() : currentGetDB()._ts
-      if (remoteTs != null && refTs != null && refTs > 0 && remoteTs <= refTs) return
+      if (remoteTs != null && refTs != null && refTs > 0 && remoteTs < refTs) return
       _realtimeRetry = 0
       onUpdate?.()
     })
     .subscribe((status) => {
+      onStatusChange?.(status)
       if (status === 'SUBSCRIBED') {
+        // Si veníamos de un error/cierre, hacer fetch al reconectar para recuperar
+        // cualquier cambio que llegó mientras el canal estaba caído.
+        if (_realtimeRetry > 0) onUpdate?.()
         _realtimeRetry = 0
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        // Reconexión exponencial: máx 60s. CLOSED ocurre cuando Android suspende la red.
+        // Reconexión exponencial: máx 15s (antes 60s). CLOSED ocurre cuando Android suspende la red.
         clearTimeout(_realtimeTimer)
-        const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 60000)
+        const delay = Math.min(3000 * Math.pow(2, _realtimeRetry), 15000)
         _realtimeRetry++
-        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate, getServerTs), delay)
+        _realtimeTimer = setTimeout(() => startRealtime(currentGetDB, onUpdate, getServerTs, onStatusChange), delay)
       }
     })
 }
@@ -647,6 +651,31 @@ export function stopRealtime() {
   clearTimeout(_realtimeTimer)
   if (_realtimeChannel) { supabase?.removeChannel(_realtimeChannel); _realtimeChannel = null }
   _realtimeRetry = 0
+}
+
+// ── Presencia en tiempo real ────────────────────────────────────────────────
+// Canal ligero de presencia Supabase: cada usuario trackea su userId y
+// onCount() recibe el total de sesiones activas en este momento.
+let _presenceChannel = null
+
+export function startPresence(userId, onCount) {
+  if (!supabase || !userId) return
+  if (_presenceChannel) { supabase.removeChannel(_presenceChannel); _presenceChannel = null }
+  _presenceChannel = supabase.channel('app_presence')
+  _presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = _presenceChannel.presenceState()
+      onCount?.(Object.keys(state).length)
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await _presenceChannel.track({ userId, at: new Date().toISOString() }).catch(() => {})
+      }
+    })
+}
+
+export function stopPresence() {
+  if (_presenceChannel) { supabase?.removeChannel(_presenceChannel); _presenceChannel = null }
 }
 
 // Aviso ligero de que app_data cambió — lo llama _doCloudPush tras guardar con
@@ -805,7 +834,10 @@ export async function pushSubscribe(userId, vapidPub) {
 function _pushDedupHit(to, tag, title, body) {
   try {
     const key = '__pushdedup__'
-    const TTL = 5 * 60 * 1000
+    // 30s: suficiente para evitar dobles envíos del mismo trigger, pero no
+    // silencia notificaciones distintas que lleguen seguidas (p.ej. dos gastos
+    // aprobados al mismo empleado en el mismo minuto).
+    const TTL = 30 * 1000
     const now = Date.now()
     const raw = localStorage.getItem(key)
     const map = raw ? JSON.parse(raw) : {}

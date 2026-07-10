@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones } from '../services/dataService.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 
@@ -64,6 +64,16 @@ export const useAppStore = create((set, get) => ({
         const recent = merged.audit.filter(a => new Date(a.ts).getTime() > cutoff)
         merged.audit = recent.length >= 50 ? recent : merged.audit.slice(-300)
       }
+      // Limpiar notis soft-deleted con más de 7 días: con soft delete el array
+      // nunca pierde elementos, así que hay que podar periódicamente para que
+      // no crezca sin límite. Solo se eliminan las marcadas deleted:true y antiguas;
+      // las activas y las recién borradas se preservan.
+      if (merged.notis?.length > 150) {
+        const cutoffNotis = Date.now() - 7 * 24 * 60 * 60 * 1000
+        merged.notis = merged.notis.filter(n =>
+          !n.deleted || new Date(n.ts || 0).getTime() > cutoffNotis
+        )
+      }
       saveLocal(merged)
       // offlinePending: true si no hay red, o si ya había un guardado pendiente anterior
       // (evita que el timer cada 30s lo resetee a false en señal débil, lo que hacía
@@ -76,11 +86,26 @@ export const useAppStore = create((set, get) => ({
       // aquí para que la UI local también vea al instante cualquier dato que otro
       // dispositivo hubiera guardado mientras tanto (p. ej. un fichaje de otro
       // empleado, o un cierre de jornada hecho por un encargado).
-      (reconciled) => set(state => ({
-        db: reconciled ? mergeDB(state.db, reconciled) : state.db,
-        syncStatus: 'synced',
-        offlinePending: false
-      })),
+      (reconciled) => {
+        // Detectar registros que el servidor tenía en versión más nueva que
+        // la que acabamos de subir — otro usuario modificó el mismo fichaje
+        // mientras nosotros guardábamos. Emitir evento para mostrar aviso.
+        if (reconciled?.records) {
+          const localMap = new Map((merged.records || []).map(r => [r.id, r._upd]))
+          const changed = (reconciled.records || []).filter(r => {
+            const localUpd = localMap.get(r.id)
+            return localUpd !== undefined && r._upd && r._upd !== localUpd
+          })
+          if (changed.length) {
+            window.dispatchEvent(new CustomEvent('times-conflict', { detail: { count: changed.length } }))
+          }
+        }
+        set(state => ({
+          db: reconciled ? mergeDB(state.db, reconciled) : state.db,
+          syncStatus: 'synced',
+          offlinePending: false
+        }))
+      },
       () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
     )
     return merged
@@ -136,14 +161,27 @@ export const useAppStore = create((set, get) => ({
   // El broadcast solo trae un aviso ("algo cambió"), no los datos — al
   // recibirlo pedimos los datos con fetchDB(), que ya sabe no descargar nada
   // si resulta que no hay nada nuevo (comprueba el timestamp primero).
+  realtimeStatus: 'idle',
   initRealtime: () => {
     startRealtime(
       () => get().db,
       () => { get().fetchDB() },
-      () => get()._serverTs
+      () => get()._serverTs,
+      (status) => set({ realtimeStatus: status })
     )
   },
   stopRealtime,
+
+  // ── Presencia ────────────────────────────────────────────────────────
+  // Número de sesiones activas en este momento (admins + empleados).
+  // Solo se muestra en el panel de admin.
+  onlineCount: 0,
+  initPresence: () => {
+    const { session } = get()
+    const userId = session?.user?.id || 'admin'
+    startPresence(userId, (count) => set({ onlineCount: count }))
+  },
+  stopPresence,
 
   // ── Session ─────────────────────────────────────────────────────────
   session: (() => {

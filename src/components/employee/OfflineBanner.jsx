@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
+import { uploadPendingIfAny } from '../../services/dataService.js'
 
 export function OfflineBanner() {
   const syncStatus     = useAppStore(s => s.syncStatus)
@@ -42,8 +43,19 @@ export function OfflineBanner() {
   const handleRetry = async () => {
     if (retrying) return
     setRetrying(true)
-    try { await fetchDB() } catch {}
+    try {
+      uploadPendingIfAny()
+      await fetchDB()
+    } catch {}
     setRetrying(false)
+  }
+
+  const handleUpload = () => {
+    if (retrying) return
+    setRetrying(true)
+    uploadPendingIfAny()
+    // resetear el spinner a los 4s independientemente del resultado
+    setTimeout(() => setRetrying(false), 4000)
   }
 
   // Modo sin cobertura: sin red (real o efectiva) con datos pendientes
@@ -55,6 +67,12 @@ export function OfflineBanner() {
           <div style={{ fontWeight:700 }}>Modo sin cobertura</div>
           <div className="offline-v3-sub">Fichajes guardados · Sincronizará al conectar</div>
         </div>
+        {offlinePending && (
+          <button className="offline-v3-retry" onClick={handleUpload} disabled={retrying}
+            style={{ flexShrink:0 }}>
+            {retrying ? '…' : 'Subir'}
+          </button>
+        )}
       </div>
     )
   }

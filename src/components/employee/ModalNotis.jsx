@@ -5,7 +5,7 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const [search, setSearch] = useState('')
   const notis = (db.notis || [])
-    .filter(n => n.empId === u?.id)
+    .filter(n => n.empId === u?.id && !n.deleted)
     .slice(-50)
     .reverse()
     .filter(n => !search || (n.action||'').toLowerCase().includes(search.toLowerCase()) || (n.detail||'').toLowerCase().includes(search.toLowerCase()))
@@ -14,15 +14,18 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
   const markRead = () => {
-    const updated = (db.notis || []).map(n => ({ ...n, leido: true }))
+    const updated = (db.notis || []).map(n => n.empId === u?.id && !n.deleted ? { ...n, leido: true } : n)
     saveDB({ notis: updated })
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
+  // Soft delete: marcar deleted:true en vez de quitar del array.
+  // Si se eliminara del array, el próximo save del admin (que hace [...db.notis, newNoti]
+  // con su copia local) la volvería a añadir al servidor via _unionById.
   const delNoti = (id) => {
-    saveDB({ notis: (db.notis || []).filter(n => n.id !== id) })
+    saveDB({ notis: (db.notis || []).map(n => n.id === id ? { ...n, deleted: true, leido: true } : n) })
   }
   const clearAll = () => {
-    saveDB({ notis: (db.notis || []).filter(n => n.empId !== u?.id) })
+    saveDB({ notis: (db.notis || []).map(n => n.empId === u?.id ? { ...n, deleted: true, leido: true } : n) })
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   return (
