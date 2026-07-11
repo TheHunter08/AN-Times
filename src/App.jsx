@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
-import LoginPage from './pages/LoginPage.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
+// v2 UI — nuevas pantallas con datos reales
+import LoginV2 from './ui-v2/LoginV2.tsx'
+const AppV2Admin = lazy(() => import('./ui-v2/AppV2Admin.tsx'))
 
 // ── In-app push notification banner (mostrado cuando la app está en primer plano) ─
 function InAppNotification() {
@@ -218,7 +220,6 @@ function SyncBanner() {
 
 
 const EmployeePage = lazy(() => import('./pages/EmployeePage.jsx'))
-const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
 const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'perfil']
 
@@ -585,10 +586,10 @@ export default function App() {
       <UpdateBanner />
       <SyncBanner />
       <InAppNotification />
-      {currentScreen === 'login' && <LoginPage />}
+      {currentScreen === 'login' && <LoginV2 />}
       <Suspense fallback={<ScreenLoader />}>
-        {currentScreen === 'emp' && <EmployeePage />}
-        {currentScreen === 'admin' && <AdminPage />}
+        {currentScreen === 'emp'   && <EmployeePage />}
+        {currentScreen === 'admin' && <AppV2Admin />}
       </Suspense>
       <ToastContainer />
       <GlobalConfirm />

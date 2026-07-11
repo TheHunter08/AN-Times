@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
 export function WelcomeSlides() {
   const [visible, setVisible] = useState(() => {
@@ -18,24 +20,9 @@ export function WelcomeSlides() {
   if (!visible) return null
 
   const SLIDES = [
-    {
-      emoji: '⏱️',
-      color: '#3B5BFF',
-      title: 'Registra tu jornada',
-      sub: 'Ficha entrada y salida desde tu móvil. Tu historial siempre disponible, en cualquier lugar.',
-    },
-    {
-      emoji: '🌴',
-      color: '#16a34a',
-      title: 'Solicita vacaciones',
-      sub: 'Gestiona tus días libres fácilmente. Consulta el estado en tiempo real.',
-    },
-    {
-      emoji: '🏗️',
-      color: '#7c3aed',
-      title: 'Conecta con tu obra',
-      sub: 'Mensajes, documentos y avisos de tu obra, todo en un solo lugar.',
-    },
+    { emoji:'⏱️', color:'#3B5BFF', title:'Registra tu jornada', sub:'Ficha entrada y salida desde tu móvil. Tu historial siempre disponible, en cualquier lugar.' },
+    { emoji:'🌴', color:'#16a34a', title:'Solicita vacaciones', sub:'Gestiona tus días libres fácilmente. Consulta el estado en tiempo real.' },
+    { emoji:'🏗️', color:'#7c3aed', title:'Conecta con tu obra', sub:'Mensajes, documentos y avisos de tu obra, todo en un solo lugar.' },
   ]
 
   const s = SLIDES[slide]
@@ -45,10 +32,11 @@ export function WelcomeSlides() {
       background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
       animation: exiting ? 'wsFadeOut .35s forwards' : 'wsFadeIn .3s',
     }}>
+      <style>{`@keyframes wsFadeIn{from{opacity:0}to{opacity:1}}@keyframes wsFadeOut{from{opacity:1}to{opacity:0}}`}</style>
       <div style={{
         width:'100%', maxWidth:480, margin:'0 auto',
-        background:'var(--bg-700)', borderRadius:'24px 24px 0 0',
-        border:'1px solid var(--border2)', borderBottom:'none',
+        background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`,
+        border:`1px solid ${colors.border.subtle}`, borderBottom:'none',
         padding:'28px 24px 32px',
         animation: exiting ? 'wsSlideOut .35s forwards' : 'slideUp .3s cubic-bezier(.16,1,.3,1)',
         boxShadow:'0 -20px 60px rgba(0,0,0,.4)',
@@ -56,9 +44,11 @@ export function WelcomeSlides() {
         {/* Slide dots */}
         <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:28 }}>
           {SLIDES.map((_, i) => (
-            <div key={i} onClick={() => setSlide(i)} style={{ height:6, borderRadius:3, cursor:'pointer', transition:'all .3s',
+            <div key={i} onClick={() => setSlide(i)} style={{
+              height:6, borderRadius:3, cursor:'pointer', transition:'all .3s',
               width: i === slide ? 24 : 6,
-              background: i === slide ? s.color : 'var(--bg-500)' }} />
+              background: i === slide ? s.color : colors.bg[500],
+            }} />
           ))}
         </div>
 
@@ -68,18 +58,18 @@ export function WelcomeSlides() {
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, margin:'0 auto 20px' }}>
             {s.emoji}
           </div>
-          <div style={{ fontSize:22, fontWeight:800, color:'var(--text)', marginBottom:10, letterSpacing:'-.4px' }}>{s.title}</div>
-          <div style={{ fontSize:14, color:'var(--text3)', lineHeight:1.65, marginBottom:32 }}>{s.sub}</div>
+          <div style={{ fontSize:22, fontWeight:800, color:colors.text[900], marginBottom:10, letterSpacing:'-.4px' }}>{s.title}</div>
+          <div style={{ fontSize:14, color:colors.text[500], lineHeight:1.65, marginBottom:32 }}>{s.sub}</div>
         </div>
 
         {/* Buttons */}
         {slide < SLIDES.length - 1 ? (
           <div style={{ display:'flex', gap:10 }}>
-            <button className="btn btn-secondary" style={{ flex:1 }} onClick={dismiss}>Omitir</button>
-            <button className="btn btn-primary" style={{ flex:2, background:s.color, borderColor:s.color }} onClick={() => setSlide(slide + 1)}>Siguiente →</button>
+            <button onClick={dismiss} style={{ flex:1, padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }}>Omitir</button>
+            <button onClick={() => setSlide(slide + 1)} style={{ flex:2, padding:'12px', borderRadius:radius.lg, border:'none', background:s.color, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer' }}>Siguiente →</button>
           </div>
         ) : (
-          <button className="btn btn-primary" style={{ width:'100%', background:s.color, borderColor:s.color }} onClick={dismiss}>
+          <button onClick={dismiss} style={{ width:'100%', padding:'14px', borderRadius:radius.lg, border:'none', background:s.color, color:'#fff', fontWeight:700, fontSize:15, fontFamily:'inherit', cursor:'pointer' }}>
             Empezar →
           </button>
         )}

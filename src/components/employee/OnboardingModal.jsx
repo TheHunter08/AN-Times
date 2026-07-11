@@ -3,8 +3,16 @@ import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { getCfg } from '../../utils/userConfig.js'
 import { pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
-// ─── ONBOARDING (primer login empleado) ────────────────────────────────────────
+const LBL = { fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'block' }
+const INP = { background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.md, padding:'10px 12px', fontSize:13, color:colors.text[900], fontFamily:'inherit', outline:'none', width:'100%', boxSizing:'border-box' }
+const btnPrimary = { padding:'12px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
+const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
+const btnSmSec = { padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
+
+// ─── ONBOARDING (primer login empleado) ─────────────────────────────────────
 export function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [step, setStep] = useState(0)
@@ -20,9 +28,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
     if (!('Notification' in window)) return
     const perm = await Notification.requestPermission()
     setNotifGranted(perm === 'granted')
-    if (perm === 'granted' && u?.id) {
-      pushSubscribe(u.id, VAPID_PUB).catch(() => {})
-    }
+    if (perm === 'granted' && u?.id) pushSubscribe(u.id, VAPID_PUB).catch(() => {})
   }
 
   const finish = () => {
@@ -39,28 +45,29 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const STEPS = ['Notificaciones', 'Tu firma', 'Recordatorio']
 
   return (
-    <div className="modal-ov center" style={{ zIndex:1100 }}>
-      <div className="modal center-modal" style={{ maxWidth:400, width:'calc(100% - 32px)' }}>
+    <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
           <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
-          <div style={{ fontSize:17, fontWeight:800, color:'var(--text)' }}>Bienvenido, {u.name.split(' ')[0]}</div>
-          <div style={{ fontSize:12, color:'var(--text3)', marginTop:3 }}>Configura tu cuenta en {STEPS.length} pasos rápidos</div>
+          <div style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Bienvenido, {u.name.split(' ')[0]}</div>
+          <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Configura tu cuenta en {STEPS.length} pasos rápidos</div>
         </div>
 
         {/* Step indicator */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0, marginBottom:24 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', marginBottom:24 }}>
           {STEPS.map((s, i) => (
             <div key={i} style={{ display:'flex', alignItems:'center' }}>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                 <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, transition:'all .25s',
-                  background: i < step ? 'var(--green)' : i === step ? 'var(--primary)' : 'var(--bg-500)',
-                  color: i <= step ? '#fff' : 'var(--text4)', boxShadow: i === step ? '0 0 0 3px var(--primary-glow)' : 'none' }}>
+                  background: i < step ? colors.semantic.green : i === step ? colors.primary.base : colors.bg[500],
+                  color: i <= step ? '#fff' : colors.text[300],
+                  boxShadow: i === step ? `0 0 0 3px ${colors.primary.glow}` : 'none' }}>
                   {i < step ? '✓' : i + 1}
                 </div>
-                <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color: i===step?'var(--primary-light)':'var(--text4)', whiteSpace:'nowrap' }}>{s}</div>
+                <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color: i===step ? colors.primary.light : colors.text[300], whiteSpace:'nowrap' }}>{s}</div>
               </div>
-              {i < STEPS.length - 1 && <div style={{ width:28, height:2, background: i < step ? 'var(--green)' : 'var(--bg-400)', margin:'0 4px', transition:'all .25s', marginBottom:16 }} />}
+              {i < STEPS.length - 1 && <div style={{ width:28, height:2, background: i < step ? colors.semantic.green : colors.bg[400], margin:'0 4px', transition:'all .25s', marginBottom:16 }} />}
             </div>
           ))}
         </div>
@@ -70,20 +77,18 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
           <div>
             <div style={{ textAlign:'center', marginBottom:20 }}>
               <div style={{ fontSize:40, marginBottom:10 }}>🔔</div>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Activar notificaciones</div>
-              <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.7 }}>Recibe alertas de jornadas largas, vacaciones aprobadas y comunicados del administrador.</div>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:6 }}>Activar notificaciones</div>
+              <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>Recibe alertas de jornadas largas, vacaciones aprobadas y comunicados del administrador.</div>
             </div>
             {notifGranted ? (
-              <div style={{ background:'var(--green-dim)', border:'1px solid rgba(16,185,129,.2)', borderRadius:'var(--r)', padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+              <div style={{ background:`${colors.semantic.green}12`, border:`1px solid ${colors.semantic.green}25`, borderRadius:radius.lg, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
                 <span style={{ fontSize:20 }}>✅</span>
-                <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>Notificaciones activadas</span>
+                <span style={{ fontSize:13, color:colors.semantic.green, fontWeight:600 }}>Notificaciones activadas</span>
               </div>
             ) : (
-              <button className="btn btn-primary" style={{ width:'100%', marginBottom:10 }} onClick={requestNotif}>
-                🔔 Activar notificaciones
-              </button>
+              <button style={{ ...btnPrimary, width:'100%', marginBottom:10 }} onClick={requestNotif}>🔔 Activar notificaciones</button>
             )}
-            <button className="btn btn-secondary" style={{ width:'100%' }} onClick={() => setStep(1)}>
+            <button style={{ ...btnSecondary, width:'100%' }} onClick={() => setStep(1)}>
               {notifGranted ? 'Continuar →' : 'Omitir por ahora →'}
             </button>
           </div>
@@ -93,16 +98,16 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
         {step === 1 && (
           <div>
             <div style={{ textAlign:'center', marginBottom:14 }}>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Dibuja tu firma</div>
-              <div style={{ fontSize:12, color:'var(--text3)' }}>Se usará para firmar documentos y cierres mensuales</div>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:4 }}>Dibuja tu firma</div>
+              <div style={{ fontSize:12, color:colors.text[500] }}>Se usará para firmar documentos y cierres mensuales</div>
             </div>
             <canvas ref={canvasRef} width={640} height={180}
-              style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:8 }}
+              style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8 }}
               {...handlers} />
             <div style={{ display:'flex', gap:8, marginBottom:4 }}>
-              <button className="btn btn-secondary btn-sm" onClick={clearCanvas}>Borrar</button>
-              <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setStep(2)}>Omitir →</button>
-              <button className="btn btn-primary" onClick={() => setStep(2)}>Guardar →</button>
+              <button style={btnSmSec} onClick={clearCanvas}>Borrar</button>
+              <button style={{ ...btnSecondary, flex:1 }} onClick={() => setStep(2)}>Omitir →</button>
+              <button style={btnPrimary} onClick={() => setStep(2)}>Guardar →</button>
             </div>
           </div>
         )}
@@ -112,15 +117,14 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
           <div>
             <div style={{ textAlign:'center', marginBottom:20 }}>
               <div style={{ fontSize:40, marginBottom:10 }}>⏰</div>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Recordatorio diario</div>
-              <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.7 }}>Te avisaremos a esta hora si no has fichado entrada hoy. Podrás cambiarlo desde Configuración.</div>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:6 }}>Recordatorio diario</div>
+              <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>Te avisaremos a esta hora si no has fichado entrada hoy. Podrás cambiarlo desde Configuración.</div>
             </div>
-            <div className="field" style={{ marginBottom:20 }}>
-              <label>Hora del recordatorio</label>
-              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
-                style={{ fontSize:20, fontWeight:700, textAlign:'center', letterSpacing:2 }} />
+            <div style={{ marginBottom:20 }}>
+              <label style={LBL}>Hora del recordatorio</label>
+              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} style={{ ...INP, fontSize:20, fontWeight:700, textAlign:'center', letterSpacing:2 }} />
             </div>
-            <button className="btn btn-primary" style={{ width:'100%' }} onClick={finish}>
+            <button style={{ ...btnPrimary, width:'100%' }} onClick={finish}>
               ✅ Finalizar — Empezar a usar la app
             </button>
           </div>

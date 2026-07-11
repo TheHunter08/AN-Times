@@ -5,14 +5,21 @@ import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { gid, mhm } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
-// ─── FIRMA DE CIERRE MENSUAL (empleado) ────────────────────────────────────────
+const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
+const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'92vh', overflowY:'auto' }
+const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.default, margin:'0 auto 16px' }
+const btnPrimary = { flex:1, padding:'12px 20px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
+const btnSecondary = { flex:1, padding:'12px 20px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
+const btnSmSec = { padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
+
+// ─── FIRMA DE CIERRE MENSUAL (empleado) ─────────────────────────────────────
 export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  // Un cierre "desactualizado" (fichajes editados/borrados tras generarlo) no debe
-  // poder firmarse hasta que el admin/JO lo regenere con los datos reales actuales.
   const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !c.desactualizado)
   const selCierre = pendingCierres[selIdx] || null
 
@@ -46,45 +53,45 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   }
 
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
-        <div className="modal-drag" {...dragHandlers} />
+    <div style={OV} onClick={onClose}>
+      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+        <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-          <h2 style={{ margin:0, fontSize:16 }}>📋 Cierre mensual · {selCierre.mes}</h2>
+          <h2 style={{ margin:0, fontSize:16, fontWeight:800, color:colors.text[900] }}>📋 Cierre mensual · {selCierre.mes}</h2>
           {pendingCierres.length > 1 && (
             <div style={{ display:'flex', gap:4 }}>
               {pendingCierres.map((_, i) => (
-                <button key={i} onClick={() => setSelIdx(i)} style={{ width:8, height:8, borderRadius:'50%', border:'none', cursor:'pointer', background: i===selIdx?'var(--primary)':'var(--bg-400)', padding:0 }} />
+                <button key={i} onClick={() => setSelIdx(i)} style={{ width:8, height:8, borderRadius:'50%', border:'none', cursor:'pointer', background: i===selIdx ? colors.primary.base : colors.bg[400], padding:0 }} />
               ))}
             </div>
           )}
         </div>
-        <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12 }}>
+        <div style={{ fontSize:12, color:colors.text[500], marginBottom:14 }}>
           Generado por {selCierre.generadoPor} · {selCierre.dias} días trabajados · {mhm(selCierre.totalMin)}
         </div>
 
         {/* Records snapshot */}
-        <div style={{ background:'var(--bg-600)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'10px 12px', marginBottom:14, maxHeight:160, overflowY:'auto' }}>
+        <div style={{ background:colors.bg[600], border:`1px solid ${colors.border.subtle}`, borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, maxHeight:160, overflowY:'auto' }}>
           {(selCierre.records_snapshot || []).map((r, i) => {
             const d = new Date(r.inicio)
             return (
-              <div key={i} style={{ display:'flex', gap:8, fontSize:12, color:'var(--text2)', padding:'3px 0', borderBottom:'1px solid var(--border)' }}>
-                <span style={{ width:90, flexShrink:0, color:'var(--text3)' }}>{d.toLocaleDateString('es-ES',{day:'numeric',month:'short',weekday:'short'})}</span>
-                <span style={{ flex:1, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.centro||'—'}</span>
-                <span style={{ fontWeight:700, color:'var(--primary-light)', flexShrink:0 }}>{mhm(Math.floor((r.workSecs||0)/60))}</span>
+              <div key={i} style={{ display:'flex', gap:8, fontSize:12, color:colors.text[700], padding:'3px 0', borderBottom:`1px solid ${colors.border.subtle}` }}>
+                <span style={{ width:90, flexShrink:0, color:colors.text[500] }}>{d.toLocaleDateString('es-ES',{day:'numeric',month:'short',weekday:'short'})}</span>
+                <span style={{ flex:1, color:colors.text[500], overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.centro||'—'}</span>
+                <span style={{ fontWeight:700, color:colors.primary.light, flexShrink:0 }}>{mhm(Math.floor((r.workSecs||0)/60))}</span>
               </div>
             )
           })}
         </div>
 
-        <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:'var(--text2)' }}>Firma digital</div>
+        <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:colors.text[700] }}>Firma digital</div>
         <canvas ref={canvasRef} width={640} height={180}
-          style={{ width:'100%', height:120, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block', marginBottom:6 }}
+          style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8 }}
           {...handlers} />
-        <button className="btn btn-secondary btn-sm" onClick={clearCanvas} style={{ marginBottom:14 }}>Borrar</button>
-        <div className="modal-btns">
-          <button className="btn btn-secondary" onClick={onClose} disabled={firmando}>Cancelar</button>
-          <button className="btn btn-primary" onClick={firmar} disabled={firmando}>{firmando ? 'Generando PDF…' : '✅ Firmar y enviar'}</button>
+        <button style={{ ...btnSmSec, marginBottom:16 }} onClick={clearCanvas}>Borrar</button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={btnSecondary} onClick={onClose} disabled={firmando}>Cancelar</button>
+          <button style={btnPrimary} onClick={firmar} disabled={firmando}>{firmando ? 'Generando PDF…' : '✅ Firmar y enviar'}</button>
         </div>
       </div>
     </div>

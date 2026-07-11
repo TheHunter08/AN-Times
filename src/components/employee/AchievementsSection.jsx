@@ -1,9 +1,8 @@
 import { useMemo, useEffect } from 'react'
 import { calcMin, p2 } from '../../utils/time.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
-// Clave YYYY-MM en huso local (igual que today() en time.js) — no usar
-// toISOString().slice(0,7), que da el mes en UTC y puede desfasarse un día
-// para usuarios lejos de UTC.
 function localMonthKey(d = new Date()) { return `${d.getFullYear()}-${p2(d.getMonth() + 1)}` }
 
 function workdaysSoFarInMonth(mk, ref = new Date()) {
@@ -62,9 +61,7 @@ export function AchievementsSection({ myRecs, streak, u, saveDB, db }) {
         })
         localStorage.setItem(key, JSON.stringify([...unlocked]))
         if (saveDB && db && newOnes.length > 0) {
-          const emps = (db.employees || []).map(e =>
-            e.id === u.id ? { ...e, achievements: [...unlocked] } : e
-          )
+          const emps = (db.employees || []).map(e => e.id === u.id ? { ...e, achievements: [...unlocked] } : e)
           saveDB({ employees: emps })
         }
       }
@@ -74,17 +71,22 @@ export function AchievementsSection({ myRecs, streak, u, saveDB, db }) {
   return (
     <div style={{ padding:'0 16px 16px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px' }}>Logros</div>
-        <div style={{ fontSize:11, color:'var(--text4)' }}>{unlocked.size}/{ACHIEVEMENTS.length} desbloqueados</div>
+        <div style={{ fontSize:10, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.6px' }}>Logros</div>
+        <div style={{ fontSize:11, color:colors.text[300] }}>{unlocked.size}/{ACHIEVEMENTS.length} desbloqueados</div>
       </div>
-      <div className="v3-achievements-grid">
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(80px,1fr))', gap:8 }}>
         {ACHIEVEMENTS.map(a => {
           const ok = unlocked.has(a.id)
           return (
-            <div key={a.id} className={`v3-achievement${ok ? ' unlocked' : ''}`} title={a.desc}>
-              <div className="v3-achievement-icon">{ok ? a.icon : '🔒'}</div>
-              <div className="v3-achievement-title">{a.title}</div>
-              <div className="v3-achievement-desc">{a.desc}</div>
+            <div key={a.id} title={a.desc} style={{
+              background: ok ? `${colors.primary.base}12` : colors.bg[600],
+              border: `1px solid ${ok ? colors.primary.base+'30' : colors.border.subtle}`,
+              borderRadius:radius.xl, padding:'10px 6px', textAlign:'center',
+              opacity: ok ? 1 : 0.5, transition:'all .2s',
+            }}>
+              <div style={{ fontSize:22, marginBottom:4, filter: ok ? 'none' : 'grayscale(1)' }}>{ok ? a.icon : '🔒'}</div>
+              <div style={{ fontSize:10, fontWeight:700, color: ok ? colors.primary.light : colors.text[500], lineHeight:1.3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.title}</div>
+              <div style={{ fontSize:9, color:colors.text[300], marginTop:2, lineHeight:1.3, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{a.desc}</div>
             </div>
           )
         })}

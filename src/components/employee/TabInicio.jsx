@@ -9,6 +9,8 @@ import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed
 import { WeatherCard } from './WeatherCard.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
 import { ModalParteVoz } from '../ModalParteVoz.jsx'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
 export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast, onOpenQRScan }) {
   const { setEmpTab } = useAppStore()
@@ -20,8 +22,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const [bioOfferVisible, setBioOfferVisible] = useState(false)
   const [bioOfferLoading, setBioOfferLoading] = useState(false)
   const [showParteVoz, setShowParteVoz] = useState(false)
-  const [burst, setBurst] = useState(null) // 'start' | 'stop' | 'break' | null
-  // Memo: TabInicio re-renderiza cada segundo via timer; evitar refiltrar listas grandes
+  const [burst, setBurst] = useState(null)
+
   const recs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
     [db.records, u.id, todayStr]
@@ -32,7 +34,6 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     () => (db.documentos || []).filter(d => d.empId === u.id && !d.firma),
     [db.documentos, u.id]
   )
-
   const lastAutoClosed = useMemo(() => {
     return (db.records || [])
       .filter(r => r.empId === u.id && r.autoClosedAt)
@@ -42,14 +43,10 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const showAutoCloseWarning = !autoCloseDismissed && lastAutoClosed &&
     (Date.now() - new Date(lastAutoClosed.autoClosedAt).getTime()) < 24 * 60 * 60 * 1000
 
-  // Racha de asistencia (se actualiza cuando cambian los records, no cada segundo)
   const streak = useMemo(() => calcStreak(db.records, u.id, todayStr), [db.records, u.id, todayStr])
   const streakNext = streakLabel(streak)
-
-  // IA horaria: patrón de entrada de los últimos 30 días
   const workPattern = useMemo(() => calcWorkPattern(db.records, u.id), [db.records, u.id])
 
-  // Oferta biométrica — mostrar solo una vez si el dispositivo lo soporta y no está registrado
   useEffect(() => {
     if (!u?.id) return
     if (hasBiometric(u.id) || isBioOfferDismissed(u.id)) return
@@ -58,41 +55,37 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
   const completedSecs = realRecs.filter(r => r.fin && r.closed).reduce((a, r) => a + recWorkSecs(r), 0)
   const liveSecs = o ? calcSecs(o).work : 0
-  const totSecs = completedSecs + liveSecs
-  const totMin = Math.floor(totSecs / 60)
-  const empWD = Math.round((u.horasSemanales || WK / 60) / 5 * 60)  // minutos/día según contrato
-  const empWK = (u.horasSemanales || WK / 60) * 60                  // minutos/semana
-  const pct = Math.min(100, Math.round(totMin / empWD * 100))
+  const totSecs  = completedSecs + liveSecs
+  const totMin   = Math.floor(totSecs / 60)
+  const empWD    = Math.round((u.horasSemanales || WK / 60) / 5 * 60)
+  const empWK    = (u.horasSemanales || WK / 60) * 60
+  const pct      = Math.min(100, Math.round(totMin / empWD * 100))
   const remainMin = Math.max(0, empWD - totMin)
 
   const entradaRec = realRecs[0]
-  const salidaRec = [...realRecs].reverse().find(r => r.fin && r.closed)
-  const brkMin = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
+  const salidaRec  = [...realRecs].reverse().find(r => r.fin && r.closed)
+  const brkMin     = recs.reduce((a, r) => a + Math.floor((r.breakSecs || 0) / 60), 0)
 
   const now = new Date()
-  const ws = wkStart(now)
-  // localDateStr (no toISOString().slice(0,10)): ws ya está en medianoche LOCAL
-  // (wkStart hace setHours(0,0,0,0)) — toISOString() la convierte a UTC primero,
-  // desplazando la fecha un día atrás en España. Al reconstruir con "T00:00:00"
-  // (no como fecha-sola) se fuerza de nuevo el parseo en hora local, si no
-  // new Date("YYYY-MM-DD") se interpreta como medianoche UTC — casi 1 día
-  // entero de diferencia, arrastrando el domingo anterior a "esta semana".
+  const ws  = wkStart(now)
   const wsStr = localDateStr(ws)
-  const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+  const mk  = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+
   const weekRecs = useMemo(() => {
     const wsDate = new Date(wsStr + 'T00:00:00')
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
-  const weekMin = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
-  const weekPct = Math.min(100, Math.round(weekMin / empWK * 100))
-  // Horas extra reales: solo cuentan al superar 40h/semana (Estatuto de los Trabajadores),
-  // no por pasar de la jornada diaria — antes se marcaba "extra" solo por hacer >8h en un día.
+
+  const weekMin  = weekRecs.reduce((s, r) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
+  const weekPct  = Math.min(100, Math.round(weekMin / empWK * 100))
   const extraMin = Math.max(0, weekMin - WK)
+
   const lastWeekMin = useMemo(() => {
     const lws = new Date(wsStr + 'T00:00:00'); lws.setDate(lws.getDate() - 7)
     const lwe = new Date(wsStr + 'T00:00:00')
     return (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= lws && new Date(r.inicio) < lwe).reduce((s, r) => s + calcMin(r), 0)
   }, [db.records, u.id, wsStr])
+
   const monthRecs = useMemo(
     () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)),
     [db.records, u.id, mk]
@@ -104,12 +97,9 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   )
   const monthPct = Math.min(100, Math.round(monthMin / WM * 100))
 
-  // "Mi equipo" data — precomputado para evitar O(n²) cada segundo en encargados
   const teamData = useMemo(() => {
     if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
     const isJO = u.role === 'jefe_obra'
-    // Centros gestionados = obrasAsignadas + el propio centroTrabajo del encargado.
-    // Así funciona aunque el admin solo haya rellenado uno de los dos campos.
     const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
     const teamEmps = (db.employees || []).filter(e =>
       !e.isAdmin && !e.baja && e.id !== u.id &&
@@ -126,366 +116,384 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     return { teamEmps, liveIds, doneIds, minByEmp }
   }, [u.role, u.id, u.obrasAsignadas, db.employees, db.records, todayStr])
 
-  // SVG arc
-  const ARC_R = 50
-  const ARC_C = 2 * Math.PI * ARC_R
-  const arcOffset = ARC_C * (1 - pct / 100)
-
   const triggerBurst = (kind, pattern) => {
     try { navigator.vibrate(pattern) } catch {}
     setBurst(kind)
     setTimeout(() => setBurst(null), 650)
   }
-
   const handleMainBtn = () => {
     if (timer.state === 'idle') { triggerBurst('start', [18, 40, 18]); doStart() }
     else { triggerBurst('stop', [22, 60, 22, 60, 45]); doStop() }
   }
-
   const handleBreakBtn = () => {
     triggerBurst('break', timer.state === 'break' ? [12, 30, 12] : [30])
     doBreak()
   }
 
-  const statusClass = timer.state === 'idle' ? 'idle' : timer.state === 'break' ? 'break' : ''
+  // Button color based on state
+  const btnColor = timer.state === 'idle' ? colors.primary.base
+    : timer.state === 'break' ? colors.semantic.orange
+    : colors.semantic.green
+  const btnGlow = timer.state === 'idle' ? colors.primary.glow
+    : timer.state === 'break' ? `${colors.semantic.orange}50`
+    : `${colors.semantic.green}50`
 
   if (!db.records) return (
-    <div className="emp-tab active">
-      <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
-        <div className="skeleton" style={{ height:280, borderRadius:20 }} />
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-          {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height:68, borderRadius:14 }} />)}
-        </div>
-        <div className="skeleton" style={{ height:56, borderRadius:14 }} />
-        <div className="skeleton" style={{ height:80, borderRadius:14 }} />
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="skeleton" style={{ height: 280, borderRadius: 20 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+        {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 68, borderRadius: 14 }} />)}
       </div>
+      <div className="skeleton" style={{ height: 56, borderRadius: 14 }} />
+      <div className="skeleton" style={{ height: 80, borderRadius: 14 }} />
     </div>
   )
 
   return (
     <PullToRefresh>
-      <div className="ini-wrap">
+      <style>{`
+        @keyframes v2-burst { 0%{opacity:.75;transform:translate(-50%,-50%) scale(.8)} 100%{opacity:0;transform:translate(-50%,-50%) scale(1.7)} }
+        @keyframes v2-pulse { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:.15;transform:scale(1.08)} }
+      `}</style>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto', paddingBottom: 100 }}>
 
-        {/* ── TIMES INC 3.0 — Hero Card ──────────────────────────── */}
-        <div className="v30-hero-card">
+        {/* ── Hero Card ───────────────────────────────────────────── */}
+        <div style={{
+          margin: '16px 16px 0',
+          background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
+          borderRadius: radius['2xl'], padding: '20px 20px 16px', position: 'relative', overflow: 'hidden',
+        }}>
+          {/* ambient glow */}
+          <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${btnColor}18 0%, transparent 70%)`, pointerEvents: 'none', transition: 'background .3s' }} />
 
-          {/* Clock row */}
-          <div className="v30-hc-top">
-            <div className="v30-hc-clock-block">
-              <div className="v30-hc-clock">
-                <span className="v30-hc-hm">{clockTime?.slice(0,5) || '--:--'}</span>
-                <span className="v30-hc-sec">{clockTime?.slice(5) || ':--'}</span>
+          {/* Clock + Weather */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+            <div>
+              <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: 'tabular-nums', color: colors.text[900], lineHeight: 1 }}>
+                {clockTime?.slice(0,5) || '--:--'}
+                <span style={{ fontSize: 20, fontWeight: 600, color: colors.text[500], marginLeft: 3 }}>{clockTime?.slice(5) || ':--'}</span>
               </div>
-              <div className="v30-hc-date">{clockDate}</div>
+              <div style={{ fontSize: 12, color: colors.text[500], marginTop: 4, textTransform: 'capitalize' }}>{clockDate}</div>
             </div>
-            <div className="v30-hc-weather"><WeatherCard /></div>
+            <WeatherCard />
           </div>
 
-          {/* Button zone */}
-          <div className="v30-hc-btn-area">
-            {/* Outer glow ring — separate layer, won't overlap stats */}
-            <div className={`v30-hc-glow${timer.state === 'break' ? ' brk' : timer.state !== 'idle' ? ' live' : ''}`}/>
+          {/* Punch button */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, position: 'relative' }}>
+            {timer.state !== 'idle' && (
+              <div style={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 110, height: 110, borderRadius: '50%',
+                background: `radial-gradient(circle, ${btnColor}20 0%, transparent 70%)`,
+                animation: 'v2-pulse 2s ease-in-out infinite',
+                pointerEvents: 'none',
+              }} />
+            )}
             <button
-              className={`v30-hc-btn${timer.state === 'break' ? ' brk' : timer.state !== 'idle' ? ' live' : ''}`}
               onClick={() => {
                 if (showTip) { try { localStorage.setItem('an_tip_fichar','1') } catch {}; setShowTip(false) }
                 handleMainBtn()
               }}
-            >
-              <svg viewBox="0 0 24 24" className="v30-hc-btn-ico" aria-hidden="true">
+              style={{
+                width: 88, height: 88, borderRadius: '50%', border: 'none', flexShrink: 0,
+                background: `radial-gradient(circle at 35% 35%, ${btnColor}dd, ${btnColor})`,
+                boxShadow: `0 8px 28px ${btnGlow}, inset 0 1px 0 rgba(255,255,255,0.18)`,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+                cursor: 'pointer', color: '#fff', transition: 'all 0.2s ease', position: 'relative',
+              }}>
+              <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" style={{ display: 'block' }}>
                 {timer.state === 'idle'
                   ? <polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/>
                   : <rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>}
               </svg>
-              <span className="v30-hc-btn-lbl">
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.6px', lineHeight: 1 }}>
                 {timer.state === 'idle' ? 'INICIAR' : timer.state === 'break' ? 'PAUSADO' : 'PARAR'}
               </span>
+              {/* burst ring */}
+              {burst && (
+                <div style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  width: 88, height: 88, borderRadius: '50%',
+                  border: `2px solid ${burst === 'break' ? colors.semantic.orange : colors.semantic.green}`,
+                  animation: 'v2-burst 0.65s ease-out forwards',
+                  pointerEvents: 'none',
+                }} />
+              )}
             </button>
-            {burst && (
-              <div className={`v30-burst${burst === 'break' ? ' brk' : ''}`}>
-                <div className="v30-burst-ring" />
-                <div className="v30-burst-check-wrap">
-                  <svg viewBox="0 0 24 24" className="v30-burst-check" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12.5 L9.5 18 L20 5" />
-                  </svg>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Tip / live status — just below button, above stats */}
+          {/* Tip / live status */}
           {showTip && timer.state === 'idle' ? (
-            <div className="v30-hc-tip-text">👆 Pulsa el círculo para comenzar</div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: colors.text[500], marginBottom: 12 }}>
+              👆 Pulsa el círculo para comenzar
+            </div>
           ) : timer.state !== 'idle' ? (
-            <div className="v30-hc-live-row">
-              <span className="v30-dot on"/>
-              <span className="v30-hc-live-txt">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: timer.state === 'break' ? colors.semantic.orange : colors.semantic.green, boxShadow: `0 0 7px ${timer.state === 'break' ? colors.semantic.orange : colors.semantic.green}` }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: timer.state === 'break' ? colors.semantic.orange : colors.semantic.green }}>
                 {timer.state === 'break' ? `En descanso · ${brkMin}min` : `Jornada activa · ${s2t(timer.ws)}`}
               </span>
             </div>
           ) : null}
 
-          {/* Break toggle — when active */}
+          {/* Break toggle */}
           {timer.state !== 'idle' && (
-            <button className={`v30-break-btn${timer.state === 'break' ? ' brk' : ''}`} onClick={handleBreakBtn}>
+            <button onClick={handleBreakBtn} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width: '100%', padding: '10px 16px', marginBottom: 8,
+              borderRadius: radius.lg, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              background: timer.state === 'break' ? `${colors.semantic.orange}15` : colors.bg[500],
+              border: `1px solid ${timer.state === 'break' ? `${colors.semantic.orange}40` : colors.border.default}`,
+              color: timer.state === 'break' ? colors.semantic.orange : colors.text[700],
+              transition: 'all .15s',
+            }}>
               {timer.state === 'break' ? '▶  Reanudar trabajo' : '⏸  Iniciar descanso'}
             </button>
           )}
 
-          {/* Mostrar mi QR — el empleado muestra su QR personal para que
-              el encargado/admin lo escanee desde PanelControl o PanelMiObra. */}
-          <button className="v30-break-btn" onClick={() => openModal('miQR')} style={{ marginTop: timer.state !== 'idle' ? 8 : 0 }}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
-              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none" />
-            </svg>
-            Mostrar mi QR
-          </button>
-
-          {/* Botón dedicado y visible para que un jefe de obra o encargado
-              fiche a un empleado de su equipo escaneando su QR personal,
-              estando físicamente donde ese empleado esté (no depende del
-              centro/obra del que ficha). Antes compartía botón con "Fichar
-              con QR" y quedaba escondido; ahora es su propia acción, clara
-              desde el primer vistazo. Misma lógica de destino
-              (handleQRScan en EmployeePage.jsx) — solo cambia la entrada. */}
-          {onOpenQRScan && (u.role === 'jefe_obra' || u.role === 'encargado') && (
-            <button className="v30-break-btn" onClick={onOpenQRScan} style={{ marginTop: 8 }}>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 6 }}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Fichar a un empleado
+          {/* QR buttons */}
+          {[
+            { show: true, label: 'Mostrar mi QR', onClick: () => openModal('miQR'), icon: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px' }}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill="currentColor" stroke="none"/></svg> },
+            { show: !!(onOpenQRScan && (u.role === 'jefe_obra' || u.role === 'encargado')), label: 'Fichar a un empleado', onClick: onOpenQRScan, icon: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+          ].filter(b => b.show).map((b, i) => (
+            <button key={i} onClick={b.onClick} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width: '100%', padding: '10px 16px', marginBottom: 8,
+              borderRadius: radius.lg, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              background: colors.bg[500], border: `1px solid ${colors.border.default}`,
+              color: colors.text[700],
+            }}>
+              {b.icon}{b.label}
             </button>
-          )}
+          ))}
 
           {/* Break warn chip */}
-          {(timer.state === 'break' && brkMin > 20) && (
-            <div className="v30-chip v30-chip-warn">⚠ {brkMin}min de descanso</div>
+          {timer.state === 'break' && brkMin > 20 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 12px', marginBottom: 8, borderRadius: radius.pill, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, fontSize: 12, fontWeight: 700, color: colors.semantic.orange }}>
+              ⚠ {brkMin}min de descanso
+            </div>
           )}
 
           {/* Divider */}
-          <div className="v30-hc-sep"/>
+          <div style={{ height: 1, background: colors.border.subtle, margin: '4px 0 12px' }} />
 
           {/* Stats row */}
-          <div className="v30-hc-stats">
-            <div className="v30-hc-stat">
-              <div className="v30-hc-stat-num">{Math.floor(totMin/60)}h {p2(totMin%60)}m</div>
-              <div className="v30-hc-stat-lbl">Trabajado</div>
-            </div>
-            <div className="v30-hc-divider"/>
-            <div className="v30-hc-stat">
-              <div className="v30-hc-stat-num">{Math.floor(remainMin/60)}h {p2(remainMin%60)}m</div>
-              <div className="v30-hc-stat-lbl">Restante</div>
-            </div>
-            <div className="v30-hc-divider"/>
-            <div className="v30-hc-stat">
-              <div className="v30-hc-stat-num" style={{ color:'#818cf8' }}>{pct}%</div>
-              <div className="v30-hc-stat-lbl">Jornada</div>
-            </div>
+          <div style={{ display: 'flex', gap: 0 }}>
+            {[
+              { lbl: 'Trabajado', val: `${Math.floor(totMin/60)}h ${p2(totMin%60)}m`, color: colors.text[900] },
+              { lbl: 'Restante',  val: `${Math.floor(remainMin/60)}h ${p2(remainMin%60)}m`, color: colors.text[900] },
+              { lbl: 'Jornada',   val: `${pct}%`, color: colors.primary.light },
+            ].map(({ lbl, val, color }, i) => (
+              <div key={lbl} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', borderLeft: i > 0 ? `1px solid ${colors.border.subtle}` : 'none' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>{val}</div>
+                <div style={{ fontSize: 10, color: colors.text[300], fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginTop: 2 }}>{lbl}</div>
+              </div>
+            ))}
           </div>
 
           {/* Progress bar */}
-          <div className="v30-hc-progress">
-            <div className="v30-hc-progress-fill" style={{ width:`${pct}%` }}/>
+          <div style={{ height: 5, background: colors.bg[400], borderRadius: radius.pill, overflow: 'hidden', margin: '12px 0 6px' }}>
+            <div style={{ height: '100%', borderRadius: radius.pill, background: `linear-gradient(90deg, ${btnColor}cc, ${btnColor})`, width: `${pct}%`, transition: 'width .4s ease', boxShadow: `0 0 8px ${btnGlow}` }} />
           </div>
-          <div className="v30-hc-progress-labels">
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.text[500] }}>
             <span>{o?.centro || 'Sin obra asignada'}</span>
             {timer.state !== 'idle' && extraMin > 0 && (
-              <span style={{ color:'#34d399', fontWeight:600 }}>
-                +{Math.floor(extraMin/60)}h {p2(extraMin%60)}m extra
-              </span>
+              <span style={{ color: colors.semantic.green, fontWeight: 600 }}>+{Math.floor(extraMin/60)}h {p2(extraMin%60)}m extra</span>
             )}
           </div>
-
         </div>
 
-        {/* Stats grid */}
-        <div className="stat-mini-grid">
+        {/* ── 4-stat mini grid ────────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, padding: '0 16px' }}>
           {[
-            { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '- -:- -', color: 'var(--primary-light)', bg: 'rgba(59,91,255,.12)' },
-            { lbl: 'Salida',  val: o ? '- -:- -' : salidaRec ? ftime(salidaRec.fin) : '- -:- -', color: 'var(--green)', bg: 'var(--green-dim)' },
-            { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin / 60).toString().padStart(2, '0')}:${p2(brkMin % 60)}` : '00:00', color: 'var(--orange)', bg: 'var(--orange-dim)' },
-            { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin / 60)}h ${p2(totMin % 60)}m` : '0h 00m', color: 'var(--secondary)', bg: 'rgba(6,182,212,.1)' },
-          ].map(({ lbl, val, color, bg }) => (
-            <div key={lbl} className="stat-card-premium v3-stat-card" style={{ textAlign: 'center' }}>
-              <div className="stat-lbl v3-stat-label">{lbl}</div>
-              <div className="stat-val v3-stat-value" style={{ color, fontSize: 14 }}>{val}</div>
+            { lbl: 'Entrada', val: entradaRec ? ftime(entradaRec.inicio) : '--:--', color: colors.primary.light },
+            { lbl: 'Salida',  val: o ? '--:--' : salidaRec ? ftime(salidaRec.fin) : '--:--', color: colors.semantic.green },
+            { lbl: 'Pausa',   val: brkMin > 0 ? `${Math.floor(brkMin/60).toString().padStart(2,'0')}:${p2(brkMin%60)}` : '00:00', color: colors.semantic.orange },
+            { lbl: 'Total',   val: totMin > 0 ? `${Math.floor(totMin/60)}h ${p2(totMin%60)}m` : '0h 00m', color: colors.secondary.base },
+          ].map(({ lbl, val, color }) => (
+            <div key={lbl} style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '10px 6px', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: colors.text[300], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>{lbl}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>{val}</div>
             </div>
           ))}
         </div>
 
-        {/* Weekly progress bar */}
-        <div className="v30-prog-block">
-          <div className="v30-prog-row">
-            <div className="v30-prog-label">Semana</div>
-            <div className={`v30-prog-val${weekPct >= 100 ? ' green' : ''}`}>{mhm(weekMin)} / 40h</div>
+        {/* ── Week progress ────────────────────────────────────────── */}
+        <div style={{ margin: '0 16px', background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '14px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 660, color: colors.text[700], textTransform: 'uppercase', letterSpacing: '.5px' }}>Semana</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: weekPct >= 100 ? colors.semantic.green : colors.text[700] }}>{mhm(weekMin)} / 40h</div>
           </div>
-          <div className="v30-prog-track">
-            <div className={`v30-prog-fill${weekPct >= 100 ? ' green' : ''}`} style={{ width:`${Math.min(weekPct, 100)}%` }} />
+          <div style={{ height: 5, background: colors.bg[400], borderRadius: radius.pill, overflow: 'hidden', marginBottom: 6 }}>
+            <div style={{ height: '100%', borderRadius: radius.pill, background: weekPct >= 100 ? colors.semantic.green : colors.primary.base, width: `${Math.min(weekPct, 100)}%`, transition: 'width .4s ease' }} />
           </div>
-          <div className="v30-prog-footer">
-            <span>Lun · {new Date(ws).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}</span>
-            <span style={{ color: weekPct >= 100 ? '#34d399' : undefined }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.text[500] }}>
+            <span>Lun · {new Date(ws).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
+            <span style={{ color: weekPct >= 100 ? colors.semantic.green : undefined }}>{weekPct >= 100 ? '✓ 40h completadas' : `${100 - weekPct}% restante`}</span>
           </div>
         </div>
 
-        {/* Monthly progress bar */}
-        <div className="v30-prog-block">
-          <div className="v30-prog-row">
-            <div className="v30-prog-label">Este mes</div>
-            <div className={`v30-prog-val${monthPct >= 100 ? ' green' : ''}`}>{mhm(monthMin)} / 160h</div>
+        {/* ── Month progress ───────────────────────────────────────── */}
+        <div style={{ margin: '0 16px', background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '14px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 660, color: colors.text[700], textTransform: 'uppercase', letterSpacing: '.5px' }}>Este mes</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: monthPct >= 100 ? colors.semantic.green : colors.text[700] }}>{mhm(monthMin)} / 160h</div>
           </div>
-          <div className="v30-prog-track">
-            <div className={`v30-prog-fill${monthPct >= 100 ? ' green' : monthDeficitMin > 0 ? ' orange' : ''}`} style={{ width:`${Math.min(monthPct, 100)}%` }} />
+          <div style={{ height: 5, background: colors.bg[400], borderRadius: radius.pill, overflow: 'hidden', marginBottom: 6 }}>
+            <div style={{ height: '100%', borderRadius: radius.pill, background: monthPct >= 100 ? colors.semantic.green : monthDeficitMin > 0 ? colors.semantic.orange : colors.primary.base, width: `${Math.min(monthPct, 100)}%`, transition: 'width .4s ease' }} />
           </div>
-          <div className="v30-prog-footer">
-            <span>{now.toLocaleDateString('es-ES', { month:'long', year:'numeric' })}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.text[500] }}>
+            <span>{now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
             {monthExtraMin > 0 ? (
-              <span style={{ color:'#34d399', fontWeight:700 }}>+{mhm(monthExtraMin)} extra</span>
+              <span style={{ color: colors.semantic.green, fontWeight: 700 }}>+{mhm(monthExtraMin)} extra</span>
             ) : monthDeficitMin > 0 ? (
-              <span style={{ color:'#fbbf24' }}>−{mhm(monthDeficitMin)} déficit</span>
+              <span style={{ color: colors.semantic.orange }}>−{mhm(monthDeficitMin)} déficit</span>
             ) : (
-              <span style={{ color: monthPct >= 100 ? '#34d399' : undefined }}>{monthPct >= 100 ? '✓ 160h alcanzadas' : `${100 - monthPct}% restante`}</span>
+              <span style={{ color: monthPct >= 100 ? colors.semantic.green : undefined }}>{monthPct >= 100 ? '✓ 160h alcanzadas' : `${100 - monthPct}% restante`}</span>
             )}
           </div>
         </div>
 
-        {/* ─── Streak + IA pattern row ─────────────────────────────────────────── */}
-        <div className="v3-insights-row">
-
-          {/* Racha de asistencia */}
-          {streak > 0 && (
-            <div className={`v3-streak-card${streak >= 7 ? ' hot' : ''}`}>
-              <div className="v3-streak-fire">{streak >= 30 ? '🌟' : streak >= 7 ? '🔥' : '✅'}</div>
-              <div className="v3-streak-body">
-                <div className="v3-streak-count">{streak} <span>día{streak !== 1 ? 's' : ''}</span></div>
-                <div className="v3-streak-label">racha activa</div>
-                {streakNext && <div className="v3-streak-next">{streakNext}</div>}
+        {/* ── Streak + IA row ──────────────────────────────────────── */}
+        {(streak > 0 || workPattern) && (
+          <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
+            {streak > 0 && (
+              <div style={{
+                flex: 1, background: colors.bg[600], border: `1px solid ${streak >= 7 ? `${colors.semantic.orange}30` : colors.border.subtle}`,
+                borderRadius: radius.xl, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ fontSize: 24, lineHeight: 1 }}>{streak >= 30 ? '🌟' : streak >= 7 ? '🔥' : '✅'}</div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: streak >= 7 ? colors.semantic.orange : colors.text[900], lineHeight: 1 }}>
+                    {streak} <span style={{ fontSize: 12, fontWeight: 500, color: colors.text[500] }}>día{streak !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: colors.text[500], fontWeight: 600 }}>racha activa</div>
+                  {streakNext && <div style={{ fontSize: 10, color: colors.primary.light, marginTop: 2 }}>{streakNext}</div>}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* IA horaria offline — predicción de entrada */}
-          {workPattern && (
-            <div className="v3-pattern-card">
-              <div className="v3-pattern-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            )}
+            {workPattern && (
+              <div style={{
+                flex: 1, background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
+                borderRadius: radius.xl, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ width: 32, height: 32, borderRadius: radius.sm, background: colors.primary.dim, border: `1px solid ${colors.primary.glow}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={colors.primary.light} strokeWidth="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: colors.text[500], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>Tu horario habitual</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], marginTop: 1 }}>{workPattern.earlyStr} – {workPattern.lateStr}</div>
+                  {(() => {
+                    if (!entradaRec) return <div style={{ fontSize: 10, color: colors.text[300], marginTop: 2 }}>basado en {workPattern.sampleSize} días</div>
+                    const d = new Date(entradaRec.inicio)
+                    const entMin = d.getHours() * 60 + d.getMinutes()
+                    const diff = entMin - workPattern.avgMin
+                    const abs = Math.abs(diff)
+                    if (abs < 6) return <div style={{ fontSize: 10, color: colors.semantic.green, marginTop: 2 }}>✓ Llegaste a tu hora habitual</div>
+                    const fm = m => `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + 'min' : ''}`.trim()
+                    return <div style={{ fontSize: 10, color: diff < 0 ? colors.semantic.green : colors.semantic.orange, marginTop: 2 }}>{diff < 0 ? `⚡ ${fm(abs)} antes` : `+${fm(abs)} más tarde`}</div>
+                  })()}
+                </div>
               </div>
-              <div className="v3-pattern-body">
-                <div className="v3-pattern-title">Tu horario habitual</div>
-                <div className="v3-pattern-range">{workPattern.earlyStr} – {workPattern.lateStr}</div>
-                {(() => {
-                  if (!entradaRec) return <div className="v3-pattern-sub">basado en {workPattern.sampleSize} días</div>
-                  const d = new Date(entradaRec.inicio)
-                  const entMin = d.getHours() * 60 + d.getMinutes()
-                  const diff = entMin - workPattern.avgMin
-                  const abs = Math.abs(diff)
-                  if (abs < 6) return <div className="v3-pattern-sub" style={{ color:'var(--green)' }}>✓ Llegaste a tu hora habitual</div>
-                  const fm = m => `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + 'min' : ''}`.trim()
-                  return (
-                    <div className="v3-pattern-sub" style={{ color: diff < 0 ? 'var(--green)' : 'var(--orange)' }}>
-                      {diff < 0 ? `⚡ ${fm(abs)} antes de lo habitual` : `+${fm(abs)} más tarde de lo habitual`}
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-        </div>
-
-        {/* Biometric offer bottom sheet */}
+        {/* ── Biometric offer ──────────────────────────────────────── */}
         {bioOfferVisible && (
-          <div className="v3-bio-offer">
-            <div className="v3-bio-offer-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" width="28" height="28"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
+          <div style={{ margin: '0 16px', background: colors.bg[600], border: `1px solid ${colors.primary.base}30`, borderRadius: radius.xl, padding: '16px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: radius.lg, background: colors.primary.dim, border: `1px solid ${colors.primary.glow}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke={colors.primary.light} strokeWidth="1.6" width="22" height="22">
+                <path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
+              </svg>
             </div>
-            <div className="v3-bio-offer-text">
-              <div className="v3-bio-offer-title">Activa el acceso rápido</div>
-              <div className="v3-bio-offer-sub">Entra con tu huella o Face ID la próxima vez, sin introducir el PIN.</div>
-            </div>
-            <div className="v3-bio-offer-actions">
-              <button className="v3-bio-offer-btn primary" disabled={bioOfferLoading}
-                onClick={async () => {
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[900], marginBottom: 4 }}>Activa el acceso rápido</div>
+              <div style={{ fontSize: 12, color: colors.text[500], marginBottom: 12, lineHeight: 1.5 }}>Entra con tu huella o Face ID la próxima vez, sin introducir el PIN.</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button disabled={bioOfferLoading} onClick={async () => {
                   setBioOfferLoading(true)
                   try {
                     await registerBiometric(u.id, u.name)
-                    setBioOfferVisible(false)
-                    dismissBioOffer(u.id)
+                    setBioOfferVisible(false); dismissBioOffer(u.id)
                     toast('¡Huella registrada! Ya puedes entrar sin PIN 🔓')
                   } catch {
                     toast('No se pudo registrar. Inténtalo desde la pantalla de login.')
-                    setBioOfferVisible(false)
-                    dismissBioOffer(u.id)
+                    setBioOfferVisible(false); dismissBioOffer(u.id)
                   }
                   setBioOfferLoading(false)
-                }}>
-                {bioOfferLoading ? 'Registrando…' : 'Activar'}
-              </button>
-              <button className="v3-bio-offer-btn secondary"
-                onClick={() => { setBioOfferVisible(false); dismissBioOffer(u.id) }}>
-                Ahora no
-              </button>
+                }} style={{ padding: '8px 16px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: bioOfferLoading ? .7 : 1 }}>
+                  {bioOfferLoading ? 'Registrando…' : 'Activar'}
+                </button>
+                <button onClick={() => { setBioOfferVisible(false); dismissBioOffer(u.id) }} style={{ padding: '8px 16px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[500], fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Ahora no
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-
-        {/* Documentos pendientes de firma */}
+        {/* ── Pending docs ─────────────────────────────────────────── */}
         {pendingDocs.length > 0 && (
-          <div onClick={() => openModal('documentos')} style={{ margin:'-4px 16px 0', padding:'12px 14px', background:'var(--orange-dim)', border:'1px solid rgba(245,158,11,.3)', borderRadius:'var(--r)', display:'flex', alignItems:'center', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>📄</span>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'var(--orange)' }}>
+          <div onClick={() => openModal('documentos')} style={{ margin: '0 16px', padding: '12px 14px', background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`, borderRadius: radius.lg, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: colors.semantic.orange }}>
                 {pendingDocs.length === 1 ? 'Tienes 1 documento pendiente' : `Tienes ${pendingDocs.length} documentos pendientes`} de firma
               </div>
-              <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>Toca para revisarlos y firmar</div>
+              <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2 }}>Toca para revisarlos y firmar</div>
             </div>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--orange)" strokeWidth="2.5" style={{ flexShrink:0 }}><polyline points="9 18 15 12 9 6"/></svg>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.semantic.orange} strokeWidth="2.5" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         )}
 
-        {/* Auto-close warning banner */}
+        {/* ── Auto-close warning ───────────────────────────────────── */}
         {showAutoCloseWarning && (
-          <div className="v3-autoclose-warn">
-            <span className="v3-autoclose-warn-icon">⚠️</span>
-            <div className="v3-autoclose-warn-text">
-              <div className="v3-autoclose-warn-title">Jornada cerrada automáticamente</div>
-              <div className="v3-autoclose-warn-sub">
-                Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'short' })} fue cerrada automáticamente por inactividad ({mhm(Math.floor((lastAutoClosed.workSecs||0)/60))}).
+          <div style={{ margin: '0 16px', padding: '12px 14px', background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`, borderRadius: radius.lg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: colors.semantic.orange, marginBottom: 3 }}>Jornada cerrada automáticamente</div>
+              <div style={{ fontSize: 11, color: colors.text[500], lineHeight: 1.5 }}>
+                Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} fue cerrada automáticamente por inactividad ({mhm(Math.floor((lastAutoClosed.workSecs||0)/60))}).
               </div>
             </div>
-            <button className="v3-autoclose-warn-close" onClick={() => setAutoCloseDismissed(true)}>×</button>
+            <button onClick={() => setAutoCloseDismissed(true)} style={{ background: 'none', border: 'none', color: colors.text[500], fontSize: 18, cursor: 'pointer', padding: 0, flexShrink: 0, lineHeight: 1 }}>×</button>
           </div>
         )}
 
-        {/* GPS card */}
+        {/* ── GPS card ─────────────────────────────────────────────── */}
         {o && (
-          <div className={`gps-card${gpsStatus === 'pending' ? ' capturing' : ''}${o.geoAlert ? ' geo-alert' : ''}`}>
-            <div className="gps-ico">
-              <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+          <div style={{
+            margin: '0 16px',
+            padding: '12px 16px', borderRadius: radius.lg,
+            background: o.geoAlert ? `${colors.semantic.red}10` : gpsStatus === 'pending' ? `${colors.primary.base}10` : `${colors.semantic.green}10`,
+            border: `1px solid ${o.geoAlert ? `${colors.semantic.red}30` : gpsStatus === 'pending' ? `${colors.primary.base}20` : `${colors.semantic.green}25`}`,
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+          }}>
+            <div style={{ width: 32, height: 32, borderRadius: radius.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke={o.geoAlert ? colors.semantic.red : colors.semantic.green} strokeWidth="1.8">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+              </svg>
             </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div className="gps-name">{o.centro || u.centroTrabajo || 'Sin centro'}</div>
-              <div className={`gps-status${gpsStatus === 'pending' ? ' pending' : gpsStatus === 'fail' ? ' fail' : ''}`}>
-                {o?.locInicio ? '✓ GPS verificado'
-                  : gpsStatus === 'pending' ? 'Capturando ubicación…'
-                  : gpsStatus === 'fail' ? '⚠ Sin GPS — ubicación no registrada'
-                  : 'Sin GPS'}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], marginBottom: 2 }}>{o.centro || u.centroTrabajo || 'Sin centro'}</div>
+              <div style={{ fontSize: 11, color: o.geoAlert ? colors.semantic.red : gpsStatus === 'fail' ? colors.semantic.red : gpsStatus === 'pending' ? colors.primary.light : colors.semantic.green }}>
+                {o?.locInicio ? '✓ GPS verificado' : gpsStatus === 'pending' ? 'Capturando ubicación…' : gpsStatus === 'fail' ? '⚠ Sin GPS — ubicación no registrada' : 'Sin GPS'}
               </div>
               {o.geoAlert && (
-                <div className="gps-alert-tag">⚠ Fuera de zona · +{o.geoAlert.dist}m del radio ({o.geoAlert.radio}m)</div>
+                <div style={{ fontSize: 11, color: colors.semantic.red, marginTop: 2, fontWeight: 600 }}>
+                  ⚠ Fuera de zona · +{o.geoAlert.dist}m del radio ({o.geoAlert.radio}m)
+                </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Mi equipo — solo para encargados y jefes de obra */}
+        {/* ── Mi equipo ────────────────────────────────────────────── */}
         {teamData && (() => {
           const { teamEmps, liveIds, doneIds, minByEmp } = teamData
           const liveCount = teamEmps.filter(e => liveIds.has(e.id)).length
-          const recs = db.records || []
+          const allRecs = db.records || []
 
           const teamStartJornada = (e) => {
             if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
@@ -494,7 +502,6 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
             toast('Jornada iniciada', 2500, 'ok')
           }
-
           const teamToggleDescanso = (rec) => {
             const now = new Date().toISOString()
             let updated
@@ -510,7 +517,6 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             }
             saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? updated : r) }))
           }
-
           const teamForceClose = (rec) => {
             const empName = teamEmps.find(e => e.id === rec.empId)?.name || rec.empName
             if (!window.confirm(`¿Finalizar jornada de ${empName}?`)) return
@@ -525,58 +531,58 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           }
 
           return (
-            <div style={{ padding:'0 16px 12px' }}>
-              <div className="sec-label" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  Mi equipo hoy
-                  <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:10, background:'var(--green-dim)', color:'var(--green)', border:'1px solid rgba(16,185,129,.2)', textTransform:'none', letterSpacing:0 }}>
+            <div style={{ margin: '0 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: colors.text[700], textTransform: 'uppercase', letterSpacing: '.5px' }}>Mi equipo hoy</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, background: `${colors.semantic.green}15`, color: colors.semantic.green, border: `1px solid ${colors.semantic.green}25` }}>
                     {liveCount} activo{liveCount !== 1 ? 's' : ''}
                   </span>
-                </span>
-                <button onClick={() => setShowParteVoz(true)} style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:20, padding:'4px 10px', cursor:'pointer', display:'flex', alignItems:'center', gap:4, textTransform:'none', letterSpacing:0 }}>
+                </div>
+                <button onClick={() => setShowParteVoz(true)} style={{ fontSize: 11, fontWeight: 700, color: colors.semantic.red, background: `${colors.semantic.red}10`, border: `1px solid ${colors.semantic.red}25`, borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit' }}>
                   🎙️ Parte de trabajo
                 </button>
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {teamEmps.map(e => {
                   const isWorking = liveIds.has(e.id)
                   const isDone    = !isWorking && doneIds.has(e.id)
-                  const openRec2  = isWorking ? recs.find(r => r.empId === e.id && !r.fin) : null
+                  const openRec2  = isWorking ? allRecs.find(r => r.empId === e.id && !r.fin) : null
                   const totalMin  = isDone ? (minByEmp[e.id] || 0) : 0
-                  const dotColor  = isWorking ? 'var(--green)' : isDone ? 'var(--primary-light)' : 'var(--text4)'
+                  const dotColor  = isWorking ? colors.semantic.green : isDone ? colors.primary.light : colors.text[300]
                   const statusTxt = isWorking
                     ? (openRec2?.enDescanso ? `En descanso desde ${ftime(openRec2?.bStartTs || openRec2?.inicio)}` : `Activo desde ${ftime(openRec2?.inicio)}`)
-                    : isDone ? `${mhm(totalMin)} · Finalizado`
-                    : 'Sin fichar hoy'
+                    : isDone ? `${mhm(totalMin)} · Finalizado` : 'Sin fichar hoy'
+                  const avatarColor = colors.avatarPalette[(e.name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.avatarPalette.length]
                   return (
-                    <div key={e.id} className={`v3-team-card${isWorking ? (openRec2?.enDescanso ? ' paused' : ' working') : ''}`}>
-                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <div style={{ width:8, height:8, borderRadius:'50%', background:dotColor, flexShrink:0, boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
-                        <div style={{ width:32, height:32, borderRadius:9, background: e.color || 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>
+                    <div key={e.id} style={{
+                      background: colors.bg[600], border: `1px solid ${isWorking ? (openRec2?.enDescanso ? `${colors.semantic.orange}25` : `${colors.semantic.green}20`) : colors.border.subtle}`,
+                      borderRadius: radius.xl, padding: '12px 14px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: saveDB && (isWorking || !isDone) ? 10 : 0 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0, boxShadow: isWorking ? `0 0 7px ${dotColor}` : 'none' }} />
+                        <div style={{ width: 32, height: 32, borderRadius: radius.sm, background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                           {e.initials || e.name.slice(0,2).toUpperCase()}
                         </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:12, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.name.split(' ')[0]} {e.name.split(' ')[1] || ''}</div>
-                          <div style={{ fontSize:10, color: isWorking ? (openRec2?.enDescanso ? 'var(--orange)' : 'var(--green)') : isDone ? 'var(--text3)' : 'var(--text4)', marginTop:1 }}>{statusTxt}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name.split(' ')[0]} {e.name.split(' ')[1] || ''}</div>
+                          <div style={{ fontSize: 10, color: isWorking ? (openRec2?.enDescanso ? colors.semantic.orange : colors.semantic.green) : isDone ? colors.text[500] : colors.text[300], marginTop: 1 }}>{statusTxt}</div>
                         </div>
                       </div>
-                      {/* Botones de control — solo si saveDB disponible */}
                       {saveDB && (
                         isWorking ? (
-                          <div className="v3-team-card-actions">
-                            <button onClick={() => teamToggleDescanso(openRec2)} className="v3-team-btn">
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => teamToggleDescanso(openRec2)} style={{ flex: 1, padding: '7px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: colors.bg[500], color: colors.text[700], fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                               {openRec2?.enDescanso ? '▶ Reanudar' : '⏸ Pausa'}
                             </button>
-                            <button onClick={() => teamForceClose(openRec2)} className="v3-team-btn danger">
+                            <button onClick={() => teamForceClose(openRec2)} style={{ flex: 1, padding: '7px 12px', borderRadius: radius.md, border: `1px solid ${colors.semantic.red}30`, background: `${colors.semantic.red}10`, color: colors.semantic.red, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                               ■ Finalizar
                             </button>
                           </div>
                         ) : !isDone ? (
-                          <div className="v3-team-card-actions">
-                            <button onClick={() => teamStartJornada(e)} className="v3-team-btn primary" style={{ flex:'none', width:'100%' }}>
-                              ▶ Iniciar jornada
-                            </button>
-                          </div>
+                          <button onClick={() => teamStartJornada(e)} style={{ width: '100%', padding: '7px 12px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: `0 2px 10px ${colors.primary.glow}` }}>
+                            ▶ Iniciar jornada
+                          </button>
                         ) : null
                       )}
                     </div>
@@ -587,6 +593,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           )
         })()}
 
+        <div style={{ height: 4 }} />
       </div>
       <ModalParteVoz visible={showParteVoz} db={db} autor={u.name} saveDB={saveDB} toast={toast} onClose={() => setShowParteVoz(false)} />
     </PullToRefresh>

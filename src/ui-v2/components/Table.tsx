@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
 import { transition } from '../design-system/animations.js'
+import { shadows } from '../design-system/shadows.js'
 
 export interface TableColumn<T> {
   key: string
@@ -46,6 +47,7 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
             background: colors.bg[600],
             border: `1px solid ${colors.border.subtle}`,
             borderRadius: radius.md,
+            boxShadow: shadows.sm,
             transition: transition(['background', 'border-color', 'transform']),
           }}
         >

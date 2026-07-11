@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
 
 // iOS PWA: NUNCA aplicar transform al contenedor con overflow:auto — rompe
 // -webkit-overflow-scrolling de forma permanente. El scroll vive en .emp-tab
@@ -128,7 +129,7 @@ export function PullToRefresh({ children }) {
       <div ref={indicatorRef} style={{
         position:'absolute', top:0, left:0, right:0, height:50, zIndex:1,
         display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-        color:'var(--text3)', fontSize:11, fontWeight:600, pointerEvents:'none',
+        color:colors.text[500], fontSize:11, fontWeight:600, pointerEvents:'none',
         opacity:0, transition:'opacity .2s'
       }}>
         {refreshing ? (

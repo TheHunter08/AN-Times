@@ -23,6 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <input
         ref={ref}
         {...rest}
+        className={`uiv2-input${rest.className ? ` ${rest.className}` : ''}`}
         style={{
           width: '100%',
           padding: '10px 14px',
@@ -38,6 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         }}
       />
       {error && <div style={{ fontSize: 11, color: colors.semantic.red, marginTop: 4, fontWeight: 600 }}>{error}</div>}
+      <style>{`.uiv2-input:focus { border-color: ${colors.primary.base} !important; box-shadow: 0 0 0 3px ${colors.primary.dim}; }`}</style>
     </div>
   )
 })

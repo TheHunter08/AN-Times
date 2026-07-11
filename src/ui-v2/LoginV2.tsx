@@ -1,0 +1,310 @@
+// Login v2 — UI nueva conectada a toda la lógica real de auth:
+// PIN + biométrico + email/password + admin.
+// CLAUDE.md: UI only — preservar auth y lógica de negocio intacta.
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Login } from './pages/Login.js'
+import { useAppStore } from '../store/appStore.js'
+import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange } from '../services/authService.js'
+import { sortedEmps } from '../utils/time.js'
+import {
+  isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
+  clearLockout, hashPin,
+} from '../utils/pinSecurity.js'
+import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
+import type { LoginMode } from './pages/Login.js'
+
+const EMAIL_LK_KEY = 'an_email_lk'
+const EMAIL_MAX_ATTEMPTS = 5
+const EMAIL_LOCKOUT_MS = 10 * 60 * 1000
+
+function getEmailLockout() {
+  try {
+    const raw = localStorage.getItem(EMAIL_LK_KEY)
+    if (!raw) return { locked: false, attempts: 0 }
+    const d = JSON.parse(raw)
+    if (d.until) {
+      const remaining = d.until - Date.now()
+      if (remaining > 0) return { locked: true, remainingSecs: Math.floor(remaining / 1000) }
+      localStorage.removeItem(EMAIL_LK_KEY)
+    }
+    return { locked: false, attempts: d.attempts || 0 }
+  } catch { return { locked: false, attempts: 0 } }
+}
+function recordEmailFailed() {
+  try {
+    const state = getEmailLockout()
+    if (state.locked) return state
+    const attempts = (state.attempts || 0) + 1
+    if (attempts >= EMAIL_MAX_ATTEMPTS) {
+      localStorage.setItem(EMAIL_LK_KEY, JSON.stringify({ until: Date.now() + EMAIL_LOCKOUT_MS }))
+      return { locked: true, remainingSecs: Math.floor(EMAIL_LOCKOUT_MS / 1000) }
+    }
+    localStorage.setItem(EMAIL_LK_KEY, JSON.stringify({ attempts }))
+    return { locked: false, attempts, remaining: EMAIL_MAX_ATTEMPTS - attempts }
+  } catch { return { locked: false, attempts: 0 } }
+}
+function clearEmailLockout() { try { localStorage.removeItem(EMAIL_LK_KEY) } catch {} }
+
+export default function LoginV2() {
+  const { db, setSession, setScreen, toast, saveDB } = useAppStore()
+
+  // Mode
+  const [mode, setMode] = useState<LoginMode>('pin')
+
+  // PIN state
+  const [pin, setPin]               = useState('')
+  const [selectedEmpId, setSelectedEmpId] = useState('')
+  const [pinError, setPinError]     = useState('')
+  const [pinShaking, setPinShaking] = useState(false)
+  const [pinLocked, setPinLocked]   = useState(false)
+
+  // Bio state
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [empHasBio, setEmpHasBio]       = useState(false)
+  const [bioLoading, setBioLoading]     = useState(false)
+
+  // Email state
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailError, setEmailError]     = useState('')
+
+  const verifyingRef = useRef(false)
+  const opIdRef      = useRef(0)
+
+  const emps = sortedEmps(db).filter((e: any) => !e.isAdmin && !e.baja)
+
+  // Recordar último empleado seleccionado
+  useEffect(() => {
+    try {
+      const rem = JSON.parse(localStorage.getItem('an_times_rem') || 'null')
+      if (rem?.empId) setSelectedEmpId(rem.empId)
+    } catch {}
+    try {
+      const qrEmpId = localStorage.getItem('an_qr_emp')
+      if (qrEmpId) { setSelectedEmpId(qrEmpId); localStorage.removeItem('an_qr_emp') }
+    } catch {}
+  }, [])
+
+  useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
+  useEffect(() => { setEmpHasBio(selectedEmpId ? hasBiometric(selectedEmpId) : false) }, [selectedEmpId])
+
+  // Countdown lockout
+  useEffect(() => {
+    if (!selectedEmpId) { setPinError(''); return }
+    const emp = (db.employees || []).find((e: any) => e.id === selectedEmpId)
+    if (!emp) return
+    const update = () => {
+      const lk = getLockoutState(emp.id, db)
+      if (!lk.locked) { setPinError(''); setPinLocked(false); return false }
+      const secs = lk.remainingSecs || 0
+      const m = Math.floor(secs / 60), s = secs % 60
+      setPinError(`Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
+      setPinLocked(true)
+      return true
+    }
+    if (!update()) return
+    const id = setInterval(() => { if (!update()) clearInterval(id) }, 1000)
+    return () => clearInterval(id)
+  }, [selectedEmpId, db])
+
+  const doLogin = useCallback((emp: any) => {
+    const ses = {
+      user: emp,
+      isAdmin: emp.role === 'jefe_obra',
+      isEnc: emp.role === 'encargado',
+      isJO: emp.role === 'jefe_obra',
+    }
+    setSession(ses)
+    try { localStorage.setItem('an_times_rem', JSON.stringify({ empId: emp.id })) } catch {}
+    if (ses.isAdmin) setScreen('admin', true)
+    else setScreen('emp', true)
+  }, [setSession, setScreen])
+
+  const doAdminLogin = useCallback(() => {
+    setSession({ user: null, isAdmin: true, isEnc: false, isJO: false })
+    setScreen('admin', true)
+    toast('Modo admin activado')
+  }, [setSession, setScreen, toast])
+
+  // ── PIN handlers ──────────────────────────────────────────────────────────
+
+  const handlePinKey = useCallback(async (k: string) => {
+    if (pin.length >= 6 || verifyingRef.current) return
+    if (!selectedEmpId) return
+    const newPin = pin + k
+    setPin(newPin)
+    setPinError('')
+    if (newPin.length < 4) return
+
+    const emp = (db.employees || []).find((e: any) => e.id === selectedEmpId)
+    if (!emp) return
+
+    const lkState = getLockoutState(emp.id, db)
+    if (lkState.locked) {
+      const secs = lkState.remainingSecs || 0
+      const m = Math.floor(secs / 60), s = secs % 60
+      setPinError(`Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
+      setPin(''); return
+    }
+
+    const knownLen = isPinHashed(emp.pin) ? emp.pinLen : (emp.pin?.length || 4)
+    const minLen = knownLen || 4
+    const maxLen = knownLen || 6
+    if (newPin.length < minLen) return
+
+    verifyingRef.current = true
+    const opId = ++opIdRef.current
+    const ok = await verifyPin(newPin, emp.pin, emp.id)
+    verifyingRef.current = false
+    if (opId !== opIdRef.current) return
+
+    if (ok) {
+      const clearedLockouts = clearLockout(emp.id, db)
+      saveDB({ pinLockouts: clearedLockouts })
+      // Migrar PIN plano → hash automáticamente
+      if (!isPinHashed(emp.pin) || !emp.pinLen) {
+        const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
+        const emps2 = (db.employees || []).map((e: any) =>
+          e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
+        )
+        useAppStore.getState().saveDB({ employees: emps2 })
+      }
+      doLogin(emp)
+      setPin('')
+    } else if (!knownLen && newPin.length < maxLen) {
+      // Longitud desconocida (legacy) — esperar más dígitos sin error
+    } else {
+      const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db)
+      if (lockoutData) saveDB({ pinLockouts: lockoutData })
+      setPinShaking(true)
+      if (lk.locked) {
+        const secs = lk.remainingSecs || 0
+        const m = Math.floor(secs / 60), s = secs % 60
+        setPinError(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
+        setPinLocked(true)
+      } else {
+        setPinError(`PIN incorrecto (${lk.remaining} intentos restantes)`)
+      }
+      if (navigator.vibrate) navigator.vibrate(200)
+      setTimeout(() => { setPinShaking(false); setPin('') }, 450)
+    }
+  }, [pin, selectedEmpId, db, doLogin, saveDB])
+
+  const handlePinDel = () => { setPin(p => p.slice(0, -1)); setPinError('') }
+
+  const handleSelectEmp = (id: string) => {
+    setSelectedEmpId(id)
+    setPin('')
+    setPinError('')
+    setPinLocked(false)
+  }
+
+  // ── Biometric ─────────────────────────────────────────────────────────────
+
+  const handleBioLogin = async () => {
+    if (!selectedEmpId) return
+    const emp = (db.employees || []).find((e: any) => e.id === selectedEmpId)
+    if (!emp) return
+    setBioLoading(true)
+    try {
+      const ok = await authenticateBiometric(emp.id)
+      if (ok) doLogin(emp)
+      else setPinError('Autenticación biométrica fallida')
+    } catch {
+      setPinError('Error en autenticación biométrica')
+    }
+    setBioLoading(false)
+  }
+
+  // ── Email login ───────────────────────────────────────────────────────────
+
+  const handleEmailLogin = async (email: string, password: string, role: 'admin' | 'employee') => {
+    setEmailError('')
+    const lk = getEmailLockout()
+    if (lk.locked) {
+      const m = Math.floor((lk.remainingSecs || 0) / 60), s = (lk.remainingSecs || 0) % 60
+      setEmailError(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`); return
+    }
+    if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
+    setEmailLoading(true)
+    try {
+      const result = await signInEmail(email.trim(), password)
+      const userEmail = result.user?.email
+      clearEmailLockout()
+      await useAppStore.getState().fetchDB()
+      const freshDB = useAppStore.getState().db
+      const em = userEmail?.toLowerCase()
+      const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === em)
+      const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
+      const isAdminEmail = configuredEmails.includes(em || '') || (emp && emp.isAdmin)
+      await authSignOut()
+      if (role === 'admin' || isAdminEmail) {
+        doAdminLogin()
+      } else if (emp) {
+        doLogin(emp)
+      } else {
+        recordEmailFailed()
+        setEmailError('Tu cuenta no está registrada. Contacta al administrador.')
+      }
+    } catch (ex: any) {
+      const newLk = recordEmailFailed()
+      if (newLk.locked) {
+        const m = Math.floor((newLk.remainingSecs || 0) / 60), s = (newLk.remainingSecs || 0) % 60
+        setEmailError(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
+      } else {
+        const remaining = newLk.remaining != null ? ` (${newLk.remaining} intentos)` : ''
+        setEmailError((ex?.message || 'Email o contraseña incorrectos') + remaining)
+      }
+    }
+    setEmailLoading(false)
+  }
+
+  // ── Auth state change (Google OAuth / password reset) ─────────────────────
+
+  useEffect(() => {
+    const { data: { subscription } } = onAuthStateChange(async (event: string, session: any) => {
+      if (event === 'PASSWORD_RECOVERY') { setMode('email'); return }
+      if (event === 'SIGNED_IN' && session?.user?.email) {
+        const url = new URL(window.location.href)
+        if (url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')) return
+        const userEmail = session.user.email.toLowerCase()
+        await useAppStore.getState().fetchDB()
+        const freshDB = useAppStore.getState().db
+        const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
+        await authSignOut()
+        if (emp) {
+          if (emp.isAdmin) doAdminLogin()
+          else doLogin(emp)
+        } else {
+          const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
+          if (configuredEmails.includes(userEmail)) doAdminLogin()
+          else setEmailError('Cuenta no registrada. Contacta al administrador.')
+        }
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  return (
+    <Login
+      mode={mode}
+      onSetMode={setMode}
+      employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept }))}
+      pin={pin}
+      selectedEmpId={selectedEmpId}
+      onSelectEmp={handleSelectEmp}
+      onPinKey={handlePinKey}
+      onPinDel={handlePinDel}
+      pinError={pinError}
+      pinShaking={pinShaking}
+      pinLocked={pinLocked}
+      bioAvailable={bioAvailable}
+      empHasBio={empHasBio}
+      onBioLogin={handleBioLogin}
+      bioLoading={bioLoading}
+      onLogin={handleEmailLogin}
+      emailLoading={emailLoading}
+      emailError={emailError}
+    />
+  )
+}

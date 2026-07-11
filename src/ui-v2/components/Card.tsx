@@ -2,6 +2,7 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { colors } from '../design-system/colors.js'
 import { radius } from '../design-system/radius.js'
 import { spacing } from '../design-system/spacing.js'
+import { shadows } from '../design-system/shadows.js'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
@@ -9,8 +10,9 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
   padding?: keyof typeof spacing
 }
 
-// Fondo sólido, borde casi imperceptible, sin degradado ni sombra teatral —
-// la superficie se distingue del fondo por un tono, no por decoración.
+// La superficie se distingue del fondo por elevación real (sombra +
+// tono más claro), no solo por un borde de 1px — así una tarjeta se lee
+// como "por encima" de la página en vez de solo "delimitada".
 export function Card({ title, action, padding = 6, children, style, ...rest }: CardProps) {
   return (
     <div
@@ -20,6 +22,7 @@ export function Card({ title, action, padding = 6, children, style, ...rest }: C
         border: `1px solid ${colors.border.subtle}`,
         borderRadius: radius.lg,
         padding: spacing[padding],
+        boxShadow: shadows.sm,
         ...style,
       }}
     >

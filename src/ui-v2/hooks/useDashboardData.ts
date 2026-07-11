@@ -4,7 +4,7 @@
 // PanelDashboard.jsx en la app real, para no duplicar ni divergir cálculos.
 import { useAppStore } from '../../store/appStore.js'
 import { today, calcMin, mhm } from '../../utils/time.js'
-import type { KPI, ActivityItem, TeamMember } from '../pages/Dashboard.js'
+import type { KPI, ActivityItem } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 
 interface DbRecord {
@@ -31,8 +31,8 @@ export interface DashboardData {
   greeting: string
   kpis: KPI[]
   activity: ActivityItem[]
-  team: TeamMember[]
   trend: AreaChartPoint[]
+  compareTrend: AreaChartPoint[]
 }
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
@@ -55,42 +55,46 @@ export function useDashboardData(): DashboardData {
     { label: 'Fichajes hoy', value: String(todayRecs.length) },
   ]
 
+  function activityTone(action = ''): ActivityItem['tone'] {
+    const a = action.toLowerCase()
+    if (a.includes('entrada') || a.includes('jornada') || a.includes('inicio') || a.includes('aprobad')) return 'green'
+    if (a.includes('salida') || a.includes('rechazad') || a.includes('baja') || a.includes('error')) return 'red'
+    if (a.includes('pausa') || a.includes('descanso') || a.includes('solicitud') || a.includes('pendiente')) return 'orange'
+    if (a.includes('vacac') || a.includes('mensaje') || a.includes('chat')) return 'purple'
+    return 'gray'
+  }
+
   const activity: ActivityItem[] = (db.audit || [])
-    .slice(-8)
+    .slice(-10)
     .reverse()
     .map((a, i) => ({
       id: String(i),
-      text: `${a.action}${a.detail ? ` — ${a.detail}` : ''}`,
+      text: `${a.action}${a.detail ? ` — ${a.detail}` : ''}${a.user ? ` · ${a.user}` : ''}`,
       time: a.ts ? new Date(a.ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '',
-      tone: 'gray' as const,
+      tone: activityTone(a.action),
     }))
 
-  const liveByEmp = new Map(liveRecs.map(r => [r.empId, r]))
-  const team: TeamMember[] = emps.slice(0, 8).map(e => {
-    const rec = liveByEmp.get(e.id)
-    if (!rec) return { id: e.id, name: e.name, status: 'off', detail: 'Sin jornada hoy' }
-    if (rec.enDescanso) return { id: e.id, name: e.name, status: 'break', detail: 'En pausa' }
-    return { id: e.id, name: e.name, status: 'active', detail: rec.inicio ? `Desde ${new Date(rec.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : 'Activo' }
-  })
-
-  // Tendencia: minutos trabajados por día en los últimos 7 días, como %
-  // sobre la jornada estándar configurada (wdMin) — mismo dato que ya usa
-  // la app real, solo re-expresado como serie temporal para el gráfico.
-  const trend: AreaChartPoint[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const dayMin = recs.filter(r => r.fin && r.inicio?.startsWith(dStr)).reduce((s, r) => s + calcMin(r), 0)
-    trend.push({ label: DOW[d.getDay()], value: Math.min(100, Math.round((dayMin / wdMin) * 100)) })
+  function buildTrend(offsetWeeks: number): AreaChartPoint[] {
+    const result: AreaChartPoint[] = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i - offsetWeeks * 7)
+      const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const dayMin = recs.filter(r => r.fin && r.inicio?.startsWith(dStr)).reduce((s, r) => s + calcMin(r), 0)
+      result.push({ label: DOW[d.getDay()], value: Math.min(100, Math.round((dayMin / wdMin) * 100)) })
+    }
+    return result
   }
+
+  const trend = buildTrend(0)
+  const compareTrend = buildTrend(1)
 
   const name = session?.user?.name?.split(' ')?.[0] ?? ''
   return {
     greeting: name ? `Buenas, ${name} 👋` : 'Buenas 👋',
     kpis,
     activity,
-    team,
     trend,
+    compareTrend,
   }
 }

@@ -2,6 +2,12 @@ import { useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
+
+const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
+const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:340, textAlign:'center' }
+const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.default, margin:'0 auto 16px' }
 
 // Muestra el QR personal del empleado — el mismo formato que ya genera
 // PanelEmpleados.jsx para el admin (URL con ?emp=<id>), pero accesible
@@ -21,18 +27,18 @@ export function ModalMyQR({ visible, u, onClose }) {
   if (!visible) return null
 
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center', ...modalStyle }}>
-        <div className="modal-drag" {...dragHandlers} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Mi código QR</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer' }}>×</button>
+    <div style={OV} onClick={onClose}>
+      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+        <div style={DRAG} {...dragHandlers} />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:colors.text[900] }}>Mi código QR</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:colors.text[500], fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>×</button>
         </div>
-        <div style={{ background: '#fff', borderRadius: 'var(--r)', padding: 12, display: 'inline-block' }}>
+        <div style={{ background:'#fff', borderRadius:radius.xl, padding:12, display:'inline-block' }}>
           <canvas ref={canvasRef} />
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 14 }}>{u?.name}</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>
+        <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginTop:14 }}>{u?.name}</div>
+        <div style={{ fontSize:12, color:colors.text[500], marginTop:6 }}>
           Muéstraselo a tu jefe de obra o encargado para que te fichen la entrada.
         </div>
       </div>

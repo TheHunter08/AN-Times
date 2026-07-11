@@ -28,13 +28,13 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        background: colors.bg[700],
+        background: colors.gradients.sidebar,
         borderRight: `1px solid ${colors.border.subtle}`,
         height: '100%',
       }}
     >
-      {header && <div style={{ padding: '20px 18px 16px' }}>{header}</div>}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, padding: '8px 10px' }}>
+      {header && <div style={{ padding: '20px 18px 18px' }}>{header}</div>}
+      <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px' }}>
         {items.map(item => {
           const isActive = item.id === active
           return (
@@ -43,21 +43,23 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
               onClick={() => onSelect(item.id)}
               className={`uiv2-sidebar-item${isActive ? ' uiv2-active' : ''}`}
               style={{
+                position: 'relative',
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 10px',
+                padding: '9px 10px 9px 12px',
                 borderRadius: radius.sm,
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 fontSize: 13,
-                fontWeight: isActive ? 600 : 500,
+                fontWeight: isActive ? 700 : 500,
                 textAlign: 'left',
-                background: isActive ? colors.bg[500] : 'transparent',
-                color: isActive ? colors.text[900] : colors.text[500],
+                background: isActive ? colors.primary.base : 'transparent',
+                color: isActive ? colors.ink.onDark : colors.text[500],
+                boxShadow: isActive ? '0 4px 12px -4px rgba(124,58,237,.5)' : 'none',
                 transition: transition(['background', 'color']),
               }}
             >
-              <span style={{ display: 'inline-flex', width: 16, height: 16, color: isActive ? colors.primary.light : 'currentColor', flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ display: 'inline-flex', width: 16, height: 16, color: isActive ? colors.ink.onDark : 'currentColor', flexShrink: 0 }}>{item.icon}</span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
             </button>
           )
@@ -65,7 +67,7 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
       </nav>
       {footer && <div style={{ padding: 12, borderTop: `1px solid ${colors.border.subtle}` }}>{footer}</div>}
 
-      <style>{`.uiv2-sidebar-item:not(.uiv2-active):hover { background: rgba(255,255,255,.04) !important; color: ${colors.text[900]} !important; }`}</style>
+      <style>{`.uiv2-sidebar-item:not(.uiv2-active):hover { background: rgba(255,255,255,.045) !important; color: ${colors.text[900]} !important; }`}</style>
     </aside>
   )
 }

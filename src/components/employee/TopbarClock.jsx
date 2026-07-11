@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { useClock } from '../../hooks/useClock.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
 
 export function TopbarClock() {
   const { clockTime, clockDate } = useClock()
   const lastSyncTime = useAppStore(s => s.lastSyncTime)
   const syncStatus = useAppStore(s => s.syncStatus)
   const [, force] = useState(0)
-  // Re-render cada minuto para refrescar "hace X min"
   useEffect(() => { const id = setInterval(() => force(t => t + 1), 60000); return () => clearInterval(id) }, [])
 
   const syncLabel = (() => {
@@ -23,9 +23,9 @@ export function TopbarClock() {
   })()
 
   return (
-    <div className="emp-subdate">
-      {clockDate} · <span style={{ color:'var(--primary-light)', fontWeight:600 }}>{clockTime}</span>
-      {syncLabel && <span style={{ marginLeft:6, color: syncStatus === 'error' ? 'var(--danger)' : 'var(--text4)', fontSize:10 }}>· {syncLabel}</span>}
+    <div style={{ fontSize:12, color:colors.text[500] }}>
+      {clockDate} · <span style={{ color:colors.primary.light, fontWeight:600 }}>{clockTime}</span>
+      {syncLabel && <span style={{ marginLeft:6, color: syncStatus === 'error' ? colors.semantic.red : colors.text[300], fontSize:10 }}>· {syncLabel}</span>}
     </div>
   )
 }

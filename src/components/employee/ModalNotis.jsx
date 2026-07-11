@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
+
+const OV  = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
+const MOD = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'90vh', overflowY:'auto', position:'relative' }
+const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.default, margin:'0 auto 18px' }
 
 export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
   const [search, setSearch] = useState('')
@@ -18,9 +24,6 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
     saveDB({ notis: updated })
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
-  // Soft delete: marcar deleted:true en vez de quitar del array.
-  // Si se eliminara del array, el próximo save del admin (que hace [...db.notis, newNoti]
-  // con su copia local) la volvería a añadir al servidor via _unionById.
   const delNoti = (id) => {
     saveDB({ notis: (db.notis || []).map(n => n.id === id ? { ...n, deleted: true, leido: true } : n) })
   }
@@ -29,15 +32,15 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={modalStyle}>
-        <div className="modal-drag" {...dragHandlers} />
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-          <h2 style={{ margin:0 }}>🔔 Notificaciones</h2>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            {notis.some(n => !n.leido) && <button onClick={markRead} style={{ background:'none', border:'none', color:'var(--primary-light)', fontSize:11, fontWeight:600, cursor:'pointer', padding:'2px 6px' }}>Marcar leídas</button>}
-            {notis.length > 0 && <button onClick={clearAll} style={{ background:'none', border:'none', color:'var(--danger)', fontSize:11, fontWeight:600, cursor:'pointer', padding:'2px 6px' }}>Borrar todo</button>}
-            <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
+    <div style={OV} onClick={onClose}>
+      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+        <div style={DRAG} {...dragHandlers} />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:800, color:colors.text[900] }}>🔔 Notificaciones</h2>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {notis.some(n => !n.leido) && <button onClick={markRead} style={{ background:'none', border:'none', color:colors.primary.light, fontSize:11, fontWeight:700, cursor:'pointer', padding:'2px 6px', fontFamily:'inherit' }}>Marcar leídas</button>}
+            {notis.length > 0 && <button onClick={clearAll} style={{ background:'none', border:'none', color:colors.semantic.red, fontSize:11, fontWeight:700, cursor:'pointer', padding:'2px 6px', fontFamily:'inherit' }}>Borrar todo</button>}
+            <button onClick={onClose} style={{ background:'none', border:'none', color:colors.text[500], fontSize:22, cursor:'pointer', lineHeight:1, fontFamily:'inherit' }}>×</button>
           </div>
         </div>
         <input
@@ -46,32 +49,32 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           aria-label="Buscar notificaciones"
-          style={{ width:'100%', padding:'8px 12px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg-600)', color:'var(--text)', fontSize:13, fontFamily:'inherit', outline:'none', marginBottom:10, boxSizing:'border-box' }}
+          style={{ width:'100%', padding:'8px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13, fontFamily:'inherit', outline:'none', marginBottom:10, boxSizing:'border-box' }}
         />
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
           {mensajes.map(m => (
-            <div key={'msg-'+m.id} className="nitem" style={{ borderLeft:'3px solid var(--primary)' }}>
-              <div className="nitem-ico" style={{ background:'var(--primary-dim)' }}>📢</div>
-              <div className="nitem-body">
-                <div className="nitem-title" style={{ color:'var(--primary-light)' }}>{m.title}</div>
-                <div className="nitem-text">{m.body}</div>
-                <div className="nitem-time">Administración · {m.ts ? new Date(m.ts).toLocaleString('es-ES') : ''}</div>
+            <div key={'msg-'+m.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:colors.bg[600], border:`1px solid ${colors.primary.base}30`, borderLeft:`3px solid ${colors.primary.base}`, borderRadius:radius.lg }}>
+              <div style={{ width:36, height:36, borderRadius:radius.md, background:colors.primary.dim, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16 }}>📢</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:colors.primary.light, marginBottom:2 }}>{m.title}</div>
+                <div style={{ fontSize:12, color:colors.text[700], lineHeight:1.45 }}>{m.body}</div>
+                <div style={{ fontSize:10, color:colors.text[300], marginTop:4 }}>Administración · {m.ts ? new Date(m.ts).toLocaleString('es-ES') : ''}</div>
               </div>
             </div>
           ))}
           {!notis.length && !mensajes.length ? (
-            <div className="empty">Sin notificaciones</div>
+            <div style={{ textAlign:'center', padding:'32px 0', color:colors.text[300], fontSize:13 }}>Sin notificaciones</div>
           ) : notis.map(n => (
-            <div key={n.id} className={`nitem${!n.leido ? ' unread' : ''}`} style={{ position:'relative' }}>
-              <div className="nitem-ico" style={{ background:'rgba(108,99,255,.1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:n.leido ? colors.bg[600] : `${colors.primary.base}08`, border:`1px solid ${n.leido ? colors.border.subtle : colors.primary.base+'25'}`, borderRadius:radius.lg, position:'relative' }}>
+              <div style={{ width:36, height:36, borderRadius:radius.md, background:'rgba(108,99,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
               </div>
-              <div className="nitem-body">
-                <div className="nitem-title">{n.action || n.title || 'Notificación'}</div>
-                <div className="nitem-text">{n.detail || n.body || ''}</div>
-                <div className="nitem-time">{n.ts ? new Date(n.ts).toLocaleString('es-ES') : ''}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:n.leido ? 600 : 800, color:colors.text[900], marginBottom:2 }}>{n.action || n.title || 'Notificación'}</div>
+                <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.45 }}>{n.detail || n.body || ''}</div>
+                <div style={{ fontSize:10, color:colors.text[300], marginTop:4 }}>{n.ts ? new Date(n.ts).toLocaleString('es-ES') : ''}</div>
               </div>
-              <button onClick={() => delNoti(n.id)} style={{ position:'absolute', top:6, right:6, background:'none', border:'none', color:'var(--text4)', fontSize:16, cursor:'pointer', lineHeight:1, padding:'2px 5px', borderRadius:4 }} title="Eliminar">×</button>
+              <button onClick={() => delNoti(n.id)} style={{ position:'absolute', top:8, right:8, background:'none', border:'none', color:colors.text[300], fontSize:16, cursor:'pointer', lineHeight:1, padding:'2px 5px', borderRadius:4, fontFamily:'inherit' }} title="Eliminar">×</button>
             </div>
           ))}
         </div>

@@ -1,0 +1,637 @@
+/* ══════════════════════════════════════════════════════════
+   TIMES INC v5 — DESIGN OVERRIDE LAYER  (rev 2)
+   Selectores con ID #sAdmin / #sEmp / #sLogin para ganar
+   en especificidad sobre cualquier clase en globals.css.
+   Solo UI. No tocar lógica de backend ni auth.
+   ══════════════════════════════════════════════════════════ */
+
+/* ─── 0. RESET DE COLORES CSS (violeta en vez de índigo) ── */
+:root {
+  --primary:       #7C3AED;
+  --primary-light: #A78BFA;
+  --primary-dim:   rgba(124,58,237,0.14);
+  --primary-glow:  rgba(124,58,237,0.32);
+  --accent:        #3B82F6;
+  --accent2:       #60A5FA;
+  --accent3:       #93C5FD;
+
+  --bg-900: #09070D;
+  --bg-800: #09070D;
+  --bg-700: #0F0B17;
+  --bg-600: #14101E;
+  --bg-500: #1C1628;
+  --bg-400: #241D34;
+  --bg-300: #2F2742;
+  --bg-200: #3D3357;
+
+  --grad-primary: linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%);
+  --border:       rgba(255,255,255,0.08);
+}
+
+/* ─── 1. SHELL ADMIN — fondo + grano ────────────────────── */
+
+#sAdmin {
+  background:
+    radial-gradient(ellipse 900px 600px at 5% -5%, rgba(124,58,237,0.09), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 95% 95%, rgba(59,130,246,0.05), transparent 60%),
+    #09070D !important;
+  position: relative;
+}
+
+/* Grano de ruido: pseudo-element sobre todo el shell */
+#sAdmin::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.028;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Shell empleado */
+#sEmp {
+  background:
+    radial-gradient(ellipse 700px 500px at 50% 0%, rgba(124,58,237,0.10), transparent 60%),
+    #09070D !important;
+}
+#sEmp::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.024;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ─── 2. TOPBAR ─────────────────────────────────────────── */
+
+#sAdmin .adm-topbar {
+  background: rgba(9,7,13,0.92) !important;
+  border-bottom: 1px solid rgba(124,58,237,0.20) !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  box-shadow: 0 1px 0 rgba(124,58,237,0.10), 0 8px 32px rgba(0,0,0,0.40) !important;
+}
+
+/* Logo con degradado violeta */
+#sAdmin .adm-logo-text {
+  background: linear-gradient(135deg, #C4B5FD, #A78BFA) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+#sAdmin .adm-page-title {
+  color: rgba(167,139,250,0.55) !important;
+}
+
+#sAdmin .adm-topbar-search {
+  background: rgba(124,58,237,0.08) !important;
+  border: 1px solid rgba(124,58,237,0.20) !important;
+  color: #A78BFA !important;
+  border-radius: 10px !important;
+}
+#sAdmin .adm-topbar-search:hover {
+  background: rgba(124,58,237,0.16) !important;
+  border-color: rgba(124,58,237,0.35) !important;
+  color: #C4B5FD !important;
+}
+#sAdmin .adm-topbar-icon-btn {
+  color: rgba(167,139,250,0.60) !important;
+}
+#sAdmin .adm-topbar-icon-btn:hover {
+  background: rgba(124,58,237,0.10) !important;
+  color: #C4B5FD !important;
+  border-radius: 8px !important;
+}
+
+#sAdmin .adm-live-chip {
+  background: rgba(16,185,129,0.10) !important;
+  border: 1px solid rgba(16,185,129,0.25) !important;
+}
+
+/* ─── 3. SIDEBAR v5 (SÓLIDO VIOLETA EN ACTIVO) ──────────── */
+
+#sAdmin .adm-sidebar {
+  background: linear-gradient(180deg, #130F1E 0%, #0A0712 100%) !important;
+  border-right: 1px solid rgba(124,58,237,0.16) !important;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.45) !important;
+}
+
+/* .adm-sidebar-inner cubre visualmente el fondo del sidebar */
+#sAdmin .adm-sidebar-inner {
+  background: transparent !important;
+  border-right: none !important;
+}
+
+#sAdmin .adm-nav-section {
+  color: rgba(167,139,250,0.40) !important;
+  font-size: 9px !important;
+  letter-spacing: 1px !important;
+  font-weight: 700 !important;
+}
+
+#sAdmin .adm-nav-divider {
+  background: rgba(124,58,237,0.10) !important;
+}
+
+/* Item base */
+#sAdmin .adm-nav-item {
+  border-radius: 10px !important;
+  color: rgba(255,255,255,0.40) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border: none !important;
+  margin: 1px 0 !important;
+  transition: all 0.15s cubic-bezier(0.16,1,0.3,1) !important;
+}
+
+/* Hover */
+#sAdmin .adm-nav-item:hover {
+  background: rgba(124,58,237,0.10) !important;
+  color: rgba(255,255,255,0.80) !important;
+  border: none !important;
+}
+#sAdmin .adm-nav-item:hover .adm-nav-ico {
+  opacity: 0.90 !important;
+  filter: none !important;
+}
+
+/* ACTIVE — sólido violeta v5 */
+#sAdmin .adm-nav-item.active {
+  background: #7C3AED !important;
+  color: #F5F5F7 !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px -4px rgba(124,58,237,0.60), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+#sAdmin .adm-nav-item.active .adm-nav-ico {
+  color: #F5F5F7 !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* ─── 4. MOBILE NAV ─────────────────────────────────────── */
+
+#sAdmin .adm-mobile-nav {
+  background: rgba(9,7,13,0.94) !important;
+  border: 1px solid rgba(124,58,237,0.24) !important;
+  border-top: 1px solid rgba(124,58,237,0.32) !important;
+  box-shadow:
+    0 -4px 40px rgba(0,0,0,0.50),
+    0 16px 48px rgba(0,0,0,0.60),
+    inset 0 1px 0 rgba(124,58,237,0.12) !important;
+}
+#sAdmin .adm-mobile-nav-item {
+  color: rgba(255,255,255,0.28) !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+#sAdmin .adm-mobile-nav-item.active {
+  color: #A78BFA !important;
+  background: rgba(124,58,237,0.18) !important;
+  border-radius: 12px !important;
+}
+
+/* ─── 5. PANEL PRINCIPAL ────────────────────────────────── */
+
+#sAdmin .adm-panel-title {
+  font-size: 26px !important;
+  font-weight: 900 !important;
+  letter-spacing: -1px !important;
+  background: linear-gradient(135deg, #EDE9FE 0%, #C4B5FD 40%, #A78BFA 70%, #7C3AED 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+#sAdmin .adm-panel-sub {
+  color: rgba(124,58,237,0.50) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+#sAdmin .gradient-text {
+  background: linear-gradient(135deg, #EDE9FE 0%, #C4B5FD 40%, #A78BFA 70%, #7C3AED 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+/* Animación de entrada al cambiar de panel */
+#sAdmin .adm-panel {
+  animation: v5PanelEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+@keyframes v5PanelEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── 6. KPI CARDS v5 ───────────────────────────────────── */
+
+#sAdmin .adm-kpi-grid {
+  gap: 14px !important;
+}
+
+#sAdmin .adm-kpi-card {
+  background: rgba(16,12,24,0.92) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-top: 1px solid rgba(255,255,255,0.09) !important;
+  border-radius: 18px !important;
+  padding: 18px 16px 16px !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  transition: transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s, border-color 0.15s !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+#sAdmin .adm-kpi-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+#sAdmin .adm-kpi-card:active {
+  transform: scale(0.97) !important;
+  box-shadow: none !important;
+}
+
+/* Línea de brillo superior — colores únicos por posición */
+#sAdmin .adm-kpi-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 1px !important;
+}
+#sAdmin .adm-kpi-card:nth-child(1)::before { background: linear-gradient(90deg, transparent, rgba(124,58,237,0.9), transparent) !important; }
+#sAdmin .adm-kpi-card:nth-child(2)::before { background: linear-gradient(90deg, transparent, rgba(16,185,129,0.9), transparent) !important; }
+#sAdmin .adm-kpi-card:nth-child(3)::before { background: linear-gradient(90deg, transparent, rgba(251,191,36,0.9), transparent) !important; }
+#sAdmin .adm-kpi-card:nth-child(4)::before { background: linear-gradient(90deg, transparent, rgba(239,68,68,0.9), transparent) !important; }
+#sAdmin .adm-kpi-card:nth-child(5)::before { background: linear-gradient(90deg, transparent, rgba(124,58,237,0.9), transparent) !important; }
+#sAdmin .adm-kpi-card:nth-child(6)::before { background: linear-gradient(90deg, transparent, rgba(6,182,212,0.9), transparent) !important; }
+
+#sAdmin .adm-kpi-card:nth-child(1) { border-top-color: rgba(124,58,237,0.55) !important; }
+#sAdmin .adm-kpi-card:nth-child(2) { border-top-color: rgba(16,185,129,0.55) !important; }
+#sAdmin .adm-kpi-card:nth-child(3) { border-top-color: rgba(251,191,36,0.55) !important; }
+#sAdmin .adm-kpi-card:nth-child(4) { border-top-color: rgba(239,68,68,0.55) !important; }
+#sAdmin .adm-kpi-card:nth-child(5) { border-top-color: rgba(124,58,237,0.55) !important; }
+#sAdmin .adm-kpi-card:nth-child(6) { border-top-color: rgba(6,182,212,0.55) !important; }
+
+#sAdmin .adm-kpi-val {
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  letter-spacing: -1.5px !important;
+  color: #EDE9FE !important;
+  text-shadow: 0 0 20px rgba(124,58,237,0.15) !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+#sAdmin .adm-kpi-label {
+  font-size: 10px !important;
+  color: rgba(167,139,250,0.50) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+  margin-top: 4px !important;
+}
+#sAdmin .adm-kpi-lbl {
+  font-size: 10px !important;
+  color: rgba(167,139,250,0.50) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+}
+#sAdmin .adm-kpi-icon {
+  font-size: 22px !important;
+  margin-bottom: 12px !important;
+}
+#sAdmin .adm-kpi-glow {
+  opacity: 0.14 !important;
+  filter: blur(28px) !important;
+  width: 90px !important;
+  height: 90px !important;
+  bottom: -28px !important;
+  right: -28px !important;
+}
+#sAdmin .adm-kpi-trend { font-size: 11px !important; margin-top: 8px !important; font-weight: 700 !important; }
+#sAdmin .adm-kpi-trend.up   { color: #34D399 !important; text-shadow: 0 0 10px rgba(52,211,153,0.30) !important; }
+#sAdmin .adm-kpi-trend.down { color: #F87171 !important; text-shadow: 0 0 10px rgba(248,113,113,0.30) !important; }
+#sAdmin .adm-kpi-trend.neu  { color: rgba(167,139,250,0.40) !important; }
+
+/* ─── 7. DASH WIDGETS v5 ────────────────────────────────── */
+
+#sAdmin .dash-widget {
+  background: rgba(16,12,24,0.88) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-top: 1px solid rgba(124,58,237,0.22) !important;
+  border-radius: 18px !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s cubic-bezier(0.16,1,0.3,1) !important;
+  overflow: hidden !important;
+}
+#sAdmin .dash-widget:hover {
+  border-color: rgba(124,58,237,0.30) !important;
+  border-top-color: rgba(124,58,237,0.50) !important;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.45) !important;
+  transform: translateY(-1px) !important;
+}
+#sAdmin .dash-widget-title {
+  font-size: 10px !important;
+  color: rgba(167,139,250,0.50) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.9px !important;
+  font-weight: 700 !important;
+}
+#sAdmin .dash-widget-badge {
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 2px 10px !important;
+}
+
+/* ─── 8. BOTONES ────────────────────────────────────────── */
+
+#sAdmin .btn-primary {
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%) !important;
+  box-shadow: 0 3px 12px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  border: none !important;
+}
+#sAdmin .btn-primary:hover {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%) !important;
+  box-shadow: 0 5px 20px rgba(124,58,237,0.55) !important;
+}
+
+#sAdmin .btn-secondary {
+  background: rgba(124,58,237,0.08) !important;
+  border: 1px solid rgba(124,58,237,0.18) !important;
+  color: #A78BFA !important;
+}
+#sAdmin .btn-secondary:hover {
+  background: rgba(124,58,237,0.16) !important;
+  border-color: rgba(124,58,237,0.30) !important;
+}
+
+/* ─── 9. LIVE INDICATOR ─────────────────────────────────── */
+
+#sAdmin .live-indicator {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #10B981;
+  display: inline-block; flex-shrink: 0;
+  animation: livePingV5 2s ease-in-out infinite;
+}
+@keyframes livePingV5 {
+  0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  60%     { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+}
+
+/* ─── 10. CARD LIFT ─────────────────────────────────────── */
+
+#sAdmin .card-lift {
+  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s, border-color 0.15s !important;
+}
+#sAdmin .card-lift:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.45) !important;
+}
+
+/* ─── 11. ADMIN STAT CARDS ──────────────────────────────── */
+
+#sAdmin .adm-stat-card {
+  background: rgba(16,12,24,0.88) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 16px !important;
+}
+#sAdmin .adm-stat-card:hover {
+  border-color: rgba(124,58,237,0.22) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.40) !important;
+}
+
+/* ─── 12. INPUTS ────────────────────────────────────────── */
+
+#sAdmin input:focus, #sAdmin select:focus, #sAdmin textarea:focus {
+  border-color: #7C3AED !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.22) !important;
+}
+
+/* ─── 13. MODAL ─────────────────────────────────────────── */
+
+#sAdmin .modal {
+  background: #13101D !important;
+  border-top: 1px solid rgba(124,58,237,0.22) !important;
+}
+#sAdmin .modal-ov {
+  background: rgba(0,0,0,0.80) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* ─── 14. SIDEBAR OVERLAY mobile ───────────────────────── */
+
+#sAdmin .adm-sidebar-ov {
+  background: rgba(0,0,0,0.72) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* ─── 15. MENU BTN ──────────────────────────────────────── */
+
+#sAdmin .adm-menu-btn {
+  background: rgba(124,58,237,0.10) !important;
+  border: 1px solid rgba(124,58,237,0.20) !important;
+  color: #A78BFA !important;
+}
+
+/* ─── 16. PROGRESS ──────────────────────────────────────── */
+
+#sAdmin .progress-fill {
+  background: linear-gradient(90deg, #7C3AED, #3B82F6) !important;
+}
+
+/* ─── 17. SECTION TITLE ─────────────────────────────────── */
+
+#sAdmin .adm-section-title {
+  color: rgba(167,139,250,0.40) !important;
+  letter-spacing: 0.9px !important;
+  text-transform: uppercase !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+/* ─── 18. EMP SCREENS ───────────────────────────────────── */
+
+#sEmp .emp-topbar {
+  background: rgba(9,7,13,0.94) !important;
+  border-bottom: 1px solid rgba(124,58,237,0.16) !important;
+  box-shadow: 0 4px 28px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(124,58,237,0.10) !important;
+}
+
+/* Fichar circle button — violet to blue */
+#sEmp .jor-circle-btn {
+  background: linear-gradient(145deg, #6D28D9, #7C3AED) !important;
+  box-shadow:
+    0 0 0 8px rgba(124,58,237,0.12),
+    0 0 0 16px rgba(124,58,237,0.06),
+    0 12px 40px rgba(124,58,237,0.50) !important;
+}
+#sEmp .jor-circle-btn.working,
+#sEmp .jor-circle-btn.active {
+  background: linear-gradient(145deg, #4C1D95, #6D28D9) !important;
+  box-shadow:
+    0 0 0 8px rgba(109,40,217,0.16),
+    0 0 0 16px rgba(109,40,217,0.07),
+    0 12px 40px rgba(109,40,217,0.50) !important;
+}
+
+/* Jornada principal card */
+#sEmp .jor-main-card {
+  background: linear-gradient(160deg, rgba(124,58,237,0.18) 0%, rgba(20,16,30,0.97) 55%, rgba(9,7,13,0.99) 100%) !important;
+  border: 1px solid rgba(124,58,237,0.30) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.65), inset 0 1px 0 rgba(167,139,250,0.10) !important;
+}
+
+/* EMP NAV */
+#sEmp .emp-nav {
+  background: rgba(9,7,13,0.94) !important;
+  border: 1px solid rgba(124,58,237,0.22) !important;
+  border-top: 1px solid rgba(124,58,237,0.30) !important;
+  box-shadow:
+    0 -4px 40px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(124,58,237,0.12) !important;
+}
+#sEmp .emp-nav-item { color: rgba(255,255,255,0.28) !important; }
+#sEmp .emp-nav-item.on {
+  color: #A78BFA !important;
+}
+#sEmp .emp-nav-item.on svg {
+  stroke: #A78BFA !important;
+  stroke-width: 2.2 !important;
+  filter: drop-shadow(0 0 5px rgba(124,58,237,0.55)) !important;
+  transform: scale(1.08) !important;
+}
+#sEmp .emp-nav-item.on::before {
+  background: rgba(124,58,237,0.18) !important;
+  box-shadow: 0 0 16px rgba(124,58,237,0.24) !important;
+}
+
+/* ─── 19. LOGIN ─────────────────────────────────────────── */
+
+#sLogin {
+  background:
+    radial-gradient(ellipse 800px 600px at 15% 10%, rgba(124,58,237,0.20), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 85% 85%, rgba(59,130,246,0.10), transparent 60%),
+    #09070D !important;
+}
+
+#sLogin .login-card {
+  background: rgba(19,15,28,0.82) !important;
+  border: 1px solid rgba(124,58,237,0.18) !important;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.65), inset 0 1px 0 rgba(167,139,250,0.15) !important;
+}
+#sLogin .login-card::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(167,139,250,0.60) 50%, transparent 100%) !important;
+}
+#sLogin .login-submit-btn {
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%) !important;
+  box-shadow: 0 4px 22px rgba(124,58,237,0.45), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+#sLogin .login-submit-btn:hover {
+  box-shadow: 0 8px 30px rgba(124,58,237,0.60), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+#sLogin .login-tab.active {
+  background: rgba(124,58,237,0.22) !important;
+  color: #E9D5FF !important;
+}
+#sLogin .login-input-group:focus-within {
+  border-color: #7C3AED !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.22) !important;
+}
+
+/* ─── 20. LIGHT MODE ────────────────────────────────────── */
+
+[data-theme="light"] #sAdmin {
+  background:
+    radial-gradient(ellipse 700px 500px at 5% -5%, rgba(124,58,237,0.04), transparent 60%),
+    #F8F6FF !important;
+}
+[data-theme="light"] #sAdmin::after { opacity: 0.012 !important; }
+[data-theme="light"] #sAdmin .adm-sidebar {
+  background: linear-gradient(180deg, #F3F0FF 0%, #F9F7FF 100%) !important;
+  border-right: 1px solid rgba(124,58,237,0.14) !important;
+}
+[data-theme="light"] #sAdmin .adm-sidebar-inner {
+  background: transparent !important;
+}
+[data-theme="light"] #sAdmin .adm-nav-item {
+  color: rgba(0,0,0,0.45) !important;
+}
+[data-theme="light"] #sAdmin .adm-nav-item:hover {
+  background: rgba(124,58,237,0.08) !important;
+  color: #5B21B6 !important;
+}
+[data-theme="light"] #sAdmin .adm-nav-item.active {
+  background: #7C3AED !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px -4px rgba(124,58,237,0.50) !important;
+}
+[data-theme="light"] #sAdmin .adm-nav-section {
+  color: rgba(124,58,237,0.45) !important;
+}
+[data-theme="light"] #sAdmin .adm-topbar {
+  background: rgba(255,255,255,0.95) !important;
+  border-bottom: 1px solid rgba(124,58,237,0.14) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] #sAdmin .adm-panel-title {
+  background: linear-gradient(135deg, #4C1D95 0%, #6D28D9 60%, #7C3AED 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+[data-theme="light"] #sAdmin .adm-kpi-card {
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] #sAdmin .adm-kpi-card:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.12) !important;
+}
+[data-theme="light"] #sAdmin .adm-kpi-val {
+  color: #1E1B4B !important;
+  text-shadow: none !important;
+}
+[data-theme="light"] #sAdmin .adm-kpi-label,
+[data-theme="light"] #sAdmin .adm-kpi-lbl {
+  color: rgba(109,40,217,0.50) !important;
+}
+[data-theme="light"] #sAdmin .dash-widget {
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] #sAdmin .dash-widget:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10) !important;
+}
+[data-theme="light"] #sAdmin .adm-mobile-nav {
+  background: rgba(255,255,255,0.97) !important;
+  border-color: rgba(124,58,237,0.15) !important;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] #sAdmin .adm-mobile-nav-item:not(.active) {
+  color: rgba(0,0,0,0.32) !important;
+}
+[data-theme="light"] #sAdmin .adm-mobile-nav-item.active {
+  color: #7C3AED !important;
+  background: rgba(124,58,237,0.10) !important;
+}
+[data-theme="light"] #sEmp .emp-nav {
+  background: rgba(255,255,255,0.97) !important;
+  border-color: rgba(124,58,237,0.15) !important;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] #sEmp .emp-nav-item { color: rgba(0,0,0,0.32) !important; }

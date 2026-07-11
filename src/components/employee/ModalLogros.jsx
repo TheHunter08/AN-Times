@@ -3,6 +3,7 @@ import { today } from '../../utils/time.js'
 import { calcStreak } from '../../utils/streaks.js'
 import { AchievementsSection } from './AchievementsSection.jsx'
 import { WorkHeatmap } from './WorkHeatmap.jsx'
+import { colors } from '../../ui-v2/design-system/colors.js'
 
 export function ModalLogros({ visible, db, u, onClose, saveDB }) {
   useModalBack(visible, onClose)
@@ -14,18 +15,18 @@ export function ModalLogros({ visible, db, u, onClose, saveDB }) {
   // Perfil, además de bloquear en la práctica los logros de racha (3/7/30 días).
   const streak = calcStreak(db.records, u.id, today())
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', flexDirection:'column', background:'var(--bg-800)' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 12px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-        <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:4, display:'flex' }}>
+    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', flexDirection:'column', background:colors.bg[800] }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 12px', borderBottom:`1px solid ${colors.border.default}`, flexShrink:0 }}>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:colors.text[500], cursor:'pointer', padding:4, display:'flex' }}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>Logros</div>
+        <div style={{ fontSize:16, fontWeight:800, color:colors.text[900] }}>Logros</div>
       </div>
       <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
         <div style={{ padding:'16px 0' }}>
           <AchievementsSection myRecs={myRecs} streak={streak} u={u} saveDB={saveDB} db={db} />
           <div style={{ padding:'0 16px 16px' }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
+            <div style={{ fontSize:10, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Mi actividad (15 semanas)</div>
             <WorkHeatmap records={db.records} empId={u.id} />
           </div>
         </div>

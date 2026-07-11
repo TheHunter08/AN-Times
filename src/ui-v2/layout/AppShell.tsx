@@ -29,7 +29,7 @@ export function AppShell({
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 900
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', background: colors.bg[800], color: colors.text[900], fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', background: `radial-gradient(1200px 700px at 15% -10%, rgba(59,91,255,0.07), transparent 60%), ${colors.bg[800]}`, color: colors.text[900], fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
       {/* Grano sutil sobre todo el shell — el detalle que separa un fondo
           negro plano ("de plantilla") de una superficie con textura real,
           igual que hacen Linear/Vercel/Arc. Opacidad mínima a propósito. */}

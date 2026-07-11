@@ -34,14 +34,16 @@ export function Dropdown({ options, value, onChange, placeholder = 'Seleccionaâ€
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         onClick={() => setOpen(o => !o)}
+        className="uiv2-dd-trigger"
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '9px 14px',
           borderRadius: radius.sm,
-          border: `1px solid ${colors.border.default}`,
+          border: `1px solid ${open ? colors.primary.base : colors.border.default}`,
           background: colors.bg[600],
           color: colors.text[900],
           fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+          boxShadow: shadows.sm,
         }}
       >
         {trigger ?? (selected?.label || placeholder)}
@@ -61,6 +63,7 @@ export function Dropdown({ options, value, onChange, placeholder = 'Seleccionaâ€
             <button
               key={o.value}
               onClick={() => { onChange(o.value); setOpen(false) }}
+              className="uiv2-dd-option"
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '9px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
@@ -73,6 +76,7 @@ export function Dropdown({ options, value, onChange, placeholder = 'Seleccionaâ€
           ))}
         </div>
       )}
+      <style>{`.uiv2-dd-option:hover { background: rgba(255,255,255,.05) !important; }`}</style>
     </div>
   )
 }

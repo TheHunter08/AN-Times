@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
 export function WeatherCard() {
   const [wx, setWx] = useState(null)
@@ -15,9 +17,12 @@ export function WeatherCard() {
         }).catch(() => {})
     }, () => setDenied(true), { timeout: 5000 })
   }, [])
+
+  const pill = { display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:colors.bg[500], border:`1px solid ${colors.border.subtle}`, borderRadius:radius.pill, fontSize:12, color:colors.text[700], flexShrink:0 }
+
   if (denied) return (
-    <div className="v3-weather-pill" style={{ opacity:.55, cursor:'pointer' }} onClick={() => navigator.geolocation?.getCurrentPosition(() => {}, () => {})}>
-      <span>📍</span><span className="v3-weather-desc">Activa ubicación</span>
+    <div style={{ ...pill, opacity:.55, cursor:'pointer' }} onClick={() => navigator.geolocation?.getCurrentPosition(() => {}, () => {})}>
+      <span>📍</span><span style={{ fontSize:11 }}>Activa ubicación</span>
     </div>
   )
   if (!wx) return null
@@ -25,10 +30,10 @@ export function WeatherCard() {
   const icon = c === 0 ? '☀️' : c <= 2 ? '⛅' : c <= 3 ? '☁️' : c <= 49 ? '🌫️' : c <= 69 ? '🌧️' : c <= 79 ? '🌨️' : c <= 99 ? '⛈️' : '🌤️'
   const desc = c === 0 ? 'Despejado' : c <= 2 ? 'Poco nublado' : c <= 3 ? 'Nublado' : c <= 49 ? 'Niebla' : c <= 69 ? 'Lluvia' : c <= 79 ? 'Nieve' : c <= 99 ? 'Tormenta' : 'Variable'
   return (
-    <div className="v3-weather-pill">
+    <div style={pill}>
       <span>{icon}</span>
-      <span className="v3-weather-temp">{Math.round(wx.temperature_2m)}°C</span>
-      <span className="v3-weather-desc">{desc}</span>
+      <span style={{ fontWeight:700, color:colors.text[900] }}>{Math.round(wx.temperature_2m)}°C</span>
+      <span style={{ fontSize:11, color:colors.text[500] }}>{desc}</span>
     </div>
   )
 }

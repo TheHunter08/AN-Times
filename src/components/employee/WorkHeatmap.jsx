@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { calcMin, mhm, localDateStr } from '../../utils/time.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
 
 export function WorkHeatmap({ records, empId }) {
   const dayMap = useMemo(() => {
@@ -21,8 +23,7 @@ export function WorkHeatmap({ records, empId }) {
         const dt = new Date(start)
         dt.setDate(dt.getDate() + w * 7 + d)
         // localDateStr (no toISOString().slice(0,10)): dt ya está en medianoche
-        // LOCAL — toISOString() la desplaza al día UTC anterior en España,
-        // desfasando el heatmap entero un día hacia atrás, siempre.
+        // LOCAL — toISOString() la desplaza al día UTC anterior en España.
         const ds = localDateStr(dt)
         col.push({ ds, mins: dayMap[ds] || 0, future: dt > now })
       }
@@ -31,31 +32,33 @@ export function WorkHeatmap({ records, empId }) {
     return result
   }, [dayMap])
 
-  const color = (mins, future) => {
+  const cellColor = (mins, future) => {
     if (future) return 'transparent'
-    if (mins === 0) return 'var(--bg-500)'
-    if (mins < 120) return 'rgba(59,91,255,.25)'
-    if (mins < 300) return 'rgba(59,91,255,.5)'
-    if (mins < 450) return 'rgba(59,91,255,.75)'
-    return 'rgba(59,91,255,.95)'
+    if (mins === 0) return colors.bg[500]
+    if (mins < 120) return `${colors.primary.base}28`
+    if (mins < 300) return `${colors.primary.base}55`
+    if (mins < 450) return `${colors.primary.base}80`
+    return `${colors.primary.base}f0`
   }
 
+  const cell = { width:10, height:10, borderRadius:radius.xs || 2 }
+
   return (
-    <div className="v3-heatmap-wrap">
-      <div className="v3-heatmap-grid">
+    <div style={{ overflowX:'auto', paddingBottom:4 }}>
+      <div style={{ display:'flex', gap:2, minWidth:'fit-content' }}>
         {weeks.map((col, wi) => (
-          <div key={wi} className="v3-heatmap-col">
+          <div key={wi} style={{ display:'flex', flexDirection:'column', gap:2 }}>
             {col.map(({ ds, mins, future }) => (
-              <div key={ds} className="v3-heatmap-cell" style={{ background: color(mins, future) }}
+              <div key={ds} style={{ ...cell, background: cellColor(mins, future) }}
                 title={mins > 0 ? `${ds}: ${mhm(mins)}` : ds} />
             ))}
           </div>
         ))}
       </div>
-      <div className="v3-heatmap-legend">
+      <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:8, fontSize:10, color:colors.text[300] }}>
         <span>Menos</span>
         {[0, 120, 300, 450, 600].map((m, i) => (
-          <div key={i} className="v3-heatmap-cell" style={{ background: color(m, false), width:10, height:10 }} />
+          <div key={i} style={{ ...cell, background: cellColor(m, false) }} />
         ))}
         <span>Más</span>
       </div>

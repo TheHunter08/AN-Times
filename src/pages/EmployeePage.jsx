@@ -1,7 +1,10 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
-import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds } from '../utils/time.js'
+import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, localDateStr } from '../utils/time.js'
+import { calcStreak } from '../utils/streaks.js'
+import { WK } from '../config/constants.js'
+import { EmployeeHome } from '../ui-v2/pages/EmployeeHome.tsx'
 import { VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
@@ -853,10 +856,147 @@ export default function EmployeePage() {
     return `Buenas noches, ${firstName} 🌙`
   }, [u.name, greetHour])
 
+  const homeData = useMemo(() => {
+    const now = new Date()
+    const todayD = localDateStr(now)
+    const empWKmin = (u.horasSemanales || WK / 60) * 60
+    const dayMin = Math.round(empWKmin / 5)
+
+    // Hoy: registros cerrados + timer vivo
+    const todayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayD) && r.fin)
+    const closedMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
+    const liveMin = timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0
+    const totMin = closedMin + liveMin
+    const liveSec = timer.state !== 'idle' ? timer.ws % 60 : 0
+    const totSecs = totMin * 60 + liveSec
+    const pct = Math.min(100, Math.round(totMin / (dayMin || 480) * 100))
+    const remainMin = Math.max(0, dayMin - totMin)
+
+    // Semana L-D
+    const ws = wkStart(now)
+    const weekDayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+    let weekMin = 0
+    const week = weekDayLabels.map((label, i) => {
+      const d = new Date(ws)
+      d.setDate(ws.getDate() + i)
+      const ds = localDateStr(d)
+      const isToday = ds === todayD
+      const dayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(ds) && r.fin)
+      let dm = dayRecs.reduce((s, r) => s + calcMin(r), 0)
+      if (isToday && timer.state !== 'idle') dm += Math.floor(timer.ws / 60)
+      weekMin += dm
+      return {
+        label,
+        pct: Math.min(100, Math.round(dm / (dayMin || 480) * 100)),
+        hours: dm >= 60 ? `${Math.floor(dm / 60)}h` : dm > 0 ? `${dm}m` : '',
+        isToday,
+      }
+    })
+
+    // Últimas acciones de hoy
+    const allTodayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayD))
+    const recent = []
+    allTodayRecs.forEach(r => {
+      if (r.inicio) recent.push({ id: r.id + '-e', label: 'Entrada', time: r.inicio.slice(11, 16), tone: 'green', type: 'entrada' })
+      if (r.fin)    recent.push({ id: r.id + '-s', label: 'Salida',  time: r.fin.slice(11, 16),    tone: 'red',   type: 'salida'  })
+      ;(r.breaks || []).forEach((b, bi) => {
+        if (b.start) recent.push({ id: r.id + '-bp' + bi, label: 'Pausa',   time: b.start.slice(11, 16), tone: 'orange', type: 'pausa'  })
+        if (b.end)   recent.push({ id: r.id + '-br' + bi, label: 'Reanuda', time: b.end.slice(11, 16),   tone: 'green',  type: 'reanuda' })
+      })
+    })
+    recent.sort((a, b) => a.time.localeCompare(b.time))
+
+    const streak = calcStreak(db.records, u.id, todayD)
+    const currentRec = (db.records || []).find(r => r.empId === u.id && !r.fin)
+    const siteLabel = currentRec?.centro || u.centroTrabajo || undefined
+    const dateLabel = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+    const extraMin = Math.max(0, weekMin - empWKmin)
+    const overtimeLabel = extraMin > 0 ? `+${Math.floor(extraMin / 60)}h ${p2(extraMin % 60)}m extra esta semana` : undefined
+
+    return {
+      time: `${p2(Math.floor(totSecs / 3600))}:${p2(Math.floor((totSecs % 3600) / 60))}`,
+      seconds: `:${p2(totSecs % 60)}`,
+      dateLabel,
+      state: timer.state,
+      workedLabel: mhm(totMin),
+      remainingLabel: mhm(remainMin),
+      progressPct: pct,
+      siteLabel,
+      streakDays: streak > 0 ? streak : undefined,
+      week,
+      weeklyTotal: `${Math.floor(weekMin / 60)}h ${p2(weekMin % 60)}m`,
+      recent: recent.slice(-6).reverse(),
+      greeting,
+      overtimeLabel,
+    }
+  }, [db.records, timer.state, timer.ws, u.id, u.horasSemanales, u.centroTrabajo, greeting])
+
   const handleWellbeingSubmit = ({ mood, nota }) => {
     if (!mood || !wellbeingRecId) return
     const entry = { id: gid(), empId: u.id, mood, nota: nota || '', ts: new Date().toISOString(), recordId: wellbeingRecId }
     saveDB(freshDb => ({ wellbeing: [...(freshDb.wellbeing || []), entry] }))
+  }
+
+  // Cierres pendientes de firma del empleado actual
+  const pendingCierresEmp = useMemo(
+    () => (db.cierres || []).filter(c => c.empId === u.id && !c.firma && !c.firmaEmp && c.estado !== 'rechazado'),
+    [db.cierres, u.id]
+  )
+
+  // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)
+  const teamCierresPendientes = useMemo(() => {
+    if (u.role !== 'encargado' && u.role !== 'jefe_obra') return []
+    const centro = u.centroTrabajo || ''
+    const teamIds = new Set(
+      (db.employees || [])
+        .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
+        .map(e => e.id)
+    )
+    return (db.cierres || [])
+      .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor)
+      .map(c => ({ id: c.id, empName: c.empName || c.empId, mes: c.mes || '' }))
+  }, [db.cierres, db.employees, u.role, u.centroTrabajo, u.id])
+
+  // Planning semanal del equipo para encargados/jefes de obra
+  const weekPlanningData = useMemo(() => {
+    if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
+    const centro = u.centroTrabajo || ''
+    const team = (db.employees || []).filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
+    if (!team.length) return null
+    const todayD = new Date()
+    const dow = todayD.getDay()
+    const monday = new Date(todayD)
+    monday.setDate(todayD.getDate() - (dow === 0 ? 6 : dow - 1))
+    const todayStr2 = todayD.toISOString().slice(0, 10)
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      const ds = d.toISOString().slice(0, 10)
+      return { label: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i], dateStr: ds, isToday: ds === todayStr2, isWeekend: i >= 5 }
+    })
+    const members = team.map(e => {
+      const initials = e.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+      const dayData = days.map(d => {
+        const dayRecs = (db.records || []).filter(r => r.empId === e.id && (r.inicio || '').startsWith(d.dateStr))
+        const open = dayRecs.find(r => !r.fin)
+        const done = dayRecs.filter(r => r.fin)
+        const totalMins = done.reduce((s, r) => s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
+        return { status: open ? 'active' : done.length ? 'done' : 'absent', hours: totalMins > 0 ? `${Math.floor(totalMins/60)}h${Math.round(totalMins%60)>0?Math.round(totalMins%60)+'m':''}` : '' }
+      })
+      return { id: e.id, name: e.name, initials, days: dayData }
+    })
+    return { days, members }
+  }, [db.records, db.employees, u.role, u.centroTrabajo, u.id])
+
+  const handleSignSupervisor = (cierreId) => {
+    saveDB(freshDb => ({
+      cierres: (freshDb.cierres || []).map(c =>
+        c.id === cierreId
+          ? { ...c, firmaSupervisor: true, firmaSupervisorAt: new Date().toISOString(), firmaSupervisorBy: u.name }
+          : c
+      ),
+    }))
+    toast('Cierre firmado como supervisor', 2500, 'ok')
   }
 
   const handleGeoStart = () => {
@@ -972,7 +1112,106 @@ export default function EmployeePage() {
           </div>
         )}
         <div className="emp-dsk-content" ref={empBodyRef}>
-          {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} onOpenQRScan={() => setQrScanOpen(true)} />}
+          {currentEmpTab === 'inicio' && (
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 100 }}>
+              {pendingCierresEmp.length > 0 && (
+                <div style={{ margin: '16px 20px 0', padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 20 }}>✍️</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--orange)' }}>
+                      {pendingCierresEmp.length === 1 ? 'Tienes 1 cierre mensual pendiente de firma' : `Tienes ${pendingCierresEmp.length} cierres mensuales pendientes de firma`}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text4)', marginTop: 2 }}>Tu firma es obligatoria para cerrar el mes</div>
+                  </div>
+                  <button onClick={() => openModal('cierreSign')} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--orange)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Firmar
+                  </button>
+                </div>
+              )}
+              {teamCierresPendientes.length > 0 && (
+                <div style={{ margin: '12px 20px 0', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)', overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 14px', background: 'rgba(124,58,237,.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15 }}>📋</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Cierres del equipo — requieren tu firma</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '2px 8px' }}>{teamCierresPendientes.length}</span>
+                  </div>
+                  {teamCierresPendientes.slice(0, 6).map(c => (
+                    <div key={c.id} style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{c.empName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text4)' }}>{c.mes}</div>
+                      </div>
+                      <button onClick={() => handleSignSupervisor(c.id)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.1)', color: 'var(--primary-light)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Firmar
+                      </button>
+                    </div>
+                  ))}
+                  {teamCierresPendientes.length > 6 && (
+                    <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--text4)', textAlign: 'center' }}>+{teamCierresPendientes.length - 6} más</div>
+                  )}
+                </div>
+              )}
+              <div style={{ padding: '16px 20px' }}>
+                <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+              </div>
+              {(u.role === 'jefe_obra' || u.role === 'encargado') && (
+                <div style={{ padding: '0 20px 20px' }}>
+                  <button onClick={() => setQrScanOpen(true)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
+                    background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                    fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Fichar a un empleado
+                  </button>
+                </div>
+              )}
+              {weekPlanningData && (
+                <div style={{ padding: '0 20px 20px' }}>
+                  <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', background: 'rgba(124,58,237,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 15 }}>📅</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal del equipo</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: '8px 14px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)' }}>Empleado</th>
+                            {weekPlanningData.days.map(d => (
+                              <th key={d.dateStr} style={{ padding: '8px 6px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 40 }}>{d.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {weekPlanningData.members.map((m, mi) => (
+                            <tr key={m.id} style={{ borderTop: mi > 0 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                              <td style={{ padding: '8px 14px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 9, fontWeight: 800, marginRight: 7 }}>{m.initials}</span>
+                                {m.name.split(' ')[0]}
+                              </td>
+                              {m.days.map((d, di) => (
+                                <td key={di} style={{ padding: '6px 4px', textAlign: 'center' }}>
+                                  {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 14 }}>●</span>
+                                    : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(124,58,237,.7)', fontSize: 10, fontWeight: 700 }}>{d.hours || '✓'}</span>
+                                    : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 12 }}>—</span>}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
           {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
           {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
@@ -1019,27 +1258,56 @@ export default function EmployeePage() {
           </div>
         </div>
         <div className="emp-top-right">
+          {/* Panel chip — encargados y jefes de obra */}
           {(session.isEnc || session.isJO) && (
             <button className="enc-chip" onClick={() => setScreen('admin')}>
-              {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
+              {session.isJO ? '🏗️' : '⭐'} Panel
             </button>
           )}
-          <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema claro/oscuro">{isLight ? '🌙' : '☀️'}</button>
-          <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Abrir asistente de IA">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
-          </button>
-          <button className="icon-btn" onClick={() => openModal('chat')} style={{ position:'relative' }} aria-label="Chat con administrador">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            {chatUnread > 0 && <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', pointerEvents:'none' }} aria-hidden="true">{chatUnread > 9 ? '9+' : chatUnread}</span>}
-          </button>
-          <button className="icon-btn" onClick={() => openModal('notis')} style={{ position:'relative' }} aria-label={`Notificaciones${unread > 0 ? ` (${unread} sin leer)` : ''}`}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            {unread > 0 && (
-              <span style={{ position:'absolute', top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:'var(--danger)', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1, pointerEvents:'none' }} aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
-            )}
-          </button>
-          <button className="icon-btn logout-btn" onClick={doLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+
+          {/* Pill de acciones agrupadas */}
+          <div style={{ display:'flex', alignItems:'center', gap:2, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.08)', borderRadius:22, padding:'3px 4px' }}>
+            {/* IA */}
+            <button onClick={() => openModal('ai')} title="Asistente IA" aria-label="Abrir asistente de IA" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,.18)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+              </svg>
+            </button>
+
+            {/* Chat */}
+            <button onClick={() => openModal('chat')} title="Chat con admin" aria-label="Chat con administrador" style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(255,255,255,.55)', cursor:'pointer', transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              {chatUnread > 0 && <span style={{ position:'absolute', top:2, right:2, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px', pointerEvents:'none', lineHeight:1 }} aria-hidden="true">{chatUnread > 9 ? '9+' : chatUnread}</span>}
+            </button>
+
+            {/* Notificaciones */}
+            <button onClick={() => openModal('notis')} title="Notificaciones" aria-label={`Notificaciones${unread > 0 ? ` (${unread})` : ''}`} style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(255,255,255,.55)', cursor:'pointer', transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unread > 0 && <span style={{ position:'absolute', top:2, right:2, minWidth:14, height:14, borderRadius:7, background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 2px', lineHeight:1, pointerEvents:'none' }} aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
+            </button>
+
+            {/* Separador */}
+            <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
+
+            {/* Tema */}
+            <button onClick={() => { toggleTheme(); setIsLight(l => !l) }} title={isLight ? 'Modo oscuro' : 'Modo claro'} aria-label="Cambiar tema claro/oscuro" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(255,255,255,.45)', cursor:'pointer', fontSize:14, transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              {isLight ? '🌙' : '☀️'}
+            </button>
+          </div>
+
+          {/* Logout — separado, fuera del pill */}
+          <button onClick={doLogout} title="Cerrar sesión" aria-label="Cerrar sesión" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:32, height:32, borderRadius:'50%', border:'1px solid rgba(239,68,68,.25)', background:'rgba(239,68,68,.07)', color:'rgba(239,68,68,.7)', cursor:'pointer', transition:'all .15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background='rgba(239,68,68,.18)'; e.currentTarget.style.borderColor='rgba(239,68,68,.5)'; e.currentTarget.style.color='#ef4444' }}
+            onMouseLeave={e => { e.currentTarget.style.background='rgba(239,68,68,.07)'; e.currentTarget.style.borderColor='rgba(239,68,68,.25)'; e.currentTarget.style.color='rgba(239,68,68,.7)' }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
@@ -1080,7 +1348,106 @@ export default function EmployeePage() {
 
       {/* Body */}
       <div className="emp-body" ref={empBodyRef}>
-        {currentEmpTab === 'inicio' && <TabInicio timer={timer} doStart={doStart} doStop={doStop} doBreak={doBreak} openRec={openRec} db={db} u={u} openModal={openModal} gpsStatus={gpsStatus} session={session} vac={vac} saveDB={saveDB} toast={toast} onOpenQRScan={() => setQrScanOpen(true)} />}
+        {currentEmpTab === 'inicio' && (
+          <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 116, boxSizing: 'border-box' }}>
+            {pendingCierresEmp.length > 0 && (
+              <div style={{ margin: '12px 16px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>✍️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange)' }}>
+                    {pendingCierresEmp.length === 1 ? 'Cierre mensual pendiente de firma' : `${pendingCierresEmp.length} cierres pendientes de firma`}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 1 }}>Tu firma es obligatoria</div>
+                </div>
+                <button onClick={() => openModal('cierreSign')} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 7, border: 'none', background: 'var(--orange)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Firmar
+                </button>
+              </div>
+            )}
+            {teamCierresPendientes.length > 0 && (
+              <div style={{ margin: '10px 16px 0', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)', overflow: 'hidden' }}>
+                <div style={{ padding: '9px 12px', background: 'rgba(124,58,237,.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>📋</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-light)', flex: 1 }}>Cierres del equipo sin firma</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '2px 7px' }}>{teamCierresPendientes.length}</span>
+                </div>
+                {teamCierresPendientes.slice(0, 5).map(c => (
+                  <div key={c.id} style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{c.empName}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text4)' }}>{c.mes}</div>
+                    </div>
+                    <button onClick={() => handleSignSupervisor(c.id)} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.1)', color: 'var(--primary-light)', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Firmar
+                    </button>
+                  </div>
+                ))}
+                {teamCierresPendientes.length > 5 && (
+                  <div style={{ padding: '7px 12px', fontSize: 10, color: 'var(--text4)', textAlign: 'center' }}>+{teamCierresPendientes.length - 5} más</div>
+                )}
+              </div>
+            )}
+            <div style={{ padding: '16px' }}>
+              <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+            </div>
+            {(u.role === 'jefe_obra' || u.role === 'encargado') && (
+              <div style={{ padding: '0 16px 16px' }}>
+                <button onClick={() => setQrScanOpen(true)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
+                  background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                  fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  Fichar a un empleado
+                </button>
+              </div>
+            )}
+            {weekPlanningData && (
+              <div style={{ padding: '0 16px 16px' }}>
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 12px', background: 'rgba(124,58,237,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>📅</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)' }}>Empleado</th>
+                          {weekPlanningData.days.map(d => (
+                            <th key={d.dateStr} style={{ padding: '6px 4px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 32 }}>{d.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weekPlanningData.members.map((m, mi) => (
+                          <tr key={m.id} style={{ borderTop: mi > 0 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                            <td style={{ padding: '6px 10px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 8, fontWeight: 800, marginRight: 6 }}>{m.initials}</span>
+                              {m.name.split(' ')[0]}
+                            </td>
+                            {m.days.map((d, di) => (
+                              <td key={di} style={{ padding: '5px 3px', textAlign: 'center' }}>
+                                {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 12 }}>●</span>
+                                  : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(124,58,237,.7)', fontSize: 9, fontWeight: 700 }}>{d.hours || '✓'}</span>
+                                  : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 10 }}>—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
         {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
         {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}

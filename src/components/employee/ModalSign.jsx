@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
+import { colors } from '../../ui-v2/design-system/colors.js'
+import { radius } from '../../ui-v2/design-system/radius.js'
+
+const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
+const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto' }
+const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.default, margin:'0 auto 20px' }
+const BTN_ROW = { display:'flex', gap:8, marginTop:20 }
+const btnPrimary = { flex:1, padding:'12px 20px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
+const btnSecondary = { flex:1, padding:'12px 20px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
 
 export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
@@ -27,45 +36,45 @@ export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
   }
 
   return (
-    <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480, ...modalStyle }}>
-        <div className="modal-drag" {...dragHandlers} />
+    <div style={OV} onClick={onClose}>
+      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+        <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ margin:0, fontSize:18 }}>Firma digital</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:22, cursor:'pointer' }}>×</button>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:colors.text[900] }}>Firma digital</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:colors.text[500], fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>×</button>
         </div>
 
         {mode === 'view' && existingFirma ? (
           <>
-            <div style={{ background:'var(--bg-500)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'6px', marginBottom:14 }}>
-              <img src={existingFirma.data} alt="Firma guardada" style={{ width:'100%', height:120, objectFit:'contain', borderRadius:8, display:'block' }} />
+            <div style={{ background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.xl, padding:6, marginBottom:14 }}>
+              <img src={existingFirma.data} alt="Firma guardada" style={{ width:'100%', height:120, objectFit:'contain', borderRadius:radius.md, display:'block' }} />
             </div>
-            <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:16 }}>
+            <div style={{ fontSize:11, color:colors.text[500], textAlign:'center', marginBottom:16 }}>
               Firma guardada — {existingFirma.updatedAt ? new Date(existingFirma.updatedAt).toLocaleDateString('es-ES') : ''}
             </div>
-            <div style={{ background:'var(--green-dim)', border:'1px solid rgba(54,178,126,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:12, color:'var(--green)' }}>
+            <div style={{ background:`${colors.semantic.green}15`, border:`1px solid ${colors.semantic.green}30`, borderRadius:radius.md, padding:'10px 14px', marginBottom:16, fontSize:12, color:colors.semantic.green }}>
               Esta firma se aplicará automáticamente al firmar documentos y jornadas mensuales.
             </div>
-            <div className="modal-btns">
-              <button className="btn btn-secondary" onClick={() => setMode('draw')}>Actualizar firma</button>
-              <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
+            <div style={BTN_ROW}>
+              <button style={btnSecondary} onClick={() => setMode('draw')}>Actualizar firma</button>
+              <button style={btnPrimary} onClick={onClose}>Cerrar</button>
             </div>
           </>
         ) : (
           <>
             <div style={{ marginBottom:8 }}>
               <canvas ref={canvasRef} width={640} height={200}
-                style={{ width:'100%', height:150, borderRadius:'var(--r)', background:'#0D1218', cursor:'crosshair', touchAction:'none', border:'1px solid var(--border2)', display:'block' }}
+                style={{ width:'100%', height:150, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block' }}
                 {...handlers} />
             </div>
-            <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:16 }}>Dibuja tu firma con el dedo o ratón</div>
-            <div className="modal-btns">
-              <button className="btn btn-secondary" onClick={clearCanvas}>Borrar</button>
+            <div style={{ fontSize:11, color:colors.text[500], textAlign:'center', marginBottom:16 }}>Dibuja tu firma con el dedo o ratón</div>
+            <div style={BTN_ROW}>
+              <button style={btnSecondary} onClick={clearCanvas}>Borrar</button>
               {existingFirma
-                ? <button className="btn btn-secondary" onClick={() => setMode('view')}>Cancelar</button>
-                : <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
+                ? <button style={btnSecondary} onClick={() => setMode('view')}>Cancelar</button>
+                : <button style={btnSecondary} onClick={onClose}>Cerrar</button>
               }
-              <button className="btn btn-primary" onClick={save}>Guardar firma</button>
+              <button style={btnPrimary} onClick={save}>Guardar firma</button>
             </div>
           </>
         )}

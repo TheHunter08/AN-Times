@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     // ── 3. Empleados ────────────────────────────────────────────────────
     const employees = (db.employees || []).filter(e => e.id && e.name).map(e => ({
       id: e.id, company_id: COMPANY_ID, name: e.name,
-      email: e.email || null, pin_hash: e.pinHash || null,
+      email: e.email || null, pin_hash: e.pin || e.pinHash || null, pin_len: e.pinLen || null,
       role: e.role || (e.isAdmin ? 'admin' : e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : 'empleado'),
       centro_trabajo: e.centroTrabajo || null,
       obras_asignadas: e.obrasAsignadas || [],
