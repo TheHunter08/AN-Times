@@ -17,11 +17,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 function removeSplash() {
   const splash = document.getElementById('splash')
-  if (splash) {
-    splash.style.opacity = '0'
-    splash.style.transition = 'opacity .3s ease'
-    setTimeout(() => splash.remove(), 350)
-  }
+  if (splash) splash.remove()
 }
 
 createRoot(document.getElementById('root')).render(

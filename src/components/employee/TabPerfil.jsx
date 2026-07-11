@@ -105,44 +105,48 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
         {/* ── Hero ───────────────────────────────────────────── */}
         <div style={{
-          background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
-          borderRadius: radius['2xl'], padding: '28px 24px',
+          background: `linear-gradient(160deg, ${avatarColor}20 0%, ${colors.bg[600]} 55%)`,
+          border: `1px solid ${avatarColor}30`,
+          borderRadius: radius['2xl'], padding: '36px 24px 28px',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           position: 'relative', overflow: 'hidden', margin: '16px 16px 0',
+          boxShadow: `0 12px 48px ${avatarColor}20`,
         }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${avatarColor}, ${colors.primary.base})`, borderRadius: `${radius['2xl']} ${radius['2xl']} 0 0` }} />
           <div style={{
             position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
-            width: 280, height: 280, borderRadius: '50%',
-            background: `radial-gradient(circle, ${avatarColor}18 0%, transparent 70%)`,
+            width: 400, height: 400, borderRadius: '50%',
+            background: `radial-gradient(circle, ${avatarColor}18 0%, transparent 65%)`,
             pointerEvents: 'none',
           }} />
           <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-1px',
-            boxShadow: `0 0 28px ${avatarColor}50`,
-            marginBottom: 14,
+            width: 84, height: 84, borderRadius: '50%',
+            background: `linear-gradient(135deg, ${avatarColor} 0%, ${avatarColor}cc 100%)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 30, fontWeight: 800, color: '#fff', letterSpacing: '-1px',
+            boxShadow: `0 0 0 4px ${avatarColor}25, 0 8px 40px ${avatarColor}55`,
+            marginBottom: 18,
           }}>{initials}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: colors.text[900], letterSpacing: '-.4px', marginBottom: 4 }}>{u.name}</div>
-          <div style={{ fontSize: 12, color: colors.text[500], marginBottom: 10 }}>
+          <div style={{ fontSize: 24, fontWeight: 800, color: colors.text[900], letterSpacing: '-.8px', marginBottom: 4 }}>{u.name}</div>
+          <div style={{ fontSize: 12, color: colors.text[500], marginBottom: 14 }}>
             {u.empresa || u.centroTrabajo || '—'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '4px 12px', borderRadius: radius.pill,
-              background: `${avatarColor}18`, border: `1px solid ${avatarColor}35`,
-              fontSize: 11, fontWeight: 700, color: avatarColor,
+              padding: '5px 14px', borderRadius: radius.pill,
+              background: `${avatarColor}20`, border: `1px solid ${avatarColor}40`,
+              fontSize: 12, fontWeight: 700, color: avatarColor,
             }}>
-              {u.role === 'encargado' ? '⭐' : u.role === 'jefe_obra' ? '🏗️' : '👷'} {roleLabel}
+              {roleLabel}
             </span>
             <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '4px 12px', borderRadius: radius.pill,
-              background: `${colors.semantic.green}15`, border: `1px solid ${colors.semantic.green}30`,
-              fontSize: 11, fontWeight: 700, color: colors.semantic.green,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 14px', borderRadius: radius.pill,
+              background: `${colors.semantic.green}15`, border: `1px solid ${colors.semantic.green}35`,
+              fontSize: 12, fontWeight: 700, color: colors.semantic.green,
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.semantic.green, display: 'inline-block' }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: colors.semantic.green, display: 'inline-block', boxShadow: `0 0 6px ${colors.semantic.green}` }} />
               Activo
             </span>
           </div>
@@ -151,23 +155,61 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
         {/* ── Stats grid ─────────────────────────────────────── */}
         <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { val: mhm(monthMin), lbl: 'Horas este mes', ico: '📅', color: colors.primary.light, bg: colors.primary.dim },
-            { val: String(vac.available), lbl: 'Días de vacaciones', ico: '🌴', color: colors.semantic.green, bg: `${colors.semantic.green}12` },
-            { val: `${streak}`, lbl: 'Racha actual', ico: '🔥', color: colors.semantic.orange, bg: `${colors.semantic.orange}12` },
-            { val: yearDays > 0 ? `${yearDays}` : '—', lbl: `Días trabajados ${now.getFullYear()}`, ico: '🏆', color: colors.kpiTone.cyan.base, bg: colors.kpiTone.cyan.dim },
-          ].map(({ val, lbl, ico, color, bg }) => (
+            {
+              val: mhm(monthMin), lbl: 'Horas este mes',
+              accent: colors.primary.base, color: colors.primary.light,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+                </svg>
+              ),
+            },
+            {
+              val: String(vac.available), lbl: 'Vacaciones disp.',
+              accent: colors.semantic.green, color: colors.semantic.green,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              ),
+            },
+            {
+              val: `${streak}`, lbl: 'Racha actual',
+              accent: colors.semantic.orange, color: colors.semantic.orange,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+                  <path d="M12 2c0 6-6 8-6 14a6 6 0 0 0 12 0c0-6-6-8-6-14z"/>
+                  <path d="M12 12c0 3-2 4-2 6a2 2 0 0 0 4 0c0-2-2-3-2-6z"/>
+                </svg>
+              ),
+            },
+            {
+              val: yearDays > 0 ? `${yearDays}` : '—', lbl: `Días ${now.getFullYear()}`,
+              accent: colors.kpiTone.cyan.base, color: colors.kpiTone.cyan.base,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              ),
+            },
+          ].map(({ val, lbl, accent, color, icon }) => (
             <div key={lbl} style={{
               background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
               borderRadius: radius.xl, padding: '16px 14px',
+              position: 'relative', overflow: 'hidden',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: radius.sm,
-                  background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                }}>{ico}</div>
-                <div style={{ fontSize: 10, color: colors.text[500], fontWeight: 600, lineHeight: 1.3, flex: 1 }}>{lbl}</div>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: '12px 12px 0 0' }} />
+              <div style={{
+                width: 34, height: 34, borderRadius: radius.md,
+                background: accent + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 12,
+              }}>
+                {icon(color)}
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color, letterSpacing: '-.5px', fontVariantNumeric: 'tabular-nums' }}>{val}</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: '-1.5px', fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginBottom: 6 }}>{val}</div>
+              <div style={{ fontSize: 10, color: colors.text[500], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>{lbl}</div>
             </div>
           ))}
         </div>
@@ -300,41 +342,6 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
           </button>
         </div>
 
-        {/* ── Audit history ──────────────────────────────────── */}
-        {(() => {
-          const myAudit = (db.audit || [])
-            .filter(a => a.detail?.includes(u.name) || a.empId === u.id || (a.detail && a.detail.includes(u.id)))
-            .slice(-20).reverse()
-          if (!myAudit.length) return null
-          return (
-            <div style={{
-              margin: '0 16px', background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
-              borderRadius: radius.xl, overflow: 'hidden',
-            }}>
-              <div style={{ padding: '14px 18px 10px', fontSize: 12, fontWeight: 660, color: colors.text[700], textTransform: 'uppercase', letterSpacing: '.5px' }}>
-                Historial de cambios
-              </div>
-              {myAudit.slice(0, 5).map((a, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: 12, padding: '11px 18px',
-                  borderTop: `1px solid ${colors.border.subtle}`,
-                }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: radius.sm,
-                    background: colors.bg[400], display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 13, flexShrink: 0,
-                  }}>📋</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: colors.text[700], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.action}</div>
-                    {a.detail && <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.detail}</div>}
-                    <div style={{ fontSize: 10, color: colors.text[300], marginTop: 2 }}>{new Date(a.ts).toLocaleString('es-ES')}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        })()}
-
         <div style={{ height: 4 }} />
       </div>
     </PullToRefresh>
@@ -344,8 +351,11 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 function SectionCard({ title, children }) {
   return (
     <div style={{ margin: '0 16px' }}>
-      <div style={{ fontSize: 11, fontWeight: 660, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 8, paddingLeft: 4 }}>
-        {title}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingLeft: 2 }}>
+        <div style={{ width: 3, height: 14, borderRadius: 2, background: colors.primary.base }} />
+        <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.7px' }}>
+          {title}
+        </div>
       </div>
       <div style={{
         background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,

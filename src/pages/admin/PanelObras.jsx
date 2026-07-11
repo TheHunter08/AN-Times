@@ -145,7 +145,7 @@ export default function PanelObras({ db, toast, saveDB, session }) {
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3, flexWrap:'wrap' }}>
                       <span style={{ fontSize:11, color:'var(--text3)' }}>{(db.records||[]).filter(r=>r.centro===o.nombre&&r.fin).length} fichajes · {o.createdAt}</span>
                       <span className={`geo-badge ${o.coords ? 'active' : 'none'}`}>
-                        {o.coords ? `📍 ${o.radio||200}m` : '📍 Sin geovalla'}
+                        {o.coords ? `📍 ${o.radio != null ? o.radio : 200}m` : '📍 Sin geovalla'}
                       </span>
                     </div>
                   </div>
@@ -176,7 +176,7 @@ export default function PanelObras({ db, toast, saveDB, session }) {
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ fontSize:11, color:'var(--text3)', fontWeight:600 }}>Radio:</span>
                         <select
-                          value={o.radio || 200}
+                          value={o.radio != null ? o.radio : 200}
                           onChange={e => setRadio(o.id, e.target.value)}
                           style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:'auto' }}
                         >

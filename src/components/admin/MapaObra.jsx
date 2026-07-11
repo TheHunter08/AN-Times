@@ -47,7 +47,7 @@ export function MapaObra({ obras, liveEmps }) {
 
     obras.filter(o => o.coords).forEach(o => {
       const circle = L.circle([o.coords.lat, o.coords.lng], {
-        radius: o.radio || 200,
+        radius: o.radio != null ? o.radio : 200,
         color: '#6366f1', weight: 2, fillColor: '#6366f1', fillOpacity: .08,
       }).addTo(map).bindTooltip(o.nombre, { permanent: false })
       layersRef.current.push(circle)

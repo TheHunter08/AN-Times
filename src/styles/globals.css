@@ -9,11 +9,6 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
-}
-
-.login-spinner, [class*="skeleton"], svg *, button:active {
-  transition: none !important;
 }
 
 /* Quitamos el menú contextual de mantener pulsado y el "drag" de iOS en
@@ -24,6 +19,8 @@ html, body {
   -webkit-touch-callout: none;
   touch-action: manipulation;
   -webkit-user-drag: none;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 input, textarea, [contenteditable="true"], .selectable {
   -webkit-user-select: text;
@@ -5118,7 +5115,6 @@ textarea.input-error {
   line-height: 1.4;
 }
 
-@keyframes loadingBar { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
 /* ══════════════════════════════════════════════════════════════
    TIMES INC 3.0 — Premium finishing touches

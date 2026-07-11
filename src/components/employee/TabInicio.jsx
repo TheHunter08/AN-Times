@@ -362,7 +362,14 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                 flex: 1, background: colors.bg[600], border: `1px solid ${streak >= 7 ? `${colors.semantic.orange}30` : colors.border.subtle}`,
                 borderRadius: radius.xl, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <div style={{ fontSize: 24, lineHeight: 1 }}>{streak >= 30 ? '🌟' : streak >= 7 ? '🔥' : '✅'}</div>
+                <div style={{ width: 36, height: 36, borderRadius: radius.sm, background: streak >= 30 ? 'rgba(251,191,36,.15)' : streak >= 7 ? `${colors.semantic.orange}20` : `${colors.semantic.green}15`, border: `1px solid ${streak >= 30 ? 'rgba(251,191,36,.3)' : streak >= 7 ? `${colors.semantic.orange}40` : `${colors.semantic.green}30`}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {streak >= 30
+                    ? <svg viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2" width="18" height="18"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    : streak >= 7
+                    ? <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.orange} strokeWidth="2" width="18" height="18"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    : <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.green} strokeWidth="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+                  }
+                </div>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: streak >= 7 ? colors.semantic.orange : colors.text[900], lineHeight: 1 }}>
                     {streak} <span style={{ fontSize: 12, fontWeight: 500, color: colors.text[500] }}>día{streak !== 1 ? 's' : ''}</span>
@@ -391,7 +398,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                     const abs = Math.abs(diff)
                     if (abs < 6) return <div style={{ fontSize: 10, color: colors.semantic.green, marginTop: 2 }}>✓ Llegaste a tu hora habitual</div>
                     const fm = m => `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + 'min' : ''}`.trim()
-                    return <div style={{ fontSize: 10, color: diff < 0 ? colors.semantic.green : colors.semantic.orange, marginTop: 2 }}>{diff < 0 ? `⚡ ${fm(abs)} antes` : `+${fm(abs)} más tarde`}</div>
+                    return <div style={{ fontSize: 10, color: diff < 0 ? colors.semantic.green : colors.semantic.orange, marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>{diff < 0 ? <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>{fm(abs)} antes</> : `+${fm(abs)} más tarde`}</div>
                   })()}
                 </div>
               </div>

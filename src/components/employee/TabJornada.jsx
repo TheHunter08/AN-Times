@@ -378,57 +378,91 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0 2px' }}>
           <div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: colors.text[900], letterSpacing: '-1.5px', lineHeight: 1.1 }}>Mi Jornada</div>
-            <div style={{ fontSize: 12, color: colors.text[500], marginTop: 4, textTransform: 'capitalize' }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: colors.text[900], letterSpacing: '-1.5px', lineHeight: 1.1 }}>Mi Jornada</div>
+            <div style={{ fontSize: 13, color: colors.text[500], marginTop: 5, textTransform: 'capitalize' }}>
               {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
             </div>
           </div>
-          <div style={{
-            padding: '4px 12px', borderRadius: radius.pill,
-            background: colors.bg[400], border: `1px solid ${colors.border.default}`,
-            fontSize: 10, fontWeight: 700, color: colors.text[500],
-            textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 4,
-          }}>Hoy</div>
+          {o ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
+              padding: '5px 12px', borderRadius: radius.pill,
+              background: `${colors.semantic.green}18`, border: `1px solid ${colors.semantic.green}35`,
+              fontSize: 11, fontWeight: 700, color: colors.semantic.green,
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: colors.semantic.green, display: 'inline-block', boxShadow: `0 0 8px ${colors.semantic.green}` }} />
+              En curso
+            </div>
+          ) : (
+            <div style={{
+              padding: '5px 12px', borderRadius: radius.pill, marginTop: 4,
+              background: colors.bg[400], border: `1px solid ${colors.border.default}`,
+              fontSize: 10, fontWeight: 700, color: colors.text[500],
+              textTransform: 'uppercase', letterSpacing: '.5px',
+            }}>Hoy</div>
+          )}
         </div>
 
         {/* KPI grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-          <div style={{
-            background: colors.bg[600],
-            border: `1px solid ${weekMin > WK ? `${colors.semantic.orange}30` : colors.border.subtle}`,
-            borderRadius: radius.xl, padding: '14px 10px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-          }}>
-            <div style={{ fontSize: 16, marginBottom: 2 }}>{weekMin > WK ? '🔴' : '⏱️'}</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: weekMin > WK ? colors.semantic.orange : colors.primary.light, fontVariantNumeric: 'tabular-nums', lineHeight: 1, letterSpacing: '-0.5px' }}>{mhm(Math.floor(weekMin))}</div>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[300], textAlign: 'center' }}>Semana{weekMin > WK ? ' ↑' : ''}</div>
-          </div>
-          <div style={{
-            background: colors.bg[600], border: `1px solid ${colors.semantic.green}20`,
-            borderRadius: radius.xl, padding: '14px 10px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-          }}>
-            <div style={{ fontSize: 16, marginBottom: 2 }}>✅</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: colors.semantic.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1, letterSpacing: '-0.5px' }}>{mhm(normMin)}</div>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[300], textAlign: 'center' }}>Normal</div>
-          </div>
-          <div style={{
-            background: colors.bg[600],
-            border: `1px solid ${extraMin > 0 ? `${colors.kpiTone.amber.base}25` : colors.border.subtle}`,
-            borderRadius: radius.xl, padding: '14px 10px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-          }}>
-            <div style={{ fontSize: 16, marginBottom: 2 }}>⚡</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: extraMin > 0 ? colors.kpiTone.amber.base : colors.text[500], fontVariantNumeric: 'tabular-nums', lineHeight: 1, letterSpacing: '-0.5px' }}>{mhm(extraMin)}</div>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[300], textAlign: 'center' }}>Extra hoy</div>
-          </div>
+          {[
+            {
+              val: mhm(Math.floor(weekMin)),
+              lbl: 'Semana', suffix: weekMin > WK ? ' ↑' : '',
+              accent: weekMin > WK ? colors.semantic.orange : colors.primary.base,
+              color: weekMin > WK ? colors.semantic.orange : colors.primary.light,
+              borderCol: weekMin > WK ? colors.semantic.orange + '30' : colors.border.subtle,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+                </svg>
+              ),
+            },
+            {
+              val: mhm(normMin), lbl: 'Normal', suffix: '',
+              accent: colors.semantic.green, color: colors.semantic.green,
+              borderCol: colors.semantic.green + '20',
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              ),
+            },
+            {
+              val: mhm(extraMin), lbl: 'Extra', suffix: '',
+              accent: extraMin > 0 ? colors.kpiTone.amber.base : colors.border.default,
+              color: extraMin > 0 ? colors.kpiTone.amber.base : colors.text[500],
+              borderCol: extraMin > 0 ? colors.kpiTone.amber.base + '25' : colors.border.subtle,
+              icon: (c) => (
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              ),
+            },
+          ].map(({ val, lbl, suffix, accent, color, borderCol, icon }) => (
+            <div key={lbl} style={{
+              background: colors.bg[600], border: `1px solid ${borderCol}`,
+              borderRadius: radius.xl, padding: '14px 10px 12px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+              overflow: 'hidden', position: 'relative',
+            }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent, borderRadius: '12px 12px 0 0' }} />
+              <div style={{ marginBottom: 2, opacity: 0.9 }}>{icon(color)}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1, letterSpacing: '-1px' }}>{val}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[300], textAlign: 'center' }}>{lbl}{suffix}</div>
+            </div>
+          ))}
         </div>
 
         {/* Total card */}
         <div style={{
-          background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
+          background: `linear-gradient(160deg, ${colors.primary.base}1a 0%, ${colors.bg[600]} 55%)`,
+          border: `1px solid ${o ? colors.primary.base + '55' : colors.border.subtle}`,
           borderRadius: radius['2xl'], padding: '20px 20px 16px',
+          boxShadow: o ? `0 8px 40px ${colors.primary.glow}` : `0 4px 20px rgba(0,0,0,0.2)`,
+          position: 'relative', overflow: 'hidden',
         }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${colors.primary.base}, ${colors.accent.base})`, borderRadius: '16px 16px 0 0' }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             <div style={{ fontSize: 11, color: colors.text[500], fontWeight: 660, textTransform: 'uppercase', letterSpacing: '.5px' }}>
               Total trabajado hoy
@@ -460,15 +494,15 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
 
         {/* PDF export buttons */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <PdfBtn onClick={exportWeekPDF} loading={generatingWeekPdf} label="📅 Semanal" />
-          <PdfBtn onClick={exportMonthPDF} loading={generatingPdf} label="📄 PDF firmado" />
+          <PdfBtn onClick={exportWeekPDF} loading={generatingWeekPdf} label="Semanal" />
+          <PdfBtn onClick={exportMonthPDF} loading={generatingPdf} label="PDF firmado" />
           <button onClick={() => setShowRangeExport(v => !v)} style={{
             padding: '11px 14px', borderRadius: radius.lg,
             border: `1px solid ${showRangeExport ? colors.primary.base : colors.border.default}`,
             background: showRangeExport ? colors.primary.dim : colors.bg[500],
             color: showRangeExport ? colors.primary.light : colors.text[700],
             fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
-          }}>📆</button>
+          }}>Rango</button>
         </div>
 
         {/* Range export panel */}
@@ -603,7 +637,9 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
               background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`,
               borderRadius: radius.lg, display: 'flex', alignItems: 'center', gap: 12,
             }}>
-              <span style={{ fontSize: 16 }}>⏳</span>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.orange} strokeWidth="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
               <div style={{ flex: 1, fontSize: 12 }}>
                 <span style={{ fontWeight: 700, color: colors.semantic.orange }}>
                   {pendVal.length} jornada{pendVal.length !== 1 ? 's' : ''} pendiente{pendVal.length !== 1 ? 's' : ''} de validación

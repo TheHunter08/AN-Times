@@ -250,12 +250,7 @@ function applyDeepLink(url) {
 
 function ScreenLoader() {
   return (
-    <div style={{ position:'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg-800)', flexDirection:'column', gap:20 }}>
-      <div style={{ width:48, height:48, borderRadius:14, background:'linear-gradient(135deg,var(--primary-dim),rgba(0,212,255,.08))', border:'1px solid rgba(108,99,255,.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div className="login-spinner" style={{ width:22, height:22, borderWidth:2.5, borderColor:'rgba(108,99,255,.15)', borderTopColor:'var(--primary-light)' }} />
-      </div>
-      <div style={{ fontSize:13, color:'var(--text3)', fontWeight:600, letterSpacing:'.3px' }}>Cargando</div>
-    </div>
+    <div style={{ position:'fixed', inset:0, background:'var(--bg-800)' }} />
   )
 }
 
@@ -284,18 +279,7 @@ function GlobalConfirm() {
   )
 }
 
-function LoadingBar() {
-  const dbLoading = useAppStore(s => s.dbLoading)
-  if (!dbLoading) return null
-  return (
-    <div style={{
-      position:'fixed', top:0, left:0, right:0, height:3, zIndex:999999,
-      background:'linear-gradient(90deg, var(--primary), var(--accent), var(--primary))',
-      backgroundSize:'200% 100%',
-      animation:'loadingBar 1.2s linear infinite',
-    }} />
-  )
-}
+function LoadingBar() { return null }
 
 export default function App() {
   const currentScreen  = useAppStore(s => s.currentScreen)

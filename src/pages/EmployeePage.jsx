@@ -58,7 +58,7 @@ const GEO_OPTS = { enableHighAccuracy: true, timeout: 25000, maximumAge: 120000 
 const STARTING_LOCK_MS = GEO_OPTS.timeout + 2000
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus } = useAppStore()
   const winW = useWindowWidth()
   const timer = useTimer()
   // Derivar siempre desde db.employees para que onboardingDone y otros campos
@@ -226,7 +226,7 @@ export default function EmployeePage() {
              }, null)?.o
         if (!obra) return
         const dist = distTo(lat, lng, obra)
-        const radio = obra.radio || 200
+        const radio = obra.radio != null ? obra.radio : 200
         if (dist <= radio) {
           geoWasInsideRef.current = openRec.id
           setGeoExitPrompt(null)
@@ -245,7 +245,7 @@ export default function EmployeePage() {
       setGeoExitPrompt(null)
       geoWasInsideRef.current = null
       if (geoDismissedRef.current) return
-      const inRange = obras.find(o => distTo(lat, lng, o) <= (o.radio || 200))
+      const inRange = obras.find(o => distTo(lat, lng, o) <= (o.radio != null ? o.radio : 200))
       setGeoPrompt(inRange ? { obraName: inRange.nombre } : null)
     }
     geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, (err) => { console.warn('[geo] watchPosition error:', err.code, err.message) }, { enableHighAccuracy: false, maximumAge: 60000 })
@@ -647,7 +647,7 @@ export default function EmployeePage() {
       const obraGeo = (db.obras || []).find(o => o.nombre === centro)
       if (obraGeo?.coords) {
         const dist = haversine(effectiveGPS.lat, effectiveGPS.lng, obraGeo.coords.lat, obraGeo.coords.lng)
-        const radio = obraGeo.radio || 200
+        const radio = obraGeo.radio != null ? obraGeo.radio : 200
         if (dist > radio) {
           rec.geoAlert = { dist, radio, ts: new Date().toISOString() }
           setTimeout(() => toast(`⚠️ Estás a ${dist}m de la obra (radio ${radio}m)`, 6000, 'warn'), 600)
@@ -1162,7 +1162,7 @@ export default function EmployeePage() {
                 <div style={{ padding: '0 20px 20px' }}>
                   <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', background: 'rgba(124,58,237,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 15 }}>📅</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" strokeWidth="2" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal del equipo</span>
                       <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
                     </div>
@@ -1243,7 +1243,6 @@ export default function EmployeePage() {
           <div style={{ minWidth:0, overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <div className="emp-greeting">{greeting}</div>
-              <span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:999, background:'rgba(124,58,237,.2)', color:'#a78bfa', letterSpacing:'.3px', flexShrink:0 }}>v5</span>
             </div>
             <TopbarClock />
           </div>
@@ -1254,6 +1253,14 @@ export default function EmployeePage() {
             <button className="enc-chip" onClick={() => setScreen('admin')}>
               {isJefeObra ? '🏗️' : '⭐'} Panel
             </button>
+          )}
+
+          {/* Indicador live realtime */}
+          {realtimeStatus === 'SUBSCRIBED' && (
+            <div title="Tiempo real activo" style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 9px', borderRadius:20, background:'rgba(16,185,129,.12)', border:'1px solid rgba(16,185,129,.25)', flexShrink:0 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'#10b981', display:'inline-block', boxShadow:'0 0 6px #10b981', animation:'pulse 2s ease-in-out infinite' }} />
+              <span style={{ fontSize:10, fontWeight:700, color:'#10b981', letterSpacing:'.3px' }}>LIVE</span>
+            </div>
           )}
 
           {/* Pill de acciones agrupadas */}

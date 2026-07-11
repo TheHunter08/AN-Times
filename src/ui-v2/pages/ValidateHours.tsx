@@ -172,7 +172,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
               {tab === 'pending' && (
                 <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
                   <button onClick={() => handleApprove(row.id)} style={{
-                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: 'rgba(16,185,129,.18)', color: colors.semantic.green,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -180,7 +180,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
                     <IconCheck width={14} height={14} /> Aceptar
                   </button>
                   <button onClick={() => handleModify(row)} style={{
-                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: 'rgba(124,58,237,.18)', color: colors.primary.light,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -188,7 +188,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
                     <IconEdit width={14} height={14} /> Modificar
                   </button>
                   <button onClick={() => handleReject(row.id)} style={{
-                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: 'rgba(239,68,68,.14)', color: colors.semantic.red,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,

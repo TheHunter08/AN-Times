@@ -1410,7 +1410,7 @@ export default function AppV2Admin() {
           </div>
         </div>
       }
-      pageTitle={PAGES.find(p => p.id === effectivePage)?.label ?? ''}
+      pageTitle=""
       breadcrumb="TIMES INC"
     >
       {renderPage()}

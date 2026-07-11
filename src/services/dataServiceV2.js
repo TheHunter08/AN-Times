@@ -309,8 +309,11 @@ export function startTableRealtime(onRefresh) {
   stopTableRealtime()
   _tableRealtimeCh = supabase
     .channel('db-table-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'records',   filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'records',    filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees',  filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'vacaciones', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres',    filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'obras',      filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
     .subscribe()
 }
 
