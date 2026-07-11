@@ -198,3 +198,12 @@ export function IconSeal(props: SVGProps<SVGSVGElement>) {
 export function IconTrendDown(props: SVGProps<SVGSVGElement>) {
   return <svg {...base(props)}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
 }
+export function IconEdit(props: SVGProps<SVGSVGElement>) {
+  return <svg {...base(props)}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+}
+export function IconUserPlus(props: SVGProps<SVGSVGElement>) {
+  return <svg {...base(props)}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
+}
+export function IconHome(props: SVGProps<SVGSVGElement>) {
+  return <svg {...base(props)}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+}

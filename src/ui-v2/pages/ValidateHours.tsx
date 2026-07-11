@@ -1,11 +1,11 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconCheck, IconX, IconClock, IconAlertCircle } from '../components/Icons.js'
+import { IconCheck, IconX, IconClock, IconEdit } from '../components/Icons.js'
 
 export interface ValidateRow {
   id: string
@@ -19,8 +19,6 @@ export interface ValidateRow {
   diff: string
   diffTone: 'ok' | 'over' | 'under'
   status: 'pending' | 'approved' | 'rejected'
-  onApprove?: (id: string) => void
-  onReject?: (id: string) => void
 }
 
 export interface ValidateHoursProps {
@@ -28,16 +26,30 @@ export interface ValidateHoursProps {
   weekLabel?: string
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
+  onModify?: (id: string, entry: string, exit: string) => void
 }
 
 const diffColor = { ok: colors.semantic.green, over: colors.semantic.orange, under: colors.semantic.red }
 
-export function ValidateHours({ rows, weekLabel, onApprove, onReject }: ValidateHoursProps) {
+function useIsMobile() {
+  const [m, setM] = useState(() => typeof window !== 'undefined' && window.innerWidth < 700)
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < 700)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return m
+}
+
+export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }: ValidateHoursProps) {
   const [search, setSearch] = useState('')
   const [localRows, setLocalRows] = useState(rows)
   const [tab, setTab] = useState<'pending' | 'reviewed'>('pending')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editEntry, setEditEntry] = useState('')
+  const [editExit, setEditExit] = useState('')
+  const isMobile = useIsMobile()
 
-  // Sync when real DB data changes
   useEffect(() => { setLocalRows(rows) }, [rows])
 
   const handleApprove = (id: string) => {
@@ -48,6 +60,17 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject }: Validate
     setLocalRows(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r))
     onReject?.(id)
   }
+  const handleModify = (row: ValidateRow) => {
+    setEditingId(row.id)
+    setEditEntry(row.entry)
+    setEditExit(row.exit)
+  }
+  const handleSaveModify = () => {
+    if (!editingId) return
+    setLocalRows(prev => prev.map(r => r.id === editingId ? { ...r, entry: editEntry, exit: editExit, status: 'approved' } : r))
+    onModify?.(editingId, editEntry, editExit)
+    setEditingId(null)
+  }
 
   const visible = localRows
     .filter(r => tab === 'pending' ? r.status === 'pending' : r.status !== 'pending')
@@ -56,93 +79,196 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject }: Validate
   const pendingCount = localRows.filter(r => r.status === 'pending').length
   const totalOvertime = localRows.filter(r => r.diffTone === 'over').length
 
+  const inputStyle = {
+    padding: '8px 10px', borderRadius: radius.sm,
+    border: `1px solid ${colors.border.default}`,
+    background: colors.bg[600], color: colors.text[900],
+    fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' as const,
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 960 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <PageTitle>Validar horas</PageTitle>
           {weekLabel && <div style={{ fontSize: 12, color: colors.text[500], marginTop: 3 }}>{weekLabel}</div>}
         </div>
-        <Search placeholder="Buscar empleado o fecha…" value={search} onChange={e => setSearch(e.target.value)} />
+        <Search placeholder="Buscar empleado…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {[
-          { label: 'Pendientes de validar', value: String(pendingCount), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
-          { label: 'Con horas extra', value: String(totalOvertime), color: colors.primary.light, bg: colors.primary.dim },
-          { label: 'Total registros', value: String(localRows.length), color: colors.text[700], bg: colors.bg[600] },
+          { label: 'Pendientes', value: String(pendingCount), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
+          { label: 'Horas extra', value: String(totalOvertime), color: colors.primary.light, bg: colors.primary.dim },
+          { label: 'Total', value: String(localRows.length), color: colors.text[700], bg: colors.bg[600] },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '12px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
-            <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 4 }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: '-.5px' }}>{k.value}</div>
+          <div key={i} style={{ padding: '10px 14px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
+            <div style={{ fontSize: 10, color: colors.text[500], marginBottom: 3, textTransform: 'uppercase', letterSpacing: '.4px' }}>{k.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, padding: 3, borderRadius: radius.md, background: colors.bg[600], width: 'fit-content' }}>
-        {([['pending', `Pendientes (${pendingCount})`], ['reviewed', 'Validados']] as const).map(([t, l]) => (
+        {(['pending', 'reviewed'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding: '6px 16px', borderRadius: radius.sm, border: 'none', fontSize: 12.5, fontWeight: 640, cursor: 'pointer', fontFamily: 'inherit',
+            padding: '6px 14px', borderRadius: radius.sm, border: 'none', fontSize: 12.5,
+            fontWeight: 640, cursor: 'pointer', fontFamily: 'inherit',
             background: tab === t ? colors.bg[300] : 'transparent',
             color: tab === t ? colors.text[900] : colors.text[500],
           }}>
-            {l}
+            {t === 'pending' ? `Pendientes (${pendingCount})` : 'Validados'}
           </button>
         ))}
       </div>
 
-      {/* Table */}
-      <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden', background: colors.bg[700] }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 80px 80px 80px 80px 100px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
-          {['Empleado', 'Fecha', 'Entrada', 'Salida', 'Trabajado', 'Esperado', 'Diferencia'].map(h => (
-            <div key={h} style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>{h}</div>
-          ))}
+      {visible.length === 0 && (
+        <div style={{ padding: 32, textAlign: 'center', color: colors.text[500], fontSize: 13,
+          background: colors.bg[700], borderRadius: radius.md, border: `1px solid ${colors.border.subtle}` }}>
+          {tab === 'pending' ? 'No hay registros pendientes' : 'No hay registros validados'}
         </div>
+      )}
 
-        {visible.length === 0 && (
-          <div style={{ padding: '32px', textAlign: 'center', color: colors.text[500], fontSize: 13 }}>
-            {tab === 'pending' ? 'No hay registros pendientes de validar' : 'No hay registros validados'}
-          </div>
-        )}
-
-        {visible.map((row, i) => (
-          <div key={row.id} style={{
-            display: 'grid', gridTemplateColumns: '1fr 90px 80px 80px 80px 80px 100px', gap: 8,
-            padding: '12px 16px', alignItems: 'center',
-            borderBottom: i < visible.length - 1 ? `1px solid ${colors.border.subtle}` : 'none',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Avatar name={row.empName} size={28} />
-              <div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: colors.text[900] }}>{row.empName}</div>
-                <div style={{ fontSize: 11, color: colors.text[500] }}>{row.dept}</div>
+      {/* Vista móvil: tarjetas */}
+      {isMobile && visible.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {visible.map(row => (
+            <div key={row.id} style={{
+              background: colors.bg[700], borderRadius: radius.lg,
+              border: `1px solid ${colors.border.subtle}`, overflow: 'hidden',
+            }}>
+              {/* Cabecera tarjeta */}
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${colors.border.subtle}` }}>
+                <Avatar name={row.empName} size={32} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.empName}</div>
+                  <div style={{ fontSize: 11, color: colors.text[500] }}>{row.date} · {row.dept}</div>
+                </div>
+                {row.status !== 'pending' && (
+                  <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Ok' : 'Rechazado'}</Badge>
+                )}
               </div>
-            </div>
-            <div style={{ fontSize: 12.5, color: colors.text[700] }}>{row.date}</div>
-            <div style={{ fontSize: 12.5, color: colors.text[700], fontVariantNumeric: 'tabular-nums' }}>{row.entry}</div>
-            <div style={{ fontSize: 12.5, color: colors.text[700], fontVariantNumeric: 'tabular-nums' }}>{row.exit}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{row.worked}</div>
-            <div style={{ fontSize: 12.5, color: colors.text[500], fontVariantNumeric: 'tabular-nums' }}>{row.expected}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {tab === 'pending' ? (
-                <>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: diffColor[row.diffTone], fontVariantNumeric: 'tabular-nums' }}>{row.diff}</span>
-                  <button onClick={() => handleApprove(row.id)} title="Aprobar" style={{ display: 'flex', alignItems: 'center', padding: 5, borderRadius: radius.xs, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer' }}>
-                    <IconCheck width={12} height={12} />
+              {/* Horas */}
+              <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, borderBottom: `1px solid ${colors.border.subtle}` }}>
+                {[
+                  { label: 'Entrada', value: row.entry },
+                  { label: 'Salida', value: row.exit },
+                  { label: 'Trabajado', value: row.worked },
+                ].map(f => (
+                  <div key={f.label}>
+                    <div style={{ fontSize: 10, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 2 }}>{f.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Diferencia */}
+              <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IconClock width={13} height={13} style={{ color: diffColor[row.diffTone] }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: diffColor[row.diffTone] }}>{row.diff} vs {row.expected} esperadas</span>
+              </div>
+              {/* Botones acción — solo en pendientes */}
+              {tab === 'pending' && (
+                <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
+                  <button onClick={() => handleApprove(row.id)} style={{
+                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    background: 'rgba(16,185,129,.18)', color: colors.semantic.green,
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  }}>
+                    <IconCheck width={14} height={14} /> Aceptar
                   </button>
-                  <button onClick={() => handleReject(row.id)} title="Rechazar" style={{ display: 'flex', alignItems: 'center', padding: 5, borderRadius: radius.xs, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer' }}>
-                    <IconX width={12} height={12} />
+                  <button onClick={() => handleModify(row)} style={{
+                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    background: 'rgba(124,58,237,.18)', color: colors.primary.light,
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  }}>
+                    <IconEdit width={14} height={14} /> Modificar
                   </button>
-                </>
-              ) : (
-                <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Aprobado' : 'Rechazado'}</Badge>
+                  <button onClick={() => handleReject(row.id)} style={{
+                    padding: '10px 0', borderRadius: radius.md, border: 'none',
+                    background: 'rgba(239,68,68,.14)', color: colors.semantic.red,
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  }}>
+                    <IconX width={14} height={14} /> Rechazar
+                  </button>
+                </div>
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Vista escritorio: tabla con scroll horizontal */}
+      {!isMobile && visible.length > 0 && (
+        <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, background: colors.bg[700], overflowX: 'auto' }}>
+          <div style={{ minWidth: 760 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 75px 75px 80px 80px 130px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
+              {['Empleado', 'Fecha', 'Entrada', 'Salida', 'Trabajado', 'Esperado', 'Acción'].map(h => (
+                <div key={h} style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>{h}</div>
+              ))}
+            </div>
+            {visible.map((row, i) => (
+              <div key={row.id} style={{
+                display: 'grid', gridTemplateColumns: '1fr 90px 75px 75px 80px 80px 130px', gap: 8,
+                padding: '11px 16px', alignItems: 'center',
+                borderBottom: i < visible.length - 1 ? `1px solid ${colors.border.subtle}` : 'none',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Avatar name={row.empName} size={26} />
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: colors.text[900] }}>{row.empName}</div>
+                    <div style={{ fontSize: 11, color: colors.text[500] }}>{row.dept}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12.5, color: colors.text[700] }}>{row.date}</div>
+                <div style={{ fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: colors.text[700] }}>{row.entry}</div>
+                <div style={{ fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: colors.text[700] }}>{row.exit}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{row.worked}</div>
+                <div style={{ fontSize: 12, color: colors.text[500], fontVariantNumeric: 'tabular-nums' }}>{row.expected}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {tab === 'pending' ? (
+                    <>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: diffColor[row.diffTone], fontVariantNumeric: 'tabular-nums', minWidth: 32 }}>{row.diff}</span>
+                      <button onClick={() => handleApprove(row.id)} title="Aceptar" style={{ padding: '4px 6px', borderRadius: radius.xs, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>Ok</button>
+                      <button onClick={() => handleModify(row)} title="Modificar" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: 'rgba(124,58,237,.16)', color: colors.primary.light, cursor: 'pointer', display: 'flex' }}><IconEdit width={12} height={12} /></button>
+                      <button onClick={() => handleReject(row.id)} title="Rechazar" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', display: 'flex' }}><IconX width={12} height={12} /></button>
+                    </>
+                  ) : (
+                    <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Aprobado' : 'Rechazado'}</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* Modal modificar horario */}
+      {editingId && (
+        <div onClick={() => setEditingId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[800], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 24, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Modificar horario</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Entrada</div>
+                <input type="time" value={editEntry} onChange={e => setEditEntry(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Salida</div>
+                <input type="time" value={editExit} onChange={e => setEditExit(e.target.value)} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={handleSaveModify} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

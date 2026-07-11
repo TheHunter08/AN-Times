@@ -1,6 +1,6 @@
 ﻿// Shell admin v2 — usa el nuevo AppShell + páginas v2 con datos reales de useAppStore.
 // CLAUDE.md: UI only — NO tocar backend, Supabase, auth ni lógica de negocio.
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
@@ -28,6 +28,7 @@ import {
   IconFolder, IconFileText, IconClipboard, IconBell, IconChat,
   IconShield, IconBuilding, IconAlertCircle, IconReceipt,
   IconCheck, IconLogout, IconRows, IconSeal, IconTrendUp, IconMapPin,
+  IconEdit, IconUserPlus, IconHome, IconX, IconPlus,
 } from './components/Icons.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
@@ -38,7 +39,7 @@ import { auditLog, queuePush } from '../services/dataService.js'
 import { gid, today } from '../utils/time.js'
 
 const PAGES = [
-  { id: 'dashboard',      label: 'Dashboard',       icon: <IconGrid /> },
+  { id: 'dashboard',      label: 'Dashboard',        icon: <IconGrid /> },
   { id: 'empleados',      label: 'Empleados',        icon: <IconUsers /> },
   { id: 'fichajes',       label: 'Fichajes',         icon: <IconClock /> },
   { id: 'planning',       label: 'Planning',         icon: <IconCalendar /> },
@@ -47,6 +48,7 @@ const PAGES = [
   { id: 'solicitudes',    label: 'Solicitudes',      icon: <IconClipboard /> },
   { id: 'gastos',         label: 'Gastos',           icon: <IconReceipt /> },
   { id: 'obras',          label: 'Obras',            icon: <IconBuilding /> },
+  { id: 'centros',        label: 'Centros trabajo',  icon: <IconMapPin /> },
   { id: 'documentos',     label: 'Documentos',       icon: <IconFolder /> },
   { id: 'estadisticas',   label: 'Estadísticas',     icon: <IconChart /> },
   { id: 'informes',       label: 'Informes',         icon: <IconFileText /> },
@@ -56,6 +58,194 @@ const PAGES = [
   { id: 'anomalias',      label: 'Anomalías',        icon: <IconAlertCircle /> },
   { id: 'auditoria',      label: 'Auditoría',        icon: <IconShield /> },
 ]
+
+const ROLES = [
+  { value: 'empleado',   label: 'Empleado' },
+  { value: 'encargado',  label: 'Encargado' },
+  { value: 'jefe_obra',  label: 'Jefe de obra' },
+  { value: 'admin',      label: 'Administrador' },
+]
+
+interface EmpForm {
+  id: string; name: string; email: string; role: string
+  pin: string; pinLen: number | null
+  centroTrabajo: string; telefono: string; obrasAsignadas: string[]
+}
+
+function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () => void }) {
+  const db     = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast  = useAppStore(s => s.toast)
+  const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
+  const centros: string[] = db.config?.centros || []
+
+  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [] }
+  const [form, setForm] = useState<EmpForm>(initial ?? blank)
+  const isEdit = !!initial
+
+  const setF = (k: keyof EmpForm, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const toggleObra = (id: string) =>
+    setF('obrasAsignadas', form.obrasAsignadas.includes(id)
+      ? form.obrasAsignadas.filter((x: string) => x !== id)
+      : [...form.obrasAsignadas, id])
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    saveDB((fresh: any) => {
+      const emps: any[] = fresh.employees || []
+      const existing = isEdit ? emps.find((e: any) => e.id === form.id) || {} : {}
+      const pinHash = form.pin ? form.pin : (isEdit ? existing.pin || null : null)
+      const pinLen = form.pin ? form.pin.length : (isEdit ? existing.pinLen || null : null)
+      const emp = {
+        ...existing,
+        id: form.id, name: form.name.trim(), email: form.email || null,
+        role: form.role, pin: pinHash, pinLen,
+        centroTrabajo: form.centroTrabajo || null,
+        telefono: form.telefono || null,
+        obrasAsignadas: form.obrasAsignadas,
+        isAdmin: form.role === 'admin',
+        isEnc: form.role === 'encargado',
+        isJO: form.role === 'jefe_obra',
+        baja: false,
+      }
+      const updated = isEdit
+        ? emps.map((e: any) => e.id === form.id ? emp : e)
+        : [...emps, emp]
+      return { employees: updated }
+    })
+    toast(isEdit ? 'Empleado actualizado' : 'Empleado creado', 2500, 'ok')
+    onClose()
+  }
+
+  const iField = (label: string, key: keyof EmpForm, type = 'text', placeholder = '') => (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</div>
+      <input type={type} value={form[key] as string} onChange={e => setF(key, e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+    </div>
+  )
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#09070D', borderRadius: '16px 16px 0 0', border: '1px solid rgba(255,255,255,.1)', padding: '24px 20px 40px', width: '100%', maxWidth: 480, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#f5f5f7' }}>{isEdit ? 'Editar empleado' : 'Nuevo empleado'}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767f', padding: 4 }}><IconX width={18} height={18} /></button>
+        </div>
+        {iField('Nombre completo', 'name', 'text', 'Ej: Juan García')}
+        {iField('Email', 'email', 'email', 'juan@empresa.com')}
+        {iField('Teléfono', 'telefono', 'tel', '+34 600 000 000')}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Rol</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {ROLES.map(r => (
+              <button key={r.value} onClick={() => setF('role', r.value)} style={{
+                padding: '10px 12px', borderRadius: 8,
+                border: `1px solid ${form.role === r.value ? '#7C3AED' : 'rgba(255,255,255,.1)'}`,
+                background: form.role === r.value ? 'rgba(124,58,237,.18)' : 'rgba(255,255,255,.04)',
+                color: form.role === r.value ? '#A78BFA' : '#aeaeb8',
+                fontSize: 13, fontWeight: form.role === r.value ? 700 : 500,
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const,
+              }}>{r.label}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+            PIN numérico {isEdit ? '(vacío = no cambiar)' : ''}
+          </div>
+          <input type="password" inputMode="numeric" pattern="[0-9]*" value={form.pin}
+            onChange={e => { if (/^\d*$/.test(e.target.value)) setF('pin', e.target.value) }}
+            placeholder="4-6 dígitos" maxLength={6}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none', letterSpacing: '0.3em' }} />
+        </div>
+        {centros.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
+            <select value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+              <option value="">Sin asignar</option>
+              {centros.map((c: string) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+        {obras.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.4px' }}>Obras asignadas</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {obras.map((o: any) => (
+                <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '7px 10px', borderRadius: 8, background: form.obrasAsignadas.includes(o.id) ? 'rgba(124,58,237,.14)' : 'rgba(255,255,255,.04)', border: `1px solid ${form.obrasAsignadas.includes(o.id) ? 'rgba(124,58,237,.4)' : 'rgba(255,255,255,.08)'}` }}>
+                  <input type="checkbox" checked={form.obrasAsignadas.includes(o.id)} onChange={() => toggleObra(o.id)} style={{ accentColor: '#7C3AED' }} />
+                  <span style={{ fontSize: 13, color: '#f5f5f7' }}>{o.nombre || o.name || o.id}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#7C3AED', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+          {isEdit ? 'Guardar cambios' : 'Crear empleado'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CentrosPage() {
+  const db     = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast  = useAppStore(s => s.toast)
+  const [newName, setNewName] = useState('')
+
+  const centros: string[] = db.config?.centros || []
+
+  const addCentro = () => {
+    const name = newName.trim()
+    if (!name) return
+    if (centros.includes(name)) { toast('Ya existe ese centro', 2000, 'warn'); return }
+    saveDB((f: any) => ({ config: { ...(f.config || {}), centros: [...centros, name] } }))
+    setNewName('')
+    toast('Centro creado', 2000, 'ok')
+  }
+  const removeCentro = (c: string) => {
+    saveDB((f: any) => ({ config: { ...(f.config || {}), centros: centros.filter((x: string) => x !== c) } }))
+    toast('Centro eliminado', 2000, 'ok')
+  }
+
+  return (
+    <div style={{ maxWidth: 600 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#f5f5f7', marginBottom: 4 }}>Centros de trabajo</div>
+        <div style={{ fontSize: 13, color: '#76767f' }}>Gestiona los centros para asignar empleados y grupos.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+        <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCentro()}
+          placeholder="Nombre del centro…"
+          style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        <button onClick={addCentro} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#7C3AED', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <IconPlus width={14} height={14} /> Añadir
+        </button>
+      </div>
+      {centros.length === 0 && (
+        <div style={{ padding: 32, textAlign: 'center', color: '#76767f', fontSize: 13, background: 'rgba(255,255,255,.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,.06)' }}>
+          No hay centros de trabajo. Crea el primero arriba.
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {centros.map((c: string) => {
+          const count = (db.employees || []).filter((e: any) => !e.baja && e.centroTrabajo === c).length
+          return (
+            <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)' }}>
+              <IconMapPin width={16} height={16} style={{ color: '#A78BFA', flexShrink: 0 }} />
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#f5f5f7' }}>{c}</div>
+              <div style={{ fontSize: 12, color: '#76767f', marginRight: 4 }}>{count} empleado{count !== 1 ? 's' : ''}</div>
+              <button onClick={() => removeCentro(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767f', padding: 4, display: 'flex' }}><IconX width={16} height={16} /></button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 // ─── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -207,8 +397,30 @@ function NotificationsPage() {
 }
 
 function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) => void }) {
-  const rows = useEmployeesData()
-  return <Employees rows={rows} onViewTimesheets={onViewTimesheets} />
+  const rows   = useEmployeesData()
+  const db     = useAppStore(s => s.db) as any
+  const [modal, setModal] = useState<{ mode: 'create' } | { mode: 'edit'; emp: EmpForm } | null>(null)
+
+  const openEdit = (id: string) => {
+    const emp = (db.employees || []).find((e: any) => e.id === id)
+    if (!emp) return
+    const role = emp.role || (emp.isAdmin ? 'admin' : emp.isEnc ? 'encargado' : emp.isJO ? 'jefe_obra' : 'empleado')
+    setModal({ mode: 'edit', emp: {
+      id: emp.id, name: emp.name || '', email: emp.email || '',
+      role, pin: '', pinLen: emp.pinLen || null,
+      centroTrabajo: emp.centroTrabajo || '', telefono: emp.telefono || '',
+      obrasAsignadas: emp.obrasAsignadas || [],
+    }})
+  }
+
+  return (
+    <>
+      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} />
+      {modal && (
+        <EmployeeModal initial={modal.mode === 'edit' ? modal.emp : undefined} onClose={() => setModal(null)} />
+      )}
+    </>
+  )
 }
 
 function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?: string; onSearchChange?: (s: string) => void }) {
@@ -977,7 +1189,7 @@ function MessagesPage() {
 // ─── Main shell ────────────────────────────────────────────────────────────────
 
 export default function AppV2Admin() {
-  const { session, currentAdminPage, setAdminPage, logout } = useAppStore()
+  const { session, currentAdminPage, setAdminPage, logout, setScreen } = useAppStore() as any
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
 
@@ -1013,7 +1225,8 @@ export default function AppV2Admin() {
     if (page === 'notificaciones') return <NotificationsPage />
     if (page === 'anomalias')      return <AnomaliesPage />
     if (page === 'auditoria')      return <AuditPage />
-    if (page === 'obras')         return <ObrasPage />
+    if (page === 'obras')          return <ObrasPage />
+    if (page === 'centros')        return <CentrosPage />
     return null
   }
 
@@ -1035,16 +1248,23 @@ export default function AppV2Admin() {
         </div>
       }
       sidebarFooter={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
-          <Avatar name={name} size={32} status="online" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-            <div style={{ fontSize: 10.5, color: colors.text[500] }}>Administrador</div>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
+            <Avatar name={name} size={32} status="online" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+              <div style={{ fontSize: 10.5, color: colors.text[500] }}>Administrador</div>
+            </div>
+            <button onClick={logout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
+              <IconLogout width={15} height={15} />
+            </button>
           </div>
-          <button onClick={logout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
-            <IconLogout width={15} height={15} />
-          </button>
-        </div>
+          {setScreen && (
+            <button onClick={() => setScreen('emp')} style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(124,58,237,.3)', background: 'rgba(124,58,237,.08)', color: '#A78BFA', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <IconHome width={13} height={13} /> Vista empleado
+            </button>
+          )}
+        </>
       }
       headerActions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

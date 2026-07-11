@@ -21,6 +21,7 @@ export interface EmployeeRow {
 export interface EmployeesProps {
   rows: EmployeeRow[]
   onAdd?: () => void
+  onEdit?: (id: string) => void
   onSelect?: (id: string) => void
   onViewTimesheets?: (id: string) => void
 }
@@ -71,7 +72,7 @@ const FILTERS = [
   { key: 'off', label: 'Inactivo' },
 ] as const
 
-export function Employees({ rows, onAdd, onSelect, onViewTimesheets }: EmployeesProps) {
+export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: EmployeesProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
@@ -258,6 +259,14 @@ export function Employees({ rows, onAdd, onSelect, onViewTimesheets }: Employees
               >
                 Ver fichajes
               </button>
+              {onEdit && (
+                <button
+                  onClick={() => { onEdit(profileEmp.id); setProfileEmp(null) }}
+                  style={{ padding: '10px 16px', borderRadius: radius.md, border: 'none', background: colors.bg[600], color: colors.text[900], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Editar
+                </button>
+              )}
               <button
                 onClick={() => setProfileEmp(null)}
                 style={{ padding: '10px 16px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}

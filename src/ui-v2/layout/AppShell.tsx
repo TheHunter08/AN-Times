@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Sidebar } from '../components/Sidebar.js'
 import type { SidebarItem } from '../components/Sidebar.js'
@@ -18,21 +18,46 @@ export interface AppShellProps {
   children: ReactNode
 }
 
-// Layout responsive: sidebar fija en escritorio, oculta tras un botón de
-// menú en móvil (drawer superpuesto) — mismo patrón ya probado en la UI
-// actual, reimplementado limpio para ui-v2.
 export function AppShell({
   navItems, activeNav, onSelectNav, sidebarHeader, sidebarFooter,
   pageTitle, breadcrumb, headerActions, children,
 }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 900
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900)
+  const touchStartX = useRef<number | null>(null)
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 900)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // Cerrar drawer al cambiar de página
+  useEffect(() => { if (mobileNavOpen) setMobileNavOpen(false) }, [activeNav])
+
+  // Gesto iOS: deslizar desde el borde izquierdo abre el sidebar
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    if (dx > 55 && touchStartX.current < 30) setMobileNavOpen(true)
+    if (dx < -55) setMobileNavOpen(false)
+    touchStartX.current = null
+  }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', background: `radial-gradient(1200px 700px at 15% -10%, rgba(59,91,255,0.07), transparent 60%), ${colors.bg[800]}`, color: colors.text[900], fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
-      {/* Grano sutil sobre todo el shell — el detalle que separa un fondo
-          negro plano ("de plantilla") de una superficie con textura real,
-          igual que hacen Linear/Vercel/Arc. Opacidad mínima a propósito. */}
+    <div
+      onTouchStart={isMobile ? handleTouchStart : undefined}
+      onTouchEnd={isMobile ? handleTouchEnd : undefined}
+      style={{
+        position: 'fixed', inset: 0, display: 'flex',
+        background: `radial-gradient(1200px 700px at 15% -10%, rgba(59,91,255,0.07), transparent 60%), ${colors.bg[800]}`,
+        color: colors.text[900],
+        fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
+      }}
+    >
       <div
         aria-hidden
         style={{
@@ -40,12 +65,21 @@ export function AppShell({
           backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
         }}
       />
+
+      {/* Sidebar escritorio */}
       {!isMobile && (
         <Sidebar items={navItems} active={activeNav} onSelect={onSelectNav} header={sidebarHeader} footer={sidebarFooter} />
       )}
-      {isMobile && mobileNavOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }}>
-          <div style={{ width: 232 }}>
+
+      {/* Drawer móvil con animación fluida y overlay */}
+      {isMobile && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, pointerEvents: mobileNavOpen ? 'auto' : 'none' }}>
+          <div style={{
+            width: 240, height: '100%',
+            transform: mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform .26s cubic-bezier(.32,1,.23,1)',
+            willChange: 'transform',
+          }}>
             <Sidebar
               items={navItems}
               active={activeNav}
@@ -54,9 +88,21 @@ export function AppShell({
               footer={sidebarFooter}
             />
           </div>
-          <div style={{ flex: 1, background: 'rgba(0,0,0,.5)' }} onClick={() => setMobileNavOpen(false)} />
+          <div
+            style={{
+              position: 'absolute', inset: 0, left: 240,
+              background: 'rgba(0,0,0,.5)',
+              opacity: mobileNavOpen ? 1 : 0,
+              transition: 'opacity .26s ease',
+              WebkitBackdropFilter: 'blur(4px)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => setMobileNavOpen(false)}
+          />
         </div>
       )}
+
+      {/* Contenido principal */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <Header
           title={pageTitle}
@@ -67,7 +113,12 @@ export function AppShell({
                 <button
                   onClick={() => setMobileNavOpen(o => !o)}
                   aria-label="Menú"
-                  style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    border: `1px solid ${colors.border.default}`,
+                    background: colors.bg[600], color: colors.text[900],
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
                 >
                   <IconMenu width={16} height={16} />
                 </button>
@@ -76,7 +127,14 @@ export function AppShell({
             </>
           }
         />
-        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '32px 36px', position: 'relative' }}>
+        <main
+          style={{
+            flex: 1, minHeight: 0, overflowY: 'auto',
+            padding: isMobile ? '16px 14px' : '32px 36px',
+            position: 'relative',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           <div key={activeNav} className="uiv2-page-enter" style={{ position: 'relative', zIndex: 1 }}>{children}</div>
         </main>
         <style>{`
