@@ -68,6 +68,9 @@ export default function EmployeePage() {
     if (!su) return null
     return (db.employees || []).find(e => e.id === su.id) || su
   }, [session.user?.id, db.employees])
+  // Usar session.isEnc/isJO como fallback cuando u.role no está actualizado post-reconcile
+  const isSuper = u ? (u.role === 'encargado' || u.role === 'jefe_obra' || session.isEnc || session.isJO) : false
+  const isJefeObra = u ? (u.role === 'jefe_obra' || session.isJO) : false
   const [pendingGPS, setPendingGPS] = useState(null)
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
   const [qrScanOpen, setQrScanOpen] = useState(false)
@@ -785,12 +788,12 @@ export default function EmployeePage() {
 
     const empId = decodeEmployeeQR(text)
     if (empId) {
-      if (u.role !== 'jefe_obra' && u.role !== 'encargado') {
+      if (!isSuper) {
         toast('No tienes permiso para fichar a otro empleado', 4000, 'err')
         return
       }
       if (empId === u.id) { toast('Este es tu propio QR — usa "Fichar con QR" para tu jornada', 4000, 'warn'); return }
-      const isJO = u.role === 'jefe_obra'
+      const isJO = isJefeObra
       const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
       const emp = (db.employees || []).find(e =>
         e.id === empId && !e.isAdmin && !e.baja &&
@@ -945,8 +948,9 @@ export default function EmployeePage() {
 
   // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)
   const teamCierresPendientes = useMemo(() => {
-    if (u.role !== 'encargado' && u.role !== 'jefe_obra') return []
+    if (!isSuper) return []
     const centro = u.centroTrabajo || ''
+    const empMap = new Map((db.employees || []).map(e => [e.id, e]))
     const teamIds = new Set(
       (db.employees || [])
         .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
@@ -954,12 +958,12 @@ export default function EmployeePage() {
     )
     return (db.cierres || [])
       .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor)
-      .map(c => ({ id: c.id, empName: c.empName || c.empId, mes: c.mes || '' }))
-  }, [db.cierres, db.employees, u.role, u.centroTrabajo, u.id])
+      .map(c => ({ id: c.id, empName: c.empName || empMap.get(c.empId)?.name || c.empId, mes: c.mes || '' }))
+  }, [db.cierres, db.employees, isSuper, u.centroTrabajo, u.id])
 
   // Planning semanal del equipo para encargados/jefes de obra
   const weekPlanningData = useMemo(() => {
-    if (u.role !== 'encargado' && u.role !== 'jefe_obra') return null
+    if (!isSuper) return null
     const centro = u.centroTrabajo || ''
     const team = (db.employees || []).filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
     if (!team.length) return null
@@ -1059,9 +1063,9 @@ export default function EmployeePage() {
             <TopbarClock />
           </div>
           <div className="emp-dsk-topbar-actions">
-            {(session.isEnc || session.isJO) && (
+            {isSuper && (
               <button className="enc-chip" onClick={() => setScreen('admin')}>
-                {session.isJO ? '🏗️ Panel' : '⭐ Panel'}
+                {isJefeObra ? '🏗️ Panel' : '⭐ Panel'}
               </button>
             )}
             <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema">
@@ -1154,7 +1158,7 @@ export default function EmployeePage() {
               <div style={{ padding: '16px 20px' }}>
                 <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
               </div>
-              {(u.role === 'jefe_obra' || u.role === 'encargado') && (
+              {isSuper && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <button onClick={() => setQrScanOpen(true)} style={{
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -1259,9 +1263,9 @@ export default function EmployeePage() {
         </div>
         <div className="emp-top-right">
           {/* Panel chip — encargados y jefes de obra */}
-          {(session.isEnc || session.isJO) && (
+          {isSuper && (
             <button className="enc-chip" onClick={() => setScreen('admin')}>
-              {session.isJO ? '🏗️' : '⭐'} Panel
+              {isJefeObra ? '🏗️' : '⭐'} Panel
             </button>
           )}
 
@@ -1390,7 +1394,7 @@ export default function EmployeePage() {
             <div style={{ padding: '16px' }}>
               <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
             </div>
-            {(u.role === 'jefe_obra' || u.role === 'encargado') && (
+            {isSuper && (
               <div style={{ padding: '0 16px 16px' }}>
                 <button onClick={() => setQrScanOpen(true)} style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
