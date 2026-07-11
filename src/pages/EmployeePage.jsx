@@ -1140,11 +1140,8 @@ export default function EmployeePage() {
                   </button>
                 </div>
               )}
-              <div style={{ padding: '16px 20px' }}>
-                <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
-              </div>
               {isSuper && (
-                <div style={{ padding: '0 20px 20px' }}>
+                <div style={{ padding: '12px 20px 0' }}>
                   <button onClick={() => setQrScanOpen(true)} style={{
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
@@ -1159,6 +1156,9 @@ export default function EmployeePage() {
                   </button>
                 </div>
               )}
+              <div style={{ padding: '16px 20px' }}>
+                <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+              </div>
               {weekPlanningData && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
@@ -1353,11 +1353,8 @@ export default function EmployeePage() {
                 </button>
               </div>
             )}
-            <div style={{ padding: '16px' }}>
-              <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
-            </div>
             {isSuper && (
-              <div style={{ padding: '0 16px 16px' }}>
+              <div style={{ padding: '12px 16px 0' }}>
                 <button onClick={() => setQrScanOpen(true)} style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
@@ -1372,6 +1369,9 @@ export default function EmployeePage() {
                 </button>
               </div>
             )}
+            <div style={{ padding: '16px' }}>
+              <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+            </div>
             {weekPlanningData && (
               <div style={{ padding: '0 16px 16px' }}>
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
