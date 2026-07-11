@@ -956,10 +956,13 @@ export default function EmployeePage() {
         .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
         .map(e => e.id)
     )
+    // Fallback: también excluir IDs guardados en config para cuando firmaSupervisor
+    // se pierde en el sync de Supabase (el blob lo preserva, la tabla individual no)
+    const firmadosSet = new Set(db.config?._firmadosSupervisor || [])
     return (db.cierres || [])
-      .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor)
+      .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor && !firmadosSet.has(c.id))
       .map(c => ({ id: c.id, empName: c.empName || empMap.get(c.empId)?.name || c.empId, mes: c.mes || '' }))
-  }, [db.cierres, db.employees, isSuper, u.centroTrabajo, u.id])
+  }, [db.cierres, db.employees, db.config, isSuper, u.centroTrabajo, u.id])
 
   // Planning semanal del equipo para encargados/jefes de obra
   const weekPlanningData = useMemo(() => {
@@ -999,6 +1002,11 @@ export default function EmployeePage() {
           ? { ...c, firmaSupervisor: true, firmaSupervisorAt: new Date().toISOString(), firmaSupervisorBy: u.name }
           : c
       ),
+      // Guardar el ID en config como fallback por si firmaSupervisor se pierde en reconcile
+      config: {
+        ...(freshDb.config || {}),
+        _firmadosSupervisor: [...new Set([...(freshDb.config?._firmadosSupervisor || []), cierreId])],
+      },
     }))
     toast('Cierre firmado como supervisor', 2500, 'ok')
   }

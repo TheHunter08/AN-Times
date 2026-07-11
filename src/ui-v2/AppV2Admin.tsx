@@ -1209,6 +1209,9 @@ function MessagesPage() {
 
 // ─── Main shell ────────────────────────────────────────────────────────────────
 
+// Páginas visibles para encargado/jefe de obra (panel supervisor limitado)
+const ENC_PAGES = ['fichajes', 'planning', 'validar', 'solicitudes', 'mensajes', 'notificaciones']
+
 export default function AppV2Admin() {
   const { session, currentAdminPage, setAdminPage, logout, setScreen } = useAppStore() as any
   const [search, setSearch] = useState('')
@@ -1218,7 +1221,18 @@ export default function AppV2Admin() {
   const notis = useNotificationsData()
   const unreadCount = notis.items.filter(n => !n.read).length
 
-  const navItems = PAGES.map(p => ({ id: p.id, label: p.label, icon: <span>{p.icon}</span> }))
+  // Detectar si es encargado/jefe_obra en lugar de admin
+  const isEnc = !session?.isAdmin && (session?.isEnc || session?.isJO)
+  const encRoleLabel = session?.isJO ? 'Jefe de obra' : 'Encargado'
+
+  // Filtrar páginas según rol
+  const visiblePages = isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES
+  const navItems = visiblePages.map(p => ({ id: p.id, label: p.label, icon: <span>{p.icon}</span> }))
+
+  // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'
+  const effectivePage = isEnc
+    ? (ENC_PAGES.includes(currentAdminPage || '') ? (currentAdminPage || 'validar') : 'validar')
+    : (currentAdminPage || 'dashboard')
 
   const db = useAppStore(s => s.db) as any
 
@@ -1229,7 +1243,7 @@ export default function AppV2Admin() {
   }
 
   function renderPage() {
-    const page = currentAdminPage || 'dashboard'
+    const page = effectivePage
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
     if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
@@ -1254,7 +1268,7 @@ export default function AppV2Admin() {
   return (
     <AppShell
       navItems={navItems}
-      activeNav={currentAdminPage || 'dashboard'}
+      activeNav={effectivePage}
       onSelectNav={setAdminPage}
       sidebarHeader={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1274,7 +1288,7 @@ export default function AppV2Admin() {
             <Avatar name={name} size={32} status="online" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-              <div style={{ fontSize: 10.5, color: colors.text[500] }}>Administrador</div>
+              <div style={{ fontSize: 10.5, color: colors.text[500] }}>{isEnc ? encRoleLabel : 'Administrador'}</div>
             </div>
             <button onClick={logout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
               <IconLogout width={15} height={15} />
@@ -1313,7 +1327,7 @@ export default function AppV2Admin() {
           </div>
         </div>
       }
-      pageTitle={PAGES.find(p => p.id === (currentAdminPage || 'dashboard'))?.label ?? ''}
+      pageTitle={PAGES.find(p => p.id === effectivePage)?.label ?? ''}
       breadcrumb="TIMES v5"
     >
       {renderPage()}

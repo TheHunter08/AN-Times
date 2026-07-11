@@ -597,24 +597,24 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .emp-topbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; flex-shrink: 0; overflow: hidden;
-  padding: 20px 20px 18px;
+  padding: 11px 16px 10px;
   background: rgba(9,7,13,0.92);
   backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
   border-bottom: 1px solid rgba(124,58,237,0.16);
   box-shadow: 0 1px 0 rgba(124,58,237,0.08), 0 4px 20px rgba(0,0,0,.4);
 }
-.emp-top-left  { display: flex; align-items: center; gap: 12px; min-width: 0; flex-shrink: 1; }
-.emp-top-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.emp-top-left  { display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1; }
+.emp-top-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 @media (max-width: 400px) {
   .icon-btn { width: 30px; height: 30px; }
   .icon-btn svg { width: 14px; height: 14px; }
   .enc-chip { padding: 4px 9px; font-size: 10px; }
 }
-.emp-greeting  { font-size: 18px; font-weight: 800; letter-spacing: -.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.emp-subdate   { font-size: 11px; color: var(--text3); margin-top: 2px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.emp-greeting  { font-size: 15px; font-weight: 700; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-subdate   { font-size: 10.5px; color: var(--text3); margin-top: 1px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Avatar */
-.emp-avatar { width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+.emp-avatar { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
 
 /* Icon buttons */
 .icon-btn {
