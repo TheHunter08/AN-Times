@@ -71,15 +71,15 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
         ))}
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px', minWidth: 760 }}>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', minWidth: 560 }}>
           <thead>
             <tr>
-              <th style={{ width: 180, padding: '6px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500] }}>Empleado</th>
+              <th style={{ width: 110, padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500] }}>Empleado</th>
               {days.map((d, i) => (
-                <th key={i} style={{ padding: '6px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: i >= 5 ? colors.text[300] : colors.text[500] }}>
-                  <div style={{ textTransform: 'uppercase', letterSpacing: '.5px' }}>{d.split(' ')[0]}</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: i >= 5 ? colors.text[300] : colors.text[900], letterSpacing: '-.5px' }}>{d.split(' ')[1]}</div>
+                <th key={i} style={{ padding: '6px 2px', textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? colors.text[300] : colors.text[500] }}>
+                  <div style={{ textTransform: 'uppercase', letterSpacing: '.4px' }}>{d.split(' ')[0]}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: i >= 5 ? colors.text[300] : colors.text[900], letterSpacing: '-.3px' }}>{d.split(' ')[1]}</div>
                 </th>
               ))}
             </tr>
@@ -87,32 +87,36 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
           <tbody>
             {employees.map(emp => (
               <tr key={emp.id}>
-                <td style={{ padding: '6px 12px', verticalAlign: 'middle' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Avatar name={emp.name} size={28} />
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: colors.text[900] }}>{emp.name}</div>
-                      <div style={{ fontSize: 10.5, color: colors.text[500] }}>{emp.dept}</div>
+                <td style={{ padding: '4px 8px', verticalAlign: 'middle', width: 110 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Avatar name={emp.name} size={24} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: colors.text[900], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 70 }}>
+                        {emp.name.split(' ')[0]}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: colors.text[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 70 }}>
+                        {emp.name.split(' ').slice(1).join(' ') || emp.dept}
+                      </div>
                     </div>
                   </div>
                 </td>
                 {emp.week.map((cell, di) => {
                   const def = cellDef[cell.status]
                   return (
-                    <td key={di} style={{ padding: '6px 3px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <td key={di} style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle' }}>
                       <div style={{
-                        padding: '6px 3px', borderRadius: radius.sm, minHeight: 36,
+                        padding: '4px 2px', borderRadius: radius.sm, minHeight: 30,
                         background: def.bg, border: `1px solid ${def.border}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         position: 'relative',
                       }}>
                         {cell.status === 'live' && (
-                          <span style={{ position: 'absolute', top: 3, right: 4, width: 6, height: 6, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 0 3px rgba(52,211,153,.25)', animation: 'pulse 2s infinite' }} />
+                          <span style={{ position: 'absolute', top: 2, right: 3, width: 5, height: 5, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 0 2px rgba(52,211,153,.25)', animation: 'pulse 2s infinite' }} />
                         )}
                         {cell.value ? (
-                          <span style={{ fontSize: 10.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{cell.value}</span>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{cell.value}</span>
                         ) : (
-                          <span style={{ fontSize: 10, color: def.color, fontWeight: 700 }}>
+                          <span style={{ fontSize: 9, color: def.color, fontWeight: 700 }}>
                             {cell.status === 'absent' ? '—' : cell.status === 'vac' ? 'VAC' : cell.status === 'weekend' ? '·' : ''}
                           </span>
                         )}

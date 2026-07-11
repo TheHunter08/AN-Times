@@ -28,39 +28,53 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
       </div>
     )
   }
+  // Calcula ancho mínimo sumando columnas fijas + gaps para que el scroll horizontal funcione
+  const minW = columns.reduce((s, c) => s + (c.width ? parseInt(c.width) + 16 : 140), 18 * 2)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', padding: '0 18px 8px', gap: 16, borderBottom: `1px solid ${colors.border.subtle}` }}>
-        {columns.map(col => (
-          <div key={col.key} style={{ flex: col.width ? `0 0 ${col.width}` : 1, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500] }}>
-            {col.header}
-          </div>
-        ))}
-      </div>
-      {rows.map(row => (
-        <div
-          key={rowKey(row)}
-          className="uiv2-table-row"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 16,
-            padding: '13px 18px',
-            background: colors.bg[600],
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radius.md,
-            boxShadow: shadows.sm,
-            transition: transition(['background', 'border-color', 'transform']),
-          }}
-        >
+    <div style={{ position: 'relative' }}>
+      {/* Fade derecha: indica que hay más columnas al deslizar */}
+      <div className="uiv2-table-fade-right" style={{
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: 40, zIndex: 2, pointerEvents: 'none',
+        background: `linear-gradient(to right, transparent, ${colors.bg[800]}dd)`,
+      }} />
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ minWidth: minW, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', padding: '0 18px 8px', gap: 16, borderBottom: `1px solid ${colors.border.subtle}` }}>
           {columns.map(col => (
-            <div key={col.key} style={{ flex: col.width ? `0 0 ${col.width}` : 1, fontSize: 13, color: colors.text[900], minWidth: 0 }}>
-              {col.render(row)}
+            <div key={col.key} style={{ flex: col.width ? `0 0 ${col.width}` : 1, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500] }}>
+              {col.header}
             </div>
           ))}
         </div>
-      ))}
-      <style>{`
-        .uiv2-table-row:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.default} !important; transform: translateX(2px); }
-      `}</style>
+        {rows.map(row => (
+          <div
+            key={rowKey(row)}
+            className="uiv2-table-row"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '13px 18px',
+              background: colors.bg[600],
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: radius.md,
+              boxShadow: shadows.sm,
+              transition: transition(['background', 'border-color', 'transform']),
+            }}
+          >
+            {columns.map(col => (
+              <div key={col.key} style={{ flex: col.width ? `0 0 ${col.width}` : 1, fontSize: 13, color: colors.text[900], minWidth: 0 }}>
+                {col.render(row)}
+              </div>
+            ))}
+          </div>
+        ))}
+        <style>{`
+          .uiv2-table-row:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.default} !important; transform: translateX(2px); }
+          .uiv2-table-fade-right { display: none; }
+          @media (max-width: 700px) { .uiv2-table-fade-right { display: block; } }
+        `}</style>
+      </div>
+      </div>
     </div>
   )
 }

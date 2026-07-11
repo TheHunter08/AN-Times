@@ -26,22 +26,22 @@ export interface TimesheetsProps {
 export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
   const columns: TableColumn<TimesheetRow>[] = [
     {
-      key: 'name', header: 'Empleado', width: '220px',
+      key: 'name', header: 'Empleado', width: '160px',
       render: r => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar name={r.name} size={30} />
-          <div>
-            <div style={{ fontWeight: 700 }}>{r.name}</div>
-            <div style={{ fontSize: 11, color: colors.text[500] }}>{r.centro}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <Avatar name={r.name} size={26} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+            <div style={{ fontSize: 11, color: colors.text[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.centro}</div>
           </div>
         </div>
       ),
     },
-    { key: 'day', header: 'Día', width: '110px', render: r => r.day },
-    { key: 'entrada', header: 'Entrada', width: '80px', render: r => r.entrada },
-    { key: 'salida', header: 'Salida', width: '80px', render: r => r.salida },
+    { key: 'day', header: 'Día', width: '90px', render: r => r.day },
+    { key: 'entrada', header: 'Entrada', width: '66px', render: r => r.entrada },
+    { key: 'salida', header: 'Salida', width: '66px', render: r => r.salida },
     {
-      key: 'worked', header: 'Trabajado', width: '100px',
+      key: 'worked', header: 'Trabajo', width: '72px',
       render: r => <span style={{ fontWeight: 700, color: r.over ? colors.semantic.orange : colors.text[900] }}>{r.worked}</span>,
     },
   ]
