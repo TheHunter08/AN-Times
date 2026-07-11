@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { useClock } from '../../hooks/useClock.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
+import { colors } from '../../ui-v2/design-system/colors'
 
 export function TopbarClock() {
   const { clockTime, clockDate } = useClock()

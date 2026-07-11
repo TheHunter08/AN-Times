@@ -1,7 +1,7 @@
-import { useMemo, useEffect } from 'react'
+﻿import { useMemo, useEffect } from 'react'
 import { calcMin, p2 } from '../../utils/time.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 function localMonthKey(d = new Date()) { return `${d.getFullYear()}-${p2(d.getMonth() + 1)}` }
 

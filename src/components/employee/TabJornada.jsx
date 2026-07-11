@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+﻿import { useState, useCallback, useMemo } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { today, calcSecs, calcMin, recWorkSecs, wkStart, p2, mhm, ftime, s2t, monthlyExtras, localDateStr } from '../../utils/time.js'
 import { WD, WK } from '../../config/constants.js'
@@ -7,8 +7,8 @@ import { PomodoroWidget } from './PomodoroWidget.jsx'
 import { WeeklyBars } from './WeeklyBars.jsx'
 import { HistorialReciente } from './HistorialReciente.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 function PdfBtn({ onClick, loading, label }) {
   return (

@@ -1,4 +1,4 @@
-// Arnés de previsualización aislado para ui-v2 — NO forma parte de la app
+﻿// Arnés de previsualización aislado para ui-v2 — NO forma parte de la app
 // real, no se importa desde main.jsx/App.jsx. Sirve solo para verificar
 // visualmente los componentes/pantallas nuevas con datos de ejemplo
 // mientras se construyen, sin tocar la aplicación en producción.
@@ -35,8 +35,8 @@ import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 import { Search } from './components/Search.js'
 import { Avatar } from './components/Avatar.js'
-import { colors } from './design-system/colors.js'
-import { radius } from './design-system/radius.js'
+import { colors } from './design-system/colors'
+import { radius } from './design-system/radius'
 import * as demo from './data/demoData.js'
 import {
   IconGrid, IconClock, IconCalendar, IconChart, IconSettings, IconUsers,

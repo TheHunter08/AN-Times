@@ -1,5 +1,5 @@
-import { useId } from 'react'
-import { colors } from '../design-system/colors.js'
+﻿import { useId } from 'react'
+import { colors } from '../design-system/colors'
 
 export interface AreaChartPoint {
   label: string

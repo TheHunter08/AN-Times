@@ -1,6 +1,6 @@
-import { wkStart, calcMin, localDateStr } from '../../utils/time.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+﻿import { wkStart, calcMin, localDateStr } from '../../utils/time.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function WeeklyBars({ db, u, timer }) {
   const DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']

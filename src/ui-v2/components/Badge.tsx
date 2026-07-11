@@ -1,6 +1,6 @@
-import type { HTMLAttributes } from 'react'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+﻿import type { HTMLAttributes } from 'react'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 
 type Tone = 'green' | 'orange' | 'red' | 'purple' | 'gray'
 

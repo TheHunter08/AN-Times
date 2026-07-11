@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+﻿import type { ReactNode } from 'react'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { shadows } from '../design-system/shadows.js'
 

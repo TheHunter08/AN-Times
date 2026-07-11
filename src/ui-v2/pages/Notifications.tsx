@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+﻿import { useState } from 'react'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import {
   IconBell, IconCheck, IconX, IconAlertCircle, IconClock,
   IconCalendar, IconUsers, IconFileText, IconChat,

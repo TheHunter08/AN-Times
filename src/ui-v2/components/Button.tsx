@@ -1,7 +1,7 @@
-import { forwardRef } from 'react'
+﻿import { forwardRef } from 'react'
 import type { ButtonHTMLAttributes, ReactNode, CSSProperties } from 'react'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'

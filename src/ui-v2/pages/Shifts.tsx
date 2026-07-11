@@ -1,8 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { PageTitle } from '../components/PageTitle.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconArrowLeft, IconArrowRight, IconClock } from '../components/Icons.js'
 
 export interface ShiftCell {

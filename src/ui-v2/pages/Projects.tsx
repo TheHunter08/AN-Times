@@ -1,7 +1,7 @@
-import { Badge } from '../components/Badge.js'
+﻿import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { shadows } from '../design-system/shadows.js'
 

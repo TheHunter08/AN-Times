@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { Card } from './Card.js'
-import { colors } from '../design-system/colors.js'
+import { colors } from '../design-system/colors'
 import { IconDots, IconArrowRight } from './Icons.js'
 
 export interface ListCardItem {

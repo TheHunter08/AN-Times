@@ -1,7 +1,7 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconCheck, IconX } from '../components/Icons.js'
 
 export interface EmployeeRow {

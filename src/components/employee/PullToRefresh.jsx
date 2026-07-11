@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
+import { colors } from '../../ui-v2/design-system/colors'
 
 // iOS PWA: NUNCA aplicar transform al contenedor con overflow:auto — rompe
 // -webkit-overflow-scrolling de forma permanente. El scroll vive en .emp-tab

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { uploadPendingIfAny } from '../../services/dataService.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 const BASE = { position:'fixed', top:0, left:0, right:0, zIndex:200, display:'flex', alignItems:'center', gap:10, padding:'9px 16px', fontSize:13, backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }
 const retryBtn = { background:'rgba(255,255,255,.12)', border:'1px solid rgba(255,255,255,.2)', borderRadius:radius.md, padding:'4px 12px', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:'inherit', flexShrink:0 }

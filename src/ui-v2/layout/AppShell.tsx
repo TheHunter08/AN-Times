@@ -1,10 +1,10 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Sidebar } from '../components/Sidebar.js'
 import type { SidebarItem } from '../components/Sidebar.js'
 import { Header } from '../components/Header.js'
 import { IconMenu } from '../components/Icons.js'
-import { colors } from '../design-system/colors.js'
+import { colors } from '../design-system/colors'
 
 export interface AppShellProps {
   navItems: SidebarItem[]

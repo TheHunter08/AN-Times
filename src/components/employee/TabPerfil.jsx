@@ -1,12 +1,12 @@
-import { useMemo, useCallback } from 'react'
+﻿import { useMemo, useCallback } from 'react'
 import { vacData, p2, calcMin, mhm, today, localDateStr } from '../../utils/time.js'
 import { calcStreak } from '../../utils/streaks.js'
 import { applyBrandColor } from '../../utils/webauthn.js'
 import TabGastos from '../TabGastos.jsx'
 import TabDenuncia from '../TabDenuncia.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 const ChevronRight = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: .45 }}>

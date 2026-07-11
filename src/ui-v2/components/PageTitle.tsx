@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
-import { colors } from '../design-system/colors.js'
-import { typeScale } from '../design-system/typography.js'
+﻿import type { ReactNode } from 'react'
+import { colors } from '../design-system/colors'
+import { typeScale } from '../design-system/typography'
 
 // Texto sólido, no degradado — el degradado-en-texto es un recurso de
 // página de marketing, no de un producto que se usa a diario. Confianza

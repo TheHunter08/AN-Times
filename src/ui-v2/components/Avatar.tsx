@@ -1,4 +1,4 @@
-import { colors } from '../design-system/colors.js'
+﻿import { colors } from '../design-system/colors'
 
 export interface AvatarProps {
   name: string

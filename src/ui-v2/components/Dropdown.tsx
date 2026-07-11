@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { shadows } from '../design-system/shadows.js'
 
 export interface DropdownOption {

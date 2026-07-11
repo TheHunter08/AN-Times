@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { AreaChart } from '../components/AreaChart.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Button } from '../components/Button.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { IconDownload, IconChevronDown, IconArrowRight, IconClock, IconUsers, IconCalendar } from '../components/Icons.js'
 

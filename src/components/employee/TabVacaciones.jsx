@@ -1,8 +1,8 @@
-import { useAppStore } from '../../store/appStore.js'
+﻿import { useAppStore } from '../../store/appStore.js'
 import { today, fds } from '../../utils/time.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const { openModal, showConfirm } = useAppStore()

@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { calcMin, mhm, localDateStr } from '../../utils/time.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function WorkHeatmap({ records, empId }) {
   const dayMap = useMemo(() => {

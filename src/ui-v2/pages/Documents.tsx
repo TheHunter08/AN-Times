@@ -1,10 +1,10 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Button } from '../components/Button.js'
 import { Search } from '../components/Search.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconFileText, IconDownload, IconPlus, IconFolder } from '../components/Icons.js'
 
 export interface DocumentItem {

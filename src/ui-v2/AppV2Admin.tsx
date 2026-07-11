@@ -1,4 +1,4 @@
-// Shell admin v2 — usa el nuevo AppShell + páginas v2 con datos reales de useAppStore.
+﻿// Shell admin v2 — usa el nuevo AppShell + páginas v2 con datos reales de useAppStore.
 // CLAUDE.md: UI only — NO tocar backend, Supabase, auth ni lógica de negocio.
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
@@ -22,7 +22,7 @@ import { Messages } from './pages/Messages.js'
 import { Obras } from './pages/Obras.js'
 import { Search } from './components/Search.js'
 import { Avatar } from './components/Avatar.js'
-import { colors } from './design-system/colors.js'
+import { colors } from './design-system/colors'
 import {
   IconGrid, IconClock, IconCalendar, IconChart, IconUsers,
   IconFolder, IconFileText, IconClipboard, IconBell, IconChat,

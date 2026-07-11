@@ -1,7 +1,7 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { calcMin, ftime, recWorkSecs, mhm } from '../../utils/time.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function HistorialReciente({ histWithRecs, openModal, u }) {
   const [open, setOpen] = useState(false)

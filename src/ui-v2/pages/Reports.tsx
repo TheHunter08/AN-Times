@@ -1,7 +1,7 @@
-import { Card } from '../components/Card.js'
+﻿import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconFileText, IconDownload } from '../components/Icons.js'
 
 export interface ReportRow {

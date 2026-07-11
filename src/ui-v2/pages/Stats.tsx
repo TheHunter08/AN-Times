@@ -1,9 +1,9 @@
-import { AreaChart } from '../components/AreaChart.js'
+﻿import { AreaChart } from '../components/AreaChart.js'
 import { DonutChart } from '../components/DonutChart.js'
 import type { DonutSlice } from '../components/DonutChart.js'
 import { PageTitle } from '../components/PageTitle.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { shadows } from '../design-system/shadows.js'
 

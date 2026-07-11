@@ -1,9 +1,9 @@
-import { useModalBack } from '../../hooks/useModalBack.js'
+﻿import { useModalBack } from '../../hooks/useModalBack.js'
 import { today } from '../../utils/time.js'
 import { calcStreak } from '../../utils/streaks.js'
 import { AchievementsSection } from './AchievementsSection.jsx'
 import { WorkHeatmap } from './WorkHeatmap.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
+import { colors } from '../../ui-v2/design-system/colors'
 
 export function ModalLogros({ visible, db, u, onClose, saveDB }) {
   useModalBack(visible, onClose)

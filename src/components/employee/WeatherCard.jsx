@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+﻿import { useState, useEffect } from 'react'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function WeatherCard() {
   const [wx, setWx] = useState(null)

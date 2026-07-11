@@ -1,7 +1,7 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconClock, IconClipboard, IconFilter } from '../components/Icons.js'
 
 export interface RequestRow {

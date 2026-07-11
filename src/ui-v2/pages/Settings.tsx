@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { Card } from '../components/Card.js'
 import { Input } from '../components/Input.js'
 import { Button } from '../components/Button.js'
 import { PageTitle } from '../components/PageTitle.js'
-import { colors } from '../design-system/colors.js'
+import { colors } from '../design-system/colors'
 
 export interface SettingsSection {
   id: string

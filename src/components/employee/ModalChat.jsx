@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { gid } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   const [text, setText] = useState('')

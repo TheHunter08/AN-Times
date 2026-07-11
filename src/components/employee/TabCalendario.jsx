@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo } from 'react'
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
 import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 const STATUS_COLORS = {
   complete: colors.semantic.green,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { useClock } from '../../hooks/useClock.js'
 import { today, calcSecs, calcMin, recWorkSecs, ftime, mhm, p2, wkStart, monthlyExtras, gid, s2t, localDateStr } from '../../utils/time.js'
@@ -9,8 +9,8 @@ import { checkPlatformAuth, hasBiometric, registerBiometric, isBioOfferDismissed
 import { WeatherCard } from './WeatherCard.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
 import { ModalParteVoz } from '../ModalParteVoz.jsx'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast, onOpenQRScan }) {
   const { setEmpTab } = useAppStore()

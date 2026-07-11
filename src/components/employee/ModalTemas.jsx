@@ -1,7 +1,7 @@
-import { useModalBack } from '../../hooks/useModalBack.js'
+﻿import { useModalBack } from '../../hooks/useModalBack.js'
 import { applyBrandColor, removeBrandColor } from '../../utils/webauthn.js'
-import { colors } from '../../ui-v2/design-system/colors.js'
-import { radius } from '../../ui-v2/design-system/radius.js'
+import { colors } from '../../ui-v2/design-system/colors'
+import { radius } from '../../ui-v2/design-system/radius'
 
 const ACCENT_PRESETS = ['#5E6AD2','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#F97316','#0EA5E9','#84CC16']
 

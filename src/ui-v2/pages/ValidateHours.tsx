@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Search } from '../components/Search.js'
-import { colors } from '../design-system/colors.js'
-import { radius } from '../design-system/radius.js'
+import { colors } from '../design-system/colors'
+import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconClock, IconAlertCircle } from '../components/Icons.js'
 
 export interface ValidateRow {
