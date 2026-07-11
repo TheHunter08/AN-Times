@@ -39,6 +39,8 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
 
   const generarCierreJO = (e, totalMin, days) => {
     if (procesandoCierreJORef.current.has(e.id)) return
+    const mesActual = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+    if (selMonth >= mesActual) { toast('Solo se puede cerrar un mes ya finalizado', 4000, 'warn'); return }
     if ((db.cierres || []).find(c => c.empId === e.id && c.mes === selMonth)) {
       toast('Ya existe un cierre para este empleado y mes', 3000, 'warn')
       return
@@ -78,6 +80,8 @@ export default function PanelValidarHoras({ db, toast, saveDB, session }) {
   }
 
   const generarTodosJO = () => {
+    const mesActual = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+    if (selMonth >= mesActual) { toast('Solo se puede cerrar un mes ya finalizado', 4000, 'warn'); return }
     const nuevos = []
     rows.forEach(({ e, totalMin, days }) => {
       if ((db.cierres||[]).find(c => c.empId === e.id && c.mes === selMonth)) return

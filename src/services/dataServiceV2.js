@@ -55,7 +55,7 @@ const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 function fromEmployee(e) {
   return {
     id: e.id, name: e.name, email: e.email ?? null,
-    pinHash: e.pin_hash ?? null, role: e.role ?? 'empleado',
+    pin: e.pin_hash ?? null, pinLen: e.pin_len ?? null, role: e.role ?? 'empleado',
     centroTrabajo: e.centro_trabajo ?? null,
     obrasAsignadas: e.obras_asignadas ?? [],
     reminderTime: e.reminder_time ?? '08:30',
@@ -87,11 +87,17 @@ function fromVac(v) {
 }
 
 function fromCierre(c) {
+  // firma_emp se guarda como JSON string en la columna text
+  const firmaObj = (() => { try { return c.firma_emp ? JSON.parse(c.firma_emp) : null } catch { return null } })()
   return {
-    id: c.id, empId: c.emp_id, mes: c.mes,
+    id: c.id, empId: c.emp_id, empName: c.emp_name ?? null, mes: c.mes,
     totalMin: c.total_min ?? 0, extraMin: c.extra_min ?? 0,
+    dias: c.dias ?? null,
     estado: c.estado ?? 'pendiente',
-    firmaAdmin: c.firma_admin ?? null, firmaEmp: c.firma_emp ?? null,
+    firma: firmaObj,          // campo canónico que usa la app
+    firmaEmp: firmaObj,       // alias usado en algunos filtros
+    firmaAdmin: c.firma_admin ?? null,
+    generadoPor: c.generado_por ?? null, generadoAt: c.generado_at ?? null,
     desactualizado: !!c.desactualizado,
   }
 }
@@ -105,7 +111,8 @@ function fromObra(o) {
 function toEmployee(e) {
   return {
     id: e.id, company_id: COMPANY_ID, name: e.name,
-    email: e.email ?? null, pin_hash: e.pinHash ?? null,
+    email: e.email ?? null, pin_hash: e.pin ?? e.pinHash ?? null,
+    pin_len: e.pinLen ?? null,
     role: e.role ?? 'empleado',
     centro_trabajo: e.centroTrabajo ?? null,
     obras_asignadas: e.obrasAsignadas ?? [],
@@ -140,12 +147,17 @@ function toVac(v) {
 }
 
 function toCierre(c) {
+  // firma vive en c.firma (objeto) — serializar a JSON para la columna text
+  const firmaVal = c.firma ?? c.firmaEmp ?? null
   return {
     id: c.id, company_id: COMPANY_ID,
-    emp_id: c.empId, mes: c.mes,
+    emp_id: c.empId, emp_name: c.empName ?? null, mes: c.mes,
     total_min: c.totalMin ?? 0, extra_min: c.extraMin ?? 0,
+    dias: c.dias ?? null,
     estado: c.estado ?? 'pendiente',
-    firma_admin: c.firmaAdmin ?? null, firma_emp: c.firmaEmp ?? null,
+    firma_admin: c.firmaAdmin ?? null,
+    firma_emp: firmaVal ? JSON.stringify(firmaVal) : null,
+    generado_por: c.generadoPor ?? null, generado_at: c.generadoAt ?? null,
     desactualizado: !!c.desactualizado,
     updated_at: new Date().toISOString(),
   }

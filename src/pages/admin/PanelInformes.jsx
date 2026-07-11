@@ -227,6 +227,8 @@ export default function PanelInformes({ db, toast, saveDB, session }) {
 
   const generarTodosCierres = () => {
     const mes = filterMonth
+    const mesActual = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+    if (mes >= mesActual) { toast('Solo se puede cerrar un mes ya finalizado', 4000, 'warn'); return }
     const empsActivos = sortedEmps(db).filter(e => !e.baja && !e.isAdmin)
     const nuevos = []
     empsActivos.forEach(e => {
@@ -254,9 +256,11 @@ export default function PanelInformes({ db, toast, saveDB, session }) {
 
   const generarCierre = (e, totalMin, days) => {
     if (procesandoCierreRef.current.has(e.id)) return
+    const mes = filterMonth
+    const mesActual = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
+    if (mes >= mesActual) { toast('Solo se puede cerrar un mes ya finalizado', 4000, 'warn'); return }
     procesandoCierreRef.current.add(e.id)
     setProcesandoCierre(s => new Set([...s, e.id]))
-    const mes = filterMonth
     if ((db.cierres || []).find(c => c.empId === e.id && c.mes === mes)) {
       procesandoCierreRef.current.delete(e.id)
       setProcesandoCierre(s => { const n = new Set(s); n.delete(e.id); return n })

@@ -132,6 +132,8 @@ export default async function handler(req, res) {
     const nowH      = now.getHours()
     const nowM      = now.getMinutes()
     const nowMs     = Date.now()
+    const dowSpain  = now.getDay() // 0=Dom, 1=Lun … 5=Vie, 6=Sáb
+    const isWeekday = dowSpain >= 1 && dowSpain <= 5
 
     const isValidTime = s => /^\d{1,2}:\d{2}$/.test(String(s || ''))
     const safeTimeSplit = (s, def) => {
@@ -179,8 +181,8 @@ export default async function handler(req, res) {
       const todayRecs = empRecs.filter(r => typeof r.inicio === 'string' && r.inicio.startsWith(today))
       const hasFichado = todayRecs.length > 0
 
-      // ── 1. Recordatorio de fichaje ──────────────────────────────────────────
-      {
+      // ── 1. Recordatorio de fichaje (solo lunes a viernes) ──────────────────
+      if (isWeekday) {
         const entradaTimes = db.config?.reminders?.entrada?.length
           ? db.config.reminders.entrada
           : (emp.reminderTime ? [emp.reminderTime] : ['08:30'])
@@ -412,6 +414,81 @@ export default async function handler(req, res) {
         } catch (e) {
           console.error(`[cron-reminders] error aniversario ${emp.id}:`, e.message)
         }
+      }
+    }
+
+    // ── AUTO-CIERRE MENSUAL (solo el día 1 de cada mes) ──────────────────────
+    // Genera cierres del mes anterior para todos los empleados activos que
+    // aún no tengan uno — sin que el admin tenga que hacerlo manualmente.
+    if (today.endsWith('-01')) {
+      try {
+        const [y, m] = today.split('-').map(Number)
+        const prevM = m === 1 ? 12 : m - 1
+        const prevY = m === 1 ? y - 1 : y
+        const mes = `${prevY}-${String(prevM).padStart(2, '0')}`
+        const mesLabel = new Date(`${mes}-15`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+        const empActivos = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+        const existenCierres = (db.cierres || []).filter(c => c.mes === mes)
+        const nuevos = []
+        for (const emp of empActivos) {
+          if (existenCierres.find(c => c.empId === emp.id)) continue
+          const eRecs = (db.records || []).filter(r =>
+            r.empId === emp.id && r.fin && r.inicio && r.inicio.startsWith(mes)
+          )
+          if (!eRecs.length) continue
+          const totalMin = Math.floor(eRecs.reduce((s, r) => {
+            const ini = new Date(r.inicio).getTime()
+            const fin = new Date(r.fin).getTime()
+            return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
+          }, 0))
+          const id = nowMs.toString(36) + emp.id.slice(0, 4) + Math.random().toString(36).slice(2, 6)
+          nuevos.push({
+            id, empId: emp.id, empName: emp.name, mes,
+            generadoPor: 'Sistema', generadoPorId: null,
+            generadoAt: new Date().toISOString(),
+            totalMin, dias: eRecs.length, estado: 'pendiente', firma: null,
+            records_snapshot: eRecs.map(r => ({ inicio: r.inicio, fin: r.fin, centro: r.centro, workSecs: r.workSecs || 0 }))
+          })
+        }
+        if (nuevos.length > 0) {
+          const updatedDb = { ...db, cierres: [...(db.cierres || []), ...nuevos], _ts: Date.now() }
+          // Escribir al blob (V1)
+          await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+            method: 'PATCH',
+            headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ data: updatedDb, updated_at: new Date().toISOString() })
+          }).catch(e => console.warn('[cron] auto-cierre patch error:', e.message))
+          // Escribir también a la tabla cierres (V2) — best-effort
+          const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+          const cierresRows = nuevos.map(c => ({
+            id: c.id, company_id: COMPANY_ID, emp_id: c.empId,
+            emp_name: c.empName ?? null, mes: c.mes,
+            total_min: c.totalMin ?? 0, extra_min: 0, dias: c.dias ?? null,
+            estado: 'pendiente', firma_admin: null, firma_emp: null,
+            generado_por: c.generadoPor ?? null,
+            generado_at: c.generadoAt ? new Date(c.generadoAt).toISOString() : null,
+            desactualizado: false, updated_at: new Date().toISOString(),
+          }))
+          await fetch(`${SB_URL}/rest/v1/cierres?on_conflict=id`, {
+            method: 'POST',
+            headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify(cierresRows)
+          }).catch(e => console.warn('[cron] auto-cierre table insert error:', e.message))
+          // Notificar a cada empleado
+          for (const c of nuevos) {
+            const sub = subMap.get(c.empId)
+            if (sub?.endpoint) {
+              toSend.push({
+                emp: { id: c.empId, name: c.empName }, sub,
+                payload: mkPayload('📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil'),
+                key: `auto_cierre_${c.empId}_${mes}`, keyVal: today
+              })
+            }
+          }
+          console.log(`[cron] auto-cierre ${mes}: ${nuevos.length} generados`)
+        }
+      } catch (e) {
+        console.error('[cron] auto-cierre error:', e.message)
       }
     }
 

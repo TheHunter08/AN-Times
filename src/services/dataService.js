@@ -139,7 +139,12 @@ function _unionById(base, incoming, tKey) {
 
   const map = new Map()
   for (const item of b) map.set(item.id, item)
-  for (const item of i) map.set(item.id, item)
+  for (const item of i) {
+    const cur = map.get(item.id)
+    // Si el item local está soft-deleted y el servidor aún no lo sabe, no resucitarlo
+    if (cur?.deleted && !item.deleted) continue
+    map.set(item.id, item)
+  }
   return [...map.values()]
 }
 
@@ -175,7 +180,24 @@ export function mergeDB(base, incoming) {
     startDate: '2024-01-01', email: '', isAdmin: true
   }
   // Bug fix #7: no sobrescribir employees locales con array vacío (Supabase reset / rate-limit)
-  const incomingEmps = (incoming.employees?.length > 0) ? incoming.employees : base.employees
+  const _rawIncomingEmps = (incoming.employees?.length > 0) ? incoming.employees : base.employees
+  // Preservar campos que no existen en Supabase (onboardingDone, horasSemanales, etc.)
+  const _baseEmpMap = new Map((base.employees || []).map(e => [e.id, e]))
+  // Campos que la tabla Supabase employees NO almacena (solo en blob o local):
+  const _LOCAL_ONLY_FIELDS = ['empresa','color','initials','startDate','fechaAlta',
+    'accentColor','horasSemanales','permisos','dept','pin','pinLen']
+  const incomingEmps = _rawIncomingEmps.map(e => {
+    const b = _baseEmpMap.get(e.id)
+    if (!b) return e
+    const extras = {}
+    // Preservar campos que el servidor no tiene (V2 solo guarda columnas de la tabla)
+    for (const key of _LOCAL_ONLY_FIELDS) {
+      if (b[key] != null && e[key] == null) extras[key] = b[key]
+    }
+    // onboardingDone: solo puede ir de false→true, nunca al revés
+    if (b.onboardingDone && !e.onboardingDone) extras.onboardingDone = true
+    return Object.keys(extras).length ? { ...e, ...extras } : e
+  })
   // Bug fix #8: union de notisSent — cleanup entries older than 90 days
   const _mergedNotis = { ...(base.notisSent || {}), ...(incoming.notisSent || {}) }
   const _cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
@@ -193,7 +215,25 @@ export function mergeDB(base, incoming) {
     ausencias:           _unionById(base.ausencias,           incoming.ausencias,           'ausencias'),
     mensajes:            _unionById(base.mensajes,            incoming.mensajes,            'mensajes'),
     notis:               _unionById(base.notis,               incoming.notis,               'notis'),
-    cierres:             _unionById(base.cierres,             incoming.cierres,             'cierres'),
+    cierres:             (() => {
+      const merged  = _unionById(base.cierres, incoming.cierres, 'cierres')
+      const baseMap = new Map((base.cierres || []).map(c => [c.id, c]))
+      // records_snapshot, empName, dias, generadoPor no están en la tabla Supabase —
+      // si la fila vino de V2 sin esos campos, recuperarlos del blob local.
+      return merged.map(c => {
+        const b = baseMap.get(c.id)
+        if (!b) return c
+        const fix = {}
+        if (!c.records_snapshot && b.records_snapshot) fix.records_snapshot = b.records_snapshot
+        if (!c.firma          && b.firma)          fix.firma          = b.firma
+        if (!c.firmaEmp       && b.firma)          fix.firmaEmp       = b.firma
+        if (!c.empName        && b.empName)        fix.empName        = b.empName
+        if (!c.dias           && b.dias)           fix.dias           = b.dias
+        if (!c.generadoPor    && b.generadoPor)    fix.generadoPor    = b.generadoPor
+        if (!c.generadoAt     && b.generadoAt)     fix.generadoAt     = b.generadoAt
+        return Object.keys(fix).length ? { ...c, ...fix } : c
+      })
+    })(),
     monthSnapshots:      incoming.monthSnapshots       || {},
     firmas:              incoming.firmas               || {},
     documentos:          _unionById(base.documentos,          incoming.documentos,          'documentos'),

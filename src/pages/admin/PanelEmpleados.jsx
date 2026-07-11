@@ -29,7 +29,7 @@ export default function PanelEmpleados({ db, toast, saveDB, openModal, closeModa
   const [showForm, setShowForm] = useState(false)
   const [editEmp, setEditEmp] = useState(null)
 
-  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'emp', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today(), horasSemanales: 40 }
+  const EMPTY_EMP = { id: gid(), name:'', pin:'', email:'', role:'empleado', empresa:'', centroTrabajo:'', obrasAsignadas:[], color:'#5E6AD2', baja:false, fechaAlta: today(), startDate: today(), horasSemanales: 40 }
   const [form, setForm] = useState(EMPTY_EMP)
 
   const openNew = () => { setForm({ ...EMPTY_EMP, id: gid() }); setShowForm(true); setEditEmp(null) }

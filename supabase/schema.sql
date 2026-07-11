@@ -6,6 +6,10 @@
 -- (e.g. "e1", "mqfbu0urtvyo") antes de migrar a crypto.randomUUID().
 -- company_id sí es text con el UUID fijo de single-tenant.
 -- ================================================================
+--
+-- PARCHE 2026-07-11: añadir pin_len a employees (si ya existe la tabla):
+--   ALTER TABLE employees ADD COLUMN IF NOT EXISTS pin_len int;
+-- ================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -26,6 +30,7 @@ CREATE TABLE employees (
   name            text NOT NULL,
   email           text,
   pin_hash        text,
+  pin_len         int,
   role            text DEFAULT 'empleado',
   centro_trabajo  text,
   obras_asignadas text[] DEFAULT '{}',
