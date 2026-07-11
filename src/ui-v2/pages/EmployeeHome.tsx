@@ -1,4 +1,5 @@
-﻿import { colors } from '../design-system/colors'
+﻿import type { ReactNode } from 'react'
+import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { IconPlay, IconPause, IconStop, IconMapPin, IconArrowRight, IconArrowLeft } from '../components/Icons.js'
@@ -40,6 +41,7 @@ export interface EmployeeHomeProps {
   shiftStart?: string
   shiftEnd?: string
   overtimeLabel?: string
+  extraAction?: React.ReactNode
 }
 
 const stateConfig: Record<ClockState, { status: string; statusDesc: string; mainLabel: string; color: string; pulse: boolean }> = {
@@ -103,7 +105,7 @@ function Ring({ pct, color, size = 240 }: { pct: number; color: string; size?: n
 export function EmployeeHome({
   time, seconds, dateLabel, state, onStartAction, onBreakAction, onStopAction,
   workedLabel, remainingLabel, progressPct, siteLabel, streakDays, week, weeklyTotal,
-  recent, greeting, shiftStart, shiftEnd, overtimeLabel,
+  recent, greeting, shiftStart, shiftEnd, overtimeLabel, extraAction,
 }: EmployeeHomeProps) {
   const cfg = stateConfig[state]
   const mainClick = state === 'idle' ? onStartAction : (onBreakAction ?? onStartAction)
@@ -317,6 +319,8 @@ export function EmployeeHome({
           </button>
         )}
       </div>
+
+      {extraAction}
 
       {/* ── Semana ─────────────────────────────────────────────── */}
       {week && week.length > 0 && (

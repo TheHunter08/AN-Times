@@ -1140,24 +1140,23 @@ export default function EmployeePage() {
                   </button>
                 </div>
               )}
-              {isSuper && (
-                <div style={{ padding: '12px 20px 0' }}>
-                  <button onClick={() => setQrScanOpen(true)} style={{
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
-                    background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
-                    fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                  }}>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                    Fichar a un empleado
-                  </button>
-                </div>
-              )}
               <div style={{ padding: '16px 20px' }}>
-                <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+                <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop}
+                  extraAction={isSuper ? (
+                    <button onClick={() => setQrScanOpen(true)} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
+                      background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                      Fichar a un empleado
+                    </button>
+                  ) : undefined}
+                />
               </div>
               {weekPlanningData && (
                 <div style={{ padding: '0 20px 20px' }}>
@@ -1353,24 +1352,23 @@ export default function EmployeePage() {
                 </button>
               </div>
             )}
-            {isSuper && (
-              <div style={{ padding: '12px 16px 0' }}>
-                <button onClick={() => setQrScanOpen(true)} style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
-                  background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
-                  fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                  Fichar a un empleado
-                </button>
-              </div>
-            )}
             <div style={{ padding: '16px' }}>
-              <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
+              <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop}
+                extraAction={isSuper ? (
+                  <button onClick={() => setQrScanOpen(true)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
+                    background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                    fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Fichar a un empleado
+                  </button>
+                ) : undefined}
+              />
             </div>
             {weekPlanningData && (
               <div style={{ padding: '0 16px 16px' }}>
