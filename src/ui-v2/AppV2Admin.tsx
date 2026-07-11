@@ -159,16 +159,20 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             placeholder="4-6 dígitos" maxLength={6}
             style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none', letterSpacing: '0.3em' }} />
         </div>
-        {centros.length > 0 && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
+          {centros.length > 0 ? (
             <select value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
               style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
               <option value="">Sin asignar</option>
               {centros.map((c: string) => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-        )}
+          ) : (
+            <input type="text" value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
+              placeholder="Ej: Oficina Central"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+          )}
+        </div>
         {obras.length > 0 && (
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.4px' }}>Obras asignadas</div>
@@ -607,7 +611,24 @@ function ValidateHoursPage() {
     toast('Jornada rechazada', 2500, 'warn')
   }
 
-  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} />
+  const handleModify = (id: string, entry: string, exit: string) => {
+    const rec = (db.records || []).find((r: any) => r.id === id)
+    if (!rec) return
+    const base = new Date(rec.inicio)
+    const [eh, em] = entry.split(':').map(Number)
+    const [xh, xm] = exit.split(':').map(Number)
+    const newInicio = new Date(base); newInicio.setHours(eh, em, 0, 0)
+    const newFin    = new Date(base); newFin.setHours(xh, xm, 0, 0)
+    if (newFin <= newInicio) newFin.setDate(newFin.getDate() + 1)
+    saveDB((fresh: any) => ({
+      records: (fresh.records || []).map((r: any) =>
+        r.id === id ? { ...r, inicio: newInicio.toISOString(), fin: newFin.toISOString(), validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+      ),
+    }))
+    toast('Horario modificado', 2500, 'ok')
+  }
+
+  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} />
 }
 
 function ExpensesPage() {
