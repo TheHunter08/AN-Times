@@ -25,6 +25,7 @@ export interface StatsProps {
   title: string
   kpis?: StatKpi[]
   bars: StatsBar[]
+  centrosBars?: StatsBar[]
   comparison?: { label: string; value: string; deltaTone: 'up' | 'down' }[]
   donut?: { slices: DonutSlice[]; centerValue: string; centerLabel: string }
 }
@@ -50,7 +51,7 @@ function KpiChip({ tone, arrow }: { tone: KpiTone; arrow: 'up' | 'down' | 'flat'
   )
 }
 
-export function Stats({ title, kpis, bars, comparison, donut }: StatsProps) {
+export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: StatsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>
       <PageTitle>{title}</PageTitle>
@@ -93,6 +94,31 @@ export function Stats({ title, kpis, bars, comparison, donut }: StatsProps) {
           </div>
         )}
       </div>
+
+      {/* Horas por centro de trabajo */}
+      {centrosBars && centrosBars.length > 0 && (
+        <div style={{ ...darkPanel, padding: '18px 20px' }}>
+          <div style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], marginBottom: 16 }}>Horas por centro de trabajo</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {centrosBars.map(bar => (
+              <div key={bar.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: colors.text[700] }}>{bar.label}</span>
+                  <span style={{ fontSize: 11, color: colors.text[500], fontVariantNumeric: 'tabular-nums' }}>{bar.value}h</span>
+                </div>
+                <div style={{ height: 6, borderRadius: radius.pill, background: colors.bg[400], overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: radius.pill,
+                    width: `${Math.min(100, bar.value > 0 ? Math.round(bar.value / (centrosBars[0]?.value || 1) * 100) : 0)}%`,
+                    background: `linear-gradient(90deg, ${colors.primary.base}, ${colors.accent.base})`,
+                    transition: 'width .6s ease',
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Comparativa numérica — tarjetas neutras con acento de color en dot, no borderTop */}
       {comparison && comparison.length > 0 && (

@@ -311,8 +311,43 @@ function useRequestsActions() {
 function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
   const data = useDashboardData()
   const db = useAppStore(s => s.db) as any
+  const toast = useAppStore(s => s.toast)
   const { rows: reqRows } = useRequestsActions()
   const pendingCount = reqRows.filter((r: any) => r.status === 'pending').length
+
+  const handleExport = () => {
+    const now = new Date()
+    const dow = now.getDay()
+    const monday = new Date(now); monday.setDate(now.getDate() - ((dow + 6) % 7)); monday.setHours(0,0,0,0)
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999)
+    const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
+    const weekRecs = (db.records || []).filter((r: any) => {
+      if (!r.fin || !r.inicio) return false
+      const d = new Date(r.inicio)
+      return d >= monday && d <= sunday
+    })
+    const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas']]
+    weekRecs.forEach((r: any) => {
+      const emp = emps.find((e: any) => e.id === r.empId)
+      const mins = Math.round((new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000)
+      rows.push([
+        emp?.name || r.empName || '',
+        r.centro || emp?.centroTrabajo || '',
+        (r.inicio || '').slice(0, 10),
+        new Date(r.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        `${Math.floor(mins/60)}h${mins%60>0?Math.floor(mins%60)+'m':''}`,
+      ])
+    })
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `semana-${monday.toISOString().slice(0,10)}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    toast(`CSV semana descargado — ${weekRecs.length} fichajes`, 3000, 'ok')
+  }
 
   const activeEmps = useMemo(() => {
     const liveIds = new Set((db.records || []).filter((r: any) => !r.fin).map((r: any) => r.empId))
@@ -380,6 +415,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       activity={data.activity}
       nextEvent={nextVacRequest}
       teamSlot={teamAvatars}
+      onExport={handleExport}
       quickLinks={[
         { id: 'empleados',   label: 'Empleados activos', value: `${teamAvatars.activeCount}/${teamAvatars.total}`, onClick: () => onNavigate('empleados') },
         { id: 'fichajes',    label: 'Fichajes hoy',      value: data.kpis[2]?.value || '0', onClick: () => onNavigate('fichajes') },
@@ -731,6 +767,38 @@ function ReportsPage() {
     return [...set].sort().reverse().slice(0, 12)
   }, [db.records])
 
+  const handleDownloadCSV = (mes: string) => {
+    const [year, mon] = mes.split('-')
+    const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(mes) && r.fin)
+    const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
+    const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']]
+    recs.forEach((r: any) => {
+      const emp = emps.find((e: any) => e.id === r.empId)
+      const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      const brk = Math.round((r.breakSecs || 0) / 60)
+      const worked = Math.round(mins - brk)
+      rows.push([
+        emp?.name || r.empName || r.empId || '',
+        r.centro || emp?.centroTrabajo || '',
+        (r.inicio || '').slice(0, 10),
+        new Date(r.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        `${Math.floor(worked / 60)}h ${worked % 60}m`,
+        String(brk),
+      ])
+    })
+    const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const bom = '﻿'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `fichajes-${mes}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    toast(`CSV descargado — ${label}`, 3000, 'ok')
+  }
+
   const handleDownload = (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -790,6 +858,7 @@ tr:nth-child(even) td{background:#f9f9f9}
       description: `${empCount} empleados · ${Math.round(totalMins / 60)}h totales`,
       generatedOn: label,
       onDownload: handleDownload,
+      onDownloadCSV: handleDownloadCSV,
     }
   }), [months, db.records])
 
@@ -799,7 +868,7 @@ tr:nth-child(even) td{background:#f9f9f9}
 function StatsPage() {
   const db = useAppStore(s => s.db) as any
 
-  const { kpis, bars, donut, rawSlices } = useMemo(() => {
+  const { kpis, bars, centrosBars, donut, rawSlices } = useMemo(() => {
     const allRecs = (db.records || []).filter((r: any) => r.fin && r.inicio)
     const thisMonth = new Date().toISOString().slice(0, 7)
     const monthRecs = allRecs.filter((r: any) => (r.inicio || '').startsWith(thisMonth))
@@ -828,6 +897,19 @@ function StatsPage() {
       return { label: e.name?.split(' ')[0] || e.id, value: Math.min(100, Math.round(empMins / maxPossible * 100)) }
     })
 
+    // Hours per centro de trabajo
+    const centroMap = new Map<string, number>()
+    monthRecs.forEach((r: any) => {
+      const emp = emps.find((e: any) => e.id === r.empId)
+      const centro = r.centro || emp?.centroTrabajo || 'Sin asignar'
+      const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      centroMap.set(centro, (centroMap.get(centro) || 0) + mins)
+    })
+    const centrosBars = [...centroMap.entries()]
+      .map(([label, mins]) => ({ label, value: Math.round(mins / 60) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+
     const rawSlices = [
       { label: 'Jornada completa', value: monthRecs.filter((r: any) => {
         const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
@@ -849,7 +931,7 @@ function StatsPage() {
       centerLabel: 'fichajes',
     }
 
-    return { kpis, bars, donut, rawSlices }
+    return { kpis, bars, centrosBars, donut, rawSlices }
   }, [db])
 
   return (
@@ -857,6 +939,7 @@ function StatsPage() {
       title="Estadísticas del mes"
       kpis={kpis}
       bars={bars}
+      centrosBars={centrosBars}
       donut={donut}
       comparison={[
         { label: 'Jornada completa', value: `${Math.round((rawSlices[0].value / Math.max(rawSlices.reduce((s, x) => s + x.value, 0), 1)) * 100)}%`, deltaTone: 'up' },
@@ -1272,10 +1355,10 @@ export default function AppV2Admin() {
       onSelectNav={setAdminPage}
       sidebarHeader={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff', flexShrink: 0 }}>T</div>
+          <img src="/icon-192.png" style={{ width: 30, height: 30, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} alt="Times INC" />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-.2px', color: colors.text[900] }}>TIMES v5</span>
+              <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-.2px', color: colors.text[900] }}>TIMES INC</span>
               <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: colors.primary.dim, color: colors.primary.light }}>PREMIUM</span>
             </div>
             <div style={{ fontSize: 10, color: colors.text[500] }}>Control Horario</div>
@@ -1328,7 +1411,7 @@ export default function AppV2Admin() {
         </div>
       }
       pageTitle={PAGES.find(p => p.id === effectivePage)?.label ?? ''}
-      breadcrumb="TIMES v5"
+      breadcrumb="TIMES INC"
     >
       {renderPage()}
     </AppShell>

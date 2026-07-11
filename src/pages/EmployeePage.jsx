@@ -1241,7 +1241,10 @@ export default function EmployeePage() {
             {syncStatus === 'syncing' && <span style={{ position:'absolute', bottom:-2, right:-2, width:8, height:8, borderRadius:'50%', background:'var(--primary-light)', border:'2px solid var(--bg-700)', animation:'pulse 1.2s ease-in-out infinite' }} />}
           </div>
           <div style={{ minWidth:0, overflow:'hidden' }}>
-            <div className="emp-greeting">{greeting}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div className="emp-greeting">{greeting}</div>
+              <span style={{ fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:999, background:'rgba(124,58,237,.2)', color:'#a78bfa', letterSpacing:'.3px', flexShrink:0 }}>v5</span>
+            </div>
             <TopbarClock />
           </div>
         </div>

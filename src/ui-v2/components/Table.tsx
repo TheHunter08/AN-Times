@@ -31,12 +31,20 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
   // Calcula ancho mínimo sumando columnas fijas + gaps para que el scroll horizontal funcione
   const minW = columns.reduce((s, c) => s + (c.width ? parseInt(c.width) + 16 : 140), 18 * 2)
 
+  const fadeColor = colors.bg[800] + 'dd'
+  const rowHoverBg = colors.bg[500]
+  const rowHoverBorder = colors.border.default
+  const tableStyles = [
+    '.uiv2-table-row:hover { background: ' + rowHoverBg + ' !important; border-color: ' + rowHoverBorder + ' !important; transform: translateX(2px); }',
+    '.uiv2-table-fade-right { display: none; }',
+    '@media (max-width: 700px) { .uiv2-table-fade-right { display: block; } }',
+  ].join('\n')
+
   return (
     <div style={{ position: 'relative' }}>
-      {/* Fade derecha: indica que hay más columnas al deslizar */}
       <div className="uiv2-table-fade-right" style={{
         position: 'absolute', top: 0, right: 0, bottom: 0, width: 40, zIndex: 2, pointerEvents: 'none',
-        background: `linear-gradient(to right, transparent, ${colors.bg[800]}dd)`,
+        background: 'linear-gradient(to right, transparent, ' + fadeColor + ')',
       }} />
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <div style={{ minWidth: minW, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -68,11 +76,7 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
             ))}
           </div>
         ))}
-        <style>{`
-          .uiv2-table-row:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.default} !important; transform: translateX(2px); }
-          .uiv2-table-fade-right { display: none; }
-          @media (max-width: 700px) { .uiv2-table-fade-right { display: block; } }
-        `}</style>
+        <style>{tableStyles}</style>
       </div>
       </div>
     </div>

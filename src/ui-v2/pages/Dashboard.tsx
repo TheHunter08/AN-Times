@@ -54,6 +54,7 @@ export interface DashboardProps {
   fichaje?: { statusLabel: string; time: string; tone: 'green' | 'primary' | 'orange' }
   quickLinks?: QuickLink[]
   teamSlot?: TeamSlot
+  onExport?: () => void
 }
 
 const toneOrder: KpiTone[] = ['primary', 'accent', 'cyan', 'amber']
@@ -131,7 +132,7 @@ function KpiCard({ kpi, tone }: { kpi: KPI; tone: KpiTone }) {
 
 export function Dashboard({
   greeting, greetingSub, kpis, activity, trend, compareTrend, quickActions,
-  nextEvent, fichaje, quickLinks, teamSlot,
+  nextEvent, fichaje, quickLinks, teamSlot, onExport,
 }: DashboardProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1100 }}>
@@ -151,7 +152,7 @@ export function Dashboard({
           }}>
             Esta semana <IconChevronDown width={13} height={13} />
           </button>
-          <Button size="md" icon={<IconDownload width={15} height={15} />}>Exportar</Button>
+          <Button size="md" icon={<IconDownload width={15} height={15} />} onClick={onExport}>Exportar CSV</Button>
           {quickActions}
         </div>
       </div>
