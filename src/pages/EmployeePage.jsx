@@ -1140,29 +1140,6 @@ export default function EmployeePage() {
                   </button>
                 </div>
               )}
-              {teamCierresPendientes.length > 0 && (
-                <div style={{ margin: '12px 20px 0', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)', overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 14px', background: 'rgba(124,58,237,.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>📋</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Cierres del equipo — requieren tu firma</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '2px 8px' }}>{teamCierresPendientes.length}</span>
-                  </div>
-                  {teamCierresPendientes.slice(0, 6).map(c => (
-                    <div key={c.id} style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{c.empName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text4)' }}>{c.mes}</div>
-                      </div>
-                      <button onClick={() => handleSignSupervisor(c.id)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.1)', color: 'var(--primary-light)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        Firmar
-                      </button>
-                    </div>
-                  ))}
-                  {teamCierresPendientes.length > 6 && (
-                    <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--text4)', textAlign: 'center' }}>+{teamCierresPendientes.length - 6} más</div>
-                  )}
-                </div>
-              )}
               <div style={{ padding: '16px 20px' }}>
                 <EmployeeHome {...homeData} onStartAction={doStart} onBreakAction={doBreak} onStopAction={doStop} />
               </div>
@@ -1374,29 +1351,6 @@ export default function EmployeePage() {
                 <button onClick={() => openModal('cierreSign')} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 7, border: 'none', background: 'var(--orange)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Firmar
                 </button>
-              </div>
-            )}
-            {teamCierresPendientes.length > 0 && (
-              <div style={{ margin: '10px 16px 0', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)', overflow: 'hidden' }}>
-                <div style={{ padding: '9px 12px', background: 'rgba(124,58,237,.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14 }}>📋</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-light)', flex: 1 }}>Cierres del equipo sin firma</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '2px 7px' }}>{teamCierresPendientes.length}</span>
-                </div>
-                {teamCierresPendientes.slice(0, 5).map(c => (
-                  <div key={c.id} style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{c.empName}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text4)' }}>{c.mes}</div>
-                    </div>
-                    <button onClick={() => handleSignSupervisor(c.id)} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.1)', color: 'var(--primary-light)', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Firmar
-                    </button>
-                  </div>
-                ))}
-                {teamCierresPendientes.length > 5 && (
-                  <div style={{ padding: '7px 12px', fontSize: 10, color: 'var(--text4)', textAlign: 'center' }}>+{teamCierresPendientes.length - 5} más</div>
-                )}
               </div>
             )}
             <div style={{ padding: '16px' }}>
