@@ -193,16 +193,16 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                 <span style={{ fontSize: 12, fontWeight: 700, color: diffColor[row.diffTone] }}>{row.diff} vs {row.expected} esperadas</span>
               </div>
               {/* Botones acción — solo en pendientes */}
-              {tab === 'pending' && (
-                <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
-                  <button onClick={() => handleApprove(row.id)} style={{
+              {(tab === 'pending' || row.status !== 'pending') && (
+                <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: tab === 'pending' ? '1fr 1fr 1fr' : '1fr 1fr', gap: 8, borderTop: `1px solid ${colors.border.subtle}` }}>
+                  {tab === 'pending' && <button onClick={() => handleApprove(row.id)} style={{
                     padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: 'rgba(16,185,129,.18)', color: colors.semantic.green,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   }}>
                     <IconCheck width={14} height={14} /> Aceptar
-                  </button>
+                  </button>}
                   <button onClick={() => handleModify(row)} style={{
                     padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: colors.primary.dim, color: colors.primary.light,
@@ -211,16 +211,16 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                   }}>
                     <IconEdit width={14} height={14} /> Modificar
                   </button>
-                  <button onClick={() => handleReject(row.id)} style={{
+                  {tab === 'pending' && <button onClick={() => handleReject(row.id)} style={{
                     padding: '7px 0', borderRadius: radius.md, border: 'none',
                     background: 'rgba(239,68,68,.14)', color: colors.semantic.red,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   }}>
                     <IconX width={14} height={14} /> Rechazar
-                  </button>
+                  </button>}
                   <button onClick={() => handleDelete(row.id)} style={{
-                    gridColumn: '1 / -1', padding: '7px 0', borderRadius: radius.md, border: '1px solid rgba(239,68,68,.24)',
+                    gridColumn: tab === 'pending' ? '1 / -1' : 'auto', padding: '7px 0', borderRadius: radius.md, border: '1px solid rgba(239,68,68,.24)',
                     background: 'transparent', color: colors.semantic.red, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   }}><IconX width={14} height={14} /> Eliminar fichaje</button>
@@ -268,7 +268,11 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                       <button onClick={() => handleDelete(row.id)} title="Eliminar fichaje" style={{ padding: '4px', borderRadius: radius.xs, border: '1px solid rgba(239,68,68,.24)', background: 'transparent', color: colors.semantic.red, cursor: 'pointer', display: 'flex' }}><IconX width={12} height={12} /></button>
                     </>
                   ) : (
-                    <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Aprobado' : 'Rechazado'}</Badge>
+                    <>
+                      <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Aprobado' : 'Rechazado'}</Badge>
+                      <button onClick={() => handleModify(row)} title="Modificar fichaje validado" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: colors.primary.dim, color: colors.primary.light, cursor: 'pointer', display: 'flex' }}><IconEdit width={12} height={12} /></button>
+                      <button onClick={() => handleDelete(row.id)} title="Eliminar fichaje" style={{ padding: '4px', borderRadius: radius.xs, border: '1px solid rgba(239,68,68,.24)', background: 'transparent', color: colors.semantic.red, cursor: 'pointer', display: 'flex' }}><IconX width={12} height={12} /></button>
+                    </>
                   )}
                 </div>
               </div>

@@ -195,12 +195,27 @@ export async function cloudFetch() {
     const v1 = await _v1Fetch()
     const blobData = v1.data ?? {}
 
+    const blobRecordMap = new Map((blobData.records ?? []).map(r => [r.id, r]))
+    const tableRecords = (recsR.data ?? []).map(fromRecord)
+    // Workflow metadata such as rejected/validated flags still lives in the
+    // legacy blob. Keep it when a realtime table snapshot is merged; otherwise
+    // a refresh can make an edited row look pending again.
+    const records = tableRecords.map(record => {
+      const blobRecord = blobRecordMap.get(record.id)
+      if (!blobRecord) return record
+      const merged = { ...blobRecord, ...record }
+      for (const key of ['validado', 'rechazado', 'modificado', 'validadoBy', 'validadoAt', 'aceptadaPor', 'aceptadaAt']) {
+        if (blobRecord[key] !== undefined) merged[key] = blobRecord[key]
+      }
+      return merged
+    })
+
     return {
       ok: true,
       data: {
         ...blobData,                                         // config, notis, chats, audit del blob
         employees:  (empsR.data   ?? []).map(fromEmployee),
-        records:    (recsR.data   ?? []).map(fromRecord),
+        records,
         vacaciones: (vacsR.data   ?? []).map(fromVac),
         cierres:    (cierresR.data ?? []).map(fromCierre),
         obras:      (obrasR.data  ?? []).map(fromObra),
@@ -248,49 +263,56 @@ async function _syncToTables(db, deleted) {
   if (!supabase) return
 
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-  const ops = []
+  const deletedRecords = new Set(deleted?.records ?? [])
+  const deletedVacaciones = new Set(deleted?.vacaciones ?? [])
+  const upsertOps = []
 
   if (db.employees?.length) {
-    ops.push(_upsertResilient('employees', db.employees.map(toEmployee)))
+    upsertOps.push(_upsertResilient('employees', db.employees.map(toEmployee)))
   }
 
   // Fichajes recientes (abiertos o modificados en < 48 h)
   const recentRecs = (db.records ?? []).filter(
-    r => !r.fin || !r._upd || r._upd > cutoff
+    r => !deletedRecords.has(r.id) && (!r.fin || !r._upd || r._upd > cutoff)
   )
   if (recentRecs.length) {
-    ops.push(_upsertResilient('records', recentRecs.map(toRecord)))
+    upsertOps.push(_upsertResilient('records', recentRecs.map(toRecord)))
   }
 
   if (db.vacaciones?.length) {
-    ops.push(_upsertResilient('vacaciones', db.vacaciones.map(toVac)))
+    const activeVacaciones = db.vacaciones.filter(v => !deletedVacaciones.has(v.id))
+    if (activeVacaciones.length) upsertOps.push(_upsertResilient('vacaciones', activeVacaciones.map(toVac)))
   }
 
   if (db.cierres?.length) {
-    ops.push(_upsertResilient('cierres', db.cierres.map(toCierre)))
+    upsertOps.push(_upsertResilient('cierres', db.cierres.map(toCierre)))
   }
 
   if (db.obras?.length) {
-    ops.push(_upsertResilient('obras', db.obras.map(toObra)))
+    upsertOps.push(_upsertResilient('obras', db.obras.map(toObra)))
   }
 
   // Borrados físicos: tombstones → DELETE en tablas
+  const upsertResults = await Promise.allSettled(upsertOps)
+  const upsertFailures = upsertResults.filter(r => r.status === 'rejected' || r.value?.error)
+  if (upsertFailures.length) console.warn(`[v2] ${upsertFailures.length}/${upsertOps.length} table upserts failed`)
+  const deleteOps = []
   if (deleted?.records?.length) {
-    ops.push(supabase.from('records').delete().in('id', deleted.records))
+    deleteOps.push(supabase.from('records').delete().in('id', deleted.records))
   }
   if (deleted?.vacaciones?.length) {
-    ops.push(supabase.from('vacaciones').delete().in('id', deleted.vacaciones))
+    deleteOps.push(supabase.from('vacaciones').delete().in('id', deleted.vacaciones))
   }
   // Employees no se borran físicamente: se marcan baja=true
   if (deleted?.employees?.length) {
-    ops.push(supabase.from('employees').update({ baja: true }).in('id', deleted.employees))
+    deleteOps.push(supabase.from('employees').update({ baja: true }).in('id', deleted.employees))
   }
 
-  if (!ops.length) return
-  const results = await Promise.allSettled(ops)
+  if (!deleteOps.length) return
+  const results = await Promise.allSettled(deleteOps)
   const failures = results.filter(r => r.status === 'rejected' || r.value?.error)
   if (failures.length) {
-    console.warn(`[v2] ${failures.length}/${ops.length} table ops failed (non-fatal)`)
+    console.warn(`[v2] ${failures.length}/${deleteOps.length} table deletes failed (non-fatal)`)
   }
 }
 

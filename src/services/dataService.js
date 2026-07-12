@@ -637,7 +637,10 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
 export function cloudPush(db, deleted, onSuccess, onError) {
   if (!supabase) { onError?.(); return }
   if (_pushFlight) {
-    _pushQueue.push({ db, deleted, onSuccess, onError })
+    // Do not retain a stale snapshot while another push is in flight. At
+    // drain time the latest optimistic local DB is the source of truth; only
+    // the tombstones/callback from this queued mutation need to be preserved.
+    _pushQueue.push({ db: null, deleted, onSuccess, onError })
     return
   }
   _doCloudPush(db, deleted, onSuccess, onError)

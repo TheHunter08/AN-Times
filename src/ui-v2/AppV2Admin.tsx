@@ -37,7 +37,8 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush } from '../services/dataService.js'
 import { supabase } from '../services/dataServiceV2.js'
-import { gid, today, mhm, localDateStr } from '../utils/time.js'
+import { gid, today, mhm, localDateStr, calcSecs } from '../utils/time.js'
+import { clipBreaksToWindow } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 
 const PAGES = [
@@ -681,15 +682,23 @@ function ValidateHoursPage() {
     const newInicio = new Date(base); newInicio.setHours(eh, em, 0, 0)
     const newFin    = new Date(base); newFin.setHours(xh, xm, 0, 0)
     if (newFin <= newInicio) newFin.setDate(newFin.getDate() + 1)
+    const breaks = clipBreaksToWindow(rec.breaks || [], newInicio, newFin)
+    const recalculated = calcSecs({ ...rec, inicio: newInicio.toISOString(), fin: newFin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
     const inicioIso = newInicio.toISOString()
     const finIso = newFin.toISOString()
+    const correction = {
+      id: gid(), ts: nowIso, tipo: 'admin', motivo: 'Corrección de horario desde Validar horas',
+      oldInicio: rec.inicio, oldFin: rec.fin, newInicio: inicioIso, newFin: finIso,
+      by: session?.user?.name || 'Admin',
+    }
+    const correcciones = [...(rec.correcciones || []), correction]
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, inicio: inicioIso, fin: finIso, aceptada: true, validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
+        r.id === id ? { ...r, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
       ),
     }))
-    syncRecordDirect(id, { inicio: inicioIso, fin: finIso, aceptada: true, updated_at: nowIso })
+    syncRecordDirect(id, { inicio: inicioIso, fin: finIso, breaks, work_secs: recalculated.work, break_secs: recalculated.brk, aceptada: true, correcciones, updated_at: nowIso })
     toast('Horario modificado', 2500, 'ok')
   }
 
