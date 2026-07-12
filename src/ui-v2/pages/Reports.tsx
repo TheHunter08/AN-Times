@@ -64,7 +64,7 @@ export function Reports({ rows }: ReportsProps) {
           ))}
         </div>
       </Card>
-      <style>{`.uiv2-report-row:hover { background: rgba(255,255,255,.02); }`}</style>
+      <style>{`.uiv2-report-row:hover { background: rgba(var(--uiv2-overlay-rgb),.02); }`}</style>
     </div>
   )
 }

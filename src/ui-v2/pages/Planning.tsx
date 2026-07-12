@@ -32,7 +32,7 @@ const cellDef: Record<PlanCell['status'], { bg: string; color: string; border: s
   turno:   { bg: colors.primary.dim,      color: colors.primary.light, border: colors.primary.base + '55' },
   absent:  { bg: 'rgba(239,68,68,.12)',   color: colors.semantic.red, border: 'rgba(239,68,68,.3)' },
   vac:     { bg: 'rgba(59,130,246,.14)',  color: colors.accent.base, border: 'rgba(59,130,246,.35)' },
-  weekend: { bg: 'rgba(255,255,255,.03)', color: colors.text[300], border: colors.border.subtle },
+  weekend: { bg: 'rgba(var(--uiv2-overlay-rgb),.03)', color: colors.text[300], border: colors.border.subtle },
   future:  { bg: 'transparent',           color: colors.text[300], border: colors.border.subtle },
 }
 

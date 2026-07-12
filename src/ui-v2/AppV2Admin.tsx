@@ -120,31 +120,31 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
 
   const iField = (label: string, key: keyof EmpForm, type = 'text', placeholder = '') => (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</div>
       <input type={type} value={form[key] as string} onChange={e => setF(key, e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
     </div>
   )
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#09070D', borderRadius: '16px 16px 0 0', border: '1px solid rgba(255,255,255,.1)', padding: '24px 20px 40px', width: '100%', maxWidth: 480, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 480, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#f5f5f7' }}>{isEdit ? 'Editar empleado' : 'Nuevo empleado'}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767f', padding: 4 }}><IconX width={18} height={18} /></button>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>{isEdit ? 'Editar empleado' : 'Nuevo empleado'}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
         </div>
         {iField('Nombre completo', 'name', 'text', 'Ej: Juan García')}
         {iField('Email', 'email', 'email', 'juan@empresa.com')}
         {iField('Teléfono', 'telefono', 'tel', '+34 600 000 000')}
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Rol</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Rol</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {ROLES.map(r => (
               <button key={r.value} onClick={() => setF('role', r.value)} style={{
                 padding: '10px 12px', borderRadius: 8,
-                border: `1px solid ${form.role === r.value ? '#7C3AED' : 'rgba(255,255,255,.1)'}`,
-                background: form.role === r.value ? 'rgba(124,58,237,.18)' : 'rgba(255,255,255,.04)',
-                color: form.role === r.value ? '#A78BFA' : '#aeaeb8',
+                border: `1px solid ${form.role === r.value ? colors.primary.base : colors.border.default}`,
+                background: form.role === r.value ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)',
+                color: form.role === r.value ? colors.primary.light : colors.text[700],
                 fontSize: 13, fontWeight: form.role === r.value ? 700 : 500,
                 cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const,
               }}>{r.label}</button>
@@ -152,42 +152,42 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>
             PIN numérico {isEdit ? '(vacío = no cambiar)' : ''}
           </div>
           <input type="password" inputMode="numeric" pattern="[0-9]*" value={form.pin}
             onChange={e => { if (/^\d*$/.test(e.target.value)) setF('pin', e.target.value) }}
             placeholder="4-6 dígitos" maxLength={6}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none', letterSpacing: '0.3em' }} />
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none', letterSpacing: '0.3em' }} />
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
           {centros.length > 0 ? (
             <select value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
               <option value="">Sin asignar</option>
               {centros.map((c: string) => <option key={c} value={c}>{c}</option>)}
             </select>
           ) : (
             <input type="text" value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
               placeholder="Ej: Oficina Central"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
           )}
         </div>
         {obras.length > 0 && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9494a0', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.4px' }}>Obras asignadas</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.4px' }}>Obras asignadas</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {obras.map((o: any) => (
-                <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '7px 10px', borderRadius: 8, background: form.obrasAsignadas.includes(o.id) ? 'rgba(124,58,237,.14)' : 'rgba(255,255,255,.04)', border: `1px solid ${form.obrasAsignadas.includes(o.id) ? 'rgba(124,58,237,.4)' : 'rgba(255,255,255,.08)'}` }}>
-                  <input type="checkbox" checked={form.obrasAsignadas.includes(o.id)} onChange={() => toggleObra(o.id)} style={{ accentColor: '#7C3AED' }} />
-                  <span style={{ fontSize: 13, color: '#f5f5f7' }}>{o.nombre || o.name || o.id}</span>
+                <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '7px 10px', borderRadius: 8, background: form.obrasAsignadas.includes(o.id) ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)', border: `1px solid ${form.obrasAsignadas.includes(o.id) ? colors.primary.glow : colors.border.default}` }}>
+                  <input type="checkbox" checked={form.obrasAsignadas.includes(o.id)} onChange={() => toggleObra(o.id)} style={{ accentColor: colors.primary.base }} />
+                  <span style={{ fontSize: 13, color: colors.text[900] }}>{o.nombre || o.name || o.id}</span>
                 </label>
               ))}
             </div>
           </div>
         )}
-        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#7C3AED', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
           {isEdit ? 'Guardar cambios' : 'Crear empleado'}
         </button>
       </div>
@@ -219,19 +219,19 @@ function CentrosPage() {
   return (
     <div style={{ maxWidth: 600 }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#f5f5f7', marginBottom: 4 }}>Centros de trabajo</div>
-        <div style={{ fontSize: 13, color: '#76767f' }}>Gestiona los centros para asignar empleados y grupos.</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: colors.text[900], marginBottom: 4 }}>Centros de trabajo</div>
+        <div style={{ fontSize: 13, color: colors.text[500] }}>Gestiona los centros para asignar empleados y grupos.</div>
       </div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
         <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCentro()}
           placeholder="Nombre del centro…"
-          style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-        <button onClick={addCentro} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#7C3AED', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+          style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        <button onClick={addCentro} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
           <IconPlus width={14} height={14} /> Añadir
         </button>
       </div>
       {centros.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', color: '#76767f', fontSize: 13, background: 'rgba(255,255,255,.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,.06)' }}>
+        <div style={{ padding: 32, textAlign: 'center', color: colors.text[500], fontSize: 13, background: 'rgba(var(--uiv2-overlay-rgb),.03)', borderRadius: 12, border: `1px solid ${colors.border.subtle}` }}>
           No hay centros de trabajo. Crea el primero arriba.
         </div>
       )}
@@ -239,11 +239,11 @@ function CentrosPage() {
         {centros.map((c: string) => {
           const count = (db.employees || []).filter((e: any) => !e.baja && e.centroTrabajo === c).length
           return (
-            <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)' }}>
-              <IconMapPin width={16} height={16} style={{ color: '#A78BFA', flexShrink: 0 }} />
-              <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#f5f5f7' }}>{c}</div>
-              <div style={{ fontSize: 12, color: '#76767f', marginRight: 4 }}>{count} empleado{count !== 1 ? 's' : ''}</div>
-              <button onClick={() => removeCentro(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#76767f', padding: 4, display: 'flex' }}><IconX width={16} height={16} /></button>
+            <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(var(--uiv2-overlay-rgb),.05)', border: `1px solid ${colors.border.default}` }}>
+              <IconMapPin width={16} height={16} style={{ color: colors.primary.light, flexShrink: 0 }} />
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: colors.text[900] }}>{c}</div>
+              <div style={{ fontSize: 12, color: colors.text[500], marginRight: 4 }}>{count} empleado{count !== 1 ? 's' : ''}</div>
+              <button onClick={() => removeCentro(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4, display: 'flex' }}><IconX width={16} height={16} /></button>
             </div>
           )
         })}

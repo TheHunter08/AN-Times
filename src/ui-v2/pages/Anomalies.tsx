@@ -72,7 +72,7 @@ export function Anomalies({ items }: AnomaliesProps) {
           { label: 'Severidad alta', value: String(highSev), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
           { label: 'Total detectadas', value: String(localItems.length), color: colors.text[700], bg: colors.bg[600] },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '12px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
+          <div key={i} style={{ padding: '12px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 4 }}>{k.label}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: '-.5px' }}>{k.value}</div>
           </div>

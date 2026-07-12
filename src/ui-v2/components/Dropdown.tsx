@@ -76,7 +76,7 @@ export function Dropdown({ options, value, onChange, placeholder = 'Seleccionaâ€
           ))}
         </div>
       )}
-      <style>{`.uiv2-dd-option:hover { background: rgba(255,255,255,.05) !important; }`}</style>
+      <style>{`.uiv2-dd-option:hover { background: rgba(var(--uiv2-overlay-rgb),.05) !important; }`}</style>
     </div>
   )
 }

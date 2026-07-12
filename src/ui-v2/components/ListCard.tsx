@@ -46,7 +46,7 @@ export function ListCard({ title, items, moreLabel = 'Ver todas', onMore, menu }
           {moreLabel} <IconArrowRight width={11} height={11} />
         </button>
       )}
-      <style>{`.uiv2-list-row:hover { background: rgba(255,255,255,.03); }`}</style>
+      <style>{`.uiv2-list-row:hover { background: rgba(var(--uiv2-overlay-rgb),.03); }`}</style>
     </Card>
   )
 }

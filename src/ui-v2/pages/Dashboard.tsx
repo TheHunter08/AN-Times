@@ -356,8 +356,8 @@ export function Dashboard({
       )}
 
       <style>{`
-        .uiv2-kpi-card:hover { border-color: rgba(255,255,255,.1) !important; transform: translateY(-1px); }
-        .uiv2-activity-row:hover { background: rgba(255,255,255,.03); }
+        .uiv2-kpi-card:hover { border-color: rgba(var(--uiv2-overlay-rgb),.1) !important; transform: translateY(-1px); }
+        .uiv2-activity-row:hover { background: rgba(var(--uiv2-overlay-rgb),.03); }
         .uiv2-quicklink:hover { border-color: ${colors.border.strong} !important; background: ${colors.bg[500]} !important; }
         @keyframes uiv2BlinkDot { 0%,100%{opacity:1;}50%{opacity:.25;} }
         .uiv2-live-dot-dash { animation: uiv2BlinkDot 1.6s ease-in-out infinite; }

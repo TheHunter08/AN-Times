@@ -39,7 +39,7 @@ export function Accordion({ items }: { items: AccordionItem[] }) {
           </div>
         )
       })}
-      <style>{`.uiv2-accordion-trigger:hover { background: rgba(255,255,255,.03) !important; }`}</style>
+      <style>{`.uiv2-accordion-trigger:hover { background: rgba(var(--uiv2-overlay-rgb),.03) !important; }`}</style>
     </div>
   )
 }

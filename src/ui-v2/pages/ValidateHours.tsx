@@ -103,7 +103,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
           { label: 'Horas extra', value: String(totalOvertime), color: colors.primary.light, bg: colors.primary.dim },
           { label: 'Total', value: String(localRows.length), color: colors.text[700], bg: colors.bg[600] },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '10px 14px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
+          <div key={i} style={{ padding: '10px 14px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
             <div style={{ fontSize: 10, color: colors.text[500], marginBottom: 3, textTransform: 'uppercase', letterSpacing: '.4px' }}>{k.label}</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
           </div>

@@ -67,7 +67,7 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
       </nav>
       {footer && <div style={{ padding: 12, borderTop: `1px solid ${colors.border.subtle}` }}>{footer}</div>}
 
-      <style>{`.uiv2-sidebar-item:not(.uiv2-active):hover { background: rgba(255,255,255,.045) !important; color: ${colors.text[900]} !important; }`}</style>
+      <style>{`.uiv2-sidebar-item:not(.uiv2-active):hover { background: rgba(var(--uiv2-overlay-rgb),.045) !important; color: ${colors.text[900]} !important; }`}</style>
     </aside>
   )
 }

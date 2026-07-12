@@ -167,7 +167,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
           { label: 'Firmados completos',  value: String(totalSigned),        color: colors.semantic.green,   bg: 'rgba(16,185,129,.10)' },
           { label: 'Pendientes de firma', value: String(totalPending),       color: colors.semantic.orange,  bg: 'rgba(245,158,11,.10)' },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
+          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 6 }}>{k.label}</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: k.color, letterSpacing: '-1px' }}>{k.value}</div>
           </div>
@@ -209,7 +209,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
                 ].map(f => (
                   <span key={f.label} style={{
                     padding: '2px 7px', borderRadius: radius.pill, fontSize: 10.5, fontWeight: 700,
-                    background: f.ok ? 'rgba(16,185,129,.15)' : 'rgba(255,255,255,.06)',
+                    background: f.ok ? 'rgba(16,185,129,.15)' : 'rgba(var(--uiv2-overlay-rgb),.06)',
                     color: f.ok ? colors.semantic.green : colors.text[400],
                     border: `1px solid ${f.ok ? 'rgba(16,185,129,.3)' : colors.border.subtle}`,
                     display: 'flex', alignItems: 'center', gap: 3,
@@ -285,7 +285,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
                   ...(detail.supervisorName ? [{ role: 'Encargado / Jefe de obra', signed: detail.firmaSupervisor, name: detail.supervisorName }] : []),
                   { role: 'Administrador', signed: detail.firmaAdmin, name: 'Times INC' },
                 ].map(f => (
-                  <div key={f.role} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: radius.sm, background: f.signed ? 'rgba(16,185,129,.08)' : 'rgba(255,255,255,.04)', border: `1px solid ${f.signed ? 'rgba(16,185,129,.2)' : colors.border.subtle}` }}>
+                  <div key={f.role} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: radius.sm, background: f.signed ? 'rgba(16,185,129,.08)' : 'rgba(var(--uiv2-overlay-rgb),.04)', border: `1px solid ${f.signed ? 'rgba(16,185,129,.2)' : colors.border.subtle}` }}>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: colors.text[700] }}>{f.role}</div>
                       <div style={{ fontSize: 11, color: colors.text[400] }}>{f.name}</div>
@@ -304,7 +304,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Registro diario</div>
                 <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden' }}>
                   {detail.records.map((r, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px', gap: 8, padding: '8px 12px', borderBottom: i === detail.records.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.02)' }}>
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px', gap: 8, padding: '8px 12px', borderBottom: i === detail.records.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`, background: i % 2 === 0 ? 'transparent' : 'rgba(var(--uiv2-overlay-rgb),.02)' }}>
                       <span style={{ fontSize: 12, color: colors.text[700] }}>{r.date}</span>
                       <span style={{ fontSize: 12, color: colors.text[500] }}>{r.entry}</span>
                       <span style={{ fontSize: 12, color: colors.text[500] }}>{r.exit}</span>

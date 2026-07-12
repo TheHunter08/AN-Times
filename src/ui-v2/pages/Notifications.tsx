@@ -149,7 +149,7 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
       ))}
 
       <style>{`
-        .uiv2-notif-markall:hover { background: rgba(255,255,255,.07) !important; color: ${colors.text[900]} !important; }
+        .uiv2-notif-markall:hover { background: rgba(var(--uiv2-overlay-rgb),.07) !important; color: ${colors.text[900]} !important; }
         .uiv2-notif-card:hover { border-color: rgba(124,58,237,.25) !important; background: rgba(124,58,237,.04) !important; }
         .uiv2-notif-read-btn:hover { background: rgba(16,185,129,.22) !important; }
         .uiv2-notif-dismiss-btn:hover { background: rgba(239,68,68,.14) !important; color: ${colors.semantic.red} !important; }
@@ -215,7 +215,7 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
           className="uiv2-notif-dismiss-btn"
           onClick={() => onDismiss?.(n.id)}
           title="Descartar"
-          style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(255,255,255,.06)', color: colors.text[400], cursor: 'pointer', transition: 'all .15s' }}
+          style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[400], cursor: 'pointer', transition: 'all .15s' }}
         >
           <IconX width={13} height={13} />
         </button>

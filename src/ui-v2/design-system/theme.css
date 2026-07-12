@@ -51,6 +51,12 @@
   --uiv2-kpi-cyan-dim: rgba(34,211,238,0.16);
   --uiv2-kpi-amber: #FBBF24;
   --uiv2-kpi-amber-dim: rgba(251,191,36,0.16);
+
+  /* RGB triplet (sin alfa) para overlays/hover/divisores que deben invertir
+     con el tema: rgba(var(--uiv2-overlay-rgb), 0.06) etc. Blanco sobre fondo
+     oscuro por defecto. NO usar para texto/iconos sobre un bloque de color
+     sólido (botones primarios, badges) — eso se queda blanco siempre. */
+  --uiv2-overlay-rgb: 255,255,255;
 }
 
 :root[data-theme="light"] {
@@ -96,4 +102,6 @@
   --uiv2-kpi-cyan-dim: rgba(8,145,178,0.12);
   --uiv2-kpi-amber: #D97706;
   --uiv2-kpi-amber-dim: rgba(217,119,6,0.12);
+
+  --uiv2-overlay-rgb: 0,0,0;
 }

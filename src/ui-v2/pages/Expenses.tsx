@@ -71,7 +71,7 @@ export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
           { label: 'Total aprobado (mes)', value: `${fmt(items.filter(i => i.status === 'aprobado').reduce((s, i) => s + i.amount, 0))} €`, color: colors.semantic.green, bg: 'rgba(16,185,129,.10)' },
           { label: 'Solicitudes este mes', value: String(items.length), color: colors.accent.base, bg: colors.accent.dim },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(255,255,255,.06)` }}>
+          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 6 }}>{k.label}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color, letterSpacing: '-.5px' }}>{k.value}</div>
           </div>

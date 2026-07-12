@@ -430,7 +430,7 @@ export function EmployeeHome({
         .uiv2-ring-btn:hover .uiv2-ring-center  { opacity: 0.15; }
         .uiv2-ring-btn:active .uiv2-ring-overlay { transform: scale(.96); }
         .uiv2-stop-btn:hover  { background: rgba(239,68,68,.08) !important; border-color: rgba(239,68,68,.45) !important; }
-        .uiv2-timeline-row:hover { background: rgba(255,255,255,.03); }
+        .uiv2-timeline-row:hover { background: rgba(var(--uiv2-overlay-rgb),.03); }
         @keyframes uiv2IdleGlow { 0%,100% { opacity:.4; transform:scale(1); } 50% { opacity:.9; transform:scale(1.06); } }
         .uiv2-idle-glow { animation: uiv2IdleGlow 3s ease-in-out infinite; }
         @keyframes uiv2IdleHint { 0%,100% { opacity:.6; } 50% { opacity:1; } }

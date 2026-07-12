@@ -29,7 +29,7 @@ export interface EmployeesProps {
 const statusCfg: Record<EmployeeRow['status'], { label: string; color: string; bg: string; dot: string }> = {
   active: { label: 'Trabajando',  color: colors.semantic.green,  bg: 'rgba(16,185,129,.12)', dot: colors.semantic.green  },
   break:  { label: 'En pausa',    color: colors.semantic.orange, bg: 'rgba(245,158,11,.12)', dot: colors.semantic.orange },
-  off:    { label: 'Inactivo',    color: colors.text[400],       bg: 'rgba(255,255,255,.06)', dot: colors.text[300]    },
+  off:    { label: 'Inactivo',    color: colors.text[400],       bg: 'rgba(var(--uiv2-overlay-rgb),.06)', dot: colors.text[300]    },
 }
 
 function StatusPill({ status }: { status: EmployeeRow['status'] }) {

@@ -15,7 +15,7 @@ export interface TabsProps {
 
 export function Tabs({ items, active, onChange }: TabsProps) {
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(255,255,255,.04)', borderRadius: radius.md, border: `1px solid ${colors.border.subtle}` }}>
+    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(var(--uiv2-overlay-rgb),.04)', borderRadius: radius.md, border: `1px solid ${colors.border.subtle}` }}>
       {items.map(item => {
         const isActive = item.id === active
         return (

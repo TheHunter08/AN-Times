@@ -10,7 +10,7 @@ export function Loader({ size = 18 }: LoaderProps) {
       <div
         style={{
           width: size, height: size,
-          border: `2px solid rgba(255,255,255,.15)`,
+          border: `2px solid rgba(var(--uiv2-overlay-rgb),.15)`,
           borderTopColor: colors.primary.base,
           borderRadius: '50%',
           animation: 'uiv2Spin .6s linear infinite',

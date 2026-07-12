@@ -128,7 +128,7 @@ export function Calendar({ monthLabel, weeks, onPrev, onNext, week }: CalendarPr
         </>
       )}
 
-      <style>{`.uiv2-cal-nav:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.strong} !important; } .uiv2-cal-day:hover { background: rgba(255,255,255,.04) !important; }`}</style>
+      <style>{`.uiv2-cal-nav:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.strong} !important; } .uiv2-cal-day:hover { background: rgba(var(--uiv2-overlay-rgb),.04) !important; }`}</style>
     </div>
   )
 }
