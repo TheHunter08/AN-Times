@@ -1,5 +1,6 @@
 ﻿import type { ReactNode } from 'react'
 import { colors } from '../design-system/colors'
+import { TopbarClock } from '../../components/employee/TopbarClock.jsx'
 
 export interface HeaderProps {
   title: ReactNode
@@ -35,7 +36,12 @@ export function Header({ title, breadcrumb, actions }: HeaderProps) {
           {title}
         </div>
       </div>
-      {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+        <div style={{ display: window.innerWidth < 560 ? 'none' : 'block' }}>
+          <TopbarClock />
+        </div>
+        {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}</div>}
+      </div>
     </header>
   )
 }

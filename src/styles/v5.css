@@ -462,6 +462,14 @@
   border-bottom: 1px solid rgba(124,58,237,0.16) !important;
   box-shadow: 0 4px 28px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(124,58,237,0.10) !important;
 }
+/* globals.css define [data-theme="light"] .emp-topbar sin !important — la
+   regla oscura de arriba (con !important) siempre ganaba y el topbar nunca
+   cambiaba a claro. Repetido aquí con !important para igualar especificidad. */
+[data-theme="light"] #sEmp .emp-topbar {
+  background: rgba(255,255,255,0.90) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.07) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06) !important;
+}
 
 /* Fichar circle button — violet to blue */
 #sEmp .jor-circle-btn {
