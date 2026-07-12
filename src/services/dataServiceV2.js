@@ -241,15 +241,29 @@ async function _syncToTables(db, deleted) {
     ))
   }
 
-  // Fichajes recientes (abiertos o modificados en < 48 h)
+  // Fichajes recientes (abiertos o modificados en < 48 h).
+  // Se suben en un upsert por lotes propio (fuera de `ops`) porque un solo
+  // registro con datos inválidos (FK a un empleado borrado, etc.) hace que
+  // Postgres rechace el INSERT...ON CONFLICT entero — con eso, TODOS los
+  // demás fichajes del lote (incluida cualquier validación/rechazo/edición
+  // de un admin) se perdían en silencio, aunque solo uno tuviera el problema.
+  // Si el lote falla, se reintenta fila a fila para aislar el problema.
   const recentRecs = (db.records ?? []).filter(
     r => !r.fin || !r._upd || r._upd > cutoff
   )
-  if (recentRecs.length) {
-    ops.push(supabase.from('records').upsert(
+  const recordsSyncPromise = (async () => {
+    if (!recentRecs.length) return
+    const { error } = await supabase.from('records').upsert(
       recentRecs.map(toRecord), { onConflict: 'id' }
-    ))
-  }
+    )
+    if (!error) return
+    console.warn('[v2] batch records upsert failed, retrying individually:', error.message)
+    for (const r of recentRecs) {
+      const { error: rowErr } = await supabase.from('records').upsert(toRecord(r), { onConflict: 'id' })
+      if (rowErr) console.warn(`[v2] record ${r.id} upsert failed:`, rowErr.message)
+    }
+  })()
+  ops.push(recordsSyncPromise)
 
   // Vacaciones
   if (db.vacaciones?.length) {
