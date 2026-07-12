@@ -1067,7 +1067,6 @@ export default function EmployeePage() {
       <div className="emp-dsk-main">
         <header className="emp-dsk-topbar">
           <div className="emp-dsk-greeting-block">
-            <div className="emp-greeting">{greeting}</div>
             <TopbarClock />
           </div>
           <div className="emp-dsk-topbar-actions">
@@ -1245,9 +1244,6 @@ export default function EmployeePage() {
               : null}
           </div>
           <div style={{ minWidth:0, overflow:'hidden' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <div className="emp-greeting">{greeting}</div>
-            </div>
             <TopbarClock />
           </div>
         </div>
