@@ -1845,33 +1845,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ── Premium Micro-interactions & Animations ──────────────── */
 
-/* Tab content slide-in (directional)
-   NOTE: NO transform aquí — animar transform sobre un elemento con
-   -webkit-overflow-scrolling: touch rompe el momentum scroll en iOS
-   (queda "congelado" hasta que el usuario hace tap fuera). Solo opacity. */
-.emp-tab.active {
-  animation: tabFadeIn .22s ease-out;
-}
-.emp-body[data-dir="right"] .emp-tab.active {
-  animation: tabFadeIn .22s ease-out;
-}
-.emp-body[data-dir="left"] .emp-tab.active {
-  animation: tabFadeIn .22s ease-out;
-}
-/* Admin panel fade-in — sin transform para evitar stacking context que atrapa modales */
-.adm-main > .adm-panel {
-  animation: admPanelIn .2s ease;
-}
-.adm-main[data-dir="right"] > .adm-panel {
-  animation: admPanelSlideRight .22s ease;
-}
-.adm-main[data-dir="left"] > .adm-panel {
-  animation: admPanelSlideLeft .22s ease;
-}
-@keyframes admPanelIn         { from { opacity: 0 } to { opacity: 1 } }
-@keyframes admPanelSlideRight { from { opacity: 0; clip-path: inset(0 0 0 10%) } to { opacity: 1; clip-path: inset(0 0 0 0%) } }
-@keyframes admPanelSlideLeft  { from { opacity: 0; clip-path: inset(0 10% 0 0) } to { opacity: 1; clip-path: inset(0 0% 0 0) } }
-@keyframes tabFadeIn     { from { opacity:0; } to { opacity:1; } }
+@keyframes admPanelIn         { from { opacity: 1 } to { opacity: 1 } }
+@keyframes admPanelSlideRight { from { opacity: 1 } to { opacity: 1 } }
+@keyframes admPanelSlideLeft  { from { opacity: 1 } to { opacity: 1 } }
+@keyframes tabFadeIn     { from { opacity:1; } to { opacity:1; } }
 @keyframes slideDown     { from { opacity:0; transform:translateX(-50%) translateY(-12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 @keyframes pulse         { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.5; transform:scale(1.3); } }
 @keyframes tabSlideRight { from { opacity:0; transform:translateX(28px);  } to { opacity:1; transform:translateX(0);  } }
