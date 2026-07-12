@@ -223,6 +223,22 @@ export function cloudPush(db, deleted, onSuccess, onError) {
   }, onError)
 }
 
+// Sube un lote de filas a una tabla en un único upsert. Si Postgres rechaza
+// el lote (una sola fila con datos inválidos — FK a un empleado borrado,
+// constraint violada, etc. — hace fallar el INSERT...ON CONFLICT entero),
+// reintenta fila a fila para aislar el problema en vez de perder en
+// silencio los cambios de TODAS las demás filas del lote.
+async function _upsertResilient(table, rows) {
+  if (!rows.length) return
+  const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' })
+  if (!error) return
+  console.warn(`[v2] batch upsert failed for ${table}, retrying individually:`, error.message)
+  for (const row of rows) {
+    const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
+    if (rowErr) console.warn(`[v2] ${table} row ${row.id} upsert failed:`, rowErr.message)
+  }
+}
+
 // Escribe en las tablas lo que acaba de cambiar en el blob.
 // • Empleados y vacaciones: upsert completo (arrays pequeños).
 // • Fichajes: solo los abiertos + los cerrados con _upd reciente (48h).
@@ -234,56 +250,28 @@ async function _syncToTables(db, deleted) {
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const ops = []
 
-  // Empleados
   if (db.employees?.length) {
-    ops.push(supabase.from('employees').upsert(
-      db.employees.map(toEmployee), { onConflict: 'id' }
-    ))
+    ops.push(_upsertResilient('employees', db.employees.map(toEmployee)))
   }
 
-  // Fichajes recientes (abiertos o modificados en < 48 h).
-  // Se suben en un upsert por lotes propio (fuera de `ops`) porque un solo
-  // registro con datos inválidos (FK a un empleado borrado, etc.) hace que
-  // Postgres rechace el INSERT...ON CONFLICT entero — con eso, TODOS los
-  // demás fichajes del lote (incluida cualquier validación/rechazo/edición
-  // de un admin) se perdían en silencio, aunque solo uno tuviera el problema.
-  // Si el lote falla, se reintenta fila a fila para aislar el problema.
+  // Fichajes recientes (abiertos o modificados en < 48 h)
   const recentRecs = (db.records ?? []).filter(
     r => !r.fin || !r._upd || r._upd > cutoff
   )
-  const recordsSyncPromise = (async () => {
-    if (!recentRecs.length) return
-    const { error } = await supabase.from('records').upsert(
-      recentRecs.map(toRecord), { onConflict: 'id' }
-    )
-    if (!error) return
-    console.warn('[v2] batch records upsert failed, retrying individually:', error.message)
-    for (const r of recentRecs) {
-      const { error: rowErr } = await supabase.from('records').upsert(toRecord(r), { onConflict: 'id' })
-      if (rowErr) console.warn(`[v2] record ${r.id} upsert failed:`, rowErr.message)
-    }
-  })()
-  ops.push(recordsSyncPromise)
+  if (recentRecs.length) {
+    ops.push(_upsertResilient('records', recentRecs.map(toRecord)))
+  }
 
-  // Vacaciones
   if (db.vacaciones?.length) {
-    ops.push(supabase.from('vacaciones').upsert(
-      db.vacaciones.map(toVac), { onConflict: 'id' }
-    ))
+    ops.push(_upsertResilient('vacaciones', db.vacaciones.map(toVac)))
   }
 
-  // Cierres mensuales
   if (db.cierres?.length) {
-    ops.push(supabase.from('cierres').upsert(
-      db.cierres.map(toCierre), { onConflict: 'id' }
-    ))
+    ops.push(_upsertResilient('cierres', db.cierres.map(toCierre)))
   }
 
-  // Obras / centros
   if (db.obras?.length) {
-    ops.push(supabase.from('obras').upsert(
-      db.obras.map(toObra), { onConflict: 'id' }
-    ))
+    ops.push(_upsertResilient('obras', db.obras.map(toObra)))
   }
 
   // Borrados físicos: tombstones → DELETE en tablas

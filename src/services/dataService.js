@@ -141,8 +141,15 @@ function _unionById(base, incoming, tKey) {
   for (const item of b) map.set(item.id, item)
   for (const item of i) {
     const cur = map.get(item.id)
+    if (!cur) { map.set(item.id, item); continue }
     // Si el item local está soft-deleted y el servidor aún no lo sabe, no resucitarlo
     if (cur?.deleted && !item.deleted) continue
+    // Si ambos lados llevan _upd, el más reciente gana — protege una edición
+    // local recién hecha (aprobar/rechazar vacaciones o gastos, editar un
+    // empleado) de ser pisada por un fetch que trae la versión vieja del
+    // servidor porque el push local aún no ha aterrizado. Si algún lado no
+    // tiene _upd, se mantiene el comportamiento previo (incoming siempre gana).
+    if (cur._upd && item._upd && Date.parse(item._upd) < Date.parse(cur._upd)) continue
     map.set(item.id, item)
   }
   return [...map.values()]

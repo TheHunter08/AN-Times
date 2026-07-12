@@ -279,8 +279,9 @@ function useRequestsActions() {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
     saveDB((freshDb: any) => {
+      const nowIso = new Date().toISOString()
       const updated = (freshDb.vacaciones || []).map((v: any) =>
-        v.id === id ? { ...v, estado: 'aprobada', resolvedAt: new Date().toISOString() } : v
+        v.id === id ? { ...v, estado: 'aprobada', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(freshDb, 'Solicitud aprobada', vac.empName || '', session?.user?.name || 'Admin')
       const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones aprobadas', detail: '', ts: new Date().toISOString(), leido: false }
@@ -294,8 +295,9 @@ function useRequestsActions() {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
     saveDB((freshDb: any) => {
+      const nowIso = new Date().toISOString()
       const updated = (freshDb.vacaciones || []).map((v: any) =>
-        v.id === id ? { ...v, estado: 'rechazada', resolvedAt: new Date().toISOString() } : v
+        v.id === id ? { ...v, estado: 'rechazada', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(freshDb, 'Solicitud rechazada', vac.empName || '', session?.user?.name || 'Admin')
       const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones rechazadas', detail: '', ts: new Date().toISOString(), leido: false }
@@ -717,8 +719,9 @@ function ExpensesPage() {
     const g = (db.gastos || []).find((x: any) => x.id === id)
     if (!g) return
     saveDB((freshDb: any) => {
+      const nowIso = new Date().toISOString()
       const updated = (freshDb.gastos || []).map((x: any) =>
-        x.id === id ? { ...x, estado: 'aprobado', resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin' } : x
+        x.id === id ? { ...x, estado: 'aprobado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto aprobado', `${g.empName}: ${g.concepto} ${g.importe}€`, session?.user?.name || 'Admin')
       return { gastos: updated, audit: withAudit.audit }
@@ -730,8 +733,9 @@ function ExpensesPage() {
     const g = (db.gastos || []).find((x: any) => x.id === id)
     if (!g) return
     saveDB((freshDb: any) => {
+      const nowIso = new Date().toISOString()
       const updated = (freshDb.gastos || []).map((x: any) =>
-        x.id === id ? { ...x, estado: 'rechazado', resolvedAt: new Date().toISOString(), resolvedBy: session?.user?.name || 'Admin' } : x
+        x.id === id ? { ...x, estado: 'rechazado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto rechazado', `${g.empName}: ${g.concepto}`, session?.user?.name || 'Admin')
       return { gastos: updated, audit: withAudit.audit }
