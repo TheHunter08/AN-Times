@@ -626,23 +626,6 @@ function ValidateHoursPage() {
     })
   }, [db])
 
-  // Escritura directa a la tabla `records` de Supabase para ESTE registro
-  // concreto, en paralelo al saveDB (que va por el blob + sync por lotes).
-  // El sync por lotes agrupa todos los fichajes "recientes" en un único
-  // upsert — si cualquiera de ellos tiene datos inválidos, Postgres rechaza
-  // el lote entero y esta validación se perdía en silencio. Escribiendo
-  // directo aquí, la validación del admin no depende de la salud del resto
-  // del lote, y si falla lo sabemos al momento (toast de aviso).
-  const syncRecordDirect = (id: string, patch: Record<string, any>) => {
-    if (!supabase) return
-    supabase.from('records').update(patch).eq('id', id).then(({ error }: any) => {
-      if (error) {
-        console.warn('[validar] direct sync failed:', error.message)
-        toast('Guardado local — no se pudo confirmar con el servidor', 4000, 'warn')
-      }
-    })
-  }
-
   const handleApprove = (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
@@ -652,7 +635,6 @@ function ValidateHoursPage() {
         r.id === id ? { ...r, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
       ),
     }))
-    syncRecordDirect(id, { aceptada: true, updated_at: nowIso })
     toast('Jornada validada', 2500, 'ok')
   }
 
@@ -665,7 +647,6 @@ function ValidateHoursPage() {
         r.id === id ? { ...r, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
       ),
     }))
-    syncRecordDirect(id, { aceptada: false, updated_at: nowIso })
     toast('Jornada rechazada', 2500, 'warn')
   }
 
@@ -698,7 +679,6 @@ function ValidateHoursPage() {
         r.id === id ? { ...r, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
       ),
     }))
-    syncRecordDirect(id, { inicio: inicioIso, fin: finIso, breaks, work_secs: recalculated.work, break_secs: recalculated.brk, aceptada: true, correcciones, updated_at: nowIso })
     toast('Horario modificado', 2500, 'ok')
   }
 
