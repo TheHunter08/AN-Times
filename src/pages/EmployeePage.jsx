@@ -854,9 +854,9 @@ export default function EmployeePage() {
   }, [])
   const greeting = useMemo(() => {
     const firstName = u.name.split(' ')[0]
-    if (greetHour >= 6 && greetHour < 14) return `Buenos días, ${firstName} ☀️`
-    if (greetHour >= 14 && greetHour < 21) return `Buenas tardes, ${firstName} 👋`
-    return `Buenas noches, ${firstName} 🌙`
+    if (greetHour >= 6 && greetHour < 14) return `Buenos días, ${firstName}`
+    if (greetHour >= 14 && greetHour < 21) return `Buenas tardes, ${firstName}`
+    return `Buenas noches, ${firstName}`
   }, [u.name, greetHour])
 
   const homeData = useMemo(() => {
@@ -1238,7 +1238,11 @@ export default function EmployeePage() {
         <div className="emp-top-left">
           <div className="emp-avatar" style={{ background: u.color || 'var(--primary)', position:'relative' }}>
             {initials}
-            {syncStatus === 'syncing' && <span style={{ position:'absolute', bottom:-2, right:-2, width:8, height:8, borderRadius:'50%', background:'var(--primary-light)', border:'2px solid var(--bg-700)', animation:'pulse 1.2s ease-in-out infinite' }} />}
+            {syncStatus === 'syncing'
+              ? <span title="Sincronizando" style={{ position:'absolute', bottom:-2, right:-2, width:9, height:9, borderRadius:'50%', background:'var(--primary-light)', border:'2px solid var(--bg-700)', animation:'pulse 1.2s ease-in-out infinite' }} />
+              : realtimeStatus === 'SUBSCRIBED'
+              ? <span title="Tiempo real activo" style={{ position:'absolute', bottom:-2, right:-2, width:9, height:9, borderRadius:'50%', background:'#10b981', border:'2px solid var(--bg-700)', boxShadow:'0 0 5px #10b981' }} />
+              : null}
           </div>
           <div style={{ minWidth:0, overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1248,23 +1252,19 @@ export default function EmployeePage() {
           </div>
         </div>
         <div className="emp-top-right">
-          {/* Panel chip — encargados y jefes de obra */}
-          {isSuper && (
-            <button className="enc-chip" onClick={() => setScreen('admin')}>
-              {isJefeObra ? '🏗️' : '⭐'} Panel
-            </button>
-          )}
-
-          {/* Indicador live realtime */}
-          {realtimeStatus === 'SUBSCRIBED' && (
-            <div title="Tiempo real activo" style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 9px', borderRadius:20, background:'rgba(16,185,129,.12)', border:'1px solid rgba(16,185,129,.25)', flexShrink:0 }}>
-              <span style={{ width:6, height:6, borderRadius:'50%', background:'#10b981', display:'inline-block', boxShadow:'0 0 6px #10b981', animation:'pulse 2s ease-in-out infinite' }} />
-              <span style={{ fontSize:10, fontWeight:700, color:'#10b981', letterSpacing:'.3px' }}>LIVE</span>
-            </div>
-          )}
-
-          {/* Pill de acciones agrupadas */}
+          {/* Pill de acciones agrupadas — todo en un único contenedor para no competir por espacio */}
           <div style={{ display:'flex', alignItems:'center', gap:2, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.08)', borderRadius:22, padding:'3px 4px' }}>
+            {/* Panel — encargados y jefes de obra */}
+            {isSuper && (
+              <>
+                <button onClick={() => setScreen('admin')} title="Panel de administración" aria-label="Ir al panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'rgba(124,58,237,.16)', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,.28)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(124,58,237,.16)'}>
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                </button>
+                <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
+              </>
+            )}
             {/* IA */}
             <button onClick={() => openModal('ai')} title="Asistente IA" aria-label="Abrir asistente de IA" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,.18)'}
@@ -1299,14 +1299,16 @@ export default function EmployeePage() {
               onMouseLeave={e => e.currentTarget.style.background='transparent'}>
               {isLight ? '🌙' : '☀️'}
             </button>
-          </div>
 
-          {/* Logout — separado, fuera del pill */}
-          <button onClick={doLogout} title="Cerrar sesión" aria-label="Cerrar sesión" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:32, height:32, borderRadius:'50%', border:'1px solid rgba(239,68,68,.25)', background:'rgba(239,68,68,.07)', color:'rgba(239,68,68,.7)', cursor:'pointer', transition:'all .15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background='rgba(239,68,68,.18)'; e.currentTarget.style.borderColor='rgba(239,68,68,.5)'; e.currentTarget.style.color='#ef4444' }}
-            onMouseLeave={e => { e.currentTarget.style.background='rgba(239,68,68,.07)'; e.currentTarget.style.borderColor='rgba(239,68,68,.25)'; e.currentTarget.style.color='rgba(239,68,68,.7)' }}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          </button>
+            <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
+
+            {/* Logout */}
+            <button onClick={doLogout} title="Cerrar sesión" aria-label="Cerrar sesión" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(239,68,68,.75)', cursor:'pointer', transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(239,68,68,.16)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+          </div>
         </div>
       </div>
 
