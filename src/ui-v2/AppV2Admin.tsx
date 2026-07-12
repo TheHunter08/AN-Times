@@ -620,7 +620,7 @@ function ValidateHoursPage() {
         expected: '8h',
         diff: diffStr,
         diffTone: Math.abs(diff) < 15 ? 'ok' : diff > 0 ? 'over' : 'under',
-        status: r.validado ? 'approved' : r.rechazado ? 'rejected' : 'pending',
+        status: (r.aceptada || r.validado) ? 'approved' : r.rechazado ? 'rejected' : 'pending',
       } as any
     })
   }, [db])
@@ -630,7 +630,7 @@ function ValidateHoursPage() {
     if (!rec) return
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
       ),
     }))
     toast('Jornada validada', 2500, 'ok')
@@ -641,7 +641,7 @@ function ValidateHoursPage() {
     if (!rec) return
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
       ),
     }))
     toast('Jornada rechazada', 2500, 'warn')

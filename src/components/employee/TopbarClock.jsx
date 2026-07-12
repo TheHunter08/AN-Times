@@ -23,9 +23,8 @@ export function TopbarClock() {
   })()
 
   return (
-    <div style={{ fontSize:12, color:colors.text[500] }}>
+    <div style={{ fontSize:12, color:colors.text[500], whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
       {clockDate} · <span style={{ color:colors.primary.light, fontWeight:600 }}>{clockTime}</span>
-      {syncLabel && <span style={{ marginLeft:6, color: syncStatus === 'error' ? colors.semantic.red : colors.text[300], fontSize:10 }}>· {syncLabel}</span>}
     </div>
   )
 }
