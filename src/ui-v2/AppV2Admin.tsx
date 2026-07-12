@@ -630,7 +630,7 @@ function ValidateHoursPage() {
     if (!rec) return
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString(), _upd: new Date().toISOString() } : r
       ),
     }))
     toast('Jornada validada', 2500, 'ok')
@@ -641,7 +641,7 @@ function ValidateHoursPage() {
     if (!rec) return
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString(), _upd: new Date().toISOString() } : r
       ),
     }))
     toast('Jornada rechazada', 2500, 'warn')
@@ -658,7 +658,7 @@ function ValidateHoursPage() {
     if (newFin <= newInicio) newFin.setDate(newFin.getDate() + 1)
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, inicio: newInicio.toISOString(), fin: newFin.toISOString(), validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString() } : r
+        r.id === id ? { ...r, inicio: newInicio.toISOString(), fin: newFin.toISOString(), aceptada: true, validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: new Date().toISOString(), _upd: new Date().toISOString() } : r
       ),
     }))
     toast('Horario modificado', 2500, 'ok')
