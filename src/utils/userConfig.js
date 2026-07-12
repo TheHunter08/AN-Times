@@ -13,9 +13,10 @@ export function setCfg(key, value) {
   try { localStorage.setItem('cfg_' + key, String(value)) } catch {}
 }
 
+// App de un solo tema (oscuro con degradado azul-negro) — no-op a propósito.
+// Se mantiene exportada porque varias pantallas todavía la importan y
+// llaman al botón "Tema"; en vez de tocar cada callsite, se neutraliza aquí.
 export function toggleTheme() {
-  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
-  if (next === 'dark') document.documentElement.removeAttribute('data-theme')
-  else document.documentElement.setAttribute('data-theme', 'light')
-  try { localStorage.setItem('theme', next) } catch {}
+  document.documentElement.removeAttribute('data-theme')
+  try { localStorage.removeItem('theme') } catch {}
 }

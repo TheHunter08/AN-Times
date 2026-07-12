@@ -113,24 +113,6 @@ export function EmployeeHome({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto' }}>
 
-      {/* ── Cabecera ───────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
-        <div>
-          {greeting && <div style={{ fontSize: 18, fontWeight: 660, color: colors.text[900], letterSpacing: '-.3px' }}>{greeting}</div>}
-          <div style={{ fontSize: 11.5, color: colors.text[500], marginTop: greeting ? 2 : 0 }}>{dateLabel}</div>
-        </div>
-        {!!streakDays && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '5px 12px', borderRadius: radius.pill,
-            background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.2)',
-            color: colors.kpiTone.amber.base, fontSize: 12, fontWeight: 700,
-          }}>
-            🔥 {streakDays} días seguidos
-          </div>
-        )}
-      </div>
-
       {/* ── Héroe ──────────────────────────────────────────────── */}
       <div style={{
         background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,

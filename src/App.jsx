@@ -517,38 +517,17 @@ export default function App() {
     }
   }, [])
 
+  // App de un solo tema (oscuro, degradado azul-negro): sin auto-detección
+  // de preferencia del sistema ni toggle — se fuerza siempre a oscuro,
+  // incluso si el navegador/SO del usuario está en modo claro o quedó un
+  // 'theme'='light' guardado de antes de este cambio.
   useEffect(() => {
-    const applyTheme = (prefersDark) => {
-      try {
-        const saved = localStorage.getItem('theme')
-        if (saved === 'light') {
-          document.documentElement.setAttribute('data-theme', 'light')
-        } else if (saved === 'dark') {
-          document.documentElement.removeAttribute('data-theme')
-        } else {
-          if (prefersDark) document.documentElement.removeAttribute('data-theme')
-          else document.documentElement.setAttribute('data-theme', 'light')
-        }
-      } catch {}
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    applyTheme(mq.matches)
-    const onChange = (e) => { try { if (!localStorage.getItem('theme')) applyTheme(e.matches) } catch { applyTheme(e.matches) } }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-
-  // Sincronizar theme-color meta con el tema activo (dark/light toggle en app)
-  useEffect(() => {
-    const updateThemeColor = () => {
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light'
-      const meta = document.querySelector('meta[name="theme-color"]')
-      if (meta) meta.content = isLight ? '#ffffff' : '#0d0d18'
-    }
-    const observer = new MutationObserver(updateThemeColor)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    updateThemeColor()
-    return () => observer.disconnect()
+    try {
+      document.documentElement.removeAttribute('data-theme')
+      localStorage.removeItem('theme')
+    } catch {}
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.content = '#0B1220'
   }, [])
 
   // Registrar Periodic Background Sync (Chrome/Android — sincroniza datos aunque la app esté cerrada)

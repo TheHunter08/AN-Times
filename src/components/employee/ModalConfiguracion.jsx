@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
-import { getCfg, setCfg, toggleTheme } from '../../utils/userConfig.js'
+import { getCfg, setCfg } from '../../utils/userConfig.js'
 import { queuePush, pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
@@ -22,7 +22,6 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [salidaTime, setSalidaTime] = useState(() => getCfg('salidaTime', '21:00'))
   const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
   const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
-  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
@@ -106,7 +105,6 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
         <Toggle label="Notificaciones de fichaje" value={notiFichaje} onChange={setNotiFichaje} />
         <Toggle label="Recordatorio de salida" value={notiSalida} onChange={setNotiSalida} />
         <Toggle label="GPS automático" value={gpsAuto} onChange={setGpsAuto} />
-        <Toggle label="Modo claro" value={isLight} onChange={() => { toggleTheme(); setIsLight(l => !l); toast(isLight ? 'Modo oscuro activado' : 'Modo claro activado') }} />
 
         <div style={{ padding:'14px 0', borderBottom:SEP }}>
           <div style={{ fontSize:14, color:colors.text[900], marginBottom:4 }}>Recordatorio de fichaje</div>
