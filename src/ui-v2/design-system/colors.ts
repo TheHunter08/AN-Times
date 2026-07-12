@@ -70,7 +70,6 @@ export const colors = {
     hero: 'linear-gradient(135deg, var(--uiv2-primary-glow) 0%, var(--uiv2-accent-dim) 55%, transparent 100%)',
     brand: 'linear-gradient(135deg, var(--uiv2-primary-base) 0%, #2563EB 100%)',
     sidebar: 'linear-gradient(180deg, var(--uiv2-bg-700) 0%, var(--uiv2-bg-900) 100%)',
-    appBg: 'var(--uiv2-grad-bg)',
   },
   // Blanco/negro puros reservados para texto sobre bloques de color sólido
   // (estilo neo-brutalista v5) — el resto de la paleta usa grises reales,

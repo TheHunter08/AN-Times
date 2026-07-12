@@ -29,12 +29,6 @@ input, textarea, [contenteditable="true"], .selectable {
 }
 
 :root {
-  /* Fondo de lienzo de app — degradado azul a negro, profesional/moderno.
-     Solo para contenedores de pantalla completa (body, .screen); las
-     tarjetas y superficies elevadas siguen usando los --bg-XXX planos de
-     abajo para no perder legibilidad. */
-  --grad-app-bg: linear-gradient(160deg, #0B1220 0%, #0d1b3a 35%, #000000 100%);
-
   /* ── Backgrounds — deep violet-black */
   --bg-900: #09070D;
   --bg-800: #09070D;
@@ -52,19 +46,18 @@ input, textarea, [contenteditable="true"], .selectable {
   --bg4: #1C1628;
   --bg5: #241D34;
 
-  /* ── Primary — azul profesional (dominante, coherente con el degradado
-     de fondo azul→negro y con ui-v2). El violeta pasa a --accent. */
-  --primary:       #3B82F6;
-  --primary-light: #60A5FA;
-  --primary-dim:   rgba(59,130,246,0.13);
-  --primary-glow:  rgba(59,130,246,0.28);
+  /* ── Primary — v5: violeta premium */
+  --primary:       #7C3AED;
+  --primary-light: #A78BFA;
+  --primary-dim:   rgba(124,58,237,0.13);
+  --primary-glow:  rgba(124,58,237,0.28);
 
-  /* ── Accent — Violeta (secundario: IA, detalles puntuales) */
-  --accent:     #7C3AED;
-  --accent2:    #A78BFA;
-  --accent3:    #C4B5FD;
-  --accent-dim: rgba(124,58,237,0.12);
-  --accent-glow:rgba(124,58,237,0.22);
+  /* ── Accent — Azul electrico */
+  --accent:     #3B82F6;
+  --accent2:    #6366F1;
+  --accent3:    #93C5FD;
+  --accent-dim: rgba(59,130,246,0.12);
+  --accent-glow:rgba(59,130,246,0.22);
 
   /* ── Secondary — Cyan */
   --secondary:      #06B6D4;
@@ -126,12 +119,12 @@ input, textarea, [contenteditable="true"], .selectable {
   --shadow-md: 0 4px 14px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.35);
   --shadow-lg: 0 8px 28px rgba(0,0,0,0.65), 0 4px 10px rgba(0,0,0,0.45);
   --shadow-xl: 0 20px 64px rgba(0,0,0,0.80), 0 0 0 1px rgba(255,255,255,0.04);
-  --shadow-primary: 0 8px 28px rgba(59,130,246,0.35), 0 2px 8px rgba(59,130,246,0.20);
+  --shadow-primary: 0 8px 28px rgba(124,58,237,0.35), 0 2px 8px rgba(124,58,237,0.20);
   --shadow-green:   0 8px 28px rgba(16,185,129,0.32), 0 2px 8px rgba(16,185,129,0.18);
   --shadow-red:     0 8px 28px rgba(239,68,68,0.35), 0 2px 8px rgba(239,68,68,0.20);
 
   /* ── v5 — Gradients */
-  --grad-primary: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  --grad-primary: linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%);
   --grad-success: linear-gradient(135deg, #059669 0%, #10B981 100%);
   --grad-warning: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
   --grad-hero:    linear-gradient(160deg, #09070D 0%, #1A0D3A 50%, #09070D 100%);
@@ -208,7 +201,7 @@ input, textarea, [contenteditable="true"], .selectable {
 html, body {
   position: fixed;
   inset: 0;
-  background: var(--grad-app-bg);
+  background: var(--bg-800);
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
 }
@@ -394,7 +387,7 @@ input[type=date], input[type=time] { -webkit-appearance: auto; appearance: auto;
   inset: 0;
   display: none;
   flex-direction: column;
-  background: var(--grad-app-bg);
+  background: var(--bg-800);
   overflow: hidden;
 }
 .screen.active { display: flex; }
@@ -595,7 +588,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 @keyframes circle-breathe { 0%,100%{box-shadow:0 0 0 8px rgba(124,58,237,.12),0 0 0 16px rgba(124,58,237,.06),0 12px 40px rgba(124,58,237,.4)} 50%{box-shadow:0 0 0 14px rgba(124,58,237,.22),0 0 0 28px rgba(124,58,237,.1),0 16px 52px rgba(124,58,237,.65)} }
 
 /* ── Employee screen ────────────────────────────────────────── */
-#sEmp { overflow: hidden; background: var(--grad-app-bg); flex-direction: column; }
+#sEmp { overflow: hidden; background: #000000; flex-direction: column; }
 
 /* Topbar — TIMES INC 3.0 */
 .emp-topbar {
@@ -645,7 +638,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .enc-chip { display: flex; align-items: center; gap: 5px; background: var(--accent-dim); border: 1px solid var(--accent-glow); border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 700; color: var(--accent3); cursor: pointer; white-space: nowrap; }
 
 /* Employee body */
-.emp-body { flex: 1; overflow: hidden; min-height: 0; background: transparent; position: relative; }
+.emp-body { flex: 1; overflow: hidden; min-height: 0; background: #000000; position: relative; }
 
 /* Tab pages */
 .emp-tab {
@@ -724,7 +717,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ── Login screen — Premium SaaS ───────────────────────────── */
 #sLogin {
-  background: var(--grad-app-bg);
+  background: var(--bg-800);
   overflow: hidden;
   position: relative;
 }

@@ -140,7 +140,7 @@ export function AppShell({
     <div
       style={{
         position: 'fixed', inset: 0, display: 'flex',
-        background: `radial-gradient(1200px 700px at 15% -10%, rgba(59,91,255,0.09), transparent 60%), ${colors.gradients.appBg}`,
+        background: `radial-gradient(1200px 700px at 15% -10%, rgba(59,91,255,0.07), transparent 60%), ${colors.bg[800]}`,
         color: colors.text[900],
         fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
       }}

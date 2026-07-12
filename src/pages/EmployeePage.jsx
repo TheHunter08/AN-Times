@@ -14,7 +14,7 @@ import { startedInHorizontalScroller } from '../utils/gesture.js'
 import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
-import { getCfg } from '../utils/userConfig.js'
+import { getCfg, toggleTheme } from '../utils/userConfig.js'
 import { TopbarClock } from '../components/employee/TopbarClock.jsx'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { ModalSelCentro } from '../components/employee/ModalSelCentro.jsx'
@@ -85,6 +85,8 @@ export default function EmployeePage() {
   const geoExitDismissedRef = useRef(null) // rec.id cuyo aviso de salida se descartó
   const [showConfetti, setShowConfetti] = useState(false)
   const [perfilSubTab, setPerfilSubTab] = useState('perfil') // 'perfil' | 'gastos' | 'denuncia'
+  // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
+  const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   const dbRef = useRef(db)
   const geoAbortRef = useRef(false)
   // Contador de generación: cada nueva solicitud GPS incrementa el nonce y
@@ -1074,6 +1076,9 @@ export default function EmployeePage() {
                 {isJefeObra ? '🏗️ Panel' : '⭐ Panel'}
               </button>
             )}
+            <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema">
+              {isLight ? '🌙' : '☀️'}
+            </button>
             <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Asistente IA">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
             </button>
@@ -1286,6 +1291,15 @@ export default function EmployeePage() {
             </button>
 
             {/* Separador */}
+            <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
+
+            {/* Tema */}
+            <button onClick={() => { toggleTheme(); setIsLight(l => !l) }} title={isLight ? 'Modo oscuro' : 'Modo claro'} aria-label="Cambiar tema claro/oscuro" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(255,255,255,.45)', cursor:'pointer', fontSize:14, transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              {isLight ? '🌙' : '☀️'}
+            </button>
+
             <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
 
             {/* Logout */}

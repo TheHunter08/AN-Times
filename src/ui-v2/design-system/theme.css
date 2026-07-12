@@ -1,16 +1,11 @@
-/* Tokens de color para ui-v2 como custom properties. App de un solo tema
-   (oscuro, degradado azul→negro) — sin modo claro: se probó y no encajaba
-   con el look "profesional moderno" buscado, así que se retiró a favor de
-   un único tema bien cuidado. */
+/* Tokens de color para ui-v2 como custom properties — permite que colors.ts
+   siga exportando el mismo objeto (cero cambios en los 79 archivos que lo
+   consumen) mientras los VALORES reaccionan a [data-theme] en tiempo real.
+   Namespaced con --uiv2- para no chocar con las variables --bg-800 etc. de
+   la UI clásica (globals.css), que usan otra escala. */
 
 :root {
-  /* Fondo de lienzo de pantalla completa (AppShell, sidebar) — mismo
-     degradado que usa la UI clásica (globals.css --grad-app-bg), para que
-     ambas versiones compartan una única identidad visual. */
-  --uiv2-grad-bg: linear-gradient(160deg, #0B1220 0%, #0d1b3a 35%, #000000 100%);
-
-  /* Superficies elevadas (tarjetas, inputs) — planas, no degradado, para
-     no perder legibilidad del texto encima. */
+  /* Fondo — oscuro por defecto */
   --uiv2-bg-900: #09070D;
   --uiv2-bg-800: #0B0810;
   --uiv2-bg-700: #110D19;
@@ -57,6 +52,56 @@
   --uiv2-kpi-amber: #FBBF24;
   --uiv2-kpi-amber-dim: rgba(251,191,36,0.16);
 
-  /* RGB triplet (sin alfa) para overlays/hover/divisores: rgba(var(--uiv2-overlay-rgb), 0.06) etc. */
+  /* RGB triplet (sin alfa) para overlays/hover/divisores que deben invertir
+     con el tema: rgba(var(--uiv2-overlay-rgb), 0.06) etc. Blanco sobre fondo
+     oscuro por defecto. NO usar para texto/iconos sobre un bloque de color
+     sólido (botones primarios, badges) — eso se queda blanco siempre. */
   --uiv2-overlay-rgb: 255,255,255;
+}
+
+:root[data-theme="light"] {
+  --uiv2-bg-900: #FFFFFF;
+  --uiv2-bg-800: #F7F7F9;
+  --uiv2-bg-700: #F0F1F4;
+  --uiv2-bg-600: #E9EAEF;
+  --uiv2-bg-500: #DFE1E8;
+  --uiv2-bg-400: #D2D5E0;
+  --uiv2-bg-300: #C2C6D6;
+  --uiv2-bg-200: #AEB3C8;
+
+  --uiv2-primary-base:  #2563EB;
+  --uiv2-primary-light: #3B82F6;
+  --uiv2-primary-dim:   rgba(37,99,235,0.10);
+  --uiv2-primary-glow:  rgba(37,99,235,0.22);
+
+  --uiv2-accent-base: #7C3AED;
+  --uiv2-accent-dim:  rgba(124,58,237,0.08);
+  --uiv2-accent-glow: rgba(124,58,237,0.18);
+
+  --uiv2-secondary-base: #0891B2;
+  --uiv2-secondary-dim:  rgba(8,145,178,0.10);
+
+  --uiv2-green:  #059669;
+  --uiv2-orange: #D97706;
+  --uiv2-red:    #DC2626;
+
+  --uiv2-text-900: #14141A;
+  --uiv2-text-700: #47474F;
+  --uiv2-text-500: #6B6B76;
+  --uiv2-text-300: #A0A0AC;
+
+  --uiv2-border-subtle: rgba(0,0,0,0.06);
+  --uiv2-border-default: rgba(0,0,0,0.10);
+  --uiv2-border-strong: rgba(0,0,0,0.16);
+
+  --uiv2-kpi-primary: #2563EB;
+  --uiv2-kpi-primary-dim: rgba(37,99,235,0.12);
+  --uiv2-kpi-accent: #7C3AED;
+  --uiv2-kpi-accent-dim: rgba(124,58,237,0.10);
+  --uiv2-kpi-cyan: #0891B2;
+  --uiv2-kpi-cyan-dim: rgba(8,145,178,0.12);
+  --uiv2-kpi-amber: #D97706;
+  --uiv2-kpi-amber-dim: rgba(217,119,6,0.12);
+
+  --uiv2-overlay-rgb: 0,0,0;
 }

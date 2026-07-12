@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,interactive-widget=resizes-content" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
   <meta name="format-detection" content="telephone=no,date=no,email=no,address=no" />
   <meta name="apple-touch-fullscreen" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#0B1220" />
+  <meta name="theme-color" content="#0d0d18" />
   <title>TIMES INC</title>
   <meta name="description" content="Sistema de fichaje y control horario para empresas" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
@@ -33,13 +33,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet" />
   <script>
-    (function(){try{document.documentElement.removeAttribute('data-theme');localStorage.removeItem('theme')}catch(e){}}())
+    (function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light');document.querySelector('meta[name="theme-color"]').content='#ffffff';document.querySelector('meta[name="color-scheme"]').content='light dark';}}catch(e){}}())
   </script>
   <style>
-    html, body { margin: 0; padding: 0; background: linear-gradient(160deg, #0B1220 0%, #0d1b3a 35%, #000000 100%); position: fixed; inset: 0; }
+    html, body { margin: 0; padding: 0; background: #0d0d18; position: fixed; inset: 0; }
+    [data-theme="light"] html, [data-theme="light"] body { background: #ffffff; }
     #root { position: fixed; inset: 0; }
     #splash {
-      position: fixed; inset: 0; background: linear-gradient(160deg, #0B1220 0%, #0d1b3a 35%, #000000 100%);
+      position: fixed; inset: 0; background: #0d0d18;
       display: flex; align-items: center; justify-content: center;
       flex-direction: column; gap: 16px; z-index: 9999;
     }

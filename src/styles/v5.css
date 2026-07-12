@@ -5,15 +5,15 @@
    Solo UI. No tocar lógica de backend ni auth.
    ══════════════════════════════════════════════════════════ */
 
-/* ─── 0. RESET DE COLORES CSS (azul dominante, violeta secundario) ── */
+/* ─── 0. RESET DE COLORES CSS (violeta en vez de índigo) ── */
 :root {
-  --primary:       #3B82F6;
-  --primary-light: #60A5FA;
-  --primary-dim:   rgba(59,130,246,0.14);
-  --primary-glow:  rgba(59,130,246,0.32);
-  --accent:        #7C3AED;
-  --accent2:       #A78BFA;
-  --accent3:       #C4B5FD;
+  --primary:       #7C3AED;
+  --primary-light: #A78BFA;
+  --primary-dim:   rgba(124,58,237,0.14);
+  --primary-glow:  rgba(124,58,237,0.32);
+  --accent:        #3B82F6;
+  --accent2:       #60A5FA;
+  --accent3:       #93C5FD;
 
   --bg-900: #09070D;
   --bg-800: #09070D;
@@ -24,7 +24,7 @@
   --bg-300: #2F2742;
   --bg-200: #3D3357;
 
-  --grad-primary: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  --grad-primary: linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%);
   --border:       rgba(255,255,255,0.08);
 }
 
@@ -32,9 +32,9 @@
 
 #sAdmin {
   background:
-    radial-gradient(ellipse 900px 600px at 5% -5%, rgba(59,130,246,0.10), transparent 60%),
-    radial-gradient(ellipse 600px 400px at 95% 95%, rgba(124,58,237,0.05), transparent 60%),
-    var(--grad-app-bg) !important;
+    radial-gradient(ellipse 900px 600px at 5% -5%, rgba(124,58,237,0.09), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 95% 95%, rgba(59,130,246,0.05), transparent 60%),
+    #09070D !important;
   position: relative;
 }
 
@@ -53,8 +53,8 @@
 /* Shell empleado */
 #sEmp {
   background:
-    radial-gradient(ellipse 700px 500px at 50% 0%, rgba(59,130,246,0.12), transparent 60%),
-    var(--grad-app-bg) !important;
+    radial-gradient(ellipse 700px 500px at 50% 0%, rgba(124,58,237,0.10), transparent 60%),
+    #09070D !important;
 }
 #sEmp::after {
   content: '';
@@ -515,9 +515,9 @@
 
 #sLogin {
   background:
-    radial-gradient(ellipse 800px 600px at 15% 10%, rgba(59,130,246,0.20), transparent 60%),
-    radial-gradient(ellipse 600px 400px at 85% 85%, rgba(124,58,237,0.10), transparent 60%),
-    var(--grad-app-bg) !important;
+    radial-gradient(ellipse 800px 600px at 15% 10%, rgba(124,58,237,0.20), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 85% 85%, rgba(59,130,246,0.10), transparent 60%),
+    #09070D !important;
 }
 
 #sLogin .login-card {
