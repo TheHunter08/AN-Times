@@ -26,7 +26,9 @@ export interface PlanningProps {
   onToday?: () => void
 }
 
-const cellDef: Record<PlanCell['status'], { bg: string; color: string; border: string }> = {
+type PlanStatus = PlanCell['status']
+
+const cellDef: Record<PlanStatus, { bg: string; color: string; border: string }> = {
   ok:      { bg: 'rgba(16,185,129,.14)',  color: colors.semantic.green, border: 'rgba(16,185,129,.35)' },
   live:    { bg: 'rgba(16,185,129,.26)',  color: '#34D399', border: '#34D399' },
   turno:   { bg: colors.primary.dim,      color: colors.primary.light, border: colors.primary.base + '55' },
@@ -34,6 +36,30 @@ const cellDef: Record<PlanCell['status'], { bg: string; color: string; border: s
   vac:     { bg: colors.accent.dim,       color: colors.accent.base, border: colors.border.default },
   weekend: { bg: 'rgba(var(--uiv2-overlay-rgb),.03)', color: colors.text[300], border: colors.border.subtle },
   future:  { bg: 'transparent',           color: colors.text[300], border: colors.border.subtle },
+}
+
+const PLAN_STATUSES = new Set<PlanStatus>(['ok', 'live', 'turno', 'absent', 'vac', 'weekend', 'future'])
+
+/**
+ * The planning payload can be hydrated from older local data where cells used
+ * `type` (for example `libre`/`vacaciones`) instead of the current `status`.
+ * Keep the screen render-safe while those records are being migrated or when
+ * a partially populated week arrives from realtime.
+ */
+function resolveCell(cell: PlanCell | Partial<PlanCell> | null | undefined): PlanCell {
+  const raw = cell as (Partial<PlanCell> & { type?: string }) | null | undefined
+  const legacyStatus = raw?.status ?? raw?.type
+  const status = legacyStatus === 'libre'
+    ? 'weekend'
+    : legacyStatus === 'vacaciones'
+      ? 'vac'
+      : legacyStatus === 'normal'
+        ? 'turno'
+        : PLAN_STATUSES.has(legacyStatus as PlanStatus)
+          ? legacyStatus as PlanStatus
+          : 'future'
+
+  return { status, value: raw?.value }
 }
 
 const LEGEND = [
@@ -46,6 +72,9 @@ const LEGEND = [
 ] as const
 
 export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }: PlanningProps) {
+  const safeDays = Array.isArray(days) ? days : []
+  const safeEmployees = Array.isArray(employees) ? employees : []
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -76,7 +105,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
           <thead>
             <tr>
               <th style={{ width: 110, padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: colors.text[500] }}>Empleado</th>
-              {days.map((d, i) => (
+              {safeDays.map((d, i) => (
                 <th key={i} style={{ padding: '6px 2px', textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? colors.text[300] : colors.text[500] }}>
                   <div style={{ textTransform: 'uppercase', letterSpacing: '.4px' }}>{d.split(' ')[0]}</div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: i >= 5 ? colors.text[300] : colors.text[900], letterSpacing: '-.3px' }}>{d.split(' ')[1]}</div>
@@ -85,7 +114,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
             </tr>
           </thead>
           <tbody>
-            {employees.map(emp => (
+            {safeEmployees.map(emp => (
               <tr key={emp.id}>
                 <td style={{ padding: '4px 8px', verticalAlign: 'middle', width: 110 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -100,8 +129,9 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
                     </div>
                   </div>
                 </td>
-                {emp.week.map((cell, di) => {
-                  const def = cellDef[cell.status]
+                {(Array.isArray(emp.week) ? emp.week : []).map((cell, di) => {
+                  const safeCell = resolveCell(cell)
+                  const def = cellDef[safeCell.status]
                   return (
                     <td key={di} style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle' }}>
                       <div style={{
@@ -110,14 +140,14 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         position: 'relative',
                       }}>
-                        {cell.status === 'live' && (
+                        {safeCell.status === 'live' && (
                           <span style={{ position: 'absolute', top: 2, right: 3, width: 5, height: 5, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 0 2px rgba(52,211,153,.25)', animation: 'pulse 2s infinite' }} />
                         )}
-                        {cell.value ? (
-                          <span style={{ fontSize: 9.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{cell.value}</span>
+                        {safeCell.value ? (
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{safeCell.value}</span>
                         ) : (
                           <span style={{ fontSize: 9, color: def.color, fontWeight: 700 }}>
-                            {cell.status === 'absent' ? '—' : cell.status === 'vac' ? 'VAC' : cell.status === 'weekend' ? '·' : ''}
+                            {safeCell.status === 'absent' ? '—' : safeCell.status === 'vac' ? 'VAC' : safeCell.status === 'weekend' ? '·' : ''}
                           </span>
                         )}
                       </div>
@@ -130,7 +160,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
         </table>
       </div>
       <div className="uiv2-week-mobile" role="list" aria-label="Planning por empleado">
-        {employees.map(emp => (
+        {safeEmployees.map(emp => (
           <article key={emp.id} className="uiv2-week-card" role="listitem">
             <header className="uiv2-week-card-head">
               <Avatar name={emp.name} size={34} />
@@ -140,13 +170,14 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
               </div>
             </header>
             <div className="uiv2-week-days">
-              {emp.week.map((cell, di) => {
-                const def = cellDef[cell.status]
+              {(Array.isArray(emp.week) ? emp.week : []).map((cell, di) => {
+                const safeCell = resolveCell(cell)
+                const def = cellDef[safeCell.status]
                 return (
                   <div key={di} className="uiv2-week-day">
-                    <span className="uiv2-week-day-label">{days[di] || ''}</span>
+                    <span className="uiv2-week-day-label">{safeDays[di] || ''}</span>
                     <span style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
-                      {cell.value || (cell.status === 'absent' ? 'Ausente' : cell.status === 'vac' ? 'Vacaciones' : cell.status === 'weekend' ? 'Libre' : '—')}
+                      {safeCell.value || (safeCell.status === 'absent' ? 'Ausente' : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
                     </span>
                   </div>
                 )
