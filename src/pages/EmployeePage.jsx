@@ -1166,20 +1166,20 @@ export default function EmployeePage() {
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal del equipo</span>
                       <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                         <thead>
                           <tr>
-                            <th style={{ padding: '8px 14px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)' }}>Empleado</th>
+                            <th style={{ padding: '8px 14px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)', position: 'sticky', left: 0, background: 'var(--bg-700)', zIndex: 1 }}>Empleado</th>
                             {weekPlanningData.days.map(d => (
-                              <th key={d.dateStr} style={{ padding: '8px 6px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 40 }}>{d.label}</th>
+                              <th key={d.dateStr} style={{ padding: '8px 6px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 44 }}>{d.label}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {weekPlanningData.members.map((m, mi) => (
                             <tr key={m.id} style={{ borderTop: mi > 0 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
-                              <td style={{ padding: '8px 14px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                              <td style={{ padding: '8px 14px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg-700)', zIndex: 1 }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 9, fontWeight: 800, marginRight: 7 }}>{m.initials}</span>
                                 {m.name.split(' ')[0]}
                               </td>

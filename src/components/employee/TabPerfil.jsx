@@ -186,7 +186,7 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
             },
             {
               val: yearDays > 0 ? `${yearDays}` : '—', lbl: `Días ${now.getFullYear()}`,
-              accent: colors.kpiTone.cyan.base, color: colors.kpiTone.cyan.base,
+              accent: colors.primary.base, color: colors.primary.light,
               icon: (c) => (
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
                   <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
@@ -224,7 +224,9 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
               borderRadius: radius.lg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
             }}
           >
-            <span style={{ fontSize: 22 }}>📋</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.orange} strokeWidth="2" width="18" height="18"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: colors.semantic.orange }}>Cierre mensual pendiente de firma</div>
               <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2 }}>
