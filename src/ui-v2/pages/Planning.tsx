@@ -31,7 +31,7 @@ const cellDef: Record<PlanCell['status'], { bg: string; color: string; border: s
   live:    { bg: 'rgba(16,185,129,.26)',  color: '#34D399', border: '#34D399' },
   turno:   { bg: colors.primary.dim,      color: colors.primary.light, border: colors.primary.base + '55' },
   absent:  { bg: 'rgba(239,68,68,.12)',   color: colors.semantic.red, border: 'rgba(239,68,68,.3)' },
-  vac:     { bg: 'rgba(59,130,246,.14)',  color: colors.accent.base, border: 'rgba(59,130,246,.35)' },
+  vac:     { bg: colors.accent.dim,       color: colors.accent.base, border: colors.border.default },
   weekend: { bg: 'rgba(var(--uiv2-overlay-rgb),.03)', color: colors.text[300], border: colors.border.subtle },
   future:  { bg: 'transparent',           color: colors.text[300], border: colors.border.subtle },
 }
@@ -71,7 +71,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
         ))}
       </div>
 
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div className="uiv2-week-desktop" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', minWidth: 560 }}>
           <thead>
             <tr>
@@ -129,7 +129,47 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
           </tbody>
         </table>
       </div>
-      <style>{`@keyframes pulse { 0%, 100% { opacity:1 } 50% { opacity:.5 } }`}</style>
+      <div className="uiv2-week-mobile" role="list" aria-label="Planning por empleado">
+        {employees.map(emp => (
+          <article key={emp.id} className="uiv2-week-card" role="listitem">
+            <header className="uiv2-week-card-head">
+              <Avatar name={emp.name} size={34} />
+              <div style={{ minWidth: 0 }}>
+                <div className="uiv2-week-card-name">{emp.name}</div>
+                <div className="uiv2-week-card-meta">{emp.dept}</div>
+              </div>
+            </header>
+            <div className="uiv2-week-days">
+              {emp.week.map((cell, di) => {
+                const def = cellDef[cell.status]
+                return (
+                  <div key={di} className="uiv2-week-day">
+                    <span className="uiv2-week-day-label">{days[di] || ''}</span>
+                    <span style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
+                      {cell.value || (cell.status === 'absent' ? 'Ausente' : cell.status === 'vac' ? 'Vacaciones' : cell.status === 'weekend' ? 'Libre' : '—')}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </article>
+        ))}
+      </div>
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity:1 } 50% { opacity:.5 } }
+        .uiv2-week-mobile{display:none}
+        @media(max-width:700px){
+          .uiv2-week-desktop{display:none}
+          .uiv2-week-mobile{display:grid;gap:12px}
+          .uiv2-week-card{padding:16px;background:${colors.bg[700]};border:1px solid ${colors.border.subtle};border-radius:${radius.lg}}
+          .uiv2-week-card-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;margin-bottom:12px;border-bottom:1px solid ${colors.border.subtle}}
+          .uiv2-week-card-name{font-size:14px;font-weight:700;color:${colors.text[900]};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .uiv2-week-card-meta{font-size:11px;color:${colors.text[500]};margin-top:2px}
+          .uiv2-week-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+          .uiv2-week-day-label{display:block;margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;color:${colors.text[500]}}
+          .uiv2-week-day-value{display:flex;min-height:38px;padding:7px 8px;align-items:center;justify-content:center;border-radius:${radius.sm};font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center}
+        }
+      `}</style>
     </div>
   )
 }

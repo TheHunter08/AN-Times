@@ -28,14 +28,14 @@ const catLabel: Record<ExpenseItem['category'], string> = {
 
 const catColor: Record<ExpenseItem['category'], string> = {
   dieta: colors.semantic.orange,
-  transporte: '#6366F1',
+  transporte: 'var(--uiv2-secondary-base)',
   material: colors.semantic.green,
   otro: colors.text[500],
 }
 
 const catBg: Record<ExpenseItem['category'], string> = {
   dieta: 'rgba(245,158,11,.14)',
-  transporte: 'rgba(99,102,241,.14)',
+  transporte: colors.secondary.dim,
   material: 'rgba(16,185,129,.14)',
   otro: 'rgba(148,163,184,.10)',
 }

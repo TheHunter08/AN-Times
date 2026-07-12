@@ -45,14 +45,18 @@ export function useDashboardData(): DashboardData {
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const recs = db.records || []
   const liveRecs = recs.filter(r => !r.fin)
+  const breakRecs = liveRecs.filter(r => r.enDescanso)
+  const workingRecs = liveRecs.filter(r => !r.enDescanso)
   const todayRecs = recs.filter(r => r.fin && r.inicio?.startsWith(todayStr))
   const todayMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
   const wdMin = db.config?.wdMin || 480
 
   const kpis: KPI[] = [
-    { label: 'Activos ahora', value: `${liveRecs.length}/${emps.length}` },
-    { label: 'Horas hoy', value: mhm(todayMin) },
-    { label: 'Fichajes hoy', value: String(todayRecs.length) },
+    { label: 'Empleados activos', value: String(emps.length), tone: 'primary' },
+    { label: 'Trabajando ahora', value: String(workingRecs.length), tone: 'cyan' },
+    { label: 'En descanso', value: String(breakRecs.length), tone: 'amber' },
+    { label: 'Ausentes hoy', value: String(Math.max(0, emps.length - liveRecs.length)), tone: 'accent' },
+    { label: 'Horas trabajadas hoy', value: mhm(todayMin), tone: 'primary' },
   ]
 
   function activityTone(action = ''): ActivityItem['tone'] {
@@ -91,7 +95,7 @@ export function useDashboardData(): DashboardData {
 
   const name = session?.user?.name?.split(' ')?.[0] ?? ''
   return {
-    greeting: name ? `Buenas, ${name} 👋` : 'Buenas 👋',
+    greeting: name ? `Buenos días, ${name}` : 'Buenos días',
     kpis,
     activity,
     trend,

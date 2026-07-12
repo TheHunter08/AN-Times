@@ -101,7 +101,7 @@ export function ModalAI({ visible, db, u, onClose }) {
 
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-          <div style={{ width:40, height:40, borderRadius:radius.lg, background:'linear-gradient(135deg,#3B5BFF,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0, boxShadow:'0 4px 14px rgba(59,91,255,.4)' }}>✨</div>
+          <div style={{ width:40, height:40, borderRadius:radius.lg, background:'linear-gradient(135deg,#B18A52,#8D672E)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0, boxShadow:'0 4px 14px rgba(177,138,82,.4)' }}>✨</div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:800, letterSpacing:'-.3px', display:'flex', alignItems:'center', gap:6, color:colors.text[900] }}>
               Times AI

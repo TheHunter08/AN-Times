@@ -25,7 +25,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
   const [burst, setBurst] = useState(null)
 
   const recs = useMemo(
-    () => (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayStr)),
+    () => (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayStr),
     [db.records, u.id, todayStr]
   )
   const realRecs = useMemo(() => recs.filter(r => !r.fin || recWorkSecs(r) >= 30), [recs])
@@ -108,7 +108,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
         (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
     )
     if (!teamEmps.length) return null
-    const todayRecords = (db.records || []).filter(r => r.inicio?.startsWith(todayStr))
+    const todayRecords = (db.records || []).filter(r => r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
     const liveIds  = new Set(todayRecords.filter(r => !r.fin).map(r => r.empId))
     const doneIds  = new Set(todayRecords.filter(r => r.fin && !liveIds.has(r.empId)).map(r => r.empId))
     const minByEmp = {}
@@ -158,7 +158,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto', paddingBottom: 100 }}>
 
         {/* ── Hero Card ───────────────────────────────────────────── */}
-        <div style={{
+        <div className="v7-clock-hero" style={{
           margin: '16px 16px 0',
           background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius['2xl'], padding: '20px 20px 16px', position: 'relative', overflow: 'hidden',
@@ -169,7 +169,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           {/* Clock + Weather */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
             <div>
-              <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: 'tabular-nums', color: colors.text[900], lineHeight: 1 }}>
+              <div className="v7-clock-time" style={{ fontSize: 36, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: 'tabular-nums', color: colors.text[900], lineHeight: 1 }}>
                 {clockTime?.slice(0,5) || '--:--'}
                 <span style={{ fontSize: 20, fontWeight: 600, color: colors.text[500], marginLeft: 3 }}>{clockTime?.slice(5) || ':--'}</span>
               </div>
@@ -179,7 +179,10 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           </div>
 
           {/* Punch button */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, position: 'relative' }}>
+          <div className="v7-punch-orbit" style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, position: 'relative' }}>
+            <span className="v7-orbit v7-orbit-a" aria-hidden="true" />
+            <span className="v7-orbit v7-orbit-b" aria-hidden="true" />
+            <span className="v7-orbit v7-orbit-c" aria-hidden="true" />
             {timer.state !== 'idle' && (
               <div style={{
                 position: 'absolute', top: '50%', left: '50%',
@@ -190,6 +193,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
               }} />
             )}
             <button
+              className="v7-punch-button"
               onClick={() => {
                 if (showTip) { try { localStorage.setItem('an_tip_fichar','1') } catch {}; setShowTip(false) }
                 handleMainBtn()

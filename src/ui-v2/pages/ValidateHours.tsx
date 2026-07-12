@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
@@ -27,6 +27,7 @@ export interface ValidateHoursProps {
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   onModify?: (id: string, entry: string, exit: string) => void
+  onDelete?: (id: string) => void
 }
 
 const diffColor = { ok: colors.semantic.green, over: colors.semantic.orange, under: colors.semantic.red }
@@ -41,16 +42,32 @@ function useIsMobile() {
   return m
 }
 
-export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }: ValidateHoursProps) {
+export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, onDelete }: ValidateHoursProps) {
   const [search, setSearch] = useState('')
   const [localRows, setLocalRows] = useState(rows)
   const [tab, setTab] = useState<'pending' | 'reviewed'>('pending')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
+  const editedRows = useRef(new Map<string, { entry: string; exit: string }>())
   const isMobile = useIsMobile()
 
-  useEffect(() => { setLocalRows(rows) }, [rows])
+  // Keep the optimistic decision visible while the store/Supabase round-trip
+  // finishes. A parent refresh can briefly contain the old pending row; in
+  // that case replacing localRows made the card jump back to the first state.
+  useEffect(() => {
+    setLocalRows(prev => rows.map(row => {
+      const current = prev.find(item => item.id === row.id)
+      const edited = editedRows.current.get(row.id)
+      if (edited && row.entry === edited.entry && row.exit === edited.exit) editedRows.current.delete(row.id)
+      if (edited && (row.entry !== edited.entry || row.exit !== edited.exit)) {
+        return { ...row, entry: edited.entry, exit: edited.exit, status: current?.status === 'rejected' ? current.status : 'approved' }
+      }
+      return current && current.status !== 'pending' && row.status === 'pending'
+        ? { ...row, status: current.status, entry: current.entry, exit: current.exit }
+        : row
+    }))
+  }, [rows])
 
   const handleApprove = (id: string) => {
     setLocalRows(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r))
@@ -67,9 +84,16 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
   }
   const handleSaveModify = () => {
     if (!editingId) return
+    editedRows.current.set(editingId, { entry: editEntry, exit: editExit })
     setLocalRows(prev => prev.map(r => r.id === editingId ? { ...r, entry: editEntry, exit: editExit, status: 'approved' } : r))
     onModify?.(editingId, editEntry, editExit)
     setEditingId(null)
+  }
+  const handleDelete = (id: string) => {
+    if (!window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return
+    editedRows.current.delete(id)
+    setLocalRows(prev => prev.filter(row => row.id !== id))
+    onDelete?.(id)
   }
 
   const visible = localRows
@@ -181,7 +205,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
                   </button>
                   <button onClick={() => handleModify(row)} style={{
                     padding: '7px 0', borderRadius: radius.md, border: 'none',
-                    background: 'rgba(124,58,237,.18)', color: colors.primary.light,
+                    background: colors.primary.dim, color: colors.primary.light,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   }}>
@@ -195,6 +219,11 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
                   }}>
                     <IconX width={14} height={14} /> Rechazar
                   </button>
+                  <button onClick={() => handleDelete(row.id)} style={{
+                    gridColumn: '1 / -1', padding: '7px 0', borderRadius: radius.md, border: '1px solid rgba(239,68,68,.24)',
+                    background: 'transparent', color: colors.semantic.red, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  }}><IconX width={14} height={14} /> Eliminar fichaje</button>
                 </div>
               )}
             </div>
@@ -234,8 +263,9 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
                     <>
                       <span style={{ fontSize: 12, fontWeight: 700, color: diffColor[row.diffTone], fontVariantNumeric: 'tabular-nums', minWidth: 32 }}>{row.diff}</span>
                       <button onClick={() => handleApprove(row.id)} title="Aceptar" style={{ padding: '4px 6px', borderRadius: radius.xs, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>Ok</button>
-                      <button onClick={() => handleModify(row)} title="Modificar" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: 'rgba(124,58,237,.16)', color: colors.primary.light, cursor: 'pointer', display: 'flex' }}><IconEdit width={12} height={12} /></button>
+                      <button onClick={() => handleModify(row)} title="Modificar" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: colors.primary.dim, color: colors.primary.light, cursor: 'pointer', display: 'flex' }}><IconEdit width={12} height={12} /></button>
                       <button onClick={() => handleReject(row.id)} title="Rechazar" style={{ padding: '4px', borderRadius: radius.xs, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', display: 'flex' }}><IconX width={12} height={12} /></button>
+                      <button onClick={() => handleDelete(row.id)} title="Eliminar fichaje" style={{ padding: '4px', borderRadius: radius.xs, border: '1px solid rgba(239,68,68,.24)', background: 'transparent', color: colors.semantic.red, cursor: 'pointer', display: 'flex' }}><IconX width={12} height={12} /></button>
                     </>
                   ) : (
                     <Badge tone={row.status === 'approved' ? 'green' : 'red'}>{row.status === 'approved' ? 'Aprobado' : 'Rechazado'}</Badge>
@@ -249,8 +279,8 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify }
 
       {/* Modal modificar horario */}
       {editingId && (
-        <div onClick={() => setEditingId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[800], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 24, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="uiv2-sheet-overlay" onClick={() => setEditingId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="uiv2-sheet-panel" role="dialog" aria-modal="true" aria-label="Modificar horario" onClick={e => e.stopPropagation()} style={{ background: colors.bg[800], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 24, width: '100%', maxWidth: 360, maxHeight: '90dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Modificar horario</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>

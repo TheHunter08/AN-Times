@@ -28,7 +28,7 @@ import {
   IconFolder, IconFileText, IconClipboard, IconBell, IconChat,
   IconShield, IconBuilding, IconAlertCircle, IconReceipt,
   IconCheck, IconLogout, IconRows, IconSeal, IconTrendUp, IconMapPin,
-  IconEdit, IconUserPlus, IconHome, IconX, IconPlus,
+  IconEdit, IconUserPlus, IconHome, IconX, IconPlus, IconSun, IconMoon,
 } from './components/Icons.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
@@ -37,27 +37,28 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush } from '../services/dataService.js'
 import { supabase } from '../services/dataServiceV2.js'
-import { gid, today } from '../utils/time.js'
+import { gid, today, mhm, localDateStr } from '../utils/time.js'
+import { toggleTheme } from '../utils/userConfig.js'
 
 const PAGES = [
-  { id: 'dashboard',      label: 'Dashboard',        icon: <IconGrid /> },
-  { id: 'empleados',      label: 'Empleados',        icon: <IconUsers /> },
-  { id: 'fichajes',       label: 'Fichajes',         icon: <IconClock /> },
-  { id: 'planning',       label: 'Planning',         icon: <IconCalendar /> },
-  { id: 'turnos',         label: 'Turnos',           icon: <IconRows /> },
-  { id: 'validar',        label: 'Validar horas',    icon: <IconCheck /> },
-  { id: 'solicitudes',    label: 'Solicitudes',      icon: <IconClipboard /> },
-  { id: 'gastos',         label: 'Gastos',           icon: <IconReceipt /> },
-  { id: 'obras',          label: 'Obras',            icon: <IconBuilding /> },
-  { id: 'centros',        label: 'Centros trabajo',  icon: <IconMapPin /> },
-  { id: 'documentos',     label: 'Documentos',       icon: <IconFolder /> },
-  { id: 'estadisticas',   label: 'Estadísticas',     icon: <IconChart /> },
-  { id: 'informes',       label: 'Informes',         icon: <IconFileText /> },
-  { id: 'cierre',         label: 'Cierre mensual',   icon: <IconSeal /> },
-  { id: 'mensajes',       label: 'Mensajes',         icon: <IconChat /> },
-  { id: 'notificaciones', label: 'Notificaciones',   icon: <IconBell /> },
-  { id: 'anomalias',      label: 'Anomalías',        icon: <IconAlertCircle /> },
-  { id: 'auditoria',      label: 'Auditoría',        icon: <IconShield /> },
+  { id: 'dashboard',      label: 'Resumen',           group: 'Principal', icon: <IconGrid /> },
+  { id: 'empleados',      label: 'Empleados',         group: 'Equipo', icon: <IconUsers /> },
+  { id: 'fichajes',       label: 'Fichajes',          group: 'Equipo', icon: <IconClock /> },
+  { id: 'planning',       label: 'Planning',          group: 'Equipo', icon: <IconCalendar /> },
+  { id: 'turnos',         label: 'Turnos',            group: 'Equipo', icon: <IconRows /> },
+  { id: 'validar',        label: 'Validar horas',     group: 'Gestión', icon: <IconCheck /> },
+  { id: 'solicitudes',    label: 'Solicitudes',       group: 'Gestión', icon: <IconClipboard /> },
+  { id: 'gastos',         label: 'Gastos',            group: 'Gestión', icon: <IconReceipt /> },
+  { id: 'obras',          label: 'Obras',             group: 'Gestión', icon: <IconBuilding /> },
+  { id: 'centros',        label: 'Centros de trabajo',group: 'Gestión', icon: <IconMapPin /> },
+  { id: 'documentos',     label: 'Documentos',        group: 'Gestión', icon: <IconFolder /> },
+  { id: 'estadisticas',   label: 'Estadísticas',      group: 'Análisis', icon: <IconChart /> },
+  { id: 'informes',       label: 'Informes',          group: 'Análisis', icon: <IconFileText /> },
+  { id: 'cierre',         label: 'Cierre mensual',    group: 'Análisis', icon: <IconSeal /> },
+  { id: 'anomalias',      label: 'Anomalías',         group: 'Análisis', icon: <IconAlertCircle /> },
+  { id: 'auditoria',      label: 'Auditoría',         group: 'Análisis', icon: <IconShield /> },
+  { id: 'mensajes',       label: 'Mensajes',          group: 'Comunicación', icon: <IconChat /> },
+  { id: 'notificaciones', label: 'Notificaciones',    group: 'Comunicación', icon: <IconBell /> },
 ]
 
 const ROLES = [
@@ -78,7 +79,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const saveDB = useAppStore(s => s.saveDB)
   const toast  = useAppStore(s => s.toast)
   const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
-  const centros: string[] = db.config?.centros || []
+  const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
   const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [] }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
@@ -201,18 +202,18 @@ function CentrosPage() {
   const toast  = useAppStore(s => s.toast)
   const [newName, setNewName] = useState('')
 
-  const centros: string[] = db.config?.centros || []
+  const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
   const addCentro = () => {
     const name = newName.trim()
     if (!name) return
     if (centros.includes(name)) { toast('Ya existe ese centro', 2000, 'warn'); return }
-    saveDB((f: any) => ({ config: { ...(f.config || {}), centros: [...centros, name] } }))
+    saveDB(() => ({ centrosTrabajo: [...centros, name] }))
     setNewName('')
     toast('Centro creado', 2000, 'ok')
   }
   const removeCentro = (c: string) => {
-    saveDB((f: any) => ({ config: { ...(f.config || {}), centros: centros.filter((x: string) => x !== c) } }))
+    saveDB(() => ({ centrosTrabajo: centros.filter((x: string) => x !== c) }))
     toast('Centro eliminado', 2000, 'ok')
   }
 
@@ -398,11 +399,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     <IconClipboard width={16} height={16} />,
   ]
 
-  const kpisWithExtra = [
-    ...data.kpis,
-    { label: 'Extra este mes', value: extraHorasMes > 0 ? `${Math.floor(extraHorasMes/60)}h${extraHorasMes%60>0?Math.floor(extraHorasMes%60)+'m':''}` : '0h', tone: 'cyan' as const },
-    { label: 'Solicitudes pend.', value: String(pendingCount), tone: 'amber' as const },
-  ].map((k, i) => ({
+  const kpisWithExtra = data.kpis.map((k, i) => ({
     ...k,
     icon: kpiIcons[i],
     tone: (k as any).tone ?? (['primary', 'accent', 'cyan', 'cyan', 'amber'] as const)[i],
@@ -421,7 +418,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       onExport={handleExport}
       quickLinks={[
         { id: 'empleados',   label: 'Empleados activos', value: `${teamAvatars.activeCount}/${teamAvatars.total}`, onClick: () => onNavigate('empleados') },
-        { id: 'fichajes',    label: 'Fichajes hoy',      value: data.kpis[2]?.value || '0', onClick: () => onNavigate('fichajes') },
+        { id: 'fichajes',    label: 'Trabajando ahora',  value: data.kpis[1]?.value || '0', onClick: () => onNavigate('fichajes') },
         { id: 'solicitudes', label: 'Solicitudes pend.', value: String(pendingCount), onClick: () => onNavigate('solicitudes') },
         { id: 'estadisticas',label: 'Estadísticas',      value: 'Ver', onClick: () => onNavigate('estadisticas') },
       ]}
@@ -502,12 +499,12 @@ function PlanningPage() {
       name: e.name,
       dept: e.dept || e.centroTrabajo || '',
       week: weekDays.map(d => {
-        const isWeekend = d.getDay() === 0 || d.getDay() === 6
         const isFuture = d > now && d.toDateString() !== now.toDateString()
-        if (isWeekend) return { status: 'weekend' as const }
-        if (isFuture)  return { status: 'future' as const }
-        const dateStr = d.toISOString().slice(0, 10)
-        const dayRecs = records.filter((r: any) => r.empId === e.id && (r.inicio || '').startsWith(dateStr))
+        const dateStr = localDateStr(d)
+        const dayRecs = records.filter((r: any) => r.empId === e.id && r.inicio && localDateStr(new Date(r.inicio)) === dateStr)
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6
+        if (!dayRecs.length && isWeekend) return { status: 'weekend' as const }
+        if (!dayRecs.length && isFuture)  return { status: 'future' as const }
         if (!dayRecs.length) return { status: 'absent' as const }
         const live = dayRecs.some((r: any) => !r.fin)
         if (live) return { status: 'live' as const, value: fmtTime(dayRecs[0]?.inicio) }
@@ -566,12 +563,13 @@ function ShiftsPage() {
       week: weekDays.map(d => {
         const isWeekend = d.getDay() === 0 || d.getDay() === 6
         if (isWeekend) return { status: 'weekend' as const }
-        const dateStr = d.toISOString().slice(0, 10)
+        const dateStr = localDateStr(d)
         const turno = turnos.find((t: any) => t.empId === e.id && t.fecha === dateStr)
-        if (!turno) return { status: 'absent' as const }
+        if (!turno) return {}
         return {
-          status: 'turno' as const,
-          value: turno.horaInicio ? `${turno.horaInicio}–${turno.horaFin || '?'}` : turno.tipo || 'Turno',
+          type: (turno.tipo === 'guardia' || turno.tipo === 'vacaciones' || turno.tipo === 'libre' ? turno.tipo : 'normal') as 'normal' | 'guardia' | 'vacaciones' | 'libre',
+          start: turno.horaInicio || undefined,
+          end: turno.horaFin || undefined,
         }
       }),
     }))
@@ -582,7 +580,6 @@ function ShiftsPage() {
   return (
     <Shifts
       weekLabel={weekLabel}
-      days={days}
       employees={employees}
       onPrev={() => setWeekOffset(o => o - 1)}
       onNext={() => setWeekOffset(o => o + 1)}
@@ -607,7 +604,7 @@ function ValidateHoursPage() {
     return records.map((r: any) => {
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
       const worked = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
-      const expected = 480 // 8h
+      const expected = Number(db.config?.wdMin) || 480
       const diff = worked - expected
       const diffH = Math.abs(Math.floor(diff / 60))
       const diffM = Math.abs(Math.floor(diff % 60))
@@ -620,7 +617,7 @@ function ValidateHoursPage() {
         entry: fmtTime(r.inicio),
         exit: fmtTime(r.fin),
         worked: `${Math.floor(worked / 60)}h${Math.floor(worked % 60)}m`,
-        expected: '8h',
+        expected: mhm(expected),
         diff: diffStr,
         diffTone: Math.abs(diff) < 15 ? 'ok' : diff > 0 ? 'over' : 'under',
         status: (r.aceptada || r.validado) ? 'approved' : r.rechazado ? 'rejected' : 'pending',
@@ -677,20 +674,36 @@ function ValidateHoursPage() {
     const base = new Date(rec.inicio)
     const [eh, em] = entry.split(':').map(Number)
     const [xh, xm] = exit.split(':').map(Number)
+    if (!Number.isFinite(eh) || !Number.isFinite(em) || !Number.isFinite(xh) || !Number.isFinite(xm)) {
+      toast('Introduce una hora válida', 3000, 'warn')
+      return
+    }
     const newInicio = new Date(base); newInicio.setHours(eh, em, 0, 0)
     const newFin    = new Date(base); newFin.setHours(xh, xm, 0, 0)
     if (newFin <= newInicio) newFin.setDate(newFin.getDate() + 1)
     const nowIso = new Date().toISOString()
+    const inicioIso = newInicio.toISOString()
+    const finIso = newFin.toISOString()
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, inicio: newInicio.toISOString(), fin: newFin.toISOString(), aceptada: true, validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
+        r.id === id ? { ...r, inicio: inicioIso, fin: finIso, aceptada: true, validado: true, rechazado: false, modificado: true, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
       ),
     }))
-    syncRecordDirect(id, { inicio: newInicio.toISOString(), fin: newFin.toISOString(), aceptada: true, updated_at: nowIso })
+    syncRecordDirect(id, { inicio: inicioIso, fin: finIso, aceptada: true, updated_at: nowIso })
     toast('Horario modificado', 2500, 'ok')
   }
 
-  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} />
+  const handleDelete = (id: string) => {
+    const rec = (db.records || []).find((r: any) => r.id === id)
+    if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return
+    saveDB((fresh: any) => ({ records: (fresh.records || []).filter((r: any) => r.id !== id) }))
+    if (supabase) supabase.from('records').delete().eq('id', id).then(({ error }: any) => {
+      if (error) toast('Eliminado localmente — no se pudo confirmar con el servidor', 4000, 'warn')
+    })
+    toast('Fichaje eliminado', 2500, 'ok')
+  }
+
+  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} onDelete={handleDelete} />
 }
 
 function ExpensesPage() {
@@ -786,6 +799,7 @@ function DocumentsPage() {
 
 function ReportsPage() {
   const db = useAppStore(s => s.db) as any
+  const toast = useAppStore(s => s.toast)
 
   const months = useMemo(() => {
     const set = new Set<string>()
@@ -850,10 +864,10 @@ function ReportsPage() {
 <style>body{font-family:Inter,Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px;margin-bottom:4px}
 .sub{color:#666;font-size:13px;margin-bottom:24px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#7C3AED;color:#fff;padding:8px 12px;text-align:left}
+th{background:#8D672E;color:#fff;padding:8px 12px;text-align:left}
 td{padding:8px 12px;border-bottom:1px solid #eee}
 tr:nth-child(even) td{background:#f9f9f9}
-.total{margin-top:16px;font-size:13px;color:#444}strong{color:#7C3AED}
+.total{margin-top:16px;font-size:13px;color:#444}strong{color:#8D672E}
 </style></head><body>
 <h1>Informe mensual · ${label}</h1>
 <p class="sub">Generado el ${new Date().toLocaleDateString('es-ES')} · TIMES INC</p>
@@ -1119,7 +1133,17 @@ function MonthlyClosePage() {
     toast('Firma admin registrada', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} />
+  const handleDeleteClosure = (id: string) => {
+    const closure = (db.cierres || []).find((c: any) => c.id === id)
+    if (!closure || !window.confirm('¿Eliminar este cierre y su PDF generado? Esta acción no se puede deshacer.')) return
+    saveDB((fresh: any) => ({ cierres: (fresh.cierres || []).filter((c: any) => c.id !== id) }))
+    if (supabase) supabase.from('cierres').delete().eq('id', id).then(({ error }: any) => {
+      if (error) toast('Eliminado localmente — no se pudo confirmar con el servidor', 4000, 'warn')
+    })
+    toast('Cierre eliminado', 2500, 'ok')
+  }
+
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} />
 }
 
 function AuditPage() {
@@ -1258,7 +1282,7 @@ function ObrasPage() {
         employeeCount: assigned.length,
         hoursToday: todayMins > 0 ? `${Math.floor(todayMins / 60)}h${todayMins % 60 > 0 ? Math.floor(todayMins % 60) + 'm' : ''}` : '0h',
         manager: manager?.name || '—',
-        startDate: '—',
+        startDate: fmtDate(o.fechaInicio || o.createdAt || o.ts),
       }
     })
   }, [db, todayStr])
@@ -1295,7 +1319,6 @@ function MessagesPage() {
         unread,
         lastMessage: last?.text || 'Sin mensajes',
         lastTime: last?.ts ? fmtTime(last.ts) : '',
-        online: false,
         messages: conv.map((m: any) => ({
           id: m.id,
           from: m.from === adminId ? 'admin' : 'emp',
@@ -1327,6 +1350,7 @@ export default function AppV2Admin() {
   const { session, currentAdminPage, setAdminPage, logout, setScreen } = useAppStore() as any
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
+  const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
 
   const name = session?.user?.name || 'Admin'
   const notis = useNotificationsData()
@@ -1338,7 +1362,7 @@ export default function AppV2Admin() {
 
   // Filtrar páginas según rol
   const visiblePages = isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES
-  const navItems = visiblePages.map(p => ({ id: p.id, label: p.label, icon: <span>{p.icon}</span> }))
+  const navItems = visiblePages.map(p => ({ id: p.id, label: p.label, group: p.group, icon: <span>{p.icon}</span> }))
 
   // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'
   const effectivePage = isEnc
@@ -1377,6 +1401,7 @@ export default function AppV2Admin() {
   }
 
   return (
+    <div id="sAdmin" style={{ minHeight: '100dvh' }}>
     <AppShell
       navItems={navItems}
       activeNav={effectivePage}
@@ -1387,7 +1412,6 @@ export default function AppV2Admin() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-.2px', color: colors.text[900] }}>TIMES INC</span>
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: colors.primary.dim, color: colors.primary.light }}>PREMIUM</span>
             </div>
             <div style={{ fontSize: 10, color: colors.text[500] }}>Control Horario</div>
           </div>
@@ -1406,7 +1430,7 @@ export default function AppV2Admin() {
             </button>
           </div>
           {setScreen && (
-            <button onClick={() => setScreen('emp')} style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(124,58,237,.3)', background: 'rgba(124,58,237,.08)', color: '#A78BFA', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={() => setScreen('emp')} style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[700], fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <IconHome width={13} height={13} /> Vista empleado
             </button>
           )}
@@ -1421,6 +1445,15 @@ export default function AppV2Admin() {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
             />
           </div>
+          <button
+            type="button"
+            aria-label={isLight ? 'Activar modo oscuro' : 'Activar modo claro'}
+            title={isLight ? 'Modo oscuro' : 'Modo claro'}
+            onClick={() => { toggleTheme(); setIsLight(v => !v) }}
+            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: `1px solid ${colors.border.subtle}`, background: colors.bg[600], color: colors.text[700], cursor: 'pointer', fontSize: 15, lineHeight: 1 }}
+          >
+            {isLight ? <IconMoon width={18} height={18} /> : <IconSun width={18} height={18} />}
+          </button>
           <button
             onClick={() => setAdminPage('notificaciones')}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: colors.text[700], display: 'flex', padding: 4 }}
@@ -1443,5 +1476,6 @@ export default function AppV2Admin() {
     >
       {renderPage()}
     </AppShell>
+    </div>
   )
 }

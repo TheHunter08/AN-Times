@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { useTimer } from '../hooks/useTimer.js'
-import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, localDateStr } from '../utils/time.js'
+import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, localDateStr } from '../utils/time.js'
 import { calcStreak } from '../utils/streaks.js'
 import { WK } from '../config/constants.js'
 import { EmployeeHome } from '../ui-v2/pages/EmployeeHome.tsx'
@@ -150,7 +150,7 @@ export default function EmployeePage() {
       const [rh, rm] = u.reminderTime.split(':').map(Number)
       if (now.getHours() * 60 + now.getMinutes() < rh * 60 + rm) return
       const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-      const worked = (dbRef.current?.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
+      const worked = (dbRef.current?.records || []).some(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
       if (worked) return
       const key = `rem_${u.id}_${todayStr}`
       if (localStorage.getItem(key)) return
@@ -369,7 +369,7 @@ export default function EmployeePage() {
         const [rh, rm] = (_empRec?.reminderTime || getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
         if (minsPast >= 0) {
-          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio?.startsWith(todayStr))
+          const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)
@@ -866,7 +866,7 @@ export default function EmployeePage() {
     const dayMin = Math.round(empWKmin / 5)
 
     // Hoy: registros cerrados + timer vivo
-    const todayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayD) && r.fin)
+    const todayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD && r.fin)
     const closedMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
     const liveMin = timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0
     const totMin = closedMin + liveMin
@@ -884,7 +884,7 @@ export default function EmployeePage() {
       d.setDate(ws.getDate() + i)
       const ds = localDateStr(d)
       const isToday = ds === todayD
-      const dayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(ds) && r.fin)
+      const dayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin)
       let dm = dayRecs.reduce((s, r) => s + calcMin(r), 0)
       if (isToday && timer.state !== 'idle') dm += Math.floor(timer.ws / 60)
       weekMin += dm
@@ -897,14 +897,14 @@ export default function EmployeePage() {
     })
 
     // Últimas acciones de hoy
-    const allTodayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio?.startsWith(todayD))
+    const allTodayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD)
     const recent = []
     allTodayRecs.forEach(r => {
-      if (r.inicio) recent.push({ id: r.id + '-e', label: 'Entrada', time: r.inicio.slice(11, 16), tone: 'green', type: 'entrada' })
-      if (r.fin)    recent.push({ id: r.id + '-s', label: 'Salida',  time: r.fin.slice(11, 16),    tone: 'red',   type: 'salida'  })
+      if (r.inicio) recent.push({ id: r.id + '-e', label: 'Entrada', time: ftime(r.inicio), tone: 'green', type: 'entrada' })
+      if (r.fin)    recent.push({ id: r.id + '-s', label: 'Salida',  time: ftime(r.fin),    tone: 'red',   type: 'salida'  })
       ;(r.breaks || []).forEach((b, bi) => {
-        if (b.start) recent.push({ id: r.id + '-bp' + bi, label: 'Pausa',   time: b.start.slice(11, 16), tone: 'orange', type: 'pausa'  })
-        if (b.end)   recent.push({ id: r.id + '-br' + bi, label: 'Reanuda', time: b.end.slice(11, 16),   tone: 'green',  type: 'reanuda' })
+        if (b.start) recent.push({ id: r.id + '-bp' + bi, label: 'Pausa',   time: ftime(b.start), tone: 'orange', type: 'pausa'  })
+        if (b.end)   recent.push({ id: r.id + '-br' + bi, label: 'Reanuda', time: ftime(b.end),   tone: 'green',  type: 'reanuda' })
       })
     })
     recent.sort((a, b) => a.time.localeCompare(b.time))
@@ -974,17 +974,17 @@ export default function EmployeePage() {
     const dow = todayD.getDay()
     const monday = new Date(todayD)
     monday.setDate(todayD.getDate() - (dow === 0 ? 6 : dow - 1))
-    const todayStr2 = todayD.toISOString().slice(0, 10)
+    const todayStr2 = localDateStr(todayD)
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() + i)
-      const ds = d.toISOString().slice(0, 10)
+      const ds = localDateStr(d)
       return { label: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i], dateStr: ds, isToday: ds === todayStr2, isWeekend: i >= 5 }
     })
     const members = team.map(e => {
       const initials = e.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
       const dayData = days.map(d => {
-        const dayRecs = (db.records || []).filter(r => r.empId === e.id && (r.inicio || '').startsWith(d.dateStr))
+        const dayRecs = (db.records || []).filter(r => r.empId === e.id && r.inicio && localDateStr(new Date(r.inicio)) === d.dateStr)
         const open = dayRecs.find(r => !r.fin)
         const done = dayRecs.filter(r => r.fin)
         const totalMins = done.reduce((s, r) => s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
@@ -1072,11 +1072,13 @@ export default function EmployeePage() {
           <div className="emp-dsk-topbar-actions">
             {isSuper && (
               <button className="enc-chip" onClick={() => setScreen('admin')}>
-                {isJefeObra ? '🏗️ Panel' : '⭐ Panel'}
+                Panel
               </button>
             )}
             <button className="theme-toggle-btn" onClick={() => { toggleTheme(); setIsLight(l => !l) }} title="Tema" aria-label="Cambiar tema">
-              {isLight ? '🌙' : '☀️'}
+              {isLight
+                ? <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>}
             </button>
             <button className="icon-btn ai-btn" onClick={() => openModal('ai')} title="IA" aria-label="Asistente IA">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
@@ -1096,7 +1098,7 @@ export default function EmployeePage() {
         <OfflineBanner />
         {showNotifBanner && (
           <div className="v3-notif-banner" style={{ borderRadius:0, borderLeft:'none', borderRight:'none', borderTop:'none' }}>
-            <div className="v3-notif-banner-icon">🔔</div>
+            <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
             <div className="v3-notif-banner-text">
               <div className="v3-notif-banner-title">Activa las notificaciones</div>
               <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
@@ -1127,7 +1129,7 @@ export default function EmployeePage() {
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 100 }}>
               {pendingCierresEmp.length > 0 && (
                 <div style={{ margin: '16px 20px 0', padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 20 }}>✍️</span>
+                  <span style={{ display:'flex', color:'var(--warning)' }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--orange)' }}>
                       {pendingCierresEmp.length === 1 ? 'Tienes 1 cierre mensual pendiente de firma' : `Tienes ${pendingCierresEmp.length} cierres mensuales pendientes de firma`}
@@ -1144,8 +1146,8 @@ export default function EmployeePage() {
                   extraAction={isSuper ? (
                     <button onClick={() => setQrScanOpen(true)} style={{
                       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
-                      background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                      padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(177,138,82,.3)',
+                      background: 'rgba(177,138,82,.08)', color: 'var(--primary-light)', fontSize: 13,
                       fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                     }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1160,13 +1162,13 @@ export default function EmployeePage() {
               {weekPlanningData && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 16px', background: 'rgba(124,58,237,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ padding: '12px 16px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" strokeWidth="2" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal del equipo</span>
                       <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
                     </div>
-                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                    <div className="emp-planning-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table className="emp-planning-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                         <thead>
                           <tr>
                             <th style={{ padding: '8px 14px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)', position: 'sticky', left: 0, background: 'var(--bg-700)', zIndex: 1 }}>Empleado</th>
@@ -1185,7 +1187,7 @@ export default function EmployeePage() {
                               {m.days.map((d, di) => (
                                 <td key={di} style={{ padding: '6px 4px', textAlign: 'center' }}>
                                   {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 14 }}>●</span>
-                                    : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(124,58,237,.7)', fontSize: 10, fontWeight: 700 }}>{d.hours || '✓'}</span>
+                                    : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(177,138,82,.7)', fontSize: 10, fontWeight: 700 }}>{d.hours || '✓'}</span>
                                     : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 12 }}>—</span>}
                                 </td>
                               ))}
@@ -1253,9 +1255,9 @@ export default function EmployeePage() {
             {/* Panel — encargados y jefes de obra */}
             {isSuper && (
               <>
-                <button onClick={() => setScreen('admin')} title="Panel de administración" aria-label="Ir al panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'rgba(124,58,237,.16)', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,.28)'}
-                  onMouseLeave={e => e.currentTarget.style.background='rgba(124,58,237,.16)'}>
+                <button onClick={() => setScreen('admin')} title="Panel de administración" aria-label="Ir al panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'rgba(177,138,82,.16)', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(177,138,82,.28)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(177,138,82,.16)'}>
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                 </button>
                 <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
@@ -1263,7 +1265,7 @@ export default function EmployeePage() {
             )}
             {/* IA */}
             <button onClick={() => openModal('ai')} title="Asistente IA" aria-label="Abrir asistente de IA" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'var(--primary-light)', cursor:'pointer', transition:'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,.18)'}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(177,138,82,.18)'}
               onMouseLeave={e => e.currentTarget.style.background='transparent'}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
@@ -1293,7 +1295,9 @@ export default function EmployeePage() {
             <button onClick={() => { toggleTheme(); setIsLight(l => !l) }} title={isLight ? 'Modo oscuro' : 'Modo claro'} aria-label="Cambiar tema claro/oscuro" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, height:30, borderRadius:18, border:'none', background:'transparent', color:'rgba(255,255,255,.45)', cursor:'pointer', fontSize:14, transition:'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
               onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-              {isLight ? '🌙' : '☀️'}
+              {isLight
+                ? <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>}
             </button>
 
             <div style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
@@ -1313,8 +1317,8 @@ export default function EmployeePage() {
 
       {/* Notificaciones push v3 */}
       {showNotifBanner && (
-        <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(59,91,255,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
-          <div className="v3-notif-banner-icon">🔔</div>
+        <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(177,138,82,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
+          <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
           <div className="v3-notif-banner-text">
             <div className="v3-notif-banner-title">Activa las notificaciones</div>
             <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
@@ -1348,7 +1352,7 @@ export default function EmployeePage() {
           <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 116, boxSizing: 'border-box' }}>
             {pendingCierresEmp.length > 0 && (
               <div style={{ margin: '12px 16px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18 }}>✍️</span>
+                <span style={{ display:'flex', color:'var(--warning)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange)' }}>
                     {pendingCierresEmp.length === 1 ? 'Cierre mensual pendiente de firma' : `${pendingCierresEmp.length} cierres pendientes de firma`}
@@ -1365,8 +1369,8 @@ export default function EmployeePage() {
                 extraAction={isSuper ? (
                   <button onClick={() => setQrScanOpen(true)} style={{
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(124,58,237,.3)',
-                    background: 'rgba(124,58,237,.08)', color: 'var(--primary-light)', fontSize: 13,
+                    padding: '11px 16px', borderRadius: 12, border: '1px solid rgba(177,138,82,.3)',
+                    background: 'rgba(177,138,82,.08)', color: 'var(--primary-light)', fontSize: 13,
                     fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                   }}>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1381,13 +1385,13 @@ export default function EmployeePage() {
             {weekPlanningData && (
               <div style={{ padding: '0 16px 16px' }}>
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 12px', background: 'rgba(124,58,237,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>📅</span>
+                  <div style={{ padding: '10px 12px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display:'flex', color:'var(--primary-light)' }}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal</span>
                     <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                  <div className="emp-planning-wrap" style={{ overflowX: 'auto' }}>
+                    <table className="emp-planning-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                       <thead>
                         <tr>
                           <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)' }}>Empleado</th>
@@ -1406,7 +1410,7 @@ export default function EmployeePage() {
                             {m.days.map((d, di) => (
                               <td key={di} style={{ padding: '5px 3px', textAlign: 'center' }}>
                                 {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 12 }}>●</span>
-                                  : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(124,58,237,.7)', fontSize: 9, fontWeight: 700 }}>{d.hours || '✓'}</span>
+                                  : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(177,138,82,.7)', fontSize: 9, fontWeight: 700 }}>{d.hours || '✓'}</span>
                                   : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 10 }}>—</span>}
                               </td>
                             ))}

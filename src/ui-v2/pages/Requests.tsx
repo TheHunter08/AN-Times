@@ -2,7 +2,7 @@
 import { Avatar } from '../components/Avatar.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconCheck, IconX, IconClock, IconClipboard, IconFilter } from '../components/Icons.js'
+import { IconCheck, IconX, IconClock, IconClipboard, IconFilter, IconCalendar, IconHome, IconAlertCircle } from '../components/Icons.js'
 
 export interface RequestRow {
   id: string
@@ -20,15 +20,15 @@ export interface RequestsProps {
   rows: RequestRow[]
 }
 
-const typeCfg: Record<string, { color: string; bg: string; emoji: string }> = {
-  'Vacaciones':    { color: colors.kpiTone.primary.base, bg: colors.primary.dim,              emoji: '🌴' },
-  'Día personal':  { color: colors.kpiTone.accent.base,  bg: 'rgba(59,130,246,.12)',           emoji: '📅' },
-  'Teletrabajo':   { color: colors.kpiTone.cyan.base,    bg: 'rgba(6,182,212,.12)',            emoji: '🏠' },
-  'Horas extra':   { color: colors.kpiTone.amber.base,   bg: 'rgba(245,158,11,.12)',           emoji: '⏱️' },
-  'Baja':          { color: colors.semantic.red,         bg: 'rgba(239,68,68,.12)',            emoji: '🏥' },
+const typeCfg: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
+  'Vacaciones':    { color: colors.kpiTone.primary.base, bg: colors.primary.dim,              icon: <IconCalendar width={17} height={17} /> },
+  'Día personal':  { color: colors.kpiTone.accent.base,  bg: colors.accent.dim,                icon: <IconCalendar width={17} height={17} /> },
+  'Teletrabajo':   { color: colors.kpiTone.cyan.base,    bg: colors.secondary.dim,             icon: <IconHome width={17} height={17} /> },
+  'Horas extra':   { color: colors.kpiTone.amber.base,   bg: 'rgba(245,158,11,.12)',           icon: <IconClock width={17} height={17} /> },
+  'Baja':          { color: colors.semantic.red,         bg: 'rgba(239,68,68,.12)',            icon: <IconAlertCircle width={17} height={17} /> },
 }
 function getTypeCfg(type: string) {
-  return typeCfg[type] ?? { color: colors.primary.light, bg: colors.primary.dim, emoji: '📋' }
+  return typeCfg[type] ?? { color: colors.primary.light, bg: colors.primary.dim, icon: <IconClipboard width={17} height={17} /> }
 }
 
 const statusCfg = {
@@ -59,7 +59,7 @@ export function Requests({ rows }: RequestsProps) {
 
       {/* Header */}
       <div>
-        <div style={{ fontSize: 21, fontWeight: 900, color: colors.text[900], letterSpacing: '-.5px' }}>Solicitudes</div>
+        <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Solicitudes</div>
         <div style={{ fontSize: 13, color: colors.text[400], marginTop: 3 }}>Gestiona peticiones del equipo</div>
       </div>
 
@@ -79,7 +79,7 @@ export function Requests({ rows }: RequestsProps) {
               {s.icon}
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: s.color, letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: s.color, letterSpacing: '-.7px', fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
               <div style={{ fontSize: 11, color: colors.text[400], fontWeight: 600 }}>{s.label}</div>
             </div>
           </div>
@@ -94,12 +94,12 @@ export function Requests({ rows }: RequestsProps) {
             key={f}
             onClick={() => setActiveFilter(f)}
             style={{
-              padding: '7px 14px', borderRadius: radius.pill, border: 'none',
+              padding: '7px 14px', borderRadius: radius.pill,
               cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
               background: activeFilter === f ? colors.primary.base : colors.bg[700],
               color: activeFilter === f ? '#fff' : colors.text[500],
               border: `1px solid ${activeFilter === f ? 'transparent' : colors.border.subtle}`,
-              boxShadow: activeFilter === f ? '0 2px 10px rgba(124,58,237,.3)' : 'none',
+              boxShadow: activeFilter === f ? '0 4px 14px var(--uiv2-primary-glow)' : 'none',
               transition: 'all .15s ease',
             }}
           >
@@ -125,7 +125,7 @@ export function Requests({ rows }: RequestsProps) {
       </div>
 
       <style>{`
-        .uiv2-req-card:hover { border-color: rgba(124,58,237,.3) !important; }
+        .uiv2-req-card:hover { border-color: var(--uiv2-border-strong) !important; }
         .uiv2-req-approve:hover { background: rgba(16,185,129,.22) !important; }
         .uiv2-req-reject:hover  { background: rgba(239,68,68,.22) !important; }
       `}</style>
@@ -158,7 +158,7 @@ function RequestCard({ row }: { row: RequestRow }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 20,
       }}>
-        {tc.emoji}
+        {tc.icon}
       </div>
 
       {/* Info */}

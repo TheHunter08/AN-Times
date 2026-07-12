@@ -5,6 +5,9 @@
 import { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { StrictMode } from 'react'
+import '../design-system/index.ts'
+import './design-system/theme.css'
+import '../styles/v7.css'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
 import { Timesheets } from './pages/Timesheets.js'
@@ -47,25 +50,25 @@ import {
 
 const PAGES = [
   // Admin views
-  { id: 'dashboard',      label: 'Dashboard',           icon: <IconGrid />,         group: 'admin' },
-  { id: 'empleados',      label: 'Empleados',           icon: <IconUsers />,        group: 'admin' },
-  { id: 'fichajes',       label: 'Fichajes',            icon: <IconClock />,        group: 'admin' },
-  { id: 'planning',       label: 'Planning',            icon: <IconCalendar />,     group: 'admin' },
-  { id: 'turnos',         label: 'Turnos',              icon: <IconCalendar />,     group: 'admin' },
-  { id: 'validar',        label: 'Validar horas',       icon: <IconCheck />,        group: 'admin' },
-  { id: 'solicitudes',    label: 'Solicitudes',         icon: <IconClipboard />,    group: 'admin' },
-  { id: 'gastos',         label: 'Gastos',              icon: <IconReceipt />,      group: 'admin' },
-  { id: 'obras',          label: 'Obras',               icon: <IconBuilding />,     group: 'admin' },
-  { id: 'proyectos',      label: 'Proyectos',           icon: <IconFolder />,       group: 'admin' },
-  { id: 'cierre',         label: 'Cierre mensual',      icon: <IconFileText />,     group: 'admin' },
-  { id: 'documentos',     label: 'Documentos',          icon: <IconFolder />,       group: 'admin' },
-  { id: 'stats',          label: 'Estadísticas',        icon: <IconChart />,        group: 'admin' },
-  { id: 'reportes',       label: 'Reportes',            icon: <IconFileText />,     group: 'admin' },
-  { id: 'mensajes',       label: 'Mensajes',            icon: <IconChat />,         group: 'admin' },
-  { id: 'notificaciones', label: 'Notificaciones',      icon: <IconBell />,         group: 'admin' },
-  { id: 'anomalias',      label: 'Anomalías',           icon: <IconAlertCircle />,  group: 'admin' },
-  { id: 'auditoria',      label: 'Auditoría',           icon: <IconShield />,       group: 'admin' },
-  { id: 'ajustes',        label: 'Ajustes',             icon: <IconSettings />,     group: 'admin' },
+  { id: 'dashboard',      label: 'Resumen',             icon: <IconGrid />,         group: 'Principal' },
+  { id: 'empleados',      label: 'Empleados',           icon: <IconUsers />,        group: 'Equipo' },
+  { id: 'fichajes',       label: 'Fichajes',            icon: <IconClock />,        group: 'Equipo' },
+  { id: 'planning',       label: 'Planning',            icon: <IconCalendar />,     group: 'Equipo' },
+  { id: 'turnos',         label: 'Turnos',              icon: <IconCalendar />,     group: 'Equipo' },
+  { id: 'validar',        label: 'Validar horas',       icon: <IconCheck />,        group: 'Gestión' },
+  { id: 'solicitudes',    label: 'Solicitudes',         icon: <IconClipboard />,    group: 'Gestión' },
+  { id: 'gastos',         label: 'Gastos',              icon: <IconReceipt />,      group: 'Gestión' },
+  { id: 'obras',          label: 'Obras',               icon: <IconBuilding />,     group: 'Gestión' },
+  { id: 'proyectos',      label: 'Proyectos',           icon: <IconFolder />,       group: 'Gestión' },
+  { id: 'documentos',     label: 'Documentos',          icon: <IconFolder />,       group: 'Gestión' },
+  { id: 'cierre',         label: 'Cierre mensual',      icon: <IconFileText />,     group: 'Análisis' },
+  { id: 'stats',          label: 'Estadísticas',        icon: <IconChart />,        group: 'Análisis' },
+  { id: 'reportes',       label: 'Informes',            icon: <IconFileText />,     group: 'Análisis' },
+  { id: 'anomalias',      label: 'Anomalías',           icon: <IconAlertCircle />,  group: 'Análisis' },
+  { id: 'auditoria',      label: 'Auditoría',           icon: <IconShield />,       group: 'Análisis' },
+  { id: 'mensajes',       label: 'Mensajes',            icon: <IconChat />,         group: 'Comunicación' },
+  { id: 'notificaciones', label: 'Notificaciones',      icon: <IconBell />,         group: 'Comunicación' },
+  { id: 'ajustes',        label: 'Ajustes',             icon: <IconSettings />,     group: 'Sistema' },
   // Employee views
   { id: 'empleado',       label: 'Vista Empleado',      icon: <IconClock />,        group: 'emp' },
   { id: 'calendario',     label: 'Calendario',          icon: <IconCalendar />,     group: 'emp' },
@@ -101,7 +104,7 @@ function EmployeeHomeDemo() {
   }, [])
   const p2 = (n: number) => String(n).padStart(2, '0')
   const hour = now.getHours()
-  const greeting = hour < 12 ? 'Buenos días 👋' : hour < 19 ? 'Buenas tardes 👋' : 'Buenas noches 👋'
+  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   return (
     <EmployeeHome
       greeting={greeting}
@@ -160,13 +163,14 @@ function useRequestsState() {
 function DashboardDemo({ pendingCount, onNavigate }: { pendingCount: number; onNavigate: (id: string) => void }) {
   return (
     <Dashboard
-      greeting="Buenos días, Admin 👋"
+      greeting="Buenos días, Admin"
       greetingSub="Aquí tienes el resumen de tu equipo hoy."
       kpis={[
-        { label: 'Horas trabajadas', value: demo.kpis.horasTrabajadas, delta: { text: '12.5% vs semana pasada', tone: 'up' }, tone: 'primary', icon: <IconClock width={17} height={17} />, sparkline: [40, 55, 48, 65, 60, 78, 70] },
-        { label: 'Fichajes realizados', value: String(demo.kpis.fichajesRealizados), delta: { text: '8.1% vs semana pasada', tone: 'up' }, tone: 'accent', icon: <IconGrid width={17} height={17} />, sparkline: [50, 48, 60, 58, 66, 64, 72] },
-        { label: 'Empleados activos', value: `${demo.kpis.empleadosActivos}/${demo.employees.length}`, delta: { text: '2 nuevos esta semana', tone: 'up' }, tone: 'cyan', icon: <IconUsers width={17} height={17} />, sparkline: [60, 62, 61, 65, 63, 68, 70] },
-        { label: 'Ausencias hoy', value: String(demo.kpis.ausenciasHoy), delta: { text: '2.0% vs ayer', tone: 'down' }, tone: 'amber', icon: <IconChart width={17} height={17} />, sparkline: [30, 45, 20, 35, 25, 40, 30] },
+        { label: 'Empleados activos', value: String(demo.employees.length), tone: 'primary', icon: <IconUsers width={17} height={17} /> },
+        { label: 'Trabajando ahora', value: String(demo.employees.filter(e => e.status === 'active').length), tone: 'cyan', icon: <IconClock width={17} height={17} /> },
+        { label: 'En descanso', value: String(demo.employees.filter(e => e.status === 'break').length), tone: 'amber', icon: <IconClock width={17} height={17} /> },
+        { label: 'Ausentes hoy', value: String(demo.employees.filter(e => e.status === 'off').length), tone: 'accent', icon: <IconUsers width={17} height={17} /> },
+        { label: 'Horas trabajadas hoy', value: demo.kpis.horasTrabajadas, tone: 'primary', icon: <IconChart width={17} height={17} /> },
       ]}
       trend={demo.weeklyTrend}
       compareTrend={demo.weeklyTrendCompare}
@@ -214,7 +218,7 @@ function SidebarFooterContent({ onNavigate }: { onNavigate: (id: string) => void
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: radius.md, padding: 14, background: colors.gradients.brand }}>
         <div style={{ position: 'absolute', top: -30, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,.15)', filter: 'blur(6px)' }} />
         <div style={{ position: 'relative', fontSize: 12.5, fontWeight: 700, color: '#fff' }}>Potencia tu productividad</div>
-        <div style={{ position: 'relative', fontSize: 11, color: 'rgba(255,255,255,.85)', marginTop: 4, marginBottom: 10 }}>Descubre todas las novedades de TIMES v5</div>
+        <div style={{ position: 'relative', fontSize: 11, color: 'rgba(255,255,255,.85)', marginTop: 4, marginBottom: 10 }}>Workforce Operating System</div>
         <button style={{ position: 'relative', padding: '6px 12px', borderRadius: radius.xs, border: 'none', background: 'rgba(255,255,255,.18)', color: '#fff', fontSize: 11.5, fontWeight: 640, cursor: 'pointer' }}>Ver novedades</button>
       </div>
 
@@ -282,7 +286,7 @@ function PreviewApp() {
 
   return (
     <AppShell
-      navItems={PAGES.filter(p => p.group !== 'auth').map(p => ({ id: p.id, label: p.label, icon: <span>{p.icon}</span> }))}
+      navItems={PAGES.filter(p => p.group !== 'auth').map(p => ({ id: p.id, label: p.label, group: p.group, icon: <span>{p.icon}</span> }))}
       activeNav={active}
       onSelectNav={setActive}
       sidebarHeader={
@@ -291,10 +295,9 @@ function PreviewApp() {
             <div style={{ width: 30, height: 30, borderRadius: 9, background: colors.gradients.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff', flexShrink: 0 }}>T</div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-.2px' }}>TIMES v5</span>
-                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: radius.pill, background: colors.primary.dim, color: colors.primary.light }}>PREMIUM</span>
+                <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-.2px' }}>TIMES INC</span>
               </div>
-              <div style={{ fontSize: 10, color: colors.text[500] }}>Sistema de Control Horario</div>
+              <div style={{ fontSize: 10, color: colors.text[500] }}>Workforce Operating System</div>
             </div>
           </div>
         </div>
@@ -414,7 +417,7 @@ function PreviewApp() {
         />
       )}
       {active === 'cierre' && (
-        <MonthlyClose items={demo.closures} />
+        <MonthlyClose items={demo.closures as any} />
       )}
       {active === 'documentos' && (
         <Documents items={demo.documents} />

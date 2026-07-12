@@ -98,7 +98,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'es2020',
-    // Aumentar el límite de aviso de chunk (xlsx y AdminPage son grandes por diseño)
+    // La IA local se carga bajo demanda y conserva un límite de aviso separado.
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
@@ -107,7 +107,6 @@ export default defineConfig({
           state:     ['zustand'],
           charts:    ['recharts'],
           pdf:       ['pdf-lib'],
-          excel:     ['xlsx'],
           supabase:  ['@supabase/supabase-js'],
           localai:   ['@mlc-ai/web-llm'],
         }

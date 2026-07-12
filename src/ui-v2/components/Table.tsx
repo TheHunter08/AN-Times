@@ -9,6 +9,7 @@ export interface TableColumn<T> {
   header: string
   render: (row: T) => ReactNode
   width?: string
+  mobileHidden?: boolean
 }
 
 export interface TableProps<T> {
@@ -31,25 +32,24 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
   // Calcula ancho mínimo sumando columnas fijas + gaps para que el scroll horizontal funcione
   const minW = columns.reduce((s, c) => s + (c.width ? parseInt(c.width) + 16 : 140), 18 * 2)
 
-  const fadeColor = colors.bg[800] + 'dd'
   const rowHoverBg = colors.bg[500]
   const rowHoverBorder = colors.border.default
   const tableStyles = [
     '.uiv2-table-row:hover { background: ' + rowHoverBg + ' !important; border-color: ' + rowHoverBorder + ' !important; transform: translateX(2px); }',
-    '.uiv2-table-fade-right { display: none; }',
-    '@media (max-width: 700px) { .uiv2-table-fade-right { display: block; } }',
+    '.uiv2-table-mobile { display: none; }',
+    '@media (max-width: 700px) {',
+    '  .uiv2-table-desktop { display: none !important; }',
+    '  .uiv2-table-mobile { display: grid; gap: 10px; }',
+    '  .uiv2-table-mobile-card { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; padding: 16px; background: ' + colors.bg[600] + '; border: 1px solid ' + colors.border.subtle + '; border-radius: ' + radius.lg + '; }',
+    '  .uiv2-table-mobile-field:first-child { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid ' + colors.border.subtle + '; }',
+    '  .uiv2-table-mobile-label { display:block; margin-bottom:5px; color:' + colors.text[500] + '; font-size:10px; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }',
+    '  .uiv2-table-mobile-value { color:' + colors.text[900] + '; font-size:13px; min-width:0; overflow-wrap:anywhere; }',
+    '}',
   ].join('\n')
 
   return (
     <div style={{ position: 'relative' }}>
-      <div
-        className="uiv2-table-fade-right"
-        style={{
-          position: 'absolute', top: 0, right: 0, bottom: 0, width: 40, zIndex: 2, pointerEvents: 'none',
-          background: 'linear-gradient(to right, transparent, ' + fadeColor + ')',
-        }}
-      />
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div className="uiv2-table-desktop" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ minWidth: minW, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', padding: '0 18px 8px', gap: 16, borderBottom: `1px solid ${colors.border.subtle}` }}>
             {columns.map(col => (
@@ -79,9 +79,21 @@ export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' 
               ))}
             </div>
           ))}
-          <style>{tableStyles}</style>
         </div>
       </div>
+      <div className="uiv2-table-mobile" role="list" aria-label="Resultados">
+        {rows.map(row => (
+          <article key={rowKey(row)} className="uiv2-table-mobile-card" role="listitem">
+            {columns.filter(col => !col.mobileHidden).map(col => (
+              <div key={col.key} className="uiv2-table-mobile-field">
+                <span className="uiv2-table-mobile-label">{col.header}</span>
+                <div className="uiv2-table-mobile-value">{col.render(row)}</div>
+              </div>
+            ))}
+          </article>
+        ))}
+      </div>
+      <style>{tableStyles}</style>
     </div>
   )
 }

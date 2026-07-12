@@ -2,16 +2,29 @@
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
 import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors'
-import { radius } from '../../ui-v2/design-system/radius'
+
+const colors = {
+  bg: { 400: 'var(--bg-card-hover)', 500: 'var(--bg-elevated)', 600: 'var(--bg-card)' },
+  primary: {
+    base: 'var(--brand-500)', light: 'var(--brand-400)',
+    dim: 'color-mix(in srgb, var(--brand-500) 13%, transparent)',
+    glow: 'rgba(53, 104, 255, 0.25)',
+  },
+  semantic: { green: 'var(--success-400)', orange: 'var(--warning-400)', red: 'var(--danger-400)' },
+  text: { 900: 'var(--text-primary)', 700: 'var(--text-secondary)', 500: 'var(--text-tertiary)', 300: 'var(--text-disabled)' },
+  border: { subtle: 'var(--border-subtle)', default: 'var(--border-default)' },
+}
+
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', xl: 'var(--radius-xl)', pill: 'var(--radius-pill)' }
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`
 
 const STATUS_COLORS = {
   complete: colors.semantic.green,
   pending:  colors.semantic.orange,
   absence:  colors.semantic.red,
-  medical:  '#F59E0B',
-  vacation: '#3B82F6',
-  festivo:  '#E879F9',
+  medical:  'var(--warning-400)',
+  vacation: 'var(--brand-400)',
+  festivo:  'var(--accent-400)',
   missing:  colors.semantic.red,
   weekend:  colors.text[300],
   future:   colors.text[500],
@@ -109,35 +122,42 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
   const getDayStyle = (ds, date, status, isToday, isSelected) => {
     const base = {
-      position: 'relative', borderRadius: radius.sm, padding: '6px 4px 4px',
+      position: 'relative', borderRadius: radius.sm, padding: '6px 4px 5px',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      cursor: 'pointer', fontSize: 13, fontWeight: 600, minHeight: 44,
-      transition: 'all 0.12s ease', userSelect: 'none',
+      justifyContent: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600, minHeight: 48,
+      border: '1px solid transparent', fontFamily: 'inherit',
+      transition: 'background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard)',
+      userSelect: 'none',
     }
-    if (isToday) return { ...base, background: colors.primary.base, color: '#fff', fontWeight: 800, boxShadow: `0 2px 10px ${colors.primary.glow}` }
+    if (isToday) return { ...base, background: colors.primary.base, color: 'var(--brand-50)', fontWeight: 700, boxShadow: 'var(--shadow-brand)' }
     const colorMap = {
-      complete: { background: `${colors.semantic.green}20`, color: colors.semantic.green },
-      pending:  { background: `${colors.semantic.orange}18`, color: colors.semantic.orange },
-      absence:  { background: `${colors.semantic.red}18`, color: colors.semantic.red },
-      medical:  { background: 'rgba(245,158,11,.15)', color: '#F59E0B' },
-      vacation: { background: 'rgba(59,130,246,.15)', color: '#3B82F6' },
-      festivo:  { background: 'rgba(232,121,249,.15)', color: '#E879F9' },
-      missing:  { background: `${colors.semantic.red}08`, color: colors.semantic.red, opacity: .45 },
+      complete: { background: 'var(--success-soft)', color: colors.semantic.green },
+      pending:  { background: 'var(--warning-soft)', color: colors.semantic.orange },
+      absence:  { background: 'var(--danger-soft)', color: colors.semantic.red },
+      medical:  { background: 'var(--warning-soft)', color: 'var(--warning-400)' },
+      vacation: { background: 'var(--info-soft)', color: 'var(--brand-400)' },
+      festivo:  { background: toneSoft('var(--accent-400)', 14), color: 'var(--accent-400)' },
+      missing:  { background: toneSoft(colors.semantic.red, 6), color: colors.semantic.red, opacity: .62 },
       weekend:  { color: colors.text[300], opacity: .55 },
       future:   { color: colors.text[500] },
     }
     const sStyle = colorMap[status] || {}
-    const selStyle = isSelected ? { outline: `2px solid ${colors.primary.base}`, outlineOffset: '-2px' } : {}
+    const selStyle = isSelected && !isToday ? { borderColor: 'var(--border-focus)', background: colors.bg[400] } : {}
     return { ...base, ...sStyle, ...selStyle }
   }
 
   return (
     <PullToRefresh>
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto', paddingBottom: 100 }}>
+      <div className="employee-calendar-v2" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: colors.text[900], textTransform: 'capitalize', letterSpacing: '-.5px' }}>
+        <header style={{ display: 'grid', gap: 'var(--space-1)', padding: 'var(--space-2) 2px var(--space-1)' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', color: colors.text[900], letterSpacing: '-.035em', lineHeight: 'var(--leading-heading)' }}>Calendario</h1>
+          <p style={{ margin: 0, fontSize: 'var(--font-body-sm)', color: colors.text[500], lineHeight: 'var(--leading-body)' }}>Jornadas, ausencias y vacaciones en una sola vista.</p>
+        </header>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+          <div style={{ fontSize: 'var(--font-heading-sm)', fontWeight: 'var(--font-semibold)', color: colors.text[900], textTransform: 'capitalize', letterSpacing: '-.02em' }}>
             {calMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -148,10 +168,10 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
             ].map((btn, i) => (
               <button key={i} onClick={btn.onClick} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '6px 10px', borderRadius: radius.sm,
+                minWidth: i === 1 ? 52 : 40, minHeight: 40, padding: '6px 10px', borderRadius: radius.sm,
                 background: colors.bg[500], border: `1px solid ${colors.border.default}`,
                 color: colors.text[700], fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'inherit', minWidth: 32,
+                fontFamily: 'inherit',
               }}>{btn.label}</button>
             ))}
           </div>
@@ -164,15 +184,15 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
               { n: monthStats.complete,  label: 'Completos',  color: colors.semantic.green },
               { n: monthStats.pending,   label: 'Parciales',  color: colors.semantic.orange },
               { n: monthStats.absence,   label: 'Ausencias',  color: colors.semantic.red },
-              { n: monthStats.medical,   label: 'Baja médica', color: '#F59E0B' },
-              { n: monthStats.vacation,  label: 'Vacaciones', color: '#3B82F6' },
-              { n: monthStats.festivo,   label: 'Festivos',   color: '#E879F9' },
+                { n: monthStats.medical,   label: 'Baja médica', color: 'var(--warning-400)' },
+                { n: monthStats.vacation,  label: 'Vacaciones', color: 'var(--brand-400)' },
+                { n: monthStats.festivo,   label: 'Festivos',   color: 'var(--accent-400)' },
               { n: monthStats.missing,   label: 'Sin fichaje', color: colors.semantic.red },
             ].filter(c => c.n > 0).map(c => (
               <div key={c.label} style={{
                 display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px',
-                borderRadius: 20, fontSize: 11, fontWeight: 700, color: c.color,
-                background: `${c.color}15`, border: `1px solid ${c.color}22`,
+                borderRadius: radius.pill, fontSize: 11, fontWeight: 600, color: c.color,
+                background: toneSoft(c.color, 10), border: `1px solid ${toneSoft(c.color, 22)}`,
               }}>
                 <span>{c.n}</span><span style={{ fontWeight: 500 }}>{c.label}</span>
               </div>
@@ -182,8 +202,8 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
         {/* Calendar grid */}
         <div style={{
-          background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
-          borderRadius: radius.xl, padding: '14px 12px', overflow: 'hidden',
+          background: 'var(--gradient-card), var(--bg-card)', border: `1px solid ${colors.border.subtle}`,
+          borderRadius: radius.xl, padding: 'var(--space-4) var(--space-3)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)',
         }}>
           {/* Day headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, marginBottom: 4 }}>
@@ -202,16 +222,23 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
               const mins = workedMap[ds] || 0
               const festLabel = (db.config?.festivosExtra || {})[ds] || (db.config?.usarFestivosMadrid !== false ? FESTIVOS_MADRID_2026[ds] : undefined)
               return (
-                <div key={i} style={getDayStyle(ds, date, status, isToday, isSelected)} onClick={() => setSelDay(selDay === ds ? null : ds)} title={festLabel || undefined}>
+                <button
+                  key={i}
+                  type="button"
+                  style={getDayStyle(ds, date, status, isToday, isSelected)}
+                  onClick={() => setSelDay(selDay === ds ? null : ds)}
+                  title={festLabel || undefined}
+                  aria-pressed={isSelected}
+                  aria-label={`${date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}: ${status === 'complete' ? 'jornada completa' : status === 'pending' ? 'jornada parcial' : status === 'absence' ? 'ausencia' : status === 'medical' ? 'baja médica' : status === 'vacation' ? 'vacaciones' : status === 'festivo' ? festLabel : status === 'missing' ? 'sin fichaje' : status === 'weekend' ? 'fin de semana' : 'sin actividad'}`}
+                >
                   <span>{date.getDate()}</span>
                   {mins > 0 && !isToday && (
                     <span style={{ fontSize: 8, fontWeight: 700, marginTop: 2, opacity: .85 }}>{Math.floor(mins/60)}h</span>
                   )}
-                  {status === 'absence'  && !isToday && <span style={{ fontSize: 9, marginTop: 2 }}>✕</span>}
-                  {status === 'medical'  && !isToday && <span style={{ fontSize: 9, marginTop: 2 }}>🏥</span>}
-                  {status === 'vacation' && !isToday && <span style={{ fontSize: 9, marginTop: 2 }}>🌴</span>}
-                  {status === 'festivo'  && !isToday && <span style={{ fontSize: 9, marginTop: 2 }}>★</span>}
-                </div>
+                  {['absence', 'medical', 'vacation', 'festivo'].includes(status) && !isToday && (
+                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', marginTop: 4, background: STATUS_COLORS[status], boxShadow: `0 0 0 2px ${toneSoft(STATUS_COLORS[status], 18)}` }} />
+                  )}
+                </button>
               )
             })}
           </div>
@@ -223,9 +250,9 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
             [colors.semantic.green,  'Completo'],
             [colors.semantic.orange, 'Parcial'],
             [colors.semantic.red,    'Ausencia'],
-            ['#F59E0B',              'Baja médica'],
-            ['#3B82F6',              'Vacaciones'],
-            ['#E879F9',              'Festivo'],
+            ['var(--warning-400)',    'Baja médica'],
+            ['var(--brand-400)',      'Vacaciones'],
+            ['var(--accent-400)',     'Festivo'],
           ].map(([c, l]) => (
             <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: colors.text[700] }}>
               <div style={{ width: 10, height: 10, borderRadius: 3, background: c, flexShrink: 0 }} />{l}
@@ -252,14 +279,16 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
                   {selDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
                 {statusLabels[status] && (
-                  <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12, color: statusColor, background: `${statusColor}18`, textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: radius.pill, color: statusColor, background: toneSoft(statusColor, 12), textTransform: 'uppercase', letterSpacing: '.5px' }}>
                     {statusLabels[status]}
                   </div>
                 )}
               </div>
               {recs.length ? recs.map(r => (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${colors.border.subtle}` }}>
-                  <div style={{ width: 32, height: 32, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, background: colors.primary.dim, flexShrink: 0 }}>⏱️</div>
+                  <div aria-hidden="true" style={{ width: 36, height: 36, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.primary.dim, color: colors.primary.light, flexShrink: 0 }}>
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: colors.text[900] }}>{r.centro || 'Trabajo'}</div>
                     <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2 }}>{mhm(calcMin(r))} trabajadas</div>

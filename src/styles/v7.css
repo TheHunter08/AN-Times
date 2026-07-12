@@ -1,0 +1,255 @@
+/* TIMES INC V7 production skin. Presentation only; data and callbacks remain in existing views. */
+:root {
+  --v7-bg:#06080d; --v7-surface:#0d111a; --v7-card:#101622; --v7-hover:#141c2a;
+  --v7-line:rgba(255,255,255,.055); --v7-blue:#3568ff; --v7-violet:#7c5cff;
+  --v7-success:#16c96f; --v7-warning:#f59e0b; --v7-danger:#ef4444;
+  --v7-text:#f7f9fc; --v7-sub:#aeb8ca; --v7-muted:#77839a;
+}
+*,*::before,*::after { box-sizing:border-box; }
+body { background:var(--v7-bg); color:var(--v7-text); font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+button,input,textarea,select { font-family:inherit; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--brand-400,#5f87ff) !important; outline-offset:3px !important; }
+
+/* Employee desktop shell */
+#sEmp.emp-dsk { background:var(--v7-bg) !important; }
+#sEmp.emp-dsk .emp-dsk-sidebar { width:240px !important; background:var(--bg-sidebar,#080b12) !important; border-right:1px solid var(--v7-line) !important; }
+#sEmp.emp-dsk .emp-dsk-brand { height:64px !important; padding:0 24px !important; border-bottom:1px solid var(--v7-line) !important; }
+#sEmp.emp-dsk .emp-dsk-brand-icon { background:var(--v7-blue) !important; border-radius:8px !important; box-shadow:0 8px 20px rgba(53,104,255,.22) !important; }
+#sEmp.emp-dsk .emp-dsk-nav-item { margin:2px 12px !important; min-height:40px !important; border-radius:10px !important; color:var(--v7-muted) !important; }
+#sEmp.emp-dsk .emp-dsk-nav-item.on { background:rgba(53,104,255,.14) !important; color:#fff !important; box-shadow:inset 2px 0 0 var(--v7-blue) !important; }
+#sEmp.emp-dsk .emp-dsk-main { background:var(--v7-bg) !important; }
+#sEmp.emp-dsk .emp-dsk-topbar { height:64px !important; background:rgba(6,8,13,.86) !important; border-bottom:1px solid var(--v7-line) !important; backdrop-filter:blur(18px) !important; }
+#sEmp.emp-dsk .emp-dsk-content { padding:28px 32px !important; max-width:1440px !important; }
+
+/* Employee mobile */
+#sEmp:not(.emp-dsk) { min-height:100dvh !important; background:var(--v7-bg) !important; }
+#sEmp:not(.emp-dsk) .emp-topbar { height:56px !important; padding:0 16px !important; background:rgba(6,8,13,.92) !important; border-bottom:1px solid var(--v7-line) !important; backdrop-filter:blur(18px) !important; }
+#sEmp:not(.emp-dsk) .emp-body { background:var(--v7-bg) !important; }
+#sEmp:not(.emp-dsk) .emp-nav { left:50% !important; right:auto !important; width:min(620px,calc(100% - 20px)) !important; max-width:none !important; transform:translateX(-50%) !important; bottom:max(10px,env(safe-area-inset-bottom)) !important; height:64px !important; padding:6px !important; border-radius:20px !important; background:rgba(13,17,26,.94) !important; border:1px solid rgba(255,255,255,.10) !important; box-shadow:0 14px 40px rgba(0,0,0,.35) !important; backdrop-filter:blur(22px) !important; overflow:hidden !important; }
+#sEmp:not(.emp-dsk) .emp-nav-item { flex:1 1 0 !important; min-width:0 !important; min-height:48px !important; padding:4px 1px !important; border-radius:14px !important; color:var(--v7-muted) !important; font-size:9px !important; white-space:nowrap; }
+#sEmp:not(.emp-dsk) .emp-nav-item.on { color:#fff !important; background:rgba(53,104,255,.14) !important; }
+
+/* Real employee home hierarchy */
+#sEmp .v7-clock-hero { background:var(--gradient-card,var(--v7-card)) !important; border:1px solid var(--v7-line) !important; border-radius:22px !important; box-shadow:var(--shadow-md,0 14px 38px rgba(0,0,0,.26)) !important; }
+#sEmp .v7-clock-time { font-size:40px !important; font-weight:600 !important; letter-spacing:-1.5px !important; }
+#sEmp .v7-punch-orbit { height:184px !important; align-items:center !important; isolation:isolate; }
+#sEmp .v7-orbit { position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%); border-radius:50%; pointer-events:none; }
+#sEmp .v7-orbit-a { width:174px; height:174px; border:1px solid rgba(53,104,255,.24); box-shadow:0 0 46px rgba(53,104,255,.16),inset 0 0 30px rgba(53,104,255,.08); }
+#sEmp .v7-orbit-b { width:142px; height:142px; border:3px solid rgba(53,104,255,.78); box-shadow:0 0 22px rgba(53,104,255,.40); }
+#sEmp .v7-orbit-c { width:112px; height:112px; border:3px solid var(--v7-violet); box-shadow:0 0 22px rgba(124,92,255,.60),inset 0 0 20px rgba(124,92,255,.20); }
+#sEmp .v7-punch-button { width:74px !important; height:74px !important; z-index:2; background:var(--v7-blue) !important; box-shadow:0 0 0 6px rgba(53,104,255,.14),0 0 30px rgba(53,104,255,.52) !important; }
+/* EmployeeHome is the live production hero (not the preview): keep its ring
+   large, calm and technological while retaining the existing callback. */
+#sEmp .uiv2-ring-btn { width:260px !important; height:260px !important; }
+#sEmp .uiv2-ring-btn > svg { width:260px !important; height:260px !important; }
+#sEmp .uiv2-ring-btn > svg circle:first-of-type { stroke:rgba(255,255,255,.08) !important; }
+#sEmp .uiv2-ring-btn > svg circle:last-of-type { stroke:#3568ff !important; filter:drop-shadow(0 0 8px rgba(53,104,255,.55)); }
+#sEmp .uiv2-ring-center > div:first-child { font-size:42px !important; font-weight:600 !important; }
+#sEmp .uiv2-ring-center > div:first-child span { color:#aeb8ca !important; }
+#sEmp .uiv2-ring-center { gap:7px !important; }
+#sEmp .uiv2-ring-btn::before,#sEmp .uiv2-ring-btn::after { content:""; position:absolute; inset:14px; border-radius:50%; border:1px solid rgba(53,104,255,.25); pointer-events:none; box-shadow:0 0 30px rgba(53,104,255,.13); }
+#sEmp .uiv2-ring-btn::after { inset:38px; border:2px solid rgba(124,92,255,.75); box-shadow:0 0 18px rgba(124,92,255,.45),inset 0 0 18px rgba(124,92,255,.18); }
+#sEmp .uiv2-ring-btn:hover::after { border-color:#9b7cff; }
+
+/* Admin app shell */
+#sAdmin .uiv2-app-shell { background:var(--v7-bg) !important; }
+#sAdmin .uiv2-sidebar { width:240px !important; background:var(--bg-sidebar,#080b12) !important; border-right:1px solid var(--v7-line) !important; }
+#sAdmin .uiv2-desktop-topbar { height:64px !important; background:rgba(6,8,13,.88) !important; border-bottom:1px solid var(--v7-line) !important; }
+#sAdmin .uiv2-page-container { padding:28px 32px !important; }
+#sAdmin .uiv2-sidebar-item { min-height:40px !important; border-radius:10px !important; }
+#sAdmin .uiv2-sidebar-item.uiv2-active { background:rgba(53,104,255,.14) !important; color:#fff !important; box-shadow:inset 2px 0 0 var(--v7-blue) !important; }
+#sAdmin .uiv2-kpi-card,#sAdmin .uiv2-emp-card,#sAdmin .uiv2-quicklink { background:var(--v7-card) !important; border:1px solid var(--v7-line) !important; border-radius:18px !important; box-shadow:none !important; }
+#sAdmin .uiv2-kpi-card:hover,#sAdmin .uiv2-emp-card:hover,#sAdmin .uiv2-quicklink:hover { background:var(--v7-hover) !important; border-color:rgba(95,135,255,.32) !important; transform:translateY(-2px) !important; }
+#sAdmin .v7-dashboard { max-width:1480px !important; }
+
+@media (max-width:900px) {
+  #sAdmin .uiv2-page-container { padding:16px !important; }
+  #sAdmin .uiv2-desktop-topbar { height:56px !important; padding:0 16px !important; }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+
+/* Shared production components: remaining admin pages and employee modals. */
+#sAdmin .uiv2-btn { min-height:44px !important; border-radius:var(--radius-md) !important; font-weight:600 !important; }
+#sAdmin .uiv2-btn-primary { background:var(--gradient-brand) !important; box-shadow:var(--shadow-brand) !important; }
+#sAdmin .uiv2-btn-secondary { background:var(--bg-card) !important; border:1px solid var(--border-default) !important; color:var(--text-primary) !important; }
+#sAdmin .uiv2-input,#sAdmin input,#sAdmin select,#sAdmin textarea { min-height:44px; border-radius:var(--radius-md) !important; background:var(--bg-elevated) !important; border-color:var(--border-default) !important; color:var(--text-primary) !important; }
+#sAdmin .uiv2-input:focus,#sAdmin input:focus,#sAdmin select:focus,#sAdmin textarea:focus { border-color:var(--border-focus) !important; box-shadow:0 0 0 3px rgba(53,104,255,.13) !important; }
+#sAdmin .uiv2-table-row { min-height:56px !important; transition:background var(--duration-fast) var(--ease-standard) !important; }
+#sAdmin .uiv2-table-row:hover { background:var(--bg-card-hover) !important; }
+#sAdmin .uiv2-req-card,#sAdmin .uiv2-notif-card,#sAdmin .uiv2-stat-kpi,#sAdmin .uiv2-report-row,#sAdmin .uiv2-project-row { background:var(--bg-card) !important; border:1px solid var(--border-subtle) !important; border-radius:var(--radius-lg) !important; box-shadow:none !important; }
+#sAdmin .uiv2-req-card:hover,#sAdmin .uiv2-notif-card:hover,#sAdmin .uiv2-report-row:hover,#sAdmin .uiv2-project-row:hover { background:var(--bg-card-hover) !important; border-color:var(--border-default) !important; }
+#sAdmin .uiv2-cal-day { border-radius:var(--radius-sm) !important; }
+#sAdmin .uiv2-cal-day:hover { background:var(--bg-card-hover) !important; }
+#sAdmin .uiv2-msg-conv-btn:hover,#sAdmin .uiv2-list-row:hover { background:var(--bg-card-hover) !important; }
+
+#sEmp .modal-ov { background:var(--bg-overlay) !important; backdrop-filter:blur(8px) !important; }
+#sEmp .modal { max-height:min(88dvh,760px) !important; overflow-y:auto !important; background:var(--bg-elevated) !important; border:1px solid var(--border-default) !important; border-radius:var(--radius-2xl) var(--radius-2xl) 0 0 !important; box-shadow:var(--shadow-lg) !important; padding-bottom:max(24px,env(safe-area-inset-bottom)) !important; }
+#sEmp .card,#sEmp .panel,#sEmp .v2-card { background:var(--bg-card) !important; border-color:var(--border-subtle) !important; box-shadow:none !important; }
+#sEmp input,#sEmp select,#sEmp textarea { min-height:44px; border-radius:var(--radius-md) !important; background:var(--bg-elevated) !important; border-color:var(--border-default) !important; color:var(--text-primary) !important; }
+#sEmp .btn-primary,#sEmp .btn.btn-primary { min-height:44px; border-radius:var(--radius-md) !important; background:var(--gradient-brand) !important; box-shadow:var(--shadow-brand) !important; }
+
+@media (max-width:767px) {
+  #sAdmin button { min-height:44px; }
+  #sAdmin .uiv2-sidebar-item { min-height:44px !important; }
+  #sAdmin .uiv2-mobile-menu-button { width:44px !important; height:44px !important; flex-basis:44px !important; }
+  #sAdmin .uiv2-mobile-drawer-backdrop { min-height:100dvh; }
+  #sAdmin .uiv2-sheet-overlay { align-items:flex-end !important; padding:0 !important; }
+  #sAdmin .uiv2-sheet-panel {
+    width:100% !important;
+    max-width:none !important;
+    max-height:90dvh !important;
+    overflow-y:auto !important;
+    padding:22px 16px max(22px,env(safe-area-inset-bottom)) !important;
+    border-radius:var(--radius-2xl) var(--radius-2xl) 0 0 !important;
+  }
+  #sAdmin table { max-width:100%; }
+  #sEmp .modal { width:100% !important; }
+
+  /* PWA data views: real mobile lists replace wide desktop tables. */
+  #sAdmin .uiv2-close-kpis { grid-template-columns:1fr !important; }
+  #sAdmin .uiv2-close-table-head { display:none !important; }
+  #sAdmin .uiv2-close-row {
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:14px 12px !important;
+    margin:10px !important;
+    padding:16px !important;
+    border:1px solid var(--border-subtle) !important;
+    border-radius:var(--radius-lg) !important;
+    background:var(--bg-card) !important;
+  }
+  #sAdmin .uiv2-close-row > :first-child,
+  #sAdmin .uiv2-close-row > :nth-child(5),
+  #sAdmin .uiv2-close-row > :nth-child(6) { grid-column:1 / -1; }
+  #sAdmin .uiv2-close-row > :not(:first-child)::before {
+    display:block;
+    margin-bottom:5px;
+    color:var(--text-tertiary);
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.055em;
+    text-transform:uppercase;
+  }
+  #sAdmin .uiv2-close-row > :nth-child(2)::before { content:"Mes"; }
+  #sAdmin .uiv2-close-row > :nth-child(3)::before { content:"Horas"; }
+  #sAdmin .uiv2-close-row > :nth-child(4)::before { content:"Extra"; }
+  #sAdmin .uiv2-close-row > :nth-child(5)::before { content:"Firmas"; }
+  #sAdmin .uiv2-close-row > :nth-child(6)::before { content:"Acciones"; }
+  #sAdmin .uiv2-close-row > :nth-child(6) { display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+  #sAdmin .uiv2-close-row > :nth-child(6) button { min-height:44px; justify-content:center; }
+  #sAdmin .uiv2-close-modal {
+    align-self:flex-end;
+    max-width:none !important;
+    max-height:90dvh !important;
+    margin:-20px;
+    padding:20px 16px max(20px,env(safe-area-inset-bottom)) !important;
+    border-radius:var(--radius-2xl) var(--radius-2xl) 0 0 !important;
+  }
+  #sAdmin .uiv2-report-row {
+    display:grid !important;
+    grid-template-columns:40px minmax(0,1fr) !important;
+    gap:10px 12px !important;
+    padding:14px !important;
+  }
+  #sAdmin .uiv2-report-row > :nth-child(3),
+  #sAdmin .uiv2-report-row > :nth-child(4) { grid-column:1 / -1; }
+  #sAdmin .uiv2-report-row > :nth-child(4) { display:grid !important; grid-template-columns:1fr 1fr; }
+  #sAdmin .uiv2-report-row button { min-height:44px; justify-content:center; }
+}
+
+@media (max-width:430px) {
+  #sAdmin .uiv2-page-container { padding:14px 12px calc(88px + env(safe-area-inset-bottom)) !important; }
+  #sAdmin .uiv2-close-modal { margin:-20px; }
+
+  #sEmp:not(.emp-dsk) .emp-planning-wrap { overflow-x:hidden !important; }
+  #sEmp:not(.emp-dsk) .emp-planning-table { display:block; width:100% !important; }
+  #sEmp:not(.emp-dsk) .emp-planning-table thead,
+  #sEmp:not(.emp-dsk) .emp-planning-table tbody { display:block; width:100%; }
+  #sEmp:not(.emp-dsk) .emp-planning-table tr {
+    display:grid;
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    width:100%;
+  }
+  #sEmp:not(.emp-dsk) .emp-planning-table th:first-child { display:none; }
+  #sEmp:not(.emp-dsk) .emp-planning-table th { min-width:0 !important; padding:7px 1px !important; font-size:9px !important; }
+  #sEmp:not(.emp-dsk) .emp-planning-table td:first-child {
+    grid-column:1 / -1;
+    position:static !important;
+    padding:10px 8px 6px !important;
+    background:transparent !important;
+    border-top:1px solid var(--border-subtle);
+  }
+  #sEmp:not(.emp-dsk) .emp-planning-table tbody tr:first-child td:first-child { border-top:0; }
+  #sEmp:not(.emp-dsk) .emp-planning-table td:not(:first-child) { min-width:0; padding:7px 1px 10px !important; }
+}
+
+/* Employee secondary screens: a deliberately distinct operating-system layer,
+   not a recolour of the old forms. */
+#sEmp .employee-calendar-v2,
+#sEmp .employee-vacations-v2,
+#sEmp .employee-profile-v2,
+#sEmp .employee-shifts-v2 {
+  position:relative;
+  isolation:isolate;
+}
+#sEmp .employee-calendar-v2::before,
+#sEmp .employee-vacations-v2::before,
+#sEmp .employee-profile-v2::before,
+#sEmp .employee-shifts-v2::before {
+  content:""; position:absolute; z-index:-1; pointer-events:none;
+  width:260px; height:260px; top:-90px; right:-110px; border-radius:50%;
+  background:radial-gradient(circle,rgba(53,104,255,.16),transparent 68%);
+}
+#sEmp .employee-calendar-v2 > header,
+#sEmp .employee-vacations-v2 > header,
+#sEmp .employee-profile-v2 > header {
+  padding:22px 4px 6px !important;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+#sEmp .employee-calendar-v2 > header h1,
+#sEmp .employee-vacations-v2 > header h1,
+#sEmp .employee-profile-v2 > header h1 { font-size:30px !important; letter-spacing:-1.1px !important; }
+#sEmp .employee-calendar-v2 > header p,
+#sEmp .employee-vacations-v2 > header p,
+#sEmp .employee-profile-v2 > header p { color:#8d9bb2 !important; }
+#sEmp .employee-calendar-v2 > :nth-child(4),
+#sEmp .employee-vacations-v2 > :nth-child(3),
+#sEmp .employee-profile-v2 > :nth-child(3),
+#sEmp .employee-shifts-v2 > :nth-child(3) {
+  background:linear-gradient(180deg,rgba(16,22,34,.98),rgba(10,14,23,.98)) !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+  border-radius:24px !important;
+  box-shadow:0 18px 44px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.035) !important;
+}
+#sEmp .employee-calendar-v2 > :nth-child(4) { padding:22px 16px !important; }
+#sEmp .employee-calendar-v2 button { min-height:48px !important; }
+#sEmp .employee-calendar-v2 > :nth-child(4) button { border-radius:14px !important; }
+#sEmp .employee-calendar-v2 > :nth-child(5) { padding:4px 2px !important; gap:10px !important; }
+#sEmp .employee-calendar-v2 > :nth-child(5) > div { font-size:11px !important; }
+#sEmp .employee-vacations-v2 > :nth-child(2) {
+  min-height:270px; display:flex; flex-direction:column; justify-content:flex-end;
+  background:linear-gradient(145deg,#172a5a 0%,#111a31 52%,#101622 100%) !important;
+  border-color:rgba(95,135,255,.34) !important; box-shadow:0 22px 55px rgba(25,63,186,.22) !important;
+}
+#sEmp .employee-vacations-v2 > :nth-child(3) > div { border-radius:18px !important; }
+#sEmp .employee-vacations-v2 > button { min-height:52px !important; border-radius:16px !important; }
+#sEmp .employee-profile-v2 > :nth-child(2) {
+  min-height:180px; grid-template-columns:86px minmax(0,1fr) !important; padding:24px !important;
+  background:linear-gradient(145deg,#201957 0%,#141a31 55%,#101622 100%) !important;
+  border-color:rgba(155,124,255,.36) !important; box-shadow:0 22px 55px rgba(101,69,232,.2) !important;
+}
+#sEmp .employee-profile-v2 > :nth-child(2) > :first-child { width:86px !important; height:86px !important; border-radius:26px !important; box-shadow:0 0 0 6px rgba(155,124,255,.12),0 14px 30px rgba(0,0,0,.32) !important; }
+#sEmp .employee-profile-v2 > :nth-child(3) > div,
+#sEmp .employee-profile-v2 section { border-radius:20px !important; }
+#sEmp .employee-shifts-v2 { display:flex !important; flex-direction:column !important; gap:18px !important; }
+#sEmp .employee-shifts-v2 > :first-child { padding-top:12px !important; }
+#sEmp .employee-shifts-v2 > :nth-child(2) { padding:18px !important; border:1px solid rgba(255,255,255,.08); border-radius:22px; background:linear-gradient(180deg,#111a2a,#0d121d); }
+#sEmp .employee-shifts-v2 > :nth-child(3) { background:transparent !important; border:0 !important; box-shadow:none !important; padding:0 !important; }
+#sEmp .employee-shifts-v2 > :nth-child(3) > div { border-radius:18px !important; border:1px solid rgba(255,255,255,.07) !important; background:#101622 !important; min-height:66px; }
+#sEmp .employee-shifts-v2 button { min-width:44px !important; min-height:44px !important; border-radius:14px !important; }
+@media (min-width:768px) {
+  #sEmp .employee-calendar-v2,
+  #sEmp .employee-vacations-v2,
+  #sEmp .employee-profile-v2,
+  #sEmp .employee-shifts-v2 { max-width:760px !important; }
+}

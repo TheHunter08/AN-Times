@@ -59,7 +59,7 @@ function StatChip({ label, value, color }: { label: string; value: number; color
       background: colors.bg[700], border: `1px solid ${colors.border.subtle}`,
       minWidth: 90, gap: 3,
     }}>
-      <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color, letterSpacing: '-.7px', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
       <div style={{ fontSize: 11, color: colors.text[400], fontWeight: 600 }}>{label}</div>
     </div>
   )
@@ -94,7 +94,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 21, fontWeight: 900, color: colors.text[900], letterSpacing: '-.5px' }}>Empleados</div>
+          <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Empleados</div>
           <div style={{ fontSize: 13, color: colors.text[400], marginTop: 3 }}>Directorio completo · {total} personas</div>
         </div>
         <button
@@ -102,10 +102,10 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
           style={{
             display: 'flex', alignItems: 'center', gap: 7,
             padding: '10px 18px', borderRadius: radius.md, border: 'none',
-            background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+            background: colors.gradients.brand,
             color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
             fontFamily: 'inherit', letterSpacing: '-.1px',
-            boxShadow: '0 4px 16px rgba(124,58,237,.35)',
+            boxShadow: '0 8px 24px var(--uiv2-primary-glow)',
           }}
           className="uiv2-emp-addbtn"
         >
@@ -150,12 +150,12 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
               key={f.key}
               onClick={() => setFilter(f.key)}
               style={{
-                padding: '7px 13px', borderRadius: radius.pill, border: 'none',
+                padding: '7px 13px', borderRadius: radius.pill,
                 cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
                 background: filter === f.key ? colors.primary.base : colors.bg[700],
                 color: filter === f.key ? '#fff' : colors.text[500],
                 border: `1px solid ${filter === f.key ? 'transparent' : colors.border.subtle}`,
-                boxShadow: filter === f.key ? '0 2px 10px rgba(124,58,237,.3)' : 'none',
+                boxShadow: filter === f.key ? '0 4px 14px var(--uiv2-primary-glow)' : 'none',
                 transition: 'all .15s ease',
               }}
             >
@@ -193,16 +193,21 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
         .uiv2-emp-addbtn:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .uiv2-emp-addbtn:active { transform: scale(.98); }
         .uiv2-emp-search:focus { border-color: ${colors.primary.base} !important; }
-        .uiv2-emp-card:hover { border-color: rgba(124,58,237,.35) !important; transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,.35) !important; }
+        .uiv2-emp-card:hover { border-color: var(--uiv2-border-strong) !important; transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,0,0,.22) !important; }
       `}</style>
 
       {/* Profile modal */}
       {profileEmp && (
         <div
+          className="uiv2-sheet-overlay"
           onClick={() => setProfileEmp(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
         >
           <div
+            className="uiv2-sheet-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Perfil de ${profileEmp.name}`}
             onClick={e => e.stopPropagation()}
             style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 20 }}
           >

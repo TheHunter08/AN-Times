@@ -100,14 +100,10 @@ export const FESTIVOS_MADRID = {
 export const FESTIVOS_MADRID_2026 = FESTIVOS_MADRID
 
 export const INITIAL_DB = {
-  empresas: ['Soluciones Mata'],
-  obras: [{ id: 'o1', nombre: 'Soluciones Mata', direccion: '', estado: 'activa', createdAt: '2024-01-01' }],
-  centrosTrabajo: ['Obra Principal', 'Oficina Central', 'Almacén'],
-  employees: [
-    { id: 'admin', name: 'Administrador', empresa: 'Soluciones Mata', pin: '', color: '#5aa9e6', initials: 'AD', startDate: '2024-01-01', email: '', isAdmin: true },
-    { id: 'e1', name: 'Ismael Angeles de la Cruz', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '1111', pinLen: 4, color: '#6366f1', initials: 'IA', startDate: '2024-01-01', email: '', role: 'encargado', obrasAsignadas: ['Soluciones Mata'] },
-    { id: 'e2', name: 'Franklin Lisandro Nuñez Roque', empresa: 'Soluciones Mata', centroTrabajo: 'Obra Principal', pin: '2222', pinLen: 4, color: '#10b981', initials: 'FL', startDate: '2024-01-01', email: '', role: 'empleado', obrasAsignadas: [] }
-  ],
+  empresas: [],
+  obras: [],
+  centrosTrabajo: [],
+  employees: [],
   records: [],
   vacaciones: [],
   medicos: [],
@@ -129,6 +125,6 @@ export const INITIAL_DB = {
   anomalias_vistas: [],
   notisSent: {},
   pinLockouts: {},
-  config: { adminEmails: ['ismael.angeles.c@live.com'] },
+  config: {},
   _ts: 0
 }

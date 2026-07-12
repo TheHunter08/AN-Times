@@ -5,8 +5,21 @@ import { applyBrandColor } from '../../utils/webauthn.js'
 import TabGastos from '../TabGastos.jsx'
 import TabDenuncia from '../TabDenuncia.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors'
-import { radius } from '../../ui-v2/design-system/radius'
+
+const colors = {
+  bg: { 400: 'var(--bg-card-hover)', 600: 'var(--bg-card)' },
+  primary: { base: 'var(--brand-500)', light: 'var(--brand-400)' },
+  accent: { base: 'var(--accent-500)' },
+  secondary: { base: 'var(--accent-400)', dim: 'color-mix(in srgb, var(--accent-400) 13%, transparent)' },
+  semantic: { green: 'var(--success-400)', orange: 'var(--warning-400)', red: 'var(--danger-400)' },
+  text: { 900: 'var(--text-primary)', 500: 'var(--text-tertiary)' },
+  border: { subtle: 'var(--border-subtle)' },
+  avatarPalette: ['var(--brand-400)', 'var(--accent-400)', 'var(--brand-300)', 'var(--accent-500)'],
+  kpiTone: { amber: { base: 'var(--warning-400)', dim: 'var(--warning-soft)' } },
+}
+
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radius-lg)', xl: 'var(--radius-xl)', '2xl': 'var(--radius-2xl)', pill: 'var(--radius-pill)' }
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`
 
 const ChevronRight = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: .45 }}>
@@ -16,13 +29,13 @@ const ChevronRight = () => (
 
 function MenuRow({ icon, iconBg, label, sub, badge, badgeColor, onClick }) {
   return (
-    <button onClick={onClick} style={{
+    <button type="button" onClick={onClick} style={{
       width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-      padding: '13px 18px', background: 'transparent', border: 'none',
+      minHeight: 60, padding: '10px 16px', background: 'transparent', border: 'none',
       cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
       transition: 'background 0.15s',
     }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${colors.bg[400]}80` }}
+      onMouseEnter={e => { e.currentTarget.style.background = colors.bg[400] }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
       <div style={{
@@ -101,54 +114,40 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
   return (
     <PullToRefresh>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto', paddingBottom: 100 }}>
+      <div className="employee-profile-v2" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+
+        <header style={{ display: 'grid', gap: 'var(--space-1)', margin: 'var(--space-6) var(--space-4) 0' }}>
+          <h1 style={{ margin: 0, color: colors.text[900], fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', lineHeight: 'var(--leading-heading)', letterSpacing: '-.035em' }}>Perfil</h1>
+          <p style={{ margin: 0, color: colors.text[500], fontSize: 'var(--font-body-sm)', lineHeight: 'var(--leading-body)' }}>Tu cuenta, documentos y preferencias.</p>
+        </header>
 
         {/* ── Hero ───────────────────────────────────────────── */}
         <div style={{
-          background: `linear-gradient(160deg, ${avatarColor}20 0%, ${colors.bg[600]} 55%)`,
-          border: `1px solid ${avatarColor}30`,
-          borderRadius: radius['2xl'], padding: '36px 24px 28px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          background: `linear-gradient(145deg, ${toneSoft(avatarColor, 12)} 0%, var(--bg-card) 58%)`,
+          border: `1px solid ${toneSoft(avatarColor, 24)}`,
+          borderRadius: radius['2xl'], padding: 'var(--space-6)',
+          display: 'grid', gridTemplateColumns: '72px minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-4)',
           position: 'relative', overflow: 'hidden', margin: '16px 16px 0',
-          boxShadow: `0 12px 48px ${avatarColor}20`,
+          boxShadow: 'var(--shadow-sm)',
         }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${avatarColor}, ${colors.primary.base})`, borderRadius: `${radius['2xl']} ${radius['2xl']} 0 0` }} />
           <div style={{
-            position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
-            width: 400, height: 400, borderRadius: '50%',
-            background: `radial-gradient(circle, ${avatarColor}18 0%, transparent 65%)`,
-            pointerEvents: 'none',
-          }} />
-          <div style={{
-            width: 84, height: 84, borderRadius: '50%',
-            background: `linear-gradient(135deg, ${avatarColor} 0%, ${avatarColor}cc 100%)`,
+            width: 72, height: 72, borderRadius: radius.xl,
+            background: avatarColor,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 30, fontWeight: 800, color: '#fff', letterSpacing: '-1px',
-            boxShadow: `0 0 0 4px ${avatarColor}25, 0 8px 40px ${avatarColor}55`,
-            marginBottom: 18,
+            fontSize: 24, fontWeight: 700, color: 'var(--brand-50)', letterSpacing: '-.04em',
+            boxShadow: `0 0 0 4px ${toneSoft(avatarColor, 16)}, var(--shadow-sm)`,
           }}>{initials}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: colors.text[900], letterSpacing: '-.8px', marginBottom: 4 }}>{u.name}</div>
-          <div style={{ fontSize: 12, color: colors.text[500], marginBottom: 14 }}>
-            {u.empresa || u.centroTrabajo || '—'}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 14px', borderRadius: radius.pill,
-              background: `${avatarColor}20`, border: `1px solid ${avatarColor}40`,
-              fontSize: 12, fontWeight: 700, color: avatarColor,
-            }}>
-              {roleLabel}
-            </span>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 14px', borderRadius: radius.pill,
-              background: `${colors.semantic.green}15`, border: `1px solid ${colors.semantic.green}35`,
-              fontSize: 12, fontWeight: 700, color: colors.semantic.green,
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: colors.semantic.green, display: 'inline-block', boxShadow: `0 0 6px ${colors.semantic.green}` }} />
-              Activo
-            </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-heading-lg)', fontWeight: 'var(--font-semibold)', color: colors.text[900], letterSpacing: '-.035em', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
+            <div style={{ fontSize: 'var(--font-caption)', color: colors.text[500], marginBottom: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {u.empresa || u.centroTrabajo || 'Sin centro asignado'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: radius.pill, background: toneSoft(avatarColor, 12), border: `1px solid ${toneSoft(avatarColor, 24)}`, fontSize: 11, fontWeight: 600, color: avatarColor }}>{roleLabel}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: radius.pill, background: 'var(--success-soft)', border: `1px solid ${toneSoft(colors.semantic.green, 24)}`, fontSize: 11, fontWeight: 600, color: colors.semantic.green }}>
+                <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: colors.semantic.green, display: 'inline-block' }} />Activo
+              </span>
+            </div>
           </div>
         </div>
 
@@ -203,7 +202,7 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: '12px 12px 0 0' }} />
               <div style={{
                 width: 34, height: 34, borderRadius: radius.md,
-                background: accent + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: toneSoft(accent, 13), display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 12,
               }}>
                 {icon(color)}
@@ -216,15 +215,16 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
         {/* ── Pending items ─────────────────────────────────── */}
         {pendingCierres.length > 0 && (
-          <div
+          <button
+            type="button"
             onClick={() => openModal('cierreSign')}
             style={{
-              margin: '0 16px', padding: '12px 16px',
-              background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`,
+              margin: '0 16px', padding: '12px 16px', width: 'calc(100% - 32px)', textAlign: 'left', fontFamily: 'inherit',
+              background: 'var(--warning-soft)', border: `1px solid ${toneSoft(colors.semantic.orange, 28)}`,
               borderRadius: radius.lg, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
             }}
           >
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: radius.sm, background: 'var(--warning-soft)', border: `1px solid ${toneSoft(colors.semantic.orange, 28)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.orange} strokeWidth="2" width="18" height="18"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
             </div>
             <div style={{ flex: 1 }}>
@@ -239,21 +239,21 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
               fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: '0 5px', flexShrink: 0,
             }}>{pendingCierres.length}</span>
-          </div>
+          </button>
         )}
 
         {/* ── Section: Más opciones ─────────────────────────── */}
         <SectionCard title="Más opciones">
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.semantic.green} strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
-            iconBg={`${colors.semantic.green}15`}
+            iconBg="var(--success-soft)"
             label="Gastos"
             onClick={() => setPerfilView('gastos')}
           />
           <RowDivider />
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.primary.light} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}
-            iconBg={`${colors.primary.base}15`}
+            iconBg={toneSoft(colors.primary.base, 13)}
             label="Denuncia"
             onClick={() => setPerfilView('denuncia')}
           />
@@ -263,14 +263,14 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
         <SectionCard title="Mi cuenta">
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.primary.light} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
-            iconBg={`${colors.primary.base}15`}
+            iconBg={toneSoft(colors.primary.base, 13)}
             label="Información personal"
             onClick={() => openModal('infoPersonal')}
           />
           <RowDivider />
           <MenuRow
-            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#60a5fa" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-            iconBg={`${colors.accent.base}15`}
+            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--info-400)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+            iconBg="var(--info-soft)"
             label="Documentos"
             sub={pendingDocs > 0 ? `${pendingDocs} pendiente${pendingDocs > 1 ? 's' : ''} de firma` : undefined}
             badge={pendingDocs > 0 ? pendingDocs : undefined}
@@ -278,8 +278,8 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
           />
           <RowDivider />
           <MenuRow
-            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}
-            iconBg="rgba(124,92,255,0.15)"
+            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent-400)" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}
+            iconBg={toneSoft('var(--accent-400)', 13)}
             label="Firma digital"
             sub={!hasFirma ? 'Sin configurar' : undefined}
             badge={!hasFirma ? '!' : undefined}
@@ -288,7 +288,7 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
           <RowDivider />
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.semantic.green} strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z" fill={colors.semantic.green} stroke="none"/></svg>}
-            iconBg={`${colors.semantic.green}15`}
+            iconBg="var(--success-soft)"
             label="Mi código QR"
             onClick={() => openModal('miQR')}
           />
@@ -297,8 +297,8 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
         {/* ── Section: Personalización ──────────────────────── */}
         <SectionCard title="Personalización">
           <MenuRow
-            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#8b5cf6" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>}
-            iconBg="rgba(139,92,246,0.15)"
+            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent-400)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>}
+            iconBg={toneSoft('var(--accent-400)', 13)}
             label="Temas y colores"
             onClick={() => openModal('temas')}
           />
@@ -320,18 +320,18 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
         {/* ── Logout ─────────────────────────────────────────── */}
         <div style={{ padding: '0 16px' }}>
-          <button onClick={doLogout} style={{
+          <button type="button" onClick={doLogout} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 12,
             padding: '13px 18px', borderRadius: radius.xl,
-            background: `${colors.semantic.red}08`, border: `1px solid ${colors.semantic.red}25`,
+            background: toneSoft(colors.semantic.red, 6), border: `1px solid ${toneSoft(colors.semantic.red, 20)}`,
             cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
           }}
-            onMouseEnter={e => { e.currentTarget.style.background = `${colors.semantic.red}14` }}
-            onMouseLeave={e => { e.currentTarget.style.background = `${colors.semantic.red}08` }}
+            onMouseEnter={e => { e.currentTarget.style.background = toneSoft(colors.semantic.red, 11) }}
+            onMouseLeave={e => { e.currentTarget.style.background = toneSoft(colors.semantic.red, 6) }}
           >
             <div style={{
               width: 34, height: 34, borderRadius: radius.sm,
-              background: `${colors.semantic.red}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.semantic.red} strokeWidth="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -353,14 +353,13 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 function SectionCard({ title, children }) {
   return (
     <div style={{ margin: '0 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingLeft: 2 }}>
-        <div style={{ width: 3, height: 14, borderRadius: 2, background: colors.primary.base }} />
-        <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.7px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, paddingLeft: 2 }}>
+        <div style={{ fontSize: 'var(--font-caption)', fontWeight: 'var(--font-semibold)', color: colors.text[500] }}>
           {title}
         </div>
       </div>
       <div style={{
-        background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,
+        background: 'var(--gradient-card), var(--bg-card)', border: `1px solid ${colors.border.subtle}`,
         borderRadius: radius.xl, overflow: 'hidden',
       }}>
         {children}

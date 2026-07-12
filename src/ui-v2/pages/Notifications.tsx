@@ -34,7 +34,7 @@ const typeIcon: Record<NotificationItem['type'], React.ReactNode> = {
 
 const typeTone: Record<NotificationItem['type'], { bg: string; color: string }> = {
   fichaje:     { bg: 'rgba(16,185,129,.16)',  color: colors.semantic.green  },
-  solicitud:   { bg: 'rgba(59,130,246,.16)',  color: colors.accent.base     },
+  solicitud:   { bg: colors.accent.dim,        color: colors.accent.base     },
   mensaje:     { bg: colors.primary.dim,      color: colors.primary.light   },
   sistema:     { bg: 'rgba(148,163,184,.12)', color: colors.text[700]       },
   aniversario: { bg: 'rgba(251,191,36,.16)',  color: colors.semantic.orange },
@@ -43,7 +43,7 @@ const typeTone: Record<NotificationItem['type'], { bg: string; color: string }> 
 
 const typeLabel: Record<NotificationItem['type'], string> = {
   fichaje: 'Fichaje', solicitud: 'Solicitud', mensaje: 'Mensaje',
-  sistema: 'Sistema', aniversario: '🎉 Aniversario', anomalia: '⚠️ Anomalía',
+  sistema: 'Sistema', aniversario: 'Aniversario', anomalia: 'Anomalía',
 }
 
 function groupItems(items: NotificationItem[]) {
@@ -70,7 +70,7 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 21, fontWeight: 900, color: colors.text[900], letterSpacing: '-.5px' }}>Notificaciones</div>
+            <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Notificaciones</div>
             {unreadCount > 0 && (
               <span style={{
                 padding: '3px 9px', borderRadius: radius.pill,
@@ -124,7 +124,7 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
           background: colors.bg[700], borderRadius: radius.xl,
           border: `1px solid ${colors.border.subtle}`,
         }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🔔</div>
+          <div style={{ width: 44, height: 44, margin: '0 auto 12px', borderRadius: radius.md, background: colors.primary.dim, color: colors.primary.light, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconBell width={20} height={20} /></div>
           <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[700] }}>Todo al día</div>
           <div style={{ fontSize: 12, color: colors.text[400], marginTop: 4 }}>No tienes notificaciones{tab === 'unread' ? ' sin leer' : ''}</div>
         </div>
@@ -150,7 +150,7 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
 
       <style>{`
         .uiv2-notif-markall:hover { background: rgba(var(--uiv2-overlay-rgb),.07) !important; color: ${colors.text[900]} !important; }
-        .uiv2-notif-card:hover { border-color: rgba(124,58,237,.25) !important; background: rgba(124,58,237,.04) !important; }
+        .uiv2-notif-card:hover { border-color: var(--uiv2-border-default) !important; background: rgba(var(--uiv2-overlay-rgb),.035) !important; }
         .uiv2-notif-read-btn:hover { background: rgba(16,185,129,.22) !important; }
         .uiv2-notif-dismiss-btn:hover { background: rgba(239,68,68,.14) !important; color: ${colors.semantic.red} !important; }
       `}</style>
@@ -166,8 +166,8 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 14,
         padding: '14px 16px', borderRadius: radius.lg,
-        background: n.read ? colors.bg[700] : `rgba(124,58,237,0.06)`,
-        border: `1px solid ${n.read ? colors.border.subtle : 'rgba(124,58,237,.2)'}`,
+        background: n.read ? colors.bg[700] : colors.primary.dim,
+        border: `1px solid ${n.read ? colors.border.subtle : colors.border.default}`,
         transition: 'all .18s ease',
         position: 'relative',
         overflow: 'hidden',

@@ -15,6 +15,7 @@ interface DbRecord {
 }
 interface Db {
   records?: DbRecord[]
+  employees?: { id: string; name: string; centroTrabajo?: string }[]
   config?: { wdMin?: number }
 }
 
@@ -23,16 +24,21 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
   const wdMin = db.config?.wdMin || 480
 
   return useMemo(() => {
-    const recs = (db.records || []).filter(r => r.fin).slice(-40).reverse()
+    const employees = db.employees || []
+    const recs = (db.records || [])
+      .filter(r => r.fin)
+      .sort((a, b) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
     const q = search.trim().toLowerCase()
     return recs
-      .filter(r => !q || r.empName?.toLowerCase().includes(q) || r.centro?.toLowerCase().includes(q))
       .map(r => {
+        const employee = employees.find(e => e.id === r.empId)
+        const employeeName = employee?.name || r.empName || '—'
+        const centro = r.centro || employee?.centroTrabajo || 'Sin centro'
         const workedMin = Math.floor(recWorkSecs(r) / 60)
         return {
           id: r.id,
-          name: r.empName || '—',
-          centro: r.centro || 'Sin centro',
+          name: employeeName,
+          centro,
           day: fds(r.inicio),
           entrada: ftime(r.inicio),
           salida: ftime(r.fin),
@@ -40,5 +46,6 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
           over: workedMin > wdMin,
         }
       })
-  }, [db.records, search, wdMin])
+      .filter(r => !q || r.name.toLowerCase().includes(q) || r.centro.toLowerCase().includes(q))
+  }, [db.records, db.employees, search, wdMin])
 }

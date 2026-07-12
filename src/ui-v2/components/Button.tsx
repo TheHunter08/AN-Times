@@ -23,7 +23,7 @@ const sizeStyles: Record<Size, { padding: string; fontSize: string }> = {
 // Botón primario sólido con una sombra de color suave y difuminada — audaz
 // por el color a máxima confianza, no por un borde de cómic o una sombra 3D.
 const variantStyles: Record<Variant, CSSProperties> = {
-  primary:   { background: colors.primary.base, color: colors.ink.onDark, border: 'none', boxShadow: '0 8px 20px -8px rgba(59,91,255,.6)' },
+  primary:   { background: colors.primary.base, color: colors.ink.onDark, border: 'none', boxShadow: '0 8px 20px -8px var(--uiv2-primary-glow)' },
   secondary: { background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[700], border: `1px solid ${colors.border.default}` },
   ghost:     { background: 'transparent', color: colors.text[500], border: `1px solid ${colors.border.subtle}` },
   danger:    { background: 'rgba(239,68,68,.12)', color: colors.semantic.red, border: '1px solid rgba(239,68,68,.2)' },

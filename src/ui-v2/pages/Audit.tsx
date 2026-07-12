@@ -33,7 +33,7 @@ const catIcon: Record<AuditEntry['category'], React.ReactNode> = {
 const catStyle: Record<AuditEntry['category'], { bg: string; color: string }> = {
   jornada:   { bg: 'rgba(16,185,129,.15)',  color: colors.semantic.green },
   empleado:  { bg: colors.primary.dim,      color: colors.primary.light },
-  obra:      { bg: 'rgba(6,182,212,.15)',    color: '#22D3EE' },
+  obra:      { bg: colors.secondary.dim,    color: colors.secondary.base },
   documento: { bg: 'rgba(245,158,11,.15)',   color: colors.semantic.orange },
   solicitud: { bg: colors.accent.dim,       color: colors.accent.base },
   sistema:   { bg: 'rgba(148,163,184,.12)', color: colors.text[700] },

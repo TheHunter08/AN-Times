@@ -55,19 +55,19 @@ export function Login({
   const selEmp = employees.find(e => e.id === selectedEmpId)
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    <div className="v7-login-shell" style={{
+      minHeight: '100dvh', display: 'flex', alignItems: 'stretch', justifyContent: 'center',
       background: colors.bg[900], position: 'relative', overflow: 'hidden',
       fontFamily: 'Inter, SF Pro Display, -apple-system, sans-serif',
     }}>
       {/* Glows de fondo */}
       <div className="uiv2-login-glow-a" style={{
         position: 'absolute', top: -160, left: -160, width: 520, height: 520,
-        borderRadius: '50%', background: 'rgba(124,58,237,0.16)', filter: 'blur(110px)', pointerEvents: 'none',
+        borderRadius: '50%', background: 'var(--uiv2-primary-dim)', filter: 'blur(110px)', pointerEvents: 'none',
       }} />
       <div className="uiv2-login-glow-b" style={{
         position: 'absolute', bottom: -100, right: -100, width: 400, height: 400,
-        borderRadius: '50%', background: 'rgba(59,130,246,0.11)', filter: 'blur(90px)', pointerEvents: 'none',
+        borderRadius: '50%', background: 'var(--uiv2-accent-dim)', filter: 'blur(90px)', pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -75,23 +75,38 @@ export function Login({
         backgroundSize: '44px 44px',
       }} />
 
-      <div style={{ position: 'relative', width: '100%', maxWidth: 400, padding: '0 20px' }}>
+      <aside className="v7-login-brand-panel" aria-label="TIMES INC Workforce Operating System">
+        <div className="v7-brand-mark">T</div>
+        <div>
+          <div className="v7-brand-kicker">TIMES INC</div>
+          <h1>El trabajo de tu equipo, en un solo lugar.</h1>
+          <p>Jornadas, equipos y operaciones conectadas con una experiencia segura y profesional.</p>
+        </div>
+        <div className="v7-brand-points">
+          <span><IconShield width={17} height={17} /> Acceso protegido</span>
+          <span><IconClock width={17} height={17} /> Registro en tiempo real</span>
+          <span><IconDevice width={17} height={17} /> Disponible como PWA</span>
+        </div>
+      </aside>
+
+      <main className="v7-login-main">
+      <div className="v7-login-form-wrap" style={{ position: 'relative', width: '100%', maxWidth: 420, padding: '0 20px' }}>
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div className="uiv2-logo-float" style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 60, height: 60, borderRadius: 20,
-            background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-            boxShadow: '0 0 0 1px rgba(124,58,237,.4), 0 0 40px rgba(124,58,237,.4)',
+            background: colors.gradients.brand,
+            boxShadow: '0 0 0 1px var(--uiv2-border-default), 0 16px 42px var(--uiv2-primary-glow)',
             marginBottom: 14,
           }}>
             <span style={{ fontSize: 30, fontWeight: 900, color: '#fff', letterSpacing: '-2px' }}>T</span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: colors.text[900], letterSpacing: '-1.2px' }}>
-            TIMES <span style={{ color: colors.primary.light }}>v5</span>
+          <div style={{ fontSize: 26, fontWeight: 650, color: colors.text[900], letterSpacing: '-1px' }}>
+            TIMES <span style={{ color: colors.primary.light }}>INC</span>
           </div>
-          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Control Horario · RD 8/2019</div>
+          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Workforce Operating System</div>
         </div>
 
         {/* Toggle PIN / Email */}
@@ -112,7 +127,7 @@ export function Login({
                 transition: 'all .18s ease',
                 background: mode === m ? colors.primary.base : 'transparent',
                 color: mode === m ? '#fff' : colors.text[500],
-                boxShadow: mode === m ? `0 4px 14px rgba(124,58,237,.4)` : 'none',
+                boxShadow: mode === m ? '0 6px 18px var(--uiv2-primary-glow)' : 'none',
               }}
             >
               {m === 'pin' ? <><IconShield width={13} height={13} /> PIN</> : <><IconMail width={13} height={13} /> Email</>}
@@ -215,7 +230,7 @@ export function Login({
                           type="button"
                           onClick={() => isDel ? onPinDel?.() : onPinKey?.(k)}
                           style={{
-                            padding: '14px 0', borderRadius: radius.md, border: 'none',
+                            padding: '14px 0', borderRadius: radius.md,
                             background: isDel ? 'transparent' : colors.bg[600],
                             color: isDel ? colors.text[500] : colors.text[900],
                             fontSize: isDel ? 20 : 20, fontWeight: isDel ? 400 : 600,
@@ -246,7 +261,7 @@ export function Login({
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                     }}
                   >
-                    <span style={{ fontSize: 18 }}>👆</span>
+                    <IconShield width={17} height={17} />
                     {bioLoading ? 'Verificando…' : 'Acceso biométrico'}
                   </button>
                 )}
@@ -383,11 +398,11 @@ export function Login({
                   marginTop: 4, padding: '12px', borderRadius: radius.md, border: 'none',
                   background: emailLoading || loading || !email || !password
                     ? colors.bg[400]
-                    : 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                    : colors.gradients.brand,
                   color: emailLoading || loading || !email || !password ? colors.text[500] : '#fff',
                   fontSize: 13.5, fontWeight: 800, cursor: emailLoading || loading ? 'wait' : 'pointer',
                   fontFamily: 'inherit',
-                  boxShadow: emailLoading || loading || !email || !password ? 'none' : '0 6px 24px rgba(124,58,237,.4)',
+                  boxShadow: emailLoading || loading || !email || !password ? 'none' : '0 10px 28px var(--uiv2-primary-glow)',
                   transition: 'all .2s',
                 }}
               >
@@ -410,6 +425,7 @@ export function Login({
           ))}
         </div>
       </div>
+      </main>
 
       <style>{`
         @keyframes uiv2LoginGlowA { 0%,100%{transform:scale(1) translate(0,0);} 50%{transform:scale(1.08) translate(20px,10px);} }
@@ -422,10 +438,28 @@ export function Login({
         .uiv2-login-input::placeholder { color: ${colors.text[300]}; }
         .uiv2-login-submit:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1px); }
         .uiv2-login-submit:not(:disabled):active { transform: scale(.98); }
-        .uiv2-pin-key:hover { background: rgba(124,58,237,.15) !important; border-color: rgba(124,58,237,.4) !important; }
-        .uiv2-pin-key:active { transform: scale(.94); background: rgba(124,58,237,.25) !important; }
+        .uiv2-pin-key:hover { background: var(--uiv2-primary-dim) !important; border-color: var(--uiv2-border-strong) !important; }
+        .uiv2-pin-key:active { transform: scale(.96); background: var(--uiv2-primary-glow) !important; }
         @keyframes uiv2PinShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
         .uiv2-pin-shake { animation: uiv2PinShake .4s cubic-bezier(.36,.07,.19,.97); }
+        .v7-login-brand-panel { display:none; }
+        .v7-login-main { position:relative; z-index:1; flex:1; display:flex; align-items:center; justify-content:center; padding:48px 24px; }
+        @media (min-width: 960px) {
+          .v7-login-shell { justify-content:stretch !important; }
+          .v7-login-brand-panel { display:flex; width:min(46vw,680px); flex-direction:column; justify-content:space-between; padding:56px 64px; position:relative; z-index:1; border-right:1px solid var(--border-subtle); background:linear-gradient(180deg,rgba(53,104,255,.08),transparent 45%),#080b12; }
+          .v7-brand-mark { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#2450e6,#3568ff 58%,#7c5cff); color:#fff; font-size:24px; font-weight:700; box-shadow:0 12px 36px rgba(53,104,255,.25); }
+          .v7-brand-kicker { color:#8dadff; font-size:12px; font-weight:700; letter-spacing:.12em; margin-bottom:16px; }
+          .v7-login-brand-panel h1 { margin:0; max-width:520px; color:#f7f9fc; font-size:clamp(36px,4vw,56px); line-height:1.06; letter-spacing:-.045em; font-weight:600; }
+          .v7-login-brand-panel p { max-width:500px; margin:22px 0 0; color:#aeb8ca; font-size:15px; line-height:1.65; }
+          .v7-brand-points { display:flex; flex-wrap:wrap; gap:12px 24px; color:#77839a; font-size:12px; }
+          .v7-brand-points span { display:flex; align-items:center; gap:8px; }
+          .v7-login-main { min-width:460px; }
+        }
+        @media (max-width: 520px) {
+          .v7-login-main { padding:calc(24px + env(safe-area-inset-top)) 0 calc(20px + env(safe-area-inset-bottom)); align-items:flex-start; overflow-y:auto; }
+          .v7-login-form-wrap { padding-inline:16px !important; }
+          .uiv2-logo-float { width:52px !important; height:52px !important; border-radius:16px !important; }
+        }
       `}</style>
     </div>
   )

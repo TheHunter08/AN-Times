@@ -29,10 +29,10 @@ export interface ShiftsProps {
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 const shiftStyle: Record<string, { bg: string; color: string; label: string }> = {
-  normal:     { bg: 'rgba(99,102,241,.18)',  color: '#818CF8', label: 'Normal' },
+  normal:     { bg: colors.primary.dim,     color: colors.primary.light, label: 'Normal' },
   guardia:    { bg: 'rgba(245,158,11,.18)',   color: colors.semantic.orange, label: 'Guardia' },
   libre:      { bg: 'rgba(16,185,129,.16)',   color: colors.semantic.green, label: 'Libre' },
-  vacaciones: { bg: 'rgba(59,130,246,.16)',   color: colors.accent.base, label: 'Vacaciones' },
+  vacaciones: { bg: colors.accent.dim,          color: colors.accent.base, label: 'Vacaciones' },
 }
 
 export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: ShiftsProps) {
@@ -67,7 +67,7 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
       </div>
 
       {/* Grid */}
-      <div style={{ overflowX: 'auto' }}>
+      <div className="uiv2-shifts-desktop" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 680 }}>
           <thead>
             <tr>
@@ -119,6 +119,46 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
           </tbody>
         </table>
       </div>
+      <div className="uiv2-shifts-mobile" role="list" aria-label="Turnos por empleado">
+        {employees.map(emp => (
+          <article key={emp.id} className="uiv2-shift-card" role="listitem">
+            <header className="uiv2-shift-card-head">
+              <Avatar name={emp.name} size={34} />
+              <div style={{ minWidth: 0 }}>
+                <div className="uiv2-shift-card-name">{emp.name}</div>
+                <div className="uiv2-shift-card-meta">{emp.dept}</div>
+              </div>
+            </header>
+            <div className="uiv2-shift-days">
+              {emp.week.map((cell, di) => {
+                const s = cell.type ? shiftStyle[cell.type] : null
+                return (
+                  <div key={di} className="uiv2-shift-day">
+                    <span>{DAY_NAMES[di]}</span>
+                    <strong style={s ? { background: s.bg, color: s.color, borderColor: `${s.color}44` } : undefined}>
+                      {s ? (cell.start ? `${cell.start}${cell.end ? `–${cell.end}` : ''}` : s.label) : 'Sin turno'}
+                    </strong>
+                  </div>
+                )
+              })}
+            </div>
+          </article>
+        ))}
+      </div>
+      <style>{`
+        .uiv2-shifts-mobile{display:none}
+        @media(max-width:700px){
+          .uiv2-shifts-desktop{display:none}
+          .uiv2-shifts-mobile{display:grid;gap:12px}
+          .uiv2-shift-card{padding:16px;background:${colors.bg[700]};border:1px solid ${colors.border.subtle};border-radius:${radius.lg}}
+          .uiv2-shift-card-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;margin-bottom:12px;border-bottom:1px solid ${colors.border.subtle}}
+          .uiv2-shift-card-name{font-size:14px;font-weight:700;color:${colors.text[900]};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .uiv2-shift-card-meta{font-size:11px;color:${colors.text[500]};margin-top:2px}
+          .uiv2-shift-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+          .uiv2-shift-day>span{display:block;margin-bottom:4px;font-size:10px;font-weight:700;text-transform:uppercase;color:${colors.text[500]}}
+          .uiv2-shift-day>strong{display:flex;min-height:38px;padding:7px 8px;align-items:center;justify-content:center;border:1px dashed ${colors.border.subtle};border-radius:${radius.sm};font-size:11px;color:${colors.text[400]};font-variant-numeric:tabular-nums;text-align:center}
+        }
+      `}</style>
     </div>
   )
 }

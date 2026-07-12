@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcSecs, calcMin, mhm, wkStart, monthlyExtras, vacData } from './time.js'
+import { calcSecs, calcMin, mhm, wkStart, monthlyExtras, vacData, localDateStr } from './time.js'
 
 describe('calcSecs', () => {
   it('calcula trabajo sin descansos', () => {
@@ -73,6 +73,13 @@ describe('wkStart', () => {
     const d = wkStart(new Date('2026-07-05T10:00:00')) // domingo
     expect(d.getDay()).toBe(1)
     expect(d.getDate()).toBe(29)
+  })
+})
+
+describe('localDateStr', () => {
+  it('mantiene el día local al construir el calendario semanal', () => {
+    const d = new Date(2026, 6, 6, 0, 0, 0) // lunes 6 de julio en hora local
+    expect(localDateStr(d)).toBe('2026-07-06')
   })
 })
 

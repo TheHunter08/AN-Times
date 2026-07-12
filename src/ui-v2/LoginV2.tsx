@@ -173,7 +173,7 @@ export default function LoginV2() {
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
     } else {
-      const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db)
+      const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db) as any
       if (lockoutData) saveDB({ pinLockouts: lockoutData })
       setPinShaking(true)
       if (lk.locked) {
@@ -246,7 +246,7 @@ export default function LoginV2() {
         setEmailError('Tu cuenta no está registrada. Contacta al administrador.')
       }
     } catch (ex: any) {
-      const newLk = recordEmailFailed()
+      const newLk: any = recordEmailFailed()
       if (newLk.locked) {
         const m = Math.floor((newLk.remainingSecs || 0) / 60), s = (newLk.remainingSecs || 0) % 60
         setEmailError(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)

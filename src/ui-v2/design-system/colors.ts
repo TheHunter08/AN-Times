@@ -41,7 +41,9 @@ export const colors = {
   text: {
     900: 'var(--uiv2-text-900)',
     700: 'var(--uiv2-text-700)',
+    600: 'var(--uiv2-text-700)',
     500: 'var(--uiv2-text-500)',
+    400: 'var(--uiv2-text-500)',
     300: 'var(--uiv2-text-300)',
   },
   border: {
@@ -55,7 +57,7 @@ export const colors = {
   // que la lista no se sienta monocroma. Nunca se usa el color "libre"
   // que un empleado tuviera guardado del sistema anterior.
   avatarPalette: [
-    '#3B5BFF', '#7C3AED', '#0EA5E9', '#6366F1', '#C026D3', '#0891B2', '#DB2777', '#8B5CF6',
+    '#8B5CF6', '#EC4899', '#A855F7', '#C084FC', '#7C3AED', '#F0ABFC', '#DB2777', '#D8B4FE',
   ],
   // Tonos por categoría de KPI/chip — el "restraint" del pase anterior se
   // quedó corto: reservar el color solo para estados semánticos hacía que
@@ -68,8 +70,8 @@ export const colors = {
   },
   gradients: {
     hero: 'linear-gradient(135deg, var(--uiv2-primary-glow) 0%, var(--uiv2-accent-dim) 55%, transparent 100%)',
-    brand: 'linear-gradient(135deg, var(--uiv2-primary-base) 0%, #2563EB 100%)',
-    sidebar: 'linear-gradient(180deg, var(--uiv2-bg-700) 0%, var(--uiv2-bg-900) 100%)',
+    brand: 'linear-gradient(135deg, var(--uiv2-primary-light) 0%, var(--uiv2-primary-base) 100%)',
+    sidebar: 'linear-gradient(180deg, var(--uiv2-bg-700) 0%, var(--uiv2-bg-800) 100%)',
   },
   // Blanco/negro puros reservados para texto sobre bloques de color sólido
   // (estilo neo-brutalista v5) — el resto de la paleta usa grises reales,

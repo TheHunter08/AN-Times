@@ -34,6 +34,7 @@ export interface MonthlyCloseProps {
   onDownload?: (id: string) => void
   onSignAdmin?: (id: string) => void
   onGenerateAll?: () => void
+  onDelete?: (id: string) => void
 }
 
 const signLabel = (item: ClosureItem) => {
@@ -124,7 +125,7 @@ function generatePDF(item: ClosureItem) {
   setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: MonthlyCloseProps) {
+export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
 
@@ -161,7 +162,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div className="uiv2-close-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
           { label: 'Cierres generados',   value: String(items.length),       color: colors.accent.base,      bg: colors.accent.dim },
           { label: 'Firmados completos',  value: String(totalSigned),        color: colors.semantic.green,   bg: 'rgba(16,185,129,.10)' },
@@ -177,14 +178,14 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
       {/* Table */}
       <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden' }}>
         <div style={{ background: colors.bg[700] }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 90px 180px 130px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
+          <div className="uiv2-close-table-head" style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 90px 180px 130px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
             {['Empleado', 'Mes', 'Horas', 'Extra', 'Firmas', 'Acciones'].map(h => (
               <div key={h} style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>{h}</div>
             ))}
           </div>
 
           {filtered.map((item, i) => (
-            <div key={item.id} style={{
+            <div key={item.id} className="uiv2-close-row" style={{
               display: 'grid', gridTemplateColumns: '1fr 120px 90px 90px 180px 130px', gap: 8,
               padding: '12px 16px', alignItems: 'center',
               borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`,
@@ -233,6 +234,15 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
                 >
                   Ver
                 </button>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(item.id)}
+                    title="Eliminar cierre y PDF"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: colors.semantic.red, cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
+                  >
+                    <IconX width={13} height={13} /> Eliminar
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -250,7 +260,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll }: 
       {/* Detail / sign modal */}
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 28, width: '100%', maxWidth: 560, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div className="uiv2-close-modal" onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 28, width: '100%', maxWidth: 560, maxHeight: '85dvh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>

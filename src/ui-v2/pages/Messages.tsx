@@ -65,7 +65,7 @@ export function Messages({ conversations, adminName = 'Admin', onSend }: Message
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 21, fontWeight: 900, color: colors.text[900], letterSpacing: '-.5px' }}>Mensajes</div>
+            <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Mensajes</div>
             {totalUnread > 0 && (
               <span style={{ padding: '3px 9px', borderRadius: radius.pill, background: colors.primary.base, color: '#fff', fontSize: 11, fontWeight: 800 }}>
                 {totalUnread}
@@ -188,11 +188,11 @@ export function Messages({ conversations, adminName = 'Admin', onSend }: Message
                           ? `${radius.lg} ${radius.sm} ${radius.sm} ${radius.lg}`
                           : `${radius.sm} ${radius.lg} ${radius.lg} ${radius.sm}`,
                         background: isAdmin
-                          ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)'
+                          ? colors.gradients.brand
                           : colors.bg[500],
                         color: isAdmin ? '#fff' : colors.text[900],
                         fontSize: 13.5, lineHeight: 1.55,
-                        boxShadow: isAdmin ? '0 4px 14px rgba(124,58,237,.35)' : '0 2px 8px rgba(0,0,0,.2)',
+                        boxShadow: isAdmin ? '0 6px 18px var(--uiv2-primary-glow)' : '0 2px 8px rgba(0,0,0,.16)',
                       }}>
                         {m.text}
                         <div style={{ fontSize: 10, opacity: .65, marginTop: 4, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{m.time}</div>
@@ -227,11 +227,11 @@ export function Messages({ conversations, adminName = 'Admin', onSend }: Message
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 42, height: 42, borderRadius: radius.lg, border: 'none',
-                    background: text.trim() ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)' : colors.bg[500],
+                    background: text.trim() ? colors.gradients.brand : colors.bg[500],
                     color: text.trim() ? '#fff' : colors.text[300],
                     cursor: text.trim() ? 'pointer' : 'default',
                     flexShrink: 0, transition: 'all .15s',
-                    boxShadow: text.trim() ? '0 4px 14px rgba(124,58,237,.35)' : 'none',
+                    boxShadow: text.trim() ? '0 6px 18px var(--uiv2-primary-glow)' : 'none',
                   }}
                 >
                   <IconSend width={16} height={16} />

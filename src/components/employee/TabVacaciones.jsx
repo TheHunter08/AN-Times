@@ -1,8 +1,21 @@
 ﻿import { useAppStore } from '../../store/appStore.js'
 import { today, fds } from '../../utils/time.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
-import { colors } from '../../ui-v2/design-system/colors'
-import { radius } from '../../ui-v2/design-system/radius'
+const colors = {
+  bg: { 400: 'var(--bg-card-hover)', 600: 'var(--bg-card)' },
+  primary: {
+    base: 'var(--brand-500)', light: 'var(--brand-400)',
+    dim: 'color-mix(in srgb, var(--brand-500) 13%, transparent)',
+    glow: 'rgba(53, 104, 255, 0.25)',
+  },
+  accent: { base: 'var(--accent-500)' },
+  semantic: { green: 'var(--success-400)', orange: 'var(--warning-400)', red: 'var(--danger-400)' },
+  text: { 900: 'var(--text-primary)', 700: 'var(--text-secondary)', 500: 'var(--text-tertiary)', 300: 'var(--text-disabled)' },
+  border: { subtle: 'var(--border-subtle)', default: 'var(--border-default)' },
+}
+
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radius-lg)', xl: 'var(--radius-xl)', '2xl': 'var(--radius-2xl)', pill: 'var(--radius-pill)' }
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`
 
 export function TabVacaciones({ db, u, vac, toast, saveDB }) {
   const { openModal, showConfirm } = useAppStore()
@@ -44,36 +57,42 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
 
   return (
     <PullToRefresh>
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460, margin: '0 auto', paddingBottom: 100 }}>
+      <div className="employee-vacations-v2" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+
+        <header style={{ display: 'grid', gap: 'var(--space-1)', padding: 'var(--space-2) 2px var(--space-1)' }}>
+          <h1 style={{ margin: 0, color: colors.text[900], fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', lineHeight: 'var(--leading-heading)', letterSpacing: '-.035em' }}>Vacaciones</h1>
+          <p style={{ margin: 0, color: colors.text[500], fontSize: 'var(--font-body-sm)', lineHeight: 'var(--leading-body)' }}>Consulta tu saldo y gestiona tus solicitudes.</p>
+        </header>
 
         {/* ── Hero ───────────────────────────────────────────── */}
         <div style={{
-          background: colors.bg[600],
+          background: 'var(--gradient-card), var(--bg-card)',
           border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius['2xl'],
-          padding: '28px 24px',
+          padding: 'var(--space-7) var(--space-6)',
           position: 'relative',
           overflow: 'hidden',
+          boxShadow: 'var(--shadow-sm)',
         }}>
           <div style={{
             position: 'absolute', top: -80, right: -80, width: 300, height: 300,
             borderRadius: '50%',
-            background: `radial-gradient(circle, ${colors.primary.base}28 0%, transparent 70%)`,
+            background: `radial-gradient(circle, ${toneSoft(colors.primary.base, 18)} 0%, transparent 70%)`,
             pointerEvents: 'none',
           }} />
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${colors.primary.base}, ${colors.accent.base})`, borderRadius: `${radius['2xl']} ${radius['2xl']} 0 0` }} />
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '4px 12px', borderRadius: radius.pill,
-            background: `${colors.primary.base}18`, border: `1px solid ${colors.primary.base}35`,
+            background: colors.primary.dim, border: `1px solid ${toneSoft(colors.primary.base, 28)}`,
             fontSize: 10, fontWeight: 700, color: colors.primary.light,
             textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 16,
           }}>
-            Mis Vacaciones
+            Saldo anual
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
             <span style={{
-              fontSize: 64, fontWeight: 800, color: colors.text[900],
+              fontSize: 'clamp(52px, 16vw, 64px)', fontWeight: 'var(--font-bold)', color: colors.text[900],
               letterSpacing: '-4px', lineHeight: 1, fontVariantNumeric: 'tabular-nums',
             }}>{vac.available}</span>
             <span style={{ fontSize: 16, fontWeight: 600, color: colors.text[500] }}>días disponibles</span>
@@ -120,9 +139,9 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
           <div style={{ height: 10, background: colors.bg[400], borderRadius: radius.pill, overflow: 'hidden', marginBottom: 8 }}>
             <div style={{
               height: '100%', borderRadius: radius.pill,
-              background: `linear-gradient(90deg, #6D28D9, ${colors.primary.base})`,
+              background: 'var(--gradient-brand)',
               width: `${pct}%`, transition: 'width .6s ease',
-              boxShadow: `0 0 8px ${colors.primary.base}60`,
+              boxShadow: '0 0 12px rgba(53, 104, 255, 0.28)',
             }} />
           </div>
           <div style={{ fontSize: 11, color: colors.text[300] }}>
@@ -134,7 +153,7 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
         {vac.pending > 0 && (
           <div style={{
             padding: '12px 16px',
-            background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`,
+            background: 'var(--warning-soft)', border: `1px solid ${toneSoft(colors.semantic.orange, 28)}`,
             borderRadius: radius.lg, display: 'flex', alignItems: 'center', gap: 12,
           }}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke={colors.semantic.orange} strokeWidth="2" strokeLinecap="round">
@@ -154,12 +173,13 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
         {/* ── CTA Button ────────────────────────────────────── */}
         <button
           onClick={() => openModal('vacForm')}
+          type="button"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            width: '100%', padding: '14px 20px', borderRadius: radius.xl,
-            border: 'none', background: `linear-gradient(135deg, ${colors.primary.base} 0%, #6D28D9 100%)`,
-            color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'inherit', boxShadow: `0 4px 20px ${colors.primary.glow}`,
+            width: '100%', minHeight: 48, padding: '12px 20px', borderRadius: radius.md,
+            border: 'none', background: 'var(--gradient-brand)',
+            color: 'var(--brand-50)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'inherit', boxShadow: 'var(--shadow-brand)',
             transition: 'opacity 0.2s ease',
           }}
           onMouseEnter={e => { e.currentTarget.style.opacity = '.88' }}
@@ -194,10 +214,10 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
               const until     = daysFrom(v.fechaInicio)
               const remaining = daysFrom(v.fechaFin)
               const isEnjoying = v.estado === 'aprobada' && until <= 0 && remaining >= 0
-              const iconBg = isEnjoying ? `${colors.semantic.green}18`
-                           : v.estado === 'rechazada' ? `${colors.semantic.red}18`
-                           : v.estado === 'aprobada' ? `${colors.primary.base}18`
-                           : `${colors.semantic.orange}18`
+              const iconBg = isEnjoying ? 'var(--success-soft)'
+                           : v.estado === 'rechazada' ? 'var(--danger-soft)'
+                           : v.estado === 'aprobada' ? colors.primary.dim
+                           : 'var(--warning-soft)'
               const iconStroke = isEnjoying ? colors.semantic.green
                                : v.estado === 'rechazada' ? colors.semantic.red
                                : v.estado === 'aprobada' ? colors.primary.light
@@ -210,7 +230,7 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
                   {/* Icono izquierda */}
                   <div style={{
                     width: 38, height: 38, borderRadius: radius.md, flexShrink: 0,
-                    background: iconBg, border: `1px solid ${iconStroke}30`,
+                    background: iconBg, border: `1px solid ${toneSoft(iconStroke, 25)}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     {isEnjoying ? (
@@ -257,12 +277,12 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: '3px 10px',
                       borderRadius: radius.pill,
-                      background: `${statusColor}15`, border: `1px solid ${statusColor}35`,
+                      background: toneSoft(statusColor, 12), border: `1px solid ${toneSoft(statusColor, 28)}`,
                       color: statusColor,
                     }}>{statusLabel}</span>
                     {v.estado === 'aprobada' && (
-                      <button onClick={() => downloadVacICS(v)} title="Añadir al calendario" style={{
-                        width: 30, height: 30, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      <button type="button" aria-label="Añadir vacaciones al calendario" onClick={() => downloadVacICS(v)} title="Añadir al calendario" style={{
+                        width: 44, height: 44, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: colors.primary.dim, border: `1px solid ${colors.primary.glow}`,
                         color: colors.primary.light, cursor: 'pointer', fontFamily: 'inherit',
                       }}>
@@ -272,8 +292,8 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
                       </button>
                     )}
                     {v.estado === 'pendiente' && (
-                      <button onClick={() => cancelVac(v.id)} title="Cancelar solicitud" style={{
-                        width: 30, height: 30, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      <button type="button" aria-label="Cancelar solicitud" onClick={() => cancelVac(v.id)} title="Cancelar solicitud" style={{
+                        width: 44, height: 44, borderRadius: radius.sm, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'transparent', border: `1px solid ${colors.border.default}`,
                         color: colors.text[500], cursor: 'pointer',
                         fontFamily: 'inherit', transition: 'color .15s, border-color .15s',

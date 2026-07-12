@@ -78,7 +78,7 @@ export default function TabTurnos({ db, u }) {
   })();
 
   return (
-    <div style={{ padding: '16px', paddingBottom: '32px' }}>
+    <div className="employee-shifts-v2" style={{ padding: '16px', paddingBottom: '32px' }}>
       {/* Upcoming shifts */}
       {upcoming.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
