@@ -7,7 +7,7 @@
 //
 // Retención recomendada: 4 años (RDL 8/2019 obliga a conservar registros de jornada).
 // Puedes configurar una política de expiración en el bucket para borrar backups > 4 años.
-import { timingSafeEqual } from 'crypto'
+import { createHash, timingSafeEqual } from 'crypto'
 
 const cleanEnv    = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL      = cleanEnv(process.env.VITE_SB_URL)
@@ -37,6 +37,9 @@ export default async function handler(req, res) {
 
     const hot  = hotRes.ok  ? (await hotRes.json())[0]  : null
     const cold = coldRes.ok ? (await coldRes.json())[0] : null
+    if (!hot?.data || !Array.isArray(hot.data.records) || !Array.isArray(hot.data.employees)) {
+      return res.status(500).json({ error: 'Backup source invalid', detail: 'app_data principal no contiene records/employees válidos' })
+    }
 
     const date = new Date().toISOString().slice(0, 10)
     const body = JSON.stringify({
@@ -46,9 +49,10 @@ export default async function handler(req, res) {
     })
 
     const filename  = `backup-${date}.json`
+    const checksum = createHash('sha256').update(body).digest('hex')
     const uploadRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, {
       method:  'POST',
-      headers: { ...SB_H_STORAGE, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+      headers: { ...SB_H_STORAGE, 'Content-Type': 'application/json', 'x-upsert': 'true', 'x-metadata': JSON.stringify({ checksum, records: hot.data.records.length, employees: hot.data.employees.length }) },
       body,
     })
 
@@ -62,9 +66,16 @@ export default async function handler(req, res) {
       })
     }
 
+    // Verificación real: descargar el objeto recién escrito y comparar hash.
+    const verifyRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, { headers: SB_H_STORAGE })
+    if (!verifyRes.ok) return res.status(500).json({ error: 'Backup verification download failed', status: verifyRes.status })
+    const verifiedBody = await verifyRes.text()
+    const verifiedChecksum = createHash('sha256').update(verifiedBody).digest('hex')
+    if (verifiedChecksum !== checksum) return res.status(500).json({ error: 'Backup checksum mismatch' })
+
     const sizeKB = Math.round(body.length / 1024)
     console.log(`[backup] ${filename} subido — ${sizeKB} KB`)
-    return res.status(200).json({ ok: true, filename, sizeKB })
+    return res.status(200).json({ ok: true, verified: true, filename, sizeKB, checksum, records: hot.data.records.length, employees: hot.data.employees.length })
   } catch (e) {
     console.error('[backup] fatal:', e)
     return res.status(500).json({ error: e.message })

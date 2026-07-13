@@ -35,10 +35,10 @@ import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 import { useEmployeesData } from './hooks/useEmployeesData.js'
 import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
-import { auditLog, queuePush } from '../services/dataService.js'
+import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
-import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
+import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, isRecordMonthLocked, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
 
@@ -579,22 +579,23 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
   const rows = useTimesheetsData(search)
   const handleSearch = (s: string) => { setSearch(s); onSearchChange?.(s) }
 
-  const modify = async (id: string, entry: string, exit: string) => {
+  const modify = async (id: string, entry: string, exit: string, reason: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return false
+    if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn'); return false }
     const times = recordTimesFromClock(rec, entry, exit)
     if (!times) { toast('Introduce horas válidas', 3000, 'warn'); return false }
     const { inicio, fin } = times
     const breaks = clipBreaksToWindow(rec.breaks || [], inicio, fin)
     const calculated = calcSecs({ ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
-    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:'Corrección desde Fichajes', oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado' }] }
+    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:reason, oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado' }] }
     try {
       await persistRecordRow(updated)
       saveDB((fresh:any) => {
         const stale = flagStaleCierreForEdit(fresh.cierres || [], rec.empId, rec.inicio, updated.inicio)
         const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
-        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empName || rec.empId}: ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado')
         return { records:(fresh.records || []).map((r:any) => r.id === id ? updated : r), cierres, audit:withAudit.audit }
       })
       toast('Fichaje modificado y sincronizado', 3000, 'ok')
@@ -602,8 +603,9 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
     } catch (error:any) { toast(`No se pudo modificar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
   }
 
-  const remove = async (id: string) => {
+  const remove = async (id: string, reason: string) => {
     const rec = (db.records || []).find((r:any) => r.id === id)
+    if (rec && isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de eliminarlo.', 5000, 'warn'); return false }
     if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return false
     try {
       await deleteRecordRow(id)
@@ -611,7 +613,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       saveDB((fresh:any) => {
         const stale = flagStaleCierre(fresh.cierres || [], rec.empId, rec.inicio)
         const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
-        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)} ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} · ${reason}`, session?.user?.name || 'Encargado')
         return { records:(fresh.records || []).filter((r:any) => r.id !== id), cierres, audit:withAudit.audit }
       })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
@@ -1572,6 +1574,12 @@ export default function AppV2Admin() {
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
+  const [manualSyncing, setManualSyncing] = useState(false)
+  const syncStatus = useAppStore(s => s.syncStatus)
+  const syncError = useAppStore(s => s.syncError)
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const lastSyncTime = useAppStore(s => s.lastSyncTime)
+  const fetchDB = useAppStore(s => s.fetchDB)
 
   const name = session?.user?.name || 'Admin'
   const notis = useNotificationsData()
@@ -1621,6 +1629,17 @@ export default function AppV2Admin() {
     if (!target) return
     target.action()
     setSearch('')
+  }
+
+  const syncNow = async () => {
+    if (manualSyncing) return
+    setManualSyncing(true)
+    try {
+      await uploadPendingIfAny()
+      await fetchDB()
+    } finally {
+      setManualSyncing(false)
+    }
   }
 
   function renderPage() {
@@ -1696,6 +1715,17 @@ export default function AppV2Admin() {
               {globalMatches.map(item => <option key={item.key} value={item.label} />)}
             </datalist>
           </div>
+          <button
+            type="button"
+            onClick={syncNow}
+            disabled={manualSyncing}
+            title={`${offlinePending ? 'Cambios pendientes' : syncStatus === 'synced' ? 'Sincronizado' : 'Estado: ' + syncStatus}${syncError ? ` · ${syncError}` : ''}${lastSyncTime ? ` · Última copia ${new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}` : ''}. Pulsa para sincronizar ahora.`}
+            aria-label="Sincronizar ahora"
+            style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', gap:6, borderRadius:9, border:`1px solid ${offlinePending || syncStatus === 'error' ? 'rgba(245,158,11,.45)' : colors.border.subtle}`, background:colors.bg[600], color:offlinePending || syncStatus === 'error' ? colors.semantic.orange : colors.semantic.green, cursor:manualSyncing?'wait':'pointer', fontSize:11, fontWeight:700 }}
+          >
+            <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor', boxShadow:offlinePending?'0 0 0 3px rgba(245,158,11,.14)':'none' }} />
+            <span className="uiv2-sync-label">{manualSyncing ? 'Sincronizando…' : offlinePending ? 'Pendiente' : syncStatus === 'synced' ? 'Al día' : 'Reintentar'}</span>
+          </button>
           <button
             type="button"
             aria-label={isLight ? 'Activar modo oscuro' : 'Activar modo claro'}

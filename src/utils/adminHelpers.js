@@ -9,6 +9,16 @@ export const downloadDataUrl = (dataUrl, filename) => {
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
 }
 
+export const isRecordMonthLocked = (cierresList, empId, inicio) => {
+  const mes = localMonthKey(inicio)
+  if (!mes || !empId) return false
+  return (cierresList || []).some(c =>
+    c.empId === empId && c.mes === mes &&
+    !!(c.firmaAdmin || c.firmaEmp || c.firma || c.estado === 'firmado') &&
+    !c.desactualizado
+  )
+}
+
 // Un cierre "pendiente" es una foto fija de las horas en el momento en que se generó.
 // Si se edita/borra un fichaje de ese mes antes de que el empleado firme, marcamos el
 // cierre como desactualizado en vez de solo avisar con un toast que desaparece — la UI
