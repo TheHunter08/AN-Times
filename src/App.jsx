@@ -178,9 +178,11 @@ function SyncBanner() {
 
   const handleRetry = useCallback(async () => {
     setRetrying(true)
-    await fetchDB()
-    setRetrying(false)
-  }, [fetchDB])
+    try {
+      const result = offlinePending ? await uploadPendingIfAny() : { ok: true, pending: false }
+      if (result?.ok && !result.pending) await fetchDB()
+    } finally { setRetrying(false) }
+  }, [fetchDB, offlinePending])
 
   // En pantalla de empleado, OfflineBanner ya muestra "Modo sin cobertura" con datos
   // pendientes — suprimir SyncBanner para evitar dos banners simultáneos.

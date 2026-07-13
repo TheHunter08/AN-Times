@@ -2,13 +2,14 @@ import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
+import { buildTableSyncPlan } from '../services/tableSyncPlan.js'
 
 // ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
 // NO se llama a self.skipWaiting() automáticamente — el cliente lo invoca vía
 // mensaje 'SKIP_WAITING' tras confirmar el banner "Nueva versión disponible".
 // Esto evita refrescos sorpresa durante una jornada activa.
 const ACTIVE_CACHES = new Set([
-  'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'supabase-api', 'offline-shell'
+  'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'offline-shell'
 ])
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -87,18 +88,10 @@ registerRoute(
   })
 )
 
-// ─── SUPABASE API ─────────────────────────────────────────────────────────────
-// Solo cachear GETs — los writes (POST/PATCH upsert) nunca deben pasar por cache:
-// si el timeout de 8s se dispara en un POST, el SW devuelve respuesta vacía y el
-// upsert falla en silencio, dejando el fichaje atrapado en IDB para siempre.
-registerRoute(
-  ({ url, request }) => url.hostname.includes('supabase.co') && request.method === 'GET',
-  new NetworkFirst({
-    cacheName: 'supabase-api',
-    networkTimeoutSeconds: 8,
-    plugins: [new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 * 60 * 2 })]
-  })
-)
+// Los datos mutables de Supabase NO se cachean. En señal débil, un NetworkFirst
+// podía devolver un snapshot antiguo con HTTP 200 y la aplicación lo trataba
+// como verdad actual. El respaldo offline correcto es loadLocal/IndexedDB; las
+// lecturas remotas deben confirmar red real o fallar para activar esa ruta.
 
 // ─── PUSH NOTIFICATIONS ────────────────────────────────────────────────────────
 // CRÍTICO: iOS PWA exige que TODO evento push llame a event.waitUntil().
@@ -285,6 +278,50 @@ function _sbFetch(url, options) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
+const _restHeaders = (extra = {}) => ({
+  apikey: _SB_ANON,
+  Authorization: `Bearer ${_SB_ANON}`,
+  'Content-Type': 'application/json',
+  ...extra,
+})
+
+async function _restUpsertResilient(table, rows) {
+  if (!rows.length) return
+  const url = `${_SB_URL}/rest/v1/${table}`
+  const headers = _restHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' })
+  const batch = await _sbFetch(url, { method: 'POST', headers, body: JSON.stringify(rows) })
+  if (batch.ok) return
+  // Una FK inválida no debe impedir que el resto de fichajes se sincronice.
+  let firstFailure = null
+  for (const row of rows) {
+    const response = await _sbFetch(url, { method: 'POST', headers, body: JSON.stringify(row) })
+    if (!response.ok && !firstFailure) {
+      firstFailure = new Error(`table sync ${table}/${row.id}: ${response.status}`)
+    }
+  }
+  if (firstFailure) throw firstFailure
+}
+
+async function _syncTablesSW(data, deleted) {
+  const plan = buildTableSyncPlan(data, deleted)
+  const employees = plan.upserts.find(op => op.table === 'employees')
+  if (employees?.rows.length) await _restUpsertResilient(employees.table, employees.rows)
+  for (const operation of plan.upserts) {
+    if (operation.table !== 'employees' && operation.rows.length) {
+      await _restUpsertResilient(operation.table, operation.rows)
+    }
+  }
+  for (const operation of plan.deletes) {
+    if (!operation.ids.length) continue
+    const idFilter = operation.ids.map(id => encodeURIComponent(id)).join(',')
+    const url = `${_SB_URL}/rest/v1/${operation.table}?id=in.(${idFilter})`
+    const response = operation.mode === 'deactivate'
+      ? await _sbFetch(url, { method: 'PATCH', headers: _restHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ baja: true }) })
+      : await _sbFetch(url, { method: 'DELETE', headers: _restHeaders({ Prefer: 'return=minimal' }) })
+    if (!response.ok) throw new Error(`table delete ${operation.table}: ${response.status}`)
+  }
+}
+
 function _idbOpen() {
   return new Promise((res, rej) => {
     const req = indexedDB.open(_IDB_NAME, 1)
@@ -434,18 +471,22 @@ async function _bgSync() {
     const coldRes = _USE_COLD_ROW
       ? await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) })
       : { ok: true, status: 200 }
-    if (!hotRes.ok && hotRes.status !== 409) {
+    if (!hotRes.ok) {
       throw new Error(`bgSync failed: hot=${hotRes.status}`)
     }
     // Si solo falla la fila fría (RLS, fila aún no creada, etc.) no bloqueamos
     // todo el sync — igual que en dataService.js, reintentamos metiendo el
     // payload completo en la fila caliente para no perder la jornada/fichaje.
-    if (!coldRes.ok && coldRes.status !== 409) {
+    if (!coldRes.ok) {
       const fbRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
-      if (!fbRes.ok && fbRes.status !== 409) {
+      if (!fbRes.ok) {
         throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
       }
     }
+    // El blob y las tablas V2 forman una sola confirmación offline. Si una
+    // tabla falla, conservamos la revisión en IDB para reintentar; así informes,
+    // planning y otros dispositivos no quedan leyendo horas antiguas.
+    await _syncTablesSW(data, deleted)
     const current = await _idbGet('pending')
     const hasNewerPending = revision != null && current?.revision != null && current.revision !== revision
     if (!hasNewerPending) await _idbDel('pending')

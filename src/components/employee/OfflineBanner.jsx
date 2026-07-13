@@ -89,15 +89,16 @@ export function OfflineBanner() {
   const handleRetry = async () => {
     if (retrying) return
     setRetrying(true)
-    try { uploadPendingIfAny(); await fetchDB() } catch {}
-    setRetrying(false)
+    try {
+      const result = await uploadPendingIfAny()
+      if (result?.ok && !result.pending) await fetchDB()
+    } finally { setRetrying(false) }
   }
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (retrying) return
     setRetrying(true)
-    uploadPendingIfAny()
-    setTimeout(() => setRetrying(false), 4000)
+    try { await uploadPendingIfAny() } finally { setRetrying(false) }
   }
 
   if (isEffectivelyOffline) return (

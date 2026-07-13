@@ -440,6 +440,14 @@ async function _idbDel(key) {
 let _onlineListenerPending = false
 let _bgSyncRetries = 0
 let _pendingWriteFlight = Promise.resolve()
+let _postBlobSyncHandler = null
+
+// dataServiceV2 registra aquí la escritura de tablas. Mantener el hook en la
+// capa primaria permite que la misma transacción lógica se ejecute también al
+// recuperar una cola offline, no solo durante guardados normales con la app abierta.
+export function setPostBlobSyncHandler(handler) {
+  _postBlobSyncHandler = typeof handler === 'function' ? handler : null
+}
 
 export function mergePendingDeletes(previous, incoming) {
   const out = {}
@@ -579,17 +587,20 @@ async function _mergeWithServer(localPayload, deleted) {
 // justo cuando ya hay una en curso: en señal débil, dos intentos compitiendo
 // a la vez por el mismo ancho de banda hace más probable que AMBOS fallen
 // por timeout, alargando aún más la sincronización.
-let _bgSyncFallbackFlight = false
+let _bgSyncFallbackFlight = null
 
-async function _bgSyncFallback() {
-  if (_bgSyncFallbackFlight) return
+function _bgSyncFallback() {
+  if (_bgSyncFallbackFlight) return _bgSyncFallbackFlight
   // Si hay un push normal en vuelo, esperar a que aterrice y reintentar
-  // (esto no cuenta como "en vuelo" propio, así que no toma el flag).
-  if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
-  _bgSyncFallbackFlight = true
+  if (_pushFlight) return new Promise(resolve => setTimeout(() => resolve(_bgSyncFallback()), 2000))
+  _bgSyncFallbackFlight = _runBgSyncFallback().finally(() => { _bgSyncFallbackFlight = null })
+  return _bgSyncFallbackFlight
+}
+
+async function _runBgSyncFallback() {
   try {
     const stored = await _readPending()
-    if (!stored || !supabase) { _bgSyncRetries = 0; return }
+    if (!stored || !supabase) { _bgSyncRetries = 0; return { ok: true, pending: false } }
     const { payload: data, deleted, revision } = stored
     // NO se comprueba navigator.onLine aquí: en iOS es conocidamente poco fiable
     // (puede quedarse pegado en `false` tras un cambio de red WiFi↔datos, o no
@@ -606,6 +617,7 @@ async function _bgSyncFallback() {
     // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
     const merged = await _mergeWithServer(data, deleted)
     await _upsertHotCold(merged)
+    if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted)
     merged._ts = Date.now()
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
@@ -615,6 +627,7 @@ async function _bgSyncFallback() {
     _bgSyncRetries = 0
     if (cleared) window.dispatchEvent(new CustomEvent('times-synced'))
     else setTimeout(_bgSyncFallback, 0)
+    return { ok: cleared, pending: !cleared }
   } catch (e) {
     console.error('[_bgSyncFallback] error:', e)
     // Reintentar hasta 3 veces (5s, 10s, 15s) antes de mostrar el toast de error.
@@ -629,8 +642,7 @@ async function _bgSyncFallback() {
       _bgSyncRetries = 0
       window.dispatchEvent(new CustomEvent('times-save-failed'))
     }
-  } finally {
-    _bgSyncFallbackFlight = false
+    return { ok: false, pending: true, error: e }
   }
 }
 
@@ -680,21 +692,32 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
   // reintentaba (todo pasaba a depender de Background Sync, que iOS no
   // soporta) hasta que el usuario cerraba y reabría la app.
   _mergeWithServer(payload, effectiveDeleted)
-    .then(merged => _upsertHotCold(merged).then(() => merged))
+    .then(async merged => {
+      await _upsertHotCold(merged)
+      if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted)
+      return merged
+    })
     .then((merged) => {
       _pushFlight = false
       _saveRetry = 0
       _onlineListenerPending = false
       // Limpiar solo la versión que acabamos de confirmar. Si llegó otra
       // operación mientras la petición volaba, queda intacta y se sube después.
-      _clearBgSync(fallbackRevision).then(cleared => {
-        if (!cleared) setTimeout(_bgSyncFallback, 0)
-      }).catch(() => setTimeout(_bgSyncFallback, 0))
       saveLocal(merged)
-      onSuccess?.(merged)
       _broadcastUpdate(merged._ts)
       _updateLastSync()
-      _drainQueue()
+      _clearBgSync(fallbackRevision).then(cleared => {
+        // El callback recibe si apareció una revisión nueva mientras esta
+        // petición estaba en vuelo. La UI no debe anunciar "sincronizado" hasta
+        // que esa revisión también haya aterrizado.
+        onSuccess?.(merged, { pending: !cleared })
+        if (!cleared) setTimeout(_bgSyncFallback, 0)
+        _drainQueue()
+      }).catch(() => {
+        onSuccess?.(merged, { pending: true })
+        setTimeout(_bgSyncFallback, 0)
+        _drainQueue()
+      })
     })
     .catch((e) => {
       console.error('[cloudPush] error:', e)
@@ -866,8 +889,8 @@ export async function _updateLastSync() {
 // NO guarda aquí si !navigator.onLine: _bgSyncFallback lo maneja con retry
 // (si quitamos el guard aquí pero no allá, nunca llegaría al retry interno).
 export function uploadPendingIfAny() {
-  if (!supabase) return
-  _bgSyncFallback().catch(() => {})
+  if (!supabase) return Promise.resolve({ ok: false, pending: false, reason: 'no_config' })
+  return _bgSyncFallback()
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────

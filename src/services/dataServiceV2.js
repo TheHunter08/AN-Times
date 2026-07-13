@@ -44,11 +44,14 @@ import {
   supabase,
   cloudFetch as _v1Fetch,
   cloudPush  as _v1Push,
+  setPostBlobSyncHandler,
 } from './dataService.js'
-
-// UUID fijo para la empresa (app single-tenant).
-// El script de migración crea una fila en la tabla companies con este id.
-const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+import {
+  COMPANY_ID,
+  buildTableSyncPlan,
+  toEmployeeRow as toEmployee,
+  toRecordRow as toRecord,
+} from './tableSyncPlan.js'
 
 // ── Mappers DB→App (snake_case → camelCase) ──────────────────────────────────
 
@@ -83,6 +86,7 @@ function fromVac(v) {
     fechaInicio: v.fecha_inicio, fechaFin: v.fecha_fin,
     tipo: v.tipo ?? 'vacaciones', estado: v.estado ?? 'pendiente',
     motivo: v.motivo ?? null, resolucion: v.resolucion ?? null,
+    _upd: v.updated_at,
   }
 }
 
@@ -98,7 +102,7 @@ function fromCierre(c) {
     firmaEmp: firmaObj,       // alias usado en algunos filtros
     firmaAdmin: c.firma_admin ?? null,
     generadoPor: c.generado_por ?? null, generadoAt: c.generado_at ?? null,
-    desactualizado: !!c.desactualizado,
+    desactualizado: !!c.desactualizado, _upd: c.updated_at,
   }
 }
 
@@ -107,33 +111,6 @@ function fromObra(o) {
 }
 
 // ── Mappers App→DB (camelCase → snake_case) ──────────────────────────────────
-
-function toEmployee(e) {
-  return {
-    id: e.id, company_id: COMPANY_ID, name: e.name,
-    email: e.email ?? null, pin_hash: e.pin ?? e.pinHash ?? null,
-    pin_len: e.pinLen ?? null,
-    role: e.role ?? 'empleado',
-    centro_trabajo: e.centroTrabajo ?? null,
-    obras_asignadas: e.obrasAsignadas ?? [],
-    reminder_time: e.reminderTime ?? '08:30',
-    salida_time: e.salidaTime ?? null,
-    telefono: e.telefono ?? null, baja: !!e.baja,
-    updated_at: new Date().toISOString(),
-  }
-}
-
-function toRecord(r) {
-  return {
-    id: r.id, company_id: COMPANY_ID,
-    emp_id: r.empId, emp_name: r.empName ?? null,
-    inicio: r.inicio, fin: r.fin ?? null, centro: r.centro ?? null,
-    work_secs: r.workSecs ?? 0, break_secs: r.breakSecs ?? 0,
-    breaks: r.breaks ?? [], closed: !!r.closed, aceptada: !!r.aceptada,
-    correcciones: r.correcciones ?? [],
-    updated_at: r._upd ?? new Date().toISOString(),
-  }
-}
 
 // Mutaciones críticas de fichajes: el panel de encargado necesita confirmación
 // de la tabla antes de mostrar éxito. El push general al blob sigue ejecutándose
@@ -151,42 +128,6 @@ export async function deleteRecordRow(id) {
   const { error } = await supabase.from('records').delete().eq('id', id).eq('company_id', COMPANY_ID)
   if (error) throw error
   return true
-}
-
-function toVac(v) {
-  return {
-    id: v.id, company_id: COMPANY_ID,
-    emp_id: v.empId, emp_name: v.empName ?? null,
-    fecha_inicio: v.fechaInicio, fecha_fin: v.fechaFin,
-    tipo: v.tipo ?? 'vacaciones', estado: v.estado ?? 'pendiente',
-    motivo: v.motivo ?? null, resolucion: v.resolucion ?? null,
-    updated_at: new Date().toISOString(),
-  }
-}
-
-function toCierre(c) {
-  // firma vive en c.firma (objeto) — serializar a JSON para la columna text
-  const firmaVal = c.firma ?? c.firmaEmp ?? null
-  return {
-    id: c.id, company_id: COMPANY_ID,
-    emp_id: c.empId, emp_name: c.empName ?? null, mes: c.mes,
-    total_min: c.totalMin ?? 0, extra_min: c.extraMin ?? 0,
-    dias: c.dias ?? null,
-    estado: c.estado ?? 'pendiente',
-    firma_admin: c.firmaAdmin ?? null,
-    firma_emp: firmaVal ? JSON.stringify(firmaVal) : null,
-    generado_por: c.generadoPor ?? null, generado_at: c.generadoAt ?? null,
-    desactualizado: !!c.desactualizado,
-    updated_at: new Date().toISOString(),
-  }
-}
-
-function toObra(o) {
-  return {
-    id: o.id, company_id: COMPANY_ID, nombre: o.nombre,
-    coords: o.coords ?? null, radio: o.radio ?? 200,
-    activa: o.activa !== false,
-  }
 }
 
 const RECORDS_PAGE_SIZE = 1000
@@ -303,12 +244,7 @@ export async function cloudFetch() {
 
 // ── cloudPush V2: blob (V1) primario + tablas en background ──────────────────
 export function cloudPush(db, deleted, onSuccess, onError) {
-  _v1Push(db, deleted, (reconciled) => {
-    onSuccess?.(reconciled)
-    // Sincronización a tablas: best-effort, no bloquea ni falla el push
-    _syncToTables(reconciled ?? db, deleted).catch(e =>
-      console.warn('[v2] table sync (non-fatal):', e.message))
-  }, onError)
+  _v1Push(db, deleted, onSuccess, onError)
 }
 
 // Sube un lote de filas a una tabla en un único upsert. Si Postgres rechaza
@@ -321,10 +257,15 @@ async function _upsertResilient(table, rows) {
   const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' })
   if (!error) return
   console.warn(`[v2] batch upsert failed for ${table}, retrying individually:`, error.message)
+  const failures = []
   for (const row of rows) {
     const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
-    if (rowErr) console.warn(`[v2] ${table} row ${row.id} upsert failed:`, rowErr.message)
+    if (rowErr) {
+      failures.push(row.id)
+      console.warn(`[v2] ${table} row ${row.id} upsert failed:`, rowErr.message)
+    }
   }
+  if (failures.length) throw new Error(`${table}: ${failures.length} filas no sincronizadas`)
 }
 
 // Escribe en las tablas lo que acaba de cambiar en el blob.
@@ -334,60 +275,31 @@ async function _upsertResilient(table, rows) {
 // • Borrados: DELETE directo en tablas.
 async function _syncToTables(db, deleted) {
   if (!supabase) return
-
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-  const deletedRecords = new Set(deleted?.records ?? [])
-  const deletedVacaciones = new Set(deleted?.vacaciones ?? [])
-  const upsertOps = []
-
-  if (db.employees?.length) {
-    upsertOps.push(_upsertResilient('employees', db.employees.map(toEmployee)))
-  }
-
-  // Fichajes recientes (abiertos o modificados en < 48 h)
-  const recentRecs = (db.records ?? []).filter(
-    r => !deletedRecords.has(r.id) && (!r.fin || !r._upd || r._upd > cutoff)
-  )
-  if (recentRecs.length) {
-    upsertOps.push(_upsertResilient('records', recentRecs.map(toRecord)))
-  }
-
-  if (db.vacaciones?.length) {
-    const activeVacaciones = db.vacaciones.filter(v => !deletedVacaciones.has(v.id))
-    if (activeVacaciones.length) upsertOps.push(_upsertResilient('vacaciones', activeVacaciones.map(toVac)))
-  }
-
-  if (db.cierres?.length) {
-    upsertOps.push(_upsertResilient('cierres', db.cierres.map(toCierre)))
-  }
-
-  if (db.obras?.length) {
-    upsertOps.push(_upsertResilient('obras', db.obras.map(toObra)))
-  }
-
-  // Borrados físicos: tombstones → DELETE en tablas
+  const plan = buildTableSyncPlan(db, deleted)
+  // Empleados primero: records/vacaciones/cierres tienen FK hacia esta tabla.
+  const employeeBatch = plan.upserts.find(op => op.table === 'employees')
+  if (employeeBatch?.rows.length) await _upsertResilient(employeeBatch.table, employeeBatch.rows)
+  const upsertOps = plan.upserts
+    .filter(op => op.table !== 'employees' && op.rows.length)
+    .map(op => _upsertResilient(op.table, op.rows))
   const upsertResults = await Promise.allSettled(upsertOps)
   const upsertFailures = upsertResults.filter(r => r.status === 'rejected' || r.value?.error)
-  if (upsertFailures.length) console.warn(`[v2] ${upsertFailures.length}/${upsertOps.length} table upserts failed`)
-  const deleteOps = []
-  if (deleted?.records?.length) {
-    deleteOps.push(supabase.from('records').delete().in('id', deleted.records))
-  }
-  if (deleted?.vacaciones?.length) {
-    deleteOps.push(supabase.from('vacaciones').delete().in('id', deleted.vacaciones))
-  }
-  // Employees no se borran físicamente: se marcan baja=true
-  if (deleted?.employees?.length) {
-    deleteOps.push(supabase.from('employees').update({ baja: true }).in('id', deleted.employees))
-  }
+  if (upsertFailures.length) throw new Error(`${upsertFailures.length}/${upsertOps.length} grupos de tablas no sincronizados`)
+  const deleteOps = plan.deletes.filter(op => op.ids.length).map(op =>
+    op.mode === 'deactivate'
+      ? supabase.from(op.table).update({ baja: true }).in('id', op.ids)
+      : supabase.from(op.table).delete().in('id', op.ids)
+  )
 
   if (!deleteOps.length) return
   const results = await Promise.allSettled(deleteOps)
   const failures = results.filter(r => r.status === 'rejected' || r.value?.error)
-  if (failures.length) {
-    console.warn(`[v2] ${failures.length}/${deleteOps.length} table deletes failed (non-fatal)`)
-  }
+  if (failures.length) throw new Error(`${failures.length}/${deleteOps.length} borrados de tablas no sincronizados`)
 }
+
+// Debe registrarse también para uploadPendingIfAny(): una recuperación
+// offline no se considera terminada hasta que blob y tablas coinciden.
+setPostBlobSyncHandler(_syncToTables)
 
 // ── postgres_changes: detecta cambios en tablas y dispara un re-fetch ────────
 // Complementa el canal broadcast con escucha directa en las tablas — cubre

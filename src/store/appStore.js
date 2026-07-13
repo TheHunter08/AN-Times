@@ -86,7 +86,7 @@ export const useAppStore = create((set, get) => ({
       // aquí para que la UI local también vea al instante cualquier dato que otro
       // dispositivo hubiera guardado mientras tanto (p. ej. un fichaje de otro
       // empleado, o un cierre de jornada hecho por un encargado).
-      (reconciled) => {
+      (reconciled, meta) => {
         // Detectar registros que el servidor tenía en versión más nueva que
         // la que acabamos de subir — otro usuario modificó el mismo fichaje
         // mientras nosotros guardábamos. Emitir evento para mostrar aviso.
@@ -102,8 +102,8 @@ export const useAppStore = create((set, get) => ({
         }
         set(state => ({
           db: reconciled ? mergeDB(state.db, reconciled) : state.db,
-          syncStatus: 'synced',
-          offlinePending: false
+          syncStatus: meta?.pending ? 'syncing' : 'synced',
+          offlinePending: !!meta?.pending
         }))
       },
       () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
