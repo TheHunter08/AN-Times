@@ -22,6 +22,10 @@ export function startedInHorizontalScroller(target, boundary) {
 // táctil del sistema y no activan la navegación global por una deriva del dedo.
 export function shouldIgnoreAppGesture(target, boundary) {
   if (!(target instanceof Element)) return false
-  if (target.closest('button, a, label, input, textarea, select, option, [contenteditable="true"], [role="button"], [role="slider"], [data-gesture-lock="true"]')) return true
+  // Botones y cards siguen formando parte de la superficie de navegación. En
+  // móvil ocupan casi toda Jornada/Vacaciones y bloquearlos hacía que el swipe
+  // solo funcionase al empezar en unos pocos huecos vacíos. Los controles de
+  // edición y los gestos complejos se excluyen explícitamente.
+  if (target.closest('input, textarea, select, option, [contenteditable="true"], [role="slider"], [data-gesture-lock="true"]')) return true
   return startedInHorizontalScroller(target, boundary)
 }

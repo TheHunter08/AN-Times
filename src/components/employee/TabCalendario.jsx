@@ -157,7 +157,6 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const onPointerDown = e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
     gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: null, moved: false }
-    e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   const onPointerMove = e => {
     const g = gesture.current
@@ -165,6 +164,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     const dx = e.clientX - g.x, dy = e.clientY - g.y
     if (!g.axis && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) g.axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'x' : 'y'
     if (g.axis !== 'x') return
+    if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.setPointerCapture?.(e.pointerId)
     g.moved = true
     calendarRef.current?.style.setProperty('--cal-drag-x', `${Math.max(-90, Math.min(90, dx * .55))}px`)
     calendarRef.current?.classList.add('is-dragging')

@@ -289,6 +289,7 @@ export function EmployeeHome({
             <button
               type="button"
               className="employee-home-v7__clock-button"
+              data-gesture-lock="true"
               data-phase={holdPhase}
               aria-label={`${cfg.action}. Mantén pulsado para confirmar.`}
               aria-describedby={hintId}

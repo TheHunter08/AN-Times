@@ -8451,6 +8451,11 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 /* Interacción táctil compartida para PWA instalada y navegador móvil. */
 @media (pointer: coarse) {
   button, [role="button"], a, input, select, textarea { touch-action: manipulation; }
+  /* Las pestañas del empleado usan swipe horizontal. Reservamos el eje
+     vertical al scroll nativo para que WebKit no cancele pointermove. */
+  .emp-body button:not([data-gesture-lock="true"]),
+  .emp-body [role="button"]:not([data-gesture-lock="true"]),
+  .emp-body a:not([data-gesture-lock="true"]) { touch-action: pan-y; }
   button, [role="button"], a {
     -webkit-user-select: none;
     user-select: none;
