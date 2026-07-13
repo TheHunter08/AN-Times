@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { uploadPendingIfAny } from '../../services/dataService.js'
+import { useConnectivity } from '../../hooks/useConnectivity.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -59,20 +60,12 @@ export function OfflineBanner() {
   const syncStatus     = useAppStore(s => s.syncStatus)
   const offlinePending = useAppStore(s => s.offlinePending)
   const fetchDB        = useAppStore(s => s.fetchDB)
-  const [realOffline, setRealOffline] = useState(() => !navigator.onLine)
+  const { online } = useConnectivity()
   const [retrying, setRetrying] = useState(false)
   const [justSynced, setJustSynced] = useState(false)
-  const wasOfflineRef = useRef(!navigator.onLine)
+  const wasOfflineRef = useRef(!online)
 
-  useEffect(() => {
-    const on  = () => setRealOffline(false)
-    const off = () => setRealOffline(true)
-    window.addEventListener('online',  on)
-    window.addEventListener('offline', off)
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
-  }, [])
-
-  const isEffectivelyOffline = realOffline || syncStatus === 'offline' || (offlinePending && syncStatus === 'error')
+  const isEffectivelyOffline = !online
 
   useEffect(() => {
     if (isEffectivelyOffline) wasOfflineRef.current = true
@@ -130,9 +123,14 @@ export function OfflineBanner() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <IcoSpinner />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, color: '#a78bfa', fontSize: 13 }}>Sincronizando…</div>
-        <div style={{ fontSize: 11, color: 'rgba(167,139,250,.7)', marginTop: 1 }}>Subiendo cambios pendientes al servidor</div>
+        <div style={{ fontWeight: 700, color: '#a78bfa', fontSize: 13 }}>
+          {syncStatus === 'syncing' ? 'Sincronizando…' : 'Cambios pendientes'}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(167,139,250,.7)', marginTop: 1 }}>
+          {syncStatus === 'syncing' ? 'Subiendo cambios pendientes al servidor' : 'Guardados en el dispositivo · Reintentando automáticamente'}
+        </div>
       </div>
+      {syncStatus !== 'syncing' && <ActionBtn onClick={handleUpload} disabled={retrying}>{retrying ? 'Subiendo…' : 'Reintentar'}</ActionBtn>}
     </div>
   )
 
@@ -140,8 +138,8 @@ export function OfflineBanner() {
     <div style={{ ...BASE, background: 'rgba(25,5,5,.88)', borderBottom: '1px solid rgba(239,68,68,.22)' }}>
       <IcoError />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: '#f87171', fontWeight: 700, fontSize: 13 }}>Error de conexión</div>
-        <div style={{ fontSize: 11, color: 'rgba(248,113,113,.6)', marginTop: 1 }}>Datos guardados localmente</div>
+        <div style={{ color: '#f87171', fontWeight: 700, fontSize: 13 }}>No se pudo sincronizar</div>
+        <div style={{ fontSize: 11, color: 'rgba(248,113,113,.6)', marginTop: 1 }}>Internet está disponible; reintentaremos con el servidor</div>
       </div>
       <ActionBtn onClick={handleRetry} disabled={retrying}>{retrying ? 'Reintentando…' : 'Reintentar'}</ActionBtn>
     </div>

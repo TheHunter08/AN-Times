@@ -11,6 +11,7 @@ import {
   clearLockout, hashPin,
 } from '../utils/pinSecurity.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
+import { useConnectivity } from '../hooks/useConnectivity.js'
 import type { LoginMode } from './pages/Login.js'
 
 const EMAIL_LK_KEY = 'an_email_lk'
@@ -67,7 +68,7 @@ export default function LoginV2() {
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailError, setEmailError]     = useState('')
   const [resetLoading, setResetLoading] = useState(false)
-  const [online, setOnline] = useState(() => navigator.onLine)
+  const { online } = useConnectivity()
 
   const verifyingRef = useRef(false)
   const opIdRef      = useRef(0)
@@ -87,11 +88,6 @@ export default function LoginV2() {
   }, [])
 
   useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
-  useEffect(() => {
-    const on = () => setOnline(true), off = () => setOnline(false)
-    window.addEventListener('online', on); window.addEventListener('offline', off)
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
-  }, [])
   useEffect(() => { setEmpHasBio(selectedEmpId ? hasBiometric(selectedEmpId) : false) }, [selectedEmpId])
 
   // Countdown lockout
@@ -271,7 +267,7 @@ export default function LoginV2() {
 
   const handleForgotPassword = async (email: string) => {
     if (!email.trim()) { setEmailError('Introduce primero tu email.'); return }
-    if (!navigator.onLine) { setEmailError('La recuperación de contraseña requiere conexión.'); return }
+    if (!online) { setEmailError('La recuperación de contraseña requiere conexión.'); return }
     setResetLoading(true); setEmailError('')
     try {
       await resetPassword(email.trim())

@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useConnectivity } from '../../hooks/useConnectivity.js'
 import { useAppStore } from '../../store/appStore.js'
 import { getCfg, setCfg, toggleTheme } from '../../utils/userConfig.js'
 import { queuePush, pushSubscribe } from '../../services/dataService.js'
@@ -16,6 +17,7 @@ const btnPrimary = { width:'100%', padding:'12px', borderRadius:radius.lg, borde
 const inpStyle = { padding:'8px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:14, fontFamily:'inherit', outline:'none' }
 
 export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
+  const { online, checking } = useConnectivity()
   const syncStatus = useAppStore(s => s.syncStatus)
   const realtimeStatus = useAppStore(s => s.realtimeStatus)
   const offlinePending = useAppStore(s => s.offlinePending)
@@ -56,7 +58,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
 
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'granted'
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
-  const netLabel = !navigator.onLine ? 'Sin conexión'
+  const netLabel = checking ? 'Comprobando conexión…' : !online ? 'Sin conexión'
     : connection?.effectiveType ? `${connection.effectiveType.toUpperCase()}${connection.downlink ? ` · ${connection.downlink} Mb/s` : ''}`
     : 'Con conexión'
   const swReady = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller

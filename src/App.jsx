@@ -207,7 +207,7 @@ function SyncBanner() {
         </svg>
       </span>
       <span className="sync-banner-text">
-        Sin conexión{sinceText ? ` · ${sinceText}` : ''}
+        Problema de sincronización{sinceText ? ` · ${sinceText}` : ''}
       </span>
       <button className="sync-banner-btn" onClick={handleRetry} disabled={retrying}>
         {retrying
