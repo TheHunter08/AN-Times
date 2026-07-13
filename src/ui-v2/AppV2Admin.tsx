@@ -971,7 +971,7 @@ function ReportsPage() {
     return [...set].sort().reverse().slice(0, 12)
   }, [db.records])
 
-  const handleDownloadCSV = (mes: string) => {
+  const handleDownloadExcel = (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(mes) && r.fin)
@@ -1035,7 +1035,7 @@ function ReportsPage() {
       description: `${empCount} empleados · ${Math.round(totalMins / 60)}h totales`,
       generatedOn: label,
       onDownload: handleDownload,
-      onDownloadCSV: handleDownloadCSV,
+      onDownloadExcel: handleDownloadExcel,
     }
   }), [months, db.records])
 

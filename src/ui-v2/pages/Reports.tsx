@@ -10,7 +10,7 @@ export interface ReportRow {
   description: string
   generatedOn: string
   onDownload?: (id: string) => void
-  onDownloadCSV?: (id: string) => void
+  onDownloadExcel?: (id: string) => void
 }
 
 export interface ReportsProps {
@@ -24,7 +24,7 @@ export interface ReportsProps {
 export function Reports({ rows }: ReportsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
-      <PageTitle>Reportes</PageTitle>
+      <PageTitle>Informes</PageTitle>
       <Card>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {rows.map((r, i) => (
@@ -45,9 +45,9 @@ export function Reports({ rows }: ReportsProps) {
               </div>
               <span style={{ fontSize: 11, color: colors.text[500], flexShrink: 0 }}>{r.generatedOn}</span>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                {r.onDownloadCSV && (
+                {r.onDownloadExcel && (
                   <button
-                    onClick={() => r.onDownloadCSV?.(r.id)}
+                    onClick={() => r.onDownloadExcel?.(r.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[500], color: colors.text[700], fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     <IconDownload width={12} height={12} /> Excel
