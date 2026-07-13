@@ -3900,40 +3900,6 @@ textarea.input-error {
   }
 }
 
-/* ── V3 Recharts overrides ────────────────────────────────────── */
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: var(--bg-600) !important;
-  border: 1px solid var(--border2) !important;
-  border-radius: var(--r) !important;
-  box-shadow: var(--shadow-md) !important;
-  padding: 8px 12px !important;
-  font-family: var(--font-body) !important;
-}
-.recharts-tooltip-label {
-  color: var(--text) !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  margin-bottom: 4px !important;
-}
-.recharts-tooltip-item-value {
-  color: var(--primary-light) !important;
-  font-weight: 600 !important;
-}
-.recharts-cartesian-axis-tick text {
-  fill: var(--text4) !important;
-  font-size: 10px !important;
-}
-.recharts-cartesian-grid line {
-  stroke: var(--border) !important;
-  stroke-dasharray: 3 3 !important;
-}
-.recharts-legend-item-text { color: var(--text3) !important; font-size: 11px !important; }
-[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: #fff !important;
-  border-color: rgba(0,0,0,.08) !important;
-}
-[data-theme="light"] .recharts-cartesian-axis-tick text { fill: var(--text3) !important; }
-
 /* ── V3 PWA Install Banner ────────────────────────────────────── */
 .v3-install-banner {
   display: flex; align-items: center; gap: 12px;

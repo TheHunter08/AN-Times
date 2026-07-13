@@ -1,6 +1,7 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-
 export async function downloadSimplePdf(title, lines, filename) {
+  // PDF solo se descarga cuando el usuario exporta. Evita cargar ~438 kB al
+  // arrancar el panel o la pantalla del empleado.
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
   const pdf = await PDFDocument.create()
   const font = await pdf.embedFont(StandardFonts.Helvetica)
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)

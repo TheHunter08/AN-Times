@@ -106,7 +106,6 @@ export default defineConfig({
         manualChunks: {
           vendor:    ['react', 'react-dom'],
           state:     ['zustand'],
-          charts:    ['recharts'],
           pdf:       ['pdf-lib'],
           supabase:  ['@supabase/supabase-js'],
           localai:   ['@mlc-ai/web-llm'],
