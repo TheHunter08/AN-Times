@@ -135,6 +135,24 @@ function toRecord(r) {
   }
 }
 
+// Mutaciones críticas de fichajes: el panel de encargado necesita confirmación
+// de la tabla antes de mostrar éxito. El push general al blob sigue ejecutándose
+// después mediante saveDB, pero realtime ya no puede devolver una fila antigua
+// durante esa ventana.
+export async function persistRecordRow(record) {
+  if (!supabase) return false
+  const { error } = await supabase.from('records').upsert(toRecord(record), { onConflict: 'id' })
+  if (error) throw error
+  return true
+}
+
+export async function deleteRecordRow(id) {
+  if (!supabase) return false
+  const { error } = await supabase.from('records').delete().eq('id', id).eq('company_id', COMPANY_ID)
+  if (error) throw error
+  return true
+}
+
 function toVac(v) {
   return {
     id: v.id, company_id: COMPANY_ID,
@@ -203,7 +221,13 @@ export async function cloudFetch() {
     const records = tableRecords.map(record => {
       const blobRecord = blobRecordMap.get(record.id)
       if (!blobRecord) return record
-      const merged = { ...blobRecord, ...record }
+      const blobTs = Date.parse(blobRecord._upd || '') || 0
+      const tableTs = Date.parse(record._upd || '') || 0
+      // Si el blob contiene una corrección más reciente que la tabla (ventana
+      // entre ambos writes u operación offline), conservar también sus horas.
+      const merged = blobTs > tableTs
+        ? { ...record, ...blobRecord }
+        : { ...blobRecord, ...record }
       for (const key of ['validado', 'rechazado', 'modificado', 'validadoBy', 'validadoAt', 'aceptadaPor', 'aceptadaAt']) {
         if (blobRecord[key] !== undefined) merged[key] = blobRecord[key]
       }

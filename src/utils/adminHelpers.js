@@ -17,7 +17,7 @@ export const flagStaleCierre = (cierresList, empId, inicio) => {
   let flagged = false
   let staleCierre = null
   const updated = (cierresList || []).map(c => {
-    if (c.empId === empId && c.mes === mes && c.estado === 'pendiente' && !c.desactualizado) {
+    if (c.empId === empId && c.mes === mes && c.estado !== 'rechazado' && !c.desactualizado) {
       flagged = true
       staleCierre = c
       return { ...c, desactualizado: true }

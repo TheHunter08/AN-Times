@@ -36,9 +36,9 @@ import { useEmployeesData } from './hooks/useEmployeesData.js'
 import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush } from '../services/dataService.js'
-import { supabase } from '../services/dataServiceV2.js'
+import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, calcSecs } from '../utils/time.js'
-import { clipBreaksToWindow } from '../utils/adminHelpers.js'
+import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, notifyStaleCierre } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
 
@@ -683,7 +683,7 @@ function ValidateHoursPage() {
     toast('Jornada rechazada', 2500, 'warn')
   }
 
-  const handleModify = (id: string, entry: string, exit: string) => {
+  const handleModify = async (id: string, entry: string, exit: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
     const base = new Date(rec.inicio)
@@ -707,22 +707,49 @@ function ValidateHoursPage() {
       by: session?.user?.name || 'Admin',
     }
     const correcciones = [...(rec.correcciones || []), correction]
-    saveDB((fresh: any) => ({
-      records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
-      ),
-    }))
-    toast('Horario modificado', 2500, 'ok')
+    const updatedRec = { ...rec, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
+    try {
+      await persistRecordRow(updatedRec)
+      let staleCierres: any[] = []
+      saveDB((fresh: any) => {
+        const stale = flagStaleCierreForEdit(fresh.cierres || [], rec.empId, rec.inicio, inicioIso)
+        staleCierres = stale.staleCierres || []
+        const cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData: null, pdfUrl: null, documentoId: null, _upd: nowIso } : c)
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado')
+        return {
+          records: (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r),
+          cierres,
+          audit: withAudit.audit,
+        }
+      })
+      staleCierres.forEach(c => notifyStaleCierre(c, session?.user?.id))
+      toast('Horario modificado y sincronizado', 3000, 'ok')
+    } catch (error: any) {
+      console.error('[records] modify failed:', error)
+      toast(`No se pudo guardar el horario: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return
-    saveDB((fresh: any) => ({ records: (fresh.records || []).filter((r: any) => r.id !== id) }))
-    if (supabase) supabase.from('records').delete().eq('id', id).then(({ error }: any) => {
-      if (error) toast('Eliminado localmente — no se pudo confirmar con el servidor', 4000, 'warn')
-    })
-    toast('Fichaje eliminado', 2500, 'ok')
+    try {
+      await deleteRecordRow(id)
+      let staleCierre: any = null
+      const nowIso = new Date().toISOString()
+      saveDB((fresh: any) => {
+        const stale = flagStaleCierre(fresh.cierres || [], rec.empId, rec.inicio)
+        staleCierre = stale.staleCierre
+        const cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData: null, pdfUrl: null, documentoId: null, _upd: nowIso } : c)
+        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado')
+        return { records: (fresh.records || []).filter((r: any) => r.id !== id), cierres, audit: withAudit.audit }
+      })
+      notifyStaleCierre(staleCierre, session?.user?.id)
+      toast('Fichaje eliminado y sincronizado', 3000, 'ok')
+    } catch (error: any) {
+      console.error('[records] delete failed:', error)
+      toast(`No se pudo eliminar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+    }
   }
 
   return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} onDelete={handleDelete} />
