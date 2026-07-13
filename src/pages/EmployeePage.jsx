@@ -986,37 +986,6 @@ export default function EmployeePage() {
       .map(c => ({ id: c.id, empName: c.empName || empMap.get(c.empId)?.name || c.empId, mes: c.mes || '' }))
   }, [db.cierres, db.employees, db.config, isSuper, u.centroTrabajo, u.id])
 
-  // Planning semanal del equipo para encargados/jefes de obra
-  const weekPlanningData = useMemo(() => {
-    if (!isSuper) return null
-    const centro = u.centroTrabajo || ''
-    const team = (db.employees || []).filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
-    if (!team.length) return null
-    const todayD = new Date()
-    const dow = todayD.getDay()
-    const monday = new Date(todayD)
-    monday.setDate(todayD.getDate() - (dow === 0 ? 6 : dow - 1))
-    const todayStr2 = localDateStr(todayD)
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(monday)
-      d.setDate(monday.getDate() + i)
-      const ds = localDateStr(d)
-      return { label: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i], dateStr: ds, isToday: ds === todayStr2, isWeekend: i >= 5 }
-    })
-    const members = team.map(e => {
-      const initials = e.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
-      const dayData = days.map(d => {
-        const dayRecs = (db.records || []).filter(r => r.empId === e.id && r.inicio && localDateStr(new Date(r.inicio)) === d.dateStr)
-        const open = dayRecs.find(r => !r.fin)
-        const done = dayRecs.filter(r => r.fin)
-        const totalMins = done.reduce((s, r) => s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
-        return { status: open ? 'active' : done.length ? 'done' : 'absent', hours: totalMins > 0 ? `${Math.floor(totalMins/60)}h${Math.round(totalMins%60)>0?Math.round(totalMins%60)+'m':''}` : '' }
-      })
-      return { id: e.id, name: e.name, initials, days: dayData }
-    })
-    return { days, members }
-  }, [db.records, db.employees, u.role, u.centroTrabajo, u.id])
-
   const handleSignSupervisor = (cierreId) => {
     saveDB(freshDb => ({
       cierres: (freshDb.cierres || []).map(c =>

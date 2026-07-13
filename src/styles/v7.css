@@ -5,6 +5,10 @@
   --v7-success:#16c96f; --v7-warning:#f59e0b; --v7-danger:#ef4444;
   --v7-text:#f7f9fc; --v7-sub:#aeb8ca; --v7-muted:#77839a;
 }
+:root[data-theme="light"] {
+  --v7-bg:#f4f6fb; --v7-surface:#ffffff; --v7-card:#ffffff; --v7-hover:#eef2f8;
+  --v7-line:rgba(15,23,42,.10); --v7-text:#111827; --v7-sub:#475569; --v7-muted:#64748b;
+}
 *,*::before,*::after { box-sizing:border-box; }
 body { background:var(--v7-bg); color:var(--v7-text); font-family:Geist,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 button,input,textarea,select { font-family:inherit; }
@@ -28,6 +32,31 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #sEmp:not(.emp-dsk) .emp-nav { left:50% !important; right:auto !important; width:min(620px,calc(100% - 20px)) !important; max-width:none !important; transform:translateX(-50%) !important; bottom:max(10px,env(safe-area-inset-bottom)) !important; height:64px !important; padding:6px !important; border-radius:20px !important; background:rgba(13,17,26,.94) !important; border:1px solid rgba(255,255,255,.10) !important; box-shadow:0 14px 40px rgba(0,0,0,.35) !important; backdrop-filter:blur(22px) !important; overflow:hidden !important; }
 #sEmp:not(.emp-dsk) .emp-nav-item { flex:1 1 0 !important; min-width:0 !important; min-height:48px !important; padding:4px 1px !important; border-radius:14px !important; color:var(--v7-muted) !important; font-size:9px !important; white-space:nowrap; }
 #sEmp:not(.emp-dsk) .emp-nav-item.on { color:#fff !important; background:rgba(53,104,255,.14) !important; }
+
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-sidebar,
+[data-theme="light"] #sAdmin .uiv2-sidebar { background:#fff !important; }
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-topbar,
+[data-theme="light"] #sEmp:not(.emp-dsk) .emp-topbar,
+[data-theme="light"] #sAdmin .uiv2-desktop-topbar { background:rgba(255,255,255,.92) !important; border-color:var(--v7-line) !important; }
+[data-theme="light"] #sEmp:not(.emp-dsk) .emp-nav { background:rgba(255,255,255,.94) !important; border-color:rgba(15,23,42,.12) !important; box-shadow:0 14px 36px rgba(15,23,42,.14) !important; }
+[data-theme="light"] #sEmp:not(.emp-dsk) .emp-nav-item.on,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-nav-item.on,
+[data-theme="light"] #sAdmin .uiv2-sidebar-item.uiv2-active { color:var(--v7-blue) !important; background:rgba(53,104,255,.10) !important; }
+[data-theme="light"] #sAdmin .uiv2-kpi-card,
+[data-theme="light"] #sAdmin .uiv2-emp-card,
+[data-theme="light"] #sAdmin .uiv2-quicklink { background:#fff !important; border-color:rgba(15,23,42,.10) !important; }
+[data-theme="light"] #sEmp .employee-calendar-v2 > :nth-child(4),
+[data-theme="light"] #sEmp .employee-vacations-v2 > :nth-child(3),
+[data-theme="light"] #sEmp .employee-profile-v2 > :nth-child(3),
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(3) {
+  background:#fff !important; border-color:rgba(15,23,42,.10) !important; box-shadow:0 14px 34px rgba(15,23,42,.08) !important;
+}
+[data-theme="light"] #sEmp .employee-vacations-v2 > :nth-child(2),
+[data-theme="light"] #sEmp .employee-profile-v2 > :nth-child(2),
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(2) {
+  background:linear-gradient(145deg,#f3f6ff,#fff) !important; border-color:rgba(53,104,255,.18) !important; box-shadow:0 16px 36px rgba(53,104,255,.10) !important;
+}
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(3) > div { background:#fff !important; border-color:rgba(15,23,42,.10) !important; }
 
 /* Real employee home hierarchy */
 #sEmp .v7-clock-hero { background:var(--gradient-card,var(--v7-card)) !important; border:1px solid var(--v7-line) !important; border-radius:22px !important; box-shadow:var(--shadow-md,0 14px 38px rgba(0,0,0,.26)) !important; }

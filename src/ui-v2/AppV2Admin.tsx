@@ -75,6 +75,7 @@ interface EmpForm {
   pin: string; pinLen: number | null
   centroTrabajo: string; telefono: string; obrasAsignadas: string[]
   fechaInicioContrato: string; turnoInicio: string; turnoFin: string
+  crearTurnos: boolean
 }
 
 function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () => void }) {
@@ -84,7 +85,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
-  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00' }
+  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
   const isEdit = !!initial
 
@@ -119,7 +120,21 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       const updated = isEdit
         ? emps.map((e: any) => e.id === form.id ? emp : e)
         : [...emps, emp]
-      return { employees: updated }
+      if (!form.crearTurnos) return { employees: updated }
+      const now = new Date()
+      now.setHours(0, 0, 0, 0)
+      const dates = Array.from({ length: 45 }, (_, i) => {
+        const d = new Date(now); d.setDate(now.getDate() + i); return d
+      }).filter(d => d.getDay() !== 0 && d.getDay() !== 6)
+      const nowIso = new Date().toISOString()
+      const turnos = [...(fresh.turnos || [])]
+      dates.forEach(d => {
+        const fecha = localDateStr(d)
+        const idx = turnos.findIndex((t: any) => t.empId === form.id && t.fecha === fecha)
+        const next = { ...(idx >= 0 ? turnos[idx] : {}), id: idx >= 0 ? turnos[idx].id : gid(), empId: form.id, empName: form.name.trim(), fecha, horaInicio: form.turnoInicio, horaFin: form.turnoFin, tipo: 'normal', _upd: nowIso }
+        if (idx >= 0) turnos[idx] = next; else turnos.push(next)
+      })
+      return { employees: updated, turnos }
     })
     toast(isEdit ? 'Empleado actualizado' : 'Empleado creado', 2500, 'ok')
     onClose()
@@ -148,6 +163,10 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
           {iField('Inicio del turno', 'turnoInicio', 'time')}
           {iField('Fin del turno', 'turnoFin', 'time')}
         </div>
+        <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'11px 12px', borderRadius:10, border:`1px solid ${colors.border.default}`, background:form.crearTurnos ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)', cursor:'pointer' }}>
+          <input type="checkbox" checked={form.crearTurnos} onChange={e => setF('crearTurnos', e.target.checked)} style={{ marginTop:2, accentColor:colors.primary.base }}/>
+          <span><strong style={{ display:'block', fontSize:12.5, color:colors.text[900] }}>Crear turnos laborables</strong><small style={{ display:'block', marginTop:3, fontSize:11, color:colors.text[500] }}>Asigna este horario de lunes a viernes durante los próximos 45 días.</small></span>
+        </label>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Rol</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -464,6 +483,7 @@ function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) =
       fechaInicioContrato: emp.fechaInicioContrato || emp.contractStart || '',
       turnoInicio: emp.turnoInicio || emp.shiftStart || '08:00',
       turnoFin: emp.turnoFin || emp.shiftEnd || '16:00',
+      crearTurnos: false,
     }})
   }
 
@@ -767,6 +787,10 @@ function DocumentsPage() {
   const toast = useAppStore(s => s.toast)
   const uploadRef = useRef<HTMLInputElement>(null)
   const uploadMeta = useRef<{ empId: string; empName: string; tipo: string } | null>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadEmpId, setUploadEmpId] = useState('')
+  const [uploadType, setUploadType] = useState('contrato')
+  const employees = useMemo(() => (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja), [db.employees])
 
   const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'otro'> = {
     contrato: 'contrato', nomina: 'nomina', nómina: 'nomina',
@@ -800,15 +824,16 @@ function DocumentsPage() {
   })), [db.documentos])
 
   const requestUpload = () => {
-    const employees = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     if (!employees.length) { toast('Primero debes crear un empleado', 3000, 'warn'); return }
-    const list = employees.map((e: any, i: number) => `${i + 1}. ${e.name}`).join('\n')
-    const selected = Number(window.prompt(`Selecciona el empleado:\n${list}`)) - 1
-    const emp = employees[selected]
-    if (!emp) return
-    const tipo = (window.prompt('Tipo de documento: contrato, nómina, certificado u otro', 'contrato') || '').trim().toLowerCase()
-    if (!tipo) return
-    uploadMeta.current = { empId: emp.id, empName: emp.name, tipo }
+    setUploadEmpId(employees[0].id)
+    setUploadType('contrato')
+    setUploadOpen(true)
+  }
+
+  const chooseFile = () => {
+    const emp = employees.find((e: any) => e.id === uploadEmpId)
+    if (!emp) { toast('Selecciona un empleado', 2500, 'warn'); return }
+    uploadMeta.current = { empId: emp.id, empName: emp.name, tipo: uploadType }
     uploadRef.current?.click()
   }
 
@@ -826,14 +851,37 @@ function DocumentsPage() {
       }] }))
       toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
       uploadMeta.current = null
+      setUploadOpen(false)
     }
     reader.onerror = () => toast('No se pudo leer el documento', 3000, 'warn')
     reader.readAsDataURL(file)
   }
 
   return <>
-    <input ref={uploadRef} type="file" hidden onChange={e => { uploadFile(e.target.files?.[0]); e.currentTarget.value = '' }} />
+    <input ref={uploadRef} type="file" hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={e => { uploadFile(e.target.files?.[0]); e.currentTarget.value = '' }} />
     <Documents items={items} onUpload={requestUpload} />
+    {uploadOpen && (
+      <div className="uiv2-sheet-overlay" onClick={() => setUploadOpen(false)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.68)', backdropFilter:'blur(8px)' }}>
+        <div className="uiv2-sheet-panel" role="dialog" aria-modal="true" aria-label="Subir documento a empleado" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:440, padding:24, borderRadius:18, background:colors.bg[900], border:`1px solid ${colors.border.default}`, boxShadow:'0 24px 70px rgba(0,0,0,.5)', display:'grid', gap:16 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+            <div><div style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Subir documento</div><div style={{ marginTop:3, fontSize:12, color:colors.text[500] }}>Asigna el archivo al perfil correcto.</div></div>
+            <button aria-label="Cerrar" onClick={() => setUploadOpen(false)} style={{ width:38, height:38, border:0, borderRadius:12, background:colors.bg[600], color:colors.text[700], cursor:'pointer' }}><IconX width={17} height={17}/></button>
+          </div>
+          <label style={{ display:'grid', gap:6, fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase' }}>Empleado
+            <select value={uploadEmpId} onChange={e => setUploadEmpId(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }}>
+              {employees.map((e:any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </label>
+          <label style={{ display:'grid', gap:6, fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase' }}>Tipo de documento
+            <select value={uploadType} onChange={e => setUploadType(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }}>
+              <option value="contrato">Contrato</option><option value="nomina">Nómina</option><option value="certificado">Certificado</option><option value="otro">Otro</option>
+            </select>
+          </label>
+          <button onClick={chooseFile} style={{ minHeight:48, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:0, borderRadius:12, background:colors.primary.base, color:'#fff', fontSize:14, fontWeight:750, cursor:'pointer' }}><IconPlus width={15} height={15}/> Seleccionar archivo</button>
+          <div style={{ fontSize:11, color:colors.text[400], textAlign:'center' }}>PDF, Word, Excel o imagen · máximo 8 MB</div>
+        </div>
+      </div>
+    )}
   </>
 }
 
