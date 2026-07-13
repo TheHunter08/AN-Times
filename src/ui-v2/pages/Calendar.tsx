@@ -27,15 +27,15 @@ export interface CalendarProps {
 }
 
 const dotColor: Record<'complete' | 'partial' | 'off', string> = {
-  complete: colors.primary.base,
-  partial: colors.semantic.orange,
-  off: colors.text[300],
+  complete: '#22C55E',
+  partial: '#F59E0B',
+  off: '#64748B',
 }
 
 export function Calendar({ monthLabel, weeks, onPrev, onNext, week }: CalendarProps) {
   const [view, setView] = useState<'mes' | 'semana'>('mes')
   return (
-    <div style={{ maxWidth: view === 'semana' ? 900 : 660 }}>
+    <div className="uiv2-calendar-page" style={{ maxWidth: view === 'semana' ? 980 : 820 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <PageTitle>{monthLabel}</PageTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -85,9 +85,9 @@ export function Calendar({ monthLabel, weeks, onPrev, onNext, week }: CalendarPr
                 <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: colors.text[500] }}>{d}</div>
               ))}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {weeks.map((w, wi) => (
-                <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
                   {w.map((d, di) => {
                     const isToday = d.status === 'today'
                     return (
@@ -97,10 +97,12 @@ export function Calendar({ monthLabel, weeks, onPrev, onNext, week }: CalendarPr
                         style={{
                           position: 'relative',
                           aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                          borderRadius: radius.sm,
+                          borderRadius: radius.md,
+                          minHeight: 74,
                           fontSize: 13, fontWeight: isToday ? 800 : 600,
-                          background: isToday ? colors.primary.base : 'transparent',
-                          boxShadow: isToday ? `0 0 0 1px ${colors.primary.base}, 0 4px 16px ${colors.primary.glow}` : 'none',
+                          border: `1px solid ${isToday ? colors.primary.base : colors.border.subtle}`,
+                          background: isToday ? colors.gradients.brand : colors.bg[700],
+                          boxShadow: isToday ? `0 10px 28px ${colors.primary.glow}` : '0 2px 10px rgba(0,0,0,.08)',
                           color: isToday ? '#fff' : d.day ? colors.text[900] : 'transparent',
                           transition: transition(['background']),
                         }}
@@ -128,7 +130,12 @@ export function Calendar({ monthLabel, weeks, onPrev, onNext, week }: CalendarPr
         </>
       )}
 
-      <style>{`.uiv2-cal-nav:hover { background: ${colors.bg[500]} !important; border-color: ${colors.border.strong} !important; } .uiv2-cal-day:hover { background: rgba(var(--uiv2-overlay-rgb),.04) !important; }`}</style>
+      <style>{`
+        .uiv2-calendar-page { width:100%; margin:0 auto; }
+        .uiv2-cal-nav:hover { background:${colors.bg[500]} !important; border-color:${colors.primary.base} !important; transform:translateY(-1px); }
+        .uiv2-cal-day:hover { border-color:${colors.primary.base} !important; transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.16) !important; }
+        @media(max-width:640px){ .uiv2-cal-day{min-height:48px !important;aspect-ratio:auto !important}.uiv2-calendar-page{padding-bottom:80px} }
+      `}</style>
     </div>
   )
 }

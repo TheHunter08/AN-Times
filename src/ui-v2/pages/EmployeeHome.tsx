@@ -53,7 +53,7 @@ export interface EmployeeHomeProps {
 
 type HoldPhase = 'ready' | 'holding' | 'confirmed'
 
-const HOLD_DURATION = 1100
+const HOLD_DURATION = 550
 const PROGRESS_RADIUS = 127
 const HOLD_RADIUS = 114
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RADIUS

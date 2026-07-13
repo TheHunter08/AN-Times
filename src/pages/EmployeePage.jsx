@@ -1159,7 +1159,7 @@ export default function EmployeePage() {
                   ) : undefined}
                 />
               </div>
-              {weekPlanningData && (
+              {false && weekPlanningData && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1382,7 +1382,7 @@ export default function EmployeePage() {
                 ) : undefined}
               />
             </div>
-            {weekPlanningData && (
+            {false && weekPlanningData && (
               <div style={{ padding: '0 16px 16px' }}>
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 12px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>

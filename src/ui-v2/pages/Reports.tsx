@@ -50,14 +50,14 @@ export function Reports({ rows }: ReportsProps) {
                     onClick={() => r.onDownloadCSV?.(r.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[500], color: colors.text[700], fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
-                    <IconDownload width={12} height={12} /> CSV
+                    <IconDownload width={12} height={12} /> Excel
                   </button>
                 )}
                 <button
                   onClick={() => r.onDownload?.(r.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[500], color: colors.text[900], fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
                 >
-                  <IconDownload width={13} height={13} /> HTML
+                  <IconDownload width={13} height={13} /> PDF
                 </button>
               </div>
             </div>

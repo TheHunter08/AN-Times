@@ -183,7 +183,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
           gap: 14,
         }}>
           {filtered.map(emp => (
-            <EmployeeCard key={emp.id} emp={emp} onSelect={onSelect} onViewProfile={() => setProfileEmp(emp)} onViewTimesheets={() => onViewTimesheets?.(emp.id)} />
+            <EmployeeCard key={emp.id} emp={emp} onSelect={onSelect} onEdit={() => onEdit?.(emp.id)} onViewProfile={() => setProfileEmp(emp)} onViewTimesheets={() => onViewTimesheets?.(emp.id)} />
           ))}
         </div>
       )}
@@ -286,7 +286,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
   )
 }
 
-function EmployeeCard({ emp, onSelect, onViewProfile, onViewTimesheets }: { emp: EmployeeRow; onSelect?: (id: string) => void; onViewProfile?: () => void; onViewTimesheets?: () => void }) {
+function EmployeeCard({ emp, onSelect, onEdit, onViewProfile, onViewTimesheets }: { emp: EmployeeRow; onSelect?: (id: string) => void; onEdit?: () => void; onViewProfile?: () => void; onViewTimesheets?: () => void }) {
   const initials = emp.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const cfg = statusCfg[emp.status]
 
@@ -325,7 +325,7 @@ function EmployeeCard({ emp, onSelect, onViewProfile, onViewTimesheets }: { emp:
             <div style={{ fontSize: 11.5, color: colors.text[400], marginTop: 2 }}>{emp.role ?? emp.dept}</div>
           </div>
         </div>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], padding: 4, display: 'flex' }}>
+        <button aria-label={`Editar ${emp.name}`} onClick={e => { e.stopPropagation(); onEdit?.() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], padding: 8, display: 'flex' }}>
           <IconDots width={16} height={16} />
         </button>
       </div>

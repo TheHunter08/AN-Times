@@ -102,7 +102,7 @@ export const vacData = (empId, db) => {
   // Días/mes: 2.5 para jornada completa (30 días/año). Ajuste proporcional para jornadas parciales.
   const jornadaH = emp.jornadaHoras || emp.weeklyHours || 40
   const VPM = parseFloat(((30 / 12) * Math.min(jornadaH, 40) / 40).toFixed(4))
-  const sd = new Date(emp.startDate || emp.fechaAlta || new Date().toISOString().slice(0, 10))
+  const sd = new Date(emp.fechaInicioContrato || emp.startDate || emp.fechaAlta || new Date().toISOString().slice(0, 10))
   const n = new Date()
   let m = (n.getFullYear() - sd.getFullYear()) * 12 + (n.getMonth() - sd.getMonth())
   const sdDay = sd.getDate()

@@ -436,6 +436,7 @@ export function Dashboard({
         .ti-kpi-card {
           min-width: 0;
           min-height: 130px;
+          grid-auto-rows: 1fr;
           padding: 16px;
           display: flex;
           flex-direction: column;

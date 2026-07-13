@@ -40,9 +40,10 @@ import { supabase } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, calcSecs } from '../utils/time.js'
 import { clipBreaksToWindow } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
+import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
 
 const PAGES = [
-  { id: 'dashboard',      label: 'Resumen',           group: 'Principal', icon: <IconGrid /> },
+  { id: 'dashboard',      label: 'Dashboard',         group: 'Principal', icon: <IconGrid /> },
   { id: 'empleados',      label: 'Empleados',         group: 'Equipo', icon: <IconUsers /> },
   { id: 'fichajes',       label: 'Fichajes',          group: 'Equipo', icon: <IconClock /> },
   { id: 'planning',       label: 'Planning',          group: 'Equipo', icon: <IconCalendar /> },
@@ -73,6 +74,7 @@ interface EmpForm {
   id: string; name: string; email: string; role: string
   pin: string; pinLen: number | null
   centroTrabajo: string; telefono: string; obrasAsignadas: string[]
+  fechaInicioContrato: string; turnoInicio: string; turnoFin: string
 }
 
 function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () => void }) {
@@ -82,7 +84,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
-  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [] }
+  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00' }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
   const isEdit = !!initial
 
@@ -105,6 +107,9 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         role: form.role, pin: pinHash, pinLen,
         centroTrabajo: form.centroTrabajo || null,
         telefono: form.telefono || null,
+        fechaInicioContrato: form.fechaInicioContrato || null,
+        turnoInicio: form.turnoInicio || null,
+        turnoFin: form.turnoFin || null,
         obrasAsignadas: form.obrasAsignadas,
         isAdmin: form.role === 'admin',
         isEnc: form.role === 'encargado',
@@ -138,6 +143,11 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         {iField('Nombre completo', 'name', 'text', 'Ej: Juan García')}
         {iField('Email', 'email', 'email', 'juan@empresa.com')}
         {iField('Teléfono', 'telefono', 'tel', '+34 600 000 000')}
+        {iField('Inicio de contrato', 'fechaInicioContrato', 'date')}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {iField('Inicio del turno', 'turnoInicio', 'time')}
+          {iField('Fin del turno', 'turnoFin', 'time')}
+        </div>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Rol</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -451,6 +461,9 @@ function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) =
       role, pin: '', pinLen: emp.pinLen || null,
       centroTrabajo: emp.centroTrabajo || '', telefono: emp.telefono || '',
       obrasAsignadas: emp.obrasAsignadas || [],
+      fechaInicioContrato: emp.fechaInicioContrato || emp.contractStart || '',
+      turnoInicio: emp.turnoInicio || emp.shiftStart || '08:00',
+      turnoFin: emp.turnoFin || emp.shiftEnd || '16:00',
     }})
   }
 
@@ -750,7 +763,10 @@ function ExpensesPage() {
 
 function DocumentsPage() {
   const db    = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
   const toast = useAppStore(s => s.toast)
+  const uploadRef = useRef<HTMLInputElement>(null)
+  const uploadMeta = useRef<{ empId: string; empName: string; tipo: string } | null>(null)
 
   const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'otro'> = {
     contrato: 'contrato', nomina: 'nomina', nómina: 'nomina',
@@ -783,7 +799,42 @@ function DocumentsPage() {
     onDownload: handleDownload,
   })), [db.documentos])
 
-  return <Documents items={items} />
+  const requestUpload = () => {
+    const employees = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+    if (!employees.length) { toast('Primero debes crear un empleado', 3000, 'warn'); return }
+    const list = employees.map((e: any, i: number) => `${i + 1}. ${e.name}`).join('\n')
+    const selected = Number(window.prompt(`Selecciona el empleado:\n${list}`)) - 1
+    const emp = employees[selected]
+    if (!emp) return
+    const tipo = (window.prompt('Tipo de documento: contrato, nómina, certificado u otro', 'contrato') || '').trim().toLowerCase()
+    if (!tipo) return
+    uploadMeta.current = { empId: emp.id, empName: emp.name, tipo }
+    uploadRef.current?.click()
+  }
+
+  const uploadFile = (file?: File) => {
+    const meta = uploadMeta.current
+    if (!file || !meta) return
+    if (file.size > 8 * 1024 * 1024) { toast('El archivo supera el máximo de 8 MB', 3500, 'warn'); return }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const now = new Date().toISOString()
+      saveDB((fresh: any) => ({ documentos: [...(fresh.documentos || []), {
+        id: gid(), empId: meta.empId, empName: meta.empName, tipo: meta.tipo,
+        nombre: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        mime: file.type, data: reader.result, createdAt: now, _upd: now,
+      }] }))
+      toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
+      uploadMeta.current = null
+    }
+    reader.onerror = () => toast('No se pudo leer el documento', 3000, 'warn')
+    reader.readAsDataURL(file)
+  }
+
+  return <>
+    <input ref={uploadRef} type="file" hidden onChange={e => { uploadFile(e.target.files?.[0]); e.currentTarget.value = '' }} />
+    <Documents items={items} onUpload={requestUpload} />
+  </>
 }
 
 function ReportsPage() {
@@ -819,59 +870,32 @@ function ReportsPage() {
         String(brk),
       ])
     })
-    const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const bom = '﻿'
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `fichajes-${mes}.csv`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-    toast(`CSV descargado — ${label}`, 3000, 'ok')
+    downloadExcel(rows[0], rows.slice(1), `fichajes-${mes}.xls`)
+    toast(`Excel descargado — ${label}`, 3000, 'ok')
   }
 
-  const handleDownload = (mes: string) => {
+  const handleDownload = async (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(mes) && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
 
-    const empRows = emps.map((e: any) => {
+    const pdfLines: string[] = []
+    emps.forEach((e: any) => {
       const empRecs = recs.filter((r: any) => r.empId === e.id)
       const mins = empRecs.reduce((s: number, r: any) =>
         s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
       const days = new Set(empRecs.map((r: any) => (r.inicio || '').slice(0, 10))).size
       const h = Math.floor(mins / 60), m = Math.floor(mins % 60)
-      return `<tr><td>${e.name}</td><td>${e.centroTrabajo || e.dept || '—'}</td><td>${days}</td><td>${h}h ${m}m</td></tr>`
-    }).join('')
+      pdfLines.push(`${e.name} | ${e.centroTrabajo || e.dept || '-'} | ${days} dias | ${h}h ${m}m`)
+    })
 
     const totalMins = recs.reduce((s: number, r: any) =>
       s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
 
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Informe mensual · ${label}</title>
-<style>body{font-family:Inter,Arial,sans-serif;padding:32px;color:#111}h1{font-size:22px;margin-bottom:4px}
-.sub{color:#666;font-size:13px;margin-bottom:24px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#8D672E;color:#fff;padding:8px 12px;text-align:left}
-td{padding:8px 12px;border-bottom:1px solid #eee}
-tr:nth-child(even) td{background:#f9f9f9}
-.total{margin-top:16px;font-size:13px;color:#444}strong{color:#8D672E}
-</style></head><body>
-<h1>Informe mensual · ${label}</h1>
-<p class="sub">Generado el ${new Date().toLocaleDateString('es-ES')} · TIMES INC</p>
-<table><thead><tr><th>Empleado</th><th>Centro</th><th>Días trabajados</th><th>Horas totales</th></tr></thead>
-<tbody>${empRows}</tbody></table>
-<p class="total">Total horas del mes: <strong>${Math.floor(totalMins / 60)}h ${Math.floor(totalMins % 60)}m</strong> · ${new Set(recs.map((r: any) => r.empId)).size} empleados · ${recs.length} fichajes</p>
-</body></html>`
-
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `informe-${mes}.html`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    pdfLines.unshift(`Generado: ${new Date().toLocaleDateString('es-ES')}`)
+    pdfLines.push(`TOTAL: ${Math.floor(totalMins / 60)}h ${Math.floor(totalMins % 60)}m | ${recs.length} fichajes`)
+    await downloadSimplePdf(`Informe mensual - ${label}`, pdfLines, `informe-${mes}.pdf`)
   }
 
   const rows = useMemo(() => months.map((m) => {

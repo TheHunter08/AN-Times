@@ -5,6 +5,7 @@ import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconFileText, IconDownload, IconCheck, IconChevronDown, IconX } from '../components/Icons.js'
+import { downloadSimplePdf, downloadExcel } from '../../utils/exportFiles.js'
 
 export interface ClosureItem {
   id: string
@@ -50,7 +51,25 @@ const signTone = (item: ClosureItem): 'gray' | 'orange' | 'green' => {
   return 'gray'
 }
 
-function generatePDF(item: ClosureItem) {
+async function generatePDF(item: ClosureItem) {
+  const lines = [
+    `Empleado: ${item.empName}`,
+    `Mes: ${item.month}`,
+    `Dias trabajados: ${item.workedDays}`,
+    `Horas totales: ${item.totalHours}`,
+    `Horas extra: ${item.extraHours}`,
+    '',
+    'Fecha | Entrada | Salida | Horas',
+    ...(item.records || []).map(r => `${r.date} | ${r.entry} | ${r.exit} | ${r.hours}`),
+  ]
+  await downloadSimplePdf(`Cierre mensual - ${item.empName}`, lines, `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.pdf`)
+}
+
+function generateExcel(item: ClosureItem) {
+  downloadExcel(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xls`)
+}
+
+function legacyGeneratePDF(item: ClosureItem) {
   const rows = (item.records || []).map(r =>
     `<tr><td>${r.date}</td><td>${r.entry}</td><td>${r.exit}</td><td>${r.hours}</td></tr>`
   ).join('')
@@ -228,6 +247,9 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
                 >
                   <IconDownload width={13} height={13} /> PDF
                 </button>
+                <button onClick={() => generateExcel(item)} title="Generar Excel" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}>
+                  <IconDownload width={13} height={13} /> Excel
+                </button>
                 <button
                   onClick={() => setDetail(item)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: radius.xs, border: 'none', background: colors.primary.dim, color: colors.primary.light, cursor: 'pointer', fontSize: 11, fontWeight: 640, fontFamily: 'inherit' }}
@@ -332,6 +354,9 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
                 style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 <IconDownload width={14} height={14} /> Descargar PDF
+              </button>
+              <button onClick={() => generateExcel(detail)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Descargar Excel
               </button>
               {!detail.firmaAdmin && onSignAdmin && (
                 <button
