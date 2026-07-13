@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mergeDB, recordTombstones } from './dataService.js'
+import { mergeDB, recordTombstones, mergePendingDeletes } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -31,5 +31,18 @@ describe('tombstones: borrar una jornada no debe resucitar en el siguiente fetch
     const rec = { id: 'r3', empId: 'e2', empName: 'Ana', inicio: '2026-07-09T09:00:00.000Z', fin: '2026-07-09T17:00:00.000Z' }
     const merged = mergeDB({ ...BASE }, { records: [rec] })
     expect(merged.records.some(r => r.id === 'r3')).toBe(true)
+  })
+})
+
+describe('cola offline', () => {
+  it('acumula tombstones de varios guardados sin cobertura', () => {
+    expect(mergePendingDeletes(
+      { records: ['r1'], vacaciones: ['v1'] },
+      { records: ['r2', 'r1'], gastos: ['g1'] },
+    )).toEqual({ records: ['r1', 'r2'], vacaciones: ['v1'], gastos: ['g1'] })
+  })
+
+  it('no crea grupos vacíos de eliminaciones', () => {
+    expect(mergePendingDeletes(null, null)).toBeNull()
   })
 })

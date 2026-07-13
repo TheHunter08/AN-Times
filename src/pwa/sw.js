@@ -8,7 +8,7 @@ import { ExpirationPlugin } from 'workbox-expiration'
 // mensaje 'SKIP_WAITING' tras confirmar el banner "Nueva versión disponible".
 // Esto evita refrescos sorpresa durante una jornada activa.
 const ACTIVE_CACHES = new Set([
-  'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'supabase-api'
+  'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'supabase-api', 'offline-shell'
 ])
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -303,8 +303,10 @@ async function _idbDel(key) {
   const db = await _idbOpen()
   return new Promise((res, rej) => {
     const tx = db.transaction(_IDB_STORE, 'readwrite')
-    const r  = tx.objectStore(_IDB_STORE).delete(key)
-    r.onsuccess = res; r.onerror = () => rej(r.error)
+    tx.objectStore(_IDB_STORE).delete(key)
+    tx.oncomplete = () => res()
+    tx.onerror = () => rej(tx.error)
+    tx.onabort = () => rej(tx.error)
   })
 }
 async function _idbPut(key, value) {
@@ -416,6 +418,7 @@ async function _bgSync() {
     const isNewFmt = stored !== null && typeof stored === 'object' && 'payload' in stored
     const pending = isNewFmt ? stored.payload : stored
     const deleted = isNewFmt ? stored.deleted : undefined
+    const revision = isNewFmt ? stored.revision : undefined
     if (!pending) return false
     const server = await _fetchServerData()
     const data = _mergeForPushSW(server, pending, deleted)
@@ -441,7 +444,9 @@ async function _bgSync() {
         throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
       }
     }
-    await _idbDel('pending')
+    const current = await _idbGet('pending')
+    const hasNewerPending = revision != null && current?.revision != null && current.revision !== revision
+    if (!hasNewerPending) await _idbDel('pending')
     // Borrar badge del icono de la app (si el navegador lo soporta)
     try { await self.navigator?.clearAppBadge?.() } catch {}
     // Marcar last_sync en BD para que el cron no siga enviando SYNC_PING
@@ -461,8 +466,13 @@ async function _bgSync() {
       }
     } catch {}
     const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
-    return true
+    if (!hasNewerPending) cs.forEach(c => c.postMessage({ type: 'BG_SYNC_DONE' }))
+    else {
+      // Llegó otro cambio mientras subíamos. Programar una segunda pasada en
+      // Android/Chromium incluso si la aplicación ya está en segundo plano.
+      try { await self.registration.sync?.register('sync-data') } catch {}
+    }
+    return !hasNewerPending
   } finally {
     _bgSyncFlight = false
   }

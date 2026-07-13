@@ -383,6 +383,7 @@ let _saveTimer  = null
 // ── IndexedDB helpers para Background Sync ────────────────────────────────────
 const _IDB_NAME = 'times-inc-sync'
 const _IDB_STORE = 'q'
+const _PENDING_FALLBACK_KEY = 'an_times_pending_sync'
 
 function _idbOpen() {
   return new Promise((res, rej) => {
@@ -397,8 +398,10 @@ async function _idbSet(key, val) {
   const db = await _idbOpen()
   return new Promise((res, rej) => {
     const tx = db.transaction(_IDB_STORE, 'readwrite')
-    const r  = tx.objectStore(_IDB_STORE).put(val, key)
-    r.onsuccess = res; r.onerror = () => rej(r.error)
+    tx.objectStore(_IDB_STORE).put(val, key)
+    tx.oncomplete = () => res()
+    tx.onerror = () => rej(tx.error)
+    tx.onabort = () => rej(tx.error)
   })
 }
 
@@ -418,8 +421,10 @@ async function _idbDel(key) {
     const db = await _idbOpen()
     return new Promise((res, rej) => {
       const tx = db.transaction(_IDB_STORE, 'readwrite')
-      const r  = tx.objectStore(_IDB_STORE).delete(key)
-      r.onsuccess = res; r.onerror = () => rej(r.error)
+      tx.objectStore(_IDB_STORE).delete(key)
+      tx.oncomplete = () => res()
+      tx.onerror = () => rej(tx.error)
+      tx.onabort = () => rej(tx.error)
     })
   } catch {}
 }
@@ -429,13 +434,56 @@ async function _idbDel(key) {
 // en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
 let _onlineListenerPending = false
 let _bgSyncRetries = 0
+let _pendingWriteFlight = Promise.resolve()
+
+export function mergePendingDeletes(previous, incoming) {
+  const out = {}
+  for (const source of [previous, incoming]) {
+    for (const [key, ids] of Object.entries(source || {})) {
+      out[key] = [...new Set([...(out[key] || []), ...(Array.isArray(ids) ? ids : [])])]
+    }
+  }
+  return Object.keys(out).length ? out : null
+}
+
+function _fallbackPendingGet() {
+  try { return JSON.parse(localStorage.getItem(_PENDING_FALLBACK_KEY) || 'null') } catch { return null }
+}
+
+async function _readPending() {
+  const idb = await _idbGet('pending')
+  const fallback = _fallbackPendingGet()
+  if (!idb) return fallback
+  if (!fallback) return idb
+  return (Number(fallback.revision) || 0) > (Number(idb.revision) || 0) ? fallback : idb
+}
+
+async function _writePending(value) {
+  try {
+    await _idbSet('pending', value)
+    try { localStorage.removeItem(_PENDING_FALLBACK_KEY) } catch {}
+  } catch {
+    // Safari privado y algunos WebViews pueden bloquear IndexedDB aunque
+    // localStorage sí funcione. Mantener una segunda copia evita perder la cola.
+    try { localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(value)) } catch {}
+  }
+}
 
 async function _storeForBgSync(data, deleted) {
   try {
     // Se envuelve junto con `deleted` (ids borrados a propósito en este guardado)
     // para que, cuando por fin se sincronice offline, sw.js/_bgSyncFallback puedan
     // aplicar la eliminación real en vez de que la unión con el servidor la resucite.
-    await _idbSet('pending', { payload: data, deleted: deleted || null })
+    await (_pendingWriteFlight = _pendingWriteFlight.catch(() => {}).then(async () => {
+      const previous = await _readPending()
+      const previousRevision = Number(previous?.revision) || 0
+      const revision = Math.max(Date.now(), previousRevision + 1)
+      await _writePending({
+        payload: data,
+        deleted: mergePendingDeletes(previous?.deleted, deleted),
+        revision,
+      })
+    }))
     // Badge rojo en el icono de la app: avisa al usuario de que hay datos pendientes.
     // Se borra en _bgSyncFallback y en _bgSync del SW cuando la subida tiene éxito.
     try { navigator.setAppBadge?.(1) } catch {}
@@ -528,9 +576,9 @@ async function _bgSyncFallback() {
   if (_pushFlight) { setTimeout(_bgSyncFallback, 2000); return }
   _bgSyncFallbackFlight = true
   try {
-    const stored = await _idbGet('pending')
+    const stored = await _readPending()
     if (!stored || !supabase) { _bgSyncRetries = 0; return }
-    const { payload: data, deleted } = stored
+    const { payload: data, deleted, revision } = stored
     // NO se comprueba navigator.onLine aquí: en iOS es conocidamente poco fiable
     // (puede quedarse pegado en `false` tras un cambio de red WiFi↔datos, o no
     // reflejar nunca una señal débil real) — confiar en él para decidir si
@@ -549,11 +597,12 @@ async function _bgSyncFallback() {
     merged._ts = Date.now()
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
-    await _idbDel('pending')
+    const cleared = await _clearBgSync(revision)
     try { navigator.clearAppBadge?.() } catch {}
     _updateLastSync()
     _bgSyncRetries = 0
-    window.dispatchEvent(new CustomEvent('times-synced'))
+    if (cleared) window.dispatchEvent(new CustomEvent('times-synced'))
+    else setTimeout(_bgSyncFallback, 0)
   } catch (e) {
     console.error('[_bgSyncFallback] error:', e)
     // Reintentar hasta 3 veces (5s, 10s, 15s) antes de mostrar el toast de error.
@@ -573,7 +622,16 @@ async function _bgSyncFallback() {
   }
 }
 
-function _clearBgSync() { _idbDel('pending') }
+async function _clearBgSync(revision) {
+  await _pendingWriteFlight.catch(() => {})
+  const current = await _readPending()
+  if (!current) return true
+  // No borrar una operación que llegó mientras esta petición estaba en vuelo.
+  if (revision != null && current.revision != null && current.revision !== revision) return false
+  await _idbDel('pending')
+  try { localStorage.removeItem(_PENDING_FALLBACK_KEY) } catch {}
+  return true
+}
 
 function _drainQueue() {
   if (_pushFlight || _pushQueue.length === 0) return
@@ -583,10 +641,24 @@ function _drainQueue() {
   _doCloudPush(freshDb, entry.deleted, entry.onSuccess, entry.onError)
 }
 
+function _markPendingFallback(payload, deleted) {
+  const previous = _fallbackPendingGet()
+  const revision = Math.max(Date.now(), (Number(previous?.revision) || 0) + 1)
+  const effectiveDeleted = mergePendingDeletes(previous?.deleted, deleted)
+  try {
+    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify({ payload, deleted: effectiveDeleted, revision }))
+  } catch {}
+  return { revision, effectiveDeleted }
+}
+
 function _doCloudPush(db, deleted, onSuccess, onError) {
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
+  // Escribir una marca síncrona ANTES de iniciar la red. Si iOS/Android mata
+  // el proceso durante el primer timeout, el siguiente arranque aún sabe que
+  // debe subir esta foto local aunque IndexedDB no llegara a prepararse.
+  const { revision: fallbackRevision, effectiveDeleted } = _markPendingFallback(payload, deleted)
 
   // NO se comprueba navigator.onLine aquí — ver el mismo razonamiento en
   // _bgSyncFallback: en iOS puede quedarse pegado en `false` con red real
@@ -595,13 +667,17 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
   // subir nunca en esos dispositivos — ni la app en primer plano lo
   // reintentaba (todo pasaba a depender de Background Sync, que iOS no
   // soporta) hasta que el usuario cerraba y reabría la app.
-  _mergeWithServer(payload, deleted)
+  _mergeWithServer(payload, effectiveDeleted)
     .then(merged => _upsertHotCold(merged).then(() => merged))
     .then((merged) => {
       _pushFlight = false
       _saveRetry = 0
       _onlineListenerPending = false
-      _clearBgSync()
+      // Limpiar solo la versión que acabamos de confirmar. Si llegó otra
+      // operación mientras la petición volaba, queda intacta y se sube después.
+      _clearBgSync(fallbackRevision).then(cleared => {
+        if (!cleared) setTimeout(_bgSyncFallback, 0)
+      }).catch(() => setTimeout(_bgSyncFallback, 0))
       saveLocal(merged)
       onSuccess?.(merged)
       _broadcastUpdate(merged._ts)
@@ -615,7 +691,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       // Guardar en IDB desde el primer fallo: si el usuario cierra la app
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
-      _storeForBgSync(payload, deleted)
+      _storeForBgSync(payload, effectiveDeleted)
       // Solo 2 reintentos en primer plano (antes 5): el dato YA está a salvo en
       // IDB desde la línea de arriba, así que insistir aquí solo añade tiempo de
       // espera en pantalla sin más seguridad — en señal débil es mejor rendirse
@@ -623,7 +699,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       // termine el trabajo sin bloquear al usuario.
       if (_saveRetry < 2) {
         _saveRetry++
-        _pushQueue.unshift({ db: null, deleted, onSuccess, onError })
+        _pushQueue.unshift({ db: null, deleted: effectiveDeleted, onSuccess, onError })
         // Backoff: 1s, 2s
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
@@ -640,7 +716,10 @@ export function cloudPush(db, deleted, onSuccess, onError) {
     // Do not retain a stale snapshot while another push is in flight. At
     // drain time the latest optimistic local DB is the source of truth; only
     // the tombstones/callback from this queued mutation need to be preserved.
-    _pushQueue.push({ db: null, deleted, onSuccess, onError })
+    const latestPayload = { ...db, _ts: Date.now() }
+    saveLocal(latestPayload)
+    const { effectiveDeleted } = _markPendingFallback(latestPayload, deleted)
+    _pushQueue.push({ db: null, deleted: effectiveDeleted, onSuccess, onError })
     return
   }
   _doCloudPush(db, deleted, onSuccess, onError)
