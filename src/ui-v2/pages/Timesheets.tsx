@@ -5,6 +5,7 @@ import { Table } from '../components/Table.js'
 import type { TableColumn } from '../components/Table.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
+import { IconEdit, IconX, IconCheck } from '../components/Icons.js'
 
 export interface TimesheetRow {
   id: string
@@ -21,9 +22,23 @@ export interface TimesheetsProps {
   rows: TimesheetRow[]
   search: string
   onSearchChange: (v: string) => void
+  onModify?: (id: string, entry: string, exit: string) => Promise<boolean> | boolean
+  onDelete?: (id: string) => Promise<boolean> | boolean
 }
 
-export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
+export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }: TimesheetsProps) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editEntry, setEditEntry] = useState('')
+  const [editExit, setEditExit] = useState('')
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const startEdit = (row: TimesheetRow) => { setEditingId(row.id); setEditEntry(row.entrada); setEditExit(row.salida) }
+  const saveEdit = async (row: TimesheetRow) => {
+    if (!onModify) return
+    setSavingId(row.id)
+    const ok = await onModify(row.id, editEntry, editExit)
+    setSavingId(null)
+    if (ok !== false) setEditingId(null)
+  }
   const columns: TableColumn<TimesheetRow>[] = [
     {
       key: 'name', header: 'Empleado', width: '160px',
@@ -38,11 +53,24 @@ export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
       ),
     },
     { key: 'day', header: 'Día', width: '90px', render: r => r.day },
-    { key: 'entrada', header: 'Entrada', width: '66px', render: r => r.entrada },
-    { key: 'salida', header: 'Salida', width: '66px', render: r => r.salida },
+    { key: 'entrada', header: 'Entrada', width: '88px', render: r => editingId === r.id ? <input aria-label={`Entrada de ${r.name}`} type="time" value={editEntry} onChange={e => setEditEntry(e.target.value)} style={{ width:82, minHeight:36, padding:'4px 6px', borderRadius:8, border:`1px solid ${colors.primary.base}`, background:colors.bg[600], color:colors.text[900] }}/> : r.entrada },
+    { key: 'salida', header: 'Salida', width: '88px', render: r => editingId === r.id ? <input aria-label={`Salida de ${r.name}`} type="time" value={editExit} onChange={e => setEditExit(e.target.value)} style={{ width:82, minHeight:36, padding:'4px 6px', borderRadius:8, border:`1px solid ${colors.primary.base}`, background:colors.bg[600], color:colors.text[900] }}/> : r.salida },
     {
       key: 'worked', header: 'Trabajo', width: '72px',
       render: r => <span style={{ fontWeight: 700, color: r.over ? colors.semantic.orange : colors.text[900] }}>{r.worked}</span>,
+    },
+    {
+      key: 'actions', header: 'Acciones', width: '104px', render: r => (
+        <div style={{ display:'flex', gap:6 }}>
+          {editingId === r.id ? <>
+            <button aria-label={`Guardar fichaje de ${r.name}`} disabled={savingId === r.id} onClick={() => saveEdit(r)} style={{ width:38, height:38, border:0, borderRadius:9, background:colors.primary.base, color:'#fff', cursor:'pointer' }}><IconCheck width={14} height={14}/></button>
+            <button aria-label="Cancelar edición" onClick={() => setEditingId(null)} style={{ width:38, height:38, border:`1px solid ${colors.border.default}`, borderRadius:9, background:'transparent', color:colors.text[700], cursor:'pointer' }}><IconX width={14} height={14}/></button>
+          </> : <>
+            <button aria-label={`Modificar fichaje de ${r.name}`} onClick={() => startEdit(r)} style={{ width:38, height:38, border:0, borderRadius:9, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer' }}><IconEdit width={14} height={14}/></button>
+            <button aria-label={`Eliminar fichaje de ${r.name}`} onClick={() => onDelete?.(r.id)} style={{ width:38, height:38, border:'1px solid rgba(239,68,68,.28)', borderRadius:9, background:'transparent', color:colors.semantic.red, cursor:'pointer' }}><IconX width={14} height={14}/></button>
+          </>}
+        </div>
+      )
     },
   ]
 
@@ -59,3 +87,4 @@ export function Timesheets({ rows, search, onSearchChange }: TimesheetsProps) {
     </div>
   )
 }
+import { useState } from 'react'

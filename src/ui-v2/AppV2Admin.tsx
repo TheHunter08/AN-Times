@@ -499,9 +499,56 @@ function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) =
 
 function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?: string; onSearchChange?: (s: string) => void }) {
   const [search, setSearch] = useState(initialSearch)
+  const db = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const session = useAppStore(s => s.session)
+  const toast = useAppStore(s => s.toast)
   const rows = useTimesheetsData(search)
   const handleSearch = (s: string) => { setSearch(s); onSearchChange?.(s) }
-  return <Timesheets rows={rows} search={search} onSearchChange={handleSearch} />
+
+  const modify = async (id: string, entry: string, exit: string) => {
+    const rec = (db.records || []).find((r: any) => r.id === id)
+    if (!rec) return false
+    const [eh, em] = entry.split(':').map(Number), [xh, xm] = exit.split(':').map(Number)
+    if (![eh, em, xh, xm].every(Number.isFinite)) { toast('Introduce horas válidas', 3000, 'warn'); return false }
+    const inicio = new Date(rec.inicio); inicio.setHours(eh, em, 0, 0)
+    const fin = new Date(rec.inicio); fin.setHours(xh, xm, 0, 0)
+    if (fin <= inicio) fin.setDate(fin.getDate() + 1)
+    const breaks = clipBreaksToWindow(rec.breaks || [], inicio, fin)
+    const calculated = calcSecs({ ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
+    const nowIso = new Date().toISOString()
+    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:'Corrección desde Fichajes', oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado' }] }
+    try {
+      await persistRecordRow(updated)
+      saveDB((fresh:any) => {
+        const stale = flagStaleCierreForEdit(fresh.cierres || [], rec.empId, rec.inicio, updated.inicio)
+        const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado')
+        return { records:(fresh.records || []).map((r:any) => r.id === id ? updated : r), cierres, audit:withAudit.audit }
+      })
+      toast('Fichaje modificado y sincronizado', 3000, 'ok')
+      return true
+    } catch (error:any) { toast(`No se pudo modificar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
+  }
+
+  const remove = async (id: string) => {
+    const rec = (db.records || []).find((r:any) => r.id === id)
+    if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return false
+    try {
+      await deleteRecordRow(id)
+      const nowIso = new Date().toISOString()
+      saveDB((fresh:any) => {
+        const stale = flagStaleCierre(fresh.cierres || [], rec.empId, rec.inicio)
+        const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
+        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado')
+        return { records:(fresh.records || []).filter((r:any) => r.id !== id), cierres, audit:withAudit.audit }
+      })
+      toast('Fichaje eliminado y sincronizado', 3000, 'ok')
+      return true
+    } catch (error:any) { toast(`No se pudo eliminar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
+  }
+
+  return <Timesheets rows={rows} search={search} onSearchChange={handleSearch} onModify={modify} onDelete={remove} />
 }
 
 function PlanningPage() {
