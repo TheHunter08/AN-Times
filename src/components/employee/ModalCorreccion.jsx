@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
-import { gid, ftime, toDatetimeLocal } from '../../utils/time.js'
+import { gid, ftime, ftimeInput } from '../../utils/time.js'
+import { recordTimesFromClock } from '../../utils/adminHelpers.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -20,8 +21,8 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
 
   useEffect(() => {
     if (visible && rec) {
-      setInicio(toDatetimeLocal(rec.inicio))
-      setFin(toDatetimeLocal(rec.fin))
+      setInicio(ftimeInput(rec.inicio))
+      setFin(ftimeInput(rec.fin))
       setMotivo('')
     }
   }, [visible, rec])
@@ -33,11 +34,13 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
     if (!motivo.trim()) { toast('Añade un motivo para la corrección'); return }
     if (!inicio) { toast('Indica la hora de entrada correcta'); return }
     setSending(true)
+    const times = recordTimesFromClock(rec, inicio, fin || inicio)
+    if (!times) { toast('Indica horas válidas'); setSending(false); return }
     const corr = {
       id: gid(), empId: u.id, empName: u.name, recId: rec.id,
       recInicio: rec.inicio, recFin: rec.fin || null,
-      propInicio: new Date(inicio).toISOString(),
-      propFin: fin ? new Date(fin).toISOString() : null,
+      propInicio: times.inicio.toISOString(),
+      propFin: fin ? times.fin.toISOString() : null,
       motivo: motivo.trim(), estado: 'pendiente', ts: Date.now()
     }
     saveDB(freshDb => ({
@@ -63,11 +66,11 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
 
         <div style={{ marginBottom:12 }}>
           <label style={LBL}>Nueva hora de entrada</label>
-          <input type="datetime-local" value={inicio} onChange={e => setInicio(e.target.value)} style={INP} />
+          <input type="time" value={inicio} onChange={e => setInicio(e.target.value)} style={INP} />
         </div>
         <div style={{ marginBottom:12 }}>
           <label style={LBL}>Nueva hora de salida</label>
-          <input type="datetime-local" value={fin} onChange={e => setFin(e.target.value)} style={INP} />
+          <input type="time" value={fin} onChange={e => setFin(e.target.value)} style={INP} />
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={LBL}>Motivo de la corrección *</label>

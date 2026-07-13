@@ -37,8 +37,8 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
-import { gid, today, mhm, localDateStr, calcSecs } from '../utils/time.js'
-import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, notifyStaleCierre } from '../utils/adminHelpers.js'
+import { gid, today, mhm, localDateStr, calcSecs, recWorkSecs } from '../utils/time.js'
+import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
 
@@ -363,7 +363,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas']]
     weekRecs.forEach((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
-      const mins = Math.round((new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000)
+      const mins = Math.round(recWorkSecs(r) / 60)
       rows.push([
         emp?.name || r.empName || '',
         r.centro || emp?.centroTrabajo || '',
@@ -413,7 +413,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const byDay = new Map<string, number>()
     ;(db.records || []).filter((r: any) => r.fin && r.inicio?.startsWith(mesStr)).forEach((r: any) => {
       const key = `${r.empId}::${r.inicio.slice(0, 10)}`
-      const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      const mins = recWorkSecs(r) / 60
       byDay.set(key, (byDay.get(key) || 0) + mins)
     })
     let extra = 0
@@ -509,11 +509,9 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
   const modify = async (id: string, entry: string, exit: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return false
-    const [eh, em] = entry.split(':').map(Number), [xh, xm] = exit.split(':').map(Number)
-    if (![eh, em, xh, xm].every(Number.isFinite)) { toast('Introduce horas válidas', 3000, 'warn'); return false }
-    const inicio = new Date(rec.inicio); inicio.setHours(eh, em, 0, 0)
-    const fin = new Date(rec.inicio); fin.setHours(xh, xm, 0, 0)
-    if (fin <= inicio) fin.setDate(fin.getDate() + 1)
+    const times = recordTimesFromClock(rec, entry, exit)
+    if (!times) { toast('Introduce horas válidas', 3000, 'warn'); return false }
+    const { inicio, fin } = times
     const breaks = clipBreaksToWindow(rec.breaks || [], inicio, fin)
     const calculated = calcSecs({ ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
@@ -592,7 +590,7 @@ function PlanningPage() {
         // calculate hours
         const mins = dayRecs.reduce((s: number, r: any) => {
           if (!r.inicio || !r.fin) return s
-          return s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+          return s + recWorkSecs(r) / 60
         }, 0)
         const h = Math.floor(mins / 60)
         const m = Math.floor(mins % 60)
@@ -684,7 +682,7 @@ function ValidateHoursPage() {
 
     return records.map((r: any) => {
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
-      const worked = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      const worked = recWorkSecs(r) / 60
       const expected = Number(db.config?.wdMin) || 480
       const diff = worked - expected
       const diffH = Math.abs(Math.floor(diff / 60))
@@ -706,25 +704,35 @@ function ValidateHoursPage() {
     })
   }, [db])
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
     const nowIso = new Date().toISOString()
+    const updated = { ...rec, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
+    try { await persistRecordRow(updated) } catch (error: any) {
+      toast(`No se pudo validar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      return
+    }
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
+        r.id === id ? updated : r
       ),
     }))
     toast('Jornada validada', 2500, 'ok')
   }
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
     const nowIso = new Date().toISOString()
+    const updated = { ...rec, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
+    try { await persistRecordRow(updated) } catch (error: any) {
+      toast(`No se pudo rechazar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      return
+    }
     saveDB((fresh: any) => ({
       records: (fresh.records || []).map((r: any) =>
-        r.id === id ? { ...r, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso } : r
+        r.id === id ? updated : r
       ),
     }))
     toast('Jornada rechazada', 2500, 'warn')
@@ -733,16 +741,12 @@ function ValidateHoursPage() {
   const handleModify = async (id: string, entry: string, exit: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
-    const base = new Date(rec.inicio)
-    const [eh, em] = entry.split(':').map(Number)
-    const [xh, xm] = exit.split(':').map(Number)
-    if (!Number.isFinite(eh) || !Number.isFinite(em) || !Number.isFinite(xh) || !Number.isFinite(xm)) {
+    const times = recordTimesFromClock(rec, entry, exit)
+    if (!times) {
       toast('Introduce una hora válida', 3000, 'warn')
       return
     }
-    const newInicio = new Date(base); newInicio.setHours(eh, em, 0, 0)
-    const newFin    = new Date(base); newFin.setHours(xh, xm, 0, 0)
-    if (newFin <= newInicio) newFin.setDate(newFin.getDate() + 1)
+    const { inicio: newInicio, fin: newFin } = times
     const breaks = clipBreaksToWindow(rec.breaks || [], newInicio, newFin)
     const recalculated = calcSecs({ ...rec, inicio: newInicio.toISOString(), fin: newFin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
@@ -979,7 +983,7 @@ function ReportsPage() {
     const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']]
     recs.forEach((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
-      const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      const mins = recWorkSecs(r) / 60
       const brk = Math.round((r.breakSecs || 0) / 60)
       const worked = Math.round(mins - brk)
       rows.push([
@@ -1006,14 +1010,14 @@ function ReportsPage() {
     emps.forEach((e: any) => {
       const empRecs = recs.filter((r: any) => r.empId === e.id)
       const mins = empRecs.reduce((s: number, r: any) =>
-        s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
+        s + recWorkSecs(r) / 60, 0)
       const days = new Set(empRecs.map((r: any) => (r.inicio || '').slice(0, 10))).size
       const h = Math.floor(mins / 60), m = Math.floor(mins % 60)
       pdfLines.push(`${e.name} | ${e.centroTrabajo || e.dept || '-'} | ${days} dias | ${h}h ${m}m`)
     })
 
     const totalMins = recs.reduce((s: number, r: any) =>
-      s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0)
+      s + recWorkSecs(r) / 60, 0)
 
     pdfLines.unshift(`Generado: ${new Date().toLocaleDateString('es-ES')}`)
     pdfLines.push(`TOTAL: ${Math.floor(totalMins / 60)}h ${Math.floor(totalMins % 60)}m | ${recs.length} fichajes`)
@@ -1026,7 +1030,7 @@ function ReportsPage() {
     const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(m) && r.fin)
     const totalMins = recs.reduce((s: number, r: any) => {
       if (!r.inicio || !r.fin) return s
-      return s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      return s + recWorkSecs(r) / 60
     }, 0)
     const empCount = new Set(recs.map((r: any) => r.empId)).size
     return {
@@ -1050,7 +1054,7 @@ function StatsPage() {
     const thisMonth = new Date().toISOString().slice(0, 7)
     const monthRecs = allRecs.filter((r: any) => (r.inicio || '').startsWith(thisMonth))
     const totalMins = monthRecs.reduce((s: number, r: any) => {
-      return s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      return s + recWorkSecs(r) / 60
     }, 0)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const empCount = emps.length || 1
@@ -1068,7 +1072,7 @@ function StatsPage() {
     // Hours per employee bar
     const bars = emps.slice(0, 8).map((e: any) => {
       const empMins = monthRecs.filter((r: any) => r.empId === e.id).reduce((s: number, r: any) =>
-        s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0
+        s + recWorkSecs(r) / 60, 0
       )
       const maxPossible = 160 * 60 // 160h/month
       return { label: e.name?.split(' ')[0] || e.id, value: Math.min(100, Math.round(empMins / maxPossible * 100)) }
@@ -1079,7 +1083,7 @@ function StatsPage() {
     monthRecs.forEach((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
       const centro = r.centro || emp?.centroTrabajo || 'Sin asignar'
-      const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+      const mins = recWorkSecs(r) / 60
       centroMap.set(centro, (centroMap.get(centro) || 0) + mins)
     })
     const centrosBars = [...centroMap.entries()]
@@ -1089,15 +1093,15 @@ function StatsPage() {
 
     const rawSlices = [
       { label: 'Jornada completa', value: monthRecs.filter((r: any) => {
-        const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+        const mins = recWorkSecs(r) / 60
         return mins >= 420 && mins <= 540
       }).length, color: colors.semantic.green },
       { label: 'Jornada parcial', value: monthRecs.filter((r: any) => {
-        const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+        const mins = recWorkSecs(r) / 60
         return mins > 0 && mins < 420
       }).length, color: colors.semantic.orange },
       { label: 'Horas extra', value: monthRecs.filter((r: any) => {
-        const mins = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+        const mins = recWorkSecs(r) / 60
         return mins > 540
       }).length, color: colors.primary.base },
     ]
@@ -1186,7 +1190,7 @@ function MonthlyClosePage() {
           r.empId === c.empId && r.fin && r.inicio && (r.inicio || '').startsWith(c.mes || '')
         )
         const totalMins = recs.reduce((s: number, r: any) =>
-          s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000, 0
+          s + recWorkSecs(r) / 60, 0
         )
         const extraMins = Math.max(0, totalMins - 160 * 60)
 
@@ -1194,7 +1198,7 @@ function MonthlyClosePage() {
           date:  new Date(r.inicio).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
           entry: fmtTime(r.inicio),
           exit:  fmtTime(r.fin),
-          hours: (() => { const m = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000; return `${Math.floor(m/60)}h${Math.floor(m%60)}m` })(),
+          hours: (() => { const m = recWorkSecs(r) / 60; return `${Math.floor(m/60)}h${Math.floor(m%60)}m` })(),
         }))
 
         // Supervisor: find encargado or jefe_obra assigned to same centro
@@ -1403,7 +1407,7 @@ function ObrasPage() {
         assignedIds.has(r.empId) && r.fin && (r.inicio || '').startsWith(todayStr)
       )
       const todayMins = todayRecs.reduce((s: number, r: any) => {
-        return s + (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
+        return s + recWorkSecs(r) / 60
       }, 0)
       const manager = employees.find((e: any) =>
         (e.role === 'encargado' || e.role === 'jefe_obra') &&

@@ -55,6 +55,21 @@ export const clipBreaksToWindow = (breaks, inicio, fin) => {
   }, [])
 }
 
+export const recordTimesFromClock = (record, entry, exit) => {
+  const match = value => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value || '')
+  if (!record?.inicio || !match(entry) || !match(exit)) return null
+  const [eh, em] = entry.split(':').map(Number)
+  const [xh, xm] = exit.split(':').map(Number)
+  const inicio = new Date(record.inicio)
+  if (Number.isNaN(inicio.getTime())) return null
+  inicio.setHours(eh, em, 0, 0)
+  const fin = new Date(inicio)
+  fin.setHours(xh, xm, 0, 0)
+  // Una salida anterior o igual a la entrada representa una jornada nocturna.
+  if (fin <= inicio) fin.setDate(fin.getDate() + 1)
+  return { inicio, fin }
+}
+
 // Avisa por push a quien generó el cierre (si es un JO/encargado con dispositivo propio)
 // de que quedó desactualizado, sin esperar a que entre al panel a verlo.
 export const notifyStaleCierre = (staleCierre, editorId) => {

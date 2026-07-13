@@ -213,6 +213,17 @@ export async function cloudFetch() {
     const v1 = await _v1Fetch()
     const blobData = v1.data ?? {}
 
+    const blobEmployeeMap = new Map((blobData.employees ?? []).map(e => [e.id, e]))
+    const tableEmployees = (empsR.data ?? []).map(fromEmployee)
+    const employees = tableEmployees.map(employee => ({
+      ...(blobEmployeeMap.get(employee.id) || {}),
+      ...employee,
+    }))
+    const tableEmployeeIds = new Set(tableEmployees.map(employee => employee.id))
+    for (const blobEmployee of (blobData.employees ?? [])) {
+      if (!tableEmployeeIds.has(blobEmployee.id)) employees.push(blobEmployee)
+    }
+
     const blobRecordMap = new Map((blobData.records ?? []).map(r => [r.id, r]))
     const tableRecords = (recsR.data ?? []).map(fromRecord)
     // Workflow metadata such as rejected/validated flags still lives in the
@@ -233,15 +244,33 @@ export async function cloudFetch() {
       }
       return merged
     })
+    // El blob sigue siendo una escritura primaria. Si una fila aún no alcanzó
+    // la tabla (modo offline o fallo aislado de FK), no puede desaparecer al
+    // refrescar: se conserva hasta que el sincronizador consiga subirla.
+    const tableRecordIds = new Set(tableRecords.map(record => record.id))
+    for (const blobRecord of (blobData.records ?? [])) {
+      if (!tableRecordIds.has(blobRecord.id)) records.push(blobRecord)
+    }
+
+    const blobCierreMap = new Map((blobData.cierres ?? []).map(c => [c.id, c]))
+    const tableCierres = (cierresR.data ?? []).map(fromCierre)
+    const cierres = tableCierres.map(cierre => ({
+      ...(blobCierreMap.get(cierre.id) || {}),
+      ...cierre,
+    }))
+    const tableCierreIds = new Set(tableCierres.map(cierre => cierre.id))
+    for (const blobCierre of (blobData.cierres ?? [])) {
+      if (!tableCierreIds.has(blobCierre.id)) cierres.push(blobCierre)
+    }
 
     return {
       ok: true,
       data: {
         ...blobData,                                         // config, notis, chats, audit del blob
-        employees:  (empsR.data   ?? []).map(fromEmployee),
+        employees,
         records,
         vacaciones: (vacsR.data   ?? []).map(fromVac),
-        cierres:    (cierresR.data ?? []).map(fromCierre),
+        cierres,
         obras:      (obrasR.data  ?? []).map(fromObra),
         _ts: Date.now(),
       },
