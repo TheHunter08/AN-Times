@@ -28,7 +28,7 @@ export interface MessagesProps {
   onSend?: (empId: string, text: string) => void
 }
 
-export function Messages({ conversations, adminName = 'Admin', onSend }: MessagesProps) {
+export function Messages({ conversations, onSend }: MessagesProps) {
   const [selId, setSelId]   = useState(conversations[0]?.empId ?? null)
   const [text, setText]     = useState('')
   const [msgs, setMsgs]     = useState<Record<string, DemoMessage[]>>(
@@ -42,7 +42,6 @@ export function Messages({ conversations, adminName = 'Admin', onSend }: Message
   const filtered = conversations.filter(c =>
     (c.empName + c.dept).toLowerCase().includes(search.toLowerCase())
   )
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selId, selMsgs.length])

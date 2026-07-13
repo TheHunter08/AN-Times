@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice, IconX } from '../components/Icons.js'
+import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice } from '../components/Icons.js'
 
 export type LoginMode = 'pin' | 'email'
 

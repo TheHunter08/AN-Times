@@ -1,6 +1,6 @@
 ﻿// Shell admin v2 — usa el nuevo AppShell + páginas v2 con datos reales de useAppStore.
 // CLAUDE.md: UI only — NO tocar backend, Supabase, auth ni lógica de negocio.
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
@@ -28,7 +28,7 @@ import {
   IconFolder, IconFileText, IconClipboard, IconBell, IconChat,
   IconShield, IconBuilding, IconAlertCircle, IconReceipt,
   IconCheck, IconLogout, IconRows, IconSeal, IconTrendUp, IconMapPin,
-  IconEdit, IconUserPlus, IconHome, IconX, IconPlus, IconSun, IconMoon,
+  IconHome, IconX, IconPlus, IconSun, IconMoon,
 } from './components/Icons.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
@@ -455,11 +455,6 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     toast(`CSV semana descargado — ${weekRecs.length} fichajes`, 3000, 'ok')
   }
 
-  const activeEmps = useMemo(() => {
-    const liveIds = new Set((db.records || []).filter((r: any) => !r.fin).map((r: any) => r.empId))
-    return (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin && liveIds.has(e.id))
-  }, [db.records, db.employees])
-
   const teamAvatars = useMemo(() => {
     const emps = (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin)
     const liveIds = new Set((db.records || []).filter((r: any) => !r.fin).map((r: any) => r.empId))
@@ -477,21 +472,6 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const v = pending[0]
     return { label: `${v.empName || 'Empleado'} — ${v.tipo || 'Vacaciones'}`, time: v.fechaInicio ? new Date(v.fechaInicio).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : 'Pendiente' }
   }, [db.vacaciones])
-
-  const extraHorasMes = useMemo(() => {
-    const now = new Date()
-    const mesStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const wdMin: number = (db.config?.wdMin) || 480
-    const byDay = new Map<string, number>()
-    ;(db.records || []).filter((r: any) => r.fin && localMonthKey(r.inicio) === mesStr).forEach((r: any) => {
-      const key = `${r.empId}::${r.inicio.slice(0, 10)}`
-      const mins = recWorkSecs(r) / 60
-      byDay.set(key, (byDay.get(key) || 0) + mins)
-    })
-    let extra = 0
-    byDay.forEach(mins => { if (mins > wdMin) extra += mins - wdMin })
-    return Math.round(extra)
-  }, [db.records, db.config])
 
   const kpiIcons = [
     <IconUsers width={16} height={16} />,
@@ -650,7 +630,6 @@ function PlanningPage() {
     const days = weekDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
     const weekLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
-    const todayStr = today()
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const records = db.records || []
 
@@ -698,7 +677,7 @@ function ShiftsPage() {
   const db = useAppStore(s => s.db) as any
   const [weekOffset, setWeekOffset] = useState(0)
 
-  const { weekLabel, days, employees } = useMemo(() => {
+  const { weekLabel, employees } = useMemo(() => {
     const now = new Date()
     const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1
     const monday = new Date(now)
@@ -1232,8 +1211,6 @@ function MonthlyClosePage() {
   const toast   = useAppStore(s => s.toast)
   const autoGenRef = useRef(false)
 
-  const mesActual = localMonthKey(new Date())
-
   // Auto-generate closures only for months that have already ended (never the current month)
   useEffect(() => {
     if (autoGenRef.current) return
@@ -1537,7 +1514,6 @@ function MessagesPage() {
   const db      = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session)
   const saveDB  = useAppStore(s => s.saveDB)
-  const toast   = useAppStore(s => s.toast)
 
   const adminId = session?.user?.id || 'admin'
   const adminName = session?.user?.name || 'Admin'

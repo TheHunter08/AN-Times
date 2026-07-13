@@ -4,7 +4,7 @@ import { Button } from '../components/Button.js'
 import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconShield, IconDownload, IconClock, IconUsers, IconFileText, IconAlertCircle, IconMapPin, IconSettings } from '../components/Icons.js'
+import { IconShield, IconDownload, IconClock, IconUsers, IconFileText, IconMapPin, IconSettings } from '../components/Icons.js'
 
 export interface AuditEntry {
   id: string

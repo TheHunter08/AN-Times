@@ -1,4 +1,3 @@
-﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
@@ -36,8 +35,6 @@ const shiftStyle: Record<string, { bg: string; color: string; label: string }> =
 }
 
 export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: ShiftsProps) {
-  const [hoveredCell, setHoveredCell] = useState<string | null>(null)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -78,7 +75,7 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp, ri) => (
+            {employees.map(emp => (
               <tr key={emp.id}>
                 <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border.subtle}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -90,12 +87,9 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
                   </div>
                 </td>
                 {emp.week.map((cell, di) => {
-                  const cellKey = `${emp.id}-${di}`
                   const s = cell.type ? shiftStyle[cell.type] : null
                   return (
-                    <td key={di} style={{ padding: '6px 4px', textAlign: 'center', borderBottom: `1px solid ${colors.border.subtle}` }}
-                      onMouseEnter={() => setHoveredCell(cellKey)}
-                      onMouseLeave={() => setHoveredCell(null)}>
+                    <td key={di} style={{ padding: '6px 4px', textAlign: 'center', borderBottom: `1px solid ${colors.border.subtle}` }}>
                       {s ? (
                         <div style={{ padding: '6px 4px', borderRadius: radius.sm, background: s.bg, border: `1px solid ${s.color}44`, cursor: 'default' }}>
                           {cell.start && (

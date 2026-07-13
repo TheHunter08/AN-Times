@@ -40,17 +40,6 @@ const darkPanel: React.CSSProperties = {
   boxShadow: shadows.sm,
 }
 
-function KpiChip({ tone, arrow }: { tone: KpiTone; arrow: 'up' | 'down' | 'flat' }) {
-  const t = colors.kpiTone[tone]
-  const arrow_txt = arrow === 'up' ? '▲' : arrow === 'down' ? '▼' : '—'
-  const arrowColor = arrow === 'up' ? colors.semantic.green : arrow === 'down' ? colors.semantic.red : colors.text[500]
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: radius.pill, background: t.dim, fontSize: 11, fontWeight: 700, color: arrowColor }}>
-      <span>{arrow_txt}</span>
-    </div>
-  )
-}
-
 export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: StatsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>

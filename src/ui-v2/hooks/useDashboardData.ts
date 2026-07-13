@@ -67,7 +67,6 @@ export function useDashboardData(): DashboardData {
     if (a.includes('vacac') || a.includes('mensaje') || a.includes('chat')) return 'purple'
     return 'gray'
   }
-
   const activity: ActivityItem[] = (db.audit || [])
     .slice(-10)
     .reverse()

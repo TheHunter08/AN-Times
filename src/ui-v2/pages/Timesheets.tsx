@@ -17,7 +17,6 @@ export interface TimesheetRow {
   worked: string
   over?: boolean
 }
-
 export interface TimesheetsProps {
   rows: TimesheetRow[]
   search: string

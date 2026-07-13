@@ -3,7 +3,7 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import {
   IconBell, IconCheck, IconX, IconAlertCircle, IconClock,
-  IconCalendar, IconUsers, IconFileText, IconChat,
+  IconCalendar, IconUsers, IconChat,
 } from '../components/Icons.js'
 
 export interface NotificationItem {

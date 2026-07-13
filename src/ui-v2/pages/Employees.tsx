@@ -2,7 +2,7 @@
 import { Avatar } from '../components/Avatar.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconCheck, IconX } from '../components/Icons.js'
+import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconX } from '../components/Icons.js'
 
 export interface EmployeeRow {
   id: string
@@ -287,7 +287,6 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
 }
 
 function EmployeeCard({ emp, onSelect, onEdit, onViewProfile, onViewTimesheets }: { emp: EmployeeRow; onSelect?: (id: string) => void; onEdit?: () => void; onViewProfile?: () => void; onViewTimesheets?: () => void }) {
-  const initials = emp.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const cfg = statusCfg[emp.status]
 
   return (

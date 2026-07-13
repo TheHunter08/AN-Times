@@ -5,7 +5,7 @@ import { Button } from '../components/Button.js'
 import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconFileText, IconDownload, IconPlus, IconFolder } from '../components/Icons.js'
+import { IconFileText, IconDownload, IconPlus } from '../components/Icons.js'
 
 export interface DocumentItem {
   id: string

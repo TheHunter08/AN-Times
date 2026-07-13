@@ -1,10 +1,9 @@
 ﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
-import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconFileText, IconDownload, IconCheck, IconChevronDown, IconX } from '../components/Icons.js'
+import { IconDownload, IconCheck, IconChevronDown, IconX } from '../components/Icons.js'
 import { downloadSimplePdf, downloadExcel } from '../../utils/exportFiles.js'
 
 export interface ClosureItem {
@@ -38,19 +37,6 @@ export interface MonthlyCloseProps {
   onDelete?: (id: string) => void
 }
 
-const signLabel = (item: ClosureItem) => {
-  const count = [item.firmaAdmin, item.firmaEmp, item.firmaSupervisor].filter(Boolean).length
-  const needed = item.firmaSupervisor !== undefined ? 3 : 2
-  if (count === 0) return 'Sin firmas'
-  if (count >= needed || (item.firmaAdmin && item.firmaEmp)) return 'Firmado'
-  return `${count} de ${item.firmaSupervisor !== undefined ? 3 : 2} firmas`
-}
-const signTone = (item: ClosureItem): 'gray' | 'orange' | 'green' => {
-  if (item.firmaAdmin && item.firmaEmp) return 'green'
-  if (item.firmaAdmin || item.firmaEmp || item.firmaSupervisor) return 'orange'
-  return 'gray'
-}
-
 async function generatePDF(item: ClosureItem) {
   const lines = [
     `Empleado: ${item.empName}`,
@@ -67,81 +53,6 @@ async function generatePDF(item: ClosureItem) {
 
 function generateExcel(item: ClosureItem) {
   downloadExcel(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xls`)
-}
-
-function legacyGeneratePDF(item: ClosureItem) {
-  const rows = (item.records || []).map(r =>
-    `<tr><td>${r.date}</td><td>${r.entry}</td><td>${r.exit}</td><td>${r.hours}</td></tr>`
-  ).join('')
-
-  const firmaAdminMark = item.firmaAdmin ? '&#10003; Firmado' : '_____________________'
-  const firmaEmpMark   = item.firmaEmp   ? '&#10003; Firmado' : '_____________________'
-  const firmaSuperMark = item.firmaSupervisor ? '&#10003; Firmado' : '_____________________'
-
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<title>Cierre mensual · ${item.empName} · ${item.month}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; padding: 32px; }
-  h1 { font-size: 18px; margin-bottom: 4px; }
-  .sub { color: #666; font-size: 12px; margin-bottom: 24px; }
-  .kpi-row { display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
-  .kpi { padding: 12px 18px; border: 1px solid #e0e0e0; border-radius: 6px; min-width: 110px; }
-  .kpi-val { font-size: 20px; font-weight: 700; margin-top: 4px; }
-  .kpi-lbl { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .5px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
-  th { background: #f5f5f5; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #ddd; }
-  td { padding: 8px 10px; border-bottom: 1px solid #eee; }
-  tr:last-child td { border-bottom: none; }
-  .firma-section { display: flex; gap: 48px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #ddd; flex-wrap: wrap; }
-  .firma-box { flex: 1; min-width: 160px; }
-  .firma-line { font-size: 11px; color: #888; margin-top: 6px; }
-  .firma-name { font-weight: 600; margin-bottom: 24px; }
-  .firma-val { font-size: 13px; color: #1a7a1a; font-weight: 600; }
-</style>
-</head>
-<body>
-<h1>Cierre Mensual de Horas</h1>
-<div class="sub">${item.month} &middot; Generado el ${new Date().toLocaleDateString('es-ES')}</div>
-<div class="kpi-row">
-  <div class="kpi"><div class="kpi-lbl">Empleado</div><div class="kpi-val" style="font-size:14px">${item.empName}</div></div>
-  <div class="kpi"><div class="kpi-lbl">Centro / Depto</div><div class="kpi-val" style="font-size:13px">${item.dept || '&mdash;'}</div></div>
-  <div class="kpi"><div class="kpi-lbl">D&iacute;as trabajados</div><div class="kpi-val">${item.workedDays}</div></div>
-  <div class="kpi"><div class="kpi-lbl">Horas totales</div><div class="kpi-val">${item.totalHours}</div></div>
-  <div class="kpi"><div class="kpi-lbl">Horas extra</div><div class="kpi-val" style="color:${item.extraMins > 0 ? '#d97706' : '#1a1a1a'}">${item.extraHours}</div></div>
-</div>
-<table>
-  <thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th></tr></thead>
-  <tbody>${rows || '<tr><td colspan="4" style="color:#999;text-align:center;padding:16px">Sin registros este mes</td></tr>'}</tbody>
-</table>
-<div class="firma-section">
-  <div class="firma-box">
-    <div class="firma-name">Empleado</div>
-    <div class="firma-val">${firmaEmpMark}</div>
-    <div class="firma-line">${item.empName}</div>
-  </div>
-  ${item.supervisorName ? `<div class="firma-box"><div class="firma-name">Encargado / Jefe de obra</div><div class="firma-val">${firmaSuperMark}</div><div class="firma-line">${item.supervisorName}</div></div>` : ''}
-  <div class="firma-box">
-    <div class="firma-name">Administrador</div>
-    <div class="firma-val">${firmaAdminMark}</div>
-    <div class="firma-line">Times INC</div>
-  </div>
-</div>
-</body>
-</html>`
-
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.html`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
 export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete }: MonthlyCloseProps) {
