@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useAppStore } from '../../store/appStore.js'
 import { getCfg, setCfg, toggleTheme } from '../../utils/userConfig.js'
 import { queuePush, pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
@@ -15,6 +16,10 @@ const btnPrimary = { width:'100%', padding:'12px', borderRadius:radius.lg, borde
 const inpStyle = { padding:'8px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:14, fontFamily:'inherit', outline:'none' }
 
 export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
+  const syncStatus = useAppStore(s => s.syncStatus)
+  const realtimeStatus = useAppStore(s => s.realtimeStatus)
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const lastSyncTime = useAppStore(s => s.lastSyncTime)
   const [notiFichaje, setNotiFichaje] = useState(() => getCfg('notiFichaje', true))
   const [notiSalida, setNotiSalida] = useState(() => getCfg('notiSalida', true))
   const [gpsAuto, setGpsAuto] = useState(() => getCfg('gpsAuto', true))
@@ -50,6 +55,11 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   )
 
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'granted'
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  const netLabel = !navigator.onLine ? 'Sin conexión'
+    : connection?.effectiveType ? `${connection.effectiveType.toUpperCase()}${connection.downlink ? ` · ${connection.downlink} Mb/s` : ''}`
+    : 'Con conexión'
+  const swReady = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller
 
   return (
     <div style={OV} onClick={onClose}>
@@ -107,6 +117,25 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
         <Toggle label="Recordatorio de salida" value={notiSalida} onChange={setNotiSalida} />
         <Toggle label="GPS automático" value={gpsAuto} onChange={setGpsAuto} />
         <Toggle label="Modo claro" value={isLight} onChange={() => { toggleTheme(); setIsLight(l => !l); toast(isLight ? 'Modo oscuro activado' : 'Modo claro activado') }} />
+
+        <div style={{ padding:'14px 0', borderBottom:SEP }}>
+          <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:10 }}>Diagnóstico de la aplicación</div>
+          {[
+            ['Red', netLabel, navigator.onLine],
+            ['Modo offline', swReady ? 'Preparado' : 'Inicializando', swReady],
+            ['Sincronización', offlinePending ? 'Cambios pendientes' : syncStatus === 'synced' ? 'Actualizada' : syncStatus, !offlinePending && syncStatus !== 'error'],
+            ['Tiempo real', realtimeStatus === 'SUBSCRIBED' ? 'Activo' : 'Reconectando', realtimeStatus === 'SUBSCRIBED'],
+            ['Última copia', lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : 'Aún no disponible', !!lastSyncTime],
+          ].map(([label, value, ok]) => (
+            <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'5px 0', fontSize:12 }}>
+              <span style={{ color:colors.text[500] }}>{label}</span>
+              <span style={{ color:ok ? colors.semantic.green : colors.semantic.orange, fontWeight:650, textAlign:'right' }}>{value}</span>
+            </div>
+          ))}
+          <div style={{ fontSize:10.5, lineHeight:1.45, color:colors.text[400], marginTop:7 }}>
+            Los fichajes se guardan primero en el dispositivo. Si hay señal débil, quedan pendientes y se reintentan automáticamente.
+          </div>
+        </div>
 
         <div style={{ padding:'14px 0', borderBottom:SEP }}>
           <div style={{ fontSize:14, color:colors.text[900], marginBottom:4 }}>Recordatorio de fichaje</div>

@@ -189,14 +189,30 @@ function toObra(o) {
   }
 }
 
+const RECORDS_PAGE_SIZE = 1000
+
+// PostgREST limita el tamaño de respuesta. Leer por páginas evita que los
+// fichajes históricos desaparezcan silenciosamente al superar 5.000 filas.
+async function fetchAllRecords() {
+  const rows = []
+  for (let from = 0; ; from += RECORDS_PAGE_SIZE) {
+    const { data, error } = await supabase.from('records').select('*')
+      .eq('company_id', COMPANY_ID)
+      .order('inicio', { ascending: false })
+      .range(from, from + RECORDS_PAGE_SIZE - 1)
+    if (error) return { data: rows, error }
+    rows.push(...(data || []))
+    if (!data || data.length < RECORDS_PAGE_SIZE) return { data: rows, error: null }
+  }
+}
+
 // ── cloudFetch V2: lee de tablas, cae en V1 si están vacías ──────────────────
 export async function cloudFetch() {
   if (!supabase) return _v1Fetch()
   try {
     const [empsR, recsR, vacsR, cierresR, obrasR] = await Promise.all([
       supabase.from('employees').select('*').eq('company_id', COMPANY_ID).order('name'),
-      supabase.from('records').select('*').eq('company_id', COMPANY_ID)
-        .order('inicio', { ascending: false }).limit(5000),
+      fetchAllRecords(),
       supabase.from('vacaciones').select('*').eq('company_id', COMPANY_ID),
       supabase.from('cierres').select('*').eq('company_id', COMPANY_ID),
       supabase.from('obras').select('*').eq('company_id', COMPANY_ID),
@@ -206,6 +222,10 @@ export async function cloudFetch() {
     if (empsR.error || !empsR.data?.length) {
       if (empsR.error) console.warn('[v2] employees fetch error:', empsR.error.message)
       else             console.warn('[v2] employees table vacía → fallback V1 (ejecuta /api/migrate-to-tables)')
+      return _v1Fetch()
+    }
+    if (recsR.error) {
+      console.warn('[v2] records paginated fetch error:', recsR.error.message)
       return _v1Fetch()
     }
 

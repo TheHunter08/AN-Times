@@ -256,7 +256,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
                 >
                   Ver
                 </button>
-                {onDelete && (
+                {onDelete && !(item.firmaAdmin || item.firmaEmp) && (
                   <button
                     onClick={() => onDelete(item.id)}
                     title="Eliminar cierre y PDF"

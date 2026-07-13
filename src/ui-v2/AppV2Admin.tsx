@@ -1239,9 +1239,15 @@ function MonthlyClosePage() {
           ? new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
           : c.mes || '—'
 
-        const recs = (db.records || []).filter((r: any) =>
+        const liveRecs = (db.records || []).filter((r: any) =>
           r.empId === c.empId && r.fin && r.inicio && localMonthKey(r.inicio) === (c.mes || '')
         )
+        // Un cierre firmado es un documento laboral sellado: nunca se vuelve a
+        // calcular con fichajes que puedan cambiar después de la firma.
+        const hasSignature = !!(c.firmaAdmin || c.firmaEmp || c.firma)
+        const recs = hasSignature && Array.isArray(c.records_snapshot)
+          ? c.records_snapshot
+          : liveRecs
         const totalMins = recs.reduce((s: number, r: any) =>
           s + recWorkSecs(r) / 60, 0
         )
@@ -1274,7 +1280,7 @@ function MonthlyClosePage() {
           totalMins,
           extraHours: extraMins > 0 ? `+${Math.floor(extraMins / 60)}h${Math.floor(extraMins % 60)}m` : '0h',
           extraMins,
-          workedDays: new Set(recs.map((r: any) => (r.inicio || '').slice(0, 10))).size,
+          workedDays: new Set(recs.map((r: any) => localDateStr(new Date(r.inicio)))).size,
           signedBy: (c.firmaAdmin && (c.firmaEmp || c.firma)) ? 'all' : (c.firmaEmp || c.firma) ? 'emp' : 'none',
           firmaAdmin: !!c.firmaAdmin,
           firmaEmp: !!c.firmaEmp || !!c.firma,
@@ -1327,6 +1333,10 @@ function MonthlyClosePage() {
 
   const handleDeleteClosure = (id: string) => {
     const closure = (db.cierres || []).find((c: any) => c.id === id)
+    if (closure && (closure.firmaAdmin || closure.firmaEmp || closure.firma)) {
+      toast('Un cierre firmado está bloqueado y no puede eliminarse', 4500, 'warn')
+      return
+    }
     if (!closure || !window.confirm('¿Eliminar este cierre y su PDF generado? Esta acción no se puede deshacer.')) return
     saveDB((fresh: any) => ({ cierres: (fresh.cierres || []).filter((c: any) => c.id !== id) }))
     if (supabase) supabase.from('cierres').delete().eq('id', id).then(({ error }: any) => {
