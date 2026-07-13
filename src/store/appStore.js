@@ -251,6 +251,7 @@ export const useAppStore = create((set, get) => ({
       const localDB = loadLocal()
       const ok = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
       if (!ok) return 'login'
+      if (storedSes.isAdmin) return 'admin'
       return 'emp'
     }
     return 'login'

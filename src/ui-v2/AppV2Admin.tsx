@@ -400,8 +400,21 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
   const data = useDashboardData()
   const db = useAppStore(s => s.db) as any
   const toast = useAppStore(s => s.toast)
+  const session = useAppStore(s => s.session) as any
+  const setScreen = useAppStore(s => s.setScreen)
   const { rows: reqRows } = useRequestsActions()
   const pendingCount = reqRows.filter((r: any) => r.status === 'pending').length
+  const ownOpenRecord = session?.user?.id
+    ? (db.records || []).find((r: any) => r.empId === session.user.id && !r.fin)
+    : null
+  const canClockOwnShift = !!session?.user?.id
+  const ownShiftStatus = canClockOwnShift ? {
+    statusLabel: ownOpenRecord ? (ownOpenRecord.enDescanso ? 'En descanso' : 'Jornada en curso') : 'Jornada sin iniciar',
+    time: ownOpenRecord?.inicio
+      ? `Entrada ${new Date(ownOpenRecord.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}`
+      : 'Abre Mi jornada para fichar',
+    tone: (ownOpenRecord?.enDescanso ? 'orange' : ownOpenRecord ? 'green' : 'primary') as 'orange' | 'green' | 'primary',
+  } : undefined
 
   const handleExport = () => {
     const now = new Date()
@@ -498,8 +511,14 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       compareTrend={data.compareTrend}
       activity={data.activity}
       nextEvent={nextVacRequest}
+      fichaje={ownShiftStatus}
       teamSlot={teamAvatars}
       onExport={handleExport}
+      quickActions={canClockOwnShift ? (
+        <button className="ti-dashboard-button" type="button" onClick={() => setScreen('emp')}>
+          <IconClock width={16} height={16} /> Mi jornada
+        </button>
+      ) : undefined}
       quickLinks={[
         { id: 'empleados',   label: 'Empleados activos', value: `${teamAvatars.activeCount}/${teamAvatars.total}`, onClick: () => onNavigate('empleados') },
         { id: 'fichajes',    label: 'Trabajando ahora',  value: data.kpis[1]?.value || '0', onClick: () => onNavigate('fichajes') },
@@ -1572,11 +1591,36 @@ export default function AppV2Admin() {
     : (currentAdminPage || 'dashboard')
 
   const db = useAppStore(s => s.db) as any
+  const roleLabel = session?.isJO || session?.user?.role === 'jefe_obra'
+    ? 'Jefe de obra · Administrador'
+    : isEnc ? encRoleLabel : 'Administrador'
 
   function goToFichajes(empId: string) {
     const emp = (db.employees || []).find((e: any) => e.id === empId)
     setFichajesSearch(emp?.name || '')
     setAdminPage('fichajes')
+  }
+
+  const globalMatches = (() => {
+    const q = search.trim().toLocaleLowerCase('es')
+    if (!q) return []
+    const pages = visiblePages
+      .filter(p => `${p.label} ${p.group}`.toLocaleLowerCase('es').includes(q))
+      .slice(0, 4)
+      .map(p => ({ key:`page:${p.id}`, label:p.label, action:() => setAdminPage(p.id) }))
+    const employees = (db.employees || [])
+      .filter((e: any) => !e.baja && `${e.name} ${e.email || ''}`.toLocaleLowerCase('es').includes(q))
+      .slice(0, 4)
+      .map((e: any) => ({ key:`emp:${e.id}`, label:e.name, action:() => goToFichajes(e.id) }))
+    return [...pages, ...employees]
+  })()
+
+  const runGlobalSearch = () => {
+    const normalized = search.trim().toLocaleLowerCase('es')
+    const target = globalMatches.find(item => item.label.toLocaleLowerCase('es') === normalized) || globalMatches[0]
+    if (!target) return
+    target.action()
+    setSearch('')
   }
 
   function renderPage() {
@@ -1625,13 +1669,13 @@ export default function AppV2Admin() {
             <Avatar name={name} size={32} status="online" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-              <div style={{ fontSize: 10.5, color: colors.text[500] }}>{isEnc ? encRoleLabel : 'Administrador'}</div>
+              <div style={{ fontSize: 10.5, color: colors.text[500] }}>{roleLabel}</div>
             </div>
             <button onClick={logout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
               <IconLogout width={15} height={15} />
             </button>
           </div>
-          {setScreen && (
+          {setScreen && session?.user?.id && (
             <button onClick={() => setScreen('emp')} style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[700], fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <IconHome width={13} height={13} /> Vista empleado
             </button>
@@ -1642,10 +1686,15 @@ export default function AppV2Admin() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search
-              placeholder="Buscar…"
+              placeholder="Buscar empleado o sección…"
               value={search}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+              list="admin-global-search"
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') runGlobalSearch() }}
             />
+            <datalist id="admin-global-search">
+              {globalMatches.map(item => <option key={item.key} value={item.label} />)}
+            </datalist>
           </div>
           <button
             type="button"

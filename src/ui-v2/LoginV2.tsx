@@ -107,9 +107,10 @@ export default function LoginV2() {
   }, [selectedEmpId, db])
 
   const doLogin = useCallback((emp: any) => {
+    const isAdminRole = emp.role === 'admin' || emp.role === 'jefe_obra' || emp.isAdmin === true
     const ses = {
       user: emp,
-      isAdmin: emp.role === 'jefe_obra',
+      isAdmin: isAdminRole,
       isEnc: emp.role === 'encargado',
       isJO: emp.role === 'jefe_obra',
     }
@@ -235,10 +236,16 @@ export default function LoginV2() {
       const em = userEmail?.toLowerCase()
       const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === em)
       const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
-      const isAdminEmail = configuredEmails.includes(em || '') || (emp && emp.isAdmin)
+      const configuredAdmin = configuredEmails.includes(em || '')
+      const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
       await authSignOut()
-      if (role === 'admin' || isAdminEmail) {
+      if (emp && employeeAdmin) {
+        doLogin(emp)
+      } else if (!emp && configuredAdmin) {
         doAdminLogin()
+      } else if (role === 'admin') {
+        recordEmailFailed()
+        setEmailError('Esta cuenta no tiene permisos de administrador.')
       } else if (emp) {
         doLogin(emp)
       } else {
@@ -272,8 +279,7 @@ export default function LoginV2() {
         const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
         await authSignOut()
         if (emp) {
-          if (emp.isAdmin) doAdminLogin()
-          else doLogin(emp)
+          doLogin(emp)
         } else {
           const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
           if (configuredEmails.includes(userEmail)) doAdminLogin()
