@@ -19,8 +19,9 @@ function _timeoutFetch(url, options = {}) {
 }
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
+const _SUPABASE_SINGLETON_KEY = '__times_inc_supabase__'
 export const supabase = (SB_URL && SB_ANON)
-  ? createClient(SB_URL, SB_ANON, { global: { fetch: _timeoutFetch } })
+  ? (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, { global: { fetch: _timeoutFetch } }))
   : null
 
 const TABLE      = 'app_data'
@@ -32,6 +33,10 @@ const ROW_ID     = 1
 // principal aligera lo que se descarga en cada sincronización normal y en
 // cada consulta de los cron jobs (que ni siquiera necesitan tocar esta fila).
 const COLD_ROW_ID = 3
+// El esquema desplegado restringe app_data a la fila 1. Mantener la fila 3
+// activa provocaba un 23514 y una segunda escritura de fallback en cada save.
+// Se conserva el código de partición para una futura migración explícita.
+const USE_COLD_ROW = false
 const COLD_KEYS = ['gastos', 'denuncias', 'wellbeing', 'anomalias_vistas']
 
 function _splitHotCold(db) {
@@ -332,10 +337,10 @@ function _noteServerTs(ts) { if (ts && ts > _lastKnownServerTs) _lastKnownServer
 export async function cloudFetch() {
   if (!supabase) return { ok: false, data: null, status: 'no_config' }
   try {
-    const [hotRes, coldRes] = await Promise.all([
-      supabase.from(TABLE).select('data, updated_at').eq('id', ROW_ID).maybeSingle(),
-      supabase.from(TABLE).select('data, updated_at').eq('id', COLD_ROW_ID).maybeSingle(),
-    ])
+    const hotRes = await supabase.from(TABLE).select('data, updated_at').eq('id', ROW_ID).maybeSingle()
+    const coldRes = USE_COLD_ROW
+      ? await supabase.from(TABLE).select('data, updated_at').eq('id', COLD_ROW_ID).maybeSingle()
+      : { data: null, error: null }
     if (hotRes.error) return { ok: false, data: null, status: hotRes.error.code || 'sb_error' }
     // La fila fría puede no existir todavía (primera vez) — no es un error, solo "sin datos fríos".
     const hotData = hotRes.data?.data || null
@@ -358,10 +363,10 @@ export async function cloudFetch() {
 export async function cloudFetchTs() {
   if (!supabase) return { ok: false, ts: null, status: 'no_config' }
   try {
-    const [hotRes, coldRes] = await Promise.all([
-      supabase.from(TABLE).select('updated_at').eq('id', ROW_ID).maybeSingle(),
-      supabase.from(TABLE).select('updated_at').eq('id', COLD_ROW_ID).maybeSingle(),
-    ])
+    const hotRes = await supabase.from(TABLE).select('updated_at').eq('id', ROW_ID).maybeSingle()
+    const coldRes = USE_COLD_ROW
+      ? await supabase.from(TABLE).select('updated_at').eq('id', COLD_ROW_ID).maybeSingle()
+      : { data: null, error: null }
     if (hotRes.error) return { ok: false, ts: null, status: hotRes.error.code || 'sb_error' }
     const hotTs = hotRes.data?.updated_at ? new Date(hotRes.data.updated_at).getTime() : 0
     const coldTs = (!coldRes.error && coldRes.data?.updated_at) ? new Date(coldRes.data.updated_at).getTime() : 0
@@ -515,6 +520,13 @@ async function _storeForBgSync(data, deleted) {
 // la fila caliente para no perder datos — la sincronización principal no se
 // bloquea por un problema en la fila secundaria.
 async function _upsertHotCold(payload) {
+  if (!USE_COLD_ROW) {
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase.from(TABLE).upsert({ id: ROW_ID, data: payload, updated_at: nowIso })
+    if (error) throw error
+    _noteServerTs(new Date(nowIso).getTime())
+    return
+  }
   const { hot, cold } = _splitHotCold(payload)
   const nowIso = new Date().toISOString()
   const [hotRes, coldRes] = await Promise.all([
@@ -1009,6 +1021,9 @@ async function _doSendPush(to, title, body, tag, safeUrl) {
     const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
+      // Vite no ejecuta las funciones serverless de /api. Un 404 local no es
+      // falta de cobertura y no debe llenar la cola persistente de producción.
+      if (import.meta.env.DEV && res.status === 404) return { ok: false, skipped: true, reason: 'dev_api_unavailable' }
       console.error('[PUSH] sendpush error', res.status, text)
       _enqueueFailedPush(payload)
       return { ok: false, status: res.status, error: text }

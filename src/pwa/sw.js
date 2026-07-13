@@ -272,6 +272,8 @@ const _SB_URL  = 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const _IDB_NAME  = 'times-inc-sync'
 const _IDB_STORE = 'q'
+// El esquema de producción admite únicamente app_data.id=1.
+const _USE_COLD_ROW = false
 
 // Timeout explícito: estas peticiones las hace el propio SW directamente (no
 // pasan por su registerRoute, que solo intercepta peticiones de la página), así
@@ -391,15 +393,15 @@ function _mergeForPushSW(server, local, deleted) {
 async function _fetchServerData() {
   const headers = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}` }
   try {
-    const [hotRes, coldRes] = await Promise.all([
-      _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers }),
-      _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.3&select=data`, { headers }),
-    ])
+    const hotRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers })
+    const coldRes = _USE_COLD_ROW
+      ? await _sbFetch(`${_SB_URL}/rest/v1/app_data?id=eq.3&select=data`, { headers })
+      : null
     if (!hotRes.ok) return null
     const hotArr = await hotRes.json().catch(() => [])
     const hotData = hotArr?.[0]?.data
     if (!hotData) return null
-    const coldArr = coldRes.ok ? await coldRes.json().catch(() => []) : []
+    const coldArr = coldRes?.ok ? await coldRes.json().catch(() => []) : []
     const coldData = coldArr?.[0]?.data || {}
     return { ...hotData, ...coldData }
   } catch { return null }
@@ -428,10 +430,10 @@ async function _bgSync() {
     // primera vez — un PATCH sobre una fila inexistente no crea nada ni da error,
     // así que el dato se perdería en silencio. upsert la crea si hace falta.
     const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
-    const [hotRes, coldRes] = await Promise.all([
-      _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: hot, updated_at: nowIso }) }),
-      _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) }),
-    ])
+    const hotRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: _USE_COLD_ROW ? hot : data, updated_at: nowIso }) })
+    const coldRes = _USE_COLD_ROW
+      ? await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) })
+      : { ok: true, status: 200 }
     if (!hotRes.ok && hotRes.status !== 409) {
       throw new Error(`bgSync failed: hot=${hotRes.status}`)
     }

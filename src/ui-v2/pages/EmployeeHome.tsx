@@ -53,7 +53,9 @@ export interface EmployeeHomeProps {
 
 type HoldPhase = 'ready' | 'holding' | 'confirmed'
 
-const HOLD_DURATION = 550
+// 300 ms mantiene la confirmación deliberada sin sentirse lenta en móvil.
+// El valor anterior (550 ms) sumado al feedback posterior parecía un bloqueo.
+const HOLD_DURATION = 300
 const PROGRESS_RADIUS = 127
 const HOLD_RADIUS = 114
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RADIUS
@@ -175,7 +177,7 @@ export function EmployeeHome({
       holdCompletedRef.current = false
       setHoldProgress(0)
       setHoldPhase('ready')
-    }, 900)
+    }, 450)
   }, [clearFrame])
 
   const beginHold = useCallback(() => {
