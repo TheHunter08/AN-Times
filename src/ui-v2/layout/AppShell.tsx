@@ -171,11 +171,13 @@ export function AppShell({
     document.addEventListener('pointermove', onMove, { passive: false })
     document.addEventListener('pointerup', onEnd, { passive: true })
     document.addEventListener('pointercancel', onEnd, { passive: true })
+    document.addEventListener('lostpointercapture', onEnd, { passive: true })
     return () => {
       document.removeEventListener('pointerdown', onStart)
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onEnd)
       document.removeEventListener('pointercancel', onEnd)
+      document.removeEventListener('lostpointercapture', onEnd)
     }
   }, [isMobile, mobileNavOpen])
 

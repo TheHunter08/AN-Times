@@ -22,6 +22,6 @@ export function startedInHorizontalScroller(target, boundary) {
 // táctil del sistema y no activan la navegación global por una deriva del dedo.
 export function shouldIgnoreAppGesture(target, boundary) {
   if (!(target instanceof Element)) return false
-  if (target.closest('input, textarea, select, option, [contenteditable="true"], [role="slider"], [data-gesture-lock="true"]')) return true
+  if (target.closest('button, a, label, input, textarea, select, option, [contenteditable="true"], [role="button"], [role="slider"], [data-gesture-lock="true"]')) return true
   return startedInHorizontalScroller(target, boundary)
 }

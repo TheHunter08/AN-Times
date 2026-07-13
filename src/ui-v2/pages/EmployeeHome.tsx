@@ -151,6 +151,7 @@ export function EmployeeHome({
       frameRef.current = null
     }
   }, [])
+  const pointerStartRef = useRef({ id: -1, x: 0, y: 0 })
 
   const cancelHold = useCallback(() => {
     if (!holdActiveRef.current || holdCompletedRef.current) return
@@ -214,15 +215,22 @@ export function EmployeeHome({
 
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    event.preventDefault()
+    pointerStartRef.current = { id:event.pointerId, x:event.clientX, y:event.clientY }
     event.currentTarget.setPointerCapture?.(event.pointerId)
     beginHold()
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = pointerStartRef.current
+    if (start.id !== event.pointerId) return
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 12) cancelHold()
   }
 
   const handlePointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
+    pointerStartRef.current.id = -1
     cancelHold()
   }
 
@@ -286,8 +294,10 @@ export function EmployeeHome({
               aria-describedby={hintId}
               aria-pressed={holdPhase === 'holding'}
               onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
               onPointerUp={handlePointerEnd}
               onPointerCancel={handlePointerEnd}
+              onLostPointerCapture={cancelHold}
               onPointerLeave={cancelHold}
               onKeyDown={handleKeyDown}
               onKeyUp={handleKeyUp}
@@ -672,7 +682,7 @@ const employeeHomeStyles = `
     background: transparent;
     color: inherit;
     cursor: pointer;
-    touch-action: none;
+    touch-action: pan-y;
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;

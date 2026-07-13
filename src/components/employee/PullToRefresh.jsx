@@ -73,6 +73,9 @@ export function PullToRefresh({ children }) {
       if (ptr.current.axis === 'x') { ptr.current.active = false; setOffset(0, true); return }
       if (ptr.current.axis !== 'y') return
       if (d > 0) {
+        // Evita que Safari/Chrome ejecuten su rebote o pull-to-refresh nativo
+        // al mismo tiempo que el de la aplicación.
+        if (e.cancelable) e.preventDefault()
         const offset = Math.min(d * 0.45, 80)
         ptr.current.dist = offset
         setOffset(offset, false)
@@ -118,7 +121,7 @@ export function PullToRefresh({ children }) {
     window.addEventListener('pageshow', forceReset)
 
     el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove', onMove, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
     el.addEventListener('touchend', onEnd, { passive: true })
     el.addEventListener('touchcancel', onCancel, { passive: true })
     return () => {
@@ -133,7 +136,7 @@ export function PullToRefresh({ children }) {
   }, [fetchDB])
 
   return (
-    <div ref={scrollRef} className="emp-tab active">
+    <div ref={scrollRef} className="emp-tab active" style={{ overscrollBehaviorY:'contain', touchAction:'pan-y' }}>
       <div ref={indicatorRef} style={{
         position:'absolute', top:0, left:0, right:0, height:50, zIndex:1,
         display:'flex', alignItems:'center', justifyContent:'center', gap:7,

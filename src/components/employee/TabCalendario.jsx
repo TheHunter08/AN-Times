@@ -157,6 +157,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const onPointerDown = e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
     gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: null, moved: false }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   const onPointerMove = e => {
     const g = gesture.current
@@ -174,6 +175,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     if (g.id !== e.pointerId) return
     const dx = e.clientX - g.x
     const velocity = Math.abs(dx) / Math.max(1, performance.now() - g.t)
+    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
     calendarRef.current?.classList.remove('is-dragging')
     calendarRef.current?.style.removeProperty('--cal-drag-x')
     if (g.axis === 'x' && (Math.abs(dx) > 58 || (Math.abs(dx) > 28 && velocity > .5))) {
@@ -183,11 +185,17 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     gesture.current = { id: null, x: 0, y: 0, t: 0, axis: null, moved: g.moved }
     setTimeout(() => { gesture.current.moved = false }, 0)
   }
+  const onPointerCancel = e => {
+    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    calendarRef.current?.classList.remove('is-dragging')
+    calendarRef.current?.style.removeProperty('--cal-drag-x')
+    gesture.current = { id:null, x:0, y:0, t:0, axis:null, moved:false }
+  }
 
   return (
     <PullToRefresh>
       <div ref={calendarRef} data-gesture-scope="local" className="employee-calendar-v2 employee-calendar-v8"
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerCancel} onLostPointerCapture={onPointerCancel}
         style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 760, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
 
         {/* Header */}

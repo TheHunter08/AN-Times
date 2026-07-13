@@ -280,6 +280,7 @@ export default function EmployeePage() {
       if (e.pointerType === 'mouse' && e.button !== 0) return
       sx = e.clientX; sy = e.clientY; st = performance.now(); axis = null; pointerId = e.pointerId
       locked = shouldIgnoreAppGesture(e.target, el)
+      if (!locked) el.setPointerCapture?.(e.pointerId)
     }
     const onMove = e => {
       if (locked || pointerId !== e.pointerId) return
@@ -295,11 +296,15 @@ export default function EmployeePage() {
       e.preventDefault()
     }
     const onEnd = e => {
-      if (locked || pointerId !== e.pointerId || axis !== 'x') { reset(); return }
+      if (locked || pointerId !== e.pointerId || axis !== 'x') {
+        try { if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId) } catch {}
+        reset(); return
+      }
       const dx = e.clientX - sx
       const dt = performance.now() - st
       const vx = Math.abs(dx) / Math.max(1, dt)
       const isSwipe = Math.abs(dx) > 64 || (Math.abs(dx) > 30 && vx > .5)
+      try { if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId) } catch {}
       reset()
       if (!isSwipe) return
       const ci = TAB_ORDER.indexOf(currentTabRef.current)
@@ -310,11 +315,13 @@ export default function EmployeePage() {
     el.addEventListener('pointermove', onMove, { passive: false })
     el.addEventListener('pointerup', onEnd, { passive: true })
     el.addEventListener('pointercancel', reset, { passive: true })
+    el.addEventListener('lostpointercapture', reset, { passive: true })
     return () => {
       el.removeEventListener('pointerdown', onStart)
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('pointerup', onEnd)
       el.removeEventListener('pointercancel', reset)
+      el.removeEventListener('lostpointercapture', reset)
       reset()
     }
   }, [setEmpTab])

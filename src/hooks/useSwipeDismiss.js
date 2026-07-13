@@ -11,28 +11,6 @@ export function useSwipeDismiss(onClose) {
   const pointerId = useRef(null)
   const startedAt = useRef(0)
 
-  const onTouchStart = useCallback((e) => {
-    startY.current = e.touches[0].clientY
-    active.current = true
-    setDragging(true)
-  }, [])
-
-  const onTouchMove = useCallback((e) => {
-    if (!active.current) return
-    const d = e.touches[0].clientY - startY.current
-    if (d > 0) setDragY(d)
-  }, [])
-
-  const onTouchEnd = useCallback(() => {
-    if (!active.current) return
-    active.current = false
-    setDragging(false)
-    setDragY(d => {
-      if (d > 90) { try { navigator.vibrate?.(10) } catch {} ; onClose() }
-      return 0
-    })
-  }, [onClose])
-
   const onPointerDown = useCallback((e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
     pointerId.current = e.pointerId
@@ -53,6 +31,7 @@ export function useSwipeDismiss(onClose) {
     if (!active.current || pointerId.current !== e.pointerId) return
     const d = Math.max(0, e.clientY - startY.current)
     const velocity = d / Math.max(1, performance.now() - startedAt.current)
+    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
     active.current = false
     pointerId.current = null
     setDragging(false)
@@ -63,9 +42,17 @@ export function useSwipeDismiss(onClose) {
     }
   }, [onClose])
 
+  const onPointerCancel = useCallback((e) => {
+    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    active.current = false
+    pointerId.current = null
+    setDragging(false)
+    setDragY(0)
+  }, [])
+
   return {
     dragHandlers: {
-      onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd,
+      onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel, onLostPointerCapture: onPointerCancel,
       style: { touchAction: 'none' },
     },
     modalStyle: {
