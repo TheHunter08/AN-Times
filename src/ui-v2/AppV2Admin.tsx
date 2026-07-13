@@ -20,6 +20,7 @@ import { Audit } from './pages/Audit.js'
 import { Anomalies } from './pages/Anomalies.js'
 import { Messages } from './pages/Messages.js'
 import { Obras } from './pages/Obras.js'
+import { OnlineTeam } from './pages/OnlineTeam.js'
 import { Search } from './components/Search.js'
 import { Avatar } from './components/Avatar.js'
 import { colors } from './design-system/colors'
@@ -41,10 +42,12 @@ import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } f
 import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, isRecordMonthLocked, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
+import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
 
 const PAGES = [
   { id: 'dashboard',      label: 'Dashboard',         group: 'Principal', icon: <IconGrid /> },
   { id: 'empleados',      label: 'Empleados',         group: 'Equipo', icon: <IconUsers /> },
+  { id: 'en_linea',       label: 'En línea',          group: 'Equipo', icon: <IconTrendUp /> },
   { id: 'fichajes',       label: 'Fichajes',          group: 'Equipo', icon: <IconClock /> },
   { id: 'planning',       label: 'Planning',          group: 'Equipo', icon: <IconCalendar /> },
   { id: 'turnos',         label: 'Turnos',            group: 'Equipo', icon: <IconRows /> },
@@ -1510,6 +1513,32 @@ function ObrasPage() {
   return <Obras items={items} />
 }
 
+function OnlineTeamPage() {
+  const db = useAppStore(s => s.db) as any
+  const session = useAppStore(s => s.session) as any
+  const user = session?.user || {}
+  const isScopedRole = session?.isEnc || session?.isJO || user.role === 'encargado' || user.role === 'jefe_obra'
+  const hasScope = !isScopedRole || Boolean(user.centroTrabajo || user.dept || user.obrasAsignadas?.length)
+
+  const rows = useMemo(() => getScopedOnlineRecords({
+    records: db.records || [],
+    employees: db.employees || [],
+    obras: db.obras || [],
+    supervisor: user,
+    unrestricted: !isScopedRole,
+  }).map(({ record, employee }: any) => ({
+    id: record.id,
+    employeeId: employee.id,
+    name: employee.name || record.empName || 'Empleado',
+    location: record.centro || employee.centroTrabajo || employee.dept || 'Sin ubicación',
+    startedAt: record.inicio,
+    onBreak: Boolean(record.enDescanso),
+    isSelf: employee.id === user.id,
+  })), [db.records, db.employees, db.obras, user, isScopedRole])
+
+  return <OnlineTeam rows={rows} hasScope={hasScope} />
+}
+
 function MessagesPage() {
   const db      = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session)
@@ -1563,7 +1592,7 @@ function MessagesPage() {
 // ─── Main shell ────────────────────────────────────────────────────────────────
 
 // Páginas visibles para encargado/jefe de obra (panel supervisor limitado)
-const ENC_PAGES = ['fichajes', 'planning', 'validar', 'solicitudes', 'mensajes', 'notificaciones']
+const ENC_PAGES = ['en_linea', 'fichajes', 'planning', 'validar', 'solicitudes', 'mensajes', 'notificaciones']
 
 export default function AppV2Admin() {
   const { session, currentAdminPage, setAdminPage, logout, setScreen } = useAppStore() as any
@@ -1642,6 +1671,7 @@ export default function AppV2Admin() {
     const page = effectivePage
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
     if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} />
+    if (page === 'en_linea')       return <OnlineTeamPage />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
     if (page === 'planning')       return <PlanningPage />
     if (page === 'turnos')         return <ShiftsPage />
