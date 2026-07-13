@@ -8482,3 +8482,22 @@ button:not(.emp-nav-item):not(.icon-btn):not(.hero-fichar-btn):not(.btn):active 
 .emp-body[data-dir="left"] .emp-tab.active {
   animation: tabFadeSlideIn .28s cubic-bezier(.16,1,.3,1) !important;
 }
+/* Interacción táctil compartida para PWA instalada y navegador móvil. */
+@media (pointer: coarse) {
+  button, [role="button"], a, input, select, textarea { touch-action: manipulation; }
+  button, [role="button"], a {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button:active, [role="button"]:active, a:active { transition-duration: 80ms !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

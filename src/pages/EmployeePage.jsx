@@ -10,7 +10,7 @@ import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
 import WellbeingModal from '../components/WellbeingModal.jsx'
 import TabTurnos from '../components/TabTurnos.jsx'
-import { startedInHorizontalScroller } from '../utils/gesture.js'
+import { shouldIgnoreAppGesture } from '../utils/gesture.js'
 import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
@@ -279,7 +279,7 @@ export default function EmployeePage() {
     const onStart = e => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
       sx = e.clientX; sy = e.clientY; st = performance.now(); axis = null; pointerId = e.pointerId
-      locked = startedInHorizontalScroller(e.target, el) || !!e.target.closest('input,textarea,select,[contenteditable="true"]')
+      locked = shouldIgnoreAppGesture(e.target, el)
     }
     const onMove = e => {
       if (locked || pointerId !== e.pointerId) return

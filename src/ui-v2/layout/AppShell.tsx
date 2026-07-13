@@ -5,6 +5,7 @@ import type { SidebarItem } from '../components/Sidebar.js'
 import { Header } from '../components/Header.js'
 import { IconMenu } from '../components/Icons.js'
 import { colors } from '../design-system/colors'
+import { shouldIgnoreAppGesture } from '../../utils/gesture.js'
 
 export interface AppShellProps {
   navItems: SidebarItem[]
@@ -113,6 +114,8 @@ export function AppShell({
 
     const onStart = (event: PointerEvent) => {
       if (event.pointerType === 'mouse' && event.button !== 0) return
+      if (shouldIgnoreAppGesture(event.target, document.body)) return
+      if (!mobileNavOpen && event.clientX > 24) return
       pointerIdRef.current = event.pointerId
       touchStartX.current = event.clientX
       touchStartY.current = event.clientY
@@ -129,12 +132,12 @@ export function AppShell({
 
       if (!axisLockedRef.current) {
         if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-        axisLockedRef.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+        axisLockedRef.current = Math.abs(dx) > Math.abs(dy) * 1.25 ? 'h' : 'v'
       }
       if (axisLockedRef.current !== 'h') return
 
       if (!mobileNavOpen) {
-        if (startX > 34 || dx < 0) return
+        if (dx < 0) return
         draggingRef.current = true
         event.preventDefault()
         setDragX(Math.min(Math.max(-DRAWER_W + dx, -DRAWER_W), 0))
@@ -179,7 +182,7 @@ export function AppShell({
   const drawerX = dragX !== null ? dragX : (mobileNavOpen ? 0 : -DRAWER_W)
   const drawerProgress = Math.max(0, Math.min(1, (drawerX + DRAWER_W) / DRAWER_W))
   const isDragging = dragX !== null
-  const drawerTransition = isDragging ? 'none' : 'transform 240ms cubic-bezier(.16,1,.3,1)'
+  const drawerTransition = isDragging ? 'none' : 'transform 280ms cubic-bezier(.2,.8,.2,1)'
   const shellVariables = { '--uiv2-drawer-width': `${DRAWER_W}px` } as CSSProperties
 
   const closeDrawer = (restoreFocus = false) => {
@@ -287,6 +290,8 @@ export function AppShell({
           background: ${colors.bg[900]};
           color: ${colors.text[900]};
           font-family: Geist, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          -webkit-tap-highlight-color: transparent;
+          -webkit-touch-callout: none;
         }
         .uiv2-main-column {
           min-width: 0;
@@ -310,6 +315,7 @@ export function AppShell({
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
           scrollbar-color: ${colors.border.default} transparent;
+          touch-action: pan-y;
         }
         .uiv2-page-frame { width: 100%; max-width: 1600px; margin: 0 auto; }
         .uiv2-page-enter { width: 100%; position: relative; animation: uiv2PageEnter 220ms cubic-bezier(.16,1,.3,1); }
@@ -325,6 +331,7 @@ export function AppShell({
           background: ${colors.bg[600]};
           color: ${colors.text[900]};
           cursor: pointer;
+          touch-action: manipulation;
         }
         .uiv2-mobile-menu-button:focus-visible { outline: 2px solid ${colors.primary.base}; outline-offset: 2px; }
         .uiv2-mobile-drawer-layer { position: fixed; inset: 0; z-index: 100; }
@@ -370,6 +377,8 @@ export function AppShell({
             padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
             padding-left: max(14px, env(safe-area-inset-left, 0px));
           }
+          .uiv2-mobile-menu-button { width: 44px; height: 44px; flex-basis: 44px; }
+          button, [role="button"], a { min-height: 44px; }
         }
         @media (prefers-reduced-motion: reduce) {
           .uiv2-page-enter { animation: none; }
