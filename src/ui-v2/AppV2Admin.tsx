@@ -404,6 +404,11 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
   const setScreen = useAppStore(s => s.setScreen)
   const { rows: reqRows } = useRequestsActions()
   const pendingCount = reqRows.filter((r: any) => r.status === 'pending').length
+  const expiringDocs = (db.documentos || []).filter((d: any) => {
+    if (!d.expiresOn) return false
+    const days = (new Date(`${d.expiresOn}T23:59:59`).getTime() - Date.now()) / 86400000
+    return days <= 30
+  }).length
   const ownOpenRecord = session?.user?.id
     ? (db.records || []).find((r: any) => r.empId === session.user.id && !r.fin)
     : null
@@ -523,6 +528,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
         { id: 'empleados',   label: 'Empleados activos', value: `${teamAvatars.activeCount}/${teamAvatars.total}`, onClick: () => onNavigate('empleados') },
         { id: 'fichajes',    label: 'Trabajando ahora',  value: data.kpis[1]?.value || '0', onClick: () => onNavigate('fichajes') },
         { id: 'solicitudes', label: 'Solicitudes pend.', value: String(pendingCount), onClick: () => onNavigate('solicitudes') },
+        { id: 'documentos',  label: 'Documentos a revisar', value: String(expiringDocs), onClick: () => onNavigate('documentos') },
         { id: 'estadisticas',label: 'Estadísticas',      value: 'Ver', onClick: () => onNavigate('estadisticas') },
       ]}
     />
@@ -939,10 +945,11 @@ function DocumentsPage() {
   const saveDB = useAppStore(s => s.saveDB)
   const toast = useAppStore(s => s.toast)
   const uploadRef = useRef<HTMLInputElement>(null)
-  const uploadMeta = useRef<{ empId: string; empName: string; tipo: string } | null>(null)
+  const uploadMeta = useRef<{ empId: string; empName: string; tipo: string; expiresOn: string } | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadEmpId, setUploadEmpId] = useState('')
   const [uploadType, setUploadType] = useState('contrato')
+  const [uploadExpiry, setUploadExpiry] = useState('')
   const employees = useMemo(() => (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja), [db.employees])
 
   const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'otro'> = {
@@ -966,6 +973,13 @@ function DocumentsPage() {
     }
   }
 
+  const handlePreview = (id: string) => {
+    const doc = (db.documentos || []).find((d: any) => d.id === id)
+    const url = doc?.url || doc?.pdfData || doc?.fileUrl || doc?.data
+    if (!url) { toast('Vista previa no disponible', 3000, 'warn'); return }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   const items = useMemo(() => (db.documentos || []).map((d: any) => ({
     id: d.id,
     name: d.nombre || d.name || 'Documento',
@@ -973,20 +987,23 @@ function DocumentsPage() {
     empName: d.empName || '—',
     size: d.size || d.peso || '—',
     uploadedOn: fmtDate(d.ts || d.fecha || d.createdAt),
+    expiresOn: d.expiresOn || '',
     onDownload: handleDownload,
+    onPreview: handlePreview,
   })), [db.documentos])
 
   const requestUpload = () => {
     if (!employees.length) { toast('Primero debes crear un empleado', 3000, 'warn'); return }
     setUploadEmpId(employees[0].id)
     setUploadType('contrato')
+    setUploadExpiry('')
     setUploadOpen(true)
   }
 
   const chooseFile = () => {
     const emp = employees.find((e: any) => e.id === uploadEmpId)
     if (!emp) { toast('Selecciona un empleado', 2500, 'warn'); return }
-    uploadMeta.current = { empId: emp.id, empName: emp.name, tipo: uploadType }
+    uploadMeta.current = { empId: emp.id, empName: emp.name, tipo: uploadType, expiresOn: uploadExpiry }
     uploadRef.current?.click()
   }
 
@@ -1000,7 +1017,7 @@ function DocumentsPage() {
       saveDB((fresh: any) => ({ documentos: [...(fresh.documentos || []), {
         id: gid(), empId: meta.empId, empName: meta.empName, tipo: meta.tipo,
         nombre: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-        mime: file.type, data: reader.result, createdAt: now, _upd: now,
+        mime: file.type, data: reader.result, createdAt: now, expiresOn: meta.expiresOn || null, _upd: now,
       }] }))
       toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
       uploadMeta.current = null
@@ -1029,6 +1046,9 @@ function DocumentsPage() {
             <select value={uploadType} onChange={e => setUploadType(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }}>
               <option value="contrato">Contrato</option><option value="nomina">Nómina</option><option value="certificado">Certificado</option><option value="otro">Otro</option>
             </select>
+          </label>
+          <label style={{ display:'grid', gap:6, fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase' }}>Fecha de caducidad (opcional)
+            <input type="date" value={uploadExpiry} onChange={e => setUploadExpiry(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }} />
           </label>
           <button onClick={chooseFile} style={{ minHeight:48, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:0, borderRadius:12, background:colors.primary.base, color:'#fff', fontSize:14, fontWeight:750, cursor:'pointer' }}><IconPlus width={15} height={15}/> Seleccionar archivo</button>
           <div style={{ fontSize:11, color:colors.text[400], textAlign:'center' }}>PDF, Word, Excel o imagen · máximo 8 MB</div>
