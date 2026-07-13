@@ -1,11 +1,11 @@
 ﻿import { useState } from 'react'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice, IconUsers, IconX } from '../components/Icons.js'
+import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice, IconX } from '../components/Icons.js'
 
 export type LoginMode = 'pin' | 'email'
 
-export interface EmpOption { id: string; name: string; dept?: string }
+export interface EmpOption { id: string; name: string; dept?: string; pinLen?: number }
 
 export interface LoginProps {
   // PIN
@@ -23,7 +23,9 @@ export interface LoginProps {
   onBioLogin?: () => void
   bioLoading?: boolean
   // Email
-  onLogin?: (email: string, password: string, role: 'admin' | 'employee') => void
+  onLogin?: (email: string, password: string) => void
+  onForgotPassword?: (email: string) => void
+  resetLoading?: boolean
   emailLoading?: boolean
   emailError?: string
   // Mode
@@ -31,6 +33,8 @@ export interface LoginProps {
   onSetMode?: (m: LoginMode) => void
   loading?: boolean
   error?: string
+  online?: boolean
+  lastSyncLabel?: string
 }
 
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
@@ -38,21 +42,25 @@ const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 export function Login({
   employees = [], pin = '', selectedEmpId = '', onSelectEmp, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
-  onLogin, emailLoading, emailError,
+  onLogin, onForgotPassword, resetLoading, emailLoading, emailError,
   mode = 'pin', onSetMode,
-  loading, error,
+  loading, error, online = true, lastSyncLabel,
 }: LoginProps) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
-  const [role, setRole]         = useState<'admin' | 'employee'>('employee')
+  const [employeeSearch, setEmployeeSearch] = useState('')
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin?.(email, password, role)
+    onLogin?.(email, password)
   }
 
   const selEmp = employees.find(e => e.id === selectedEmpId)
+  const visibleEmployees = employees.length > 8 && !employeeSearch.trim()
+    ? employees.filter(e => e.id === selectedEmpId)
+    : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(employeeSearch.trim().toLocaleLowerCase('es')))
+  const pinDotCount = Math.min(6, Math.max(4, selEmp?.pinLen || 4))
 
   return (
     <div className="v7-login-shell" style={{
@@ -79,8 +87,8 @@ export function Login({
         <div className="v7-brand-mark">T</div>
         <div>
           <div className="v7-brand-kicker">TIMES INC</div>
-          <h1>El trabajo de tu equipo, en un solo lugar.</h1>
-          <p>Jornadas, equipos y operaciones conectadas con una experiencia segura y profesional.</p>
+          <h1>Control horario y gestión de equipos.</h1>
+          <p>Accede a tu jornada o al panel correspondiente. Tu rol se detecta automáticamente.</p>
         </div>
         <div className="v7-brand-points">
           <span><IconShield width={17} height={17} /> Acceso protegido</span>
@@ -106,7 +114,7 @@ export function Login({
           <div style={{ fontSize: 26, fontWeight: 650, color: colors.text[900], letterSpacing: '-1px' }}>
             TIMES <span style={{ color: colors.primary.light }}>INC</span>
           </div>
-          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Workforce Operating System</div>
+          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Control horario y gestión de equipos</div>
         </div>
 
         {/* Toggle PIN / Email */}
@@ -137,7 +145,10 @@ export function Login({
 
         {/* ── PIN MODE ───────────────────────────────────────────────── */}
         {mode === 'pin' && (
-          <div style={{
+          <div tabIndex={0} onKeyDown={e => {
+            if (/^\d$/.test(e.key)) { e.preventDefault(); onPinKey?.(e.key) }
+            if (e.key === 'Backspace') { e.preventDefault(); onPinDel?.() }
+          }} style={{
             borderRadius: radius.xl, background: colors.bg[700],
             border: `1px solid ${colors.border.default}`,
             padding: '22px 22px 18px',
@@ -148,17 +159,29 @@ export function Login({
               <label style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 8 }}>
                 Empleado
               </label>
+              {employees.length > 8 && (
+                <input
+                  type="search"
+                  value={employeeSearch}
+                  onChange={e => setEmployeeSearch(e.target.value)}
+                  placeholder="Busca tu nombre o centro"
+                  autoComplete="off"
+                  aria-label="Buscar perfil de empleado"
+                  style={{ width:'100%', boxSizing:'border-box', minHeight:42, marginBottom:9, padding:'0 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13 }}
+                />
+              )}
               {employees.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '14px', fontSize: 12.5, color: colors.text[400] }}>
                   Cargando empleados…
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, maxHeight: 130, overflowY: 'auto' }}>
-                  {employees.map(e => (
+                  {visibleEmployees.map(e => (
                     <button
                       key={e.id}
                       type="button"
                       onClick={() => onSelectEmp?.(e.id)}
+                      aria-pressed={selectedEmpId === e.id}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '5px 12px 5px 5px', borderRadius: radius.pill, border: 'none',
@@ -181,6 +204,7 @@ export function Login({
                       {e.name.split(' ')[0]}
                     </button>
                   ))}
+                  {employees.length > 8 && !employeeSearch.trim() && !selectedEmpId && <div style={{ padding:'10px 4px', color:colors.text[400], fontSize:12 }}>Escribe tu nombre para mostrar el perfil.</div>}
                 </div>
               )}
             </div>
@@ -189,7 +213,7 @@ export function Login({
             {selectedEmpId && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 18 }}>
-                  {Array.from({ length: 6 }).map((_, i) => {
+                  {Array.from({ length: pinDotCount }).map((_, i) => {
                     const filled = i < pin.length
                     return (
                       <div
@@ -209,13 +233,20 @@ export function Login({
 
                 {/* Error */}
                 {pinError && (
-                  <div style={{
+                  <div role="alert" aria-live="assertive" style={{
                     padding: '8px 12px', borderRadius: radius.sm, marginBottom: 12,
                     background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)',
                     color: '#F87171', fontSize: 11.5, textAlign: 'center',
                   }}>
                     {pinError}
                   </div>
+                )}
+
+                {/* Biometría prioritaria */}
+                {bioAvailable && empHasBio && !pinLocked && (
+                  <button type="button" onClick={onBioLogin} disabled={bioLoading} style={{ width:'100%', marginBottom:12, padding:'12px', borderRadius:radius.md, border:`1px solid ${colors.primary.base}`, background:colors.primary.dim, color:colors.primary.light, fontSize:13, fontWeight:700, cursor:bioLoading?'wait':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+                    <IconShield width={17} height={17} /> {bioLoading ? 'Verificando…' : 'Usar Face ID, Touch ID o huella'}
+                  </button>
                 )}
 
                 {/* Teclado PIN */}
@@ -247,24 +278,6 @@ export function Login({
                   </div>
                 )}
 
-                {/* Biometric */}
-                {bioAvailable && empHasBio && !pinLocked && (
-                  <button
-                    type="button"
-                    onClick={onBioLogin}
-                    disabled={bioLoading}
-                    style={{
-                      width: '100%', marginTop: 12, padding: '10px', borderRadius: radius.md,
-                      border: `1px solid ${colors.border.subtle}`, background: 'transparent',
-                      color: colors.text[600], fontSize: 12.5, fontWeight: 600,
-                      cursor: bioLoading ? 'wait' : 'pointer', fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                    }}
-                  >
-                    <IconShield width={17} height={17} />
-                    {bioLoading ? 'Verificando…' : 'Acceso biométrico'}
-                  </button>
-                )}
               </>
             )}
 
@@ -284,37 +297,12 @@ export function Login({
             padding: '26px 24px',
             boxShadow: '0 24px 64px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04)',
           }}>
-            {/* Role selector */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 20,
-              background: colors.bg[600], borderRadius: radius.md, padding: 4,
-              border: `1px solid ${colors.border.subtle}`,
-            }}>
-              {(['employee', 'admin'] as const).map(r => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  style={{
-                    padding: '7px 10px', borderRadius: radius.sm, border: 'none',
-                    cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600,
-                    background: role === r ? colors.primary.base : 'transparent',
-                    color: role === r ? '#fff' : colors.text[500],
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                    transition: 'all .15s',
-                  }}
-                >
-                  {r === 'employee' ? <><IconShield width={12} height={12} /> Empleado</> : <><IconUsers width={12} height={12} /> Admin</>}
-                </button>
-              ))}
-            </div>
-
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: colors.text[900], letterSpacing: '-.4px', marginBottom: 4 }}>
-                {role === 'admin' ? 'Panel de administración' : 'Accede a tu jornada'}
+                Accede a TIMES INC
               </div>
               <div style={{ fontSize: 12, color: colors.text[500] }}>
-                {role === 'admin' ? 'Gestiona equipos, fichajes y reportes' : 'Ficha, solicita permisos y consulta tu horario'}
+                Detectaremos automáticamente tu perfil y permisos.
               </div>
             </div>
 
@@ -349,8 +337,8 @@ export function Login({
                   <label style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px' }}>
                     Contraseña
                   </label>
-                  <button type="button" style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    ¿La olvidaste?
+                  <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
+                    {resetLoading ? 'Enviando…' : '¿La olvidaste?'}
                   </button>
                 </div>
                 <div style={{ position: 'relative' }}>
@@ -381,7 +369,7 @@ export function Login({
               </div>
 
               {(emailError || error) && (
-                <div style={{
+                <div role="alert" aria-live="assertive" style={{
                   padding: '9px 12px', borderRadius: radius.sm,
                   background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.28)',
                   color: '#F87171', fontSize: 12,
@@ -406,17 +394,20 @@ export function Login({
                   transition: 'all .2s',
                 }}
               >
-                {emailLoading || loading ? 'Entrando…' : role === 'admin' ? 'Acceder al panel' : 'Entrar a mi jornada'}
+                {emailLoading || loading ? 'Entrando…' : 'Continuar'}
               </button>
             </form>
           </div>
         )}
 
         {/* Trust badges */}
+        <div role="status" aria-live="polite" style={{ marginTop:16, padding:'9px 12px', borderRadius:radius.md, border:`1px solid ${online ? 'rgba(16,185,129,.24)' : 'rgba(245,158,11,.3)'}`, background:online?'rgba(16,185,129,.07)':'rgba(245,158,11,.08)', color:online?colors.semantic.green:colors.semantic.orange, fontSize:11.5, textAlign:'center', fontWeight:650 }}>
+          {online ? `Con conexión${lastSyncLabel ? ` · Última sincronización ${lastSyncLabel}` : ''}` : 'Sin cobertura · El acceso con PIN sigue disponible; el email requiere conexión'}
+        </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 22, marginTop: 20 }}>
           {[
             { icon: <IconShield width={10} height={10} />, label: 'Cifrado SSL' },
-            { icon: <IconDevice width={10} height={10} />, label: 'PWA offline' },
+            { icon: <IconDevice width={10} height={10} />, label: 'Funciona sin cobertura' },
             { icon: <IconClock  width={10} height={10} />, label: 'RD 8/2019' },
           ].map((b, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: colors.text[300] }}>

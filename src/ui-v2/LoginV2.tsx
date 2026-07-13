@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
-import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange } from '../services/authService.js'
+import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
 import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
@@ -46,7 +46,7 @@ function recordEmailFailed() {
 function clearEmailLockout() { try { localStorage.removeItem(EMAIL_LK_KEY) } catch {} }
 
 export default function LoginV2() {
-  const { db, setSession, setScreen, toast, saveDB } = useAppStore()
+  const { db, setSession, setScreen, toast, saveDB, lastSyncTime } = useAppStore()
 
   // Mode
   const [mode, setMode] = useState<LoginMode>('pin')
@@ -66,6 +66,8 @@ export default function LoginV2() {
   // Email state
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailError, setEmailError]     = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [online, setOnline] = useState(() => navigator.onLine)
 
   const verifyingRef = useRef(false)
   const opIdRef      = useRef(0)
@@ -85,6 +87,11 @@ export default function LoginV2() {
   }, [])
 
   useEffect(() => { checkPlatformAuth().then(setBioAvailable) }, [])
+  useEffect(() => {
+    const on = () => setOnline(true), off = () => setOnline(false)
+    window.addEventListener('online', on); window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
   useEffect(() => { setEmpHasBio(selectedEmpId ? hasBiometric(selectedEmpId) : false) }, [selectedEmpId])
 
   // Countdown lockout
@@ -218,7 +225,7 @@ export default function LoginV2() {
 
   // ── Email login ───────────────────────────────────────────────────────────
 
-  const handleEmailLogin = async (email: string, password: string, role: 'admin' | 'employee') => {
+  const handleEmailLogin = async (email: string, password: string) => {
     setEmailError('')
     const lk = getEmailLockout()
     if (lk.locked) {
@@ -243,9 +250,6 @@ export default function LoginV2() {
         doLogin(emp)
       } else if (!emp && configuredAdmin) {
         doAdminLogin()
-      } else if (role === 'admin') {
-        recordEmailFailed()
-        setEmailError('Esta cuenta no tiene permisos de administrador.')
       } else if (emp) {
         doLogin(emp)
       } else {
@@ -263,6 +267,20 @@ export default function LoginV2() {
       }
     }
     setEmailLoading(false)
+  }
+
+  const handleForgotPassword = async (email: string) => {
+    if (!email.trim()) { setEmailError('Introduce primero tu email.'); return }
+    if (!navigator.onLine) { setEmailError('La recuperación de contraseña requiere conexión.'); return }
+    setResetLoading(true); setEmailError('')
+    try {
+      await resetPassword(email.trim())
+      toast('Te hemos enviado un enlace para recuperar la contraseña', 5000, 'ok')
+    } catch (error: any) {
+      setEmailError(error?.message || 'No se pudo enviar el enlace de recuperación')
+    } finally {
+      setResetLoading(false)
+    }
   }
 
   // ── Auth state change (Google OAuth / password reset) ─────────────────────
@@ -295,7 +313,7 @@ export default function LoginV2() {
     <Login
       mode={mode}
       onSetMode={setMode}
-      employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept }))}
+      employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo, pinLen: e.pinLen || (typeof e.pin === 'string' && !isPinHashed(e.pin) ? e.pin.length : 4) }))}
       pin={pin}
       selectedEmpId={selectedEmpId}
       onSelectEmp={handleSelectEmp}
@@ -309,8 +327,12 @@ export default function LoginV2() {
       onBioLogin={handleBioLogin}
       bioLoading={bioLoading}
       onLogin={handleEmailLogin}
+      onForgotPassword={handleForgotPassword}
+      resetLoading={resetLoading}
       emailLoading={emailLoading}
       emailError={emailError}
+      online={online}
+      lastSyncLabel={lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : undefined}
     />
   )
 }
