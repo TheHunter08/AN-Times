@@ -545,7 +545,7 @@ const employeeHomeStyles = `
   .employee-home-v7__layout {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
-    align-items: start;
+    align-items: stretch;
     gap: var(--space-5);
   }
 
@@ -1007,8 +1007,13 @@ const employeeHomeStyles = `
     box-shadow: none !important;
   }
 
-  .employee-home-v7__side { min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); }
-  .employee-home-v7__panel { padding: var(--space-5); border-radius: var(--radius-lg); }
+  .employee-home-v7__side {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
+  }
+  .employee-home-v7__panel { height: 100%; min-height: 0; padding: var(--space-5); border-radius: var(--radius-lg); }
 
   .employee-home-v7__panel-heading { align-items: center; margin-bottom: var(--space-5); }
   .employee-home-v7__panel-heading h2 { margin: 0; color: var(--text-primary); font-size: var(--font-body-lg); font-weight: var(--font-semibold); letter-spacing: -0.025em; }
@@ -1106,15 +1111,15 @@ const employeeHomeStyles = `
   @media (max-width: 860px) {
     .employee-home-v7 { max-width: 620px; }
     .employee-home-v7__layout { grid-template-columns: minmax(0, 1fr); }
-    .employee-home-v7__side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .employee-home-v7__side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(288px, 1fr); align-items: stretch; }
   }
 
   @media (max-width: 620px) {
     .employee-home-v7__header { min-height: 52px; margin-bottom: var(--space-4); }
     .employee-home-v7__welcome h1 { font-size: 22px; }
     .employee-home-v7__streak > span:last-child { display: none; }
-    .employee-home-v7__layout,
-    .employee-home-v7__side { display: flex; flex-direction: column; gap: var(--space-4); }
+    .employee-home-v7__layout { display: flex; flex-direction: column; gap: var(--space-4); }
+    .employee-home-v7__side { display: grid; grid-template-columns: 1fr; grid-auto-rows: 288px; gap: var(--space-4); }
     .employee-home-v7__hero { width: 100%; padding: var(--space-5) var(--space-4); border-radius: var(--radius-xl); }
     .employee-home-v7__panel { width: 100%; padding: var(--space-4); }
     .employee-home-v7__clock-wrap { min-height: 294px; }
