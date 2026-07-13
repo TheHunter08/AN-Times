@@ -1,4 +1,5 @@
 import { queuePush } from '../services/dataService.js'
+import { localMonthKey } from './time.js'
 
 export const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 
@@ -13,7 +14,7 @@ export const downloadDataUrl = (dataUrl, filename) => {
 // cierre como desactualizado en vez de solo avisar con un toast que desaparece — la UI
 // de Informes/Validar Horas lo muestra con un badge distinto y obliga a regenerarlo.
 export const flagStaleCierre = (cierresList, empId, inicio) => {
-  const mes = inicio?.slice(0, 7)
+  const mes = localMonthKey(inicio)
   let flagged = false
   let staleCierre = null
   const updated = (cierresList || []).map(c => {
@@ -33,7 +34,7 @@ export const flagStaleCierre = (cierresList, empId, inicio) => {
 // las gana), no solo el original.
 export const flagStaleCierreForEdit = (cierresList, empId, oldInicio, newInicio) => {
   const r1 = flagStaleCierre(cierresList, empId, oldInicio)
-  const mesOld = oldInicio?.slice(0, 7), mesNew = newInicio?.slice(0, 7)
+  const mesOld = localMonthKey(oldInicio), mesNew = localMonthKey(newInicio)
   if (mesNew === mesOld) return { cierres: r1.cierres, flagged: r1.flagged, staleCierres: r1.flagged ? [r1.staleCierre] : [] }
   const r2 = flagStaleCierre(r1.cierres, empId, newInicio)
   const staleCierres = [r1.flagged && r1.staleCierre, r2.flagged && r2.staleCierre].filter(Boolean)

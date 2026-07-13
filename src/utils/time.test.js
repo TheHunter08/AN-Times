@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { calcSecs, calcMin, mhm, wkStart, monthlyExtras, vacData, localDateStr } from './time.js'
+import { calcSecs, calcMin, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey } from './time.js'
+
+describe('localMonthKey', () => {
+  it('clasifica por el mes local y no por el mes UTC', () => {
+    const local = new Date(2026, 6, 1, 0, 15)
+    expect(localMonthKey(local)).toBe('2026-07')
+  })
+
+  it('devuelve vacío para fechas inválidas', () => {
+    expect(localMonthKey('no-es-fecha')).toBe('')
+  })
+})
 
 describe('calcSecs', () => {
   it('calcula trabajo sin descansos', () => {

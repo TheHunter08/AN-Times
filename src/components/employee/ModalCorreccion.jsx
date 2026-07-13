@@ -36,12 +36,13 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
     setSending(true)
     const times = recordTimesFromClock(rec, inicio, fin || inicio)
     if (!times) { toast('Indica horas válidas'); setSending(false); return }
+    const nowIso = new Date().toISOString()
     const corr = {
       id: gid(), empId: u.id, empName: u.name, recId: rec.id,
       recInicio: rec.inicio, recFin: rec.fin || null,
       propInicio: times.inicio.toISOString(),
       propFin: fin ? times.fin.toISOString() : null,
-      motivo: motivo.trim(), estado: 'pendiente', ts: Date.now()
+      motivo: motivo.trim(), estado: 'pendiente', ts: Date.now(), _upd: nowIso
     }
     saveDB(freshDb => ({
       correccionesFichaje: [...(freshDb.correccionesFichaje || []), corr],

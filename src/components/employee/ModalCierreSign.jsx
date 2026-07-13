@@ -34,7 +34,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     setFirmando(true)
     const firmadoAt = new Date().toISOString()
-    const firmado = { ...selCierre, estado:'firmado', firma:{ signatureData, firmadoAt, empName:u.name } }
+    const firmado = { ...selCierre, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     try {
       const { dataUrl } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
@@ -43,9 +43,11 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
       console.warn('[cierre] No se pudo generar el PDF firmado:', e)
     }
     const cierreFinal = pdfData ? { ...firmado, pdfData } : firmado
-    const updatedCierres = (db.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci)
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
-    saveDB({ cierres: updatedCierres, notis:[...(db.notis||[]), noti] })
+    saveDB(fresh => ({
+      cierres:(fresh.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci),
+      notis:[...(fresh.notis || []), noti],
+    }))
     queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
     toast('Cierre mensual firmado correctamente', 3000, 'ok')
     setFirmando(false)

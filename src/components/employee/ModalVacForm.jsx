@@ -31,9 +31,10 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     const days = Math.round((e - s) / 86400000) + 1
     const availDays = vacData(u.id, db).available
     if (days > availDays) { toast(`Solo tienes ${availDays} día${availDays !== 1 ? 's' : ''} disponibles`, 4000, 'warn'); return }
-    const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: new Date().toISOString() }
+    const nowIso = new Date().toISOString()
+    const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: nowIso, _upd: nowIso }
     const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
-    saveDB({ vacaciones: [...(db.vacaciones||[]), vac], notis: [...(db.notis||[]), noti] })
+    saveDB(fresh => ({ vacaciones:[...(fresh.vacaciones || []), vac], notis:[...(fresh.notis || []), noti] }))
     queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
     toast('Solicitud enviada', 3000, 'ok')
     onClose()

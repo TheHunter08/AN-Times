@@ -10,6 +10,11 @@ export const localDateStr = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(
 
 export const today = () => localDateStr(new Date())
 
+export const localMonthKey = value => {
+  const d = value instanceof Date ? value : new Date(value)
+  return isNaN(d.getTime()) ? '' : localDateStr(d).slice(0, 7)
+}
+
 export const mhm = m => { m = Math.max(0, Math.floor(m || 0)); return `${Math.floor(m/60)}h ${p2(m%60)}m` }
 export const s2t = s => `${p2(Math.floor(s/3600))}:${p2(Math.floor((s%3600)/60))}:${p2(s%60)}`
 

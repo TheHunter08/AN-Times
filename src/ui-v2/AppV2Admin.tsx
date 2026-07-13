@@ -37,7 +37,7 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
-import { gid, today, mhm, localDateStr, calcSecs, recWorkSecs } from '../utils/time.js'
+import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
 import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
@@ -338,7 +338,61 @@ function useRequestsActions() {
     toast('Solicitud rechazada', 3000, 'warn')
   }
 
-  const rows = useRequestsData(approve, reject)
+  const resolveCorrection = async (id: string, estado: 'aprobada' | 'rechazada') => {
+    const corr = (db.correccionesFichaje || []).find((c: any) => c.id === id)
+    if (!corr) return
+    const who = session?.user?.name || 'Admin'
+    const nowIso = new Date().toISOString()
+    const rec = (db.records || []).find((r: any) => r.id === corr.recId)
+    let updatedRecord: any = null
+
+    if (estado === 'aprobada') {
+      if (!rec || !corr.propInicio) { toast('El fichaje original ya no existe', 4000, 'warn'); return }
+      const breaks = corr.propFin ? clipBreaksToWindow(rec.breaks || [], corr.propInicio, corr.propFin) : (rec.breaks || [])
+      const base = { ...rec, inicio:corr.propInicio, fin:corr.propFin || null, breaks, _upd:nowIso, modificado:true, aceptada:true, validado:true, rechazado:false }
+      const calculated = calcSecs(base)
+      updatedRecord = { ...base, workSecs:calculated.work, breakSecs:calculated.brk }
+      try { await persistRecordRow(updatedRecord) } catch (error: any) {
+        toast(`No se pudo aplicar la corrección: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+        return
+      }
+    }
+
+    let staleCierres: any[] = []
+    saveDB((fresh: any) => {
+      let cierres = fresh.cierres || []
+      if (updatedRecord) {
+        const stale = flagStaleCierreForEdit(cierres, corr.empId, rec.inicio, updatedRecord.inicio)
+        staleCierres = stale.staleCierres || []
+        cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
+      }
+      const correccionesFichaje = (fresh.correccionesFichaje || []).map((c: any) =>
+        c.id === id ? { ...c, estado, resolvedAt:nowIso, resolvedBy:who, finalInicio:corr.propInicio, finalFin:corr.propFin, _upd:nowIso } : c
+      )
+      const records = updatedRecord
+        ? (fresh.records || []).map((r: any) => r.id === corr.recId ? updatedRecord : r)
+        : (fresh.records || [])
+      const noti = { id:gid(), empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', ts:nowIso, leido:false }
+      const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who)
+      return { correccionesFichaje, records, cierres, notis:[...(fresh.notis || []), noti], audit:withAudit.audit }
+    })
+    staleCierres.forEach(c => notifyStaleCierre(c, session?.user?.id))
+    queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada')
+    toast(estado === 'aprobada' ? 'Corrección aplicada y sincronizada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
+  }
+
+  const vacationRows = useRequestsData(approve, reject)
+  const correctionRows = (db.correccionesFichaje || []).map((c: any) => ({
+    id:c.id,
+    type:'Corrección de fichaje',
+    employeeName:c.empName || '—',
+    requestedOn:fmtDate(typeof c.ts === 'number' ? new Date(c.ts).toISOString() : c.ts),
+    status:c.estado === 'aprobada' ? 'approved' : c.estado === 'rechazada' ? 'rejected' : 'pending',
+    note:`${fmtTime(c.recInicio)}–${fmtTime(c.recFin)} → ${fmtTime(c.propInicio)}–${fmtTime(c.propFin)}${c.motivo ? ` · ${c.motivo}` : ''}`,
+    onApprove:(corrId: string) => resolveCorrection(corrId, 'aprobada'),
+    onReject:(corrId: string) => resolveCorrection(corrId, 'rechazada'),
+  }))
+  const rows = [...correctionRows, ...vacationRows]
   return { rows, approve, reject }
 }
 
@@ -411,7 +465,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const mesStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const wdMin: number = (db.config?.wdMin) || 480
     const byDay = new Map<string, number>()
-    ;(db.records || []).filter((r: any) => r.fin && r.inicio?.startsWith(mesStr)).forEach((r: any) => {
+    ;(db.records || []).filter((r: any) => r.fin && localMonthKey(r.inicio) === mesStr).forEach((r: any) => {
       const key = `${r.empId}::${r.inicio.slice(0, 10)}`
       const mins = recWorkSecs(r) / 60
       byDay.set(key, (byDay.get(key) || 0) + mins)
@@ -970,7 +1024,7 @@ function ReportsPage() {
   const months = useMemo(() => {
     const set = new Set<string>()
     ;(db.records || []).forEach((r: any) => {
-      if (r.inicio) set.add(r.inicio.slice(0, 7))
+      if (r.inicio) set.add(localMonthKey(r.inicio))
     })
     return [...set].sort().reverse().slice(0, 12)
   }, [db.records])
@@ -978,7 +1032,7 @@ function ReportsPage() {
   const handleDownloadExcel = (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-    const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(mes) && r.fin)
+    const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
     const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']]
     recs.forEach((r: any) => {
@@ -1003,7 +1057,7 @@ function ReportsPage() {
   const handleDownload = async (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-    const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(mes) && r.fin)
+    const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
 
     const pdfLines: string[] = []
@@ -1051,7 +1105,7 @@ function StatsPage() {
 
   const { kpis, bars, centrosBars, donut, rawSlices } = useMemo(() => {
     const allRecs = (db.records || []).filter((r: any) => r.fin && r.inicio)
-    const thisMonth = new Date().toISOString().slice(0, 7)
+    const thisMonth = localMonthKey(new Date())
     const monthRecs = allRecs.filter((r: any) => (r.inicio || '').startsWith(thisMonth))
     const totalMins = monthRecs.reduce((s: number, r: any) => {
       return s + recWorkSecs(r) / 60
@@ -1137,7 +1191,7 @@ function MonthlyClosePage() {
   const toast   = useAppStore(s => s.toast)
   const autoGenRef = useRef(false)
 
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = localMonthKey(new Date())
 
   // Auto-generate closures only for months that have already ended (never the current month)
   useEffect(() => {
@@ -1155,17 +1209,16 @@ function MonthlyClosePage() {
     saveDB((fresh: any) => {
       const recs = fresh.records || []
       const nuevos = toCreate.flatMap((e: any) => {
-        const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && r.inicio?.startsWith(mesPasado))
+        const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
         if (!eRecs.length) return []
-        const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => {
-          const ini = new Date(r.inicio).getTime(), fin = new Date(r.fin).getTime()
-          return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
-        }, 0))
+        const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
+        const records_snapshot = eRecs.map((r: any) => ({ id:r.id, inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:recWorkSecs(r), breakSecs:r.breakSecs || 0 }))
+        const generadoAt = new Date().toISOString()
         return [{
           id: gid(), empId: e.id, empName: e.name, mes: mesPasado,
-          totalMin, dias: eRecs.length, estado: 'pendiente',
-          generadoPor: 'Sistema', generadoAt: new Date().toISOString(),
-          firma: null, firmaEmp: null, firmaAdmin: null,
+          totalMin, dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
+          generadoPor: 'Sistema', generadoAt,
+          firma: null, firmaEmp: null, firmaAdmin: null, _upd: generadoAt,
         }]
       })
       if (!nuevos.length) return null
@@ -1187,7 +1240,7 @@ function MonthlyClosePage() {
           : c.mes || '—'
 
         const recs = (db.records || []).filter((r: any) =>
-          r.empId === c.empId && r.fin && r.inicio && (r.inicio || '').startsWith(c.mes || '')
+          r.empId === c.empId && r.fin && r.inicio && localMonthKey(r.inicio) === (c.mes || '')
         )
         const totalMins = recs.reduce((s: number, r: any) =>
           s + recWorkSecs(r) / 60, 0
@@ -1248,13 +1301,12 @@ function MonthlyClosePage() {
     saveDB((fresh: any) => {
       const recs = fresh.records || []
       const nuevos = toCreate.flatMap((e: any) => {
-        const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && r.inicio?.startsWith(mesPasado))
+        const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
         if (!eRecs.length) return []
-        const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => {
-          const ini = new Date(r.inicio).getTime(), fin = new Date(r.fin).getTime()
-          return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
-        }, 0))
-        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, dias: eRecs.length, estado: 'pendiente', generadoPor: session?.user?.name || 'Admin', generadoAt: new Date().toISOString(), firma: null, firmaEmp: null, firmaAdmin: null }]
+        const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
+        const records_snapshot = eRecs.map((r: any) => ({ id:r.id, inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:recWorkSecs(r), breakSecs:r.breakSecs || 0 }))
+        const generadoAt = new Date().toISOString()
+        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
       if (!nuevos.length) { toast(`Sin registros de ${mesPasado}`, 3000, 'warn'); return null }
       const withAudit = auditLog(fresh, `Cierre mensual generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
@@ -1264,9 +1316,10 @@ function MonthlyClosePage() {
   }
 
   const handleSignAdmin = (id: string) => {
+    const nowIso = new Date().toISOString()
     saveDB((fresh: any) => ({
       cierres: (fresh.cierres || []).map((c: any) =>
-        c.id === id ? { ...c, firmaAdmin: true, firmaAdminAt: new Date().toISOString(), firmaAdminBy: session?.user?.name || 'Admin', estado: c.firmaEmp ? 'firmado' : c.estado } : c
+        c.id === id ? { ...c, firmaAdmin:true, firmaAdminAt:nowIso, firmaAdminBy:session?.user?.name || 'Admin', estado:(c.firmaEmp || c.firma) ? 'firmado' : c.estado, _upd:nowIso } : c
       ),
     }))
     toast('Firma admin registrada', 2500, 'ok')
