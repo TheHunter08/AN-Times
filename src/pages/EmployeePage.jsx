@@ -269,24 +269,26 @@ export default function EmployeePage() {
   useEffect(() => {
     const el = empBodyRef.current
     if (!el) return
-    let sx = 0, sy = 0, st = 0, locked = false, axis = null, pointerId = null, suppressClickUntil = 0
+    let sx = 0, sy = 0, st = 0, locked = false, axis = null, touchId = null, suppressClickUntil = 0
     const reset = () => {
       el.classList.remove('is-swiping')
       el.style.removeProperty('--emp-swipe-x')
       el.style.removeProperty('--emp-swipe-opacity')
-      axis = null; pointerId = null
+      axis = null; touchId = null
     }
     const onStart = e => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      sx = e.clientX; sy = e.clientY; st = performance.now(); axis = null; pointerId = e.pointerId
+      if (e.touches.length !== 1) { reset(); return }
+      const touch = e.touches[0]
+      sx = touch.clientX; sy = touch.clientY; st = performance.now(); axis = null; touchId = touch.identifier
       locked = shouldIgnoreAppGesture(e.target, el)
     }
     const onMove = e => {
-      if (locked || pointerId !== e.pointerId) return
-      const dx = e.clientX - sx, dy = e.clientY - sy
+      if (locked || touchId == null) return
+      const touch = Array.from(e.touches).find(t => t.identifier === touchId)
+      if (!touch) return
+      const dx = touch.clientX - sx, dy = touch.clientY - sy
       if (!axis && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'x' : 'y'
       if (axis !== 'x') return
-      if (!el.hasPointerCapture?.(e.pointerId)) el.setPointerCapture?.(e.pointerId)
       const ci = TAB_ORDER.indexOf(currentTabRef.current)
       const atEdge = (dx > 0 && ci === 0) || (dx < 0 && ci === TAB_ORDER.length - 1)
       const visualDx = atEdge ? dx * .22 : dx * .72
@@ -296,15 +298,12 @@ export default function EmployeePage() {
       e.preventDefault()
     }
     const onEnd = e => {
-      if (locked || pointerId !== e.pointerId || axis !== 'x') {
-        try { if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId) } catch {}
-        reset(); return
-      }
-      const dx = e.clientX - sx
+      const touch = Array.from(e.changedTouches || []).find(t => t.identifier === touchId)
+      if (locked || !touch || axis !== 'x') { reset(); return }
+      const dx = touch.clientX - sx
       const dt = performance.now() - st
       const vx = Math.abs(dx) / Math.max(1, dt)
       const isSwipe = Math.abs(dx) > 64 || (Math.abs(dx) > 30 && vx > .5)
-      try { if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId) } catch {}
       reset()
       if (!isSwipe) return
       suppressClickUntil = performance.now() + 350
@@ -318,18 +317,16 @@ export default function EmployeePage() {
         e.stopPropagation()
       }
     }
-    el.addEventListener('pointerdown', onStart, { passive: true })
-    el.addEventListener('pointermove', onMove, { passive: false })
-    el.addEventListener('pointerup', onEnd, { passive: true })
-    el.addEventListener('pointercancel', reset, { passive: true })
-    el.addEventListener('lostpointercapture', reset, { passive: true })
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', reset, { passive: true })
     el.addEventListener('click', onClickCapture, true)
     return () => {
-      el.removeEventListener('pointerdown', onStart)
-      el.removeEventListener('pointermove', onMove)
-      el.removeEventListener('pointerup', onEnd)
-      el.removeEventListener('pointercancel', reset)
-      el.removeEventListener('lostpointercapture', reset)
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', reset)
       el.removeEventListener('click', onClickCapture, true)
       reset()
     }

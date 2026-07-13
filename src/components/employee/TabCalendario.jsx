@@ -154,28 +154,29 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     setCalMonth(new Date(y, m + delta, 1))
   }
 
-  const onPointerDown = e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
-    gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: null, moved: false }
+  const onTouchStart = e => {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+    gesture.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY, t: performance.now(), axis: null, moved: false }
   }
-  const onPointerMove = e => {
+  const onTouchMove = e => {
     const g = gesture.current
-    if (g.id !== e.pointerId) return
-    const dx = e.clientX - g.x, dy = e.clientY - g.y
+    const touch = Array.from(e.touches).find(t => t.identifier === g.id)
+    if (!touch) return
+    const dx = touch.clientX - g.x, dy = touch.clientY - g.y
     if (!g.axis && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) g.axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'x' : 'y'
     if (g.axis !== 'x') return
-    if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.setPointerCapture?.(e.pointerId)
     g.moved = true
     calendarRef.current?.style.setProperty('--cal-drag-x', `${Math.max(-90, Math.min(90, dx * .55))}px`)
     calendarRef.current?.classList.add('is-dragging')
     e.preventDefault()
   }
-  const onPointerEnd = e => {
+  const onTouchEnd = e => {
     const g = gesture.current
-    if (g.id !== e.pointerId) return
-    const dx = e.clientX - g.x
+    const touch = Array.from(e.changedTouches || []).find(t => t.identifier === g.id)
+    if (!touch) return
+    const dx = touch.clientX - g.x
     const velocity = Math.abs(dx) / Math.max(1, performance.now() - g.t)
-    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
     calendarRef.current?.classList.remove('is-dragging')
     calendarRef.current?.style.removeProperty('--cal-drag-x')
     if (g.axis === 'x' && (Math.abs(dx) > 58 || (Math.abs(dx) > 28 && velocity > .5))) {
@@ -185,8 +186,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     gesture.current = { id: null, x: 0, y: 0, t: 0, axis: null, moved: g.moved }
     setTimeout(() => { gesture.current.moved = false }, 0)
   }
-  const onPointerCancel = e => {
-    try { if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+  const onTouchCancel = () => {
     calendarRef.current?.classList.remove('is-dragging')
     calendarRef.current?.style.removeProperty('--cal-drag-x')
     gesture.current = { id:null, x:0, y:0, t:0, axis:null, moved:false }
@@ -195,7 +195,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
   return (
     <PullToRefresh>
       <div ref={calendarRef} data-gesture-scope="local" className="employee-calendar-v2 employee-calendar-v8"
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerCancel} onLostPointerCapture={onPointerCancel}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}
         style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 760, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
 
         {/* Header */}
