@@ -6,6 +6,7 @@ export function startedInHorizontalScroller(target, boundary) {
   let el = target
   while (el && el !== boundary && el !== document.body) {
     if (el.nodeType === 1) {
+      if (el.dataset?.gestureScope === 'local' || el.dataset?.gestureLock === 'true') return true
       const canScrollX = el.scrollWidth - el.clientWidth > 4
       if (canScrollX) {
         const ox = getComputedStyle(el).overflowX

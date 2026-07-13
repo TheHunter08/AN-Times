@@ -270,31 +270,53 @@ export default function EmployeePage() {
   useEffect(() => {
     const el = empBodyRef.current
     if (!el) return
-    let sx = 0, sy = 0, st = 0, locked = false
+    let sx = 0, sy = 0, st = 0, locked = false, axis = null, pointerId = null
+    const reset = () => {
+      el.classList.remove('is-swiping')
+      el.style.removeProperty('--emp-swipe-x')
+      el.style.removeProperty('--emp-swipe-opacity')
+      axis = null; pointerId = null
+    }
     const onStart = e => {
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now()
-      // Si el gesto nace dentro de un scroller horizontal, no cambiamos de pantalla
-      locked = startedInHorizontalScroller(e.target, el)
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      sx = e.clientX; sy = e.clientY; st = performance.now(); axis = null; pointerId = e.pointerId
+      locked = startedInHorizontalScroller(e.target, el) || !!e.target.closest('input,textarea,select,[contenteditable="true"]')
+    }
+    const onMove = e => {
+      if (locked || pointerId !== e.pointerId) return
+      const dx = e.clientX - sx, dy = e.clientY - sy
+      if (!axis && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'x' : 'y'
+      if (axis !== 'x') return
+      const ci = TAB_ORDER.indexOf(currentTabRef.current)
+      const atEdge = (dx > 0 && ci === 0) || (dx < 0 && ci === TAB_ORDER.length - 1)
+      const visualDx = atEdge ? dx * .22 : dx * .72
+      el.classList.add('is-swiping')
+      el.style.setProperty('--emp-swipe-x', `${visualDx}px`)
+      el.style.setProperty('--emp-swipe-opacity', String(Math.max(.72, 1 - Math.abs(visualDx) / 520)))
+      e.preventDefault()
     }
     const onEnd = e => {
-      if (locked) return
-      const dx = e.changedTouches[0].clientX - sx
-      const dy = e.changedTouches[0].clientY - sy
-      const dt = Date.now() - st
-      const vx = Math.abs(dx) / dt
-      // Gesto de cambio de pantalla: claramente horizontal (no un scroll lateral
-      // accidental ni un scroll vertical). Exigimos dominancia horizontal 2:1.
-      const isSwipe = Math.abs(dx) > 45 && (Math.abs(dx) > 70 || vx > 0.45) && Math.abs(dx) > Math.abs(dy) * 2
+      if (locked || pointerId !== e.pointerId || axis !== 'x') { reset(); return }
+      const dx = e.clientX - sx
+      const dt = performance.now() - st
+      const vx = Math.abs(dx) / Math.max(1, dt)
+      const isSwipe = Math.abs(dx) > 64 || (Math.abs(dx) > 30 && vx > .5)
+      reset()
       if (!isSwipe) return
       const ci = TAB_ORDER.indexOf(currentTabRef.current)
       if (dx < 0 && ci < TAB_ORDER.length - 1) { try { navigator.vibrate(8) } catch {} ; setEmpTab(TAB_ORDER[ci + 1]) }
       else if (dx > 0 && ci > 0) { try { navigator.vibrate(8) } catch {} ; setEmpTab(TAB_ORDER[ci - 1]) }
     }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('pointerdown', onStart, { passive: true })
+    el.addEventListener('pointermove', onMove, { passive: false })
+    el.addEventListener('pointerup', onEnd, { passive: true })
+    el.addEventListener('pointercancel', reset, { passive: true })
     return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('pointerdown', onStart)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onEnd)
+      el.removeEventListener('pointercancel', reset)
+      reset()
     }
   }, [setEmpTab])
 
@@ -1066,9 +1088,7 @@ export default function EmployeePage() {
 
       <div className="emp-dsk-main">
         <header className="emp-dsk-topbar">
-          <div className="emp-dsk-greeting-block">
-            <TopbarClock />
-          </div>
+          <div className="emp-dsk-greeting-block" aria-hidden="true" />
           <div className="emp-dsk-topbar-actions">
             {isSuper && (
               <button className="enc-chip" onClick={() => setScreen('admin')}>
@@ -1244,9 +1264,6 @@ export default function EmployeePage() {
               : realtimeStatus === 'SUBSCRIBED'
               ? <span title="Tiempo real activo" style={{ position:'absolute', bottom:-2, right:-2, width:9, height:9, borderRadius:'50%', background:'#10b981', border:'2px solid var(--bg-700)', boxShadow:'0 0 5px #10b981' }} />
               : null}
-          </div>
-          <div style={{ minWidth:0, overflow:'hidden' }}>
-            <TopbarClock />
           </div>
         </div>
         <div className="emp-top-right">

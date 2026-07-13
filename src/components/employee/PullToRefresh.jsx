@@ -14,7 +14,7 @@ export function PullToRefresh({ children }) {
   const arrowRef = useRef(null)
   const labelRef = useRef(null)
   const [refreshing, setRefreshing] = useState(false)
-  const ptr = useRef({ startY: 0, active: false, dist: 0, refreshing: false })
+  const ptr = useRef({ startX: 0, startY: 0, active: false, axis: null, dist: 0, refreshing: false })
 
   useEffect(() => {
     const el = scrollRef.current
@@ -55,15 +55,23 @@ export function PullToRefresh({ children }) {
     const onStart = e => {
       if (ptr.current.refreshing) return
       if (el.scrollTop <= 0) {
+        ptr.current.startX = e.touches[0].clientX
         ptr.current.startY = e.touches[0].clientY
         ptr.current.active = true
+        ptr.current.axis = null
         ptr.current.dist = 0
       }
     }
 
     const onMove = e => {
       if (!ptr.current.active || ptr.current.refreshing) return
+      const dx = e.touches[0].clientX - ptr.current.startX
       const d = e.touches[0].clientY - ptr.current.startY
+      if (!ptr.current.axis && (Math.abs(dx) > 7 || Math.abs(d) > 7)) {
+        ptr.current.axis = Math.abs(d) > Math.abs(dx) * 1.2 ? 'y' : 'x'
+      }
+      if (ptr.current.axis === 'x') { ptr.current.active = false; setOffset(0, true); return }
+      if (ptr.current.axis !== 'y') return
       if (d > 0) {
         const offset = Math.min(d * 0.45, 80)
         ptr.current.dist = offset

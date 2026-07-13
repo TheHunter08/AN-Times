@@ -27,6 +27,13 @@ html, body {
   overflow: hidden;
 }
 #root { width: 100%; height: 100%; overflow: hidden; }
+.emp-body { touch-action: pan-y; overscroll-behavior: contain; }
+.emp-body.is-swiping > * {
+  transform: translate3d(var(--emp-swipe-x, 0), 0, 0) !important;
+  opacity: var(--emp-swipe-opacity, 1);
+  transition: none !important;
+  will-change: transform, opacity;
+}
 input, textarea, [contenteditable="true"], .selectable {
   -webkit-user-select: text;
   user-select: text;

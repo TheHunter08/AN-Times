@@ -1,5 +1,6 @@
 ﻿import { useState, useMemo } from 'react'
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
+import { useRef } from 'react'
 import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
 
@@ -32,6 +33,8 @@ const STATUS_COLORS = {
 
 export function TabCalendario({ db, u, calMonth, setCalMonth }) {
   const [selDay, setSelDay] = useState(null)
+  const gesture = useRef({ id: null, x: 0, y: 0, t: 0, axis: null, moved: false })
+  const calendarRef = useRef(null)
 
   const y = calMonth.getFullYear(), m = calMonth.getMonth()
   const firstDay = new Date(y, m, 1)
@@ -146,9 +149,46 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     return { ...base, ...sStyle, ...selStyle }
   }
 
+  const moveMonth = delta => {
+    setSelDay(null)
+    setCalMonth(new Date(y, m + delta, 1))
+  }
+
+  const onPointerDown = e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), axis: null, moved: false }
+  }
+  const onPointerMove = e => {
+    const g = gesture.current
+    if (g.id !== e.pointerId) return
+    const dx = e.clientX - g.x, dy = e.clientY - g.y
+    if (!g.axis && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) g.axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'x' : 'y'
+    if (g.axis !== 'x') return
+    g.moved = true
+    calendarRef.current?.style.setProperty('--cal-drag-x', `${Math.max(-90, Math.min(90, dx * .55))}px`)
+    calendarRef.current?.classList.add('is-dragging')
+    e.preventDefault()
+  }
+  const onPointerEnd = e => {
+    const g = gesture.current
+    if (g.id !== e.pointerId) return
+    const dx = e.clientX - g.x
+    const velocity = Math.abs(dx) / Math.max(1, performance.now() - g.t)
+    calendarRef.current?.classList.remove('is-dragging')
+    calendarRef.current?.style.removeProperty('--cal-drag-x')
+    if (g.axis === 'x' && (Math.abs(dx) > 58 || (Math.abs(dx) > 28 && velocity > .5))) {
+      try { navigator.vibrate?.(7) } catch {}
+      moveMonth(dx < 0 ? 1 : -1)
+    }
+    gesture.current = { id: null, x: 0, y: 0, t: 0, axis: null, moved: g.moved }
+    setTimeout(() => { gesture.current.moved = false }, 0)
+  }
+
   return (
     <PullToRefresh>
-      <div className="employee-calendar-v2" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+      <div ref={calendarRef} data-gesture-scope="local" className="employee-calendar-v2 employee-calendar-v8"
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
+        style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 760, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
 
         {/* Header */}
         <header style={{ display: 'grid', gap: 'var(--space-1)', padding: 'var(--space-2) 2px var(--space-1)' }}>
@@ -156,15 +196,15 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
           <p style={{ margin: 0, fontSize: 'var(--font-body-sm)', color: colors.text[500], lineHeight: 'var(--leading-body)' }}>Jornadas, ausencias y vacaciones en una sola vista.</p>
         </header>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <section className="employee-calendar-v8__monthbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
           <div style={{ fontSize: 'var(--font-heading-sm)', fontWeight: 'var(--font-semibold)', color: colors.text[900], textTransform: 'capitalize', letterSpacing: '-.02em' }}>
             {calMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {[
-              { label: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>, onClick: () => setCalMonth(new Date(y, m-1, 1)) },
+              { label: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>, onClick: () => moveMonth(-1) },
               { label: 'Hoy', onClick: () => setCalMonth(new Date()) },
-              { label: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>, onClick: () => setCalMonth(new Date(y, m+1, 1)) },
+              { label: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>, onClick: () => moveMonth(1) },
             ].map((btn, i) => (
               <button key={i} onClick={btn.onClick} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -175,11 +215,11 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
               }}>{btn.label}</button>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Month summary chips */}
         {Object.values(monthStats).some(n => n > 0) && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="employee-calendar-v8__stats" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
               { n: monthStats.complete,  label: 'Completos',  color: colors.semantic.green },
               { n: monthStats.pending,   label: 'Parciales',  color: colors.semantic.orange },
@@ -201,7 +241,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
         )}
 
         {/* Calendar grid */}
-        <div style={{
+        <div className="employee-calendar-v8__grid" style={{
           background: 'var(--gradient-card), var(--bg-card)', border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius.xl, padding: 'var(--space-4) var(--space-3)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)',
         }}>
@@ -212,7 +252,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
             ))}
           </div>
           {/* Day cells */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
             {cells.map((date, i) => {
               if (!date) return <div key={i} />
               const ds = lds(date)
@@ -226,7 +266,7 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
                   key={i}
                   type="button"
                   style={getDayStyle(ds, date, status, isToday, isSelected)}
-                  onClick={() => setSelDay(selDay === ds ? null : ds)}
+                  onClick={() => { if (!gesture.current.moved) setSelDay(selDay === ds ? null : ds) }}
                   title={festLabel || undefined}
                   aria-pressed={isSelected}
                   aria-label={`${date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}: ${status === 'complete' ? 'jornada completa' : status === 'pending' ? 'jornada parcial' : status === 'absence' ? 'ausencia' : status === 'medical' ? 'baja médica' : status === 'vacation' ? 'vacaciones' : status === 'festivo' ? festLabel : status === 'missing' ? 'sin fichaje' : status === 'weekend' ? 'fin de semana' : 'sin actividad'}`}

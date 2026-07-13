@@ -39,6 +39,8 @@ export function AppShell({
   const [dragX, setDragX] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
+  const pointerIdRef = useRef<number | null>(null)
+  const gestureStartedAt = useRef(0)
   const draggingRef = useRef(false)
   const axisLockedRef = useRef<'h' | 'v' | null>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
@@ -109,21 +111,21 @@ export function AppShell({
   useEffect(() => {
     if (!isMobile) return
 
-    const onStart = (event: TouchEvent) => {
-      const touch = event.touches[0]
-      if (!touch) return
-      touchStartX.current = touch.clientX
-      touchStartY.current = touch.clientY
+    const onStart = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+      pointerIdRef.current = event.pointerId
+      touchStartX.current = event.clientX
+      touchStartY.current = event.clientY
+      gestureStartedAt.current = performance.now()
       axisLockedRef.current = null
       draggingRef.current = false
     }
 
-    const onMove = (event: TouchEvent) => {
-      const touch = event.touches[0]
-      if (!touch || touchStartX.current === null || touchStartY.current === null) return
+    const onMove = (event: PointerEvent) => {
+      if (pointerIdRef.current !== event.pointerId || touchStartX.current === null || touchStartY.current === null) return
       const startX = touchStartX.current
-      const dx = touch.clientX - startX
-      const dy = touch.clientY - touchStartY.current
+      const dx = event.clientX - startX
+      const dy = event.clientY - touchStartY.current
 
       if (!axisLockedRef.current) {
         if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
@@ -132,7 +134,7 @@ export function AppShell({
       if (axisLockedRef.current !== 'h') return
 
       if (!mobileNavOpen) {
-        if (startX > 28 || dx < 0) return
+        if (startX > 34 || dx < 0) return
         draggingRef.current = true
         event.preventDefault()
         setDragX(Math.min(Math.max(-DRAWER_W + dx, -DRAWER_W), 0))
@@ -143,15 +145,15 @@ export function AppShell({
       }
     }
 
-    const onEnd = (event: TouchEvent) => {
-      const touch = event.changedTouches[0]
-      if (!touch || touchStartX.current === null) return
-      const dx = touch.clientX - touchStartX.current
+    const onEnd = (event: PointerEvent) => {
+      if (pointerIdRef.current !== event.pointerId || touchStartX.current === null) return
+      const dx = event.clientX - touchStartX.current
+      const velocity = Math.abs(dx) / Math.max(1, performance.now() - gestureStartedAt.current)
 
       if (!mobileNavOpen) {
-        setMobileNavOpen(Boolean(draggingRef.current && (dx > DRAWER_W * .36 || dx > 55)))
+        setMobileNavOpen(Boolean(draggingRef.current && (dx > DRAWER_W * .3 || (dx > 34 && velocity > .48))))
       } else if (draggingRef.current) {
-        setMobileNavOpen(!(dx < -DRAWER_W * .36))
+        setMobileNavOpen(!(dx < -DRAWER_W * .3 || (dx < -34 && velocity > .48)))
       }
 
       setDragX(null)
@@ -159,15 +161,18 @@ export function AppShell({
       axisLockedRef.current = null
       touchStartX.current = null
       touchStartY.current = null
+      pointerIdRef.current = null
     }
 
-    document.addEventListener('touchstart', onStart, { passive: true })
-    document.addEventListener('touchmove', onMove, { passive: false })
-    document.addEventListener('touchend', onEnd, { passive: true })
+    document.addEventListener('pointerdown', onStart, { passive: true })
+    document.addEventListener('pointermove', onMove, { passive: false })
+    document.addEventListener('pointerup', onEnd, { passive: true })
+    document.addEventListener('pointercancel', onEnd, { passive: true })
     return () => {
-      document.removeEventListener('touchstart', onStart)
-      document.removeEventListener('touchmove', onMove)
-      document.removeEventListener('touchend', onEnd)
+      document.removeEventListener('pointerdown', onStart)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onEnd)
+      document.removeEventListener('pointercancel', onEnd)
     }
   }, [isMobile, mobileNavOpen])
 

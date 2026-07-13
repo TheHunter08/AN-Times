@@ -8,6 +8,8 @@ export function useSwipeDismiss(onClose) {
   const [dragging, setDragging] = useState(false)
   const startY = useRef(0)
   const active = useRef(false)
+  const pointerId = useRef(null)
+  const startedAt = useRef(0)
 
   const onTouchStart = useCallback((e) => {
     startY.current = e.touches[0].clientY
@@ -31,8 +33,41 @@ export function useSwipeDismiss(onClose) {
     })
   }, [onClose])
 
+  const onPointerDown = useCallback((e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    pointerId.current = e.pointerId
+    startY.current = e.clientY
+    startedAt.current = performance.now()
+    active.current = true
+    setDragging(true)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }, [])
+
+  const onPointerMove = useCallback((e) => {
+    if (!active.current || pointerId.current !== e.pointerId) return
+    const d = Math.max(0, e.clientY - startY.current)
+    setDragY(d > 160 ? 160 + (d - 160) * .22 : d)
+  }, [])
+
+  const onPointerEnd = useCallback((e) => {
+    if (!active.current || pointerId.current !== e.pointerId) return
+    const d = Math.max(0, e.clientY - startY.current)
+    const velocity = d / Math.max(1, performance.now() - startedAt.current)
+    active.current = false
+    pointerId.current = null
+    setDragging(false)
+    setDragY(0)
+    if (d > 82 || (d > 34 && velocity > .55)) {
+      try { navigator.vibrate?.(8) } catch {}
+      onClose()
+    }
+  }, [onClose])
+
   return {
-    dragHandlers: { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd },
+    dragHandlers: {
+      onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd,
+      style: { touchAction: 'none' },
+    },
     modalStyle: {
       transform: dragY ? `translateY(${dragY}px)` : undefined,
       transition: dragging ? 'none' : 'transform .3s cubic-bezier(.25,.46,.45,.94)',
