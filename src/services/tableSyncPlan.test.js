@@ -37,4 +37,33 @@ describe('plan de sincronización offline V2', () => {
     expect(toVacationRow({ id: 'v1', empId: 'e1', _upd: '2026-07-13T10:00:00Z' }, 'fallback').updated_at)
       .toBe('2026-07-13T10:00:00Z')
   })
+
+  it('una vacación legacy sin fecha no bloquea las filas válidas', () => {
+    const plan = buildTableSyncPlan({
+      employees: [{ id: 'e1', name: 'Ana' }],
+      vacaciones: [
+        { id: 'legacy', empId: 'e1', fechaInicio: null, fechaFin: null },
+        { id: 'ok', empId: 'e1', fechaInicio: '2026-08-01', fechaFin: '2026-08-03' },
+      ],
+    }, null, now)
+
+    expect(plan.upserts.find(op => op.table === 'vacaciones').rows.map(row => row.id)).toEqual(['ok'])
+    expect(plan.skipped.vacaciones).toBe(1)
+  })
+
+  it('omite hijos huérfanos para que una FK antigua no atasque la cola PWA', () => {
+    const plan = buildTableSyncPlan({
+      employees: [{ id: 'e1', name: 'Ana' }],
+      records: [
+        { id: 'ok', empId: 'e1', inicio: '2026-07-13T08:00:00Z' },
+        { id: 'orphan', empId: 'deleted', inicio: '2026-07-13T08:00:00Z' },
+      ],
+      cierres: [{ id: 'c1', empId: 'deleted', mes: '2026-06' }],
+    }, null, now)
+
+    expect(plan.upserts.find(op => op.table === 'records').rows.map(row => row.id)).toEqual(['ok'])
+    expect(plan.upserts.find(op => op.table === 'cierres').rows).toHaveLength(0)
+    expect(plan.skipped.records).toBe(1)
+    expect(plan.skipped.cierres).toBe(1)
+  })
 })

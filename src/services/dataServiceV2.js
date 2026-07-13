@@ -258,14 +258,25 @@ async function _upsertResilient(table, rows) {
   if (!error) return
   console.warn(`[v2] batch upsert failed for ${table}, retrying individually:`, error.message)
   const failures = []
+  const quarantined = []
   for (const row of rows) {
     const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
     if (rowErr) {
-      failures.push(row.id)
-      console.warn(`[v2] ${table} row ${row.id} upsert failed:`, rowErr.message)
+      // Errores 22xxx/23xxx son datos legacy incompatibles (fecha inválida,
+      // NOT NULL, FK, UNIQUE...). Reintentarlos nunca los arreglará y mantener
+      // la cola PWA bloqueada impide subir incluso fichajes perfectamente
+      // válidos. El blob principal conserva la fila para no perder información.
+      if (/^(22|23)/.test(rowErr.code || '')) {
+        quarantined.push(row.id)
+        console.warn(`[v2] ${table} row ${row.id} quarantined:`, rowErr.message)
+      } else {
+        failures.push(row.id)
+        console.warn(`[v2] ${table} row ${row.id} upsert failed:`, rowErr.message)
+      }
     }
   }
   if (failures.length) throw new Error(`${table}: ${failures.length} filas no sincronizadas`)
+  return { quarantined }
 }
 
 // Escribe en las tablas lo que acaba de cambiar en el blob.
@@ -276,6 +287,10 @@ async function _upsertResilient(table, rows) {
 async function _syncToTables(db, deleted) {
   if (!supabase) return
   const plan = buildTableSyncPlan(db, deleted)
+  const skipped = Object.entries(plan.skipped || {}).filter(([, count]) => count > 0)
+  if (skipped.length) {
+    console.warn('[v2] filas legacy omitidas sin bloquear la sincronización:', Object.fromEntries(skipped))
+  }
   // Empleados primero: records/vacaciones/cierres tienen FK hacia esta tabla.
   const employeeBatch = plan.upserts.find(op => op.table === 'employees')
   if (employeeBatch?.rows.length) await _upsertResilient(employeeBatch.table, employeeBatch.rows)

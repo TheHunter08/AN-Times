@@ -52,23 +52,53 @@ export function toWorksiteRow(o) {
   }
 }
 
+function hasValue(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isDateValue(value) {
+  return hasValue(value) && !Number.isNaN(Date.parse(value))
+}
+
 export function buildTableSyncPlan(db, deleted, now = Date.now()) {
   const nowIso = new Date(now).toISOString()
   const cutoff = new Date(now - 48 * 60 * 60 * 1000).toISOString()
   const deletedRecords = new Set(deleted?.records ?? [])
   const deletedVacations = new Set(deleted?.vacaciones ?? [])
+  const employees = (db.employees ?? []).filter(e => hasValue(e?.id) && hasValue(e?.name))
+  const employeeIds = new Set(employees.map(e => e.id))
   const recentRecords = (db.records ?? []).filter(
-    r => !deletedRecords.has(r.id) && r?.inicio && (!r.fin || !r._upd || r._upd > cutoff)
+    r => !deletedRecords.has(r.id) && hasValue(r?.id) && employeeIds.has(r?.empId) && isDateValue(r?.inicio) && (!r.fin || !r._upd || r._upd > cutoff)
   )
+  // El blob legacy puede contener solicitudes antiguas incompletas. La tabla
+  // normalizada aplica constraints más estrictas; esas filas se conservan en
+  // el blob, pero no deben bloquear la sincronización de todos los fichajes.
+  const vacations = (db.vacaciones ?? []).filter(v =>
+    !deletedVacations.has(v?.id) &&
+    hasValue(v?.id) &&
+    employeeIds.has(v?.empId) &&
+    isDateValue(v?.fechaInicio)
+  )
+  const closures = (db.cierres ?? []).filter(c =>
+    hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
+  )
+  const worksites = (db.obras ?? []).filter(o => hasValue(o?.id) && hasValue(o?.nombre))
 
   return {
     upserts: [
-      { table: 'employees', rows: (db.employees ?? []).map(e => toEmployeeRow(e, nowIso)) },
+      { table: 'employees', rows: employees.map(e => toEmployeeRow(e, nowIso)) },
       { table: 'records', rows: recentRecords.map(r => toRecordRow(r, nowIso)) },
-      { table: 'vacaciones', rows: (db.vacaciones ?? []).filter(v => !deletedVacations.has(v.id)).map(v => toVacationRow(v, nowIso)) },
-      { table: 'cierres', rows: (db.cierres ?? []).map(c => toClosureRow(c, nowIso)) },
-      { table: 'obras', rows: (db.obras ?? []).map(toWorksiteRow) },
+      { table: 'vacaciones', rows: vacations.map(v => toVacationRow(v, nowIso)) },
+      { table: 'cierres', rows: closures.map(c => toClosureRow(c, nowIso)) },
+      { table: 'obras', rows: worksites.map(toWorksiteRow) },
     ],
+    skipped: {
+      employees: (db.employees ?? []).length - employees.length,
+      records: (db.records ?? []).filter(r => !deletedRecords.has(r?.id) && (!r?.fin || !r?._upd || r._upd > cutoff)).length - recentRecords.length,
+      vacaciones: (db.vacaciones ?? []).filter(v => !deletedVacations.has(v?.id)).length - vacations.length,
+      cierres: (db.cierres ?? []).length - closures.length,
+      obras: (db.obras ?? []).length - worksites.length,
+    },
     deletes: [
       { table: 'records', ids: [...deletedRecords], mode: 'delete' },
       { table: 'vacaciones', ids: [...deletedVacations], mode: 'delete' },

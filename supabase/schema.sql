@@ -72,7 +72,7 @@ CREATE TABLE vacaciones (
   company_id   text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   emp_id       text NOT NULL REFERENCES employees(id),
   emp_name     text,
-  fecha_inicio date,
+  fecha_inicio date NOT NULL,
   fecha_fin    date,
   tipo         text DEFAULT 'vacaciones',
   estado       text DEFAULT 'pendiente',
