@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
+import { useEffect } from 'react'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Search } from '../components/Search.js'
@@ -11,7 +12,7 @@ export interface AnomalyItem {
   id: string
   empName: string
   dept: string
-  type: 'retraso' | 'ausencia' | 'extra' | 'sin_salida' | 'solapamiento'
+  type: 'retraso' | 'ausencia' | 'extra' | 'sin_salida' | 'solapamiento' | 'jornada_larga' | 'sin_descanso' | 'doble_abierto' | 'fuera_zona' | 'cierre_manual'
   description: string
   date: string
   severity: 'alta' | 'media' | 'baja'
@@ -21,10 +22,12 @@ export interface AnomalyItem {
 
 export interface AnomaliesProps {
   items: AnomalyItem[]
+  onResolve?: (id: string) => void
 }
 
 const typeLabel: Record<AnomalyItem['type'], string> = {
   retraso: 'Retraso', ausencia: 'Ausencia', extra: 'Horas extra', sin_salida: 'Sin salida', solapamiento: 'Solapamiento',
+  jornada_larga: 'Jornada larga', sin_descanso: 'Sin descanso', doble_abierto: 'Doble fichaje', fuera_zona: 'Fuera de zona', cierre_manual: 'Cierre supervisor',
 }
 
 const sevStyle: Record<AnomalyItem['severity'], { bg: string; color: string; label: string }> = {
@@ -33,13 +36,15 @@ const sevStyle: Record<AnomalyItem['severity'], { bg: string; color: string; lab
   baja:  { bg: 'rgba(16,185,129,.14)', color: colors.semantic.green, label: 'Baja' },
 }
 
-export function Anomalies({ items }: AnomaliesProps) {
+export function Anomalies({ items, onResolve }: AnomaliesProps) {
   const [search, setSearch] = useState('')
   const [showResolved, setShowResolved] = useState(false)
   const [localItems, setLocalItems] = useState(items)
+  useEffect(() => setLocalItems(items), [items])
 
   const handleResolve = (id: string) => {
     setLocalItems(prev => prev.map(i => i.id === id ? { ...i, resolved: true } : i))
+    onResolve?.(id)
   }
 
   const filtered = localItems

@@ -74,9 +74,9 @@ describe('V7 administrator dashboard contract', () => {
 
 describe('V7 employee home contract', () => {
   it.each([
-    ['idle', 'Fichar entrada'],
-    ['working', 'Iniciar descanso'],
-    ['break', 'Finalizar descanso'],
+    ['idle', 'Iniciar jornada'],
+    ['working', 'Finalizar jornada'],
+    ['break', 'Finalizar jornada'],
   ])('maps the %s state to the available clock action', (state, actionLabel) => {
     const callbacks = {
       onStartAction: vi.fn(),

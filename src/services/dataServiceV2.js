@@ -49,6 +49,8 @@ import {
 import {
   COMPANY_ID,
   buildTableSyncPlan,
+  ENTITY_COLLECTIONS,
+  SINGLETON_COLLECTIONS,
   toEmployeeRow as toEmployee,
   toRecordRow as toRecord,
 } from './tableSyncPlan.js'
@@ -77,6 +79,11 @@ function fromRecord(r) {
     workSecs: r.work_secs ?? 0, breakSecs: r.break_secs ?? 0,
     breaks: r.breaks ?? [], closed: !!r.closed, aceptada: !!r.aceptada,
     correcciones: r.correcciones ?? [], _upd: r.updated_at,
+    _rev: r.revision ?? 1, operationId: r.operation_id ?? null,
+    validado: !!r.validado, rechazado: !!r.rechazado, modificado: !!r.modificado,
+    validadoBy: r.validado_by ?? null, validadoAt: r.validado_at ?? null,
+    cerradoPor: r.cerrado_por ?? null, cerradoPorId: r.cerrado_por_id ?? null,
+    cierreManual: !!r.cierre_manual, motivoCierre: r.motivo_cierre ?? null,
   }
 }
 
@@ -139,6 +146,7 @@ async function fetchAllRecords() {
   for (let from = 0; ; from += RECORDS_PAGE_SIZE) {
     const { data, error } = await supabase.from('records').select('*')
       .eq('company_id', COMPANY_ID)
+      .eq('deleted', false)
       .order('inicio', { ascending: false })
       .range(from, from + RECORDS_PAGE_SIZE - 1)
     if (error) return { data: rows, error }
@@ -151,12 +159,13 @@ async function fetchAllRecords() {
 export async function cloudFetch() {
   if (!supabase) return _v1Fetch()
   try {
-    const [empsR, recsR, vacsR, cierresR, obrasR] = await Promise.all([
+    const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR] = await Promise.all([
       supabase.from('employees').select('*').eq('company_id', COMPANY_ID).order('name'),
       fetchAllRecords(),
       supabase.from('vacaciones').select('*').eq('company_id', COMPANY_ID),
       supabase.from('cierres').select('*').eq('company_id', COMPANY_ID),
       supabase.from('obras').select('*').eq('company_id', COMPANY_ID),
+      supabase.from('app_entities').select('collection,entity_id,data,revision,updated_at').eq('company_id', COMPANY_ID).eq('deleted', false),
     ])
 
     // Si employees está vacía, las tablas aún no han sido migradas → fallback V1
@@ -173,6 +182,35 @@ export async function cloudFetch() {
     // Config, notis, chats, audit: aún en blob; leemos de V1 para obtenerlos
     const v1 = await _v1Fetch()
     const blobData = v1.data ?? {}
+    const entityData = { ...blobData }
+    if (!entitiesR.error) {
+      const grouped = new Map()
+      for (const row of (entitiesR.data ?? [])) {
+        if (!grouped.has(row.collection)) grouped.set(row.collection, [])
+        grouped.get(row.collection).push(row)
+      }
+      for (const collection of ENTITY_COLLECTIONS) {
+        const rows = grouped.get(collection)
+        if (rows?.length) {
+          const blobItems = blobData[collection] ?? []
+          const blobById = new Map(blobItems.map(item => [String(item?.id), item]))
+          const merged = rows.map(row => {
+            const tableItem = { ...row.data, _rev:row.revision ?? row.data?._rev, _upd:row.updated_at ?? row.data?._upd }
+            const blobItem = blobById.get(String(row.entity_id))
+            blobById.delete(String(row.entity_id))
+            if (!blobItem) return tableItem
+            const blobTs = Date.parse(blobItem._upd || '') || 0
+            const tableTs = Date.parse(tableItem._upd || '') || 0
+            return blobTs > tableTs ? { ...tableItem, ...blobItem } : { ...blobItem, ...tableItem }
+          })
+          entityData[collection] = [...merged, ...blobById.values()]
+        }
+      }
+      for (const collection of SINGLETON_COLLECTIONS) {
+        const row = grouped.get(collection)?.find(item => item.entity_id === '__singleton__')
+        if (row) entityData[collection] = row.data
+      }
+    }
 
     const blobEmployeeMap = new Map((blobData.employees ?? []).map(e => [e.id, e]))
     const tableEmployees = (empsR.data ?? []).map(fromEmployee)
@@ -227,7 +265,7 @@ export async function cloudFetch() {
     return {
       ok: true,
       data: {
-        ...blobData,                                         // config, notis, chats, audit del blob
+        ...entityData,                                       // granular cuando existe; blob como respaldo
         employees,
         records,
         vacaciones: (vacsR.data   ?? []).map(fromVac),
@@ -279,6 +317,15 @@ async function _upsertResilient(table, rows) {
   return { quarantined }
 }
 
+let _entitiesTableAvailable = null
+async function hasEntitiesTable() {
+  if (_entitiesTableAvailable !== null) return _entitiesTableAvailable
+  const { error } = await supabase.from('app_entities').select('id').limit(1)
+  _entitiesTableAvailable = !error
+  if (error) console.info('[v2] app_entities aún no está desplegada; se mantiene app_data como respaldo')
+  return _entitiesTableAvailable
+}
+
 // Escribe en las tablas lo que acaba de cambiar en el blob.
 // • Empleados y vacaciones: upsert completo (arrays pequeños).
 // • Fichajes: solo los abiertos + los cerrados con _upd reciente (48h).
@@ -287,6 +334,7 @@ async function _upsertResilient(table, rows) {
 async function _syncToTables(db, deleted) {
   if (!supabase) return
   const plan = buildTableSyncPlan(db, deleted)
+  const entitiesEnabled = await hasEntitiesTable()
   const skipped = Object.entries(plan.skipped || {}).filter(([, count]) => count > 0)
   if (skipped.length) {
     console.warn('[v2] filas legacy omitidas sin bloquear la sincronización:', Object.fromEntries(skipped))
@@ -295,14 +343,16 @@ async function _syncToTables(db, deleted) {
   const employeeBatch = plan.upserts.find(op => op.table === 'employees')
   if (employeeBatch?.rows.length) await _upsertResilient(employeeBatch.table, employeeBatch.rows)
   const upsertOps = plan.upserts
-    .filter(op => op.table !== 'employees' && op.rows.length)
+    .filter(op => op.table !== 'employees' && op.rows.length && (op.table !== 'app_entities' || entitiesEnabled))
     .map(op => _upsertResilient(op.table, op.rows))
   const upsertResults = await Promise.allSettled(upsertOps)
   const upsertFailures = upsertResults.filter(r => r.status === 'rejected' || r.value?.error)
   if (upsertFailures.length) throw new Error(`${upsertFailures.length}/${upsertOps.length} grupos de tablas no sincronizados`)
-  const deleteOps = plan.deletes.filter(op => op.ids.length).map(op =>
+  const deleteOps = plan.deletes.filter(op => op.ids.length && (op.table !== 'app_entities' || entitiesEnabled)).map(op =>
     op.mode === 'deactivate'
       ? supabase.from(op.table).update({ baja: true }).in('id', op.ids)
+      : op.mode === 'soft_delete'
+        ? supabase.from(op.table).update({ deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in('id', op.ids)
       : supabase.from(op.table).delete().in('id', op.ids)
   )
 
@@ -338,6 +388,7 @@ export function startTableRealtime(onRefresh) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'vacaciones', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres',    filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'obras',      filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
     .subscribe()
 }
 

@@ -1,4 +1,26 @@
 export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+export const ENTITY_COLLECTIONS = ['empresas','centrosTrabajo','medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
+export const SINGLETON_COLLECTIONS = ['monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
+
+export function entityRowId(collection, entityId) {
+  return `${collection}:${entityId}`
+}
+
+export function toEntityRows(db, nowIso = new Date().toISOString()) {
+  const rows = []
+  for (const collection of ENTITY_COLLECTIONS) {
+    for (const item of (db[collection] ?? [])) {
+      if (!item || !hasValue(String(item.id ?? ''))) continue
+      const entityId = String(item.id)
+      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:entityId, data:item, revision:Math.max(1, Number(item._rev) || 1), deleted:false, updated_at:item._upd ?? nowIso })
+    }
+  }
+  for (const collection of SINGLETON_COLLECTIONS) {
+    if (db[collection] === undefined) continue
+    rows.push({ id:entityRowId(collection, '__singleton__'), company_id:COMPANY_ID, collection, entity_id:'__singleton__', data:db[collection], revision:1, deleted:false, updated_at:nowIso })
+  }
+  return rows
+}
 
 export function toEmployeeRow(e, nowIso = new Date().toISOString()) {
   return {
@@ -19,6 +41,12 @@ export function toRecordRow(r, nowIso = new Date().toISOString()) {
     work_secs: r.workSecs ?? 0, break_secs: r.breakSecs ?? 0,
     breaks: r.breaks ?? [], closed: !!r.closed, aceptada: !!r.aceptada,
     correcciones: r.correcciones ?? [], updated_at: r._upd ?? nowIso,
+    revision: Math.max(1, Number(r._rev) || 1), operation_id: r.operationId ?? null,
+    validado: !!r.validado, rechazado: !!r.rechazado, modificado: !!r.modificado,
+    validado_by: r.validadoBy ?? null, validado_at: r.validadoAt ?? null,
+    cerrado_por: r.cerradoPor ?? null, cerrado_por_id: r.cerradoPorId ?? null,
+    cierre_manual: !!r.cierreManual, motivo_cierre: r.motivoCierre ?? null,
+    deleted: false, deleted_at: null,
   }
 }
 
@@ -91,6 +119,7 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
       { table: 'vacaciones', rows: vacations.map(v => toVacationRow(v, nowIso)) },
       { table: 'cierres', rows: closures.map(c => toClosureRow(c, nowIso)) },
       { table: 'obras', rows: worksites.map(toWorksiteRow) },
+      { table: 'app_entities', rows: toEntityRows(db, nowIso) },
     ],
     skipped: {
       employees: (db.employees ?? []).length - employees.length,
@@ -100,9 +129,10 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
       obras: (db.obras ?? []).length - worksites.length,
     },
     deletes: [
-      { table: 'records', ids: [...deletedRecords], mode: 'delete' },
+      { table: 'records', ids: [...deletedRecords], mode: 'soft_delete' },
       { table: 'vacaciones', ids: [...deletedVacations], mode: 'delete' },
       { table: 'employees', ids: [...new Set(deleted?.employees ?? [])], mode: 'deactivate' },
+      { table: 'app_entities', ids: ENTITY_COLLECTIONS.flatMap(collection => [...new Set(deleted?.[collection] ?? [])].map(id => entityRowId(collection, id))), mode: 'delete' },
     ],
   }
 }

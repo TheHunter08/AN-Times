@@ -163,3 +163,22 @@ CREATE POLICY "admin_manage_obras" ON obras
   FOR ALL TO authenticated
   USING (auth_is_admin())
   WITH CHECK (auth_is_admin());
+
+-- ── app_entities (fase de migración granular) ───────────────────────────────
+DROP POLICY IF EXISTS "app_entities_anon_phase1" ON app_entities;
+CREATE POLICY "emp_read_entities" ON app_entities
+  FOR SELECT TO authenticated
+  USING (company_id IN (SELECT company_id FROM employees WHERE auth_id = auth.uid()));
+CREATE POLICY "admin_manage_entities" ON app_entities
+  FOR ALL TO authenticated
+  USING (auth_is_admin())
+  WITH CHECK (auth_is_admin());
+
+-- El registro de idempotencia no expone payloads; solo responsables pueden leerlo.
+DROP POLICY IF EXISTS "sync_operations_anon_phase1" ON sync_operations;
+CREATE POLICY "admin_read_sync_operations" ON sync_operations
+  FOR SELECT TO authenticated USING (auth_is_admin());
+CREATE POLICY "authenticated_insert_sync_operations" ON sync_operations
+  FOR INSERT TO authenticated WITH CHECK (
+    company_id IN (SELECT company_id FROM employees WHERE auth_id = auth.uid())
+  );

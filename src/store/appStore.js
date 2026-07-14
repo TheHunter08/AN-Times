@@ -114,6 +114,10 @@ export const useAppStore = create((set, get) => ({
   dbLoading: false,
 
   fetchDB: async () => {
+    // Broadcast, postgres_changes y el sondeo de seguridad pueden coincidir.
+    // Una sola descarga es suficiente; la siguiente notificacion o sondeo
+    // recuperara cualquier cambio que llegue mientras esta sigue en curso.
+    if (get().dbLoading) return
     const { db } = get()
     set({ dbLoading: true })
     try {

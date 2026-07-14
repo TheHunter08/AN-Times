@@ -1,2 +1,5 @@
 functions/
 dist/
+.codex/
+graphify-out/
+.claude/worktrees/

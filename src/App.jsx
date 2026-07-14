@@ -485,7 +485,7 @@ export default function App() {
     // ya son baratos y fallan rápido si de verdad no hay red.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && !useAppStore.getState().offlinePending) fetchDB()
-    }, 15 * 1000)
+    }, 5 * 60 * 1000)
     // Con cobertura débil (o en iOS, donde navigator.onLine es especialmente
     // poco fiable — puede quedarse pegado en `false` o en `true` sin reflejar
     // la realidad), el evento 'online' del navegador puede no llegar a

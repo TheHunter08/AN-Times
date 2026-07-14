@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTableSyncPlan, toRecordRow, toVacationRow } from './tableSyncPlan.js'
+import { buildTableSyncPlan, entityRowId, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -25,10 +25,33 @@ describe('plan de sincronización offline V2', () => {
     expect(plan.upserts.find(op => op.table === 'records').rows).toHaveLength(0)
     expect(plan.upserts.find(op => op.table === 'vacaciones').rows).toHaveLength(0)
     expect(plan.deletes).toEqual([
-      { table: 'records', ids: ['r1'], mode: 'delete' },
+      { table: 'records', ids: ['r1'], mode: 'soft_delete' },
       { table: 'vacaciones', ids: ['v1'], mode: 'delete' },
       { table: 'employees', ids: ['e2'], mode: 'deactivate' },
+      { table: 'app_entities', ids: [], mode: 'delete' },
     ])
+  })
+
+  it('descompone colecciones legacy en entidades granulares y ajustes singleton', () => {
+    const rows = toEntityRows({
+      gastos: [{ id:'g1', concepto:'Taxi', _upd:'2026-07-13T10:00:00Z' }],
+      documentos: [{ id:'d1', titulo:'Contrato' }],
+      config: { wdMin:480 },
+    }, '2026-07-13T12:00:00Z')
+    expect(rows.map(row => row.id)).toEqual(['documentos:d1', 'gastos:g1', 'config:__singleton__'])
+    expect(rows.find(row => row.id === 'gastos:g1').updated_at).toBe('2026-07-13T10:00:00Z')
+    expect(rows.find(row => row.id === 'config:__singleton__').data).toEqual({ wdMin:480 })
+  })
+
+  it('crea tombstones de entidades con ids deterministas', () => {
+    const plan = buildTableSyncPlan({}, { gastos:['g1'], documentos:['d1'] }, now)
+    const entityDelete = plan.deletes.find(op => op.table === 'app_entities')
+    expect(entityDelete.ids).toEqual([entityRowId('documentos','d1'), entityRowId('gastos','g1')])
+  })
+
+  it('persiste revisión, operación id y metadatos del cierre en records', () => {
+    const row = toRecordRow({ id:'r1', empId:'e1', inicio:'2026-07-13T08:00:00Z', _rev:3, operationId:'11111111-1111-4111-8111-111111111111', validado:true, cierreManual:true, cerradoPor:'Ana', motivoCierre:'Olvido' })
+    expect(row).toMatchObject({ revision:3, operation_id:'11111111-1111-4111-8111-111111111111', validado:true, cierre_manual:true, cerrado_por:'Ana', motivo_cierre:'Olvido' })
   })
 
   it('mantiene _upd en fichajes y vacaciones para resolver concurrencia', () => {

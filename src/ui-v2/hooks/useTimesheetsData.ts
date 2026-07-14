@@ -12,6 +12,11 @@ interface DbRecord {
   centro?: string
   inicio?: string
   fin?: string | null
+  creadoPor?: string
+  cerradoPor?: string
+  motivoCierre?: string
+  validadoBy?: string
+  correcciones?: unknown[]
 }
 interface Db {
   records?: DbRecord[]
@@ -44,6 +49,12 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
           salida: ftime(r.fin),
           worked: mhm(workedMin),
           over: workedMin > wdMin,
+          history: [
+            r.creadoPor ? `Iniciada por ${r.creadoPor}` : 'Iniciada por el empleado',
+            r.cerradoPor ? `Finalizada por ${r.cerradoPor}${r.motivoCierre ? `: ${r.motivoCierre}` : ''}` : 'Finalizada por el empleado',
+            r.validadoBy ? `Validada por ${r.validadoBy}` : '',
+            r.correcciones?.length ? `${r.correcciones.length} corrección${r.correcciones.length === 1 ? '' : 'es'}` : '',
+          ].filter(Boolean).join(' · '),
         }
       })
       .filter(r => !q || r.name.toLowerCase().includes(q) || r.centro.toLowerCase().includes(q))

@@ -670,7 +670,7 @@ export default function EmployeePage() {
     setGpsStatus('idle')
     closeModal()
     const rec = {
-      id: gid(), empId: u.id, empName: u.name, empresa: u.empresa || '',
+      id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, empId: u.id, empName: u.name, empresa: u.empresa || '',
       centro, inicio: new Date().toISOString(), fin: null,
       workSecs: 0, breakSecs: 0, enDescanso: false, bStartTs: null, breaks: [], closed: false,
       _upd: new Date().toISOString()
@@ -748,7 +748,7 @@ export default function EmployeePage() {
       let enDescanso = o.enDescanso
       let bStartTs = o.bStartTs
       if (enDescanso && bStartTs) { breaks.push({ start: bStartTs, end: now }); enDescanso = false; bStartTs = null }
-      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true, _upd: now }
+      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true, operationId: globalThis.crypto?.randomUUID?.() ?? o.operationId ?? null, _rev: (o._rev || 0) + 1, _upd: now }
       const t = calcSecs(closed)
       closed.workSecs = t.work; closed.breakSecs = t.brk
       saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? closed : r) }))
@@ -839,7 +839,7 @@ export default function EmployeePage() {
       if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
       const recs = db.records || []
       if (recs.some(r => r.empId === emp.id && !r.fin)) { toast(`${emp.name} ya tiene jornada abierta`, 3000, 'warn'); return }
-      const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
+      const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
       saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
       queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
       toast(`Jornada iniciada para ${emp.name}`, 3000, 'ok')

@@ -35,6 +35,8 @@ export interface MonthlyCloseProps {
   onSignAdmin?: (id: string) => void
   onGenerateAll?: () => void
   onDelete?: (id: string) => void
+  canGenerate?: boolean
+  generationHint?: string
 }
 
 async function generatePDF(item: ClosureItem) {
@@ -55,7 +57,7 @@ function generateExcel(item: ClosureItem) {
   downloadExcel(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xls`)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete }: MonthlyCloseProps) {
+export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
 
@@ -73,9 +75,11 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
           {onGenerateAll && (
             <button
               onClick={onGenerateAll}
-              style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${colors.primary.base}`, background: colors.primary.dim, color: colors.primary.light, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              disabled={!canGenerate}
+              title={generationHint}
+              style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${canGenerate ? colors.primary.base : colors.border.default}`, background: canGenerate ? colors.primary.dim : colors.bg[500], color: canGenerate ? colors.primary.light : colors.text[400], fontSize: 12, fontWeight: 700, cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: canGenerate ? 1 : .75 }}
             >
-              + Generar mes actual
+              {canGenerate ? '+ Generar cierre del mes' : 'Disponible el último día'}
             </button>
           )}
           <div style={{ position: 'relative' }}>

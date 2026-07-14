@@ -46,6 +46,7 @@ import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
 
 const PAGES = [
   { id: 'dashboard',      label: 'Dashboard',         group: 'Principal', icon: <IconGrid /> },
+  { id: 'pendientes',     label: 'Centro de pendientes', group: 'Principal', icon: <IconAlertCircle /> },
   { id: 'empleados',      label: 'Empleados',         group: 'Equipo', icon: <IconUsers /> },
   { id: 'en_linea',       label: 'En línea',          group: 'Equipo', icon: <IconTrendUp /> },
   { id: 'fichajes',       label: 'Fichajes',          group: 'Equipo', icon: <IconClock /> },
@@ -508,6 +509,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
         </button>
       ) : undefined}
       quickLinks={[
+        { id: 'pendientes',  label: 'Centro de pendientes', value: 'Revisar', onClick: () => onNavigate('pendientes') },
         { id: 'empleados',   label: 'Empleados activos', value: `${teamAvatars.activeCount}/${teamAvatars.total}`, onClick: () => onNavigate('empleados') },
         { id: 'fichajes',    label: 'Trabajando ahora',  value: data.kpis[1]?.value || '0', onClick: () => onNavigate('fichajes') },
         { id: 'solicitudes', label: 'Solicitudes pend.', value: String(pendingCount), onClick: () => onNavigate('solicitudes') },
@@ -1207,22 +1209,64 @@ function StatsPage() {
   )
 }
 
+function PendingCenterPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const db = useAppStore(s => s.db) as any
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const syncStatus = useAppStore(s => s.syncStatus)
+  const lastSyncTime = useAppStore(s => s.lastSyncTime)
+  const now = Date.now()
+  const openTooLong = (db.records || []).filter((r:any) => !r.fin && r.inicio && now - new Date(r.inicio).getTime() > 10 * 3600000).length
+  const pendingHours = (db.records || []).filter((r:any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length
+  const pendingVacations = (db.vacaciones || []).filter((v:any) => v.estado === 'pendiente').length
+  const pendingExpenses = (db.gastos || []).filter((g:any) => g.estado === 'pendiente').length
+  const pendingDocuments = (db.documentos || []).filter((d:any) => !d.firma).length
+  const pendingClosures = (db.cierres || []).filter((c:any) => !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
+  const cards = [
+    { label:'Jornadas abiertas +10h', value:openTooLong, page:'en_linea', tone:colors.semantic.red },
+    { label:'Horas por validar', value:pendingHours, page:'validar', tone:colors.semantic.orange },
+    { label:'Vacaciones pendientes', value:pendingVacations, page:'solicitudes', tone:colors.primary.light },
+    { label:'Gastos pendientes', value:pendingExpenses, page:'gastos', tone:colors.semantic.orange },
+    { label:'Documentos sin firma', value:pendingDocuments, page:'documentos', tone:colors.accent.base },
+    { label:'Cierres sin completar', value:pendingClosures, page:'cierre', tone:colors.text[700] },
+  ]
+  const exportBackup = () => {
+    const payload = { exportedAt:new Date().toISOString(), app:'Times INC', version:1, data:db }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href=url; a.download=`times-inc-backup-${new Date().toISOString().slice(0,10)}.json`; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+  return <div style={{ display:'flex', flexDirection:'column', gap:20, maxWidth:1000 }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+      <div><h1 style={{ margin:0, fontSize:24, color:colors.text[900] }}>Centro de pendientes</h1><p style={{ margin:'6px 0 0', color:colors.text[500], fontSize:13 }}>Todo lo que requiere atención administrativa en un único lugar.</p></div>
+      <button onClick={exportBackup} style={{ padding:'9px 13px', borderRadius:9, border:`1px solid ${colors.primary.base}`, background:colors.primary.dim, color:colors.primary.light, fontWeight:700, cursor:'pointer' }}>Descargar copia JSON</button>
+    </div>
+    <div style={{ padding:'13px 15px', borderRadius:12, border:`1px solid ${offlinePending || syncStatus === 'error' ? 'rgba(245,158,11,.4)' : colors.border.subtle}`, background:colors.bg[600], display:'flex', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+      <strong style={{ color:offlinePending || syncStatus === 'error' ? colors.semantic.orange : colors.semantic.green }}>{offlinePending ? 'Hay un lote de cambios pendiente de subir' : syncStatus === 'synced' ? 'Datos sincronizados' : `Sincronización: ${syncStatus}`}</strong>
+      <span style={{ color:colors.text[500], fontSize:12 }}>{lastSyncTime ? `Última confirmación: ${new Date(lastSyncTime).toLocaleString('es-ES')}` : 'Todavía sin confirmación del servidor'}</span>
+    </div>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+      {cards.map(card => <button key={card.label} onClick={() => onNavigate(card.page)} style={{ textAlign:'left', padding:16, borderRadius:12, border:`1px solid ${colors.border.subtle}`, background:colors.bg[600], cursor:'pointer', color:colors.text[900] }}><div style={{ color:colors.text[500], fontSize:12 }}>{card.label}</div><div style={{ marginTop:8, fontSize:28, fontWeight:800, color:card.tone }}>{card.value}</div><div style={{ marginTop:8, color:colors.primary.light, fontSize:11, fontWeight:700 }}>Revisar →</div></button>)}
+    </div>
+  </div>
+}
+
 function MonthlyClosePage() {
   const db      = useAppStore(s => s.db) as any
   const saveDB  = useAppStore(s => s.saveDB)
   const session = useAppStore(s => s.session)
   const toast   = useAppStore(s => s.toast)
   const autoGenRef = useRef(false)
+  const nowForClose = new Date()
+  const isLastDayOfMonth = nowForClose.getDate() === new Date(nowForClose.getFullYear(), nowForClose.getMonth() + 1, 0).getDate()
+  const currentCloseMonth = `${nowForClose.getFullYear()}-${String(nowForClose.getMonth() + 1).padStart(2, '0')}`
 
-  // Auto-generate closures only for months that have already ended (never the current month)
+  // El cierre, manual o automático, solo puede generarse el último día natural del mes.
   useEffect(() => {
-    if (autoGenRef.current) return
+    if (autoGenRef.current || !isLastDayOfMonth) return
     autoGenRef.current = true
     const now = new Date()
-    // Calculate previous month
-    const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-    const prevM = now.getMonth() === 0 ? 12 : now.getMonth()
-    const mesPasado = `${prevY}-${String(prevM).padStart(2, '0')}`
+    const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
@@ -1246,7 +1290,7 @@ function MonthlyClosePage() {
       const withAudit = auditLog(fresh, `Cierre mensual auto-generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
       return { cierres: [...(fresh.cierres || []), ...nuevos], audit: withAudit.audit }
     })
-  }, []) // eslint-disable-line
+  }, [isLastDayOfMonth]) // eslint-disable-line
 
   // Build closure items from db.cierres, enriched with records
   const items = useMemo(() => {
@@ -1316,10 +1360,12 @@ function MonthlyClosePage() {
 
   // Generate closures for the previous (completed) month only
   const handleGenerateAll = () => {
+    if (!isLastDayOfMonth) {
+      toast('El cierre mensual solo puede generarse el último día natural del mes', 4500, 'warn')
+      return
+    }
     const now = new Date()
-    const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-    const prevM = now.getMonth() === 0 ? 12 : now.getMonth()
-    const mesPasado = `${prevY}-${String(prevM).padStart(2, '0')}`
+    const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
@@ -1366,7 +1412,7 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} />
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage() {
@@ -1417,6 +1463,7 @@ function AuditPage() {
 
 function AnomaliesPage() {
   const db = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
 
   const items = useMemo(() => {
     const anomalies: any[] = []
@@ -1442,6 +1489,22 @@ function AnomaliesPage() {
           resolved: false,
         })
       }
+
+      if (r.fin) {
+        const workedHours = recWorkSecs(r) / 3600
+        if (workedHours > 10) anomalies.push({ id:`long-${r.id}`, empName, dept, type:'jornada_larga', description:`Jornada de ${workedHours.toFixed(1)} horas`, date:fmtDate(r.inicio), severity:'alta', resolved:false })
+        if (workedHours >= 6 && !(r.breaks || []).length && !(r.breakSecs > 0)) anomalies.push({ id:`break-${r.id}`, empName, dept, type:'sin_descanso', description:'Jornada de 6 horas o más sin descanso registrado', date:fmtDate(r.inicio), severity:'media', resolved:false })
+      }
+      if (r.geoAlert || r.fueraZona) anomalies.push({ id:`geo-${r.id}`, empName, dept, type:'fuera_zona', description:'Fichaje registrado fuera de la zona asignada', date:fmtDate(r.inicio), severity:'alta', resolved:false })
+      if (r.cierreManual) anomalies.push({ id:`manual-${r.id}`, empName, dept, type:'cierre_manual', description:`Finalizada por ${r.cerradoPor || 'un responsable'}${r.motivoCierre ? ` · ${r.motivoCierre}` : ''}`, date:fmtDate(r.fin || r.inicio), severity:'baja', resolved:false })
+    })
+
+    const openByEmployee = new Map<string, any[]>()
+    records.filter((r:any) => !r.fin && r.inicio).forEach((r:any) => openByEmployee.set(r.empId, [...(openByEmployee.get(r.empId) || []), r]))
+    openByEmployee.forEach((open, empId) => {
+      if (open.length < 2) return
+      const emp = (db.employees || []).find((e:any) => e.id === empId)
+      anomalies.push({ id:`double-${empId}`, empName:emp?.name || empId, dept:emp?.centroTrabajo || emp?.dept || '', type:'doble_abierto', description:`${open.length} jornadas abiertas simultáneamente`, date:fmtDate(open[0].inicio), severity:'alta', resolved:false })
     })
 
     // Detect overlapping records per employee per day
@@ -1467,10 +1530,12 @@ function AnomaliesPage() {
       })
     })
 
-    return anomalies.slice(0, 50)
+    const resolvedIds = new Set(db.anomalias_vistas || [])
+    return anomalies.slice(0, 50).map(item => ({ ...item, resolved: resolvedIds.has(item.id) }))
   }, [db])
 
-  return <Anomalies items={items} />
+  const resolveAnomaly = (id:string) => saveDB((fresh:any) => ({ anomalias_vistas:[...new Set([...(fresh.anomalias_vistas || []), id])] }))
+  return <Anomalies items={items} onResolve={resolveAnomaly} />
 }
 
 function ObrasPage() {
@@ -1516,6 +1581,9 @@ function ObrasPage() {
 function OnlineTeamPage() {
   const db = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
+  const [recentClose, setRecentClose] = useState<any>(null)
   const user = session?.user || {}
   const isScopedRole = session?.isEnc || session?.isJO || user.role === 'encargado' || user.role === 'jefe_obra'
   const hasScope = !isScopedRole || Boolean(user.centroTrabajo || user.dept || user.obrasAsignadas?.length)
@@ -1526,17 +1594,116 @@ function OnlineTeamPage() {
     obras: db.obras || [],
     supervisor: user,
     unrestricted: !isScopedRole,
-  }).map(({ record, employee }: any) => ({
+  })
+    .filter(({ employee }: any) => employee.id !== user.id)
+    .map(({ record, employee }: any) => ({
     id: record.id,
     employeeId: employee.id,
     name: employee.name || record.empName || 'Empleado',
     location: record.centro || employee.centroTrabajo || employee.dept || 'Sin ubicación',
     startedAt: record.inicio,
     onBreak: Boolean(record.enDescanso),
-    isSelf: employee.id === user.id,
   })), [db.records, db.employees, db.obras, user, isScopedRole])
 
-  return <OnlineTeam rows={rows} hasScope={hasScope} />
+  const missingTeam = useMemo(() => {
+    const liveIds = new Set((db.records || []).filter((record:any) => !record.fin).map((record:any) => record.empId))
+    const center = String(user.centroTrabajo || user.dept || '').toLocaleLowerCase('es')
+    const works = new Set((user.obrasAsignadas || []).map((value:string) => String(value).toLocaleLowerCase('es')))
+    return (db.employees || []).filter((employee:any) => {
+      if (employee.baja || employee.isAdmin || employee.id === user.id || liveIds.has(employee.id)) return false
+      if (!isScopedRole) return true
+      const employeeCenter = String(employee.centroTrabajo || employee.dept || '').toLocaleLowerCase('es')
+      const employeeWorks = (employee.obrasAsignadas || []).map((value:string) => String(value).toLocaleLowerCase('es'))
+      return (!!center && employeeCenter === center) || employeeWorks.some((value:string) => works.has(value))
+    })
+  }, [db.records, db.employees, user, isScopedRole])
+
+  const finishShift = (row: any) => {
+    if (!window.confirm(`¿Finalizar la jornada de ${row.name}? La hora de salida será la actual.`)) return
+    const reason = window.prompt('Motivo obligatorio para finalizar la jornada:')?.trim()
+    if (!reason) { toast('Debes indicar el motivo del cierre', 3000, 'warn'); return }
+
+    const nowIso = new Date().toISOString()
+    const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
+    let workedMinutes = 0
+
+    saveDB((fresh: any) => {
+      const current = (fresh.records || []).find((record: any) => record.id === row.id)
+      if (!current || current.fin) return {}
+      setRecentClose({ record: current, name: row.name, reason })
+
+      const breaks = [...(current.breaks || [])]
+      if (current.enDescanso && current.bStartTs) breaks.push({ start: current.bStartTs, end: nowIso })
+      const closed: any = {
+        ...current,
+        fin: nowIso,
+        breaks,
+        enDescanso: false,
+        bStartTs: null,
+        closed: true,
+        cerradoPor: actor,
+        cerradoPorId: user.id || 'admin',
+        cierreManual: true,
+        motivoCierre: reason,
+        operationId: globalThis.crypto?.randomUUID?.() ?? current.operationId ?? null,
+        _rev: (current._rev || 0) + 1,
+        _upd: nowIso,
+      }
+      const totals = calcSecs(closed)
+      closed.workSecs = totals.work
+      closed.breakSecs = totals.brk
+      workedMinutes = Math.floor(totals.work / 60)
+
+      const next = { ...fresh, records: fresh.records.map((record: any) => record.id === current.id ? closed : record) }
+      return auditLog(next, 'Jornada finalizada manualmente', `${row.name} · salida ${fmtTime(nowIso)} · ${reason}`, actor)
+    })
+
+    queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada${workedMinutes ? ` (${mhm(workedMinutes)})` : ''}.`, 'jornada', '/?tab=jornada')
+    toast(`Jornada de ${row.name} finalizada`, 3000, 'ok')
+  }
+
+  const undoClose = () => {
+    if (!recentClose?.record) return
+    const nowIso = new Date().toISOString()
+    const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
+    saveDB((fresh: any) => {
+      const restored = { ...recentClose.record, _upd: nowIso }
+      const next = { ...fresh, records: (fresh.records || []).map((record: any) => record.id === restored.id ? restored : record) }
+      return auditLog(next, 'Cierre manual deshecho', `${recentClose.name} · ${recentClose.reason}`, actor)
+    })
+    toast(`Cierre de ${recentClose.name} deshecho`, 3000, 'ok')
+    setRecentClose(null)
+  }
+
+  const remindMissing = () => {
+    missingTeam.forEach((employee:any) => queuePush(employee.id, 'Recordatorio de fichaje', `${user.name || 'Tu responsable'} te recuerda que todavía no has iniciado la jornada.`, 'jornada', '/?tab=inicio'))
+    toast(`Recordatorio enviado a ${missingTeam.length} empleado${missingTeam.length === 1 ? '' : 's'}`, 3000, 'ok')
+  }
+
+  const finishMany = (selectedRows:any[]) => {
+    if (!window.confirm(`¿Finalizar las ${selectedRows.length} jornadas visibles con la hora actual?`)) return
+    const reason = window.prompt('Motivo obligatorio para el cierre múltiple:')?.trim()
+    if (!reason) { toast('Debes indicar el motivo', 3000, 'warn'); return }
+    const nowIso = new Date().toISOString()
+    const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
+    const ids = new Set(selectedRows.map(row => row.id))
+    saveDB((fresh:any) => {
+      const records = (fresh.records || []).map((record:any) => {
+        if (!ids.has(record.id) || record.fin) return record
+        const breaks = [...(record.breaks || [])]
+        if (record.enDescanso && record.bStartTs) breaks.push({ start:record.bStartTs, end:nowIso })
+        const closed:any = { ...record, fin:nowIso, breaks, enDescanso:false, bStartTs:null, closed:true, cerradoPor:actor, cerradoPorId:user.id || 'admin', cierreManual:true, motivoCierre:reason, operationId:globalThis.crypto?.randomUUID?.() ?? record.operationId ?? null, _rev:(record._rev || 0) + 1, _upd:nowIso }
+        const totals = calcSecs(closed); closed.workSecs=totals.work; closed.breakSecs=totals.brk
+        return closed
+      })
+      const next = { ...fresh, records }
+      return auditLog(next, 'Jornadas finalizadas en lote', `${selectedRows.length} empleados · ${reason}`, actor)
+    })
+    selectedRows.forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
+    toast(`${selectedRows.length} jornadas finalizadas`, 3000, 'ok')
+  }
+
+  return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} />
 }
 
 function MessagesPage() {
@@ -1666,10 +1833,15 @@ export default function AppV2Admin() {
       setManualSyncing(false)
     }
   }
+  const safeLogout = () => {
+    if (offlinePending && !window.confirm('Hay cambios pendientes de sincronizar. Si cierras sesión ahora seguirán guardados en este dispositivo. ¿Continuar?')) return
+    logout()
+  }
 
   function renderPage() {
     const page = effectivePage
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
+    if (page === 'pendientes')     return <PendingCenterPage onNavigate={setAdminPage} />
     if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} />
     if (page === 'en_linea')       return <OnlineTeamPage />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
@@ -1716,7 +1888,7 @@ export default function AppV2Admin() {
               <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
               <div style={{ fontSize: 10.5, color: colors.text[500] }}>{roleLabel}</div>
             </div>
-            <button onClick={logout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
+            <button onClick={safeLogout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
               <IconLogout width={15} height={15} />
             </button>
           </div>
@@ -1750,7 +1922,7 @@ export default function AppV2Admin() {
             style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', gap:6, borderRadius:9, border:`1px solid ${offlinePending || syncStatus === 'error' ? 'rgba(245,158,11,.45)' : colors.border.subtle}`, background:colors.bg[600], color:offlinePending || syncStatus === 'error' ? colors.semantic.orange : colors.semantic.green, cursor:manualSyncing?'wait':'pointer', fontSize:11, fontWeight:700 }}
           >
             <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor', boxShadow:offlinePending?'0 0 0 3px rgba(245,158,11,.14)':'none' }} />
-            <span className="uiv2-sync-label">{manualSyncing ? 'Sincronizando…' : offlinePending ? 'Pendiente' : syncStatus === 'synced' ? 'Al día' : 'Reintentar'}</span>
+            <span className="uiv2-sync-label">{manualSyncing ? 'Sincronizando…' : offlinePending ? '1 lote pendiente' : syncStatus === 'synced' ? 'Al día' : 'Reintentar'}</span>
           </button>
           <button
             type="button"

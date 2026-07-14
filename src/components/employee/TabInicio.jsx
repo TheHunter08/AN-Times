@@ -210,8 +210,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                   ? <polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/>
                   : <rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>}
               </svg>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.6px', lineHeight: 1 }}>
-                {timer.state === 'idle' ? 'INICIAR' : timer.state === 'break' ? 'PAUSADO' : 'PARAR'}
+              <span style={{ maxWidth: 70, textAlign: 'center', fontSize: 8.5, fontWeight: 800, letterSpacing: '.35px', lineHeight: 1.15 }}>
+                {timer.state === 'idle' ? 'INICIAR JORNADA' : 'FINALIZAR JORNADA'}
               </span>
               {/* burst ring */}
               {burst && (
@@ -510,7 +510,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
           const teamStartJornada = (e) => {
             if (liveIds.has(e.id)) { toast('Ya tiene jornada abierta', 2500, 'warn'); return }
-            const newRec = { id: gid(), empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
+            const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: e.id, empName: e.name, inicio: new Date().toISOString(), fin: null, centro: e.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
             saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
             queuePush(e.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
             toast('Jornada iniciada', 2500, 'ok')
@@ -536,7 +536,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             const now = new Date().toISOString()
             const breaks = [...(rec.breaks || [])]
             if (rec.enDescanso && rec.bStartTs) breaks.push({ start: rec.bStartTs, end: now })
-            const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, _upd: now }
+            const closed = { ...rec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, operationId: globalThis.crypto?.randomUUID?.() ?? rec.operationId ?? null, _rev: (rec._rev || 0) + 1, _upd: now }
             const t = calcSecs(closed); closed.workSecs = t.work; closed.breakSecs = t.brk
             saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === rec.id ? closed : r) }))
             queuePush(rec.empId, '⏹ Jornada finalizada', `${u.name} ha finalizado tu jornada (${mhm(Math.floor(t.work/60))}).`, 'jornada', '/?tab=jornada')

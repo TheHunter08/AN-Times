@@ -16,6 +16,7 @@ export interface TimesheetRow {
   salida: string
   worked: string
   over?: boolean
+  history?: string
 }
 export interface TimesheetsProps {
   rows: TimesheetRow[]
@@ -55,7 +56,7 @@ export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }:
     },
     { key: 'day', header: 'Día', width: '90px', render: r => r.day },
     { key: 'entrada', header: 'Entrada', width: '88px', render: r => editingId === r.id ? <input aria-label={`Entrada de ${r.name}`} type="time" value={editEntry} onChange={e => setEditEntry(e.target.value)} style={{ width:82, minHeight:36, padding:'4px 6px', borderRadius:8, border:`1px solid ${colors.primary.base}`, background:colors.bg[600], color:colors.text[900] }}/> : r.entrada },
-    { key: 'salida', header: 'Salida', width: '190px', render: r => editingId === r.id ? <div style={{ display:'grid', gap:5 }}><input aria-label={`Salida de ${r.name}`} type="time" value={editExit} onChange={e => setEditExit(e.target.value)} style={{ width:82, minHeight:36, padding:'4px 6px', borderRadius:8, border:`1px solid ${colors.primary.base}`, background:colors.bg[600], color:colors.text[900] }}/><input aria-label={`Motivo de modificación de ${r.name}`} placeholder="Motivo obligatorio" value={editReason} onChange={e => setEditReason(e.target.value)} style={{ width:180, minHeight:34, padding:'4px 8px', borderRadius:8, border:`1px solid ${editReason.trim() ? colors.border.default : colors.semantic.orange}`, background:colors.bg[600], color:colors.text[900] }}/></div> : r.salida },
+    { key: 'salida', header: 'Salida e historial', width: '260px', render: r => editingId === r.id ? <div style={{ display:'grid', gap:5 }}><input aria-label={`Salida de ${r.name}`} type="time" value={editExit} onChange={e => setEditExit(e.target.value)} style={{ width:82, minHeight:36, padding:'4px 6px', borderRadius:8, border:`1px solid ${colors.primary.base}`, background:colors.bg[600], color:colors.text[900] }}/><input aria-label={`Motivo de modificación de ${r.name}`} placeholder="Motivo obligatorio" value={editReason} onChange={e => setEditReason(e.target.value)} style={{ width:180, minHeight:34, padding:'4px 8px', borderRadius:8, border:`1px solid ${editReason.trim() ? colors.border.default : colors.semantic.orange}`, background:colors.bg[600], color:colors.text[900] }}/></div> : <div><strong>{r.salida}</strong>{r.history && <div title={r.history} style={{ marginTop:3, maxWidth:250, color:colors.text[400], fontSize:10.5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{r.history}</div>}</div> },
     {
       key: 'worked', header: 'Trabajo', width: '72px',
       render: r => <span style={{ fontWeight: 700, color: r.over ? colors.semantic.orange : colors.text[900] }}>{r.worked}</span>,

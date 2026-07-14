@@ -70,20 +70,20 @@ const stateConfig: Record<ClockState, {
   idle: {
     status: 'Fuera de jornada',
     description: 'Todavía no has fichado hoy',
-    action: 'Fichar entrada',
-    completed: 'Entrada registrada',
+    action: 'Iniciar jornada',
+    completed: 'Jornada iniciada',
   },
   working: {
     status: 'Jornada activa',
     description: 'Tu jornada se está registrando',
-    action: 'Iniciar descanso',
-    completed: 'Descanso iniciado',
+    action: 'Finalizar jornada',
+    completed: 'Jornada finalizada',
   },
   break: {
     status: 'En descanso',
     description: 'El descanso está en curso',
-    action: 'Finalizar descanso',
-    completed: 'Jornada reanudada',
+    action: 'Finalizar jornada',
+    completed: 'Jornada finalizada',
   },
 }
 
@@ -100,8 +100,7 @@ function PunchIcon({ type, tone = 'gray' }: { type?: RecentPunch['type']; tone?:
 }
 
 function StateActionIcon({ state }: { state: ClockState }) {
-  if (state === 'working') return <IconPause />
-  return <IconPlay />
+  return state === 'idle' ? <IconPlay /> : <IconStop />
 }
 
 export function EmployeeHome({
@@ -127,7 +126,7 @@ export function EmployeeHome({
   extraAction,
 }: EmployeeHomeProps) {
   const cfg = stateConfig[state]
-  const mainAction = state === 'idle' ? onStartAction : (onBreakAction ?? onStartAction)
+  const mainAction = state === 'idle' ? onStartAction : (onStopAction ?? onStartAction)
   const actionRef = useRef(mainAction)
   actionRef.current = mainAction
 

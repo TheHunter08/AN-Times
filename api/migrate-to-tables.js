@@ -28,6 +28,8 @@ const SB_H    = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': '
 const SB_H_RD = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
 const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+const ENTITY_COLLECTIONS = ['empresas','centrosTrabajo','medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
+const SINGLETON_COLLECTIONS = ['monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
 
 async function sb(path, method = 'GET', body = null, extraHeaders = {}) {
   const opts = { method, headers: { ...SB_H, ...extraHeaders, Prefer: 'return=minimal' } }
@@ -48,6 +50,15 @@ async function upsert(table, rows, onConflict = 'id') {
     count += batch.length
   }
   return count
+}
+
+async function countCompanyRows(table) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?select=id&company_id=eq.${COMPANY_ID}`, {
+    headers: { ...SB_H, Prefer: 'count=exact', Range: '0-0' },
+  })
+  if (!r.ok) throw new Error(`[count ${table}] ${r.status}: ${(await r.text()).slice(0, 160)}`)
+  const total = r.headers.get('content-range')?.split('/')[1]
+  return total && total !== '*' ? Number(total) : 0
 }
 
 export default async function handler(req, res) {
@@ -112,6 +123,12 @@ export default async function handler(req, res) {
       work_secs: r.workSecs || 0, break_secs: r.breakSecs || 0,
       breaks: r.breaks || [], closed: !!r.closed, aceptada: !!r.aceptada,
       correcciones: r.correcciones || [],
+      revision: Math.max(1, Number(r._rev) || 1), operation_id: r.operationId || null,
+      validado: !!r.validado, rechazado: !!r.rechazado, modificado: !!r.modificado,
+      validado_by: r.validadoBy || null, validado_at: r.validadoAt || null,
+      cerrado_por: r.cerradoPor || null, cerrado_por_id: r.cerradoPorId || null,
+      cierre_manual: !!r.cierreManual, motivo_cierre: r.motivoCierre || null,
+      deleted: false, deleted_at: null,
       updated_at: r._upd || new Date().toISOString(),
     }))
     stats.records = await upsert('records', records)
@@ -147,10 +164,41 @@ export default async function handler(req, res) {
     }))
     stats.obras = await upsert('obras', obras)
 
+    // 8. Colecciones que antes solo existían dentro del blob monolítico.
+    const nowIso = new Date().toISOString()
+    const entities = []
+    for (const collection of ENTITY_COLLECTIONS) {
+      for (const item of (db[collection] || [])) {
+        if (!item || item.id === undefined || item.id === null || String(item.id).trim() === '') continue
+        const entityId = String(item.id)
+        entities.push({
+          id: `${collection}:${entityId}`, company_id: COMPANY_ID, collection, entity_id: entityId,
+          data: item, revision: Math.max(1, Number(item._rev) || 1), deleted: false,
+          updated_at: item._upd || nowIso,
+        })
+      }
+    }
+    for (const collection of SINGLETON_COLLECTIONS) {
+      if (db[collection] === undefined) continue
+      entities.push({
+        id: `${collection}:__singleton__`, company_id: COMPANY_ID, collection, entity_id: '__singleton__',
+        data: db[collection], revision: 1, deleted: false, updated_at: nowIso,
+      })
+    }
+    stats.app_entities = await upsert('app_entities', entities)
+
+    const expected = {
+      employees: employees.length, records: records.length, vacaciones: vacaciones.length,
+      cierres: cierres.length, obras: obras.length, app_entities: entities.length,
+    }
+    const actual = Object.fromEntries(await Promise.all(Object.keys(expected).map(async table => [table, await countCompanyRows(table)])))
+    const mismatch = Object.entries(expected).filter(([key, value]) => actual[key] !== value)
+
     console.log('[migrate-to-tables] completado:', JSON.stringify(stats))
     return res.status(200).json({
       ok: true,
       stats,
+      verification: { expected, actual, mismatch, consistent: mismatch.length === 0 },
       next: [
         'En appStore.js cambia el import:',
         "  from '../services/dataService.js'",
