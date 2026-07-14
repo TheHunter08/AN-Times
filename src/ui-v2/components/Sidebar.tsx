@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { colors } from '../design-system/colors'
+import { IconChevronDown } from './Icons.js'
 
 export interface SidebarItem {
   id: string
@@ -17,6 +18,25 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ items, active, onSelect, header, footer }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+
+  // Nunca dejar colapsado el grupo que contiene el item activo.
+  useEffect(() => {
+    const activeGroup = items.find(i => i.id === active)?.group
+    if (activeGroup && collapsed.has(activeGroup)) {
+      setCollapsed(prev => { const next = new Set(prev); next.delete(activeGroup); return next })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, items])
+
+  const toggleGroup = (group: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group); else next.add(group)
+      return next
+    })
+  }
+
   return (
     <aside className="uiv2-sidebar">
       {header && <div className="uiv2-sidebar-header">{header}</div>}
@@ -25,19 +45,32 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         {items.map((item, index) => {
           const isActive = item.id === active
           const startsGroup = Boolean(item.group && item.group !== items[index - 1]?.group)
+          const isCollapsed = Boolean(item.group && collapsed.has(item.group))
 
           return (
             <div className="uiv2-sidebar-entry" key={item.id}>
-              {startsGroup && <div className="uiv2-sidebar-group">{item.group}</div>}
-              <button
-                type="button"
-                onClick={() => onSelect(item.id)}
-                className={`uiv2-sidebar-item${isActive ? ' uiv2-active' : ''}`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <span className="uiv2-sidebar-icon" aria-hidden="true">{item.icon}</span>
-                <span className="uiv2-sidebar-label">{item.label}</span>
-              </button>
+              {startsGroup && (
+                <button
+                  type="button"
+                  className="uiv2-sidebar-group"
+                  onClick={() => toggleGroup(item.group as string)}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span>{item.group}</span>
+                  <IconChevronDown width={12} height={12} className={`uiv2-sidebar-group-chevron${isCollapsed ? ' uiv2-collapsed' : ''}`} aria-hidden="true" />
+                </button>
+              )}
+              {!isCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className={`uiv2-sidebar-item${isActive ? ' uiv2-active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <span className="uiv2-sidebar-icon" aria-hidden="true">{item.icon}</span>
+                  <span className="uiv2-sidebar-label">{item.label}</span>
+                </button>
+              )}
             </div>
           )
         })}
@@ -83,15 +116,26 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         }
         .uiv2-sidebar-entry { width: 100%; }
         .uiv2-sidebar-group {
+          box-sizing: border-box;
+          width: 100%;
           padding: 17px 10px 7px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          border: none;
+          background: transparent;
           color: ${colors.text[300]};
-          font-size: 9px;
-          font-weight: 650;
+          font: 650 9px/1.2 inherit;
           letter-spacing: .105em;
-          line-height: 1.2;
           text-transform: uppercase;
+          cursor: pointer;
         }
+        .uiv2-sidebar-group:hover { color: ${colors.text[500]}; }
+        .uiv2-sidebar-group:focus-visible { outline: 2px solid ${colors.primary.base}; outline-offset: 1px; }
         .uiv2-sidebar-entry:first-child .uiv2-sidebar-group { padding-top: 3px; }
+        .uiv2-sidebar-group-chevron { transition: transform 150ms cubic-bezier(.2,0,0,1); flex-shrink: 0; }
+        .uiv2-sidebar-group-chevron.uiv2-collapsed { transform: rotate(-90deg); }
         .uiv2-sidebar-item {
           box-sizing: border-box;
           width: 100%;
@@ -160,7 +204,8 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         @media (prefers-reduced-motion: reduce) {
           .uiv2-sidebar-item,
           .uiv2-sidebar-item::before,
-          .uiv2-sidebar-icon { transition: none; }
+          .uiv2-sidebar-icon,
+          .uiv2-sidebar-group-chevron { transition: none; }
         }
       `}</style>
     </aside>

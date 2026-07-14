@@ -2,6 +2,7 @@
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice } from '../components/Icons.js'
+import { ErrorBanner } from '../components/FormField.js'
 
 export type LoginMode = 'pin' | 'email'
 
@@ -233,12 +234,8 @@ export function Login({
 
                 {/* Error */}
                 {pinError && (
-                  <div role="alert" aria-live="assertive" style={{
-                    padding: '8px 12px', borderRadius: radius.sm, marginBottom: 12,
-                    background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)',
-                    color: '#F87171', fontSize: 11.5, textAlign: 'center',
-                  }}>
-                    {pinError}
+                  <div style={{ marginBottom: 12 }}>
+                    <ErrorBanner>{pinError}</ErrorBanner>
                   </div>
                 )}
 
@@ -368,15 +365,7 @@ export function Login({
                 </div>
               </div>
 
-              {(emailError || error) && (
-                <div role="alert" aria-live="assertive" style={{
-                  padding: '9px 12px', borderRadius: radius.sm,
-                  background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.28)',
-                  color: '#F87171', fontSize: 12,
-                }}>
-                  {emailError || error}
-                </div>
-              )}
+              {(emailError || error) && <ErrorBanner>{emailError || error}</ErrorBanner>}
 
               <button
                 type="submit"

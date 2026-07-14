@@ -92,6 +92,23 @@ describe('localDateStr', () => {
     const d = new Date(2026, 6, 6, 0, 0, 0) // lunes 6 de julio en hora local
     expect(localDateStr(d)).toBe('2026-07-06')
   })
+
+  // Regresión: inicio se guarda siempre en UTC (new Date().toISOString()), pero
+  // la app agrupa fichajes por día/mes/año local (RD, UTC-4, ver vitest.config.js).
+  // Un fichaje nocturno cae en el día UTC siguiente aunque localmente sea "hoy" —
+  // comparar con r.inicio?.startsWith(fecha) o r.inicio.slice(0,10) reproduce ese
+  // bug; localDateStr(new Date(r.inicio)) es la única forma correcta de agrupar.
+  it('agrupa un fichaje nocturno en el día local, no en el día UTC siguiente', () => {
+    const inicio = '2026-07-14T02:00:00.000Z' // 22:00 del 13 de julio en RD (UTC-4)
+    expect(inicio.slice(0, 10)).toBe('2026-07-14') // fecha UTC — NO es la fecha real del turno
+    expect(localDateStr(new Date(inicio))).toBe('2026-07-13') // fecha local correcta
+  })
+
+  it('agrupa un fichaje nocturno en el mes/año local aunque cruce a otro mes en UTC', () => {
+    const inicio = '2026-08-01T02:00:00.000Z' // 22:00 del 31 de julio en RD (UTC-4)
+    expect(inicio.slice(0, 7)).toBe('2026-08') // mes UTC — NO es el mes real del turno
+    expect(localDateStr(new Date(inicio)).slice(0, 7)).toBe('2026-07') // mes local correcto
+  })
 })
 
 describe('monthlyExtras', () => {
