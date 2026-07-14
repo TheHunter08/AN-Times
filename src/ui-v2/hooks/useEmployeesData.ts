@@ -1,6 +1,6 @@
 import { useAppStore } from '../../store/appStore.js'
 import type { EmployeeRow } from '../pages/Employees.js'
-import { mhm, calcMin, today } from '../../utils/time.js'
+import { mhm, calcMin, today, localDateStr } from '../../utils/time.js'
 
 interface DbEmployee {
   id: string
@@ -35,8 +35,10 @@ export function useEmployeesData() {
 
   return emps.map((e): EmployeeRow => {
     const liveRec  = recs.find(r => r.empId === e.id && !r.fin)
+    // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(todayStr)): inicio se
+    // guarda en UTC, todayStr es local — un fichaje nocturno no contaba en "hoy".
     const todayMin = recs
-      .filter(r => r.empId === e.id && r.fin && r.inicio?.startsWith(todayStr))
+      .filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
       .reduce((s, r) => s + calcMin(r), 0)
 
     let status: EmployeeRow['status'] = 'off'

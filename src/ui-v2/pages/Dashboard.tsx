@@ -165,7 +165,7 @@ export function Dashboard({
           <h1 id="dashboard-title">Dashboard</h1>
           <p>
             <span>{greeting}</span>
-            {greetingSub && <span className="ti-dashboard-heading__separator"> · </span>}
+            {greetingSub && <span className="ti-dashboard-heading__separator">{' · '}</span>}
             {greetingSub && <span>{greetingSub}</span>}
           </p>
         </div>

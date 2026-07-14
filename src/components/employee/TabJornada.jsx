@@ -70,8 +70,10 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
     return (db.records || []).filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= wsDate)
   }, [db.records, u.id, wsStr])
 
+  // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(mk)): inicio se guarda en
+  // UTC, mk es local — un fichaje nocturno se quedaba fuera del mes correcto.
   const monthMin = useMemo(
-    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk))
+    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk))
            .reduce((s, r) => s + calcMin(r), 0),
     [db.records, u.id, mk]
   )
@@ -184,7 +186,9 @@ export function TabJornada({ timer, db, u, toast, saveDB, openModal, closeModal,
       const pdfCols = pdfColors(rgb)
       const now2 = new Date()
       const mk2 = `${now2.getFullYear()}-${p2(now2.getMonth()+1)}`
-      const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
+      // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(mk2)): inicio se guarda
+      // en UTC, mk2 es local — un fichaje nocturno se quedaba fuera del informe del mes.
+      const monthRecs = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk2)).sort((a,b) => a.inicio.localeCompare(b.inicio))
       const totalMin2 = monthRecs.reduce((s,r) => s + calcMin(r), 0)
       const monthName = now2.toLocaleDateString('es-ES', { month:'long', year:'numeric' })
       const pdfDoc  = await PDFDocument.create()

@@ -11,7 +11,10 @@ export function WeeklyBars({ db, u, timer }) {
     const d = new Date(ws)
     d.setDate(d.getDate() + i)
     const ds = localDateStr(d)
-    let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(ds))
+    // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(ds)): inicio se guarda en
+    // UTC, ds es local — un fichaje nocturno se quedaba fuera del día correcto y su barra
+    // aparecía vacía aunque el total semanal sí incluyera esas horas.
+    let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === ds)
       .reduce((s, r) => s + calcMin(r), 0)
     if (i === dow && timer.state !== 'idle') min += Math.floor(timer.ws / 60)
     return { label, min, isToday: i === dow }

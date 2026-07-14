@@ -3,7 +3,7 @@
 // Reutiliza las mismas utilidades puras (today/calcMin/mhm) que ya usa
 // PanelDashboard.jsx en la app real, para no duplicar ni divergir cálculos.
 import { useAppStore } from '../../store/appStore.js'
-import { today, calcMin, mhm } from '../../utils/time.js'
+import { today, calcMin, mhm, localDateStr } from '../../utils/time.js'
 import type { KPI, ActivityItem } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 
@@ -47,15 +47,22 @@ export function useDashboardData(): DashboardData {
   const liveRecs = recs.filter(r => !r.fin)
   const breakRecs = liveRecs.filter(r => r.enDescanso)
   const workingRecs = liveRecs.filter(r => !r.enDescanso)
-  const todayRecs = recs.filter(r => r.fin && r.inicio?.startsWith(todayStr))
+  // localDateStr (no r.inicio?.startsWith(todayStr)): inicio se guarda en UTC,
+  // todayStr es local — un fichaje nocturno se quedaba fuera de "hoy" y el
+  // empleado aparecía como ausente aunque ya hubiera trabajado su jornada.
+  const todayRecs = recs.filter(r => r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
   const todayMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
   const wdMin = db.config?.wdMin || 480
+
+  // Ausente hoy = sin fichaje abierto NI cerrado hoy (no solo "no está fichado ahora mismo",
+  // que contaba como ausente a quien ya había completado su jornada).
+  const presentTodayIds = new Set([...liveRecs, ...todayRecs].map(r => r.empId))
 
   const kpis: KPI[] = [
     { label: 'Empleados activos', value: String(emps.length), tone: 'primary' },
     { label: 'Trabajando ahora', value: String(workingRecs.length), tone: 'cyan' },
     { label: 'En descanso', value: String(breakRecs.length), tone: 'amber' },
-    { label: 'Ausentes hoy', value: String(Math.max(0, emps.length - liveRecs.length)), tone: 'accent' },
+    { label: 'Ausentes hoy', value: String(Math.max(0, emps.length - presentTodayIds.size)), tone: 'accent' },
     { label: 'Horas trabajadas hoy', value: mhm(todayMin), tone: 'primary' },
   ]
 
@@ -82,8 +89,8 @@ export function useDashboardData(): DashboardData {
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
       d.setDate(d.getDate() - i - offsetWeeks * 7)
-      const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const dayMin = recs.filter(r => r.fin && r.inicio?.startsWith(dStr)).reduce((s, r) => s + calcMin(r), 0)
+      const dStr = localDateStr(d)
+      const dayMin = recs.filter(r => r.fin && r.inicio && localDateStr(new Date(r.inicio)) === dStr).reduce((s, r) => s + calcMin(r), 0)
       result.push({ label: DOW[d.getDay()], value: Math.min(100, Math.round((dayMin / wdMin) * 100)) })
     }
     return result

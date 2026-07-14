@@ -95,13 +95,17 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
   const vac = vacData(u.id, db)
   const now = new Date()
   const mk = `${now.getFullYear()}-${p2(now.getMonth()+1)}`
-  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
+  // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(mk)): inicio se guarda en
+  // UTC, mk es local — un fichaje nocturno se quedaba fuera del mes correcto.
+  const monthMin = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   const pendingDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma).length
   const pendingCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente' && !c.desactualizado)
   const hasFirma = !!db.firmas?.[u?.id]?.main
 
   const yearStr = `${now.getFullYear()}-`
-  const yearRecs = myRecs.filter(r => r.inicio?.startsWith(yearStr))
+  // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(yearStr)): inicio se
+  // guarda en UTC — un fichaje de la noche del 31 de diciembre se quedaba fuera del año.
+  const yearRecs = myRecs.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(yearStr))
   const yearMin = yearRecs.reduce((s, r) => s + calcMin(r), 0)
   const yearDays = new Set(yearRecs.map(r => localDateStr(new Date(r.inicio)))).size
   const dayMap = {}

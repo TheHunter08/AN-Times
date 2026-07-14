@@ -1472,7 +1472,9 @@ function AnomaliesPage() {
 
     records.forEach((r: any) => {
       if (!r.inicio) return
-      const dateStr = r.inicio.slice(0, 10)
+      // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se guarda en
+      // UTC — un fichaje nocturno se comparaba con el día siguiente al real.
+      const dateStr = localDateStr(new Date(r.inicio))
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
       const empName = emp?.name || r.empId
       const dept = emp?.dept || emp?.centroTrabajo || ''
@@ -1510,7 +1512,7 @@ function AnomaliesPage() {
     // Detect overlapping records per employee per day
     const byEmpDay = new Map<string, any[]>()
     records.filter((r: any) => r.fin && r.inicio).forEach((r: any) => {
-      const key = `${r.empId}::${r.inicio.slice(0, 10)}`
+      const key = `${r.empId}::${localDateStr(new Date(r.inicio))}`
       if (!byEmpDay.has(key)) byEmpDay.set(key, [])
       byEmpDay.get(key)!.push(r)
     })

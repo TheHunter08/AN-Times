@@ -512,13 +512,16 @@ export default function EmployeePage() {
             const breaks2 = [...(freshRec.breaks || [])]
             const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
             const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime, _upd: closeTime }
-            const _msgAc = `Tu jornada del ${freshRec.inicio.slice(0,10)} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
+            // localDateStr(new Date(inicio)) (no inicio.slice(0,10)): inicio se guarda en
+            // UTC — un cierre automático de madrugada mostraba el día siguiente al real.
+            const _autoCloseDay = localDateStr(new Date(freshRec.inicio))
+            const _msgAc = `Tu jornada del ${_autoCloseDay} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
             addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
             const bellSnapshot = [...bellNotis]
             bellNotis.length = 0
             saveDB(latestDb => {
               const updRecs = latestDb.records.map(r => r.id === freshRec.id ? closed2 : r)
-              const dbWithAudit = auditLog(latestDb, 'Auto-cierre jornada', `${u.name} · ${freshRec.inicio.slice(0,10)} · ${mhm(Math.floor(t2.work/60))}`, u.name)
+              const dbWithAudit = auditLog(latestDb, 'Auto-cierre jornada', `${u.name} · ${_autoCloseDay} · ${mhm(Math.floor(t2.work/60))}`, u.name)
               return { records: updRecs, notisSent: { ...(latestDb.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: [...(latestDb.notis || []), ...bellSnapshot] }
             })
             sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')

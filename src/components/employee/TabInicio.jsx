@@ -86,8 +86,10 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     return (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= lws && new Date(r.inicio) < lwe).reduce((s, r) => s + calcMin(r), 0)
   }, [db.records, u.id, wsStr])
 
+  // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(mk)): inicio se guarda en
+  // UTC, mk es local — un fichaje nocturno se quedaba fuera del mes correcto.
   const monthRecs = useMemo(
-    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio?.startsWith(mk)),
+    () => (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)),
     [db.records, u.id, mk]
   )
   const monthMin = useMemo(() => monthRecs.reduce((s, r) => s + calcMin(r), 0), [monthRecs])

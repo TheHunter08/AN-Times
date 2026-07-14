@@ -28,7 +28,9 @@ export function buildAIContext(db, u) {
   const vac = vacData(u.id, db)
   const todayStr = today()
   const emps = (db.employees || []).filter(e => !e.baja)
-  const ficharonHoy = new Set((db.records || []).filter(r => r.inicio?.startsWith(todayStr)).map(r => r.empId))
+  // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(todayStr)): inicio se
+  // guarda en UTC, todayStr es local — un fichaje nocturno no contaba como "hoy".
+  const ficharonHoy = new Set((db.records || []).filter(r => r.inicio && localDateStr(new Date(r.inicio)) === todayStr).map(r => r.empId))
   const sinFichar = emps.filter(e => !ficharonHoy.has(e.id)).map(e => e.name)
   return [
     `Empleado: ${u.name}`,
@@ -94,7 +96,9 @@ export function aiAnswer(q, db, u) {
   if (ql.includes('olvid') || ql.includes('quién') || ql.includes('quien') || ql.includes('sin fichar')) {
     const todayStr = today()
     const emps = (db.employees || []).filter(e => !e.baja)
-    const ficharon = new Set((db.records || []).filter(r => r.inicio?.startsWith(todayStr)).map(r => r.empId))
+    // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(todayStr)): inicio se
+    // guarda en UTC, todayStr es local — un fichaje nocturno no contaba como "hoy".
+    const ficharon = new Set((db.records || []).filter(r => r.inicio && localDateStr(new Date(r.inicio)) === todayStr).map(r => r.empId))
     const sinFichar = emps.filter(e => !ficharon.has(e.id))
     if (!sinFichar.length) return `✅ Hoy todo el equipo ha fichado (${emps.length} personas).`
     return `⚠️ Hoy aún no han fichado ${sinFichar.length} de ${emps.length}:\n${sinFichar.slice(0, 8).map(e => `• ${e.name}`).join('\n')}`
@@ -120,7 +124,7 @@ export function aiAnswer(q, db, u) {
   // Historial
   if (ql.includes('historial') || ql.includes('registro') || ql.includes('último') || ql.includes('ultimo')) {
     const last = fin.slice(-3).reverse()
-    if (last.length) return `📋 Tus últimos registros:\n${last.map(r => `• ${r.inicio?.slice(0, 10) || '—'}: ${mhm(calcMin(r))}`).join('\n')}`
+    if (last.length) return `📋 Tus últimos registros:\n${last.map(r => `• ${r.inicio ? localDateStr(new Date(r.inicio)) : '—'}: ${mhm(calcMin(r))}`).join('\n')}`
     return '📋 Aún no tienes registros completados.'
   }
 
