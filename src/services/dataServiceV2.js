@@ -23,7 +23,6 @@ export {
   loadLocal,
   saveLocal,
   mergeDB,
-  cloudFetchTs,
   scheduleSave,
   startRealtime,
   stopRealtime,
@@ -43,6 +42,7 @@ export {
 import {
   supabase,
   cloudFetch as _v1Fetch,
+  cloudFetchTs as _v1FetchTs,
   cloudPush  as _v1Push,
   setPostBlobSyncHandler,
 } from './dataService.js'
@@ -59,13 +59,14 @@ import {
 
 function fromEmployee(e) {
   return {
+    ...(e.data ?? {}),
     id: e.id, name: e.name, email: e.email ?? null,
     pin: e.pin_hash ?? null, pinLen: e.pin_len ?? null, role: e.role ?? 'empleado',
     centroTrabajo: e.centro_trabajo ?? null,
     obrasAsignadas: e.obras_asignadas ?? [],
     reminderTime: e.reminder_time ?? '08:30',
     salidaTime: e.salida_time ?? null,
-    telefono: e.telefono ?? null, baja: !!e.baja,
+    telefono: e.telefono ?? null, baja: !!e.baja, _upd: e.updated_at,
     isAdmin: e.role === 'admin',
     isEnc:   e.role === 'encargado',
     isJO:    e.role === 'jefe_obra',
@@ -74,6 +75,7 @@ function fromEmployee(e) {
 
 function fromRecord(r) {
   return {
+    ...(r.data ?? {}),
     id: r.id, empId: r.emp_id, empName: r.emp_name,
     inicio: r.inicio, fin: r.fin ?? null, centro: r.centro ?? null,
     workSecs: r.work_secs ?? 0, breakSecs: r.break_secs ?? 0,
@@ -89,6 +91,7 @@ function fromRecord(r) {
 
 function fromVac(v) {
   return {
+    ...(v.data ?? {}),
     id: v.id, empId: v.emp_id, empName: v.emp_name,
     fechaInicio: v.fecha_inicio, fechaFin: v.fecha_fin,
     tipo: v.tipo ?? 'vacaciones', estado: v.estado ?? 'pendiente',
@@ -101,6 +104,7 @@ function fromCierre(c) {
   // firma_emp se guarda como JSON string en la columna text
   const firmaObj = (() => { try { return c.firma_emp ? JSON.parse(c.firma_emp) : null } catch { return null } })()
   return {
+    ...(c.data ?? {}),
     id: c.id, empId: c.emp_id, empName: c.emp_name ?? null, mes: c.mes,
     totalMin: c.total_min ?? 0, extraMin: c.extra_min ?? 0,
     dias: c.dias ?? null,
@@ -114,7 +118,7 @@ function fromCierre(c) {
 }
 
 function fromObra(o) {
-  return { id: o.id, nombre: o.nombre, coords: o.coords, radio: o.radio ?? 200, activa: !!o.activa }
+  return { ...(o.data ?? {}), id: o.id, nombre: o.nombre, coords: o.coords, radio: o.radio ?? 200, activa: !!o.activa, _upd: o.updated_at }
 }
 
 // ── Mappers App→DB (camelCase → snake_case) ──────────────────────────────────
@@ -132,7 +136,10 @@ export async function persistRecordRow(record) {
 
 export async function deleteRecordRow(id) {
   if (!supabase) return false
-  const { error } = await supabase.from('records').delete().eq('id', id).eq('company_id', COMPANY_ID)
+  const nowIso = new Date().toISOString()
+  const { error } = await supabase.from('records')
+    .update({ deleted: true, deleted_at: nowIso, updated_at: nowIso })
+    .eq('id', id).eq('company_id', COMPANY_ID)
   if (error) throw error
   return true
 }
@@ -141,14 +148,14 @@ const RECORDS_PAGE_SIZE = 1000
 
 // PostgREST limita el tamaño de respuesta. Leer por páginas evita que los
 // fichajes históricos desaparezcan silenciosamente al superar 5.000 filas.
-async function fetchAllRecords() {
+async function fetchAllRecords(sinceIso = null) {
   const rows = []
   for (let from = 0; ; from += RECORDS_PAGE_SIZE) {
-    const { data, error } = await supabase.from('records').select('*')
+    let query = supabase.from('records').select('*')
       .eq('company_id', COMPANY_ID)
-      .eq('deleted', false)
       .order('inicio', { ascending: false })
-      .range(from, from + RECORDS_PAGE_SIZE - 1)
+    if (sinceIso) query = query.gt('updated_at', sinceIso)
+    const { data, error } = await query.range(from, from + RECORDS_PAGE_SIZE - 1)
     if (error) return { data: rows, error }
     rows.push(...(data || []))
     if (!data || data.length < RECORDS_PAGE_SIZE) return { data: rows, error: null }
@@ -156,7 +163,120 @@ async function fetchAllRecords() {
 }
 
 // ── cloudFetch V2: lee de tablas, cae en V1 si están vacías ──────────────────
-export async function cloudFetch() {
+// Reloj ligero calculado sobre las tablas. app_data deja de participar en las
+// lecturas normales, aunque se mantiene como respaldo durante la fase 2.
+export async function cloudFetchTs() {
+  if (!supabase) return _v1FetchTs()
+  try {
+    const { data, error } = await supabase.rpc('get_app_sync_state', { p_company_id: COMPANY_ID })
+    if (error) return _v1FetchTs()
+    const ts = data ? new Date(data).getTime() : 0
+    return { ok: true, ts: Number.isFinite(ts) ? ts : 0 }
+  } catch {
+    return _v1FetchTs()
+  }
+}
+
+function noteRemoteDelete(deleted, collection, id) {
+  if (!id) return
+  if (!deleted[collection]) deleted[collection] = []
+  deleted[collection].push(id)
+}
+
+// Fase 2: las tablas son la fuente principal de lectura. Cada fila normalizada
+// contiene tambien `data`, una copia JSON completa que evita perder metadatos.
+export async function cloudFetch(sinceTs = 0) {
+  if (!supabase) return _v1Fetch()
+  try {
+    const isPartial = Number(sinceTs) > 0
+    // Solape de un segundo para no perder dos commits dentro del mismo
+    // milisegundo al convertir timestamptz a Date de JavaScript.
+    const sinceIso = isPartial ? new Date(Math.max(0, Number(sinceTs) - 1000)).toISOString() : null
+    const tableQuery = table => {
+      let query = supabase.from(table).select('*').eq('company_id', COMPANY_ID)
+      if (sinceIso) query = query.gt('updated_at', sinceIso)
+      return query
+    }
+    let employeeQuery = tableQuery('employees')
+    if (!isPartial) employeeQuery = employeeQuery.order('name')
+    let entitiesQuery = supabase.from('app_entities')
+      .select('collection,entity_id,data,revision,deleted,updated_at')
+      .eq('company_id', COMPANY_ID)
+    if (sinceIso) entitiesQuery = entitiesQuery.gt('updated_at', sinceIso)
+    const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR] = await Promise.all([
+      employeeQuery,
+      fetchAllRecords(sinceIso),
+      tableQuery('vacaciones'),
+      tableQuery('cierres'),
+      tableQuery('obras'),
+      entitiesQuery,
+    ])
+    const responses = [empsR, recsR, vacsR, cierresR, obrasR, entitiesR]
+    if (responses.some(result => result.error) || (!isPartial && !empsR.data?.length)) return _v1Fetch()
+
+    const phase2Ready = [empsR.data, recsR.data, vacsR.data, cierresR.data, obrasR.data]
+      .every(rows => !rows?.length || Object.prototype.hasOwnProperty.call(rows[0], 'data'))
+    if (!phase2Ready) return _v1Fetch()
+
+    const deleted = {}
+    const entityData = isPartial
+      ? {}
+      : Object.fromEntries(ENTITY_COLLECTIONS.map(collection => [collection, []]))
+    if (!isPartial) for (const collection of SINGLETON_COLLECTIONS) entityData[collection] = {}
+
+    const grouped = new Map()
+    for (const row of (entitiesR.data ?? [])) {
+      if (row.deleted) {
+        if (ENTITY_COLLECTIONS.includes(row.collection)) noteRemoteDelete(deleted, row.collection, row.entity_id)
+        continue
+      }
+      if (!grouped.has(row.collection)) grouped.set(row.collection, [])
+      grouped.get(row.collection).push(row)
+    }
+    for (const collection of ENTITY_COLLECTIONS) {
+      const rows = grouped.get(collection)
+      if (!rows && isPartial) continue
+      entityData[collection] = (rows ?? []).map(row => ({
+        ...row.data,
+        _rev: row.revision ?? row.data?._rev,
+        _upd: row.updated_at ?? row.data?._upd,
+      }))
+    }
+    for (const collection of SINGLETON_COLLECTIONS) {
+      const row = grouped.get(collection)?.find(item => item.entity_id === '__singleton__')
+      if (row) entityData[collection] = row.data
+    }
+
+    const records = (recsR.data ?? []).filter(row => !row.deleted).map(fromRecord)
+    for (const row of (recsR.data ?? [])) if (row.deleted) noteRemoteDelete(deleted, 'records', row.id)
+    const vacaciones = (vacsR.data ?? []).filter(row => !row.deleted).map(fromVac)
+    for (const row of (vacsR.data ?? [])) if (row.deleted) noteRemoteDelete(deleted, 'vacaciones', row.id)
+    const cierres = (cierresR.data ?? []).filter(row => !row.deleted).map(fromCierre)
+    for (const row of (cierresR.data ?? [])) if (row.deleted) noteRemoteDelete(deleted, 'cierres', row.id)
+    const obras = (obrasR.data ?? []).filter(row => !row.deleted).map(fromObra)
+    for (const row of (obrasR.data ?? [])) if (row.deleted) noteRemoteDelete(deleted, 'obras', row.id)
+
+    return {
+      ok: true,
+      data: {
+        ...entityData,
+        employees: (empsR.data ?? []).map(fromEmployee),
+        records,
+        vacaciones,
+        cierres,
+        obras,
+        _deleted: deleted,
+        _partial: isPartial,
+        _ts: Date.now(),
+      },
+    }
+  } catch (error) {
+    console.warn('[v2] table-first fetch failed, fallback V1:', error.message)
+    return _v1Fetch()
+  }
+}
+
+async function cloudFetchLegacy() {
   if (!supabase) return _v1Fetch()
   try {
     const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR] = await Promise.all([

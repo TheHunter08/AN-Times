@@ -6,6 +6,7 @@ import { INITIAL_DB } from '../config/constants.js'
 const storedSes = (() => {
   try { return JSON.parse(localStorage.getItem('an_times_ses') || 'null') } catch { return null }
 })()
+const initialDb = loadLocal()
 
 // Detecta qué ids (o valores, en arrays de strings) desaparecieron respecto al
 // estado anterior — son eliminaciones intencionadas del usuario (borrar un
@@ -32,11 +33,11 @@ function _diffDeleted(before, partial) {
 
 export const useAppStore = create((set, get) => ({
   // ── DB ──────────────────────────────────────────────────────────────
-  db: loadLocal(),
+  db: initialDb,
   // Último updated_at conocido del servidor. SOLO se actualiza tras un fetchDB exitoso,
   // nunca por guardados locales — evita que db._ts (inflado por Date.now()) bloquee la
   // detección de cambios remotos en fetchDB y en el receptor de Realtime.
-  _serverTs: 0,
+  _serverTs: Number(initialDb?._serverTs) || 0,
 
   setDB: db => set({ db }),
 
@@ -134,11 +135,12 @@ export const useAppStore = create((set, get) => ({
         set({ syncStatus: 'synced', lastSyncTime: Date.now() })
         return
       }
-      const { ok, data, status } = await cloudFetch()
+      const { ok, data, status } = await cloudFetch(get()._serverTs)
       if (!ok) { set({ syncStatus: 'error', syncError: status }); return }
       if (!data) { set({ syncStatus: 'synced', lastSyncTime: Date.now() }); return }
       const merged = mergeDB(get().db, data)
       if (tsResult.ts && tsResult.ts > merged._ts) merged._ts = tsResult.ts
+      if (tsResult.ts) merged._serverTs = tsResult.ts
       saveLocal(merged)
       // Actualizar _serverTs con el updated_at real del servidor para que la
       // próxima comparación use un valor que no esté inflado por guardados locales.

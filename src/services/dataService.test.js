@@ -32,6 +32,31 @@ describe('tombstones: borrar una jornada no debe resucitar en el siguiente fetch
     const merged = mergeDB({ ...BASE }, { records: [rec] })
     expect(merged.records.some(r => r.id === 'r3')).toBe(true)
   })
+
+  it('un tombstone remoto elimina tambien la copia persistida en IndexedDB', () => {
+    const local = { ...BASE, records: [{ id: 'remote-deleted', inicio: '2026-07-09T08:00:00.000Z' }] }
+    const merged = mergeDB(local, { records: [], _deleted: { records: ['remote-deleted'] } })
+    expect(merged.records).toEqual([])
+  })
+
+  it('una descarga incremental actualiza filas sin borrar las no modificadas', () => {
+    const local = {
+      ...BASE,
+      employees: [{ id: 'e1', name: 'Ana' }, { id: 'e2', name: 'Luis' }],
+      obras: [{ id: 'o1', nombre: 'Norte' }, { id: 'o2', nombre: 'Sur' }],
+      monthSnapshots: { '2026-06': { total: 10 } },
+    }
+    const merged = mergeDB(local, {
+      _partial: true,
+      employees: [{ id: 'e1', name: 'Ana Maria', _upd: '2026-07-14T20:00:00Z' }],
+      obras: [{ id: 'o2', nombre: 'Sur actualizado', _upd: '2026-07-14T20:00:00Z' }],
+    })
+    expect(merged.employees.find(item => item.id === 'e1').name).toBe('Ana Maria')
+    expect(merged.employees.some(item => item.id === 'e2')).toBe(true)
+    expect(merged.obras.find(item => item.id === 'o2').nombre).toBe('Sur actualizado')
+    expect(merged.obras.some(item => item.id === 'o1')).toBe(true)
+    expect(merged.monthSnapshots).toEqual(local.monthSnapshots)
+  })
 })
 
 describe('cola offline', () => {

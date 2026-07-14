@@ -186,13 +186,29 @@ function _mergeRecords(base, incoming, tKey) {
 // ── mergeDB ───────────────────────────────────────────────────────────────────
 export function mergeDB(base, incoming) {
   if (!incoming) return { ...base }
+  // La fase 2 devuelve tombstones persistentes desde las tablas. Aplicarlos
+  // antes de las uniones evita que un elemento borrado en otro dispositivo
+  // reaparezca desde IndexedDB cuando el array remoto queda vacio.
+  if (incoming._deleted && typeof incoming._deleted === 'object') {
+    base = { ...base }
+    for (const [key, ids] of Object.entries(incoming._deleted)) {
+      if (!Array.isArray(base[key]) || !Array.isArray(ids) || !ids.length) continue
+      const deletedIds = new Set(ids.map(String))
+      base[key] = base[key].filter(item => {
+        const id = item && typeof item === 'object' ? item.id : item
+        return !deletedIds.has(String(id))
+      })
+    }
+  }
   const adm = base.employees?.find(e => e.isAdmin) || {
     id: 'admin', name: 'Administrador', empresa: base.empresas[0] || '',
     pin: '', color: '#5aa9e6', initials: 'AD',
     startDate: '2024-01-01', email: '', isAdmin: true
   }
   // Bug fix #7: no sobrescribir employees locales con array vacío (Supabase reset / rate-limit)
-  const _rawIncomingEmps = (incoming.employees?.length > 0) ? incoming.employees : base.employees
+  const _rawIncomingEmps = incoming._partial
+    ? _unionById(base.employees, incoming.employees, 'employees')
+    : ((incoming.employees?.length > 0) ? incoming.employees : base.employees)
   // Preservar campos que no existen en Supabase (onboardingDone, horasSemanales, etc.)
   const _baseEmpMap = new Map((base.employees || []).map(e => [e.id, e]))
   // Campos que la tabla Supabase employees NO almacena (solo en blob o local):
@@ -217,9 +233,9 @@ export function mergeDB(base, incoming) {
     Object.entries(_mergedNotis).filter(([, v]) => { const t = Date.parse(v); return isNaN(t) || t > _cutoff })
   )
   return {
-    empresas:            (incoming.empresas?.length)       ? incoming.empresas       : base.empresas,
-    obras:               (incoming.obras?.length)          ? incoming.obras          : base.obras,
-    centrosTrabajo:      (incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo,
+    empresas:            incoming._partial ? (incoming.empresas ?? base.empresas) : ((incoming.empresas?.length) ? incoming.empresas : base.empresas),
+    obras:               incoming._partial ? _unionById(base.obras, incoming.obras, 'obras') : ((incoming.obras?.length) ? incoming.obras : base.obras),
+    centrosTrabajo:      incoming._partial ? (incoming.centrosTrabajo ?? base.centrosTrabajo) : ((incoming.centrosTrabajo?.length) ? incoming.centrosTrabajo : base.centrosTrabajo),
     employees:           incomingEmps.some(e => e.isAdmin) ? incomingEmps            : [...incomingEmps, adm],
     records:             _mergeRecords(base.records, (incoming.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())), 'records'),
     vacaciones:          _unionById(base.vacaciones,          incoming.vacaciones,          'vacaciones'),
@@ -246,8 +262,8 @@ export function mergeDB(base, incoming) {
         return Object.keys(fix).length ? { ...c, ...fix } : c
       })
     })(),
-    monthSnapshots:      incoming.monthSnapshots       || {},
-    firmas:              incoming.firmas               || {},
+    monthSnapshots:      incoming.monthSnapshots       ?? base.monthSnapshots ?? {},
+    firmas:              incoming.firmas               ?? base.firmas ?? {},
     documentos:          _unionById(base.documentos,          incoming.documentos,          'documentos'),
     audit:               _unionById(base.audit,               incoming.audit,               'audit'),
     correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje, 'correccionesFichaje'),

@@ -28,8 +28,8 @@ const SB_H    = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': '
 const SB_H_RD = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
 const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-const ENTITY_COLLECTIONS = ['empresas','centrosTrabajo','medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
-const SINGLETON_COLLECTIONS = ['monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
+const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
+const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
 
 async function sb(path, method = 'GET', body = null, extraHeaders = {}) {
   const opts = { method, headers: { ...SB_H, ...extraHeaders, Prefer: 'return=minimal' } }
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       salida_time: e.salidaTime || null,
       telefono: e.telefono || null,
       baja: !!e.baja,
-      updated_at: new Date().toISOString(),
+      data: e, updated_at: e._upd || new Date().toISOString(),
     }))
     stats.employees = await upsert('employees', employees)
 
@@ -128,19 +128,20 @@ export default async function handler(req, res) {
       validado_by: r.validadoBy || null, validado_at: r.validadoAt || null,
       cerrado_por: r.cerradoPor || null, cerrado_por_id: r.cerradoPorId || null,
       cierre_manual: !!r.cierreManual, motivo_cierre: r.motivoCierre || null,
-      deleted: false, deleted_at: null,
+      data: r, deleted: false, deleted_at: null,
       updated_at: r._upd || new Date().toISOString(),
     }))
     stats.records = await upsert('records', records)
 
     // ── 5. Vacaciones / ausencias ────────────────────────────────────────
-    const vacaciones = (db.vacaciones || []).filter(v => v.id && v.empId && validEmpIds.has(v.empId) && v.fechaInicio && v.fechaFin).map(v => ({
+    const vacaciones = (db.vacaciones || []).filter(v => v.id && v.empId && validEmpIds.has(v.empId) && (v.fechaInicio || v.desde)).map(v => ({
       id: v.id, company_id: COMPANY_ID,
       emp_id: v.empId, emp_name: v.empName || null,
-      fecha_inicio: v.fechaInicio, fecha_fin: v.fechaFin,
+      fecha_inicio: v.fechaInicio || v.desde, fecha_fin: v.fechaFin || v.hasta || v.fechaInicio || v.desde,
       tipo: v.tipo || 'vacaciones', estado: v.estado || 'pendiente',
       motivo: v.motivo || null, resolucion: v.resolucion || null,
-      updated_at: new Date().toISOString(),
+      data: v, deleted: false, deleted_at: null,
+      updated_at: v._upd || new Date().toISOString(),
     }))
     stats.vacaciones = await upsert('vacaciones', vacaciones)
 
@@ -152,7 +153,8 @@ export default async function handler(req, res) {
       estado: c.estado || 'pendiente',
       firma_admin: c.firmaAdmin || null, firma_emp: c.firmaEmp || null,
       desactualizado: !!c.desactualizado,
-      updated_at: new Date().toISOString(),
+      data: c, deleted: false, deleted_at: null,
+      updated_at: c._upd || new Date().toISOString(),
     }))
     stats.cierres = await upsert('cierres', cierres)
 
@@ -161,6 +163,8 @@ export default async function handler(req, res) {
       id: o.id, company_id: COMPANY_ID, nombre: o.nombre,
       coords: o.coords || null, radio: o.radio || 200,
       activa: o.activa !== false,
+      data: o, deleted: false, deleted_at: null,
+      updated_at: o._upd || new Date().toISOString(),
     }))
     stats.obras = await upsert('obras', obras)
 

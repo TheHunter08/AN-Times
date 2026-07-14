@@ -1,6 +1,6 @@
 export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-export const ENTITY_COLLECTIONS = ['empresas','centrosTrabajo','medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
-export const SINGLETON_COLLECTIONS = ['monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
+export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
+export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
 
 export function entityRowId(collection, entityId) {
   return `${collection}:${entityId}`
@@ -30,7 +30,7 @@ export function toEmployeeRow(e, nowIso = new Date().toISOString()) {
     centro_trabajo: e.centroTrabajo ?? null,
     obras_asignadas: e.obrasAsignadas ?? [],
     reminder_time: e.reminderTime ?? '08:30', salida_time: e.salidaTime ?? null,
-    telefono: e.telefono ?? null, baja: !!e.baja, updated_at: nowIso,
+    telefono: e.telefono ?? null, baja: !!e.baja, data: e, updated_at: e._upd ?? nowIso,
   }
 }
 
@@ -46,17 +46,19 @@ export function toRecordRow(r, nowIso = new Date().toISOString()) {
     validado_by: r.validadoBy ?? null, validado_at: r.validadoAt ?? null,
     cerrado_por: r.cerradoPor ?? null, cerrado_por_id: r.cerradoPorId ?? null,
     cierre_manual: !!r.cierreManual, motivo_cierre: r.motivoCierre ?? null,
-    deleted: false, deleted_at: null,
+    data: r, deleted: false, deleted_at: null,
   }
 }
 
 export function toVacationRow(v, nowIso = new Date().toISOString()) {
+  const fechaInicio = v.fechaInicio ?? v.desde
+  const fechaFin = v.fechaFin ?? v.hasta ?? fechaInicio
   return {
     id: v.id, company_id: COMPANY_ID, emp_id: v.empId, emp_name: v.empName ?? null,
-    fecha_inicio: v.fechaInicio, fecha_fin: v.fechaFin,
+    fecha_inicio: fechaInicio, fecha_fin: fechaFin,
     tipo: v.tipo ?? 'vacaciones', estado: v.estado ?? 'pendiente',
     motivo: v.motivo ?? null, resolucion: v.resolucion ?? null,
-    updated_at: v._upd ?? nowIso,
+    data: v, deleted: false, deleted_at: null, updated_at: v._upd ?? nowIso,
   }
 }
 
@@ -69,14 +71,16 @@ export function toClosureRow(c, nowIso = new Date().toISOString()) {
     firma_admin: c.firmaAdmin ?? null,
     firma_emp: firmaVal ? JSON.stringify(firmaVal) : null,
     generado_por: c.generadoPor ?? null, generado_at: c.generadoAt ?? null,
-    desactualizado: !!c.desactualizado, updated_at: c._upd ?? nowIso,
+    desactualizado: !!c.desactualizado, data: c, deleted: false, deleted_at: null,
+    updated_at: c._upd ?? nowIso,
   }
 }
 
-export function toWorksiteRow(o) {
+export function toWorksiteRow(o, nowIso = new Date().toISOString()) {
   return {
     id: o.id, company_id: COMPANY_ID, nombre: o.nombre,
     coords: o.coords ?? null, radio: o.radio ?? 200, activa: o.activa !== false,
+    data: o, deleted: false, deleted_at: null, updated_at: o._upd ?? nowIso,
   }
 }
 
@@ -93,6 +97,8 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
   const cutoff = new Date(now - 48 * 60 * 60 * 1000).toISOString()
   const deletedRecords = new Set(deleted?.records ?? [])
   const deletedVacations = new Set(deleted?.vacaciones ?? [])
+  const deletedClosures = new Set(deleted?.cierres ?? [])
+  const deletedWorksites = new Set(deleted?.obras ?? [])
   const employees = (db.employees ?? []).filter(e => hasValue(e?.id) && hasValue(e?.name))
   const employeeIds = new Set(employees.map(e => e.id))
   const recentRecords = (db.records ?? []).filter(
@@ -105,12 +111,12 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
     !deletedVacations.has(v?.id) &&
     hasValue(v?.id) &&
     employeeIds.has(v?.empId) &&
-    isDateValue(v?.fechaInicio)
+    isDateValue(v?.fechaInicio ?? v?.desde)
   )
   const closures = (db.cierres ?? []).filter(c =>
-    hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
+    !deletedClosures.has(c?.id) && hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
   )
-  const worksites = (db.obras ?? []).filter(o => hasValue(o?.id) && hasValue(o?.nombre))
+  const worksites = (db.obras ?? []).filter(o => !deletedWorksites.has(o?.id) && hasValue(o?.id) && hasValue(o?.nombre))
 
   return {
     upserts: [
@@ -118,7 +124,7 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
       { table: 'records', rows: recentRecords.map(r => toRecordRow(r, nowIso)) },
       { table: 'vacaciones', rows: vacations.map(v => toVacationRow(v, nowIso)) },
       { table: 'cierres', rows: closures.map(c => toClosureRow(c, nowIso)) },
-      { table: 'obras', rows: worksites.map(toWorksiteRow) },
+      { table: 'obras', rows: worksites.map(o => toWorksiteRow(o, nowIso)) },
       { table: 'app_entities', rows: toEntityRows(db, nowIso) },
     ],
     skipped: {
@@ -130,9 +136,11 @@ export function buildTableSyncPlan(db, deleted, now = Date.now()) {
     },
     deletes: [
       { table: 'records', ids: [...deletedRecords], mode: 'soft_delete' },
-      { table: 'vacaciones', ids: [...deletedVacations], mode: 'delete' },
+      { table: 'vacaciones', ids: [...deletedVacations], mode: 'soft_delete' },
       { table: 'employees', ids: [...new Set(deleted?.employees ?? [])], mode: 'deactivate' },
-      { table: 'app_entities', ids: ENTITY_COLLECTIONS.flatMap(collection => [...new Set(deleted?.[collection] ?? [])].map(id => entityRowId(collection, id))), mode: 'delete' },
+      { table: 'cierres', ids: [...deletedClosures], mode: 'soft_delete' },
+      { table: 'obras', ids: [...deletedWorksites], mode: 'soft_delete' },
+      { table: 'app_entities', ids: ENTITY_COLLECTIONS.flatMap(collection => [...new Set(deleted?.[collection] ?? [])].map(id => entityRowId(collection, id))), mode: 'soft_delete' },
     ],
   }
 }

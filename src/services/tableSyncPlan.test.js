@@ -21,14 +21,16 @@ describe('plan de sincronización offline V2', () => {
     const plan = buildTableSyncPlan({
       records: [{ id: 'r1', empId: 'e1', inicio: '2026-07-13T08:00:00Z' }],
       vacaciones: [{ id: 'v1', empId: 'e1', fechaInicio: '2026-08-01', fechaFin: '2026-08-02' }],
-    }, { records: ['r1'], vacaciones: ['v1'], employees: ['e2'] }, now)
+    }, { records: ['r1'], vacaciones: ['v1'], cierres: ['c1'], obras: ['o1'], employees: ['e2'] }, now)
     expect(plan.upserts.find(op => op.table === 'records').rows).toHaveLength(0)
     expect(plan.upserts.find(op => op.table === 'vacaciones').rows).toHaveLength(0)
     expect(plan.deletes).toEqual([
       { table: 'records', ids: ['r1'], mode: 'soft_delete' },
-      { table: 'vacaciones', ids: ['v1'], mode: 'delete' },
+      { table: 'vacaciones', ids: ['v1'], mode: 'soft_delete' },
       { table: 'employees', ids: ['e2'], mode: 'deactivate' },
-      { table: 'app_entities', ids: [], mode: 'delete' },
+      { table: 'cierres', ids: ['c1'], mode: 'soft_delete' },
+      { table: 'obras', ids: ['o1'], mode: 'soft_delete' },
+      { table: 'app_entities', ids: [], mode: 'soft_delete' },
     ])
   })
 
@@ -50,8 +52,10 @@ describe('plan de sincronización offline V2', () => {
   })
 
   it('persiste revisión, operación id y metadatos del cierre en records', () => {
-    const row = toRecordRow({ id:'r1', empId:'e1', inicio:'2026-07-13T08:00:00Z', _rev:3, operationId:'11111111-1111-4111-8111-111111111111', validado:true, cierreManual:true, cerradoPor:'Ana', motivoCierre:'Olvido' })
+    const source = { id:'r1', empId:'e1', inicio:'2026-07-13T08:00:00Z', _rev:3, operationId:'11111111-1111-4111-8111-111111111111', validado:true, cierreManual:true, cerradoPor:'Ana', motivoCierre:'Olvido', campoLegacy:'preservado' }
+    const row = toRecordRow(source)
     expect(row).toMatchObject({ revision:3, operation_id:'11111111-1111-4111-8111-111111111111', validado:true, cierre_manual:true, cerrado_por:'Ana', motivo_cierre:'Olvido' })
+    expect(row.data).toEqual(source)
   })
 
   it('mantiene _upd en fichajes y vacaciones para resolver concurrencia', () => {
