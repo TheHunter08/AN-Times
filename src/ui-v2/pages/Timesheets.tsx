@@ -5,7 +5,10 @@ import { Table } from '../components/Table.js'
 import type { TableColumn } from '../components/Table.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
-import { IconEdit, IconX, IconCheck } from '../components/Icons.js'
+import { radius } from '../design-system/radius'
+import { IconEdit, IconX, IconCheck, IconDownload } from '../components/Icons.js'
+import { downloadXlsx, downloadCsv } from '../../utils/exportFiles.js'
+import { today } from '../../utils/time.js'
 
 export interface TimesheetRow {
   id: string
@@ -76,14 +79,25 @@ export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }:
     },
   ]
 
+  const exportHeaders = ['Empleado', 'Centro', 'Día', 'Entrada', 'Salida', 'Trabajo']
+  const exportRows = () => rows.map(r => [r.name, r.centro, r.day, r.entrada, r.salida, r.worked])
+  const exportBtnStyle = { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1100 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <PageTitle>Fichajes</PageTitle>
         <Search placeholder="Buscar empleado o centro…" value={search} onChange={e => onSearchChange(e.target.value)} />
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Badge tone="purple">{rows.length} registros</Badge>
+        <div style={{ flex: 1 }} />
+        <button type="button" style={exportBtnStyle} onClick={() => downloadXlsx(exportHeaders, exportRows(), `fichajes-${today()}.xlsx`)}>
+          <IconDownload width={13} height={13} /> Excel
+        </button>
+        <button type="button" style={exportBtnStyle} onClick={() => downloadCsv(exportHeaders, exportRows(), `fichajes-${today()}.csv`)}>
+          <IconDownload width={13} height={13} /> CSV
+        </button>
       </div>
       <Table columns={columns} rows={rows} rowKey={r => r.id} emptyLabel="Sin fichajes en este rango" />
     </div>

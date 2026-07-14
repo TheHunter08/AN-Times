@@ -41,7 +41,8 @@ import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataSer
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
 import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, isRecordMonthLocked, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
-import { downloadSimplePdf, downloadExcel } from '../utils/exportFiles.js'
+import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
+import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
 
 const PAGES = [
@@ -436,26 +437,21 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       const d = new Date(r.inicio)
       return d >= monday && d <= sunday
     })
-    const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas']]
-    weekRecs.forEach((r: any) => {
+    const rows = weekRecs.map((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
       const mins = Math.round(recWorkSecs(r) / 60)
-      rows.push([
+      // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
+      // guarda en UTC — un fichaje nocturno mostraba la fecha del día siguiente.
+      return [
         emp?.name || r.empName || '',
         r.centro || emp?.centroTrabajo || '',
-        (r.inicio || '').slice(0, 10),
+        localDateStr(new Date(r.inicio)),
         new Date(r.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         `${Math.floor(mins/60)}h${mins%60>0?Math.floor(mins%60)+'m':''}`,
-      ])
+      ]
     })
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url
-    a.download = `semana-${monday.toISOString().slice(0,10)}.csv`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    downloadCsv(['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas'], rows, `semana-${localDateStr(monday)}.csv`)
     toast(`CSV semana descargado — ${weekRecs.length} fichajes`, 3000, 'ok')
   }
 
@@ -1059,23 +1055,25 @@ function ReportsPage() {
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
-    const rows = [['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']]
-    recs.forEach((r: any) => {
+    const headers = ['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']
+    const rows = recs.map((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
       const mins = recWorkSecs(r) / 60
       const brk = Math.round((r.breakSecs || 0) / 60)
       const worked = Math.round(mins - brk)
-      rows.push([
+      // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
+      // guarda en UTC — un fichaje nocturno mostraba la fecha del día siguiente.
+      return [
         emp?.name || r.empName || r.empId || '',
         r.centro || emp?.centroTrabajo || '',
-        (r.inicio || '').slice(0, 10),
+        localDateStr(new Date(r.inicio)),
         new Date(r.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         `${Math.floor(worked / 60)}h ${worked % 60}m`,
         String(brk),
-      ])
+      ]
     })
-    downloadExcel(rows[0], rows.slice(1), `fichajes-${mes}.xls`)
+    downloadXlsx(headers, rows, `fichajes-${mes}.xlsx`, label)
     toast(`Excel descargado — ${label}`, 3000, 'ok')
   }
 
@@ -1090,7 +1088,9 @@ function ReportsPage() {
       const empRecs = recs.filter((r: any) => r.empId === e.id)
       const mins = empRecs.reduce((s: number, r: any) =>
         s + recWorkSecs(r) / 60, 0)
-      const days = new Set(empRecs.map((r: any) => (r.inicio || '').slice(0, 10))).size
+      // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
+      // guarda en UTC — un fichaje nocturno se contaba en el día siguiente.
+      const days = new Set(empRecs.map((r: any) => localDateStr(new Date(r.inicio)))).size
       const h = Math.floor(mins / 60), m = Math.floor(mins % 60)
       pdfLines.push(`${e.name} | ${e.centroTrabajo || e.dept || '-'} | ${days} dias | ${h}h ${m}m`)
     })
@@ -1106,7 +1106,9 @@ function ReportsPage() {
   const rows = useMemo(() => months.map((m) => {
     const [year, mon] = m.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-    const recs = (db.records || []).filter((r: any) => (r.inicio || '').startsWith(m) && r.fin)
+    // localMonthKey ya normaliza a mes local — evita el mismo bug UTC-vs-local
+    // que r.inicio?.startsWith(m) reproduciría con fichajes nocturnos.
+    const recs = (db.records || []).filter((r: any) => r.inicio && localMonthKey(r.inicio) === m && r.fin)
     const totalMins = recs.reduce((s: number, r: any) => {
       if (!r.inicio || !r.fin) return s
       return s + recWorkSecs(r) / 60
@@ -1131,7 +1133,9 @@ function StatsPage() {
   const { kpis, bars, centrosBars, donut, rawSlices } = useMemo(() => {
     const allRecs = (db.records || []).filter((r: any) => r.fin && r.inicio)
     const thisMonth = localMonthKey(new Date())
-    const monthRecs = allRecs.filter((r: any) => (r.inicio || '').startsWith(thisMonth))
+    // localMonthKey(r.inicio) (no r.inicio.startsWith(thisMonth)): inicio se
+    // guarda en UTC — evita atribuir un fichaje nocturno al mes siguiente.
+    const monthRecs = allRecs.filter((r: any) => localMonthKey(r.inicio) === thisMonth)
     const totalMins = monthRecs.reduce((s: number, r: any) => {
       return s + recWorkSecs(r) / 60
     }, 0)
@@ -1354,6 +1358,7 @@ function MonthlyClosePage() {
           generatedOn: fmtDate(c.ts || c.fecha),
           estado: c.estado || 'pendiente',
           records: dayRecs,
+          pdfData: c.pdfData || null,
         } as any
       })
   }, [db])
@@ -1398,6 +1403,17 @@ function MonthlyClosePage() {
     toast('Firma admin registrada', 2500, 'ok')
   }
 
+  const handleDownloadConsolidated = async (mes: string) => {
+    const cierresDelMes = (db.cierres || []).filter((c: any) => c.mes === mes)
+    if (!cierresDelMes.length) return
+    try {
+      const { dataUrl } = await buildCierreConsolidadoPDF({ cierres: cierresDelMes, mes, empresa: undefined })
+      downloadDataUrl(dataUrl, `cierre-consolidado-${mes}.pdf`)
+    } catch (e: any) {
+      toast(`No se pudo generar el PDF consolidado: ${e?.message || 'error'}`, 4500, 'warn')
+    }
+  }
+
   const handleDeleteClosure = (id: string) => {
     const closure = (db.cierres || []).find((c: any) => c.id === id)
     if (closure && (closure.firmaAdmin || closure.firmaEmp || closure.firma)) {
@@ -1412,7 +1428,7 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage() {
@@ -1444,17 +1460,11 @@ function AuditPage() {
     })), [db.audit])
 
   const handleExport = () => {
-    const csv = ['Fecha,Acción,Usuario,Detalle', ...entries.map((e: any) =>
-      `"${e.ts}","${e.action}","${e.user}","${e.detail}"`
-    )].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `auditoria-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    const rows = entries.map((e: any) => [
+      e.ts ? new Date(e.ts).toLocaleString('es-ES') : '',
+      e.action, e.user, e.detail,
+    ])
+    downloadCsv(['Fecha', 'Acción', 'Usuario', 'Detalle'], rows, `auditoria-${today()}.csv`)
     toast('Auditoría exportada', 2000, 'ok')
   }
 
@@ -1554,8 +1564,10 @@ function ObrasPage() {
         Array.isArray(e.obrasAsignadas) && e.obrasAsignadas.includes(o.id)
       )
       const assignedIds = new Set(assigned.map((e: any) => e.id))
+      // localDateStr(new Date(r.inicio)) (no r.inicio.startsWith(todayStr)): inicio
+      // se guarda en UTC — un fichaje nocturno no contaba como "hoy" en esta obra.
       const todayRecs = records.filter((r: any) =>
-        assignedIds.has(r.empId) && r.fin && (r.inicio || '').startsWith(todayStr)
+        assignedIds.has(r.empId) && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr
       )
       const todayMins = todayRecs.reduce((s: number, r: any) => {
         return s + recWorkSecs(r) / 60

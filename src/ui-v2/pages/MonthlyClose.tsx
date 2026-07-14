@@ -4,7 +4,7 @@ import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconDownload, IconCheck, IconChevronDown, IconX } from '../components/Icons.js'
-import { downloadSimplePdf, downloadExcel } from '../../utils/exportFiles.js'
+import { downloadSimplePdf, downloadXlsx, downloadDataUrl } from '../../utils/exportFiles.js'
 
 export interface ClosureItem {
   id: string
@@ -27,6 +27,9 @@ export interface ClosureItem {
   generatedOn: string
   estado: string
   records: Array<{ date: string; entry: string; exit: string; hours: string }>
+  // PDF oficial ya generado y firmado (data URL) — si existe, descargar ESTE
+  // documento (tiene firma + hash) en vez de regenerar uno en texto plano.
+  pdfData?: string | null
 }
 
 export interface MonthlyCloseProps {
@@ -35,6 +38,7 @@ export interface MonthlyCloseProps {
   onSignAdmin?: (id: string) => void
   onGenerateAll?: () => void
   onDelete?: (id: string) => void
+  onDownloadConsolidated?: (mes: string) => void
   canGenerate?: boolean
   generationHint?: string
 }
@@ -53,11 +57,22 @@ async function generatePDF(item: ClosureItem) {
   await downloadSimplePdf(`Cierre mensual - ${item.empName}`, lines, `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.pdf`)
 }
 
-function generateExcel(item: ClosureItem) {
-  downloadExcel(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xls`)
+// Si el cierre ya está firmado existe un PDF oficial (con firma + hash SHA-256)
+// generado en el momento de la firma — descargar ESE documento, nunca uno
+// regenerado, para no perder la firma ni invalidar el hash.
+function downloadPdf(item: ClosureItem) {
+  if (item.pdfData) {
+    downloadDataUrl(item.pdfData, `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.pdf`)
+    return
+  }
+  generatePDF(item)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, canGenerate = true, generationHint }: MonthlyCloseProps) {
+function generateExcel(item: ClosureItem) {
+  downloadXlsx(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`)
+}
+
+export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
 
@@ -92,6 +107,16 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
             </select>
             <IconChevronDown width={12} height={12} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: colors.text[500], pointerEvents: 'none' }} />
           </div>
+          {onDownloadConsolidated && (
+            <button
+              onClick={() => filtered[0] && onDownloadConsolidated(filtered[0].mes)}
+              disabled={monthFilter === 'all' || !filtered.length}
+              title={monthFilter === 'all' ? 'Selecciona un mes para generar el PDF consolidado' : `PDF consolidado de ${monthFilter}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: 'transparent', color: monthFilter === 'all' ? colors.text[400] : colors.text[700], fontSize: 12, fontWeight: 600, cursor: monthFilter === 'all' ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: monthFilter === 'all' ? .6 : 1 }}
+            >
+              <IconDownload width={13} height={13} /> PDF consolidado
+            </button>
+          )}
         </div>
       </div>
 
@@ -156,8 +181,8 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
 
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
-                  onClick={() => { onDownload ? onDownload(item.id) : generatePDF(item) }}
-                  title="Generar PDF"
+                  onClick={() => { onDownload ? onDownload(item.id) : downloadPdf(item) }}
+                  title={item.pdfData ? 'Descargar PDF firmado' : 'Generar PDF'}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
                 >
                   <IconDownload width={13} height={13} /> PDF
@@ -265,10 +290,10 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
             {/* Actions */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => generatePDF(detail)}
+                onClick={() => downloadPdf(detail)}
                 style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
-                <IconDownload width={14} height={14} /> Descargar PDF
+                <IconDownload width={14} height={14} /> {detail.pdfData ? 'Descargar PDF firmado' : 'Descargar PDF'}
               </button>
               <button onClick={() => generateExcel(detail)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Descargar Excel

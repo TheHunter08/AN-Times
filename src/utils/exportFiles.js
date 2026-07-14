@@ -19,10 +19,29 @@ export async function downloadSimplePdf(title, lines, filename) {
   downloadBlob(blob, filename.endsWith('.pdf') ? filename : `${filename}.pdf`)
 }
 
-export function downloadExcel(headers, rows, filename) {
-  const esc = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`
-  downloadBlob(new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename.endsWith('.xls') ? filename : `${filename}.xls`)
+// Genera un .xlsx real (no HTML disfrazado de .xls) \u2014 se descarga solo al
+// exportar, igual que el PDF, para no cargar la librer\u00eda al arrancar la app.
+export async function downloadXlsx(headers, rows, filename, sheetName) {
+  const writeXlsxFile = (await import('write-excel-file/browser')).default
+  const sheetData = [headers, ...rows].map(row => row.map(cell => ({ value: cell ?? '' })))
+  await writeXlsxFile(sheetData, { sheet: sheetName }).toFile(filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`)
+}
+
+export function downloadCsv(headers, rows, filename) {
+  const esc = value => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const csv = [headers, ...rows].map(row => row.map(esc).join(',')).join('\n')
+  downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }), filename.endsWith('.csv') ? filename : `${filename}.csv`)
+}
+
+// Descarga un PDF ya generado (data URL con firma/hash) sin regenerarlo —
+// usar siempre que exista un documento oficial ya firmado y guardado.
+export function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 function downloadBlob(blob, filename) {
