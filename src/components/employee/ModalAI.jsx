@@ -106,7 +106,7 @@ export function ModalAI({ visible, db, u, onClose }) {
             <div style={{ fontSize:15, fontWeight:800, letterSpacing:'-.3px', display:'flex', alignItems:'center', gap:6, color:colors.text[900] }}>
               Times AI
               {localAIState === 'ready' && (
-                <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`${colors.semantic.green}18`, color:colors.semantic.green, border:`1px solid ${colors.semantic.green}30` }}>IA OFFLINE</span>
+                <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.green} 9%, transparent)`, color:colors.semantic.green, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 19%, transparent)` }}>IA OFFLINE</span>
               )}
             </div>
             <div style={{ fontSize:11, color:colors.text[500] }}>Asistente de jornada · datos en vivo</div>
@@ -135,7 +135,7 @@ export function ModalAI({ visible, db, u, onClose }) {
           </div>
         )}
         {localAIState === 'error' && (
-          <div style={{ background:`${colors.semantic.orange}10`, border:`1px solid ${colors.semantic.orange}30`, borderRadius:radius.lg, padding:'10px 12px', marginBottom:12 }}>
+          <div style={{ background:`color-mix(in srgb, ${colors.semantic.orange} 6%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, borderRadius:radius.lg, padding:'10px 12px', marginBottom:12 }}>
             <div style={{ fontSize:11, color:colors.semantic.orange, marginBottom:4 }}>
               No se pudo cargar la IA local. Sigo respondiendo con el asistente estándar mientras tanto.
             </div>

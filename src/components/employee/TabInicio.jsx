@@ -137,8 +137,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
     : timer.state === 'break' ? colors.semantic.orange
     : colors.semantic.green
   const btnGlow = timer.state === 'idle' ? colors.primary.glow
-    : timer.state === 'break' ? `${colors.semantic.orange}50`
-    : `${colors.semantic.green}50`
+    : timer.state === 'break' ? `color-mix(in srgb, ${colors.semantic.orange} 31%, transparent)`
+    : `color-mix(in srgb, ${colors.semantic.green} 31%, transparent)`
 
   if (!db.records) return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -248,8 +248,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               width: '100%', padding: '10px 16px', marginBottom: 8,
               borderRadius: radius.lg, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              background: timer.state === 'break' ? `${colors.semantic.orange}15` : colors.bg[500],
-              border: `1px solid ${timer.state === 'break' ? `${colors.semantic.orange}40` : colors.border.default}`,
+              background: timer.state === 'break' ? `color-mix(in srgb, ${colors.semantic.orange} 8%, transparent)` : colors.bg[500],
+              border: `1px solid ${timer.state === 'break' ? `color-mix(in srgb, ${colors.semantic.orange} 25%, transparent)` : colors.border.default}`,
               color: timer.state === 'break' ? colors.semantic.orange : colors.text[700],
               transition: 'all .15s',
             }}>
@@ -275,7 +275,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
           {/* Break warn chip */}
           {timer.state === 'break' && brkMin > 20 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 12px', marginBottom: 8, borderRadius: radius.pill, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, fontSize: 12, fontWeight: 700, color: colors.semantic.orange }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 12px', marginBottom: 8, borderRadius: radius.pill, background: `color-mix(in srgb, ${colors.semantic.orange} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, fontSize: 12, fontWeight: 700, color: colors.semantic.orange }}>
               ⚠ {brkMin}min de descanso
             </div>
           )}
@@ -365,10 +365,10 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
             {streak > 0 && (
               <div style={{
-                flex: 1, background: colors.bg[600], border: `1px solid ${streak >= 7 ? `${colors.semantic.orange}30` : colors.border.subtle}`,
+                flex: 1, background: colors.bg[600], border: `1px solid ${streak >= 7 ? `color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)` : colors.border.subtle}`,
                 borderRadius: radius.xl, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <div style={{ width: 36, height: 36, borderRadius: radius.sm, background: streak >= 30 ? 'rgba(251,191,36,.15)' : streak >= 7 ? `${colors.semantic.orange}20` : `${colors.semantic.green}15`, border: `1px solid ${streak >= 30 ? 'rgba(251,191,36,.3)' : streak >= 7 ? `${colors.semantic.orange}40` : `${colors.semantic.green}30`}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 36, height: 36, borderRadius: radius.sm, background: streak >= 30 ? 'rgba(251,191,36,.15)' : streak >= 7 ? `color-mix(in srgb, ${colors.semantic.orange} 13%, transparent)` : `color-mix(in srgb, ${colors.semantic.green} 8%, transparent)`, border: `1px solid ${streak >= 30 ? 'rgba(251,191,36,.3)' : streak >= 7 ? `color-mix(in srgb, ${colors.semantic.orange} 25%, transparent)` : `color-mix(in srgb, ${colors.semantic.green} 19%, transparent)`}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {streak >= 30
                     ? <svg viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2" width="18" height="18"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     : streak >= 7
@@ -414,7 +414,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
         {/* ── Biometric offer ──────────────────────────────────────── */}
         {bioOfferVisible && (
-          <div style={{ margin: '0 16px', background: colors.bg[600], border: `1px solid ${colors.primary.base}30`, borderRadius: radius.xl, padding: '16px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ margin: '0 16px', background: colors.bg[600], border: `1px solid color-mix(in srgb, ${colors.primary.base} 19%, transparent)`, borderRadius: radius.xl, padding: '16px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: radius.lg, background: colors.primary.dim, border: `1px solid ${colors.primary.glow}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg viewBox="0 0 24 24" fill="none" stroke={colors.primary.light} strokeWidth="1.6" width="22" height="22">
                 <path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
@@ -448,8 +448,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
         {/* ── Pending docs ─────────────────────────────────────────── */}
         {pendingDocs.length > 0 && (
-          <div onClick={() => openModal('documentos')} style={{ margin: '0 16px', padding: '12px 14px', background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`, borderRadius: radius.lg, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: `${colors.semantic.orange}15`, border: `1px solid ${colors.semantic.orange}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div onClick={() => openModal('documentos')} style={{ margin: '0 16px', padding: '12px 14px', background: `color-mix(in srgb, ${colors.semantic.orange} 6%, transparent)`, border: `1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, borderRadius: radius.lg, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: `color-mix(in srgb, ${colors.semantic.orange} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg viewBox="0 0 24 24" fill="none" stroke={colors.semantic.orange} strokeWidth="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -464,7 +464,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
 
         {/* ── Auto-close warning ───────────────────────────────────── */}
         {showAutoCloseWarning && (
-          <div style={{ margin: '0 16px', padding: '12px 14px', background: `${colors.semantic.orange}10`, border: `1px solid ${colors.semantic.orange}30`, borderRadius: radius.lg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ margin: '0 16px', padding: '12px 14px', background: `color-mix(in srgb, ${colors.semantic.orange} 6%, transparent)`, border: `1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, borderRadius: radius.lg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: colors.semantic.orange, marginBottom: 3 }}>Jornada cerrada automáticamente</div>
@@ -481,8 +481,8 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
           <div style={{
             margin: '0 16px',
             padding: '12px 16px', borderRadius: radius.lg,
-            background: o.geoAlert ? `${colors.semantic.red}10` : gpsStatus === 'pending' ? `${colors.primary.base}10` : `${colors.semantic.green}10`,
-            border: `1px solid ${o.geoAlert ? `${colors.semantic.red}30` : gpsStatus === 'pending' ? `${colors.primary.base}20` : `${colors.semantic.green}25`}`,
+            background: o.geoAlert ? `color-mix(in srgb, ${colors.semantic.red} 6%, transparent)` : gpsStatus === 'pending' ? `color-mix(in srgb, ${colors.primary.base} 6%, transparent)` : `color-mix(in srgb, ${colors.semantic.green} 6%, transparent)`,
+            border: `1px solid ${o.geoAlert ? `color-mix(in srgb, ${colors.semantic.red} 19%, transparent)` : gpsStatus === 'pending' ? `color-mix(in srgb, ${colors.primary.base} 13%, transparent)` : `color-mix(in srgb, ${colors.semantic.green} 15%, transparent)`}`,
             display: 'flex', alignItems: 'flex-start', gap: 12,
           }}>
             <div style={{ width: 32, height: 32, borderRadius: radius.sm, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -550,11 +550,11 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: colors.text[700], textTransform: 'uppercase', letterSpacing: '.5px' }}>Mi equipo hoy</span>
-                  <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, background: `${colors.semantic.green}15`, color: colors.semantic.green, border: `1px solid ${colors.semantic.green}25` }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, background: `color-mix(in srgb, ${colors.semantic.green} 8%, transparent)`, color: colors.semantic.green, border: `1px solid color-mix(in srgb, ${colors.semantic.green} 15%, transparent)` }}>
                     {liveCount} activo{liveCount !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <button onClick={() => setShowParteVoz(true)} style={{ fontSize: 11, fontWeight: 700, color: colors.semantic.red, background: `${colors.semantic.red}10`, border: `1px solid ${colors.semantic.red}25`, borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit' }}>
+                <button onClick={() => setShowParteVoz(true)} style={{ fontSize: 11, fontWeight: 700, color: colors.semantic.red, background: `color-mix(in srgb, ${colors.semantic.red} 6%, transparent)`, border: `1px solid color-mix(in srgb, ${colors.semantic.red} 15%, transparent)`, borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit' }}>
                   🎙️ Parte de trabajo
                 </button>
               </div>
@@ -571,7 +571,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                   const avatarColor = colors.avatarPalette[(e.name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.avatarPalette.length]
                   return (
                     <div key={e.id} style={{
-                      background: colors.bg[600], border: `1px solid ${isWorking ? (openRec2?.enDescanso ? `${colors.semantic.orange}25` : `${colors.semantic.green}20`) : colors.border.subtle}`,
+                      background: colors.bg[600], border: `1px solid ${isWorking ? (openRec2?.enDescanso ? `color-mix(in srgb, ${colors.semantic.orange} 15%, transparent)` : `color-mix(in srgb, ${colors.semantic.green} 13%, transparent)`) : colors.border.subtle}`,
                       borderRadius: radius.xl, padding: '12px 14px',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: saveDB && (isWorking || !isDone) ? 10 : 0 }}>
@@ -590,7 +590,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
                             <button onClick={() => teamToggleDescanso(openRec2)} style={{ flex: 1, padding: '7px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: colors.bg[500], color: colors.text[700], fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                               {openRec2?.enDescanso ? '▶ Reanudar' : '⏸ Pausa'}
                             </button>
-                            <button onClick={() => teamForceClose(openRec2)} style={{ flex: 1, padding: '7px 12px', borderRadius: radius.md, border: `1px solid ${colors.semantic.red}30`, background: `${colors.semantic.red}10`, color: colors.semantic.red, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            <button onClick={() => teamForceClose(openRec2)} style={{ flex: 1, padding: '7px 12px', borderRadius: radius.md, border: `1px solid color-mix(in srgb, ${colors.semantic.red} 19%, transparent)`, background: `color-mix(in srgb, ${colors.semantic.red} 6%, transparent)`, color: colors.semantic.red, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                               ■ Finalizar
                             </button>
                           </div>

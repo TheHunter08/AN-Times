@@ -53,7 +53,7 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
         />
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
           {mensajes.map(m => (
-            <div key={'msg-'+m.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:colors.bg[600], border:`1px solid ${colors.primary.base}30`, borderLeft:`3px solid ${colors.primary.base}`, borderRadius:radius.lg }}>
+            <div key={'msg-'+m.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:colors.bg[600], border:`1px solid color-mix(in srgb, ${colors.primary.base} 19%, transparent)`, borderLeft:`3px solid ${colors.primary.base}`, borderRadius:radius.lg }}>
               <div style={{ width:36, height:36, borderRadius:radius.md, background:colors.primary.dim, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16 }}>📢</div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:colors.primary.light, marginBottom:2 }}>{m.title}</div>
@@ -65,7 +65,7 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u }) {
           {!notis.length && !mensajes.length ? (
             <div style={{ textAlign:'center', padding:'32px 0', color:colors.text[300], fontSize:13 }}>Sin notificaciones</div>
           ) : notis.map(n => (
-            <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:n.leido ? colors.bg[600] : `${colors.primary.base}08`, border:`1px solid ${n.leido ? colors.border.subtle : colors.primary.base+'25'}`, borderRadius:radius.lg, position:'relative' }}>
+            <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:n.leido ? colors.bg[600] : `color-mix(in srgb, ${colors.primary.base} 3%, transparent)`, border:`1px solid ${n.leido ? colors.border.subtle : `color-mix(in srgb, ${colors.primary.base} 15%, transparent)`}`, borderRadius:radius.lg, position:'relative' }}>
               <div style={{ width:36, height:36, borderRadius:radius.md, background:'rgba(108,99,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
               </div>

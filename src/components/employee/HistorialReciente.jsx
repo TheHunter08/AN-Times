@@ -31,7 +31,7 @@ export function HistorialReciente({ histWithRecs, openModal, u }) {
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                   <div style={{ fontSize:12, fontWeight:700, textTransform:'capitalize', color:colors.text[900] }}>{label}</div>
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    {isUnder && <span style={{ fontSize:9, fontWeight:700, color:colors.semantic.orange, background:`${colors.semantic.orange}12`, padding:'1px 5px', borderRadius:6 }}>↓ objetivo</span>}
+                    {isUnder && <span style={{ fontSize:9, fontWeight:700, color:colors.semantic.orange, background:`color-mix(in srgb, ${colors.semantic.orange} 7%, transparent)`, padding:'1px 5px', borderRadius:6 }}>↓ objetivo</span>}
                     <div style={{ fontSize:13, fontWeight:800, color: totalMin >= 480 ? colors.semantic.green : colors.primary.light, fontVariantNumeric:'tabular-nums' }}>{mhm(totalMin)}</div>
                   </div>
                 </div>
@@ -42,8 +42,8 @@ export function HistorialReciente({ histWithRecs, openModal, u }) {
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:colors.text[500], gap:8, flexWrap:'wrap' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                           <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
-                          {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`${colors.semantic.orange}12`, color:colors.semantic.orange, border:`1px solid ${colors.semantic.orange}30`, textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
-                          {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`${colors.semantic.green}12`, color:colors.semantic.green, border:`1px solid ${colors.semantic.green}30`, textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                          {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.orange} 7%, transparent)`, color:colors.semantic.orange, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
+                          {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.green} 7%, transparent)`, color:colors.semantic.green, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
                         </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                           <span style={{ fontWeight:600 }}>{mhm(wm)}</span>

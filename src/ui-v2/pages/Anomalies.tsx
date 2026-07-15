@@ -103,7 +103,7 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
             <div key={item.id} style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: radius.md,
               background: item.resolved ? 'transparent' : colors.bg[700],
-              border: `1px solid ${item.resolved ? colors.border.subtle : sev.color + '33'}`,
+              border: `1px solid ${item.resolved ? colors.border.subtle : `color-mix(in srgb, ${sev.color} 20%, transparent)`}`,
               opacity: item.resolved ? .55 : 1,
             }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: radius.sm, background: sev.bg, color: sev.color, flexShrink: 0 }}>

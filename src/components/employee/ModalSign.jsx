@@ -52,7 +52,7 @@ export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
             <div style={{ fontSize:11, color:colors.text[500], textAlign:'center', marginBottom:16 }}>
               Firma guardada — {existingFirma.updatedAt ? new Date(existingFirma.updatedAt).toLocaleDateString('es-ES') : ''}
             </div>
-            <div style={{ background:`${colors.semantic.green}15`, border:`1px solid ${colors.semantic.green}30`, borderRadius:radius.md, padding:'10px 14px', marginBottom:16, fontSize:12, color:colors.semantic.green }}>
+            <div style={{ background:`color-mix(in srgb, ${colors.semantic.green} 8%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 19%, transparent)`, borderRadius:radius.md, padding:'10px 14px', marginBottom:16, fontSize:12, color:colors.semantic.green }}>
               Esta firma se aplicará automáticamente al firmar documentos y jornadas mensuales.
             </div>
             <div style={BTN_ROW}>

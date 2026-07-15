@@ -5,9 +5,8 @@ import { pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { TextField } from '../../ui-v2/components/FormField.js'
 
-const LBL = { fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'block' }
-const INP = { background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.md, padding:'10px 12px', fontSize:13, color:colors.text[900], fontFamily:'inherit', outline:'none', width:'100%', boxSizing:'border-box' }
 const btnPrimary = { padding:'12px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
 const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
 const btnSmSec = { padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
@@ -81,7 +80,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
               <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>Recibe alertas de jornadas largas, vacaciones aprobadas y comunicados del administrador.</div>
             </div>
             {notifGranted ? (
-              <div style={{ background:`${colors.semantic.green}12`, border:`1px solid ${colors.semantic.green}25`, borderRadius:radius.lg, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+              <div style={{ background:`color-mix(in srgb, ${colors.semantic.green} 7%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 15%, transparent)`, borderRadius:radius.lg, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
                 <span style={{ fontSize:20 }}>✅</span>
                 <span style={{ fontSize:13, color:colors.semantic.green, fontWeight:600 }}>Notificaciones activadas</span>
               </div>
@@ -120,10 +119,11 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
               <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:6 }}>Recordatorio diario</div>
               <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>Te avisaremos a esta hora si no has fichado entrada hoy. Podrás cambiarlo desde Configuración.</div>
             </div>
-            <div style={{ marginBottom:20 }}>
-              <label style={LBL}>Hora del recordatorio</label>
-              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} style={{ ...INP, fontSize:20, fontWeight:700, textAlign:'center', letterSpacing:2 }} />
-            </div>
+            <TextField
+              label="Hora del recordatorio" type="time" value={reminderTime}
+              onChange={e => setReminderTime(e.target.value)}
+              style={{ fontSize:20, fontWeight:700, textAlign:'center', letterSpacing:2 }}
+            />
             <button style={{ ...btnPrimary, width:'100%' }} onClick={finish}>
               ✅ Finalizar — Empezar a usar la app
             </button>

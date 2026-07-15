@@ -30,7 +30,7 @@ type PlanStatus = PlanCell['status']
 const cellDef: Record<PlanStatus, { bg: string; color: string; border: string }> = {
   ok:      { bg: 'rgba(16,185,129,.14)',  color: colors.semantic.green, border: 'rgba(16,185,129,.35)' },
   live:    { bg: 'rgba(16,185,129,.26)',  color: '#34D399', border: '#34D399' },
-  turno:   { bg: colors.primary.dim,      color: colors.primary.light, border: colors.primary.base + '55' },
+  turno:   { bg: colors.primary.dim,      color: colors.primary.light, border: `color-mix(in srgb, ${colors.primary.base} 33%, transparent)` },
   absent:  { bg: 'rgba(239,68,68,.12)',   color: colors.semantic.red, border: 'rgba(239,68,68,.3)' },
   vac:     { bg: colors.accent.dim,       color: colors.accent.base, border: colors.border.default },
   weekend: { bg: 'rgba(var(--uiv2-overlay-rgb),.03)', color: colors.text[300], border: colors.border.subtle },

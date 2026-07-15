@@ -28,7 +28,7 @@ export function WeeklyBars({ db, u, timer }) {
           <div key={label} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', gap:4, height:'100%' }}>
             <div style={{
               width:'100%', borderRadius:`${radius.sm} ${radius.sm} 0 0`,
-              background: isToday ? colors.primary.base : `${colors.primary.base}50`,
+              background: isToday ? colors.primary.base : `color-mix(in srgb, ${colors.primary.base} 31%, transparent)`,
               height: min > 0 ? `${Math.max(8, min / maxMin * 100)}%` : 3,
               opacity: min > 0 ? 1 : 0.3,
               transition: 'height .3s ease',

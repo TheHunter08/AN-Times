@@ -82,8 +82,8 @@ export function AchievementsSection({ myRecs, streak, u, saveDB, db }) {
           const ok = unlocked.has(a.id)
           return (
             <div key={a.id} title={a.desc} style={{
-              background: ok ? `${colors.primary.base}12` : colors.bg[600],
-              border: `1px solid ${ok ? colors.primary.base+'30' : colors.border.subtle}`,
+              background: ok ? `color-mix(in srgb, ${colors.primary.base} 7%, transparent)` : colors.bg[600],
+              border: `1px solid ${ok ? `color-mix(in srgb, ${colors.primary.base} 19%, transparent)` : colors.border.subtle}`,
               borderRadius:radius.xl, padding:'10px 6px', textAlign:'center',
               opacity: ok ? 1 : 0.5, transition:'all .2s',
             }}>

@@ -59,8 +59,8 @@ export function PomodoroWidget() {
 
   return (
     <div style={{
-      background: isBreak ? `${colors.semantic.green}08` : colors.bg[600],
-      border:`1px solid ${isBreak ? colors.semantic.green+'25' : colors.border.subtle}`,
+      background: isBreak ? `color-mix(in srgb, ${colors.semantic.green} 3%, transparent)` : colors.bg[600],
+      border:`1px solid ${isBreak ? `color-mix(in srgb, ${colors.semantic.green} 15%, transparent)` : colors.border.subtle}`,
       borderRadius:radius.xl, padding:'12px 14px',
     }}>
       {/* Header */}
@@ -70,7 +70,7 @@ export function PomodoroWidget() {
         </span>
         <div style={{ display:'flex', gap:4, alignItems:'center' }}>
           {count > 0 && (
-            <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:10, background:`${colors.primary.base}15`, color:colors.primary.light, border:`1px solid ${colors.primary.base}25` }}>×{count}</span>
+            <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:10, background:`color-mix(in srgb, ${colors.primary.base} 8%, transparent)`, color:colors.primary.light, border:`1px solid color-mix(in srgb, ${colors.primary.base} 15%, transparent)` }}>×{count}</span>
           )}
           <button onClick={() => { reset(); setOpen(false) }} style={{ background:'none', border:'none', color:colors.text[500], fontSize:18, cursor:'pointer', lineHeight:1, padding:'2px 4px', fontFamily:'inherit' }}>×</button>
         </div>

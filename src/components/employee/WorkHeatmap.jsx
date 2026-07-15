@@ -35,10 +35,10 @@ export function WorkHeatmap({ records, empId }) {
   const cellColor = (mins, future) => {
     if (future) return 'transparent'
     if (mins === 0) return colors.bg[500]
-    if (mins < 120) return `${colors.primary.base}28`
-    if (mins < 300) return `${colors.primary.base}55`
-    if (mins < 450) return `${colors.primary.base}80`
-    return `${colors.primary.base}f0`
+    if (mins < 120) return `color-mix(in srgb, ${colors.primary.base} 16%, transparent)`
+    if (mins < 300) return `color-mix(in srgb, ${colors.primary.base} 33%, transparent)`
+    if (mins < 450) return `color-mix(in srgb, ${colors.primary.base} 50%, transparent)`
+    return `color-mix(in srgb, ${colors.primary.base} 94%, transparent)`
   }
 
   const cell = { width:10, height:10, borderRadius:radius.xs || 2 }

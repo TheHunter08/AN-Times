@@ -190,7 +190,7 @@ export function Login({
                         transition: 'all .15s',
                         background: selectedEmpId === e.id ? colors.primary.dim : colors.bg[600],
                         color: selectedEmpId === e.id ? colors.primary.light : colors.text[700],
-                        outline: selectedEmpId === e.id ? `1.5px solid ${colors.primary.base}55` : 'none',
+                        outline: selectedEmpId === e.id ? `1.5px solid color-mix(in srgb, ${colors.primary.base} 33%, transparent)` : 'none',
                       }}
                     >
                       <span style={{
@@ -198,7 +198,7 @@ export function Login({
                         background: selectedEmpId === e.id ? colors.primary.base : colors.bg[500],
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 9.5, fontWeight: 800, color: selectedEmpId === e.id ? '#fff' : colors.text[600],
-                        border: `1px solid ${selectedEmpId === e.id ? colors.primary.base + '60' : colors.border.subtle}`,
+                        border: `1px solid ${selectedEmpId === e.id ? `color-mix(in srgb, ${colors.primary.base} 38%, transparent)` : colors.border.subtle}`,
                       }}>
                         {e.name.slice(0,1).toUpperCase()}
                       </span>
@@ -224,7 +224,7 @@ export function Login({
                           width: 13, height: 13, borderRadius: '50%',
                           border: `2px solid ${filled ? colors.primary.base : colors.border.default}`,
                           background: filled ? colors.primary.base : 'transparent',
-                          boxShadow: filled ? `0 0 8px ${colors.primary.base}70` : 'none',
+                          boxShadow: filled ? `0 0 8px color-mix(in srgb, ${colors.primary.base} 44%, transparent)` : 'none',
                           transition: 'all .15s',
                         }}
                       />

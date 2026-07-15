@@ -91,7 +91,7 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
                   return (
                     <td key={di} style={{ padding: '6px 4px', textAlign: 'center', borderBottom: `1px solid ${colors.border.subtle}` }}>
                       {s ? (
-                        <div style={{ padding: '6px 4px', borderRadius: radius.sm, background: s.bg, border: `1px solid ${s.color}44`, cursor: 'default' }}>
+                        <div style={{ padding: '6px 4px', borderRadius: radius.sm, background: s.bg, border: `1px solid color-mix(in srgb, ${s.color} 27%, transparent)`, cursor: 'default' }}>
                           {cell.start && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 10.5, color: s.color, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                               <IconClock width={10} height={10} />
@@ -129,7 +129,7 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
                 return (
                   <div key={di} className="uiv2-shift-day">
                     <span>{DAY_NAMES[di]}</span>
-                    <strong style={s ? { background: s.bg, color: s.color, borderColor: `${s.color}44` } : undefined}>
+                    <strong style={s ? { background: s.bg, color: s.color, borderColor: `color-mix(in srgb, ${s.color} 27%, transparent)` } : undefined}>
                       {s ? (cell.start ? `${cell.start}${cell.end ? `–${cell.end}` : ''}` : s.label) : 'Sin turno'}
                     </strong>
                   </div>

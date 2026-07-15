@@ -203,18 +203,22 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
       <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
         {!n.read && (
           <button
+            type="button"
             className="uiv2-notif-read-btn"
             onClick={() => onMarkRead?.(n.id)}
             title="Marcar como leída"
+            aria-label="Marcar como leída"
             style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(16,185,129,.1)', color: colors.semantic.green, cursor: 'pointer', transition: 'background .15s' }}
           >
             <IconCheck width={13} height={13} />
           </button>
         )}
         <button
+          type="button"
           className="uiv2-notif-dismiss-btn"
           onClick={() => onDismiss?.(n.id)}
           title="Descartar"
+          aria-label="Descartar notificación"
           style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[400], cursor: 'pointer', transition: 'all .15s' }}
         >
           <IconX width={13} height={13} />
