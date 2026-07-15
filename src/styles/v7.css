@@ -220,6 +220,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #sEmp .employee-shifts-v2 {
   position:relative;
   isolation:isolate;
+  overflow:hidden;
 }
 #sEmp .employee-calendar-v2::before,
 #sEmp .employee-vacations-v2::before,

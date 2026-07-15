@@ -655,7 +655,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* Tab pages */
 .emp-tab {
   position: absolute; inset: 0; display: none; flex-direction: column;
-  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
   touch-action: pan-y;
   transform: translateZ(0); /* iOS PWA: capa composita propia — evita scroll congelado tras re-renders */
   /* deja espacio para la nav flotante */
