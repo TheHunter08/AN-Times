@@ -165,7 +165,7 @@ function RequestCard({ row }: { row: RequestRow }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 14, fontWeight: 800, color: colors.text[900], letterSpacing: '-.2px' }}>{row.type}</span>
-          {row.days && (
+          {!!row.days && (
             <span style={{ fontSize: 11, fontWeight: 600, color: tc.color, background: tc.bg, padding: '2px 7px', borderRadius: radius.pill }}>
               {row.days} {row.days === 1 ? 'día' : 'días'}
             </span>

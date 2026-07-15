@@ -1,6 +1,5 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { Avatar } from '../components/Avatar.js'
-import { useEffect } from 'react'
 import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { Search } from '../components/Search.js'
@@ -17,7 +16,6 @@ export interface AnomalyItem {
   date: string
   severity: 'alta' | 'media' | 'baja'
   resolved: boolean
-  onResolve?: (id: string) => void
 }
 
 export interface AnomaliesProps {
@@ -40,9 +38,20 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
   const [search, setSearch] = useState('')
   const [showResolved, setShowResolved] = useState(false)
   const [localItems, setLocalItems] = useState(items)
-  useEffect(() => setLocalItems(items), [items])
+  // Resueltas de forma optimista, hasta que items (prop) confirme el cambio
+  // — igual que ValidateHours: sin esto, un refresh del store antes de que
+  // el backend confirme podía "des-resolver" visualmente una anomalía.
+  const resolvedIds = useRef(new Set<string>())
+  useEffect(() => {
+    setLocalItems(items.map(i => resolvedIds.current.has(i.id) ? { ...i, resolved: true } : i))
+    resolvedIds.current.forEach(id => {
+      const match = items.find(i => i.id === id)
+      if (match?.resolved) resolvedIds.current.delete(id)
+    })
+  }, [items])
 
   const handleResolve = (id: string) => {
+    resolvedIds.current.add(id)
     setLocalItems(prev => prev.map(i => i.id === id ? { ...i, resolved: true } : i))
     onResolve?.(id)
   }

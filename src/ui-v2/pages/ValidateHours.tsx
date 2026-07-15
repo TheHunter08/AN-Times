@@ -50,23 +50,32 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
   const editedRows = useRef(new Map<string, { entry: string; exit: string }>())
+  // Filas borradas de forma optimista, hasta que rows (prop) confirme que ya
+  // no existen — sin esto, un refresh no relacionado del store podía traer
+  // de vuelta una fila ya eliminada localmente, antes de que el backend
+  // confirmara el borrado.
+  const deletedIds = useRef(new Set<string>())
   const isMobile = useIsMobile()
 
   // Keep the optimistic decision visible while the store/Supabase round-trip
   // finishes. A parent refresh can briefly contain the old pending row; in
   // that case replacing localRows made the card jump back to the first state.
   useEffect(() => {
-    setLocalRows(prev => rows.map(row => {
-      const current = prev.find(item => item.id === row.id)
-      const edited = editedRows.current.get(row.id)
-      if (edited && row.entry === edited.entry && row.exit === edited.exit) editedRows.current.delete(row.id)
-      if (edited && (row.entry !== edited.entry || row.exit !== edited.exit)) {
-        return { ...row, entry: edited.entry, exit: edited.exit, status: current?.status === 'rejected' ? current.status : 'approved' }
-      }
-      return current && current.status !== 'pending' && row.status === 'pending'
-        ? { ...row, status: current.status, entry: current.entry, exit: current.exit }
-        : row
-    }))
+    setLocalRows(prev => rows
+      .filter(row => !deletedIds.current.has(row.id))
+      .map(row => {
+        const current = prev.find(item => item.id === row.id)
+        const edited = editedRows.current.get(row.id)
+        if (edited && row.entry === edited.entry && row.exit === edited.exit) editedRows.current.delete(row.id)
+        if (edited && (row.entry !== edited.entry || row.exit !== edited.exit)) {
+          return { ...row, entry: edited.entry, exit: edited.exit, status: current?.status === 'rejected' ? current.status : 'approved' }
+        }
+        return current && current.status !== 'pending' && row.status === 'pending'
+          ? { ...row, status: current.status, entry: current.entry, exit: current.exit }
+          : row
+      }))
+    const stillPresent = new Set(rows.map(r => r.id))
+    deletedIds.current.forEach(id => { if (!stillPresent.has(id)) deletedIds.current.delete(id) })
   }, [rows])
 
   const handleApprove = (id: string) => {
@@ -92,6 +101,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
   const handleDelete = (id: string) => {
     if (!window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return
     editedRows.current.delete(id)
+    deletedIds.current.add(id)
     setLocalRows(prev => prev.filter(row => row.id !== id))
     onDelete?.(id)
   }
@@ -289,11 +299,11 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Entrada</div>
-                <input type="time" value={editEntry} onChange={e => setEditEntry(e.target.value)} style={inputStyle} />
+                <input type="time" value={editEntry} onChange={e => setEditEntry(e.target.value)} aria-label="Hora de entrada" style={inputStyle} />
               </div>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Salida</div>
-                <input type="time" value={editExit} onChange={e => setEditExit(e.target.value)} style={inputStyle} />
+                <input type="time" value={editExit} onChange={e => setEditExit(e.target.value)} aria-label="Hora de salida" style={inputStyle} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>

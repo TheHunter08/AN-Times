@@ -32,12 +32,15 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
     return () => window.clearInterval(timer)
   }, [])
 
-  const working = rows.filter(row => !row.onBreak).length
   const locations = [...new Set(rows.map(row => row.location).filter(Boolean))].sort()
   const visibleRows = rows.filter(row =>
     (location === 'all' || row.location === location) &&
     `${row.name} ${row.location}`.toLocaleLowerCase('es').includes(search.trim().toLocaleLowerCase('es'))
   )
+  // Sobre visibleRows, no rows: si se filtra por obra/búsqueda, los KPI deben
+  // reflejar el subconjunto visible, no el total global (confuso — parecía
+  // que el filtro no funcionaba).
+  const working = visibleRows.filter(row => !row.onBreak).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -48,7 +51,7 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
         <Card padding={4} style={{ minHeight: 86 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: colors.semantic.green }}><IconUsers width={18} height={18} /><strong style={{ fontSize: 24 }}>{rows.length}</strong></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: colors.semantic.green }}><IconUsers width={18} height={18} /><strong style={{ fontSize: 24 }}>{visibleRows.length}</strong></div>
           <div style={{ marginTop: 7, fontSize: 12, color: colors.text[500] }}>Fichajes activos</div>
         </Card>
         <Card padding={4} style={{ minHeight: 86 }}>
@@ -69,8 +72,8 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
 
       {rows.length > 0 && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar empleado…" style={{ flex: '1 1 220px', minHeight: 38, borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], padding: '7px 11px', fontFamily: 'inherit' }} />
-          <select value={location} onChange={event => setLocation(event.target.value)} style={{ minHeight: 38, borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], padding: '7px 11px', fontFamily: 'inherit' }}>
+          <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar empleado…" aria-label="Buscar empleado" style={{ flex: '1 1 220px', minHeight: 38, borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], padding: '7px 11px', fontFamily: 'inherit' }} />
+          <select value={location} onChange={event => setLocation(event.target.value)} aria-label="Filtrar por obra o centro de trabajo" style={{ minHeight: 38, borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[900], padding: '7px 11px', fontFamily: 'inherit' }}>
             <option value="all">Todas las obras y centros</option>
             {locations.map(item => <option key={item} value={item}>{item}</option>)}
           </select>

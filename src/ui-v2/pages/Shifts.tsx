@@ -40,11 +40,11 @@ export function Shifts({ weekLabel, employees, onPrev, onNext, onToday }: Shifts
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <PageTitle>Turnos</PageTitle>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={onPrev} style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
+          <button type="button" onClick={onPrev} aria-label="Semana anterior" style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
             <IconArrowLeft width={15} height={15} />
           </button>
           <span style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], minWidth: 150, textAlign: 'center' }}>{weekLabel}</span>
-          <button onClick={onNext} style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
+          <button type="button" onClick={onNext} aria-label="Semana siguiente" style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
             <IconArrowRight width={15} height={15} />
           </button>
           <button onClick={onToday} style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: colors.bg[500], color: colors.text[700], fontSize: 12, fontWeight: 640, cursor: 'pointer', fontFamily: 'inherit' }}>
