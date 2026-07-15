@@ -1163,46 +1163,6 @@ export default function EmployeePage() {
                   ) : undefined}
                 />
               </div>
-              {false && weekPlanningData && (
-                <div style={{ padding: '0 20px 20px' }}>
-                  <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 16px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" strokeWidth="2" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal del equipo</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
-                    </div>
-                    <div className="emp-planning-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table className="emp-planning-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                        <thead>
-                          <tr>
-                            <th style={{ padding: '8px 14px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)', position: 'sticky', left: 0, background: 'var(--bg-700)', zIndex: 1 }}>Empleado</th>
-                            {weekPlanningData.days.map(d => (
-                              <th key={d.dateStr} style={{ padding: '8px 6px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 44 }}>{d.label}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {weekPlanningData.members.map((m, mi) => (
-                            <tr key={m.id} style={{ borderTop: mi > 0 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
-                              <td style={{ padding: '8px 14px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg-700)', zIndex: 1 }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 9, fontWeight: 800, marginRight: 7 }}>{m.initials}</span>
-                                {m.name.split(' ')[0]}
-                              </td>
-                              {m.days.map((d, di) => (
-                                <td key={di} style={{ padding: '6px 4px', textAlign: 'center' }}>
-                                  {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 14 }}>●</span>
-                                    : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(177,138,82,.7)', fontSize: 10, fontWeight: 700 }}>{d.hours || '✓'}</span>
-                                    : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 12 }}>—</span>}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
@@ -1383,46 +1343,6 @@ export default function EmployeePage() {
                 ) : undefined}
               />
             </div>
-            {false && weekPlanningData && (
-              <div style={{ padding: '0 16px 16px' }}>
-                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 12px', background: 'rgba(177,138,82,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ display:'flex', color:'var(--primary-light)' }}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-light)' }}>Planning semanal</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text4)' }}>{weekPlanningData.members.length} miembros</span>
-                  </div>
-                  <div className="emp-planning-wrap" style={{ overflowX: 'auto' }}>
-                    <table className="emp-planning-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text4)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,.06)' }}>Empleado</th>
-                          {weekPlanningData.days.map(d => (
-                            <th key={d.dateStr} style={{ padding: '6px 4px', textAlign: 'center', color: d.isToday ? 'var(--primary-light)' : d.isWeekend ? 'var(--text5)' : 'var(--text4)', fontWeight: d.isToday ? 800 : 600, borderBottom: '1px solid rgba(255,255,255,.06)', minWidth: 32 }}>{d.label}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {weekPlanningData.members.map((m, mi) => (
-                          <tr key={m.id} style={{ borderTop: mi > 0 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
-                            <td style={{ padding: '6px 10px', color: 'var(--text1)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 8, fontWeight: 800, marginRight: 6 }}>{m.initials}</span>
-                              {m.name.split(' ')[0]}
-                            </td>
-                            {m.days.map((d, di) => (
-                              <td key={di} style={{ padding: '5px 3px', textAlign: 'center' }}>
-                                {d.status === 'active' ? <span title="Trabajando ahora" style={{ color: 'var(--green)', fontSize: 12 }}>●</span>
-                                  : d.status === 'done' ? <span title={d.hours} style={{ color: 'rgba(177,138,82,.7)', fontSize: 9, fontWeight: 700 }}>{d.hours || '✓'}</span>
-                                  : <span style={{ color: 'rgba(255,255,255,.1)', fontSize: 10 }}>—</span>}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
         {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}

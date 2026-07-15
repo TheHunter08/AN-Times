@@ -1,7 +1,7 @@
 ﻿import { useState, useMemo } from 'react'
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
 import { useRef } from 'react'
-import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
+import { WK, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
 
 const colors = {
@@ -108,7 +108,11 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
     if (medDays.has(ds)) return 'medical'
     if (absDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
-    const wdEfectivo = db.config?.wdMin || WD
+    // (u.horasSemanales || WK/60) / 5, no db.config?.wdMin: la jornada de "Inicio"
+    // (EmployeePage.jsx) ya usa las horas contratadas del propio empleado, no el
+    // estándar global — un empleado con jornada reducida veía su día en
+    // "Parcial" aunque ya hubiera cumplido su horario real.
+    const wdEfectivo = Math.round(((u.horasSemanales || WK / 60) * 60) / 5)
     if (mins >= wdEfectivo * 0.9) return 'complete'
     if (mins > 0) return 'pending'
     if (ds < todayStr) return 'missing'

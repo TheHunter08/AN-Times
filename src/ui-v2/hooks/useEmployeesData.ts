@@ -44,12 +44,16 @@ export function useEmployeesData() {
     let status: EmployeeRow['status'] = 'off'
     if (liveRec) status = liveRec.enDescanso ? 'break' : 'active'
 
+    // e.role || isEnc/isJO (no solo e.role): algunos empleados solo tienen el
+    // modelo legacy de rol marcado por estos booleans, sin el campo role
+    // string — igual que ya contempla EmployeesPage.openEdit al editar.
+    const resolvedRole = e.role || (e.isAdmin ? 'admin' : e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : 'empleado')
     const roleLabel =
-      e.role === 'empleado'    ? 'Empleado' :
-      e.role === 'encargado'   ? 'Encargado' :
-      e.role === 'jefe_obra'   ? 'Jefe de obra' :
-      e.role === 'admin'       ? 'Administrador' :
-      e.role || '—'
+      resolvedRole === 'empleado'    ? 'Empleado' :
+      resolvedRole === 'encargado'   ? 'Encargado' :
+      resolvedRole === 'jefe_obra'   ? 'Jefe de obra' :
+      resolvedRole === 'admin'       ? 'Administrador' :
+      resolvedRole || '—'
 
     const obrasNames = (e.obrasAsignadas || [])
       .map((id: string) => obras.find((o: any) => o.id === id)?.nombre || id)
@@ -62,7 +66,9 @@ export function useEmployeesData() {
       role: roleLabel,
       status,
       horasHoy: todayMin > 0 ? mhm(todayMin) : undefined,
-      location: liveRec?.centro || e.centroTrabajo || undefined,
+      // Solo mostrar "ubicación actual" cuando de verdad está fichado ahora —
+      // si no, duplicaba visualmente el mismo texto que "dept" (centroTrabajo).
+      location: liveRec?.centro || undefined,
       email: e.email || undefined,
       phone: e.telefono || e.phone || undefined,
       obrasAsignadas: obrasNames.length ? obrasNames : undefined,

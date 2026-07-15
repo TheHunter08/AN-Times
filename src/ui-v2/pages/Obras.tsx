@@ -11,7 +11,7 @@ export interface ObraItem {
   id: string
   name: string
   address: string
-  status: 'activa' | 'pausada' | 'completada'
+  status: 'activa' | 'completada'
   employeeCount: number
   hoursToday: string
   manager: string
@@ -24,10 +24,10 @@ export interface ObrasProps {
 }
 
 const statusTone: Record<ObraItem['status'], 'green' | 'orange' | 'gray'> = {
-  activa: 'green', pausada: 'orange', completada: 'gray',
+  activa: 'green', completada: 'gray',
 }
 const statusLabel: Record<ObraItem['status'], string> = {
-  activa: 'Activa', pausada: 'Pausada', completada: 'Completada',
+  activa: 'Activa', completada: 'Completada',
 }
 
 export function Obras({ items, onAdd }: ObrasProps) {
@@ -40,7 +40,6 @@ export function Obras({ items, onAdd }: ObrasProps) {
 
   const counts = {
     activa: items.filter(o => o.status === 'activa').length,
-    pausada: items.filter(o => o.status === 'pausada').length,
     completada: items.filter(o => o.status === 'completada').length,
   }
 
@@ -56,7 +55,7 @@ export function Obras({ items, onAdd }: ObrasProps) {
 
       {/* Status filter chips */}
       <div style={{ display: 'flex', gap: 6 }}>
-        {(['all', 'activa', 'pausada', 'completada'] as const).map(f => (
+        {(['all', 'activa', 'completada'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
             padding: '5px 13px', borderRadius: radius.pill, border: `1px solid ${filter === f ? colors.primary.base : colors.border.subtle}`,
             background: filter === f ? colors.primary.dim : 'transparent',
@@ -73,7 +72,7 @@ export function Obras({ items, onAdd }: ObrasProps) {
         {filtered.map(obra => (
           <div key={obra.id} style={{ borderRadius: radius.lg, background: colors.bg[700], border: `1px solid ${colors.border.subtle}`, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {/* Header strip */}
-            <div style={{ height: 4, background: obra.status === 'activa' ? colors.semantic.green : obra.status === 'pausada' ? colors.semantic.orange : colors.text[300] }} />
+            <div style={{ height: 4, background: obra.status === 'activa' ? colors.semantic.green : colors.text[300] }} />
 
             <div style={{ padding: '16px 16px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>

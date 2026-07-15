@@ -26,9 +26,10 @@ export interface MessagesProps {
   conversations: DemoConversation[]
   adminName?: string
   onSend?: (empId: string, text: string) => void
+  onSelectConversation?: (empId: string) => void
 }
 
-export function Messages({ conversations, onSend }: MessagesProps) {
+export function Messages({ conversations, onSend, onSelectConversation }: MessagesProps) {
   const [selId, setSelId]   = useState(conversations[0]?.empId ?? null)
   const [text, setText]     = useState('')
   const [msgs, setMsgs]     = useState<Record<string, DemoMessage[]>>(
@@ -45,6 +46,19 @@ export function Messages({ conversations, onSend }: MessagesProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selId, selMsgs.length])
+
+  // Reconcilia el estado local con la prop cada vez que cambian las
+  // conversaciones (mensaje nuevo entrante) — sin esto, un mensaje del
+  // empleado no aparecía hasta recargar la página.
+  useEffect(() => {
+    setMsgs(Object.fromEntries(conversations.map(c => [c.empId, c.messages])))
+  }, [conversations])
+
+  // Marca como leída la conversación abierta (inicial y en cada cambio).
+  useEffect(() => {
+    if (selId) onSelectConversation?.(selId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId])
 
   const send = () => {
     const t = text.trim()

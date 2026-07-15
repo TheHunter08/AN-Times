@@ -16,24 +16,26 @@ export function PomodoroWidget() {
 
   useEffect(() => { _save({ active, phase, secs, count }) }, [active, phase, secs, count])
 
+  // Cuenta regresiva simple; el cambio de fase se resuelve en un efecto aparte
+  // cuando secs llega a 0, en vez de anidar setState dentro del propio
+  // updater de setSecs (frágil: dependía del orden de la cola de React).
   useEffect(() => {
     if (!active) return
-    const id = setInterval(() => {
-      setSecs(s => {
-        if (s > 1) return s - 1
-        if (phase === 'work') {
-          setPhase('break'); setSecs(BS); setCount(c => c + 1)
-          try { new Notification('🍅 ¡Pomodoro completado!', { body: '5 min de descanso.' }) } catch {}
-        } else {
-          setPhase('work'); setSecs(WS)
-          try { new Notification('⏱️ ¡Vuelve al trabajo!', { body: 'Empieza el siguiente pomodoro.' }) } catch {}
-        }
-        try { navigator.vibrate?.([150, 80, 150]) } catch {}
-        return s
-      })
-    }, 1000)
+    const id = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000)
     return () => clearInterval(id)
-  }, [active, phase])
+  }, [active])
+
+  useEffect(() => {
+    if (!active || secs > 0) return
+    if (phase === 'work') {
+      setPhase('break'); setSecs(BS); setCount(c => c + 1)
+      try { new Notification('🍅 ¡Pomodoro completado!', { body: '5 min de descanso.' }) } catch {}
+    } else {
+      setPhase('work'); setSecs(WS)
+      try { new Notification('⏱️ ¡Vuelve al trabajo!', { body: 'Empieza el siguiente pomodoro.' }) } catch {}
+    }
+    try { navigator.vibrate?.([150, 80, 150]) } catch {}
+  }, [secs, active, phase])
 
   const reset = () => { setActive(false); setPhase('work'); setSecs(WS) }
 

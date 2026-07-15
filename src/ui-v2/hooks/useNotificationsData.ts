@@ -53,8 +53,13 @@ export function useNotificationsData(): {
   const db      = useAppStore(s => s.db) as { notis?: DbNoti[] }
   const saveDB  = useAppStore(s => s.saveDB)
 
+  // empId === '__admin__' (no todas): db.notis es compartido por toda la
+  // app — sin este filtro, el centro de notificaciones del admin mostraba
+  // también los recordatorios personales de cada empleado (fichaje,
+  // vacaciones, cierre pendiente…), pareciendo notis "duplicadas" cuando en
+  // realidad eran avisos de distintos empleados con el mismo texto genérico.
   const items: NotificationItem[] = (db.notis || [])
-    .filter(n => !n.deleted)
+    .filter(n => !n.deleted && n.empId === '__admin__')
     .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')))
     .slice(0, 50)
     .map((n): NotificationItem => ({

@@ -463,7 +463,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const rest = emps.filter((e: any) => !liveIds.has(e.id))
     const shown = [...active, ...rest].slice(0, 6)
     const extra = Math.max(0, emps.length - shown.length)
-    return { shown, extra, activeCount: active.size || active.length, pauseCount: pauseIds.size, total: emps.length }
+    return { shown, extra, activeCount: active.length, pauseCount: pauseIds.size, total: emps.length }
   }, [db.records, db.employees])
 
   const nextVacRequest = useMemo(() => {
@@ -1550,8 +1550,69 @@ function AnomaliesPage() {
   return <Anomalies items={items} onResolve={resolveAnomaly} />
 }
 
+function ObraModal({ onClose }: { onClose: () => void }) {
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast  = useAppStore(s => s.toast)
+  const [nombre, setNombre] = useState('')
+  const [coords, setCoords] = useState('')
+  const [radio, setRadio] = useState('200')
+  const [fechaInicio, setFechaInicio] = useState(() => today())
+
+  const handleSave = () => {
+    if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    const nowIso = new Date().toISOString()
+    const obra = {
+      id: gid(), nombre: nombre.trim(),
+      coords: coords.trim() || null,
+      radio: Number(radio) > 0 ? Number(radio) : 200,
+      activa: true,
+      fechaInicio: fechaInicio || null,
+      _upd: nowIso,
+    }
+    saveDB((fresh: any) => ({ obras: [...(fresh.obras || []), obra] }))
+    toast('Obra creada', 2500, 'ok')
+    onClose()
+  }
+
+  const fieldStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }
+  const labelStyle = { fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: '.4px' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Nueva obra</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
+        </div>
+        <div>
+          <div style={labelStyle}>Nombre</div>
+          <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Gecama" style={fieldStyle} />
+        </div>
+        <div>
+          <div style={labelStyle}>Coordenadas GPS (opcional)</div>
+          <input value={coords} onChange={e => setCoords(e.target.value)} placeholder="Ej: 18.4861,-69.9312" style={fieldStyle} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <div style={labelStyle}>Radio de geovalla (m)</div>
+            <input type="number" min="0" value={radio} onChange={e => setRadio(e.target.value)} style={fieldStyle} />
+          </div>
+          <div>
+            <div style={labelStyle}>Fecha de inicio</div>
+            <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} style={fieldStyle} />
+          </div>
+        </div>
+        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+          Crear obra
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ObrasPage() {
   const db = useAppStore(s => s.db) as any
+  const [showAdd, setShowAdd] = useState(false)
   const todayStr = today()
 
   const items = useMemo(() => {
@@ -1572,10 +1633,13 @@ function ObrasPage() {
       const todayMins = todayRecs.reduce((s: number, r: any) => {
         return s + recWorkSecs(r) / 60
       }, 0)
-      const manager = employees.find((e: any) =>
-        (e.role === 'encargado' || e.role === 'jefe_obra') &&
-        Array.isArray(e.obrasAsignadas) && e.obrasAsignadas.includes(o.id)
-      )
+      // e.role || isEnc/isJO: mismo fallback legacy que EmployeesPage.openEdit,
+      // si no, un encargado marcado solo por isEnc/isJO no se detectaba aquí.
+      const manager = employees.find((e: any) => {
+        const role = e.role || (e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : '')
+        return (role === 'encargado' || role === 'jefe_obra') &&
+          Array.isArray(e.obrasAsignadas) && e.obrasAsignadas.includes(o.id)
+      })
       return {
         id: o.id,
         name: o.nombre || o.id,
@@ -1589,7 +1653,10 @@ function ObrasPage() {
     })
   }, [db, todayStr])
 
-  return <Obras items={items} />
+  return <>
+    <Obras items={items} onAdd={() => setShowAdd(true)} />
+    {showAdd && <ObraModal onClose={() => setShowAdd(false)} />}
+  </>
 }
 
 function OnlineTeamPage() {
@@ -1632,43 +1699,49 @@ function OnlineTeamPage() {
     })
   }, [db.records, db.employees, user, isScopedRole])
 
-  const finishShift = (row: any) => {
+  // persistRecordRow primero (igual que Fichajes/Validar horas): la
+  // mutación de un record solo se confirma en local si el guardado
+  // incremental de Supabase tuvo éxito.
+  const finishShift = async (row: any) => {
     if (!window.confirm(`¿Finalizar la jornada de ${row.name}? La hora de salida será la actual.`)) return
     const reason = window.prompt('Motivo obligatorio para finalizar la jornada:')?.trim()
     if (!reason) { toast('Debes indicar el motivo del cierre', 3000, 'warn'); return }
 
+    const current = (db.records || []).find((record: any) => record.id === row.id)
+    if (!current || current.fin) return
     const nowIso = new Date().toISOString()
     const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
-    let workedMinutes = 0
 
+    const breaks = [...(current.breaks || [])]
+    if (current.enDescanso && current.bStartTs) breaks.push({ start: current.bStartTs, end: nowIso })
+    const closed: any = {
+      ...current,
+      fin: nowIso,
+      breaks,
+      enDescanso: false,
+      bStartTs: null,
+      closed: true,
+      cerradoPor: actor,
+      cerradoPorId: user.id || 'admin',
+      cierreManual: true,
+      motivoCierre: reason,
+      operationId: globalThis.crypto?.randomUUID?.() ?? current.operationId ?? null,
+      _rev: (current._rev || 0) + 1,
+      _upd: nowIso,
+    }
+    const totals = calcSecs(closed)
+    closed.workSecs = totals.work
+    closed.breakSecs = totals.brk
+    const workedMinutes = Math.floor(totals.work / 60)
+
+    try { await persistRecordRow(closed) } catch (error: any) {
+      toast(`No se pudo finalizar la jornada: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      return
+    }
+
+    setRecentClose({ record: current, name: row.name, reason })
     saveDB((fresh: any) => {
-      const current = (fresh.records || []).find((record: any) => record.id === row.id)
-      if (!current || current.fin) return {}
-      setRecentClose({ record: current, name: row.name, reason })
-
-      const breaks = [...(current.breaks || [])]
-      if (current.enDescanso && current.bStartTs) breaks.push({ start: current.bStartTs, end: nowIso })
-      const closed: any = {
-        ...current,
-        fin: nowIso,
-        breaks,
-        enDescanso: false,
-        bStartTs: null,
-        closed: true,
-        cerradoPor: actor,
-        cerradoPorId: user.id || 'admin',
-        cierreManual: true,
-        motivoCierre: reason,
-        operationId: globalThis.crypto?.randomUUID?.() ?? current.operationId ?? null,
-        _rev: (current._rev || 0) + 1,
-        _upd: nowIso,
-      }
-      const totals = calcSecs(closed)
-      closed.workSecs = totals.work
-      closed.breakSecs = totals.brk
-      workedMinutes = Math.floor(totals.work / 60)
-
-      const next = { ...fresh, records: fresh.records.map((record: any) => record.id === current.id ? closed : record) }
+      const next = { ...fresh, records: (fresh.records || []).map((record: any) => record.id === closed.id ? closed : record) }
       return auditLog(next, 'Jornada finalizada manualmente', `${row.name} · salida ${fmtTime(nowIso)} · ${reason}`, actor)
     })
 
@@ -1676,12 +1749,18 @@ function OnlineTeamPage() {
     toast(`Jornada de ${row.name} finalizada`, 3000, 'ok')
   }
 
-  const undoClose = () => {
+  const undoClose = async () => {
     if (!recentClose?.record) return
     const nowIso = new Date().toISOString()
     const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
+    const restored = { ...recentClose.record, _upd: nowIso }
+
+    try { await persistRecordRow(restored) } catch (error: any) {
+      toast(`No se pudo deshacer el cierre: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      return
+    }
+
     saveDB((fresh: any) => {
-      const restored = { ...recentClose.record, _upd: nowIso }
       const next = { ...fresh, records: (fresh.records || []).map((record: any) => record.id === restored.id ? restored : record) }
       return auditLog(next, 'Cierre manual deshecho', `${recentClose.name} · ${recentClose.reason}`, actor)
     })
@@ -1694,27 +1773,38 @@ function OnlineTeamPage() {
     toast(`Recordatorio enviado a ${missingTeam.length} empleado${missingTeam.length === 1 ? '' : 's'}`, 3000, 'ok')
   }
 
-  const finishMany = (selectedRows:any[]) => {
+  const finishMany = async (selectedRows:any[]) => {
     if (!window.confirm(`¿Finalizar las ${selectedRows.length} jornadas visibles con la hora actual?`)) return
     const reason = window.prompt('Motivo obligatorio para el cierre múltiple:')?.trim()
     if (!reason) { toast('Debes indicar el motivo', 3000, 'warn'); return }
     const nowIso = new Date().toISOString()
     const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
     const ids = new Set(selectedRows.map(row => row.id))
-    saveDB((fresh:any) => {
-      const records = (fresh.records || []).map((record:any) => {
-        if (!ids.has(record.id) || record.fin) return record
+
+    const closedRecords = (db.records || [])
+      .filter((record: any) => ids.has(record.id) && !record.fin)
+      .map((record: any) => {
         const breaks = [...(record.breaks || [])]
         if (record.enDescanso && record.bStartTs) breaks.push({ start:record.bStartTs, end:nowIso })
         const closed:any = { ...record, fin:nowIso, breaks, enDescanso:false, bStartTs:null, closed:true, cerradoPor:actor, cerradoPorId:user.id || 'admin', cierreManual:true, motivoCierre:reason, operationId:globalThis.crypto?.randomUUID?.() ?? record.operationId ?? null, _rev:(record._rev || 0) + 1, _upd:nowIso }
         const totals = calcSecs(closed); closed.workSecs=totals.work; closed.breakSecs=totals.brk
         return closed
       })
+    if (!closedRecords.length) return
+
+    try { await Promise.all(closedRecords.map((r: any) => persistRecordRow(r))) } catch (error: any) {
+      toast(`No se pudieron finalizar todas las jornadas: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      return
+    }
+
+    const closedById = new Map(closedRecords.map((r: any) => [r.id, r]))
+    saveDB((fresh:any) => {
+      const records = (fresh.records || []).map((record:any) => closedById.get(record.id) || record)
       const next = { ...fresh, records }
       return auditLog(next, 'Jornadas finalizadas en lote', `${selectedRows.length} empleados · ${reason}`, actor)
     })
     selectedRows.forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
-    toast(`${selectedRows.length} jornadas finalizadas`, 3000, 'ok')
+    toast(`${closedRecords.length} jornadas finalizadas`, 3000, 'ok')
   }
 
   return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} />
@@ -1767,7 +1857,18 @@ function MessagesPage() {
     queuePush(empId, `Mensaje de ${adminName}`, text, 'mensajes', '/?go=emp:mensajes')
   }
 
-  return <Messages conversations={conversations} adminName={adminName} onSend={handleSend} />
+  // Sin esto, el badge de "no leídos" nunca bajaba aunque el admin ya
+  // hubiera abierto y leído la conversación.
+  const handleMarkRead = (empId: string) => {
+    saveDB((fresh: any) => {
+      const chatsList = fresh.chats || []
+      const hasUnread = chatsList.some((m: any) => m.from === empId && m.to === adminId && !m.leido)
+      if (!hasUnread) return null
+      return { chats: chatsList.map((m: any) => (m.from === empId && m.to === adminId && !m.leido) ? { ...m, leido: true } : m) }
+    })
+  }
+
+  return <Messages conversations={conversations} adminName={adminName} onSend={handleSend} onSelectConversation={handleMarkRead} />
 }
 
 // ─── Main shell ────────────────────────────────────────────────────────────────
