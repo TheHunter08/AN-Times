@@ -1,4 +1,4 @@
-import { localDateStr } from './time.js'
+import { calcMin, localDateStr } from './time.js'
 
 // workedDays y el recorrido día a día deben usar la misma fecha LOCAL en ambos
 // lados — r.inicio se guarda en UTC (new Date().toISOString()), así que
@@ -8,7 +8,7 @@ import { localDateStr } from './time.js'
 export function calcStreak(records, empId, todayDate) {
   const workedDays = new Set(
     (records || [])
-      .filter(r => r.empId === empId && r.fin && (r.workSecs || 0) >= 1800)
+      .filter(r => r.empId === empId && r.fin && calcMin(r) >= 30)
       .map(r => r.inicio ? localDateStr(new Date(r.inicio)) : null)
       .filter(Boolean)
   )
@@ -33,7 +33,7 @@ export function calcWorkPattern(records, empId) {
   const recs = (records || []).filter(r =>
     r.empId === empId && r.fin && r.inicio &&
     new Date(r.inicio).getTime() > cutoff &&
-    (r.workSecs || 0) >= 3600
+    calcMin(r) >= 60
   )
   if (recs.length < 5) return null
   const entryMins = recs.map(r => { const d = new Date(r.inicio); return d.getHours() * 60 + d.getMinutes() }).sort((a, b) => a - b)

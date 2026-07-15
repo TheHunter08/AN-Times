@@ -2,7 +2,7 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
-import { gid, mhm } from '../../utils/time.js'
+import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { colors } from '../../ui-v2/design-system/colors'
@@ -20,8 +20,17 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !c.desactualizado)
+  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !(c.firmaAdmin || c.firmaEmp || c.firma))
   const selCierre = pendingCierres[selIdx] || null
+  const liveRecords = selCierre
+    ? (db.records || []).filter(record => record.empId === u?.id && record.inicio && record.fin && localMonthKey(record.inicio) === selCierre.mes)
+    : []
+  const snapshotSource = selCierre?.desactualizado ? liveRecords : (liveRecords.length ? liveRecords : (selCierre?.records_snapshot || []))
+  const previewSnapshot = snapshotSource.map(record => {
+    const totals = calcSecs(record)
+    return { ...record, workSecs: totals.work, breakSecs: totals.brk }
+  })
+  const previewTotalMin = Math.floor(previewSnapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
 
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
 
@@ -34,7 +43,10 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     setFirmando(true)
     const firmadoAt = new Date().toISOString()
-    const firmado = { ...selCierre, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+    const records_snapshot = previewSnapshot
+    const totalMin = previewTotalMin
+    const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
+    const firmado = { ...selCierre, records_snapshot, totalMin, dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     try {
       const { dataUrl } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
@@ -69,18 +81,18 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
           )}
         </div>
         <div style={{ fontSize:12, color:colors.text[500], marginBottom:14 }}>
-          Generado por {selCierre.generadoPor} · {selCierre.dias} días trabajados · {mhm(selCierre.totalMin)}
+          Generado por {selCierre.generadoPor} · {new Set(previewSnapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size} días trabajados · {mhm(previewTotalMin)}
         </div>
 
         {/* Records snapshot */}
         <div style={{ background:colors.bg[600], border:`1px solid ${colors.border.subtle}`, borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, maxHeight:160, overflowY:'auto' }}>
-          {(selCierre.records_snapshot || []).map((r, i) => {
+          {previewSnapshot.map((r, i) => {
             const d = new Date(r.inicio)
             return (
               <div key={i} style={{ display:'flex', gap:8, fontSize:12, color:colors.text[700], padding:'3px 0', borderBottom:`1px solid ${colors.border.subtle}` }}>
                 <span style={{ width:90, flexShrink:0, color:colors.text[500] }}>{d.toLocaleDateString('es-ES',{day:'numeric',month:'short',weekday:'short'})}</span>
                 <span style={{ flex:1, color:colors.text[500], overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.centro||'—'}</span>
-                <span style={{ fontWeight:700, color:colors.primary.light, flexShrink:0 }}>{mhm(Math.floor((r.workSecs||0)/60))}</span>
+                <span style={{ fontWeight:700, color:colors.primary.light, flexShrink:0 }}>{mhm(Math.floor(recWorkSecs(r)/60))}</span>
               </div>
             )
           })}

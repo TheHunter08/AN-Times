@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { vacData, gid, fds } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
@@ -22,6 +23,7 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
   useEffect(() => { if (!visible) { setFi(''); setFf(''); setMotivo('') } }, [visible])
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
 
   const submit = () => {
@@ -43,7 +45,7 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Solicitar vacaciones" tabIndex={-1} style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
         <h2 style={{ margin:'0 0 20px', fontSize:18, fontWeight:800, color:colors.text[900] }}>🌴 Solicitar vacaciones</h2>
         <div style={{ display:'flex', gap:12, marginBottom:14 }}>

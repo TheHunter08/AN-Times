@@ -6,6 +6,7 @@ import './styles/v5.css'
 import './styles/v7.css'
 import './design-system/index.ts'
 import './ui-v2/design-system/theme.css'
+import './styles/premium.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 

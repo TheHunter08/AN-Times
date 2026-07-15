@@ -3,6 +3,8 @@ import { Avatar } from '../components/Avatar.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconX } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 export interface EmployeeRow {
   id: string
@@ -76,6 +78,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
+  const profileDialogRef = useDialogA11y(Boolean(profileEmp), () => setProfileEmp(null))
 
   const filtered = rows.filter(r => {
     const matchSearch = (r.name + r.dept + (r.role ?? '') + (r.email ?? '')).toLowerCase().includes(search.toLowerCase())
@@ -167,15 +170,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
 
       {/* Grid de tarjetas */}
       {filtered.length === 0 ? (
-        <div style={{
-          padding: '56px 24px', textAlign: 'center',
-          background: colors.bg[700], borderRadius: radius.xl,
-          border: `1px solid ${colors.border.subtle}`,
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>👤</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[700] }}>Sin resultados</div>
-          <div style={{ fontSize: 12, color: colors.text[400], marginTop: 4 }}>Prueba con otro nombre o filtro</div>
-        </div>
+        <ProductState title="No encontramos empleados" description="Prueba con otro nombre o cambia el filtro." actionLabel={rows.length === 0 ? 'Añadir primer empleado' : undefined} onAction={rows.length === 0 ? onAdd : undefined} />
       ) : (
         <div style={{
           display: 'grid',
@@ -204,6 +199,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
         >
           <div
+            ref={profileDialogRef}
             className="uiv2-sheet-panel"
             role="dialog"
             aria-modal="true"
@@ -220,7 +216,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
                   <div style={{ fontSize: 12, color: colors.text[400], marginTop: 2 }}>{profileEmp.role}</div>
                 </div>
               </div>
-              <button onClick={() => setProfileEmp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
+              <button onClick={() => setProfileEmp(null)} aria-label="Cerrar perfil" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
                 <IconX width={18} height={18} />
               </button>
             </div>

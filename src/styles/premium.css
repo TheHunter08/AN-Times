@@ -1,0 +1,193 @@
+/* TIMES INC Premium Pass
+   Capa final exclusivamente visual. Unifica la marca y eleva contraste,
+   profundidad, foco y densidad sin cambiar datos ni flujos de negocio. */
+
+:root {
+  --premium-brand:#7c3aed;
+  --premium-brand-strong:#6d28d9;
+  --premium-brand-soft:#a78bfa;
+  --premium-accent:#3b82f6;
+  --premium-canvas:#05060a;
+  --premium-surface:#0b0e15;
+  --premium-card:#111621;
+  --premium-card-hover:#171d2a;
+  --premium-line:rgba(255,255,255,.085);
+  --premium-line-strong:rgba(167,139,250,.30);
+  --premium-shadow:0 24px 70px rgba(0,0,0,.32);
+  --premium-shadow-soft:0 10px 30px rgba(0,0,0,.20);
+
+  /* ui-v2 + UI clásica comparten desde aquí la misma marca. */
+  --uiv2-primary-base:var(--premium-brand);
+  --uiv2-primary-light:var(--premium-brand-soft);
+  --uiv2-primary-dim:rgba(124,58,237,.15);
+  --uiv2-primary-glow:rgba(124,58,237,.28);
+  --uiv2-accent-base:var(--premium-accent);
+  --uiv2-accent-dim:rgba(59,130,246,.12);
+  --uiv2-accent-glow:rgba(59,130,246,.22);
+  --uiv2-kpi-primary:var(--premium-brand);
+  --uiv2-kpi-primary-dim:rgba(124,58,237,.13);
+  --uiv2-kpi-accent:var(--premium-accent);
+  --uiv2-kpi-accent-dim:rgba(59,130,246,.12);
+  --v7-blue:var(--premium-brand);
+  --v7-violet:var(--premium-accent);
+  --brand-500:var(--premium-brand);
+  --brand-400:#8b5cf6;
+  --brand-300:var(--premium-brand-soft);
+  --border-focus:rgba(167,139,250,.70);
+  --gradient-brand:linear-gradient(135deg,#8b5cf6 0%,#7c3aed 52%,#5b21b6 100%);
+  --shadow-brand:0 14px 34px rgba(124,58,237,.28);
+}
+
+:root[data-theme="light"] {
+  --premium-canvas:#f7f7fc;
+  --premium-surface:#ffffff;
+  --premium-card:#ffffff;
+  --premium-card-hover:#f6f3ff;
+  --premium-line:rgba(30,20,60,.10);
+  --premium-line-strong:rgba(109,40,217,.24);
+  --premium-shadow:0 24px 70px rgba(50,35,85,.12);
+  --premium-shadow-soft:0 10px 30px rgba(50,35,85,.08);
+  --uiv2-primary-base:#6d28d9;
+  --uiv2-primary-light:#7c3aed;
+  --uiv2-primary-dim:rgba(109,40,217,.10);
+  --uiv2-primary-glow:rgba(109,40,217,.17);
+  --uiv2-accent-base:#2563eb;
+  --uiv2-accent-dim:rgba(37,99,235,.09);
+  --uiv2-accent-glow:rgba(37,99,235,.15);
+}
+
+body {
+  background:
+    radial-gradient(circle at 70% -20%,rgba(124,58,237,.11),transparent 32rem),
+    var(--premium-canvas);
+}
+
+/* Foco y controles: mismos mínimos en todo el producto. */
+button, [role="button"], input, select, textarea { -webkit-tap-highlight-color:transparent; }
+button:focus-visible, [role="button"]:focus-visible, a:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline:2px solid var(--premium-brand-soft) !important;
+  outline-offset:3px !important;
+}
+button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:saturate(.65); }
+
+/* Admin: navegación y topbar más calmadas, contenido con profundidad real. */
+#sAdmin .uiv2-app-shell,
+#sAdmin .uiv2-main-column { background:var(--premium-canvas) !important; }
+#sAdmin .uiv2-sidebar {
+  background:linear-gradient(180deg,rgba(124,58,237,.045),transparent 180px),var(--premium-surface) !important;
+  border-right-color:var(--premium-line) !important;
+}
+#sAdmin .uiv2-desktop-topbar {
+  background:color-mix(in srgb,var(--premium-surface) 88%,transparent) !important;
+  border-bottom-color:var(--premium-line) !important;
+  backdrop-filter:blur(22px) saturate(125%) !important;
+}
+#sAdmin .uiv2-sidebar-item.uiv2-active {
+  color:#fff !important;
+  background:linear-gradient(90deg,rgba(124,58,237,.24),rgba(124,58,237,.10)) !important;
+  border-color:rgba(167,139,250,.20) !important;
+  box-shadow:inset 2px 0 0 var(--premium-brand-soft),0 8px 24px rgba(124,58,237,.08) !important;
+}
+#sAdmin .uiv2-sidebar-badge {
+  min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
+  margin-left:auto; border:1px solid rgba(167,139,250,.24); border-radius:999px;
+  background:rgba(124,58,237,.14); color:var(--premium-brand-soft); font-size:10px; font-weight:750;
+  font-variant-numeric:tabular-nums;
+}
+#sAdmin .uiv2-sidebar-item.uiv2-active .uiv2-sidebar-badge { background:rgba(255,255,255,.13); color:#fff; }
+#sAdmin .uiv2-page-container { background:radial-gradient(circle at 88% 0,rgba(124,58,237,.055),transparent 26rem) !important; }
+#sAdmin .ti-kpi-card,
+#sAdmin .ti-panel,
+#sAdmin .uiv2-table-row,
+#sAdmin .uiv2-table-mobile-card {
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+#sAdmin .ti-panel { background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 55%),var(--premium-card) !important; }
+#sAdmin .ti-kpi-card { background:linear-gradient(145deg,color-mix(in srgb,var(--ti-kpi-accent) 8%,var(--premium-card)),var(--premium-card) 58%) !important; }
+#sAdmin .ti-management-link:hover { border-color:var(--premium-line-strong) !important; }
+
+/* Empleado: misma firma visual, manteniendo el reloj como protagonista. */
+#sEmp.emp-dsk .emp-dsk-brand-icon { background:var(--gradient-brand) !important; box-shadow:var(--shadow-brand) !important; }
+#sEmp.emp-dsk .emp-dsk-nav-item.on,
+#sEmp:not(.emp-dsk) .emp-nav-item.on {
+  background:rgba(124,58,237,.16) !important;
+  box-shadow:inset 2px 0 0 var(--premium-brand-soft) !important;
+}
+#sEmp .employee-home-v7__hero,
+#sEmp .employee-home-v7__panel {
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+#sEmp .employee-home-v7__hero {
+  background:
+    radial-gradient(circle at 50% 42%,rgba(124,58,237,.12),transparent 19rem),
+    linear-gradient(180deg,rgba(255,255,255,.025),transparent 60%),var(--premium-card) !important;
+}
+#sEmp .employee-home-v7__progress-ring { stroke:var(--premium-brand) !important; }
+#sEmp .employee-home-v7__orbit--inner { stroke:rgba(59,130,246,.38) !important; }
+#sEmp .employee-home-v7__week-track > span { background:rgba(124,58,237,.38) !important; }
+#sEmp .employee-home-v7__week-day[data-today="true"] .employee-home-v7__week-track > span {
+  background:var(--premium-brand) !important; box-shadow:0 0 16px rgba(124,58,237,.36) !important;
+}
+
+/* Login: menos demo tecnológica, más producto seguro y reconocible. */
+.v7-login-brand-panel {
+  background:
+    radial-gradient(circle at 10% 20%,rgba(124,58,237,.16),transparent 24rem),
+    linear-gradient(160deg,#090b12,#06070b 65%) !important;
+}
+.v7-brand-mark { background:var(--gradient-brand) !important; box-shadow:var(--shadow-brand) !important; }
+.v7-brand-kicker { color:var(--premium-brand-soft) !important; }
+.uiv2-login-submit:not(:disabled) { background:var(--gradient-brand) !important; }
+
+/* Estado compartido premium. */
+.ti-product-state {
+  min-height:220px; display:grid; place-items:center; padding:36px 24px; border:1px dashed var(--premium-line);
+  border-radius:20px; background:linear-gradient(145deg,rgba(124,58,237,.045),transparent 48%),var(--uiv2-bg-600);
+  text-align:center;
+}
+.ti-product-state--compact { min-height:160px; padding:24px; }
+.ti-product-state__content { max-width:360px; display:flex; flex-direction:column; align-items:center; }
+.ti-product-state__icon {
+  width:52px; height:52px; display:grid; place-items:center; margin-bottom:16px; border-radius:16px;
+  border:1px solid rgba(167,139,250,.22); background:rgba(124,58,237,.12); color:var(--premium-brand-soft);
+}
+.ti-product-state__icon svg { width:22px; height:22px; }
+.ti-product-state h3 { margin:0; color:var(--uiv2-text-900); font-size:15px; letter-spacing:-.02em; }
+.ti-product-state p { margin:7px 0 0; color:var(--uiv2-text-500); font-size:12.5px; line-height:1.55; }
+.ti-product-state button { min-height:40px; margin-top:18px; padding:0 16px; border:0; border-radius:12px; background:var(--gradient-brand); color:#fff; font-weight:700; cursor:pointer; }
+.ti-page-loader { display:grid; gap:12px; max-width:920px; padding:8px 0; }
+.ti-page-loader span { display:block; height:84px; border-radius:18px; background:linear-gradient(100deg,var(--uiv2-bg-600) 20%,var(--uiv2-bg-500) 45%,var(--uiv2-bg-600) 70%); background-size:220% 100%; animation:ti-loader 1.25s ease-in-out infinite; }
+.ti-page-loader span:first-child { height:58px; width:min(100%,420px); }
+@keyframes ti-loader { to { background-position:-220% 0; } }
+
+/* Preview aislada para comparar las tres superficies sin sesión. */
+.ti-preview { height:100dvh; overflow-y:auto; background:var(--premium-canvas); color:var(--uiv2-text-900); overscroll-behavior:contain; }
+.ti-preview__switcher {
+  position:fixed; z-index:10000; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); transform:translateX(-50%);
+  display:flex; gap:5px; padding:6px; border:1px solid var(--premium-line); border-radius:16px;
+  background:color-mix(in srgb,var(--premium-surface) 90%,transparent); box-shadow:var(--premium-shadow); backdrop-filter:blur(20px);
+}
+.ti-preview__switcher button { min-height:38px; padding:0 14px; border:0; border-radius:11px; background:transparent; color:var(--uiv2-text-500); font-weight:700; cursor:pointer; }
+.ti-preview__switcher button[aria-pressed="true"] { background:var(--gradient-brand); color:#fff; }
+.ti-preview__canvas { min-height:100dvh; padding-bottom:86px; }
+.ti-preview__admin { min-height:100dvh; padding:32px; background:radial-gradient(circle at 90% 0,rgba(124,58,237,.08),transparent 30rem),var(--premium-canvas); }
+.ti-preview__employee { min-height:100dvh; padding:32px; background:var(--premium-canvas); }
+
+@media (max-width:760px) {
+  #sAdmin .uiv2-page-container { padding:16px 14px calc(28px + env(safe-area-inset-bottom)) !important; }
+  #sAdmin .ti-dashboard-heading { align-items:flex-start; }
+  #sAdmin .ti-dashboard-heading__separator { display:none !important; }
+  #sAdmin .ti-dashboard-heading p span { display:block; }
+  #sAdmin .ti-dashboard-toolbar { width:100%; justify-content:flex-start; }
+  #sAdmin .ti-date-chip { flex:1; }
+  .ti-preview__admin,.ti-preview__employee { padding:16px 12px 92px; }
+  .ti-preview__switcher { width:calc(100% - 24px); justify-content:stretch; }
+  .ti-preview__switcher button { flex:1; padding:0 8px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .ti-preview *,#sAdmin *,#sEmp * { scroll-behavior:auto !important; }
+}

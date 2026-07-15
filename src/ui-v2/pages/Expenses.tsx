@@ -4,6 +4,7 @@ import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconReceipt } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
 
 export interface ExpenseItem {
   id: string
@@ -93,9 +94,7 @@ export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {visible.length === 0 && (
-          <div style={{ padding: '32px', textAlign: 'center', color: colors.text[500], fontSize: 13, borderRadius: radius.md, border: `1px dashed ${colors.border.subtle}` }}>
-            No hay gastos {tab === 'pendiente' ? 'pendientes' : tab === 'aprobado' ? 'aprobados' : 'rechazados'}
-          </div>
+          <ProductState compact title={`No hay gastos ${tab === 'pendiente' ? 'pendientes' : tab === 'aprobado' ? 'aprobados' : 'rechazados'}`} description="Las nuevas solicitudes aparecerán aquí automáticamente." />
         )}
         {visible.map(item => (
           <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}` }}>

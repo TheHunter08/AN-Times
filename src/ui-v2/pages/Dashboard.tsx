@@ -184,6 +184,24 @@ export function Dashboard({
         </div>
       </section>
 
+      {quickLinks && quickLinks.length > 0 && (
+        <section className="ti-priority-strip" aria-label="Prioridades de hoy">
+          <div className="ti-priority-strip__intro">
+            <span>Prioridades de hoy</span>
+            <strong>Resuelve primero lo que bloquea al equipo</strong>
+          </div>
+          <div className="ti-priority-strip__actions">
+            {quickLinks.slice(0, 3).map(link => (
+              <button type="button" onClick={link.onClick} key={`priority-${link.id}`}>
+                <span>{link.label}</span>
+                <strong>{link.value}</strong>
+                <IconArrowRight width={14} height={14} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section
         className="ti-kpi-grid"
         aria-label="Resumen operativo"
@@ -333,11 +351,11 @@ export function Dashboard({
             </article>
           )}
 
-          {quickLinks && quickLinks.length > 0 && (
+          {quickLinks && quickLinks.length > 3 && (
             <article className="ti-panel ti-management-card">
               <PanelTitle>Accesos de gestión</PanelTitle>
               <div className="ti-management-list">
-                {quickLinks.map(link => (
+                {quickLinks.slice(3).map(link => (
                   <button className="ti-management-link" type="button" onClick={link.onClick} key={link.id}>
                     <span className="ti-management-link__icon" aria-hidden="true">
                       {link.icon ?? <IconUsers width={16} height={16} />}
@@ -396,6 +414,29 @@ export function Dashboard({
           line-height: 1.45;
         }
         .ti-dashboard-heading__separator { color: ${colors.text[300]}; }
+        .ti-priority-strip {
+          display:grid;
+          grid-template-columns:minmax(200px,.75fr) minmax(0,1.8fr);
+          gap:18px;
+          align-items:center;
+          padding:14px 16px;
+          border:1px solid color-mix(in srgb, ${colors.primary.base} 24%, ${colors.border.subtle});
+          border-radius:16px;
+          background:linear-gradient(100deg,${colors.primary.dim},transparent 55%),${colors.bg[600]};
+          box-shadow:0 12px 34px rgba(0,0,0,.14);
+        }
+        .ti-priority-strip__intro span { display:block; color:${colors.primary.light}; font-size:9.5px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+        .ti-priority-strip__intro strong { display:block; margin-top:4px; color:${colors.text[900]}; font-size:12.5px; font-weight:620; }
+        .ti-priority-strip__actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+        .ti-priority-strip__actions button {
+          min-width:0; min-height:44px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px;
+          padding:0 12px; border:1px solid ${colors.border.subtle}; border-radius:12px; background:rgba(var(--uiv2-overlay-rgb),.04);
+          color:${colors.text[700]}; cursor:pointer; font-family:inherit; text-align:left; transition:background .15s,border-color .15s,transform .15s;
+        }
+        .ti-priority-strip__actions button:hover { background:rgba(var(--uiv2-overlay-rgb),.075); border-color:${colors.border.default}; transform:translateY(-1px); }
+        .ti-priority-strip__actions button:focus-visible { outline:2px solid ${colors.primary.base}; outline-offset:2px; }
+        .ti-priority-strip__actions button span { overflow:hidden; font-size:11.5px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+        .ti-priority-strip__actions button strong { color:${colors.text[900]}; font-size:12px; font-variant-numeric:tabular-nums; }
         .ti-dashboard-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
         .ti-date-chip,
         .ti-dashboard-button {
@@ -595,6 +636,8 @@ export function Dashboard({
         }
         @media (max-width: 640px) {
           .ti-dashboard { gap: 14px; }
+          .ti-priority-strip { grid-template-columns:1fr; gap:12px; }
+          .ti-priority-strip__actions { grid-template-columns:1fr; }
           .ti-dashboard-heading { min-height: 0; flex-direction: column; gap: 14px; }
           .ti-dashboard-toolbar { width: 100%; justify-content: flex-start; }
           .ti-date-chip { flex: 1; }

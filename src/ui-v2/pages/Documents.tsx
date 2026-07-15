@@ -6,6 +6,7 @@ import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconFileText, IconDownload, IconPlus } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
 
 export interface DocumentItem {
   id: string
@@ -106,9 +107,7 @@ export function Documents({ items, onUpload }: DocumentsProps) {
           )
         })}
         {filtered.length === 0 && (
-          <div style={{ gridColumn: '1/-1', padding: '40px', textAlign: 'center', color: colors.text[500], fontSize: 13, borderRadius: radius.md, border: `1px dashed ${colors.border.subtle}` }}>
-            No hay documentos que coincidan
-          </div>
+          <div style={{ gridColumn: '1/-1' }}><ProductState compact title="No encontramos documentos" description="Prueba con otra búsqueda o categoría." actionLabel={items.length === 0 ? 'Subir primer documento' : undefined} onAction={items.length === 0 ? onUpload : undefined} /></div>
         )}
       </div>
     </div>

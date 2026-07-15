@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { useConnectivity } from '../../hooks/useConnectivity.js'
 import { useAppStore } from '../../store/appStore.js'
 import { getCfg, setCfg, toggleTheme } from '../../utils/userConfig.js'
@@ -33,6 +34,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
 
   const save = () => {
@@ -65,7 +67,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
 
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Configuración" tabIndex={-1} style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:colors.text[900] }}>Configuración</h2>

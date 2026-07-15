@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { gid } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { DocPreview } from '../DocPreview.jsx'
@@ -23,14 +24,13 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null)
   const [stamping, setStamping] = useState(false)
   const [viewing, setViewing] = useState(null)
-  useModalBack(visible, () => {
+  const closeDocumentModal = () => {
     if (viewing || signing) { setViewing(null); setSigning(null) }
     else onClose()
-  })
-  const { dragHandlers, modalStyle } = useSwipeDismiss(() => {
-    if (viewing || signing) { setViewing(null); setSigning(null) }
-    else onClose()
-  })
+  }
+  useModalBack(visible, closeDocumentModal)
+  const { dragHandlers, modalStyle } = useSwipeDismiss(closeDocumentModal)
+  const dialogRef = useDialogA11y(visible, closeDocumentModal)
   if (!visible) return null
 
   const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
@@ -93,7 +93,7 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div style={OV} onClick={(signing || viewing) ? undefined : onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Documentos" tabIndex={-1} style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
           {(viewing || signing) && (

@@ -1,26 +1,9 @@
 ﻿// Shell admin v2 — usa el nuevo AppShell + páginas v2 con datos reales de useAppStore.
 // CLAUDE.md: UI only — NO tocar backend, Supabase, auth ni lógica de negocio.
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
-import { Timesheets } from './pages/Timesheets.js'
-import { Employees } from './pages/Employees.js'
-import { Requests } from './pages/Requests.js'
-import { Notifications } from './pages/Notifications.js'
-import { Planning } from './pages/Planning.js'
-import { Shifts } from './pages/Shifts.js'
-import { ValidateHours } from './pages/ValidateHours.js'
-import { Expenses } from './pages/Expenses.js'
-import { Documents } from './pages/Documents.js'
-import { Reports } from './pages/Reports.js'
-import { Stats } from './pages/Stats.js'
-import { MonthlyClose } from './pages/MonthlyClose.js'
-import { Audit } from './pages/Audit.js'
-import { Anomalies } from './pages/Anomalies.js'
-import { Messages } from './pages/Messages.js'
-import { Obras } from './pages/Obras.js'
-import { OnlineTeam } from './pages/OnlineTeam.js'
 import { Search } from './components/Search.js'
 import { Avatar } from './components/Avatar.js'
 import { colors } from './design-system/colors'
@@ -39,11 +22,37 @@ import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
-import { clipBreaksToWindow, flagStaleCierre, flagStaleCierreForEdit, isRecordMonthLocked, notifyStaleCierre, recordTimesFromClock } from '../utils/adminHelpers.js'
+import { buildRecordSnapshot, clipBreaksToWindow, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
+
+const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
+const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
+const Requests = lazy(() => import('./pages/Requests.js').then(module => ({ default: module.Requests })))
+const Notifications = lazy(() => import('./pages/Notifications.js').then(module => ({ default: module.Notifications })))
+const Planning = lazy(() => import('./pages/Planning.js').then(module => ({ default: module.Planning })))
+const Shifts = lazy(() => import('./pages/Shifts.js').then(module => ({ default: module.Shifts })))
+const ValidateHours = lazy(() => import('./pages/ValidateHours.js').then(module => ({ default: module.ValidateHours })))
+const Expenses = lazy(() => import('./pages/Expenses.js').then(module => ({ default: module.Expenses })))
+const Documents = lazy(() => import('./pages/Documents.js').then(module => ({ default: module.Documents })))
+const Reports = lazy(() => import('./pages/Reports.js').then(module => ({ default: module.Reports })))
+const Stats = lazy(() => import('./pages/Stats.js').then(module => ({ default: module.Stats })))
+const MonthlyClose = lazy(() => import('./pages/MonthlyClose.js').then(module => ({ default: module.MonthlyClose })))
+const Audit = lazy(() => import('./pages/Audit.js').then(module => ({ default: module.Audit })))
+const Anomalies = lazy(() => import('./pages/Anomalies.js').then(module => ({ default: module.Anomalies })))
+const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ default: module.Messages })))
+const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
+const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
+
+function PageLoader() {
+  return (
+    <div className="ti-page-loader" role="status" aria-label="Cargando sección">
+      <span /><span /><span />
+    </div>
+  )
+}
 
 const PAGES = [
   { id: 'dashboard',      label: 'Dashboard',         group: 'Principal', icon: <IconGrid /> },
@@ -298,6 +307,7 @@ function fmtTime(ts?: string) {
   if (!ts) return ''
   try { return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
+
 function daysDiff(ts?: string) {
   if (!ts) return 999
   return Math.floor((Date.now() - new Date(ts).getTime()) / 86400000)
@@ -353,6 +363,7 @@ function useRequestsActions() {
 
     if (estado === 'aprobada') {
       if (!rec || !corr.propInicio) { toast('El fichaje original ya no existe', 4000, 'warn'); return }
+      if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de aplicar la corrección.', 5000, 'warn'); return }
       const breaks = corr.propFin ? clipBreaksToWindow(rec.breaks || [], corr.propInicio, corr.propFin) : (rec.breaks || [])
       const base = { ...rec, inicio:corr.propInicio, fin:corr.propFin || null, breaks, _upd:nowIso, modificado:true, aceptada:true, validado:true, rechazado:false }
       const calculated = calcSecs(base)
@@ -363,25 +374,20 @@ function useRequestsActions() {
       }
     }
 
-    let staleCierres: any[] = []
     saveDB((fresh: any) => {
-      let cierres = fresh.cierres || []
-      if (updatedRecord) {
-        const stale = flagStaleCierreForEdit(cierres, corr.empId, rec.inicio, updatedRecord.inicio)
-        staleCierres = stale.staleCierres || []
-        cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
-      }
       const correccionesFichaje = (fresh.correccionesFichaje || []).map((c: any) =>
         c.id === id ? { ...c, estado, resolvedAt:nowIso, resolvedBy:who, finalInicio:corr.propInicio, finalFin:corr.propFin, _upd:nowIso } : c
       )
       const records = updatedRecord
         ? (fresh.records || []).map((r: any) => r.id === corr.recId ? updatedRecord : r)
         : (fresh.records || [])
+      const cierres = updatedRecord
+        ? refreshUnsignedClosures(fresh.cierres || [], records, corr.empId, [rec.inicio, updatedRecord.inicio], nowIso)
+        : (fresh.cierres || [])
       const noti = { id:gid(), empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', ts:nowIso, leido:false }
       const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who)
       return { correccionesFichaje, records, cierres, notis:[...(fresh.notis || []), noti], audit:withAudit.audit }
     })
-    staleCierres.forEach(c => notifyStaleCierre(c, session?.user?.id))
     queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada')
     toast(estado === 'aprobada' ? 'Corrección aplicada y sincronizada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
@@ -580,10 +586,10 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
     try {
       await persistRecordRow(updated)
       saveDB((fresh:any) => {
-        const stale = flagStaleCierreForEdit(fresh.cierres || [], rec.empId, rec.inicio, updated.inicio)
-        const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
+        const records = (fresh.records || []).map((r:any) => r.id === id ? updated : r)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, updated.inicio], nowIso)
         const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empName || rec.empId}: ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado')
-        return { records:(fresh.records || []).map((r:any) => r.id === id ? updated : r), cierres, audit:withAudit.audit }
+        return { records, cierres, audit:withAudit.audit }
       })
       toast('Fichaje modificado y sincronizado', 3000, 'ok')
       return true
@@ -598,10 +604,10 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       await deleteRecordRow(id)
       const nowIso = new Date().toISOString()
       saveDB((fresh:any) => {
-        const stale = flagStaleCierre(fresh.cierres || [], rec.empId, rec.inicio)
-        const cierres = stale.cierres.map((c:any) => c.desactualizado ? { ...c, pdfData:null, pdfUrl:null, documentoId:null, _upd:nowIso } : c)
+        const records = (fresh.records || []).filter((r:any) => r.id !== id)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
         const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)} ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} · ${reason}`, session?.user?.name || 'Encargado')
-        return { records:(fresh.records || []).filter((r:any) => r.id !== id), cierres, audit:withAudit.audit }
+        return { records, cierres, audit:withAudit.audit }
       })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
       return true
@@ -802,6 +808,10 @@ function ValidateHoursPage() {
   const handleModify = async (id: string, entry: string, exit: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
+      toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn')
+      return
+    }
     const times = recordTimesFromClock(rec, entry, exit)
     if (!times) {
       toast('Introduce una hora válida', 3000, 'warn')
@@ -822,19 +832,16 @@ function ValidateHoursPage() {
     const updatedRec = { ...rec, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try {
       await persistRecordRow(updatedRec)
-      let staleCierres: any[] = []
       saveDB((fresh: any) => {
-        const stale = flagStaleCierreForEdit(fresh.cierres || [], rec.empId, rec.inicio, inicioIso)
-        staleCierres = stale.staleCierres || []
-        const cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData: null, pdfUrl: null, documentoId: null, _upd: nowIso } : c)
+        const records = (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, inicioIso], nowIso)
         const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado')
         return {
-          records: (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r),
+          records,
           cierres,
           audit: withAudit.audit,
         }
       })
-      staleCierres.forEach(c => notifyStaleCierre(c, session?.user?.id))
       toast('Horario modificado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] modify failed:', error)
@@ -844,19 +851,20 @@ function ValidateHoursPage() {
 
   const handleDelete = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
+    if (rec && isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
+      toast('Mes firmado y bloqueado. Reabre el cierre antes de eliminarlo.', 5000, 'warn')
+      return
+    }
     if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return
     try {
       await deleteRecordRow(id)
-      let staleCierre: any = null
       const nowIso = new Date().toISOString()
       saveDB((fresh: any) => {
-        const stale = flagStaleCierre(fresh.cierres || [], rec.empId, rec.inicio)
-        staleCierre = stale.staleCierre
-        const cierres = stale.cierres.map((c: any) => c.desactualizado ? { ...c, pdfData: null, pdfUrl: null, documentoId: null, _upd: nowIso } : c)
+        const records = (fresh.records || []).filter((r: any) => r.id !== id)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
         const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado')
-        return { records: (fresh.records || []).filter((r: any) => r.id !== id), cierres, audit: withAudit.audit }
+        return { records, cierres, audit: withAudit.audit }
       })
-      notifyStaleCierre(staleCierre, session?.user?.id)
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] delete failed:', error)
@@ -1272,7 +1280,7 @@ function MonthlyClosePage() {
     const now = new Date()
     const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
-    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado).map((c: any) => c.empId))
+    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
     if (!toCreate.length) return
     saveDB((fresh: any) => {
@@ -1281,7 +1289,7 @@ function MonthlyClosePage() {
         const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
         if (!eRecs.length) return []
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
-        const records_snapshot = eRecs.map((r: any) => ({ id:r.id, inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:recWorkSecs(r), breakSecs:r.breakSecs || 0 }))
+        const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
         return [{
           id: gid(), empId: e.id, empName: e.name, mes: mesPasado,
@@ -1292,7 +1300,9 @@ function MonthlyClosePage() {
       })
       if (!nuevos.length) return null
       const withAudit = auditLog(fresh, `Cierre mensual auto-generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
-      return { cierres: [...(fresh.cierres || []), ...nuevos], audit: withAudit.audit }
+      const reemplazados = new Set(nuevos.map((c: any) => c.empId))
+      const cierres = (fresh.cierres || []).filter((c: any) => !(c.mes === mesPasado && c.desactualizado && reemplazados.has(c.empId)))
+      return { cierres: [...cierres, ...nuevos], audit: withAudit.audit }
     })
   }, [isLastDayOfMonth]) // eslint-disable-line
 
@@ -1372,7 +1382,7 @@ function MonthlyClosePage() {
     const now = new Date()
     const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
-    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado).map((c: any) => c.empId))
+    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
     if (!toCreate.length) { toast(`Todos los empleados ya tienen cierre de ${mesPasado}`, 3000, 'ok'); return }
 
@@ -1382,13 +1392,15 @@ function MonthlyClosePage() {
         const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
         if (!eRecs.length) return []
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
-        const records_snapshot = eRecs.map((r: any) => ({ id:r.id, inicio:r.inicio, fin:r.fin, centro:r.centro, workSecs:recWorkSecs(r), breakSecs:r.breakSecs || 0 }))
+        const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
         return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
       if (!nuevos.length) { toast(`Sin registros de ${mesPasado}`, 3000, 'warn'); return null }
       const withAudit = auditLog(fresh, `Cierre mensual generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
-      return { cierres: [...(fresh.cierres || []), ...nuevos], audit: withAudit.audit }
+      const reemplazados = new Set(nuevos.map((c: any) => c.empId))
+      const cierres = (fresh.cierres || []).filter((c: any) => !(c.mes === mesPasado && c.desactualizado && reemplazados.has(c.empId)))
+      return { cierres: [...cierres, ...nuevos], audit: withAudit.audit }
     })
     toast(`Generando cierres de ${mesPasado}…`, 2500, 'ok')
   }
@@ -1404,7 +1416,19 @@ function MonthlyClosePage() {
   }
 
   const handleDownloadConsolidated = async (mes: string) => {
-    const cierresDelMes = (db.cierres || []).filter((c: any) => c.mes === mes)
+    const cierresDelMes = (db.cierres || []).filter((c: any) => c.mes === mes).map((cierre: any) => {
+      if (cierre.firmaAdmin || cierre.firmaEmp || cierre.firma || cierre.estado === 'firmado') return cierre
+      const records = (db.records || []).filter((record: any) =>
+        record.empId === cierre.empId && record.inicio && record.fin && localMonthKey(record.inicio) === mes
+      )
+      const records_snapshot = records.map(buildRecordSnapshot)
+      return {
+        ...cierre,
+        records_snapshot,
+        totalMin: Math.floor(records_snapshot.reduce((sum: number, record: any) => sum + recWorkSecs(record), 0) / 60),
+        dias: new Set(records.map((record: any) => localDateStr(new Date(record.inicio)))).size,
+      }
+    })
     if (!cierresDelMes.length) return
     try {
       const { dataUrl } = await buildCierreConsolidadoPDF({ cierres: cierresDelMes, mes, empresa: undefined })
@@ -1891,6 +1915,7 @@ export default function AppV2Admin() {
   const name = session?.user?.name || 'Admin'
   const notis = useNotificationsData()
   const unreadCount = notis.items.filter(n => !n.read).length
+  const db = useAppStore(s => s.db) as any
 
   // Detectar si es encargado/jefe_obra en lugar de admin
   const isEnc = !session?.isAdmin && (session?.isEnc || session?.isJO)
@@ -1898,14 +1923,30 @@ export default function AppV2Admin() {
 
   // Filtrar páginas según rol
   const visiblePages = isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES
-  const navItems = visiblePages.map(p => ({ id: p.id, label: p.label, group: p.group, icon: <span>{p.icon}</span> }))
+  const pendingHours = (db.records || []).filter((r: any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length
+  const pendingRequests = (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
+    + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length
+  const pendingExpenses = (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length
+  const navBadges: Record<string, number> = {
+    pendientes: pendingHours + pendingRequests + pendingExpenses,
+    validar: pendingHours,
+    solicitudes: pendingRequests,
+    gastos: pendingExpenses,
+    notificaciones: unreadCount,
+  }
+  const navItems = visiblePages.map(p => ({
+    id: p.id,
+    label: p.label,
+    group: p.group,
+    icon: <span>{p.icon}</span>,
+    badge: navBadges[p.id] || undefined,
+  }))
 
   // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'
   const effectivePage = isEnc
     ? (ENC_PAGES.includes(currentAdminPage || '') ? (currentAdminPage || 'validar') : 'validar')
     : (currentAdminPage || 'dashboard')
 
-  const db = useAppStore(s => s.db) as any
   const roleLabel = session?.isJO || session?.user?.role === 'jefe_obra'
     ? 'Jefe de obra · Administrador'
     : isEnc ? encRoleLabel : 'Administrador'
@@ -2003,7 +2044,7 @@ export default function AppV2Admin() {
               <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
               <div style={{ fontSize: 10.5, color: colors.text[500] }}>{roleLabel}</div>
             </div>
-            <button onClick={safeLogout} title="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
+            <button onClick={safeLogout} title="Cerrar sesión" aria-label="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 6, borderRadius: 8 }}>
               <IconLogout width={15} height={15} />
             </button>
           </div>
@@ -2050,6 +2091,8 @@ export default function AppV2Admin() {
           </button>
           <button
             onClick={() => setAdminPage('notificaciones')}
+            type="button"
+            aria-label={unreadCount > 0 ? `Notificaciones, ${unreadCount} sin leer` : 'Notificaciones'}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: colors.text[700], display: 'flex', padding: 4 }}
           >
             <IconBell width={20} height={20} />
@@ -2068,7 +2111,7 @@ export default function AppV2Admin() {
       pageTitle=""
       breadcrumb="TIMES INC"
     >
-      {renderPage()}
+      <Suspense fallback={<PageLoader />}>{renderPage()}</Suspense>
     </AppShell>
     </div>
   )

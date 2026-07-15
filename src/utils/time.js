@@ -73,26 +73,46 @@ export const calcSecs = o => {
   const s = new Date(o.inicio).getTime()
   const e = o.fin ? new Date(o.fin).getTime() : Date.now()
   if (isNaN(s) || isNaN(e) || e < s) return { work: 0, brk: 0 }
-  let elapsed = Math.max(0, Math.floor((e - s) / 1000)), brk = 0
+  const elapsed = Math.max(0, Math.floor((e - s) / 1000))
+  const breakRanges = []
   ;(o.breaks || []).forEach(b => {
     if (b.start && b.end) {
       const bs = new Date(b.start).getTime(), be = new Date(b.end).getTime()
-      if (!isNaN(bs) && !isNaN(be) && be > bs) brk += Math.floor((be - bs) / 1000)
+      if (!isNaN(bs) && !isNaN(be) && be > bs) {
+        const clippedStart = Math.max(bs, s), clippedEnd = Math.min(be, e)
+        if (clippedEnd > clippedStart) breakRanges.push([clippedStart, clippedEnd])
+      }
     }
   })
-  if (o.enDescanso && o.bStartTs) {
+  // Un registro cerrado puede conservar flags antiguos de descanso. Solo la
+  // pausa activa de un fichaje abierto debe crecer hasta el momento actual.
+  if (!o.fin && o.enDescanso && o.bStartTs) {
     const bStartMs = new Date(o.bStartTs).getTime()
-    if (!isNaN(bStartMs) && bStartMs > 0 && bStartMs <= Date.now()) {
-      brk += Math.max(0, Math.floor((Date.now() - bStartMs) / 1000))
-    }
+    const clippedStart = Math.max(bStartMs, s)
+    if (!isNaN(bStartMs) && clippedStart < e) breakRanges.push([clippedStart, e])
   }
+  // Fusionar pausas solapadas evita descontar dos veces el mismo intervalo.
+  breakRanges.sort((a, b) => a[0] - b[0])
+  let brkMs = 0, rangeEnd = -Infinity
+  breakRanges.forEach(([start, end]) => {
+    if (start >= rangeEnd) brkMs += end - start
+    else if (end > rangeEnd) brkMs += end - rangeEnd
+    rangeEnd = Math.max(rangeEnd, end)
+  })
+  // Los snapshots históricos de cierres guardaban breakSecs pero no el array
+  // de pausas. Mantener ese valor como respaldo evita inflar sus PDF.
+  const cachedBreak = !Array.isArray(o.breaks) && Number(o.breakSecs) > 0
+    ? Math.min(elapsed, Math.floor(Number(o.breakSecs)))
+    : 0
+  const brk = Math.max(0, breakRanges.length ? Math.floor(brkMs / 1000) : cachedBreak)
   return { work: Math.max(0, elapsed - brk), brk: Math.max(0, brk) }
 }
 
 export const calcMin = r => {
   if (!r || !r.fin) return 0
-  if (r.workSecs > 0) return Math.floor(r.workSecs / 60)
-  return Math.floor(calcSecs(r).work / 60)
+  const start = new Date(r.inicio).getTime(), end = new Date(r.fin).getTime()
+  if (!isNaN(start) && !isNaN(end) && end >= start) return Math.floor(calcSecs(r).work / 60)
+  return r.workSecs > 0 ? Math.floor(r.workSecs / 60) : 0
 }
 
 export const gid = () => {
@@ -130,8 +150,11 @@ export const vacData = (empId, db) => {
 
 export const recWorkSecs = r => {
   if (!r) return 0
+  const start = new Date(r.inicio).getTime(), end = new Date(r.fin).getTime()
+  // inicio/fin son la fuente de verdad. workSecs es una caché que puede quedar
+  // obsoleta tras una corrección y solo sirve como respaldo para datos legacy.
+  if (r.fin && !isNaN(start) && !isNaN(end) && end >= start) return Math.max(0, calcSecs(r).work)
   if (r.workSecs && r.workSecs > 0) return r.workSecs
-  if (r.fin) return Math.max(0, calcSecs(r).work)
   return 0
 }
 

@@ -6,6 +6,7 @@ import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconMapPin, IconUsers, IconClock, IconPlus, IconBuilding } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
 
 export interface ObraItem {
   id: string
@@ -113,9 +114,7 @@ export function Obras({ items, onAdd }: ObrasProps) {
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center', color: colors.text[500], fontSize: 13 }}>
-          No hay obras que coincidan con la búsqueda
-        </div>
+        <ProductState compact title="No encontramos obras" description="Prueba con otra búsqueda o filtro." actionLabel={items.length === 0 ? 'Crear primera obra' : undefined} onAction={items.length === 0 ? onAdd : undefined} />
       )}
     </div>
   )

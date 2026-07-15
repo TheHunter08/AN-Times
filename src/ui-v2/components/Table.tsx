@@ -3,6 +3,7 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
 import { shadows } from '../design-system/shadows.js'
+import { ProductState } from './ProductState.js'
 
 export interface TableColumn<T> {
   key: string
@@ -23,11 +24,7 @@ export interface TableProps<T> {
 // es su propio bloque con hover, en vez de líneas de rejilla densas.
 export function Table<T>({ columns, rows, rowKey, emptyLabel = 'Sin resultados' }: TableProps<T>) {
   if (!rows.length) {
-    return (
-      <div style={{ padding: '48px 0', textAlign: 'center', color: colors.text[500], fontSize: 13, background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.lg }}>
-        {emptyLabel}
-      </div>
-    )
+    return <ProductState title={emptyLabel} description="Ajusta los filtros o el intervalo para encontrar información disponible." />
   }
   // Calcula ancho mínimo sumando columnas fijas + gaps para que el scroll horizontal funcione
   const minW = columns.reduce((s, c) => s + (c.width ? parseInt(c.width) + 16 : 140), 18 * 2)

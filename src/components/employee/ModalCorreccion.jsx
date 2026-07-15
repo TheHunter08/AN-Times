@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { gid, ftime, ftimeInput, localDateStr } from '../../utils/time.js'
 import { recordTimesFromClock } from '../../utils/adminHelpers.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
@@ -27,6 +28,7 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   }, [visible, rec])
 
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   if (!visible || !rec) return null
 
   const send = () => {
@@ -59,7 +61,7 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   return (
     <div style={{ position:'fixed', inset:0, zIndex:130, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center' }}
       onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Solicitar corrección de fichaje" tabIndex={-1} onClick={e => e.stopPropagation()}
         style={{ width:'100%', maxWidth:480, background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px' }}>
         <div style={{ width:36, height:4, borderRadius:2, background:colors.border.default, margin:'0 auto 20px' }} />
         <div style={{ fontSize:16, fontWeight:800, color:colors.text[900], marginBottom:4 }}>Solicitar corrección de fichaje</div>

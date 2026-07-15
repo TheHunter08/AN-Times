@@ -39,7 +39,7 @@ const ACHIEVEMENTS = [
     const mk = localMonthKey()
     const expected = workdaysSoFarInMonth(mk)
     const monthRecs = r.filter(x=>x.inicio && localDateStr(new Date(x.inicio)).startsWith(mk))
-    const workedDays = new Set(monthRecs.filter(x=>x.fin&&(x.workSecs||0)>=1800).map(x=>localDateStr(new Date(x.inicio)))).size
+    const workedDays = new Set(monthRecs.filter(x=>x.fin&&calcMin(x)>=30).map(x=>localDateStr(new Date(x.inicio)))).size
     return expected>=5 && workedDays>=expected && monthRecs.length>0 && !monthRecs.some(x=>x.autoClosedAt)
   } },
 ]

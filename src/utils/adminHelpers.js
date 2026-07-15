@@ -1,5 +1,43 @@
 import { queuePush } from '../services/dataService.js'
-import { localMonthKey } from './time.js'
+import { calcSecs, localDateStr, localMonthKey, recWorkSecs } from './time.js'
+
+export const buildRecordSnapshot = record => {
+  const totals = calcSecs(record)
+  return {
+    id: record.id,
+    empId: record.empId,
+    inicio: record.inicio,
+    fin: record.fin,
+    centro: record.centro,
+    breaks: Array.isArray(record.breaks) ? record.breaks.map(item => ({ ...item })) : undefined,
+    workSecs: totals.work,
+    breakSecs: totals.brk,
+  }
+}
+
+export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) => {
+  const months = new Set((dates || []).map(date => localMonthKey(date)).filter(Boolean))
+  return (cierres || []).map(cierre => {
+    if (cierre.empId !== empId || !months.has(cierre.mes)) return cierre
+    if (cierre.firmaAdmin || cierre.firmaEmp || cierre.firma || cierre.estado === 'firmado') return cierre
+    const monthRecords = (records || []).filter(record =>
+      record.empId === empId && record.inicio && record.fin && localMonthKey(record.inicio) === cierre.mes
+    )
+    const records_snapshot = monthRecords.map(buildRecordSnapshot)
+    return {
+      ...cierre,
+      records_snapshot,
+      totalMin: Math.floor(records_snapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60),
+      dias: new Set(monthRecords.map(record => localDateStr(new Date(record.inicio)))).size,
+      desactualizado: false,
+      pdfData: null,
+      pdfUrl: null,
+      documentoId: null,
+      recalculadoAt: nowIso,
+      _upd: nowIso,
+    }
+  })
+}
 
 export const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 

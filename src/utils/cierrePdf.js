@@ -1,4 +1,4 @@
-import { mhm, p2 } from './time.js'
+import { mhm, p2, recWorkSecs } from './time.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal } from './pdfReport.js'
 
 async function sha256Hex(str) {
@@ -55,10 +55,11 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
 
   const recs = cierre.records_snapshot || []
+  const totalMin = Math.floor(recs.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
   recs.forEach((r, i) => {
     if (y - ROW_H < 140) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
     const d = new Date(r.inicio)
-    const wm = Math.floor((r.workSecs || 0) / 60)
+    const wm = Math.floor(recWorkSecs(r) / 60)
     const vals = [
       d.toLocaleDateString('es-ES'),
       r.centro || '—',
@@ -71,7 +72,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   if (y - 90 < 30) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
   y -= 12
   page.drawRectangle({ x:ML, y:y-38, width:CW, height:38, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
-  page.drawText(pdfSafe(`TOTAL: ${mhm(cierre.totalMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''} trabajado${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:11, font:fontB, color:colors.pri })
+  page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''} trabajado${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:11, font:fontB, color:colors.pri })
   y -= 58
 
   page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:7, font:fontB, color:colors.gray })
@@ -88,7 +89,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   // Hash de integridad SHA-256: firma los datos clave del documento
   // para que inspección de trabajo pueda verificar que no ha sido alterado.
-  const hashInput = `${cierre.empId}|${cierre.mes}|${cierre.totalMin}|${recs.length}|${recs.map(r => r.id).join(',')}|${cierre.generadoAt || ''}`
+  const hashInput = `${cierre.empId}|${cierre.mes}|${totalMin}|${recs.length}|${recs.map(r => r.id).join(',')}|${cierre.generadoAt || ''}`
   const hash = await sha256Hex(hashInput)
   if (hash) {
     page.drawText(pdfSafe(`SHA-256: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })

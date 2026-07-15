@@ -469,7 +469,7 @@ export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, ope
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: colors.semantic.orange, marginBottom: 3 }}>Jornada cerrada automáticamente</div>
               <div style={{ fontSize: 11, color: colors.text[500], lineHeight: 1.5 }}>
-                Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} fue cerrada automáticamente por inactividad ({mhm(Math.floor((lastAutoClosed.workSecs||0)/60))}).
+                Tu jornada del {new Date(lastAutoClosed.inicio).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} fue cerrada automáticamente por inactividad ({mhm(calcMin(lastAutoClosed))}).
               </div>
             </div>
             <button onClick={() => setAutoCloseDismissed(true)} style={{ background: 'none', border: 'none', color: colors.text[500], fontSize: 18, cursor: 'pointer', padding: 0, flexShrink: 0, lineHeight: 1 }}>×</button>

@@ -6,6 +6,8 @@ import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconClock, IconEdit } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 export interface ValidateRow {
   id: string
@@ -49,6 +51,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
+  const editDialogRef = useDialogA11y(Boolean(editingId), () => setEditingId(null))
   const editedRows = useRef(new Map<string, { entry: string; exit: string }>())
   // Filas borradas de forma optimista, hasta que rows (prop) confirme que ya
   // no existen — sin esto, un refresh no relacionado del store podía traer
@@ -159,10 +162,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
       </div>
 
       {visible.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', color: colors.text[500], fontSize: 13,
-          background: colors.bg[700], borderRadius: radius.md, border: `1px solid ${colors.border.subtle}` }}>
-          {tab === 'pending' ? 'No hay registros pendientes' : 'No hay registros validados'}
-        </div>
+        <ProductState compact title={tab === 'pending' ? 'Todo revisado' : 'No hay registros validados'} description={tab === 'pending' ? 'No quedan registros pendientes de validación.' : 'Los fichajes revisados aparecerán aquí.'} />
       )}
 
       {/* Vista móvil: tarjetas */}
@@ -294,7 +294,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
       {/* Modal modificar horario */}
       {editingId && (
         <div className="uiv2-sheet-overlay" onClick={() => setEditingId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className="uiv2-sheet-panel" role="dialog" aria-modal="true" aria-label="Modificar horario" onClick={e => e.stopPropagation()} style={{ background: colors.bg[800], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 24, width: '100%', maxWidth: 360, maxHeight: '90dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div ref={editDialogRef} className="uiv2-sheet-panel" role="dialog" aria-modal="true" aria-label="Modificar horario" onClick={e => e.stopPropagation()} style={{ background: colors.bg[800], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 24, width: '100%', maxWidth: 360, maxHeight: '90dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Modificar horario</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>

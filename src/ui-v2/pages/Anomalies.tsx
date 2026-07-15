@@ -6,6 +6,7 @@ import { Search } from '../components/Search.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconAlertCircle, IconCheck, IconClock } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
 
 export interface AnomalyItem {
   id: string
@@ -102,9 +103,7 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.length === 0 && (
-          <div style={{ padding: '32px', textAlign: 'center', color: colors.text[500], fontSize: 13, borderRadius: radius.md, border: `1px dashed ${colors.border.subtle}` }}>
-            {showResolved ? 'No hay anomalías' : 'No hay anomalías pendientes — ¡todo en orden!'}
-          </div>
+          <ProductState compact title={showResolved ? 'No encontramos anomalías' : 'Todo está en orden'} description={showResolved ? 'Prueba con otra búsqueda.' : 'No hay anomalías pendientes de revisión.'} />
         )}
         {filtered.map(item => {
           const sev = sevStyle[item.severity]

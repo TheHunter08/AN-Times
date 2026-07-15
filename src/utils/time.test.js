@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcSecs, calcMin, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey } from './time.js'
+import { calcSecs, calcMin, recWorkSecs, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey } from './time.js'
 
 describe('localMonthKey', () => {
   it('clasifica por el mes local y no por el mes UTC', () => {
@@ -172,5 +172,44 @@ describe('vacData', () => {
     expect(r.used).toBe(5)
     expect(r.pending).toBe(2)
     expect(r.available).toBe(parseFloat((r.generated - 7).toFixed(1)))
+  })
+})
+
+describe('regresión del conteo tras modificar fichajes', () => {
+  it('prioriza inicio y fin frente a un workSecs obsoleto', () => {
+    const record = {
+      inicio: '2026-07-08T06:00:00',
+      fin: '2026-07-08T15:00:00',
+      workSecs: 12 * 3600,
+    }
+    expect(calcMin(record)).toBe(9 * 60)
+    expect(recWorkSecs(record)).toBe(9 * 3600)
+  })
+
+  it('limita las pausas a la jornada y fusiona solapamientos', () => {
+    const record = {
+      inicio: '2026-06-01T08:00:00', fin: '2026-06-01T12:00:00',
+      breaks: [
+        { start: '2026-06-01T07:30:00', end: '2026-06-01T08:15:00' },
+        { start: '2026-06-01T10:00:00', end: '2026-06-01T10:30:00' },
+        { start: '2026-06-01T10:15:00', end: '2026-06-01T10:45:00' },
+        { start: '2026-06-01T13:00:00', end: '2026-06-01T13:30:00' },
+      ],
+    }
+    expect(calcSecs(record)).toEqual({ work: 3 * 3600, brk: 60 * 60 })
+  })
+
+  it('mantiene workSecs como respaldo para datos legacy sin fechas válidas', () => {
+    expect(recWorkSecs({ inicio: 'fecha-invalida', fin: 'x', workSecs: 7200 })).toBe(7200)
+  })
+
+  it('respeta breakSecs en snapshots históricos que no guardaban breaks', () => {
+    const snapshot = {
+      inicio: '2026-07-08T06:00:00',
+      fin: '2026-07-08T15:00:00',
+      workSecs: 12 * 3600,
+      breakSecs: 15 * 60,
+    }
+    expect(recWorkSecs(snapshot)).toBe(8 * 3600 + 45 * 60)
   })
 })

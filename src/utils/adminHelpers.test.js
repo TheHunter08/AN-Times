@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRecordMonthLocked, recordTimesFromClock } from './adminHelpers.js'
+import { isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from './adminHelpers.js'
 
 describe('recordTimesFromClock', () => {
   it('conserva la fecha local original al cambiar solo la hora', () => {
@@ -34,5 +34,34 @@ describe('isRecordMonthLocked', () => {
     expect(isRecordMonthLocked([{ empId:'e2', mes:'2026-07', firmaEmp:true }], 'e1', inicio)).toBe(false)
     expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-06', firmaEmp:true }], 'e1', inicio)).toBe(false)
     expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-07', estado:'pendiente' }], 'e1', inicio)).toBe(false)
+  })
+})
+
+describe('refreshUnsignedClosures', () => {
+  it('propaga una modificación al cierre pendiente y elimina su PDF antiguo', () => {
+    const cierres = [{ id:'c1', empId:'e1', mes:'2026-07', estado:'pendiente', totalMin:720, pdfData:'data:old' }]
+    const records = [{ id:'r1', empId:'e1', inicio:'2026-07-08T06:00:00', fin:'2026-07-08T15:00:00', breaks:[] }]
+    const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z')
+    expect(updated.totalMin).toBe(540)
+    expect(updated.records_snapshot[0].workSecs).toBe(9 * 3600)
+    expect(updated.pdfData).toBeNull()
+    expect(updated.desactualizado).toBe(false)
+  })
+
+  it('no altera un cierre ya firmado', () => {
+    const signed = { id:'c1', empId:'e1', mes:'2026-07', estado:'firmado', firmaEmp:true, totalMin:720, pdfData:'data:signed' }
+    const records = [{ id:'r1', empId:'e1', inicio:'2026-07-08T06:00:00', fin:'2026-07-08T15:00:00', breaks:[] }]
+    expect(refreshUnsignedClosures([signed], records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z')[0]).toBe(signed)
+  })
+
+  it('actualiza el mes de origen y el de destino al mover un fichaje', () => {
+    const cierres = [
+      { id:'jun', empId:'e1', mes:'2026-06', estado:'pendiente' },
+      { id:'jul', empId:'e1', mes:'2026-07', estado:'pendiente' },
+    ]
+    const records = [{ id:'r1', empId:'e1', inicio:'2026-07-01T06:00:00', fin:'2026-07-01T14:00:00', breaks:[] }]
+    const updated = refreshUnsignedClosures(cierres, records, 'e1', ['2026-06-30T06:00:00', records[0].inicio], '2026-07-15T12:00:00.000Z')
+    expect(updated[0].totalMin).toBe(0)
+    expect(updated[1].totalMin).toBe(480)
   })
 })

@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { aiAnswer, buildAIContext, AI_CHIPS } from '../../utils/aiAssistant.js'
 import { isWebGPUSupported, hasLocalAIConsent, setLocalAIConsent, loadLocalModel, isLocalModelReady, askLocalModel } from '../../utils/localAI.js'
 import { colors } from '../../ui-v2/design-system/colors'
@@ -45,6 +46,7 @@ export function ModalAI({ visible, db, u, onClose }) {
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
 
   const startLocalAI = async () => {
@@ -96,7 +98,7 @@ export function ModalAI({ visible, db, u, onClose }) {
 
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Times AI" tabIndex={-1} style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
 
         {/* Header */}

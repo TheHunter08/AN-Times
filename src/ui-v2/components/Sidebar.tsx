@@ -7,6 +7,7 @@ export interface SidebarItem {
   label: string
   icon: ReactNode
   group?: string
+  badge?: string | number
 }
 
 export interface SidebarProps {
@@ -18,7 +19,10 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ items, active, onSelect, header, footer }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    const activeGroup = items.find(item => item.id === active)?.group
+    return new Set(items.map(item => item.group).filter((group): group is string => Boolean(group && group !== 'Principal' && group !== activeGroup)))
+  })
 
   // Nunca dejar colapsado el grupo que contiene el item activo.
   useEffect(() => {
@@ -69,6 +73,7 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
                 >
                   <span className="uiv2-sidebar-icon" aria-hidden="true">{item.icon}</span>
                   <span className="uiv2-sidebar-label">{item.label}</span>
+                  {item.badge !== undefined && item.badge !== 0 && <span className="uiv2-sidebar-badge" aria-label={`${item.badge} pendientes`}>{item.badge}</span>}
                 </button>
               )}
             </div>

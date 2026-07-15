@@ -48,6 +48,8 @@ export interface EmployeeHomeProps {
   shiftStart?: string
   shiftEnd?: string
   overtimeLabel?: string
+  syncLabel?: string
+  syncTone?: 'ok' | 'pending' | 'error'
   extraAction?: ReactNode
 }
 
@@ -123,6 +125,8 @@ export function EmployeeHome({
   shiftStart,
   shiftEnd,
   overtimeLabel,
+  syncLabel,
+  syncTone = 'ok',
   extraAction,
 }: EmployeeHomeProps) {
   const cfg = stateConfig[state]
@@ -256,13 +260,21 @@ export function EmployeeHome({
           {greeting && <h1>{greeting}</h1>}
           <p>{dateLabel}</p>
         </div>
-        {!!streakDays && (
-          <div className="employee-home-v7__streak" aria-label={`${streakDays} días seguidos fichando`}>
-            <span aria-hidden="true" />
-            <strong>{streakDays}</strong>
-            <span>días seguidos</span>
-          </div>
-        )}
+        <div className="employee-home-v7__header-status">
+          {syncLabel && (
+            <div className="employee-home-v7__sync" data-tone={syncTone} role="status">
+              <span aria-hidden="true" />
+              {syncLabel}
+            </div>
+          )}
+          {!!streakDays && (
+            <div className="employee-home-v7__streak" aria-label={`${streakDays} días seguidos fichando`}>
+              <span aria-hidden="true" />
+              <strong>{streakDays}</strong>
+              <span>días seguidos</span>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="employee-home-v7__layout">
@@ -560,6 +572,16 @@ const employeeHomeStyles = `
     align-items: stretch;
     gap: var(--space-5);
   }
+
+  .employee-home-v7__header-status { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .employee-home-v7__sync {
+    min-height:30px; display:inline-flex; align-items:center; gap:7px; padding:0 10px; border:1px solid var(--border-subtle);
+    border-radius:999px; background:var(--bg-elevated); color:var(--text-tertiary); font-size:10px; font-weight:var(--font-semibold);
+  }
+  .employee-home-v7__sync > span { width:7px; height:7px; border-radius:50%; background:var(--success-400); box-shadow:0 0 0 3px var(--success-soft); }
+  .employee-home-v7__sync[data-tone="pending"] > span { background:var(--warning-400); box-shadow:0 0 0 3px var(--warning-soft); animation:employeeHomeSyncPulse 1.4s ease-in-out infinite; }
+  .employee-home-v7__sync[data-tone="error"] > span { background:var(--danger-400); box-shadow:0 0 0 3px var(--danger-soft); }
+  @keyframes employeeHomeSyncPulse { 50% { opacity:.45; } }
 
   .employee-home-v7__hero,
   .employee-home-v7__panel {

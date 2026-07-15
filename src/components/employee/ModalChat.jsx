@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { gid } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
@@ -25,6 +26,7 @@ export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   }, [visible, chats.length])
 
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   if (!visible || !u) return null
 
   const send = () => {
@@ -39,10 +41,10 @@ export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:120, background:'rgba(0,0,0,.6)', display:'flex', flexDirection:'column' }}>
-      <div style={{ background:colors.bg[700], flex:1, display:'flex', flexDirection:'column', maxHeight:'100%' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Chat con administración" tabIndex={-1} style={{ background:colors.bg[700], flex:1, display:'flex', flexDirection:'column', maxHeight:'100%' }}>
         {/* Cabecera */}
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 20px', borderBottom:`1px solid ${colors.border.default}` }}>
-          <button onClick={onClose} style={{ background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.md, width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+          <button onClick={onClose} aria-label="Cerrar chat" style={{ background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.md, width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.text[700]} strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div>

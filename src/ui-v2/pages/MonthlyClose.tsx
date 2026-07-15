@@ -5,6 +5,8 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconDownload, IconCheck, IconChevronDown, IconX } from '../components/Icons.js'
 import { downloadSimplePdf, downloadXlsx, downloadDataUrl } from '../../utils/exportFiles.js'
+import { ProductState } from '../components/ProductState.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 export interface ClosureItem {
   id: string
@@ -75,6 +77,7 @@ function generateExcel(item: ClosureItem) {
 export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
+  const detailDialogRef = useDialogA11y(Boolean(detail), () => setDetail(null))
 
   const months = [...new Set(items.map(i => i.month))]
   const filtered = items.filter(i => monthFilter === 'all' || i.month === monthFilter)
@@ -210,11 +213,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
           ))}
 
           {filtered.length === 0 && (
-            <div style={{ padding: '40px', textAlign: 'center', color: colors.text[500], fontSize: 13 }}>
-              {items.length === 0
-                ? 'No hay cierres generados. Pulsa "Generar mes actual" para crear los cierres del mes en curso.'
-                : 'Sin cierres para el mes seleccionado.'}
-            </div>
+            <ProductState compact title={items.length === 0 ? 'Aún no hay cierres' : 'Sin cierres para este mes'} description={items.length === 0 ? 'Genera los cierres del mes cuando el periodo esté disponible.' : 'Selecciona otro mes para consultar sus cierres.'} actionLabel={items.length === 0 && canGenerate ? 'Generar cierre del mes' : undefined} onAction={items.length === 0 && canGenerate ? onGenerateAll : undefined} />
           )}
         </div>
       </div>
@@ -222,14 +221,14 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
       {/* Detail / sign modal */}
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div className="uiv2-close-modal" onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 28, width: '100%', maxWidth: 560, maxHeight: '85dvh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div ref={detailDialogRef} role="dialog" aria-modal="true" aria-label={`Cierre mensual de ${detail.empName}`} className="uiv2-close-modal" onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}`, padding: 28, width: '100%', maxWidth: 560, maxHeight: '85dvh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: colors.text[900] }}>{detail.empName}</div>
                 <div style={{ fontSize: 12, color: colors.text[400] }}>{detail.month} · {detail.role || detail.dept}</div>
               </div>
-              <button onClick={() => setDetail(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
+              <button onClick={() => setDetail(null)} aria-label="Cerrar detalle del cierre" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 4 }}>
                 <IconX width={18} height={18} />
               </button>
             </div>

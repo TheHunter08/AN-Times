@@ -3,6 +3,7 @@ import { Avatar } from '../components/Avatar.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconClock, IconClipboard, IconFilter, IconCalendar, IconHome, IconAlertCircle } from '../components/Icons.js'
+import { ProductState } from '../components/ProductState.js'
 
 export interface RequestRow {
   id: string
@@ -114,11 +115,7 @@ export function Requests({ rows }: RequestsProps) {
       {/* Lista */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center', background: colors.bg[700], borderRadius: radius.xl, border: `1px solid ${colors.border.subtle}` }}>
-            <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[700] }}>Sin solicitudes</div>
-            <div style={{ fontSize: 12, color: colors.text[400], marginTop: 4 }}>No hay entradas para este filtro</div>
-          </div>
+          <ProductState title="Sin solicitudes" description="No hay entradas para este filtro." />
         ) : (
           filtered.map(r => <RequestCard key={r.id} row={r} />)
         )}

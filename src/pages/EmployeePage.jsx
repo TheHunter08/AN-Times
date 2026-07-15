@@ -968,8 +968,16 @@ export default function EmployeePage() {
       recent: recent.slice(-6).reverse(),
       greeting,
       overtimeLabel,
+      syncLabel: syncStatus === 'syncing'
+        ? 'Guardando cambios…'
+        : syncStatus === 'error'
+          ? 'Pendiente de sincronizar'
+          : realtimeStatus === 'SUBSCRIBED'
+            ? 'Guardado · En tiempo real'
+            : 'Guardado en este dispositivo',
+      syncTone: syncStatus === 'error' ? 'error' : syncStatus === 'syncing' ? 'pending' : 'ok',
     }
-  }, [db.records, timer.state, timer.ws, u.id, u.horasSemanales, u.centroTrabajo, greeting])
+  }, [db.records, timer.state, timer.ws, u.id, u.horasSemanales, u.centroTrabajo, greeting, syncStatus, realtimeStatus])
 
   const handleWellbeingSubmit = ({ mood, nota }) => {
     if (!mood || !wellbeingRecId) return
