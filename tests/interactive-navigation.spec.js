@@ -130,8 +130,15 @@ test('cierres, auditoría y obras ofrecen contexto interactivo', async ({ page }
   await page.getByRole('button', { name:'Filtrar cierres: Pendientes de firma', exact:true }).click()
   await expect(page.locator('.uiv2-close-row')).toHaveCount(1)
   await expect(page.getByRole('button', { name:'Filtrar cierres: Pendientes de firma', exact:true })).toHaveAttribute('aria-pressed', 'true')
+  await page.locator('input[aria-label="Seleccionar cierre de Empleado Prueba"]:not([disabled])').check()
+  await expect(page.getByRole('status', { name:'1 cierre seleccionado', exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Revisar y firmar', exact:true }).click()
+  await expect(page.getByRole('dialog', { name:'Confirmar firma administrativa en lote', exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Firmar 1 cierre', exact:true }).click()
+  await expect(page.getByRole('checkbox', { name:'Seleccionar cierre de Empleado Prueba', exact:true })).toBeDisabled()
 
   await openAdminPage(page, 'Análisis', 'Auditoría')
+  await expect(page.getByText('Cierres firmados en lote', { exact:true })).toBeVisible()
   await page.getByRole('button', { name:/Abrir módulo relacionado con Documento descargado/i }).click()
   await expect(page.getByRole('heading', { name:'Documentos', exact:true })).toBeVisible()
 

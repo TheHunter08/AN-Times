@@ -38,6 +38,7 @@ export interface MonthlyCloseProps {
   items: ClosureItem[]
   onDownload?: (id: string) => void
   onSignAdmin?: (id: string) => void
+  onSignMany?: (ids: string[]) => void
   onGenerateAll?: () => void
   onDelete?: (id: string) => void
   onDownloadConsolidated?: (mes: string) => void
@@ -77,11 +78,14 @@ function generateExcel(item: ClosureItem) {
   downloadXlsx(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
+export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'signed' | 'pending'>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkPreview, setBulkPreview] = useState(false)
   const detailDialogRef = useDialogA11y(Boolean(detail), () => setDetail(null))
+  const bulkDialogRef = useDialogA11y(bulkPreview, () => setBulkPreview(false))
 
   const months = [...new Set(items.map(i => i.month))]
   const monthItems = items.filter(i => monthFilter === 'all' || i.month === monthFilter)
@@ -92,6 +96,26 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
 
   const totalSigned  = monthItems.filter(i => i.firmaAdmin && i.firmaEmp).length
   const totalPending = monthItems.filter(i => !(i.firmaAdmin && i.firmaEmp)).length
+  const selectable = filtered.filter(i => !i.firmaAdmin)
+  const selectedItems = items.filter(i => selectedIds.has(i.id) && !i.firmaAdmin)
+  const allVisibleSelected = selectable.length > 0 && selectable.every(i => selectedIds.has(i.id))
+  const toggleSelected = (id: string) => setSelectedIds(current => {
+    const next = new Set(current)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const toggleVisible = () => setSelectedIds(current => {
+    const next = new Set(current)
+    if (allVisibleSelected) selectable.forEach(item => next.delete(item.id))
+    else selectable.forEach(item => next.add(item.id))
+    return next
+  })
+  const confirmBulkSign = () => {
+    if (!selectedItems.length || !onSignMany) return
+    onSignMany(selectedItems.map(item => item.id))
+    setSelectedIds(new Set())
+    setBulkPreview(false)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 960 }}>
@@ -131,6 +155,19 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
         </div>
       </div>
 
+      {onSignMany && selectedItems.length > 0 && (
+        <div role="status" aria-label={`${selectedItems.length} cierre${selectedItems.length !== 1 ? 's' : ''} seleccionado${selectedItems.length !== 1 ? 's' : ''}`} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', padding:'11px 14px', borderRadius:radius.md, border:`1px solid ${colors.primary.base}`, background:colors.primary.dim }}>
+          <div>
+            <div style={{ fontSize:12.5, fontWeight:800, color:colors.primary.light }}>{selectedItems.length} cierre{selectedItems.length !== 1 ? 's' : ''} seleccionado{selectedItems.length !== 1 ? 's' : ''}</div>
+            <div style={{ marginTop:2, fontSize:11, color:colors.text[500] }}>La selección se conserva al cambiar de filtro.</div>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button type="button" onClick={() => setSelectedIds(new Set())} style={{ padding:'8px 11px', borderRadius:radius.sm, border:`1px solid ${colors.border.default}`, background:'transparent', color:colors.text[700], fontFamily:'inherit', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>Limpiar</button>
+            <button type="button" onClick={() => setBulkPreview(true)} style={{ padding:'8px 12px', borderRadius:radius.sm, border:0, background:colors.primary.base, color:'#fff', fontFamily:'inherit', fontSize:11.5, fontWeight:800, cursor:'pointer' }}>Revisar y firmar</button>
+          </div>
+        </div>
+      )}
+
       {/* KPI strip */}
       <div className="uiv2-close-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
@@ -156,8 +193,11 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
       <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden' }}>
         <div style={{ background: colors.bg[700] }}>
           <div className="uiv2-close-table-head" style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 90px 180px 130px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
-            {['Empleado', 'Mes', 'Horas', 'Extra', 'Firmas', 'Acciones'].map(h => (
-              <div key={h} style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>{h}</div>
+            {['Empleado', 'Mes', 'Horas', 'Extra', 'Firmas', 'Acciones'].map((h, index) => (
+              <div key={h} style={{ display:'flex', alignItems:'center', gap:8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>
+                {index === 0 && onSignMany && <input type="checkbox" aria-label="Seleccionar todos los cierres visibles sin firma admin" checked={allVisibleSelected} disabled={!selectable.length} onChange={toggleVisible} />}
+                {h}
+              </div>
             ))}
           </div>
 
@@ -168,6 +208,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
               borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {onSignMany && <input type="checkbox" aria-label={`Seleccionar cierre de ${item.empName}`} checked={selectedIds.has(item.id)} disabled={item.firmaAdmin} onChange={() => toggleSelected(item.id)} />}
                 <Avatar name={item.empName} size={30} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: colors.text[900] }}>{item.empName}</div>
@@ -238,6 +279,28 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
           )}
         </div>
       </div>
+
+      {bulkPreview && (
+        <div onClick={() => setBulkPreview(false)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.72)' }}>
+          <div ref={bulkDialogRef} role="dialog" aria-modal="true" aria-label="Confirmar firma administrativa en lote" onClick={event => event.stopPropagation()} style={{ width:'100%', maxWidth:500, maxHeight:'84dvh', overflowY:'auto', padding:24, borderRadius:radius.xl, border:`1px solid ${colors.border.default}`, background:colors.bg[900], boxShadow:'0 24px 64px rgba(0,0,0,.6)', display:'grid', gap:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:16 }}>
+              <div>
+                <div style={{ fontSize:16, fontWeight:850, color:colors.text[900] }}>Confirmar firma en lote</div>
+                <div style={{ marginTop:4, fontSize:12, color:colors.text[500] }}>Se registrará tu firma administrativa en {selectedItems.length} cierre{selectedItems.length !== 1 ? 's' : ''}.</div>
+              </div>
+              <button type="button" aria-label="Cerrar confirmación" onClick={() => setBulkPreview(false)} style={{ alignSelf:'flex-start', padding:4, border:0, background:'transparent', color:colors.text[500], cursor:'pointer' }}><IconX width={18} height={18} /></button>
+            </div>
+            <div style={{ display:'grid', gap:7 }}>
+              {selectedItems.map(item => <div key={item.id} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'9px 11px', borderRadius:radius.sm, background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, fontSize:11.5 }}><strong style={{ color:colors.text[900] }}>{item.empName}</strong><span style={{ color:colors.text[500] }}>{item.month}</span></div>)}
+            </div>
+            <div style={{ padding:'9px 11px', borderRadius:radius.sm, background:'rgba(245,158,11,.08)', border:'1px solid rgba(245,158,11,.24)', color:colors.semantic.orange, fontSize:11.5 }}>La firma administrativa queda auditada y no se puede deshacer desde esta pantalla.</div>
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+              <button type="button" onClick={() => setBulkPreview(false)} style={{ padding:'9px 13px', borderRadius:radius.sm, border:`1px solid ${colors.border.default}`, background:'transparent', color:colors.text[700], fontFamily:'inherit', fontWeight:700, cursor:'pointer' }}>Cancelar</button>
+              <button type="button" onClick={confirmBulkSign} style={{ padding:'9px 14px', borderRadius:radius.sm, border:0, background:colors.primary.base, color:'#fff', fontFamily:'inherit', fontWeight:800, cursor:'pointer' }}>Firmar {selectedItems.length} cierre{selectedItems.length !== 1 ? 's' : ''}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail / sign modal */}
       {detail && (

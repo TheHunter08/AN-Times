@@ -1479,12 +1479,40 @@ function MonthlyClosePage() {
 
   const handleSignAdmin = (id: string) => {
     const nowIso = new Date().toISOString()
-    saveDB((fresh: any) => ({
-      cierres: (fresh.cierres || []).map((c: any) =>
-        c.id === id ? { ...c, firmaAdmin:true, firmaAdminAt:nowIso, firmaAdminBy:session?.user?.name || 'Admin', estado:(c.firmaEmp || c.firma) ? 'firmado' : c.estado, _upd:nowIso } : c
-      ),
-    }))
+    const actor = session?.user?.name || 'Admin'
+    saveDB((fresh: any) => {
+      const closure = (fresh.cierres || []).find((c: any) => c.id === id)
+      if (!closure || closure.firmaAdmin) return null
+      const cierres = (fresh.cierres || []).map((c: any) =>
+        c.id === id ? { ...c, firmaAdmin:true, firmaAdminAt:nowIso, firmaAdminBy:actor, estado:(c.firmaEmp || c.firma) ? 'firmado' : c.estado, _upd:nowIso } : c
+      )
+      const withAudit = auditLog(fresh, 'Cierre firmado por administrador', `${closure.empName || closure.empId} · ${closure.mes}`, actor, { category:'documento', entityType:'cierre', entityId:id, device:currentDeviceLabel(), before:{ firmaAdmin:false }, after:{ firmaAdmin:true } })
+      return { cierres, audit:withAudit.audit }
+    })
     toast('Firma admin registrada', 2500, 'ok')
+  }
+
+  const handleSignMany = (ids: string[]) => {
+    const requested = new Set(ids)
+    const actor = session?.user?.name || 'Admin'
+    const nowIso = new Date().toISOString()
+    const signedCount = (db.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin).length
+    if (!signedCount) {
+      toast('No había cierres pendientes de firma administrativa', 3200, 'warn')
+      return
+    }
+    saveDB((fresh: any) => {
+      const eligible = (fresh.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin)
+      if (!eligible.length) return null
+      const eligibleIds = new Set(eligible.map((c: any) => c.id))
+      const cierres = (fresh.cierres || []).map((c: any) => eligibleIds.has(c.id)
+        ? { ...c, firmaAdmin:true, firmaAdminAt:nowIso, firmaAdminBy:actor, estado:(c.firmaEmp || c.firma) ? 'firmado' : c.estado, _upd:nowIso }
+        : c
+      )
+      const withAudit = auditLog(fresh, 'Cierres firmados en lote', `${eligible.length} cierres · ${eligible.map((c: any) => c.mes).filter((mes: string, index: number, all: string[]) => all.indexOf(mes) === index).join(', ')}`, actor, { category:'documento', entityType:'cierre_batch', entityId:eligible.map((c: any) => c.id).join(','), device:currentDeviceLabel(), before:{ count:eligible.length, firmaAdmin:false }, after:{ count:eligible.length, firmaAdmin:true } })
+      return { cierres, audit:withAudit.audit }
+    })
+    toast(`${signedCount} cierre${signedCount !== 1 ? 's' : ''} firmado${signedCount !== 1 ? 's' : ''} y auditado${signedCount !== 1 ? 's' : ''}`, 3200, 'ok')
   }
 
   const handleDownloadConsolidated = async (mes: string) => {
@@ -1524,7 +1552,7 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
