@@ -28,7 +28,7 @@ export interface ClosureItem {
   supervisorName?: string
   generatedOn: string
   estado: string
-  records: Array<{ date: string; entry: string; exit: string; hours: string }>
+  records: Array<{ date: string; entry: string; exit: string; hours: string; corrections?: Array<{ ts?: string; by?: string; motivo?: string; device?: string; oldInicio?: string; oldFin?: string; newInicio?: string; newFin?: string }> }>
   // PDF oficial ya generado y firmado (data URL) — si existe, descargar ESTE
   // documento (tiene firma + hash) en vez de regenerar uno en texto plano.
   pdfData?: string | null
@@ -55,6 +55,9 @@ async function generatePDF(item: ClosureItem) {
     '',
     'Fecha | Entrada | Salida | Horas',
     ...(item.records || []).map(r => `${r.date} | ${r.entry} | ${r.exit} | ${r.hours}`),
+    '',
+    'Historial de modificaciones',
+    ...(item.records || []).flatMap(r => (r.corrections || []).map(c => `${r.date} | ${c.by || '—'} | ${c.motivo || 'Sin motivo'} | ${c.device || 'Dispositivo no registrado'}`)),
   ]
   await downloadSimplePdf(`Cierre mensual - ${item.empName}`, lines, `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.pdf`)
 }
@@ -76,14 +79,19 @@ function generateExcel(item: ClosureItem) {
 
 export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'signed' | 'pending'>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
   const detailDialogRef = useDialogA11y(Boolean(detail), () => setDetail(null))
 
   const months = [...new Set(items.map(i => i.month))]
-  const filtered = items.filter(i => monthFilter === 'all' || i.month === monthFilter)
+  const monthItems = items.filter(i => monthFilter === 'all' || i.month === monthFilter)
+  const filtered = monthItems.filter(i => {
+    const signed = i.firmaAdmin && i.firmaEmp
+    return statusFilter === 'all' || (statusFilter === 'signed' ? signed : !signed)
+  })
 
-  const totalSigned  = items.filter(i => i.firmaAdmin && i.firmaEmp).length
-  const totalPending = items.filter(i => !(i.firmaAdmin && i.firmaEmp)).length
+  const totalSigned  = monthItems.filter(i => i.firmaAdmin && i.firmaEmp).length
+  const totalPending = monthItems.filter(i => !(i.firmaAdmin && i.firmaEmp)).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 960 }}>
@@ -126,14 +134,21 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
       {/* KPI strip */}
       <div className="uiv2-close-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Cierres generados',   value: String(items.length),       color: colors.accent.base,      bg: colors.accent.dim },
-          { label: 'Firmados completos',  value: String(totalSigned),        color: colors.semantic.green,   bg: 'rgba(16,185,129,.10)' },
-          { label: 'Pendientes de firma', value: String(totalPending),       color: colors.semantic.orange,  bg: 'rgba(245,158,11,.10)' },
-        ].map((k, i) => (
-          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
+          { id: 'all' as const, label: 'Cierres generados',   value: String(monthItems.length), color: colors.accent.base,     bg: colors.accent.dim },
+          { id: 'signed' as const, label: 'Firmados completos',  value: String(totalSigned),    color: colors.semantic.green,  bg: 'rgba(16,185,129,.10)' },
+          { id: 'pending' as const, label: 'Pendientes de firma', value: String(totalPending),   color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
+        ].map(k => (
+          <button
+            key={k.id}
+            type="button"
+            aria-pressed={statusFilter === k.id}
+            aria-label={`Filtrar cierres: ${k.label}`}
+            onClick={() => setStatusFilter(k.id)}
+            style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid ${statusFilter === k.id ? k.color : 'rgba(var(--uiv2-overlay-rgb),.06)'}`, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', boxShadow: statusFilter === k.id ? `0 0 0 2px ${k.bg}` : 'none' }}
+          >
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 6 }}>{k.label}</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: k.color, letterSpacing: '-1px' }}>{k.value}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -213,7 +228,13 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
           ))}
 
           {filtered.length === 0 && (
-            <ProductState compact title={items.length === 0 ? 'Aún no hay cierres' : 'Sin cierres para este mes'} description={items.length === 0 ? 'Genera los cierres del mes cuando el periodo esté disponible.' : 'Selecciona otro mes para consultar sus cierres.'} actionLabel={items.length === 0 && canGenerate ? 'Generar cierre del mes' : undefined} onAction={items.length === 0 && canGenerate ? onGenerateAll : undefined} />
+            <ProductState
+              compact
+              title={items.length === 0 ? 'Aún no hay cierres' : 'No hay cierres con este filtro'}
+              description={items.length === 0 ? 'Genera los cierres del mes cuando el periodo esté disponible.' : 'Selecciona otro estado o mes para consultar sus cierres.'}
+              actionLabel={items.length === 0 && canGenerate ? 'Generar cierre del mes' : statusFilter !== 'all' ? 'Ver todos los cierres' : undefined}
+              onAction={items.length === 0 && canGenerate ? onGenerateAll : statusFilter !== 'all' ? () => setStatusFilter('all') : undefined}
+            />
           )}
         </div>
       </div>
@@ -276,12 +297,27 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onGenerateAll, on
                 <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden' }}>
                   {detail.records.map((r, i) => (
                     <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px', gap: 8, padding: '8px 12px', borderBottom: i === detail.records.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`, background: i % 2 === 0 ? 'transparent' : 'rgba(var(--uiv2-overlay-rgb),.02)' }}>
-                      <span style={{ fontSize: 12, color: colors.text[700] }}>{r.date}</span>
+                      <span style={{ fontSize: 12, color: colors.text[700] }}>{r.date}{r.corrections?.length ? <small style={{ display:'block', marginTop:2, color:colors.semantic.orange, fontWeight:700 }}>Modificado · {r.corrections.length}</small> : null}</span>
                       <span style={{ fontSize: 12, color: colors.text[500] }}>{r.entry}</span>
                       <span style={{ fontSize: 12, color: colors.text[500] }}>{r.exit}</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{r.hours}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {detail.records.some(r => r.corrections?.length) && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Trazabilidad de modificaciones</div>
+                <div style={{ display:'grid', gap:8 }}>
+                  {detail.records.flatMap(r => (r.corrections || []).map((c, index) => (
+                    <div key={`${r.date}-${c.ts || index}`} style={{ padding:'10px 12px', borderRadius:radius.sm, border:`1px solid rgba(245,158,11,.24)`, background:'rgba(245,158,11,.07)', fontSize:11, color:colors.text[500], lineHeight:1.5 }}>
+                      <div style={{ color:colors.text[900], fontWeight:700 }}>{r.date} · {c.by || '—'}</div>
+                      <div>{c.motivo || 'Sin motivo'} · {c.device || 'Dispositivo no registrado'}</div>
+                      <div>{c.oldInicio ? new Date(c.oldInicio).toLocaleString('es-ES') : '—'}–{c.oldFin ? new Date(c.oldFin).toLocaleString('es-ES') : '—'} → {c.newInicio ? new Date(c.newInicio).toLocaleString('es-ES') : '—'}–{c.newFin ? new Date(c.newFin).toLocaleString('es-ES') : '—'}</div>
+                    </div>
+                  )))}
                 </div>
               </div>
             )}

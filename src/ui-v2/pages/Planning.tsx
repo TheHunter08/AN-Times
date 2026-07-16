@@ -23,6 +23,7 @@ export interface PlanningProps {
   onPrev?: () => void
   onNext?: () => void
   onToday?: () => void
+  onOpenEmployee?: (employeeId: string) => void
 }
 
 type PlanStatus = PlanCell['status']
@@ -71,7 +72,7 @@ const LEGEND = [
   { status: 'future', label: 'Aún no llega' },
 ] as const
 
-export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }: PlanningProps) {
+export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, onOpenEmployee }: PlanningProps) {
   const safeDays = Array.isArray(days) ? days : []
   const safeEmployees = Array.isArray(employees) ? employees : []
 
@@ -117,7 +118,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
             {safeEmployees.map(emp => (
               <tr key={emp.id}>
                 <td style={{ padding: '4px 8px', verticalAlign: 'middle', width: 110 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button type="button" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`Abrir fichajes de ${emp.name}`} style={{ width:'100%', display: 'flex', alignItems: 'center', gap: 6, padding:0, border:0, background:'transparent', textAlign:'left', cursor:onOpenEmployee?'pointer':'default', fontFamily:'inherit' }}>
                     <Avatar name={emp.name} size={24} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: colors.text[900], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 70 }}>
@@ -127,16 +128,17 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
                         {emp.name.split(' ').slice(1).join(' ') || emp.dept}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </td>
                 {(Array.isArray(emp.week) ? emp.week : []).map((cell, di) => {
                   const safeCell = resolveCell(cell)
                   const def = cellDef[safeCell.status]
                   return (
                     <td key={di} style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <div style={{
+                      <button type="button" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. Abrir fichajes de ${emp.name}`} style={{
+                        width:'100%', border: `1px solid ${def.border}`, cursor:onOpenEmployee?'pointer':'default', fontFamily:'inherit',
                         padding: '4px 2px', borderRadius: radius.sm, minHeight: 30,
-                        background: def.bg, border: `1px solid ${def.border}`,
+                        background: def.bg,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         position: 'relative',
                       }}>
@@ -150,7 +152,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
                             {safeCell.status === 'absent' ? '—' : safeCell.status === 'vac' ? 'VAC' : safeCell.status === 'weekend' ? '·' : ''}
                           </span>
                         )}
-                      </div>
+                      </button>
                     </td>
                   )
                 })}
@@ -162,13 +164,13 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
       <div className="uiv2-week-mobile" role="list" aria-label="Planning por empleado">
         {safeEmployees.map(emp => (
           <article key={emp.id} className="uiv2-week-card" role="listitem">
-            <header className="uiv2-week-card-head">
+            <button type="button" className="uiv2-week-card-head" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`Abrir fichajes de ${emp.name}`}>
               <Avatar name={emp.name} size={34} />
               <div style={{ minWidth: 0 }}>
                 <div className="uiv2-week-card-name">{emp.name}</div>
                 <div className="uiv2-week-card-meta">{emp.dept}</div>
               </div>
-            </header>
+            </button>
             <div className="uiv2-week-days">
               {(Array.isArray(emp.week) ? emp.week : []).map((cell, di) => {
                 const safeCell = resolveCell(cell)
@@ -176,9 +178,9 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
                 return (
                   <div key={di} className="uiv2-week-day">
                     <span className="uiv2-week-day-label">{safeDays[di] || ''}</span>
-                    <span style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
+                    <button type="button" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. Abrir fichajes de ${emp.name}`} style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
                       {safeCell.value || (safeCell.status === 'absent' ? 'Ausente' : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
-                    </span>
+                    </button>
                   </div>
                 )
               })}
@@ -193,12 +195,12 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday }
           .uiv2-week-desktop{display:none}
           .uiv2-week-mobile{display:grid;gap:12px}
           .uiv2-week-card{padding:16px;background:${colors.bg[700]};border:1px solid ${colors.border.subtle};border-radius:${radius.lg}}
-          .uiv2-week-card-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;margin-bottom:12px;border-bottom:1px solid ${colors.border.subtle}}
+          .uiv2-week-card-head{width:100%;display:flex;align-items:center;gap:10px;padding:0 0 14px;margin-bottom:12px;border:0;border-bottom:1px solid ${colors.border.subtle};background:transparent;text-align:left;cursor:pointer;font-family:inherit}
           .uiv2-week-card-name{font-size:14px;font-weight:700;color:${colors.text[900]};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
           .uiv2-week-card-meta{font-size:11px;color:${colors.text[500]};margin-top:2px}
           .uiv2-week-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
           .uiv2-week-day-label{display:block;margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;color:${colors.text[500]}}
-          .uiv2-week-day-value{display:flex;min-height:38px;padding:7px 8px;align-items:center;justify-content:center;border-radius:${radius.sm};font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center}
+          .uiv2-week-day-value{display:flex;width:100%;min-height:38px;padding:7px 8px;align-items:center;justify-content:center;border-radius:${radius.sm};font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center;cursor:pointer;font-family:inherit}
         }
       `}</style>
     </div>

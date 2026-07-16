@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from './adminHelpers.js'
+import { buildRecordSnapshot, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from './adminHelpers.js'
+
+describe('buildRecordSnapshot', () => {
+  it('conserva una copia independiente del historial de modificaciones', () => {
+    const record = {
+      id:'r1', empId:'e1', inicio:'2026-07-08T06:00:00.000Z', fin:'2026-07-08T15:00:00.000Z', breaks:[], modificado:true,
+      correcciones:[{ id:'x1', motivo:'Ajuste autorizado', by:'Admin', device:'Windows · Chrome' }],
+    }
+    const snapshot = buildRecordSnapshot(record)
+    expect(snapshot.modificado).toBe(true)
+    expect(snapshot.correcciones).toEqual(record.correcciones)
+    expect(snapshot.correcciones).not.toBe(record.correcciones)
+    expect(snapshot.correcciones[0]).not.toBe(record.correcciones[0])
+  })
+})
 
 describe('recordTimesFromClock', () => {
   it('conserva la fecha local original al cambiar solo la hora', () => {

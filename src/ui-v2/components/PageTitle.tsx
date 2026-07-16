@@ -7,8 +7,8 @@ import { typeScale } from '../design-system/typography'
 // tipográfica: tamaño y tracking hacen el trabajo, no el efecto.
 export function PageTitle({ children }: { children: ReactNode }) {
   return (
-    <div style={{ fontSize: `clamp(22px, 5vw, ${typeScale.h1.size})`, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking, color: colors.text[900], lineHeight: typeScale.h1.lineHeight }}>
+    <h1 style={{ margin: 0, fontSize: `clamp(22px, 5vw, ${typeScale.h1.size})`, fontWeight: typeScale.h1.weight, letterSpacing: typeScale.h1.tracking, color: colors.text[900], lineHeight: typeScale.h1.lineHeight }}>
       {children}
-    </div>
+    </h1>
   )
 }

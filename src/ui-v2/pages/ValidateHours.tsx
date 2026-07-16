@@ -30,6 +30,8 @@ export interface ValidateHoursProps {
   onReject?: (id: string) => void
   onModify?: (id: string, entry: string, exit: string) => void
   onDelete?: (id: string) => void
+  onApproveMany?: (ids: string[]) => void
+  onRejectMany?: (ids: string[]) => void
 }
 
 const diffColor = { ok: colors.semantic.green, over: colors.semantic.orange, under: colors.semantic.red }
@@ -44,13 +46,14 @@ function useIsMobile() {
   return m
 }
 
-export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, onDelete }: ValidateHoursProps) {
+export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, onDelete, onApproveMany, onRejectMany }: ValidateHoursProps) {
   const [search, setSearch] = useState('')
   const [localRows, setLocalRows] = useState(rows)
   const [tab, setTab] = useState<'pending' | 'reviewed'>('pending')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const editDialogRef = useDialogA11y(Boolean(editingId), () => setEditingId(null))
   const editedRows = useRef(new Map<string, { entry: string; exit: string }>())
   // Filas borradas de forma optimista, hasta que rows (prop) confirme que ya
@@ -122,6 +125,20 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
     background: colors.bg[600], color: colors.text[900],
     fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' as const,
   }
+  const selectedVisible = visible.filter(row => selectedIds.has(row.id))
+  const allVisibleSelected = visible.length > 0 && visible.every(row => selectedIds.has(row.id))
+  const toggleSelected = (id: string) => setSelectedIds(current => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const applyMany = (status: 'approved' | 'rejected') => {
+    const ids = selectedVisible.map(row => row.id)
+    if (!ids.length) return
+    setLocalRows(current => current.map(row => ids.includes(row.id) ? { ...row, status } : row))
+    if (status === 'approved') onApproveMany?.(ids); else onRejectMany?.(ids)
+    setSelectedIds(new Set())
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
@@ -161,6 +178,19 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
         ))}
       </div>
 
+      {tab === 'pending' && visible.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', padding:'10px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.subtle}`, background:colors.bg[600] }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8, color:colors.text[700], fontSize:12, cursor:'pointer' }}>
+            <input type="checkbox" checked={allVisibleSelected} onChange={() => setSelectedIds(allVisibleSelected ? new Set() : new Set(visible.map(row => row.id)))} />
+            Seleccionar visibles ({visible.length})
+          </label>
+          <div style={{ display:'flex', gap:7 }}>
+            <button type="button" disabled={!selectedVisible.length} onClick={() => applyMany('approved')} style={{ minHeight:34, padding:'0 11px', border:0, borderRadius:radius.sm, background:'rgba(16,185,129,.16)', color:colors.semantic.green, fontWeight:700, cursor:selectedVisible.length?'pointer':'default', opacity:selectedVisible.length?1:.5 }}>Aceptar ({selectedVisible.length})</button>
+            <button type="button" disabled={!selectedVisible.length} onClick={() => applyMany('rejected')} style={{ minHeight:34, padding:'0 11px', border:0, borderRadius:radius.sm, background:'rgba(239,68,68,.14)', color:colors.semantic.red, fontWeight:700, cursor:selectedVisible.length?'pointer':'default', opacity:selectedVisible.length?1:.5 }}>Rechazar</button>
+          </div>
+        </div>
+      )}
+
       {visible.length === 0 && (
         <ProductState compact title={tab === 'pending' ? 'Todo revisado' : 'No hay registros validados'} description={tab === 'pending' ? 'No quedan registros pendientes de validación.' : 'Los fichajes revisados aparecerán aquí.'} />
       )}
@@ -175,6 +205,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
             }}>
               {/* Cabecera tarjeta */}
               <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${colors.border.subtle}` }}>
+                {tab === 'pending' && <input type="checkbox" aria-label={`Seleccionar jornada de ${row.empName}`} checked={selectedIds.has(row.id)} onChange={() => toggleSelected(row.id)} />}
                 <Avatar name={row.empName} size={32} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.empName}</div>
@@ -257,6 +288,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                 borderBottom: i < visible.length - 1 ? `1px solid ${colors.border.subtle}` : 'none',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {tab === 'pending' && <input type="checkbox" aria-label={`Seleccionar jornada de ${row.empName}`} checked={selectedIds.has(row.id)} onChange={() => toggleSelected(row.id)} />}
                   <Avatar name={row.empName} size={26} />
                   <div>
                     <div style={{ fontSize: 12.5, fontWeight: 600, color: colors.text[900] }}>{row.empName}</div>

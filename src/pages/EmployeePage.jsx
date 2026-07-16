@@ -997,6 +997,17 @@ export default function EmployeePage() {
     [db.cierres, u.id]
   )
 
+  const handleNotificationNavigate = useCallback((item) => {
+    const text = `${item?.action || item?.title || ''} ${item?.detail || item?.body || ''}`.toLowerCase()
+    closeModal()
+    if (text.includes('vacac') || text.includes('solicitud')) setEmpTab('vacaciones')
+    else if (text.includes('document')) { setEmpTab('perfil'); openModal('documentos') }
+    else if (text.includes('cierre') || text.includes('firma')) { setEmpTab('perfil'); openModal('cierreSign') }
+    else if (text.includes('mensaje') || text.includes('administración')) openModal('chat')
+    else if (text.includes('jornada') || text.includes('fich') || text.includes('salida') || text.includes('hora')) setEmpTab('jornada')
+    else setEmpTab('inicio')
+  }, [closeModal, openModal, setEmpTab])
+
   // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)
   const teamCierresPendientes = useMemo(() => {
     if (!isSuper) return []
@@ -1052,7 +1063,7 @@ export default function EmployeePage() {
       {activeModal === 'selCentro' && <ModalSelCentro visible data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />}
       {qrScanOpen && <ModalQRScan visible onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />}
       {activeModal === 'miQR' && <ModalMyQR visible u={u} onClose={closeModal} />}
-      {activeModal === 'notis' && <ModalNotis visible db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />}
+      {activeModal === 'notis' && <ModalNotis visible db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} onNavigate={handleNotificationNavigate} />}
       {activeModal === 'ai' && <ModalAI visible db={db} u={u} onClose={closeModal} />}
       {activeModal === 'vacForm' && <ModalVacForm visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'sign' && <ModalSign visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}

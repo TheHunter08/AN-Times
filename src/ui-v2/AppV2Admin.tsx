@@ -13,6 +13,7 @@ import {
   IconShield, IconBuilding, IconAlertCircle, IconReceipt,
   IconCheck, IconLogout, IconRows, IconSeal, IconTrendUp, IconMapPin,
   IconHome, IconX, IconPlus, IconSun, IconMoon,
+  IconSettings,
 } from './components/Icons.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
@@ -22,7 +23,7 @@ import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
-import { buildRecordSnapshot, clipBreaksToWindow, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
+import { buildRecordSnapshot, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
@@ -45,6 +46,7 @@ const Anomalies = lazy(() => import('./pages/Anomalies.js').then(module => ({ de
 const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ default: module.Messages })))
 const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
 const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
+const Operations = lazy(() => import('./pages/Operations.js').then(module => ({ default: module.Operations })))
 
 function PageLoader() {
   return (
@@ -75,6 +77,7 @@ const PAGES = [
   { id: 'auditoria',      label: 'Auditoría',         group: 'Análisis', icon: <IconShield /> },
   { id: 'mensajes',       label: 'Mensajes',          group: 'Comunicación', icon: <IconChat /> },
   { id: 'notificaciones', label: 'Notificaciones',    group: 'Comunicación', icon: <IconBell /> },
+  { id: 'operaciones',    label: 'Centro operativo',  group: 'Sistema', icon: <IconSettings /> },
 ]
 
 const ROLES = [
@@ -365,7 +368,9 @@ function useRequestsActions() {
       if (!rec || !corr.propInicio) { toast('El fichaje original ya no existe', 4000, 'warn'); return }
       if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de aplicar la corrección.', 5000, 'warn'); return }
       const breaks = corr.propFin ? clipBreaksToWindow(rec.breaks || [], corr.propInicio, corr.propFin) : (rec.breaks || [])
-      const base = { ...rec, inicio:corr.propInicio, fin:corr.propFin || null, breaks, _upd:nowIso, modificado:true, aceptada:true, validado:true, rechazado:false }
+      const device = currentDeviceLabel()
+      const correction = { id:gid(), ts:nowIso, tipo:'solicitud_empleado', motivo:corr.motivo || 'Corrección solicitada', oldInicio:rec.inicio, oldFin:rec.fin, newInicio:corr.propInicio, newFin:corr.propFin || null, by:who, device, requestedDevice:corr.requestedDevice || null }
+      const base = { ...rec, inicio:corr.propInicio, fin:corr.propFin || null, breaks, _upd:nowIso, modificado:true, aceptada:true, validado:true, rechazado:false, correcciones:[...(rec.correcciones || []), correction], validadoAt:nowIso, validadoBy:who }
       const calculated = calcSecs(base)
       updatedRecord = { ...base, workSecs:calculated.work, breakSecs:calculated.brk }
       try { await persistRecordRow(updatedRecord) } catch (error: any) {
@@ -385,7 +390,11 @@ function useRequestsActions() {
         ? refreshUnsignedClosures(fresh.cierres || [], records, corr.empId, [rec.inicio, updatedRecord.inicio], nowIso)
         : (fresh.cierres || [])
       const noti = { id:gid(), empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', ts:nowIso, leido:false }
-      const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who)
+      const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who, {
+        category:'jornada', entityType:'record', entityId:corr.recId, reason:corr.motivo || '', device:currentDeviceLabel(),
+        before:rec ? { inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs } : null,
+        after:updatedRecord ? { inicio:updatedRecord.inicio, fin:updatedRecord.fin, workSecs:updatedRecord.workSecs, breakSecs:updatedRecord.breakSecs } : { estado:'rechazada' },
+      })
       return { correccionesFichaje, records, cierres, notis:[...(fresh.notis || []), noti], audit:withAudit.audit }
     })
     queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada')
@@ -486,24 +495,32 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     <IconTrendUp width={16} height={16} />,
     <IconClipboard width={16} height={16} />,
   ]
+  const kpiDestinations = ['empleados', 'en_linea', 'en_linea', 'empleados', 'fichajes']
 
   const kpisWithExtra = data.kpis.map((k, i) => ({
     ...k,
     icon: kpiIcons[i],
     tone: (k as any).tone ?? (['primary', 'accent', 'cyan', 'cyan', 'amber'] as const)[i],
+    onClick: () => onNavigate(kpiDestinations[i] || 'dashboard'),
   }))
+  const widgetIds = ['employees', 'working', 'validation', 'requests', 'coverage']
+  const visibleWidgets: string[] = db.config?.adminDashboard?.visibleWidgets || widgetIds
+  const visibleKpis = visibleWidgets
+    .map(id => kpisWithExtra[widgetIds.indexOf(id)])
+    .filter(Boolean)
 
   return (
     <Dashboard
       {...data}
       greetingSub="Aquí tienes el resumen de tu equipo."
-      kpis={kpisWithExtra}
+      kpis={visibleKpis}
       trend={data.trend}
       compareTrend={data.compareTrend}
-      activity={data.activity}
-      nextEvent={nextVacRequest}
-      fichaje={ownShiftStatus}
-      teamSlot={teamAvatars}
+      activity={data.activity.map(item => ({ ...item, onClick: () => onNavigate('auditoria') }))}
+      nextEvent={nextVacRequest ? { ...nextVacRequest, onClick: () => onNavigate('solicitudes') } : undefined}
+      fichaje={ownShiftStatus ? { ...ownShiftStatus, onClick: () => setScreen('emp') } : undefined}
+      teamSlot={{ ...teamAvatars, onClick: () => onNavigate('en_linea') }}
+      onTrendClick={() => onNavigate('estadisticas')}
       onExport={handleExport}
       quickActions={canClockOwnShift ? (
         <button className="ti-dashboard-button" type="button" onClick={() => setScreen('emp')}>
@@ -522,14 +539,14 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
   )
 }
 
-function RequestsPage() {
+function RequestsPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => void }) {
   const { rows } = useRequestsActions()
-  return <Requests rows={rows} />
+  return <Requests rows={rows} onOpen={row => onOpenEmployee(row.employeeName)} />
 }
 
-function NotificationsPage() {
+function NotificationsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const { items, markRead, markAllRead, dismiss } = useNotificationsData()
-  return <Notifications items={items} onMarkRead={markRead} onMarkAllRead={markAllRead} onDismiss={dismiss} />
+  return <Notifications items={items} onMarkRead={markRead} onMarkAllRead={markAllRead} onDismiss={dismiss} onOpen={item => { markRead(item.id); onNavigate(item.destination || 'auditoria') }} />
 }
 
 function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) => void }) {
@@ -582,13 +599,18 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
     const breaks = clipBreaksToWindow(rec.breaks || [], inicio, fin)
     const calculated = calcSecs({ ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
-    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:reason, oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado' }] }
+    const device = currentDeviceLabel()
+    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:reason, oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado', device }] }
     try {
       await persistRecordRow(updated)
       saveDB((fresh:any) => {
         const records = (fresh.records || []).map((r:any) => r.id === id ? updated : r)
         const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, updated.inicio], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empName || rec.empId}: ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empName || rec.empId}: ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:rec.id, reason, device,
+          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs },
+          after:{ inicio:updated.inicio, fin:updated.fin, workSecs:updated.workSecs, breakSecs:updated.breakSecs },
+        })
         return { records, cierres, audit:withAudit.audit }
       })
       toast('Fichaje modificado y sincronizado', 3000, 'ok')
@@ -606,7 +628,10 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       saveDB((fresh:any) => {
         const records = (fresh.records || []).filter((r:any) => r.id !== id)
         const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)} ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} · ${reason}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)} ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} · ${reason}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:rec.id, reason,
+          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
+        })
         return { records, cierres, audit:withAudit.audit }
       })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
@@ -617,7 +642,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
   return <Timesheets rows={rows} search={search} onSearchChange={handleSearch} onModify={modify} onDelete={remove} />
 }
 
-function PlanningPage() {
+function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const [weekOffset, setWeekOffset] = useState(0)
 
@@ -676,11 +701,12 @@ function PlanningPage() {
       onPrev={() => setWeekOffset(o => o - 1)}
       onNext={() => setWeekOffset(o => o + 1)}
       onToday={() => setWeekOffset(0)}
+      onOpenEmployee={onOpenEmployee}
     />
   )
 }
 
-function ShiftsPage() {
+function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const [weekOffset, setWeekOffset] = useState(0)
 
@@ -730,6 +756,7 @@ function ShiftsPage() {
       onPrev={() => setWeekOffset(o => o - 1)}
       onNext={() => setWeekOffset(o => o + 1)}
       onToday={() => setWeekOffset(0)}
+      onOpenEmployee={onOpenEmployee}
     />
   )
 }
@@ -780,11 +807,10 @@ function ValidateHoursPage() {
       toast(`No se pudo validar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
       return
     }
-    saveDB((fresh: any) => ({
-      records: (fresh.records || []).map((r: any) =>
-        r.id === id ? updated : r
-      ),
-    }))
+    saveDB((fresh: any) => {
+      const withAudit = auditLog(fresh, 'Jornada validada', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Admin', { category:'jornada', entityType:'record', entityId:rec.id, before:{ validado:!!rec.validado }, after:{ validado:true } })
+      return { records: (fresh.records || []).map((r: any) => r.id === id ? updated : r), audit:withAudit.audit }
+    })
     toast('Jornada validada', 2500, 'ok')
   }
 
@@ -797,11 +823,10 @@ function ValidateHoursPage() {
       toast(`No se pudo rechazar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
       return
     }
-    saveDB((fresh: any) => ({
-      records: (fresh.records || []).map((r: any) =>
-        r.id === id ? updated : r
-      ),
-    }))
+    saveDB((fresh: any) => {
+      const withAudit = auditLog(fresh, 'Jornada rechazada', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Admin', { category:'jornada', entityType:'record', entityId:rec.id, before:{ rechazado:!!rec.rechazado }, after:{ rechazado:true } })
+      return { records: (fresh.records || []).map((r: any) => r.id === id ? updated : r), audit:withAudit.audit }
+    })
     toast('Jornada rechazada', 2500, 'warn')
   }
 
@@ -827,6 +852,7 @@ function ValidateHoursPage() {
       id: gid(), ts: nowIso, tipo: 'admin', motivo: 'Corrección de horario desde Validar horas',
       oldInicio: rec.inicio, oldFin: rec.fin, newInicio: inicioIso, newFin: finIso,
       by: session?.user?.name || 'Admin',
+      device: currentDeviceLabel(),
     }
     const correcciones = [...(rec.correcciones || []), correction]
     const updatedRec = { ...rec, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
@@ -835,7 +861,11 @@ function ValidateHoursPage() {
       saveDB((fresh: any) => {
         const records = (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r)
         const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, inicioIso], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:rec.id, reason:correction.motivo, device:correction.device,
+          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs },
+          after:{ inicio:updatedRec.inicio, fin:updatedRec.fin, workSecs:updatedRec.workSecs, breakSecs:updatedRec.breakSecs },
+        })
         return {
           records,
           cierres,
@@ -862,7 +892,10 @@ function ValidateHoursPage() {
       saveDB((fresh: any) => {
         const records = (fresh.records || []).filter((r: any) => r.id !== id)
         const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado')
+        const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:rec.id, reason:'Eliminación desde Validar horas',
+          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
+        })
         return { records, cierres, audit: withAudit.audit }
       })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
@@ -872,10 +905,36 @@ function ValidateHoursPage() {
     }
   }
 
-  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} onDelete={handleDelete} />
+  const handleBulkDecision = async (ids: string[], decision: 'approved' | 'rejected') => {
+    const idSet = new Set(ids)
+    const nowIso = new Date().toISOString()
+    const actor = session?.user?.name || 'Admin'
+    const candidates = (db.records || []).filter((record: any) => idSet.has(record.id))
+    const updates = candidates.map((record: any) => ({
+      ...record,
+      aceptada: decision === 'approved',
+      validado: decision === 'approved',
+      rechazado: decision === 'rejected',
+      validadoBy: actor,
+      validadoAt: nowIso,
+      _upd: nowIso,
+    }))
+    const results = await Promise.allSettled(updates.map((record: any) => persistRecordRow(record)))
+    const successful = updates.filter((_: any, index: number) => results[index].status === 'fulfilled')
+    if (!successful.length) { toast('No se pudo actualizar ninguna jornada', 4000, 'warn'); return }
+    const successfulMap = new Map(successful.map((record: any) => [record.id, record]))
+    saveDB((fresh: any) => {
+      const nextRecords = (fresh.records || []).map((record: any) => successfulMap.get(record.id) || record)
+      const withAudit = auditLog(fresh, decision === 'approved' ? 'Jornadas validadas en lote' : 'Jornadas rechazadas en lote', `${successful.length} registros`, actor, { category:'jornada', entityType:'record_batch', entityId:successful.map((record: any) => record.id).join(','), before:{ count:successful.length }, after:{ decision } })
+      return { records:nextRecords, audit:withAudit.audit }
+    })
+    toast(`${successful.length} jornadas ${decision === 'approved' ? 'validadas' : 'rechazadas'}`, 2800, successful.length === updates.length ? 'ok' : 'warn')
+  }
+
+  return <ValidateHours rows={rows} weekLabel="Últimas 2 semanas" onApprove={handleApprove} onReject={handleReject} onModify={handleModify} onDelete={handleDelete} onApproveMany={ids => handleBulkDecision(ids, 'approved')} onRejectMany={ids => handleBulkDecision(ids, 'rejected')} />
 }
 
-function ExpensesPage() {
+function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => void }) {
   const db      = useAppStore(s => s.db) as any
   const saveDB  = useAppStore(s => s.saveDB)
   const session = useAppStore(s => s.session)
@@ -925,7 +984,7 @@ function ExpensesPage() {
     toast('Gasto rechazado', 3000, 'warn')
   }
 
-  return <Expenses items={items} onApprove={approve} onReject={reject} />
+  return <Expenses items={items} onApprove={approve} onReject={reject} onOpen={item => onOpenEmployee(item.empName)} />
 }
 
 function DocumentsPage() {
@@ -1063,7 +1122,7 @@ function ReportsPage() {
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
-    const headers = ['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)']
+    const headers = ['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)', 'Modificado', 'Historial de cambios']
     const rows = recs.map((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
       const mins = recWorkSecs(r) / 60
@@ -1079,6 +1138,8 @@ function ReportsPage() {
         new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         `${Math.floor(worked / 60)}h ${worked % 60}m`,
         String(brk),
+        r.correcciones?.length ? 'Sí' : 'No',
+        (r.correcciones || []).map((c: any) => `${c.ts || ''} · ${c.by || '—'} · ${c.motivo || 'Sin motivo'} · ${c.device || 'Dispositivo no registrado'} · ${c.oldInicio || '—'}–${c.oldFin || '—'} → ${c.newInicio || '—'}–${c.newFin || '—'}`).join(' | '),
       ]
     })
     downloadXlsx(headers, rows, `fichajes-${mes}.xlsx`, label)
@@ -1108,6 +1169,16 @@ function ReportsPage() {
 
     pdfLines.unshift(`Generado: ${new Date().toLocaleDateString('es-ES')}`)
     pdfLines.push(`TOTAL: ${Math.floor(totalMins / 60)}h ${Math.floor(totalMins % 60)}m | ${recs.length} fichajes`)
+    const corrections = recs.flatMap((r: any) => (r.correcciones || []).map((c: any) => ({ record:r, correction:c })))
+    if (corrections.length) {
+      pdfLines.push('', `TRAZABILIDAD DE MODIFICACIONES (${corrections.length})`)
+      corrections.forEach(({ record, correction: c }: any) => {
+        const emp = emps.find((e: any) => e.id === record.empId)
+        const oldRange = `${c.oldInicio ? new Date(c.oldInicio).toLocaleString('es-ES') : '—'}–${c.oldFin ? new Date(c.oldFin).toLocaleString('es-ES') : '—'}`
+        const newRange = `${c.newInicio ? new Date(c.newInicio).toLocaleString('es-ES') : '—'}–${c.newFin ? new Date(c.newFin).toLocaleString('es-ES') : '—'}`
+        pdfLines.push(`${emp?.name || record.empName || record.empId} | ${c.by || '—'} | ${c.motivo || 'Sin motivo'} | ${c.device || 'Dispositivo no registrado'} | ${oldRange} -> ${newRange}`)
+      })
+    }
     await downloadSimplePdf(`Informe mensual - ${label}`, pdfLines, `informe-${mes}.pdf`)
   }
 
@@ -1135,7 +1206,7 @@ function ReportsPage() {
   return <Reports rows={rows} />
 }
 
-function StatsPage() {
+function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
 
   const { kpis, bars, centrosBars, donut, rawSlices } = useMemo(() => {
@@ -1209,7 +1280,7 @@ function StatsPage() {
   return (
     <Stats
       title="Estadísticas del mes"
-      kpis={kpis}
+      kpis={kpis.map((kpi:any, index:number) => ({ ...kpi, onClick:() => onNavigate(index === 2 ? 'empleados' : 'fichajes') }))}
       bars={bars}
       centrosBars={centrosBars}
       donut={donut}
@@ -1337,6 +1408,7 @@ function MonthlyClosePage() {
           entry: fmtTime(r.inicio),
           exit:  fmtTime(r.fin),
           hours: (() => { const m = recWorkSecs(r) / 60; return `${Math.floor(m/60)}h${Math.floor(m%60)}m` })(),
+          corrections: Array.isArray(r.correcciones) ? r.correcciones : [],
         }))
 
         // Supervisor: find encargado or jefe_obra assigned to same centro
@@ -1455,7 +1527,7 @@ function MonthlyClosePage() {
   return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
-function AuditPage() {
+function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const toast = useAppStore(s => s.toast)
 
@@ -1481,21 +1553,35 @@ function AuditPage() {
       user: a.user || a.who || '—',
       detail: a.detail || a.target || '',
       ts: a.ts || '',
+      entityId: a.entityId || '',
+      reason: a.reason || '',
+      device: a.device || '',
+      before: a.before || null,
+      after: a.after || null,
     })), [db.audit])
 
   const handleExport = () => {
     const rows = entries.map((e: any) => [
       e.ts ? new Date(e.ts).toLocaleString('es-ES') : '',
-      e.action, e.user, e.detail,
+      e.action, e.user, e.detail, e.entityId || '', e.reason || '', e.device || '',
     ])
-    downloadCsv(['Fecha', 'Acción', 'Usuario', 'Detalle'], rows, `auditoria-${today()}.csv`)
+    downloadCsv(['Fecha', 'Acción', 'Usuario', 'Detalle', 'Registro', 'Motivo', 'Dispositivo'], rows, `auditoria-${today()}.csv`)
     toast('Auditoría exportada', 2000, 'ok')
   }
 
-  return <Audit entries={entries} onExport={handleExport} />
+  const handleOpenEntry = (entry: any) => {
+    const destinations: Record<string, string> = {
+      jornada: 'fichajes', empleado: 'empleados', obra: 'obras',
+      documento: 'documentos', solicitud: 'solicitudes',
+    }
+    const target = destinations[entry.category]
+    if (target) onNavigate(target)
+  }
+
+  return <Audit entries={entries} onExport={handleExport} onOpenEntry={handleOpenEntry} />
 }
 
-function AnomaliesPage() {
+function AnomaliesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const saveDB = useAppStore(s => s.saveDB)
 
@@ -1571,7 +1657,7 @@ function AnomaliesPage() {
   }, [db])
 
   const resolveAnomaly = (id:string) => saveDB((fresh:any) => ({ anomalias_vistas:[...new Set([...(fresh.anomalias_vistas || []), id])] }))
-  return <Anomalies items={items} onResolve={resolveAnomaly} />
+  return <Anomalies items={items} onResolve={resolveAnomaly} onOpen={item => onOpenEmployee(item.empName)} />
 }
 
 function ObraModal({ onClose }: { onClose: () => void }) {
@@ -1634,7 +1720,7 @@ function ObraModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function ObrasPage() {
+function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const [showAdd, setShowAdd] = useState(false)
   const todayStr = today()
@@ -1678,12 +1764,12 @@ function ObrasPage() {
   }, [db, todayStr])
 
   return <>
-    <Obras items={items} onAdd={() => setShowAdd(true)} />
+    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} />
     {showAdd && <ObraModal onClose={() => setShowAdd(false)} />}
   </>
 }
 
-function OnlineTeamPage() {
+function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session) as any
   const saveDB = useAppStore(s => s.saveDB)
@@ -1831,7 +1917,7 @@ function OnlineTeamPage() {
     toast(`${closedRecords.length} jornadas finalizadas`, 3000, 'ok')
   }
 
-  return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} />
+  return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} onOpenEmployee={row => onOpenEmployee(row.employeeId)} />
 }
 
 function MessagesPage() {
@@ -1893,6 +1979,56 @@ function MessagesPage() {
   }
 
   return <Messages conversations={conversations} adminName={adminName} onSend={handleSend} onSelectConversation={handleMarkRead} />
+}
+
+function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const db = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
+  const syncStatus = useAppStore(s => s.syncStatus)
+  const syncError = useAppStore(s => s.syncError)
+  const offlinePending = useAppStore(s => s.offlinePending)
+  const realtimeStatus = useAppStore(s => s.realtimeStatus)
+  const lastSyncTime = useAppStore(s => s.lastSyncTime)
+  const fetchDB = useAppStore(s => s.fetchDB)
+  const schedules = db.config?.reportSchedules || []
+  const defaultWidgets = ['employees', 'working', 'validation', 'requests', 'coverage']
+  const visibleWidgets = db.config?.adminDashboard?.visibleWidgets || defaultWidgets
+  const employees = (db.employees || []).filter((employee: any) => !employee.baja)
+  const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
+
+  const updateConfig = (patch: any) => saveDB((fresh: any) => ({
+    config: { ...(fresh.config || {}), ...patch, _upd: new Date().toISOString() },
+  }))
+
+  const onSync = async () => {
+    await uploadPendingIfAny()
+    await fetchDB()
+    toast('Sincronización comprobada', 2200, 'ok')
+  }
+
+  return <Operations
+    syncStatus={syncStatus}
+    syncError={syncError}
+    offlinePending={offlinePending}
+    realtimeStatus={realtimeStatus}
+    lastSyncTime={lastSyncTime}
+    authReady={authReady}
+    authTotal={employees.length}
+    schedules={schedules}
+    visibleWidgets={visibleWidgets}
+    brandColor={db.config?.primaryColor || '#7C3AED'}
+    onSync={onSync}
+    onSaveSchedule={(schedule: any) => {
+      updateConfig({ reportSchedules: [...schedules, schedule] })
+      toast('Programación guardada', 2200, 'ok')
+    }}
+    onToggleSchedule={(id: string) => updateConfig({ reportSchedules: schedules.map((schedule: any) => schedule.id === id ? { ...schedule, enabled: !schedule.enabled, _upd: new Date().toISOString() } : schedule) })}
+    onDeleteSchedule={(id: string) => updateConfig({ reportSchedules: schedules.filter((schedule: any) => schedule.id !== id) })}
+    onChangeWidgets={(ids: string[]) => updateConfig({ adminDashboard: { ...(db.config?.adminDashboard || {}), visibleWidgets: ids } })}
+    onChangeBrandColor={(color: string) => updateConfig({ primaryColor:color })}
+    onNavigate={onNavigate}
+  />
 }
 
 // ─── Main shell ────────────────────────────────────────────────────────────────
@@ -1999,23 +2135,24 @@ export default function AppV2Admin() {
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
     if (page === 'pendientes')     return <PendingCenterPage onNavigate={setAdminPage} />
     if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} />
-    if (page === 'en_linea')       return <OnlineTeamPage />
+    if (page === 'en_linea')       return <OnlineTeamPage onOpenEmployee={goToFichajes} />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
-    if (page === 'planning')       return <PlanningPage />
-    if (page === 'turnos')         return <ShiftsPage />
+    if (page === 'planning')       return <PlanningPage onOpenEmployee={goToFichajes} />
+    if (page === 'turnos')         return <ShiftsPage onOpenEmployee={goToFichajes} />
     if (page === 'validar')        return <ValidateHoursPage />
-    if (page === 'solicitudes')    return <RequestsPage />
-    if (page === 'gastos')         return <ExpensesPage />
+    if (page === 'solicitudes')    return <RequestsPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
+    if (page === 'gastos')         return <ExpensesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
     if (page === 'documentos')     return <DocumentsPage />
-    if (page === 'estadisticas')   return <StatsPage />
+    if (page === 'estadisticas')   return <StatsPage onNavigate={setAdminPage} />
     if (page === 'informes')       return <ReportsPage />
     if (page === 'cierre')         return <MonthlyClosePage />
     if (page === 'mensajes')       return <MessagesPage />
-    if (page === 'notificaciones') return <NotificationsPage />
-    if (page === 'anomalias')      return <AnomaliesPage />
-    if (page === 'auditoria')      return <AuditPage />
-    if (page === 'obras')          return <ObrasPage />
+    if (page === 'notificaciones') return <NotificationsPage onNavigate={setAdminPage} />
+    if (page === 'anomalias')      return <AnomaliesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
+    if (page === 'auditoria')      return <AuditPage onNavigate={setAdminPage} />
+    if (page === 'obras')          return <ObrasPage onNavigate={setAdminPage} />
     if (page === 'centros')        return <CentrosPage />
+    if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} />
     return null
   }
 

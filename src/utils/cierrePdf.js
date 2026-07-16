@@ -75,6 +75,26 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''} trabajado${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:11, font:fontB, color:colors.pri })
   y -= 58
 
+  const corrections = recs.flatMap(record => (record.correcciones || []).map(correction => ({ record, correction })))
+  if (corrections.length) {
+    if (y - 42 < 100) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+    page.drawText(`HISTORIAL DE MODIFICACIONES (${corrections.length})`, { x:ML, y, size:8, font:fontB, color:colors.pri })
+    y -= 14
+    corrections.forEach(({ record, correction }) => {
+      if (y - 38 < 100) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+      const oldIn = correction.oldInicio ? new Date(correction.oldInicio).toLocaleString('es-ES') : '—'
+      const oldOut = correction.oldFin ? new Date(correction.oldFin).toLocaleString('es-ES') : '—'
+      const newIn = correction.newInicio ? new Date(correction.newInicio).toLocaleString('es-ES') : '—'
+      const newOut = correction.newFin ? new Date(correction.newFin).toLocaleString('es-ES') : '—'
+      page.drawRectangle({ x:ML, y:y-34, width:CW, height:34, color:colors.ltGray, borderColor:colors.border, borderWidth:0.4 })
+      page.drawText(pdfSafe(`${record.id || 'Fichaje'} · ${correction.by || '—'} · ${correction.device || 'Dispositivo no registrado'}`), { x:ML+6, y:y-11, size:6.8, font:fontB, color:colors.dark, maxWidth:CW-12 })
+      page.drawText(pdfSafe(`${oldIn}–${oldOut}  ->  ${newIn}–${newOut}`), { x:ML+6, y:y-21, size:6.2, font:fontR, color:colors.gray, maxWidth:CW-12 })
+      page.drawText(pdfSafe(`Motivo: ${correction.motivo || 'Sin motivo'} · ${correction.ts ? new Date(correction.ts).toLocaleString('es-ES') : 'Fecha no registrada'}`), { x:ML+6, y:y-30, size:6.2, font:fontR, color:colors.gray, maxWidth:CW-12 })
+      y -= 39
+    })
+    y -= 8
+  }
+
   page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:7, font:fontB, color:colors.gray })
   await drawSignatureBlock(pdfDoc, page, {
     x: ML, y, width: 150, colors, fontR, fontB,
@@ -89,7 +109,10 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   // Hash de integridad SHA-256: firma los datos clave del documento
   // para que inspección de trabajo pueda verificar que no ha sido alterado.
-  const hashInput = `${cierre.empId}|${cierre.mes}|${totalMin}|${recs.length}|${recs.map(r => r.id).join(',')}|${cierre.generadoAt || ''}`
+  const hashInput = JSON.stringify({
+    empId:cierre.empId, mes:cierre.mes, totalMin, generadoAt:cierre.generadoAt || '',
+    records:recs.map(r => ({ id:r.id, inicio:r.inicio, fin:r.fin, workSecs:r.workSecs, breakSecs:r.breakSecs, correcciones:r.correcciones || [] })),
+  })
   const hash = await sha256Hex(hashInput)
   if (hash) {
     page.drawText(pdfSafe(`SHA-256: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
@@ -133,9 +156,11 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
 
   let totalMin = 0
   let firmadosCount = 0
+  let correctionCount = 0
   cierres.forEach((c, i) => {
     if (y - ROW_H < 60) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
     totalMin += c.totalMin || 0
+    correctionCount += (c.records_snapshot || []).reduce((sum, record) => sum + (record.correcciones || []).length, 0)
     const firmado = c.estado === 'firmado'
     if (firmado) firmadosCount++
     const vals = [c.empName, String(c.dias || 0), mhm(c.totalMin || 0), '', '']
@@ -154,6 +179,7 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
   page.drawRectangle({ x:ML, y:y-44, width:CW, height:44, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
   page.drawText(`TOTAL EMPRESA: ${mhm(totalMin)}`, { x:ML+10, y:y-19, size:11, font:fontB, color:colors.pri })
   page.drawText(pdfSafe(`${firmadosCount} de ${cierres.length} cierres firmados`), { x:ML+10, y:y-34, size:8.5, font:fontR, color: firmadosCount===cierres.length ? colors.green : colors.orange })
+  if (correctionCount) page.drawText(pdfSafe(`${correctionCount} modificación${correctionCount!==1?'es':''} con trazabilidad incluida${correctionCount!==1?'s':''}`), { x:ML+250, y:y-34, size:8, font:fontB, color:colors.orange, maxWidth:CW-260 })
 
   drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
 

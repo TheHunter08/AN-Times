@@ -12,7 +12,26 @@ export const buildRecordSnapshot = record => {
     breaks: Array.isArray(record.breaks) ? record.breaks.map(item => ({ ...item })) : undefined,
     workSecs: totals.work,
     breakSecs: totals.brk,
+    modificado: !!record.modificado,
+    correcciones: Array.isArray(record.correcciones)
+      ? record.correcciones.map(item => ({ ...item }))
+      : [],
   }
+}
+
+export const currentDeviceLabel = () => {
+  if (typeof navigator === 'undefined') return 'Dispositivo desconocido'
+  const ua = navigator.userAgent || ''
+  const os = /Android/i.test(ua) ? 'Android'
+    : /iPhone|iPad|iPod/i.test(ua) ? 'iOS'
+      : /Windows/i.test(ua) ? 'Windows'
+        : /Macintosh|Mac OS X/i.test(ua) ? 'macOS'
+          : /Linux/i.test(ua) ? 'Linux' : 'Otro dispositivo'
+  const browser = /Edg\//i.test(ua) ? 'Edge'
+    : /Firefox\//i.test(ua) ? 'Firefox'
+      : /Chrome\//i.test(ua) ? 'Chrome'
+        : /Safari\//i.test(ua) ? 'Safari' : 'Navegador'
+  return `${os} · ${browser}`
 }
 
 export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) => {

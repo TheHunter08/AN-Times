@@ -85,7 +85,7 @@ export function Documents({ items, onUpload }: DocumentsProps) {
           const expiryDays = doc.expiresOn ? Math.ceil((new Date(`${doc.expiresOn}T23:59:59`).getTime() - Date.now()) / 86400000) : null
           const expiryColor = expiryDays !== null && expiryDays < 0 ? colors.semantic.red : expiryDays !== null && expiryDays <= 30 ? colors.semantic.orange : colors.text[300]
           return (
-          <div key={doc.id} style={{ borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}`, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'border-color .15s' }}>
+          <div key={doc.id} className="uiv2-document-card" onClick={() => doc.onPreview?.(doc.id)} style={{ borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}`, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'border-color .15s, transform .15s', cursor:'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: radius.sm, background: catBg[doc.category], color: catColor[doc.category], flexShrink: 0 }}>
                 <IconFileText width={17} height={17} />
@@ -99,7 +99,7 @@ export function Documents({ items, onUpload }: DocumentsProps) {
             {doc.expiresOn && <div style={{ fontSize:11, fontWeight:650, color:expiryColor }}>{expiryDays !== null && expiryDays < 0 ? 'Documento caducado' : expiryDays !== null && expiryDays <= 30 ? `Caduca en ${expiryDays} días` : `Caduca el ${new Date(`${doc.expiresOn}T12:00:00`).toLocaleDateString('es-ES')}`}</div>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, color: colors.text[300] }}>{doc.size} · {doc.uploadedOn}</span>
-              <div style={{ display:'flex', gap:6 }}><button onClick={() => doc.onPreview?.(doc.id)} style={{ padding:'6px 9px', borderRadius:radius.xs, border:`1px solid ${colors.border.subtle}`, background:'transparent', color:colors.text[700], fontSize:11.5, cursor:'pointer' }}>Ver</button><button onClick={() => doc.onDownload?.(doc.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <div style={{ display:'flex', gap:6 }}><button onClick={event => { event.stopPropagation(); doc.onPreview?.(doc.id) }} style={{ padding:'6px 9px', borderRadius:radius.xs, border:`1px solid ${colors.border.subtle}`, background:'transparent', color:colors.text[700], fontSize:11.5, cursor:'pointer' }}>Ver</button><button onClick={event => { event.stopPropagation(); doc.onDownload?.(doc.id) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 <IconDownload width={12} height={12} /> Descargar
               </button></div>
             </div>

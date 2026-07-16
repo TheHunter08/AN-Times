@@ -97,7 +97,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Empleados</div>
+          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Empleados</h1>
           <div style={{ fontSize: 13, color: colors.text[400], marginTop: 3 }}>Directorio completo · {total} personas</div>
         </div>
         <button

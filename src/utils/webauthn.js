@@ -128,11 +128,17 @@ export function applyBrandColor(hex) {
   root.style.setProperty('--primary-glow', hex + '30')
   root.style.setProperty('--primary-dim', hex + '15')
   root.style.setProperty('--grad-primary', `linear-gradient(135deg, ${hex} 0%, hsl(${hShift},${Math.min(s + 15, 100)}%,${Math.max(l - 8, 20)}%) 100%)`)
+  // El mismo color alimenta la UI clásica y ui-v2 para que la marca no cambie
+  // al pasar de empleado a administración.
+  root.style.setProperty('--uiv2-primary-base', hex)
+  root.style.setProperty('--uiv2-primary-light', `hsl(${h},${Math.min(s + 5, 100)}%,${Math.min(l + 22, 90)}%)`)
+  root.style.setProperty('--uiv2-primary-glow', hex + '30')
+  root.style.setProperty('--uiv2-primary-dim', hex + '20')
 }
 
 export function removeBrandColor() {
   const root = document.documentElement
-  ;['--primary', '--primary-light', '--primary-glow', '--primary-dim', '--grad-primary'].forEach(v =>
+  ;['--primary', '--primary-light', '--primary-glow', '--primary-dim', '--grad-primary', '--uiv2-primary-base', '--uiv2-primary-light', '--uiv2-primary-glow', '--uiv2-primary-dim'].forEach(v =>
     root.style.removeProperty(v)
   )
 }

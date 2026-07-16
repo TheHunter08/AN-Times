@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
+import { useEffect } from 'react'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { useConnectivity } from '../../hooks/useConnectivity.js'
@@ -9,6 +10,7 @@ import { queuePush, pushSubscribe } from '../../services/dataService.js'
 import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { clearLocalModelCache, isModelCached } from '../../utils/localAI.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:400, maxHeight:'92vh', overflowY:'auto' }
@@ -31,6 +33,10 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [idioma, setIdioma] = useState(() => getCfg('idioma', 'es'))
   const [formato, setFormato] = useState(() => getCfg('formato', '24h'))
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
+  const [aiCached, setAiCached] = useState(false)
+  const [clearingAI, setClearingAI] = useState(false)
+
+  useEffect(() => { if (visible) isModelCached().then(setAiCached) }, [visible])
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
@@ -138,6 +144,20 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
           ))}
           <div style={{ fontSize:10.5, lineHeight:1.45, color:colors.text[400], marginTop:7 }}>
             Los fichajes se guardan primero en el dispositivo. Si hay señal débil, quedan pendientes y se reintentan automáticamente.
+          </div>
+        </div>
+
+        <div style={{ padding:'14px 0', borderBottom:SEP }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900] }}>IA avanzada sin conexión</div>
+              <div style={{ fontSize:11, color:colors.text[500], marginTop:3 }}>{aiCached ? 'Modelo descargado en este dispositivo' : 'El modelo no ocupa almacenamiento local'}</div>
+            </div>
+            {aiCached && <button type="button" disabled={clearingAI} onClick={async () => {
+              setClearingAI(true)
+              try { await clearLocalModelCache(); setAiCached(false); toast('Modelo local eliminado', 2500, 'ok') }
+              finally { setClearingAI(false) }
+            }} style={{ minHeight:34, padding:'0 10px', borderRadius:radius.sm, border:'1px solid rgba(239,68,68,.25)', background:'rgba(239,68,68,.08)', color:colors.semantic.red, fontSize:11, fontWeight:700, cursor:'pointer' }}>{clearingAI ? 'Eliminando…' : 'Liberar espacio'}</button>}
           </div>
         </div>
 

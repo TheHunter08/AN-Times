@@ -9,6 +9,8 @@ interface DbNoti {
   leido?: boolean
   deleted?: boolean
   empId?: string
+  target?: string
+  url?: string
 }
 
 function relativeTime(ts?: string): string {
@@ -44,6 +46,23 @@ function classifyAction(action?: string): NotificationItem['type'] {
   return 'sistema'
 }
 
+function notificationDestination(action = '', explicit?: string): string {
+  if (explicit) {
+    const match = explicit.match(/go=admin:([^:&]+)/)
+    if (match?.[1]) return match[1]
+  }
+  const a = action.toLowerCase()
+  if (a.includes('correcci')) return 'solicitudes'
+  if (a.includes('vacac') || a.includes('solicitud')) return 'solicitudes'
+  if (a.includes('mensaje') || a.includes('chat')) return 'mensajes'
+  if (a.includes('document')) return 'documentos'
+  if (a.includes('cierre') || a.includes('firma')) return 'cierre'
+  if (a.includes('anomal')) return 'anomalias'
+  if (a.includes('fichaj') || a.includes('entrada') || a.includes('salida') || a.includes('jornada')) return 'fichajes'
+  if (a.includes('emplead') || a.includes('aniversario') || a.includes('cumple')) return 'empleados'
+  return 'auditoria'
+}
+
 export function useNotificationsData(): {
   items: NotificationItem[]
   markRead: (id: string) => void
@@ -70,6 +89,7 @@ export function useNotificationsData(): {
       time: relativeTime(n.ts),
       read: !!n.leido,
       group: ageGroup(n.ts),
+      destination: notificationDestination(n.action, n.target || n.url),
     }))
 
   const markRead = (id: string) => {
@@ -80,7 +100,7 @@ export function useNotificationsData(): {
 
   const markAllRead = () => {
     saveDB((freshDb: { notis?: DbNoti[] }) => ({
-      notis: (freshDb.notis || []).map(n => ({ ...n, leido: true }))
+      notis: (freshDb.notis || []).map(n => n.empId === '__admin__' ? { ...n, leido: true } : n)
     }))
   }
 

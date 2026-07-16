@@ -53,7 +53,7 @@ describe('V7 administrator dashboard contract', () => {
 
     expect(html).toContain('class="ti-dashboard"')
     expect(html).toContain('aria-label="Resumen operativo"')
-    expect(html.match(/<article class="ti-kpi-card"/g)).toHaveLength(5)
+    expect(html.match(/<button type="button" class="ti-kpi-card ti-pressable"/g)).toHaveLength(5)
     dashboardProps.kpis.forEach(kpi => {
       expect(html).toContain(kpi.label)
       expect(html).toContain(kpi.value)

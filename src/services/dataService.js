@@ -1102,13 +1102,25 @@ export async function flushPushQueue() {
   }
 }
 
-export function auditLog(db, action, detail, user) {
+export function auditLog(db, action, detail, user, meta = {}) {
   try {
+    const previous = (db.audit || []).at(-1)
+    const nowIso = new Date().toISOString()
     const entry = {
       id: Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
       action, detail,
-      ts: new Date().toISOString(),
-      user: user || 'system'
+      ts: nowIso,
+      user: user || 'system',
+      category: meta.category || null,
+      entityType: meta.entityType || null,
+      entityId: meta.entityId || null,
+      reason: meta.reason || null,
+      device: meta.device || null,
+      before: meta.before || null,
+      after: meta.after || null,
+      previousId: previous?.id || null,
+      immutable: true,
+      _upd: nowIso,
     }
     return { ...db, audit: [...(db.audit || []), entry] }
   } catch { return db }

@@ -305,7 +305,7 @@ export function Login({
 
             <form onSubmit={submitEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
+                <label htmlFor="login-email" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
                   Email
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -313,6 +313,7 @@ export function Login({
                     <IconMail width={13} height={13} />
                   </span>
                   <input
+                    id="login-email"
                     type="email" value={email} onChange={e => setEmail(e.target.value)}
                     placeholder="tu@empresa.com" required autoComplete="email"
                     className="uiv2-login-input"
@@ -331,7 +332,7 @@ export function Login({
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <label style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                  <label htmlFor="login-password" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px' }}>
                     Contraseña
                   </label>
                   <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
@@ -343,6 +344,7 @@ export function Login({
                     <IconLock width={13} height={13} />
                   </span>
                   <input
+                    id="login-password"
                     type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••" required autoComplete="current-password"
                     className="uiv2-login-input"
@@ -356,7 +358,7 @@ export function Login({
                     onFocus={e => e.target.style.borderColor = colors.primary.base}
                     onBlur={e => e.target.style.borderColor = colors.border.default}
                   />
-                  <button type="button" onClick={() => setShowPass(s => !s)} style={{
+                  <button type="button" aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setShowPass(s => !s)} style={{
                     position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)',
                     background: 'none', border: 'none', color: colors.text[500], cursor: 'pointer', padding: 3, display: 'flex',
                   }}>

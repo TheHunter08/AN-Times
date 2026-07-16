@@ -19,6 +19,7 @@ export interface KPI {
   icon?: ReactNode
   tone?: KpiTone
   sparkline?: number[]
+  onClick?: () => void
 }
 
 export interface ActivityItem {
@@ -26,6 +27,7 @@ export interface ActivityItem {
   text: string
   time: string
   tone?: 'green' | 'orange' | 'red' | 'purple' | 'gray'
+  onClick?: () => void
 }
 
 export interface QuickLink {
@@ -42,6 +44,7 @@ export interface TeamSlot {
   activeCount: number
   pauseCount: number
   total: number
+  onClick?: () => void
 }
 
 export interface DashboardProps {
@@ -52,11 +55,12 @@ export interface DashboardProps {
   trend?: AreaChartPoint[]
   compareTrend?: AreaChartPoint[]
   quickActions?: ReactNode
-  nextEvent?: { label: string; time: string }
-  fichaje?: { statusLabel: string; time: string; tone: 'green' | 'primary' | 'orange' }
+  nextEvent?: { label: string; time: string; onClick?: () => void }
+  fichaje?: { statusLabel: string; time: string; tone: 'green' | 'primary' | 'orange'; onClick?: () => void }
   quickLinks?: QuickLink[]
   teamSlot?: TeamSlot
   onExport?: () => void
+  onTrendClick?: () => void
 }
 
 const toneOrder: KpiTone[] = ['primary', 'accent', 'cyan', 'amber']
@@ -90,7 +94,7 @@ function KpiCard({ kpi, tone }: { kpi: KPI; tone: KpiTone }) {
   } as CSSProperties
 
   return (
-    <article className="ti-kpi-card" style={style}>
+    <button type="button" className="ti-kpi-card ti-pressable" style={style} onClick={kpi.onClick} aria-label={`${kpi.label}: ${kpi.value}. Abrir detalle`}>
       <div className="ti-kpi-card__top">
         <span className="ti-kpi-card__icon" aria-hidden="true">
           {kpi.icon ?? <IconClock width={18} height={18} />}
@@ -116,7 +120,8 @@ function KpiCard({ kpi, tone }: { kpi: KPI; tone: KpiTone }) {
           />
         </div>
       )}
-    </article>
+      <span className="ti-open-hint">Ver detalle <IconArrowRight width={12} height={12} aria-hidden="true" /></span>
+    </button>
   )
 }
 
@@ -142,6 +147,7 @@ export function Dashboard({
   quickLinks,
   teamSlot,
   onExport,
+  onTrendClick,
 }: DashboardProps) {
   const todayLabel = new Intl.DateTimeFormat('es-ES', {
     weekday: 'short',
@@ -237,7 +243,7 @@ export function Dashboard({
                   .toUpperCase()
                 const isActive = index < teamSlot.activeCount
                 return (
-                  <div className={`ti-team-member${isActive ? ' ti-team-member--active' : ''}`} key={employee.id}>
+                  <button type="button" className={`ti-team-member ti-pressable${isActive ? ' ti-team-member--active' : ''}`} key={employee.id} onClick={teamSlot.onClick} aria-label={`${employee.name}, ${isActive ? 'activo ahora' : 'fuera de jornada'}. Abrir equipo`}>
                     <span
                       className="ti-team-member__avatar"
                       style={{ background: employee.color || colors.avatarPalette[index % colors.avatarPalette.length] }}
@@ -246,15 +252,15 @@ export function Dashboard({
                     </span>
                     <strong title={employee.name}>{employee.name}</strong>
                     <span>{isActive ? 'Activo ahora' : 'Fuera de jornada'}</span>
-                  </div>
+                  </button>
                 )
               })}
               {teamSlot.extra > 0 && (
-                <div className="ti-team-member ti-team-member--more" aria-label={`${teamSlot.extra} empleados más`}>
+                <button type="button" className="ti-team-member ti-team-member--more ti-pressable" aria-label={`${teamSlot.extra} empleados más. Abrir equipo`} onClick={teamSlot.onClick}>
                   <span className="ti-team-member__avatar">+{teamSlot.extra}</span>
                   <strong>Ver equipo</strong>
                   <span>{teamSlot.total} en total</span>
-                </div>
+                </button>
               )}
             </div>
           )}
@@ -267,7 +273,7 @@ export function Dashboard({
               </div>
             ) : (
               activity.slice(0, 5).map(item => (
-                <div className="ti-activity-row" key={item.id}>
+                <button type="button" className="ti-activity-row ti-pressable" key={item.id} onClick={item.onClick} aria-label={`${item.text}. Abrir trazabilidad`}>
                   <span
                     className="ti-activity-row__dot"
                     style={{ background: activityTone[item.tone ?? 'gray'] }}
@@ -275,14 +281,15 @@ export function Dashboard({
                   />
                   <span className="ti-activity-row__text">{item.text}</span>
                   <time>{item.time}</time>
-                </div>
+                  <IconArrowRight width={12} height={12} aria-hidden="true" />
+                </button>
               ))
             )}
           </div>
         </article>
 
         {trend && trend.length > 0 && (
-          <article className="ti-panel ti-chart-panel">
+          <article className="ti-panel ti-chart-panel ti-pressable" role="button" tabIndex={0} onClick={onTrendClick} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && onTrendClick) { e.preventDefault(); onTrendClick() } }} aria-label="Abrir estadísticas de horas trabajadas">
             <PanelTitle detail={<span className="ti-panel-caption">Comparativa semanal</span>}>
               Horas trabajadas
             </PanelTitle>
@@ -302,7 +309,7 @@ export function Dashboard({
       {hasThirdRow && (
         <section className="ti-dashboard-third" aria-label="Resumen y accesos de gestión">
           {nextEvent && (
-            <article className="ti-panel ti-request-card">
+            <article className="ti-panel ti-request-card ti-pressable" role="button" tabIndex={0} onClick={nextEvent.onClick} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && nextEvent.onClick) { e.preventDefault(); nextEvent.onClick() } }} aria-label="Abrir solicitudes pendientes">
               <PanelTitle detail={<span className="ti-status-badge ti-status-badge--warning">Pendiente</span>}>
                 Solicitudes pendientes
               </PanelTitle>
@@ -317,7 +324,7 @@ export function Dashboard({
           )}
 
           {fichaje && (
-            <article className="ti-panel ti-status-card">
+            <article className="ti-panel ti-status-card ti-pressable" role="button" tabIndex={0} onClick={fichaje.onClick} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && fichaje.onClick) { e.preventDefault(); fichaje.onClick() } }} aria-label="Abrir mi jornada">
               <PanelTitle>Estado de jornada</PanelTitle>
               <div className="ti-status-card__body">
                 <span
@@ -334,7 +341,7 @@ export function Dashboard({
           )}
 
           {teamSlot && teamSlot.total > 0 && (
-            <article className="ti-panel ti-distribution-card">
+            <article className="ti-panel ti-distribution-card ti-pressable" role="button" tabIndex={0} onClick={teamSlot.onClick} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && teamSlot.onClick) { e.preventDefault(); teamSlot.onClick() } }} aria-label="Abrir equipo en línea">
               <PanelTitle detail={<strong className="ti-distribution-card__total">{teamSlot.total}</strong>}>
                 Distribución del equipo
               </PanelTitle>
@@ -475,6 +482,11 @@ export function Dashboard({
           box-shadow: 0 1px 2px rgba(0,0,0,.16);
         }
         .ti-kpi-card {
+          width: 100%;
+          font: inherit;
+          text-align: left;
+          color: inherit;
+          cursor: pointer;
           min-width: 0;
           min-height: 130px;
           grid-auto-rows: 1fr;
@@ -528,6 +540,7 @@ export function Dashboard({
         .ti-kpi-delta--down { color: ${colors.semantic.red}; }
         .ti-kpi-delta--flat { color: ${colors.text[500]}; }
         .ti-kpi-card__sparkline { height: 28px; margin: -5px -4px -2px; opacity: .9; }
+        .ti-open-hint { display: inline-flex; align-items: center; gap: 4px; color: var(--ti-kpi-accent); font-size: 9.5px; font-weight: 700; }
         .ti-dashboard-second {
           display: grid;
           grid-template-columns: minmax(0, 1.45fr) minmax(340px, .95fr);
@@ -544,6 +557,9 @@ export function Dashboard({
         .ti-live-label__dot { width: 6px; height: 6px; border-radius: 999px; background: ${colors.semantic.green}; box-shadow: 0 0 0 4px rgba(22,201,111,.1); animation: tiLivePulse 2s ease-in-out infinite; }
         .ti-team-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 8px; padding-bottom: 14px; border-bottom: 1px solid ${colors.border.subtle}; }
         .ti-team-member {
+          font: inherit;
+          color: inherit;
+          cursor: pointer;
           min-width: 0;
           min-height: 104px;
           padding: 11px 8px 9px;
@@ -577,13 +593,17 @@ export function Dashboard({
         .ti-team-member--active > span:last-child { color: ${colors.semantic.green}; }
         .ti-team-member--more .ti-team-member__avatar { background: ${colors.bg[400]}; border-color: ${colors.border.strong}; color: ${colors.text[700]}; }
         .ti-activity-list { display: flex; flex-direction: column; padding-top: 8px; }
-        .ti-activity-row { min-height: 37px; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 0 6px; border-bottom: 1px solid ${colors.border.subtle}; }
+        .ti-activity-row { width:100%; min-height: 37px; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 12px; align-items: center; gap: 10px; padding: 0 6px; border:0; border-bottom: 1px solid ${colors.border.subtle}; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
         .ti-activity-row:last-child { border-bottom: 0; }
         .ti-activity-row__dot { width: 7px; height: 7px; border-radius: 999px; box-shadow: 0 0 0 3px rgba(var(--uiv2-overlay-rgb), .025); }
         .ti-activity-row__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: ${colors.text[700]}; font-size: 11.5px; }
         .ti-activity-row time { color: ${colors.text[500]}; font-size: 10.5px; font-variant-numeric: tabular-nums; }
         .ti-empty-state { min-height: 148px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color: ${colors.text[500]}; font-size: 12px; text-align: center; }
         .ti-chart-panel { display: flex; flex-direction: column; }
+        .ti-pressable { cursor:pointer; transition: transform 160ms cubic-bezier(.2,0,0,1), border-color 160ms cubic-bezier(.2,0,0,1), background 160ms cubic-bezier(.2,0,0,1); }
+        .ti-pressable:hover { transform:translateY(-2px); border-color:${colors.border.default}; }
+        .ti-pressable:focus-visible { outline:2px solid ${colors.primary.base}; outline-offset:2px; }
+        .ti-pressable:active { transform:scale(.99); }
         .ti-chart-panel__legend { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin: 2px 0 12px; }
         .ti-chart-panel__legend span { display: inline-flex; align-items: center; gap: 6px; color: ${colors.text[500]}; font-size: 10px; }
         .ti-chart-key { display: inline-block; width: 18px; height: 2px; border-radius: 999px; }

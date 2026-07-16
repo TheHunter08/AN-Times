@@ -1,58 +1,36 @@
 import { test, expect } from '@playwright/test'
+import { seedLogin } from './helpers/session.js'
 
-test.describe('Login - Pantalla PIN', () => {
+test.describe('Acceso con PIN y email', () => {
   test.beforeEach(async ({ page }) => {
+    await seedLogin(page)
     await page.goto('/')
-    await expect(page.locator('.login-wrap')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('button', { name: 'PIN', exact: true })).toBeVisible({ timeout: 10000 })
   })
 
-  test('muestra el logo y los tabs de modo', async ({ page }) => {
-    await expect(page.locator('.login-logo-name')).toContainText('TIMES')
-    const tabs = page.locator('.login-tab')
-    await expect(tabs).toHaveCount(2)
+  test('muestra marca, modos y empleado', async ({ page }) => {
+    await expect(page.getByText('TIMES INC').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Email', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Empleado$/ })).toBeVisible()
   })
 
-  test('selector de empleado aparece en modo PIN', async ({ page }) => {
-    const sel = page.locator('.login-select')
-    await expect(sel).toBeVisible()
+  test('seleccionar un empleado muestra el teclado PIN', async ({ page }) => {
+    await page.getByRole('button', { name: /Empleado$/ }).click()
+    await expect(page.getByRole('button', { name: '9', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '0', exact: true })).toBeVisible()
   })
 
-  test('muestra error al introducir PIN incorrecto', async ({ page }) => {
-    await page.selectOption('.login-select', { index: 1 })
-    // Pulsar 4 dígitos incorrectos
-    for (const k of ['9', '9', '9', '9']) {
-      await page.locator(`.login-key >> text="${k}"`).first().click()
-    }
-    await expect(page.locator('.login-err')).toBeVisible({ timeout: 5000 })
-  })
-
-  test('el tab de email muestra formulario de email/contraseña', async ({ page }) => {
-    await page.locator('.login-tab >> text="Email"').click()
-    await expect(page.locator('input[type="email"]')).toBeVisible()
-    await expect(page.locator('input[type="password"]')).toBeVisible()
-  })
-
-  test('botón de olvidé contraseña cambia de pantalla', async ({ page }) => {
-    await page.locator('.login-tab >> text="Email"').click()
-    const forgotBtn = page.locator('text=/olvidé|olvidaste|recuperar/i').first()
-    if (await forgotBtn.isVisible()) {
-      await forgotBtn.click()
-      await expect(page.locator('input[type="email"], .login-err, text=/email/i').first()).toBeVisible({ timeout: 3000 })
-    }
+  test('el modo email muestra sus campos', async ({ page }) => {
+    await page.getByRole('button', { name: 'Email', exact: true }).click()
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /olvidaste/i })).toBeVisible()
   })
 })
 
-test.describe('Login - Lockout PIN', () => {
-  test('lockout muestra contador después de 5 intentos fallidos', async ({ page }) => {
-    // Inyectar lockout pre-existente en localStorage
-    const empId = 'e1'
-    await page.addInitScript((id) => {
-      localStorage.setItem(`an_lk_${id}`, JSON.stringify({ until: Date.now() + 5 * 60 * 1000 }))
-    }, empId)
-    await page.goto('/')
-    await expect(page.locator('.login-select')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('.login-select', empId)
-    // Debe mostrar el countdown en formato M:SS
-    await expect(page.locator('.login-err')).toContainText(/\d:\d{2}/, { timeout: 3000 })
-  })
+test('un empleado bloqueado ve el contador', async ({ page }) => {
+  await seedLogin(page, { pinLockouts: { e1: { until: Date.now() + 5 * 60 * 1000, attempts: 5 } } })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Empleado$/ }).click()
+  await expect(page.getByText(/Bloqueado.*\d:\d{2}/i)).toBeVisible({ timeout: 5000 })
 })

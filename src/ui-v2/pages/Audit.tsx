@@ -14,11 +14,17 @@ export interface AuditEntry {
   user: string
   detail: string
   ts: string
+  entityId?: string
+  reason?: string
+  device?: string
+  before?: Record<string, unknown> | null
+  after?: Record<string, unknown> | null
 }
 
 export interface AuditProps {
   entries: AuditEntry[]
   onExport?: () => void
+  onOpenEntry?: (entry: AuditEntry) => void
 }
 
 const catIcon: Record<AuditEntry['category'], React.ReactNode> = {
@@ -41,9 +47,10 @@ const catStyle: Record<AuditEntry['category'], { bg: string; color: string }> = 
   seguridad: { bg: 'rgba(239,68,68,.14)',   color: colors.semantic.red },
 }
 
-export function Audit({ entries, onExport }: AuditProps) {
+export function Audit({ entries, onExport, onOpenEntry }: AuditProps) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<AuditEntry['category'] | 'all'>('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const filtered = entries
     .filter(e => catFilter === 'all' || e.category === catFilter)
@@ -120,7 +127,32 @@ export function Audit({ entries, onExport }: AuditProps) {
                   <span>👤 {entry.user}</span>
                   <span>·</span>
                   <span>{entry.ts}</span>
+                  {entry.device && <><span>·</span><span>{entry.device}</span></>}
                 </div>
+                {(entry.before || entry.after || entry.reason) && (
+                  <>
+                    <button type="button" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ marginTop:8, padding:0, border:0, background:'transparent', color:colors.primary.light, fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                      {expandedId === entry.id ? 'Ocultar trazabilidad' : 'Ver trazabilidad'}
+                    </button>
+                    {expandedId === entry.id && <div style={{ marginTop:8, padding:10, borderRadius:radius.sm, background:colors.bg[600], border:`1px solid ${colors.border.subtle}`, fontSize:11, color:colors.text[500], lineHeight:1.55, overflowWrap:'anywhere' }}>
+                      {entry.entityId && <div><strong style={{ color:colors.text[700] }}>Registro:</strong> {entry.entityId}</div>}
+                      {entry.reason && <div><strong style={{ color:colors.text[700] }}>Motivo:</strong> {entry.reason}</div>}
+                      {entry.device && <div><strong style={{ color:colors.text[700] }}>Dispositivo:</strong> {entry.device}</div>}
+                      {entry.before && <div><strong style={{ color:colors.text[700] }}>Antes:</strong> {JSON.stringify(entry.before)}</div>}
+                      {entry.after && <div><strong style={{ color:colors.text[700] }}>Después:</strong> {JSON.stringify(entry.after)}</div>}
+                    </div>}
+                  </>
+                )}
+                {onOpenEntry && !['sistema', 'seguridad'].includes(entry.category) && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenEntry(entry)}
+                    aria-label={`Abrir módulo relacionado con ${entry.action}`}
+                    style={{ marginTop: 8, padding: '5px 9px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: colors.bg[600], color: colors.text[700], fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Abrir módulo relacionado →
+                  </button>
+                )}
               </div>
             </div>
           )

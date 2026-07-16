@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mergeDB, recordTombstones, mergePendingDeletes } from './dataService.js'
+import { auditLog, mergeDB, recordTombstones, mergePendingDeletes } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -69,5 +69,18 @@ describe('cola offline', () => {
 
   it('no crea grupos vacíos de eliminaciones', () => {
     expect(mergePendingDeletes(null, null)).toBeNull()
+  })
+})
+
+describe('trazabilidad de modificaciones', () => {
+  it('conserva antes, después, motivo y encadena la entrada anterior', () => {
+    const first = auditLog({ audit: [] }, 'Fichaje modificado', 'Ana: 08:00–16:00', 'Admin', {
+      category: 'jornada', entityType: 'record', entityId: 'r1', reason: 'Corrección solicitada',
+      before: { inicio: '08:15' }, after: { inicio: '08:00' },
+    })
+    const second = auditLog(first, 'Jornada validada', 'Ana', 'Admin', { entityType: 'record', entityId: 'r1' })
+    expect(first.audit[0]).toMatchObject({ immutable: true, entityId: 'r1', reason: 'Corrección solicitada', before: { inicio: '08:15' }, after: { inicio: '08:00' } })
+    expect(second.audit[1].previousId).toBe(first.audit[0].id)
+    expect(second.audit[1]._upd).toBeTruthy()
   })
 })

@@ -86,3 +86,13 @@ export function unloadLocalModel() {
   engine = null
   loadingPromise = null
 }
+
+export async function clearLocalModelCache() {
+  unloadLocalModel()
+  if (!('caches' in window)) return 0
+  const keys = await caches.keys()
+  const modelKeys = keys.filter(key => key.toLowerCase().includes('webllm') || key.includes(MODEL_ID))
+  await Promise.all(modelKeys.map(key => caches.delete(key)))
+  setLocalAIConsent(false)
+  return modelKeys.length
+}

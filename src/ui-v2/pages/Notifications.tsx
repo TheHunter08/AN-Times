@@ -4,7 +4,7 @@ import { radius } from '../design-system/radius'
 import { ProductState } from '../components/ProductState.js'
 import {
   IconBell, IconCheck, IconX, IconAlertCircle, IconClock,
-  IconCalendar, IconUsers, IconChat,
+  IconCalendar, IconUsers, IconChat, IconArrowRight,
 } from '../components/Icons.js'
 
 export interface NotificationItem {
@@ -15,6 +15,7 @@ export interface NotificationItem {
   time: string
   read: boolean
   group?: 'hoy' | 'ayer' | 'semana'
+  destination?: string
 }
 
 export interface NotificationsProps {
@@ -22,6 +23,7 @@ export interface NotificationsProps {
   onMarkRead?: (id: string) => void
   onMarkAllRead?: () => void
   onDismiss?: (id: string) => void
+  onOpen?: (item: NotificationItem) => void
 }
 
 const typeIcon: Record<NotificationItem['type'], React.ReactNode> = {
@@ -58,7 +60,7 @@ function groupItems(items: NotificationItem[]) {
   ].filter(g => g.items.length > 0)
 }
 
-export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: NotificationsProps) {
+export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss, onOpen }: NotificationsProps) {
   const [tab, setTab] = useState<'all' | 'unread'>('all')
   const unreadCount = items.filter(n => !n.read).length
   const filtered = tab === 'unread' ? items.filter(n => !n.read) : items
@@ -140,7 +142,7 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {group.items.map(n => <NotifCard key={n.id} n={n} onMarkRead={onMarkRead} onDismiss={onDismiss} />)}
+            {group.items.map(n => <NotifCard key={n.id} n={n} onMarkRead={onMarkRead} onDismiss={onDismiss} onOpen={onOpen} />)}
           </div>
         </div>
       ))}
@@ -155,11 +157,16 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
   )
 }
 
-function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRead?: (id: string) => void; onDismiss?: (id: string) => void }) {
+function NotifCard({ n, onMarkRead, onDismiss, onOpen }: { n: NotificationItem; onMarkRead?: (id: string) => void; onDismiss?: (id: string) => void; onOpen?: (item: NotificationItem) => void }) {
   const tone = typeTone[n.type]
   return (
     <div
       className="uiv2-notif-card"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen?.(n)}
+      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && onOpen) { e.preventDefault(); onOpen(n) } }}
+      aria-label={`${n.title}. Abrir detalle`}
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 14,
         padding: '14px 16px', borderRadius: radius.lg,
@@ -168,6 +175,7 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
         transition: 'all .18s ease',
         position: 'relative',
         overflow: 'hidden',
+        cursor: 'pointer',
       }}
     >
       {/* Unread accent bar */}
@@ -198,11 +206,12 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+        <span title="Abrir" aria-hidden="true" style={{ display:'flex', color:colors.primary.light, padding:6 }}><IconArrowRight width={14} height={14} /></span>
         {!n.read && (
           <button
             type="button"
             className="uiv2-notif-read-btn"
-            onClick={() => onMarkRead?.(n.id)}
+            onClick={e => { e.stopPropagation(); onMarkRead?.(n.id) }}
             title="Marcar como leída"
             aria-label="Marcar como leída"
             style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(16,185,129,.1)', color: colors.semantic.green, cursor: 'pointer', transition: 'background .15s' }}
@@ -213,7 +222,7 @@ function NotifCard({ n, onMarkRead, onDismiss }: { n: NotificationItem; onMarkRe
         <button
           type="button"
           className="uiv2-notif-dismiss-btn"
-          onClick={() => onDismiss?.(n.id)}
+          onClick={e => { e.stopPropagation(); onDismiss?.(n.id) }}
           title="Descartar"
           aria-label="Descartar notificación"
           style={{ display: 'flex', padding: '6px', borderRadius: radius.xs, border: 'none', background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[400], cursor: 'pointer', transition: 'all .15s' }}

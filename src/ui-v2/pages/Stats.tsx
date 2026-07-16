@@ -13,6 +13,7 @@ export interface StatKpi {
   delta?: string
   deltaTone?: 'up' | 'down' | 'flat'
   tone?: 'primary' | 'accent' | 'cyan' | 'amber'
+  onClick?: () => void
 }
 
 export interface StatsBar {
@@ -53,7 +54,7 @@ export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: Sta
             const t = colors.kpiTone[tone]
             const deltaColor = kpi.deltaTone === 'up' ? colors.semantic.green : kpi.deltaTone === 'down' ? colors.semantic.red : colors.text[500]
             return (
-              <div key={kpi.label} style={{ ...darkPanel, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button type="button" key={kpi.label} onClick={kpi.onClick} aria-label={`${kpi.label}: ${kpi.value}. Abrir detalle`} className="uiv2-stats-kpi" style={{ ...darkPanel, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8, textAlign:'left', color:'inherit', font:'inherit', cursor:kpi.onClick?'pointer':'default' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.base, boxShadow: `0 0 8px ${t.base}` }} />
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 500, color: colors.text[500] }}>{kpi.label}</div>
@@ -64,7 +65,8 @@ export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: Sta
                     {kpi.deltaTone === 'up' ? '▲' : kpi.deltaTone === 'down' ? '▼' : ''} {kpi.delta}
                   </div>
                 )}
-              </div>
+                {kpi.onClick && <span style={{ fontSize:10, fontWeight:700, color:t.base }}>Ver detalle →</span>}
+              </button>
             )
           })}
         </div>
@@ -142,6 +144,9 @@ export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: Sta
 
       <style>{`
         .uiv2-stat-kpi:hover { transform: translateY(-1px); border-color: ${colors.border.default} !important; }
+        .uiv2-stats-kpi { transition:transform .15s ease,border-color .15s ease; }
+        .uiv2-stats-kpi:hover { transform:translateY(-2px); border-color:${colors.border.default} !important; }
+        .uiv2-stats-kpi:focus-visible { outline:2px solid ${colors.primary.base}; outline-offset:2px; }
         @media (max-width: 900px) {
           .uiv2-stats-kpi-row { grid-template-columns: 1fr 1fr !important; }
           .uiv2-stats-mid { grid-template-columns: 1fr !important; }

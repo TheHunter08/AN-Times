@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { readFileSync } from 'fs'
+import { resolve } from 'path'
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 export default defineConfig({
@@ -102,6 +103,10 @@ export default defineConfig({
     // La IA local se carga bajo demanda y conserva un límite de aviso separado.
     chunkSizeWarningLimit: 700,
     rollupOptions: {
+      input: {
+        app: resolve(process.cwd(), 'index.html'),
+        preview: resolve(process.cwd(), 'uiv2-preview.html'),
+      },
       output: {
         manualChunks: {
           vendor:    ['react', 'react-dom'],

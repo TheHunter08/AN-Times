@@ -2,7 +2,7 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { gid, ftime, ftimeInput, localDateStr } from '../../utils/time.js'
-import { recordTimesFromClock } from '../../utils/adminHelpers.js'
+import { currentDeviceLabel, recordTimesFromClock } from '../../utils/adminHelpers.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -43,14 +43,14 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
       recInicio: rec.inicio, recFin: rec.fin || null,
       propInicio: times.inicio.toISOString(),
       propFin: fin ? times.fin.toISOString() : null,
-      motivo: motivo.trim(), estado: 'pendiente', ts: Date.now(), _upd: nowIso
+      motivo: motivo.trim(), estado: 'pendiente', ts: Date.now(), requestedDevice: currentDeviceLabel(), _upd: nowIso
     }
     // localDateStr(new Date(rec.inicio)) (no rec.inicio.slice(0,10)): inicio se guarda en
     // UTC — un fichaje nocturno mostraba el día siguiente al real en el mensaje.
     const recDay = localDateStr(new Date(rec.inicio))
     saveDB(freshDb => ({
       correccionesFichaje: [...(freshDb.correccionesFichaje || []), corr],
-      audit: auditLog(freshDb, 'correccion_solicitada', `Corrección fichaje ${recDay}: ${motivo.trim()}`, u.name).audit
+      audit: auditLog(freshDb, 'correccion_solicitada', `Corrección fichaje ${recDay}: ${motivo.trim()}`, u.name, { category:'jornada', entityType:'record', entityId:rec.id, reason:motivo.trim(), device:corr.requestedDevice, before:{ inicio:rec.inicio, fin:rec.fin }, after:{ inicio:corr.propInicio, fin:corr.propFin } }).audit
     }))
     queuePush('__admin__', `✏️ Corrección de fichaje`, `${u.name} solicita corregir la jornada del ${recDay}.`, 'correccion', '/?go=admin:solicitudes:correcciones')
     toast('Solicitud enviada al administrador', 3000, 'ok')

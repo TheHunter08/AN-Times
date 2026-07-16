@@ -19,6 +19,7 @@ export interface RequestRow {
 
 export interface RequestsProps {
   rows: RequestRow[]
+  onOpen?: (row: RequestRow) => void
 }
 
 const typeCfg: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
@@ -41,7 +42,7 @@ const statusCfg = {
 const FILTERS = ['Todas', 'Pendientes', 'Aprobadas', 'Rechazadas'] as const
 type FilterKey = typeof FILTERS[number]
 
-export function Requests({ rows }: RequestsProps) {
+export function Requests({ rows, onOpen }: RequestsProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Todas')
 
   const pending  = rows.filter(r => r.status === 'pending').length
@@ -60,21 +61,21 @@ export function Requests({ rows }: RequestsProps) {
 
       {/* Header */}
       <div>
-        <div style={{ fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Solicitudes</div>
+        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: colors.text[900], letterSpacing: '-.4px' }}>Solicitudes</h1>
         <div style={{ fontSize: 13, color: colors.text[400], marginTop: 3 }}>Gestiona peticiones del equipo</div>
       </div>
 
       {/* Stats strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {[
-          { label: 'Pendientes',  value: pending,  color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)',  icon: <IconClock width={16} height={16} /> },
-          { label: 'Aprobadas',   value: approved, color: colors.semantic.green,  bg: 'rgba(16,185,129,.1)', icon: <IconCheck width={16} height={16} /> },
-          { label: 'Rechazadas',  value: rejected, color: colors.semantic.red,    bg: 'rgba(239,68,68,.1)',  icon: <IconX width={16} height={16} /> },
+          { label: 'Pendientes',  value: pending,  color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)',  icon: <IconClock width={16} height={16} />, filter:'Pendientes' as FilterKey },
+          { label: 'Aprobadas',   value: approved, color: colors.semantic.green,  bg: 'rgba(16,185,129,.1)', icon: <IconCheck width={16} height={16} />, filter:'Aprobadas' as FilterKey },
+          { label: 'Rechazadas',  value: rejected, color: colors.semantic.red,    bg: 'rgba(239,68,68,.1)',  icon: <IconX width={16} height={16} />, filter:'Rechazadas' as FilterKey },
         ].map(s => (
-          <div key={s.label} style={{
+          <button key={s.label} type="button" onClick={() => setActiveFilter(s.filter)} aria-pressed={activeFilter === s.filter} aria-label={`${s.label}: ${s.value}. Filtrar solicitudes`} style={{
             padding: '16px 18px', borderRadius: radius.lg,
             background: colors.bg[700], border: `1px solid ${colors.border.subtle}`,
-            display: 'flex', alignItems: 'center', gap: 14,
+            display: 'flex', alignItems: 'center', gap: 14, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
           }}>
             <div style={{ width: 38, height: 38, borderRadius: radius.md, background: s.bg, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {s.icon}
@@ -83,7 +84,7 @@ export function Requests({ rows }: RequestsProps) {
               <div style={{ fontSize: 22, fontWeight: 600, color: s.color, letterSpacing: '-.7px', fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
               <div style={{ fontSize: 11, color: colors.text[400], fontWeight: 600 }}>{s.label}</div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -117,12 +118,12 @@ export function Requests({ rows }: RequestsProps) {
         {filtered.length === 0 ? (
           <ProductState title="Sin solicitudes" description="No hay entradas para este filtro." />
         ) : (
-          filtered.map(r => <RequestCard key={r.id} row={r} />)
+          filtered.map(r => <RequestCard key={r.id} row={r} onOpen={onOpen} />)
         )}
       </div>
 
       <style>{`
-        .uiv2-req-card:hover { border-color: var(--uiv2-border-strong) !important; }
+        .uiv2-req-card:hover, .uiv2-req-card:focus-visible { border-color: var(--uiv2-border-strong) !important; transform: translateY(-1px); outline: none; }
         .uiv2-req-approve:hover { background: rgba(16,185,129,.22) !important; }
         .uiv2-req-reject:hover  { background: rgba(239,68,68,.22) !important; }
       `}</style>
@@ -130,7 +131,7 @@ export function Requests({ rows }: RequestsProps) {
   )
 }
 
-function RequestCard({ row }: { row: RequestRow }) {
+function RequestCard({ row, onOpen }: { row: RequestRow; onOpen?: (row: RequestRow) => void }) {
   const tc = getTypeCfg(row.type)
   const sc = statusCfg[row.status]
   const isPending = row.status === 'pending'
@@ -138,13 +139,14 @@ function RequestCard({ row }: { row: RequestRow }) {
   return (
     <div
       className="uiv2-req-card"
+      onClick={() => onOpen?.(row)}
       style={{
         background: colors.bg[700],
         border: `1px solid ${colors.border.subtle}`,
         borderRadius: radius.xl,
         padding: '18px 20px',
         display: 'flex', alignItems: 'center', gap: 16,
-        transition: 'border-color .18s',
+        transition: 'border-color .18s, transform .18s', cursor:onOpen ? 'pointer' : 'default',
         borderLeft: isPending ? `3px solid ${colors.semantic.orange}` : `1px solid ${colors.border.subtle}`,
       }}
     >
@@ -171,6 +173,7 @@ function RequestCard({ row }: { row: RequestRow }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
           <Avatar name={row.employeeName} size={20} />
           <span style={{ fontSize: 12, color: colors.text[500], fontWeight: 600 }}>{row.employeeName}</span>
+          {onOpen && <button type="button" aria-label={`Abrir fichajes de ${row.employeeName}`} onClick={event => { event.stopPropagation(); onOpen(row) }} style={{ padding:0, border:0, background:'transparent', color:colors.primary.light, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Ver fichajes →</button>}
           <span style={{ color: colors.text[300], fontSize: 11 }}>·</span>
           <span style={{ fontSize: 11.5, color: colors.text[400] }}>{row.requestedOn}</span>
         </div>
@@ -185,14 +188,14 @@ function RequestCard({ row }: { row: RequestRow }) {
           <>
             <button
               className="uiv2-req-approve"
-              onClick={() => row.onApprove?.(row.id)}
+              onClick={event => { event.stopPropagation(); row.onApprove?.(row.id) }}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(16,185,129,.14)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
             >
               <IconCheck width={13} height={13} /> Aprobar
             </button>
             <button
               className="uiv2-req-reject"
-              onClick={() => row.onReject?.(row.id)}
+              onClick={event => { event.stopPropagation(); row.onReject?.(row.id) }}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
             >
               <IconX width={13} height={13} /> Rechazar

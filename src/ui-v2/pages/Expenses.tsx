@@ -20,6 +20,7 @@ export interface ExpensesProps {
   items: ExpenseItem[]
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
+  onOpen?: (item: ExpenseItem) => void
 }
 
 const catLabel: Record<ExpenseItem['category'], string> = {
@@ -42,7 +43,7 @@ const catBg: Record<ExpenseItem['category'], string> = {
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
+export function Expenses({ items, onApprove, onReject, onOpen }: ExpensesProps) {
   const [tab, setTab] = useState<'pendiente' | 'aprobado' | 'rechazado'>('pendiente')
 
   const counts = {
@@ -67,14 +68,14 @@ export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
       {/* Summary KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Pendiente de aprobar', value: `${fmt(totalPending)} €`, color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
-          { label: 'Total aprobado (mes)', value: `${fmt(items.filter(i => i.status === 'aprobado').reduce((s, i) => s + i.amount, 0))} €`, color: colors.semantic.green, bg: 'rgba(16,185,129,.10)' },
-          { label: 'Solicitudes este mes', value: String(items.length), color: colors.accent.base, bg: colors.accent.dim },
+          { label: 'Pendiente de aprobar', value: `${fmt(totalPending)} €`, color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)', target:'pendiente' as const },
+          { label: 'Total aprobado (mes)', value: `${fmt(items.filter(i => i.status === 'aprobado').reduce((s, i) => s + i.amount, 0))} €`, color: colors.semantic.green, bg: 'rgba(16,185,129,.10)', target:'aprobado' as const },
+          { label: 'Solicitudes rechazadas', value: String(counts.rechazado), color: colors.semantic.red, bg: 'rgba(239,68,68,.10)', target:'rechazado' as const },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
+          <button key={i} type="button" onClick={() => setTab(k.target)} aria-pressed={tab === k.target} aria-label={`${k.label}: ${k.value}. Filtrar gastos`} style={{ padding: '14px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)`, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 6 }}>{k.label}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color, letterSpacing: '-.5px' }}>{k.value}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -97,7 +98,7 @@ export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
           <ProductState compact title={`No hay gastos ${tab === 'pendiente' ? 'pendientes' : tab === 'aprobado' ? 'aprobados' : 'rechazados'}`} description="Las nuevas solicitudes aparecerán aquí automáticamente." />
         )}
         {visible.map(item => (
-          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}` }}>
+          <div key={item.id} className="uiv2-expense-row" onClick={() => onOpen?.(item)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}`, cursor:onOpen?'pointer':'default', transition:'border-color .15s, transform .15s' }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: radius.sm, background: catBg[item.category], color: catColor[item.category], flexShrink: 0 }}>
               <IconReceipt width={16} height={16} />
             </span>
@@ -106,17 +107,18 @@ export function Expenses({ items, onApprove, onReject }: ExpensesProps) {
                 <span style={{ fontSize: 13, fontWeight: 640, color: colors.text[900] }}>{item.description}</span>
                 <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: radius.pill, background: catBg[item.category], color: catColor[item.category], fontWeight: 700 }}>{catLabel[item.category]}</span>
               </div>
-              <div style={{ fontSize: 11.5, color: colors.text[500], marginTop: 2 }}>
-                {item.empName} · {item.date}
+              <div style={{ fontSize: 11.5, color: colors.text[500], marginTop: 2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                <span>{item.empName} · {item.date}</span>
+                {onOpen && <button type="button" aria-label={`Abrir fichajes de ${item.empName}`} onClick={event => { event.stopPropagation(); onOpen(item) }} style={{ padding:0, border:0, background:'transparent', color:colors.primary.light, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Ver fichajes →</button>}
               </div>
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, color: colors.text[900], letterSpacing: '-.5px', flexShrink: 0 }}>{fmt(item.amount)} €</div>
             {tab === 'pendiente' && (
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button onClick={() => onApprove?.(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit' }}>
+                <button onClick={event => { event.stopPropagation(); onApprove?.(item.id) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit' }}>
                   <IconCheck width={13} height={13} /> Aprobar
                 </button>
-                <button onClick={() => onReject?.(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit' }}>
+                <button onClick={event => { event.stopPropagation(); onReject?.(item.id) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit' }}>
                   <IconX width={13} height={13} /> Rechazar
                 </button>
               </div>

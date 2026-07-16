@@ -22,6 +22,7 @@ export interface AnomalyItem {
 export interface AnomaliesProps {
   items: AnomalyItem[]
   onResolve?: (id: string) => void
+  onOpen?: (item: AnomalyItem) => void
 }
 
 const typeLabel: Record<AnomalyItem['type'], string> = {
@@ -35,9 +36,10 @@ const sevStyle: Record<AnomalyItem['severity'], { bg: string; color: string; lab
   baja:  { bg: 'rgba(16,185,129,.14)', color: colors.semantic.green, label: 'Baja' },
 }
 
-export function Anomalies({ items, onResolve }: AnomaliesProps) {
+export function Anomalies({ items, onResolve, onOpen }: AnomaliesProps) {
   const [search, setSearch] = useState('')
   const [showResolved, setShowResolved] = useState(false)
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'alta'>('all')
   const [localItems, setLocalItems] = useState(items)
   // Resueltas de forma optimista, hasta que items (prop) confirme el cambio
   // — igual que ValidateHours: sin esto, un refresh del store antes de que
@@ -59,6 +61,7 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
 
   const filtered = localItems
     .filter(i => showResolved || !i.resolved)
+    .filter(i => severityFilter === 'all' || i.severity === severityFilter)
     .filter(i => (i.empName + i.description + typeLabel[i.type]).toLowerCase().includes(search.toLowerCase()))
 
   const pending = localItems.filter(i => !i.resolved).length
@@ -83,14 +86,15 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Sin resolver', value: String(pending), color: colors.semantic.red, bg: 'rgba(239,68,68,.10)' },
-          { label: 'Severidad alta', value: String(highSev), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
-          { label: 'Total detectadas', value: String(localItems.length), color: colors.text[700], bg: colors.bg[600] },
+          { label: 'Sin resolver', value: String(pending), color: colors.semantic.red, bg: 'rgba(239,68,68,.10)', action:() => { setShowResolved(false); setSeverityFilter('all') } },
+          { label: 'Severidad alta', value: String(highSev), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)', action:() => { setShowResolved(false); setSeverityFilter('alta') } },
+          { label: 'Total detectadas', value: String(localItems.length), color: colors.text[700], bg: colors.bg[600], action:() => { setShowResolved(true); setSeverityFilter('all') } },
         ].map((k, i) => (
-          <div key={i} style={{ padding: '12px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>
+          <button type="button" key={i} onClick={k.action} aria-label={`${k.label}: ${k.value}. Aplicar filtro`} style={{ padding: '12px 16px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)`, color:'inherit', textAlign:'left', font:'inherit', cursor:'pointer' }}>
             <div style={{ fontSize: 11, color: colors.text[500], marginBottom: 4 }}>{k.label}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: '-.5px' }}>{k.value}</div>
-          </div>
+            <div style={{ marginTop:5, fontSize:10, fontWeight:700, color:k.color }}>Filtrar →</div>
+          </button>
         ))}
       </div>
 
@@ -108,11 +112,12 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
         {filtered.map(item => {
           const sev = sevStyle[item.severity]
           return (
-            <div key={item.id} style={{
+            <div key={item.id} role="button" tabIndex={0} onClick={() => onOpen?.(item)} onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && onOpen) { event.preventDefault(); onOpen(item) } }} aria-label={`${item.empName}: ${item.description}. Abrir fichajes`} style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: radius.md,
               background: item.resolved ? 'transparent' : colors.bg[700],
               border: `1px solid ${item.resolved ? colors.border.subtle : `color-mix(in srgb, ${sev.color} 20%, transparent)`}`,
               opacity: item.resolved ? .55 : 1,
+              cursor: onOpen ? 'pointer' : 'default',
             }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: radius.sm, background: sev.bg, color: sev.color, flexShrink: 0 }}>
                 <IconAlertCircle width={16} height={16} />
@@ -132,7 +137,7 @@ export function Anomalies({ items, onResolve }: AnomaliesProps) {
                 </div>
               </div>
               {!item.resolved ? (
-                <button onClick={() => handleResolve(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit', flexShrink: 0 }}>
+                <button onClick={event => { event.stopPropagation(); handleResolve(item.id) }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: 'none', background: 'rgba(16,185,129,.16)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12, fontWeight: 640, fontFamily: 'inherit', flexShrink: 0 }}>
                   <IconCheck width={13} height={13} /> Resolver
                 </button>
               ) : (

@@ -24,7 +24,7 @@ function elapsed(startedAt: string, now: number) {
   return `${hours}h ${String(minutes).padStart(2, '0')}m`
 }
 
-export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoClose, missingCount = 0, onRemindMissing, onFinishMany }: { rows: OnlineTeamRow[]; hasScope: boolean; onFinishShift?: (row: OnlineTeamRow) => void; recentClose?: { name: string; reason: string } | null; onUndoClose?: () => void; missingCount?: number; onRemindMissing?: () => void; onFinishMany?: (rows: OnlineTeamRow[]) => void }) {
+export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoClose, missingCount = 0, onRemindMissing, onFinishMany, onOpenEmployee }: { rows: OnlineTeamRow[]; hasScope: boolean; onFinishShift?: (row: OnlineTeamRow) => void; recentClose?: { name: string; reason: string } | null; onUndoClose?: () => void; missingCount?: number; onRemindMissing?: () => void; onFinishMany?: (rows: OnlineTeamRow[]) => void; onOpenEmployee?: (row: OnlineTeamRow) => void }) {
   const [now, setNow] = useState(Date.now())
   const [search, setSearch] = useState('')
   const [location, setLocation] = useState('all')
@@ -92,7 +92,7 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
           {visibleRows.map(row => (
-            <Card key={row.id} padding={4} style={{ minHeight: 128 }}>
+            <Card key={row.id} padding={4} role="button" tabIndex={0} onClick={() => onOpenEmployee?.(row)} onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && onOpenEmployee) { event.preventDefault(); onOpenEmployee(row) } }} aria-label={`${row.name}, ${row.onBreak ? 'en pausa' : 'trabajando'}. Abrir fichajes`} style={{ minHeight: 128, cursor:onOpenEmployee?'pointer':'default', transition:'transform .15s ease,border-color .15s ease' }} className="uiv2-online-employee-card">
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <Avatar name={row.name} size={42} status="online" />
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -112,7 +112,7 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
                 {onFinishShift && (
                   <button
                     type="button"
-                    onClick={() => onFinishShift(row)}
+                    onClick={event => { event.stopPropagation(); onFinishShift(row) }}
                     style={{ border: '1px solid rgba(239,68,68,.32)', background: 'rgba(239,68,68,.10)', color: colors.semantic.red, borderRadius: radius.md, padding: '7px 10px', fontSize: 11, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     Finalizar jornada
@@ -123,6 +123,7 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
           ))}
         </div>
       )}
+      <style>{`.uiv2-online-employee-card:hover{transform:translateY(-2px);border-color:${colors.border.default}!important}.uiv2-online-employee-card:focus-visible{outline:2px solid ${colors.primary.base};outline-offset:2px}`}</style>
     </div>
   )
 }
