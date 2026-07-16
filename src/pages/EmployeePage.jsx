@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
+import { useShallow } from 'zustand/react/shallow'
 import { lazy, Suspense } from 'react'
 import { useTimer } from '../hooks/useTimer.js'
 import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, localDateStr } from '../utils/time.js'
@@ -62,7 +63,25 @@ const GEO_OPTS = { enableHighAccuracy: true, timeout: 25000, maximumAge: 120000 
 const STARTING_LOCK_MS = GEO_OPTS.timeout + 2000
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus } = useAppStore()
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus } = useAppStore(
+    useShallow((state) => ({
+      db: state.db,
+      session: state.session,
+      currentEmpTab: state.currentEmpTab,
+      setEmpTab: state.setEmpTab,
+      saveDB: state.saveDB,
+      logout: state.logout,
+      toast: state.toast,
+      showConfirm: state.showConfirm,
+      setScreen: state.setScreen,
+      openModal: state.openModal,
+      closeModal: state.closeModal,
+      activeModal: state.activeModal,
+      modalData: state.modalData,
+      syncStatus: state.syncStatus,
+      realtimeStatus: state.realtimeStatus,
+    })),
+  )
   const winW = useWindowWidth()
   const timer = useTimer()
   // Derivar siempre desde db.employees para que onboardingDone y otros campos

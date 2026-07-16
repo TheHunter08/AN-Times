@@ -13,7 +13,7 @@ import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
 export function TabInicio({ timer, doStart, doStop, doBreak, openRec, db, u, openModal, gpsStatus, session, vac, saveDB, toast, onOpenQRScan }) {
-  const { setEmpTab } = useAppStore()
+  const setEmpTab = useAppStore((state) => state.setEmpTab)
   const { clockTime, clockDate } = useClock()
   const todayStr = today()
   const [showTip, setShowTip] = useState(() => {

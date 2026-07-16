@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
+import { useShallow } from 'zustand/react/shallow'
 import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
 import {
@@ -47,7 +48,16 @@ function recordEmailFailed() {
 function clearEmailLockout() { try { localStorage.removeItem(EMAIL_LK_KEY) } catch {} }
 
 export default function LoginV2() {
-  const { db, setSession, setScreen, toast, saveDB, lastSyncTime } = useAppStore()
+  const { db, setSession, setScreen, toast, saveDB, lastSyncTime } = useAppStore(
+    useShallow((state) => ({
+      db: state.db,
+      setSession: state.setSession,
+      setScreen: state.setScreen,
+      toast: state.toast,
+      saveDB: state.saveDB,
+      lastSyncTime: state.lastSyncTime,
+    })),
+  )
 
   // Mode
   const [mode, setMode] = useState<LoginMode>('pin')

@@ -2,6 +2,7 @@
 // CLAUDE.md: UI only — NO tocar backend, Supabase, auth ni lógica de negocio.
 import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react'
 import { useAppStore } from '../store/appStore.js'
+import { useShallow } from 'zustand/react/shallow'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
 import { Search } from './components/Search.js'
@@ -2077,32 +2078,41 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
 const ENC_PAGES = ['en_linea', 'fichajes', 'planning', 'validar', 'solicitudes', 'mensajes', 'notificaciones']
 
 export default function AppV2Admin() {
-  const { session, currentAdminPage, setAdminPage, logout, setScreen } = useAppStore() as any
+  const { session, currentAdminPage, setAdminPage, logout, setScreen, syncStatus, syncError, offlinePending, lastSyncTime, fetchDB, db } = useAppStore(
+    useShallow((state: any) => ({
+      session: state.session,
+      currentAdminPage: state.currentAdminPage,
+      setAdminPage: state.setAdminPage,
+      logout: state.logout,
+      setScreen: state.setScreen,
+      syncStatus: state.syncStatus,
+      syncError: state.syncError,
+      offlinePending: state.offlinePending,
+      lastSyncTime: state.lastSyncTime,
+      fetchDB: state.fetchDB,
+      db: state.db,
+    })),
+  ) as any
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
   const [manualSyncing, setManualSyncing] = useState(false)
-  const syncStatus = useAppStore(s => s.syncStatus)
-  const syncError = useAppStore(s => s.syncError)
-  const offlinePending = useAppStore(s => s.offlinePending)
-  const lastSyncTime = useAppStore(s => s.lastSyncTime)
-  const fetchDB = useAppStore(s => s.fetchDB)
-
   const name = session?.user?.name || 'Admin'
   const notis = useNotificationsData()
-  const unreadCount = notis.items.filter(n => !n.read).length
-  const db = useAppStore(s => s.db) as any
+  const unreadCount = useMemo(() => notis.items.filter(n => !n.read).length, [notis.items])
 
   // Detectar si es encargado/jefe_obra en lugar de admin
   const isEnc = !session?.isAdmin && (session?.isEnc || session?.isJO)
   const encRoleLabel = session?.isJO ? 'Jefe de obra' : 'Encargado'
 
   // Filtrar páginas según rol
-  const visiblePages = isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES
-  const pendingHours = (db.records || []).filter((r: any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length
-  const pendingRequests = (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
-    + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length
-  const pendingExpenses = (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length
+  const visiblePages = useMemo(() => isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES, [isEnc])
+  const { pendingHours, pendingRequests, pendingExpenses } = useMemo(() => ({
+    pendingHours: (db.records || []).filter((r: any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length,
+    pendingRequests: (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
+      + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length,
+    pendingExpenses: (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length,
+  }), [db.records, db.vacaciones, db.correccionesFichaje, db.gastos])
   const navBadges: Record<string, number> = {
     pendientes: pendingHours + pendingRequests + pendingExpenses,
     validar: pendingHours,

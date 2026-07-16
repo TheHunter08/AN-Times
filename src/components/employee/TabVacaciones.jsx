@@ -18,7 +18,8 @@ const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radi
 const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`
 
 export function TabVacaciones({ db, u, vac, toast, saveDB }) {
-  const { openModal, showConfirm } = useAppStore()
+  const openModal = useAppStore((state) => state.openModal)
+  const showConfirm = useAppStore((state) => state.showConfirm)
   const myVacs = (db.vacaciones || []).filter(v => v.empId === u.id).sort((a,b) => new Date(b.fechaInicio || 0) - new Date(a.fechaInicio || 0))
 
   const cancelVac = (id) => {
