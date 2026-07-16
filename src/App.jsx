@@ -55,33 +55,77 @@ function InAppNotification() {
   )
 }
 
-// Bloquea toda la app hasta que se aplique la actualización — las versiones
-// deben ser obligatorias: un cliente desactualizado puede tener bugs ya
-// corregidos (p.ej. de cálculo de horas) que contaminen datos compartidos
-// con el resto del equipo, así que no se permite "cerrar y seguir usando"
-// la versión antigua como con un banner normal.
+// Actualización silenciosa y segura de la PWA. Si hay cambios locales pendientes,
+// los sincroniza antes de activar el nuevo service worker; sin conexión, pospone
+// la recarga y reintenta automáticamente al volver a estar online.
 function UpdateBanner() {
   const [waitingSW, setWaitingSW] = useState(null)
-  const [applying, setApplying]   = useState(false)
+  const [phase, setPhase] = useState('waiting')
   const reloading   = useRef(false)
-  const waitingRef  = useRef(null)   // ref para evitar closure stale en setInterval
+  const waitingRef  = useRef(null)
+  const applyingRef = useRef(false)
+  const attemptRef  = useRef(false)
 
   const _setSW = (sw) => {
     if (!sw || waitingRef.current === sw) return
     waitingRef.current = sw
     setWaitingSW(sw)
+    setPhase('waiting')
   }
+
+  const applySafely = useCallback(async () => {
+    const sw = waitingRef.current
+    if (!sw || applyingRef.current || attemptRef.current || reloading.current) return
+    attemptRef.current = true
+    try {
+      const initialState = useAppStore.getState()
+      // No interrumpir una escritura que todavía está llegando a Supabase.
+      if (!initialState.offlinePending && initialState.syncStatus === 'syncing') {
+        setPhase('syncing')
+        return
+      }
+      if (initialState.offlinePending) {
+        setPhase('syncing')
+        try { await uploadPendingIfAny() } catch {}
+        if (useAppStore.getState().offlinePending) { setPhase('waiting'); return }
+      }
+
+      applyingRef.current = true
+      setPhase('applying')
+      sw.postMessage({ type: 'SKIP_WAITING' })
+
+      // iOS puede activar el worker sin emitir controllerchange en una PWA abierta.
+      setTimeout(() => {
+        if (!reloading.current) { reloading.current = true; window.location.reload() }
+      }, 1800)
+      setTimeout(() => {
+        if (!reloading.current) {
+          applyingRef.current = false
+          setPhase('waiting')
+        }
+      }, 8000)
+    } finally {
+      attemptRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     let updateInterval = null
+    let registration = null
     const onControllerChange = () => {
       if (reloading.current) return
       reloading.current = true
       window.location.reload()
     }
+    const checkNow = () => {
+      if (document.visibilityState !== 'visible') return
+      if (registration) registration.update().catch(() => {})
+      if (registration?.waiting) _setSW(registration.waiting)
+    }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
     navigator.serviceWorker.ready.then(reg => {
+      registration = reg
       // 1. SW ya esperando al montar (recarga tras deploy sin clic del usuario)
       if (reg.waiting) _setSW(reg.waiting)
 
@@ -103,36 +147,37 @@ function UpdateBanner() {
         check(sw)
       })
 
-      // Forzar comprobación inmediata y cada 60s
-      reg.update().catch(() => {})
-      updateInterval = setInterval(() => {
-        reg.update().catch(() => {})
-        // Fallback: si reg.waiting apareció sin disparar updatefound (iOS)
-        if (reg.waiting) _setSW(reg.waiting)
-      }, 60 * 1000)
+      // Comprobación inmediata, periódica y al volver a abrir/recuperar conexión.
+      checkNow()
+      updateInterval = setInterval(checkNow, 60 * 1000)
     }).catch(() => {})
+    window.addEventListener('online', checkNow)
+    document.addEventListener('visibilitychange', checkNow)
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+      window.removeEventListener('online', checkNow)
+      document.removeEventListener('visibilitychange', checkNow)
       if (updateInterval) clearInterval(updateInterval)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const apply = () => {
-    if (!waitingSW || applying) return
-    setApplying(true)
-    waitingSW.postMessage({ type: 'SKIP_WAITING' })
-    // iOS fallback: controllerchange puede no disparar en iOS PWA
-    setTimeout(() => {
-      if (!reloading.current) { reloading.current = true; window.location.reload() }
-    }, 1500)
-    // Seguridad: si tras 8s sigue sin recargar (red caída), resetear el banner
-    setTimeout(() => {
-      if (!reloading.current) { setApplying(false) }
-    }, 8000)
-  }
+  useEffect(() => {
+    if (!waitingSW) return
+    const initial = setTimeout(applySafely, 500)
+    const retry = setInterval(applySafely, 10 * 1000)
+    const onOnline = () => applySafely()
+    window.addEventListener('online', onOnline)
+    return () => {
+      clearTimeout(initial)
+      clearInterval(retry)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [waitingSW, applySafely])
 
-  if (!waitingSW) return null
+  // Mientras espera conexión o sincronización, la app sigue operativa. Solo se
+  // cubre la pantalla durante los pocos segundos de activación/recarga.
+  if (!waitingSW || phase !== 'applying') return null
   return (
     <div style={{
       position:'fixed', inset:0, zIndex:999999,
@@ -151,17 +196,11 @@ function UpdateBanner() {
         }}>
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </div>
-        <div style={{ fontSize:17, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Actualización obligatoria</div>
+        <div style={{ fontSize:17, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Actualizando automáticamente</div>
         <div style={{ fontSize:13, color:'var(--text3)', lineHeight:1.6, marginBottom:22 }}>
-          Hay una nueva versión de la app con correcciones importantes. No puedes seguir usándola hasta que actualices.
+          Instalando la última versión de TIMES INC. La app se abrirá de nuevo en unos segundos.
         </div>
-        <button onClick={apply} disabled={applying} style={{
-          width:'100%', padding:'13px 16px', borderRadius:12, border:'none',
-          background:'linear-gradient(90deg,#6C63FF,#5E6AD2)', color:'#fff',
-          fontSize:14, fontWeight:800, cursor: applying ? 'default' : 'pointer', opacity: applying ? .7 : 1
-        }}>
-          {applying ? 'Actualizando…' : 'Actualizar ahora'}
-        </button>
+        <div role="status" aria-live="polite" style={{ fontSize:13, fontWeight:800, color:'var(--primary-light)' }}>Actualizando…</div>
       </div>
     </div>
   )

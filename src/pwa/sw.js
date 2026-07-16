@@ -5,9 +5,9 @@ import { ExpirationPlugin } from 'workbox-expiration'
 import { buildTableSyncPlan } from '../services/tableSyncPlan.js'
 
 // ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
-// NO se llama a self.skipWaiting() automáticamente — el cliente lo invoca vía
-// mensaje 'SKIP_WAITING' tras confirmar el banner "Nueva versión disponible".
-// Esto evita refrescos sorpresa durante una jornada activa.
+// El cliente invoca skipWaiting mediante 'SKIP_WAITING' cuando ha comprobado que
+// no quedan cambios locales por sincronizar. Así la actualización es automática
+// sin arriesgar fichajes pendientes cuando el dispositivo está sin conexión.
 const ACTIVE_CACHES = new Set([
   'html-pages', 'static-assets', 'images-fonts', 'google-fonts', 'offline-shell'
 ])
