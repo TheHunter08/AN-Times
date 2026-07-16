@@ -5,12 +5,24 @@ on:
     # Día 1 de cada mes a las 08:00 UTC
     - cron: '0 8 1 * *'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: >-
+          Este script SIEMPRE genera el cierre del mes ANTERIOR al momento de
+          ejecución (nunca el mes en curso), independientemente de cuándo se
+          dispare manualmente. Escribe GENERAR para confirmar que entiendes esto.
+        required: true
 
 jobs:
   generar-cierres:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Validar confirmación (solo disparo manual)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'GENERAR'
+        run: |
+          echo "::error::Confirmación inválida. Escribe exactamente GENERAR para ejecutar este workflow manualmente."
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
