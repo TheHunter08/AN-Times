@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import type { EmployeeRow } from '../pages/Employees.js'
 import { mhm, calcMin, today, localDateStr } from '../../utils/time.js'
@@ -28,18 +29,33 @@ interface DbRecord {
 
 export function useEmployeesData() {
   const db = useAppStore(s => s.db) as { employees?: DbEmployee[]; records?: DbRecord[]; obras?: any[] }
-  const emps  = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-  const recs  = db.records || []
-  const obras = db.obras || []
-  const todayStr = today()
+  return useMemo(() => {
+    const emps  = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+    const recs  = db.records || []
+    const obras = db.obras || []
+    const todayStr = today()
+    const liveByEmployee = new Map<string, DbRecord>()
+    const minutesTodayByEmployee = new Map<string, number>()
+    const obrasById = new Map(obras.map((obra: any) => [obra.id, obra]))
 
-  return emps.map((e): EmployeeRow => {
-    const liveRec  = recs.find(r => r.empId === e.id && !r.fin)
+    for (const record of recs) {
+      if (!record.fin) {
+        if (!liveByEmployee.has(record.empId)) liveByEmployee.set(record.empId, record)
+        continue
+      }
+      if (record.inicio && localDateStr(new Date(record.inicio)) === todayStr) {
+        minutesTodayByEmployee.set(
+          record.empId,
+          (minutesTodayByEmployee.get(record.empId) || 0) + calcMin(record),
+        )
+      }
+    }
+
+    return emps.map((e): EmployeeRow => {
+    const liveRec  = liveByEmployee.get(e.id)
     // localDateStr(new Date(r.inicio)) (no r.inicio?.startsWith(todayStr)): inicio se
     // guarda en UTC, todayStr es local — un fichaje nocturno no contaba en "hoy".
-    const todayMin = recs
-      .filter(r => r.empId === e.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
-      .reduce((s, r) => s + calcMin(r), 0)
+    const todayMin = minutesTodayByEmployee.get(e.id) || 0
 
     let status: EmployeeRow['status'] = 'off'
     if (liveRec) status = liveRec.enDescanso ? 'break' : 'active'
@@ -56,7 +72,7 @@ export function useEmployeesData() {
       resolvedRole || '—'
 
     const obrasNames = (e.obrasAsignadas || [])
-      .map((id: string) => obras.find((o: any) => o.id === id)?.nombre || id)
+      .map((id: string) => obrasById.get(id)?.nombre || id)
       .filter(Boolean)
 
     return {
@@ -74,5 +90,6 @@ export function useEmployeesData() {
       obrasAsignadas: obrasNames.length ? obrasNames : undefined,
       centroTrabajo: e.centroTrabajo || undefined,
     }
-  })
+    })
+  }, [db.employees, db.records, db.obras])
 }

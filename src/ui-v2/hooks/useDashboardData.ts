@@ -2,6 +2,7 @@
 // app (useAppStore) sin tocar lógica de negocio, escrituras ni Supabase.
 // Reutiliza las mismas utilidades puras (today/calcMin/mhm) que ya usa
 // PanelDashboard.jsx en la app real, para no duplicar ni divergir cálculos.
+import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { today, calcMin, mhm, localDateStr } from '../../utils/time.js'
 import type { KPI, ActivityItem } from '../pages/Dashboard.js'
@@ -37,74 +38,73 @@ export interface DashboardData {
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 
+function activityTone(action = ''): ActivityItem['tone'] {
+  const a = action.toLowerCase()
+  if (a.includes('entrada') || a.includes('jornada') || a.includes('inicio') || a.includes('aprobad')) return 'green'
+  if (a.includes('salida') || a.includes('rechazad') || a.includes('baja') || a.includes('error')) return 'red'
+  if (a.includes('pausa') || a.includes('descanso') || a.includes('solicitud') || a.includes('pendiente')) return 'orange'
+  if (a.includes('vacac') || a.includes('mensaje') || a.includes('chat')) return 'purple'
+  return 'gray'
+}
+
 export function useDashboardData(): DashboardData {
   const db = useAppStore(s => s.db) as Db
   const session = useAppStore(s => s.session)
 
-  const todayStr = today()
-  const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-  const recs = db.records || []
-  const liveRecs = recs.filter(r => !r.fin)
-  const breakRecs = liveRecs.filter(r => r.enDescanso)
-  const workingRecs = liveRecs.filter(r => !r.enDescanso)
-  // localDateStr (no r.inicio?.startsWith(todayStr)): inicio se guarda en UTC,
-  // todayStr es local — un fichaje nocturno se quedaba fuera de "hoy" y el
-  // empleado aparecía como ausente aunque ya hubiera trabajado su jornada.
-  const todayRecs = recs.filter(r => r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
-  const todayMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
-  const wdMin = db.config?.wdMin || 480
+  const computed = useMemo(() => {
+    const todayStr = today()
+    const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
+    const wdMin = db.config?.wdMin || 480
+    const dayMinutes = new Map<string, number>()
+    const presentTodayIds = new Set<string>()
+    let workingCount = 0
+    let breakCount = 0
 
-  // Ausente hoy = sin fichaje abierto NI cerrado hoy (no solo "no está fichado ahora mismo",
-  // que contaba como ausente a quien ya había completado su jornada).
-  const presentTodayIds = new Set([...liveRecs, ...todayRecs].map(r => r.empId))
-
-  const kpis: KPI[] = [
-    { label: 'Empleados activos', value: String(emps.length), tone: 'primary' },
-    { label: 'Trabajando ahora', value: String(workingRecs.length), tone: 'cyan' },
-    { label: 'En descanso', value: String(breakRecs.length), tone: 'amber' },
-    { label: 'Ausentes hoy', value: String(Math.max(0, emps.length - presentTodayIds.size)), tone: 'accent' },
-    { label: 'Horas trabajadas hoy', value: mhm(todayMin), tone: 'primary' },
-  ]
-
-  function activityTone(action = ''): ActivityItem['tone'] {
-    const a = action.toLowerCase()
-    if (a.includes('entrada') || a.includes('jornada') || a.includes('inicio') || a.includes('aprobad')) return 'green'
-    if (a.includes('salida') || a.includes('rechazad') || a.includes('baja') || a.includes('error')) return 'red'
-    if (a.includes('pausa') || a.includes('descanso') || a.includes('solicitud') || a.includes('pendiente')) return 'orange'
-    if (a.includes('vacac') || a.includes('mensaje') || a.includes('chat')) return 'purple'
-    return 'gray'
-  }
-  const activity: ActivityItem[] = (db.audit || [])
-    .slice(-10)
-    .reverse()
-    .map((a, i) => ({
-      id: String(i),
-      text: `${a.action}${a.detail ? ` — ${a.detail}` : ''}${a.user ? ` · ${a.user}` : ''}`,
-      time: a.ts ? new Date(a.ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '',
-      tone: activityTone(a.action),
-    }))
-
-  function buildTrend(offsetWeeks: number): AreaChartPoint[] {
-    const result: AreaChartPoint[] = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i - offsetWeeks * 7)
-      const dStr = localDateStr(d)
-      const dayMin = recs.filter(r => r.fin && r.inicio && localDateStr(new Date(r.inicio)) === dStr).reduce((s, r) => s + calcMin(r), 0)
-      result.push({ label: DOW[d.getDay()], value: Math.min(100, Math.round((dayMin / wdMin) * 100)) })
+    for (const record of db.records || []) {
+      if (!record.fin) {
+        presentTodayIds.add(record.empId)
+        record.enDescanso ? breakCount++ : workingCount++
+        continue
+      }
+      if (!record.inicio) continue
+      // La fecha local se calcula una sola vez por registro, no una vez por
+      // cada punto de las dos gráficas semanales.
+      const day = localDateStr(new Date(record.inicio))
+      const minutes = calcMin(record)
+      dayMinutes.set(day, (dayMinutes.get(day) || 0) + minutes)
+      if (day === todayStr) presentTodayIds.add(record.empId)
     }
-    return result
-  }
 
-  const trend = buildTrend(0)
-  const compareTrend = buildTrend(1)
+    const buildTrend = (offsetWeeks: number): AreaChartPoint[] => {
+      const result: AreaChartPoint[] = []
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date()
+        date.setDate(date.getDate() - i - offsetWeeks * 7)
+        const dayMin = dayMinutes.get(localDateStr(date)) || 0
+        result.push({ label:DOW[date.getDay()], value:Math.min(100, Math.round((dayMin / wdMin) * 100)) })
+      }
+      return result
+    }
+
+    const kpis: KPI[] = [
+      { label:'Empleados activos', value:String(emps.length), tone:'primary' },
+      { label:'Trabajando ahora', value:String(workingCount), tone:'cyan' },
+      { label:'En descanso', value:String(breakCount), tone:'amber' },
+      { label:'Ausentes hoy', value:String(Math.max(0, emps.length - presentTodayIds.size)), tone:'accent' },
+      { label:'Horas trabajadas hoy', value:mhm(dayMinutes.get(todayStr) || 0), tone:'primary' },
+    ]
+    const activity: ActivityItem[] = (db.audit || []).slice(-10).reverse().map((entry, index) => ({
+      id:String(index),
+      text:`${entry.action}${entry.detail ? ` — ${entry.detail}` : ''}${entry.user ? ` · ${entry.user}` : ''}`,
+      time:entry.ts ? new Date(entry.ts).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '',
+      tone:activityTone(entry.action),
+    }))
+    return { kpis, activity, trend:buildTrend(0), compareTrend:buildTrend(1) }
+  }, [db.employees, db.records, db.audit, db.config?.wdMin])
 
   const name = session?.user?.name?.split(' ')?.[0] ?? ''
   return {
     greeting: name ? `Buenos días, ${name}` : 'Buenos días',
-    kpis,
-    activity,
-    trend,
-    compareTrend,
+    ...computed,
   }
 }

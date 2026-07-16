@@ -796,7 +796,7 @@ function ValidateHoursPage() {
         status: (r.aceptada || r.validado) ? 'approved' : r.rechazado ? 'rejected' : 'pending',
       } as any
     })
-  }, [db])
+  }, [db.records, db.employees, db.config?.wdMin])
 
   const handleApprove = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
@@ -1215,10 +1215,24 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     // localMonthKey(r.inicio) (no r.inicio.startsWith(thisMonth)): inicio se
     // guarda en UTC — evita atribuir un fichaje nocturno al mes siguiente.
     const monthRecs = allRecs.filter((r: any) => localMonthKey(r.inicio) === thisMonth)
-    const totalMins = monthRecs.reduce((s: number, r: any) => {
-      return s + recWorkSecs(r) / 60
-    }, 0)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+    const employeesById = new Map(emps.map((employee: any) => [employee.id, employee]))
+    const minutesByEmployee = new Map<string, number>()
+    const centroMap = new Map<string, number>()
+    const distribution = { full: 0, partial: 0, overtime: 0 }
+    let totalMins = 0
+
+    for (const record of monthRecs) {
+      const minutes = recWorkSecs(record) / 60
+      totalMins += minutes
+      minutesByEmployee.set(record.empId, (minutesByEmployee.get(record.empId) || 0) + minutes)
+      const employee = employeesById.get(record.empId) as any
+      const centro = record.centro || employee?.centroTrabajo || 'Sin asignar'
+      centroMap.set(centro, (centroMap.get(centro) || 0) + minutes)
+      if (minutes >= 420 && minutes <= 540) distribution.full += 1
+      else if (minutes > 0 && minutes < 420) distribution.partial += 1
+      else if (minutes > 540) distribution.overtime += 1
+    }
     const empCount = emps.length || 1
     const avgMins = totalMins / Math.max(monthRecs.length, 1)
     const avgH = Math.floor(avgMins / 60)
@@ -1233,39 +1247,21 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
 
     // Hours per employee bar
     const bars = emps.slice(0, 8).map((e: any) => {
-      const empMins = monthRecs.filter((r: any) => r.empId === e.id).reduce((s: number, r: any) =>
-        s + recWorkSecs(r) / 60, 0
-      )
+      const empMins = minutesByEmployee.get(e.id) || 0
       const maxPossible = 160 * 60 // 160h/month
       return { label: e.name?.split(' ')[0] || e.id, value: Math.min(100, Math.round(empMins / maxPossible * 100)) }
     })
 
     // Hours per centro de trabajo
-    const centroMap = new Map<string, number>()
-    monthRecs.forEach((r: any) => {
-      const emp = emps.find((e: any) => e.id === r.empId)
-      const centro = r.centro || emp?.centroTrabajo || 'Sin asignar'
-      const mins = recWorkSecs(r) / 60
-      centroMap.set(centro, (centroMap.get(centro) || 0) + mins)
-    })
     const centrosBars = [...centroMap.entries()]
       .map(([label, mins]) => ({ label, value: Math.round(mins / 60) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8)
 
     const rawSlices = [
-      { label: 'Jornada completa', value: monthRecs.filter((r: any) => {
-        const mins = recWorkSecs(r) / 60
-        return mins >= 420 && mins <= 540
-      }).length, color: colors.semantic.green },
-      { label: 'Jornada parcial', value: monthRecs.filter((r: any) => {
-        const mins = recWorkSecs(r) / 60
-        return mins > 0 && mins < 420
-      }).length, color: colors.semantic.orange },
-      { label: 'Horas extra', value: monthRecs.filter((r: any) => {
-        const mins = recWorkSecs(r) / 60
-        return mins > 540
-      }).length, color: colors.primary.base },
+      { label: 'Jornada completa', value: distribution.full, color: colors.semantic.green },
+      { label: 'Jornada parcial', value: distribution.partial, color: colors.semantic.orange },
+      { label: 'Horas extra', value: distribution.overtime, color: colors.primary.base },
     ]
     const sliceTotal = rawSlices.reduce((s, x) => s + x.value, 0) || 1
     const donut = {
@@ -1275,7 +1271,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     }
 
     return { kpis, bars, centrosBars, donut, rawSlices }
-  }, [db])
+  }, [db.records, db.employees])
 
   return (
     <Stats
@@ -1379,19 +1375,36 @@ function MonthlyClosePage() {
 
   // Build closure items from db.cierres, enriched with records
   const items = useMemo(() => {
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
-    return (db.cierres || [])
+    const allEmployees = db.employees || []
+    const emps = allEmployees.filter((e: any) => !e.isAdmin && !e.baja)
+    const employeesById = new Map(emps.map((employee: any) => [employee.id, employee]))
+    const recordsByEmployeeMonth = new Map<string, any[]>()
+    const supervisorByCenter = new Map<string, any>()
+
+    for (const record of db.records || []) {
+      if (!record.fin || !record.inicio) continue
+      const key = `${record.empId}\u0000${localMonthKey(record.inicio)}`
+      const grouped = recordsByEmployeeMonth.get(key)
+      if (grouped) grouped.push(record)
+      else recordsByEmployeeMonth.set(key, [record])
+    }
+    for (const employee of allEmployees) {
+      if ((employee.role === 'encargado' || employee.role === 'jefe_obra') && !employee.isAdmin) {
+        const center = employee.centroTrabajo || ''
+        if (!supervisorByCenter.has(center)) supervisorByCenter.set(center, employee)
+      }
+    }
+
+    return [...(db.cierres || [])]
       .sort((a: any, b: any) => String(b.mes || '').localeCompare(String(a.mes || '')))
       .map((c: any) => {
-        const emp = emps.find((e: any) => e.id === c.empId)
+        const emp = employeesById.get(c.empId) as any
         const [year, mon] = (c.mes || '').split('-')
         const monthLabel = year && mon
           ? new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
           : c.mes || '—'
 
-        const liveRecs = (db.records || []).filter((r: any) =>
-          r.empId === c.empId && r.fin && r.inicio && localMonthKey(r.inicio) === (c.mes || '')
-        )
+        const liveRecs = recordsByEmployeeMonth.get(`${c.empId}\u0000${c.mes || ''}`) || []
         // Un cierre firmado es un documento laboral sellado: nunca se vuelve a
         // calcular con fichajes que puedan cambiar después de la firma.
         const hasSignature = !!(c.firmaAdmin || c.firmaEmp || c.firma)
@@ -1412,10 +1425,7 @@ function MonthlyClosePage() {
         }))
 
         // Supervisor: find encargado or jefe_obra assigned to same centro
-        const supervisor = (db.employees || []).find((e: any) =>
-          (e.role === 'encargado' || e.role === 'jefe_obra') &&
-          e.centroTrabajo === (emp?.centroTrabajo || '') && !e.isAdmin
-        )
+        const supervisor = supervisorByCenter.get(emp?.centroTrabajo || '')
 
         const empRole = emp?.role === 'empleado' ? 'Empleado' : emp?.role === 'encargado' ? 'Encargado' : emp?.role === 'jefe_obra' ? 'Jefe de obra' : emp?.role || 'Empleado'
 
@@ -1443,7 +1453,7 @@ function MonthlyClosePage() {
           pdfData: c.pdfData || null,
         } as any
       })
-  }, [db])
+  }, [db.cierres, db.employees, db.records])
 
   // Generate closures for the previous (completed) month only
   const handleGenerateAll = () => {

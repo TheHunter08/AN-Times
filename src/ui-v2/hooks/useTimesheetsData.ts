@@ -30,13 +30,14 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
 
   return useMemo(() => {
     const employees = db.employees || []
+    const employeesById = new Map(employees.map(employee => [employee.id, employee]))
     const recs = (db.records || [])
       .filter(r => r.fin)
       .sort((a, b) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
     const q = search.trim().toLowerCase()
     return recs
       .map(r => {
-        const employee = employees.find(e => e.id === r.empId)
+        const employee = employeesById.get(r.empId)
         const employeeName = employee?.name || r.empName || '—'
         const centro = r.centro || employee?.centroTrabajo || 'Sin centro'
         const workedMin = Math.floor(recWorkSecs(r) / 60)
