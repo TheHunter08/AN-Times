@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Avatar } from '../components/Avatar.js'
 import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
+import { ProductState } from '../components/ProductState.js'
 import { IconClock, IconMapPin, IconUsers } from '../components/Icons.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
@@ -83,17 +84,11 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
       )}
 
       {!hasScope ? (
-        <Card style={{ textAlign: 'center', padding: '38px 20px' }}>
-          <IconMapPin width={28} height={28} />
-          <div style={{ marginTop: 12, fontWeight: 750, color: colors.text[700] }}>Falta asignar tu obra o centro</div>
-          <div style={{ marginTop: 6, fontSize: 13, color: colors.text[500] }}>Un administrador debe completar tus asignaciones para mostrarte el equipo correcto.</div>
-        </Card>
+        <ProductState compact title="Falta asignar tu obra o centro" description="Un administrador debe completar tus asignaciones para mostrarte el equipo correcto." icon={<IconMapPin />} />
       ) : rows.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: '38px 20px' }}>
-          <IconUsers width={28} height={28} />
-          <div style={{ marginTop: 12, fontWeight: 750, color: colors.text[700] }}>Nadie fichado ahora</div>
-          <div style={{ marginTop: 6, fontSize: 13, color: colors.text[500] }}>No hay fichajes abiertos en tu misma obra y centro.</div>
-        </Card>
+        <ProductState compact title="Nadie ha fichado todavía" description="No hay jornadas abiertas en tu misma obra o centro." icon={<IconUsers />} />
+      ) : visibleRows.length === 0 ? (
+        <ProductState compact title="No encontramos fichajes" description="Prueba con otro nombre o selecciona todas las obras y centros." icon={<IconUsers />} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
           {visibleRows.map(row => (

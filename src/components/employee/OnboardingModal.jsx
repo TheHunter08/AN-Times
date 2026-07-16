@@ -6,6 +6,7 @@ import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { TextField } from '../../ui-v2/components/FormField.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 const btnPrimary = { padding:'12px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
 const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
@@ -18,6 +19,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const [done, setDone] = useState(false)
   const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
+  const dialogRef = useDialogA11y(visible && !done)
 
   useEffect(() => { if (step === 1) initCanvas() }, [step])
 
@@ -45,11 +47,11 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-dialog-title" tabIndex={-1} style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
           <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
-          <div style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Bienvenido, {u.name.split(' ')[0]}</div>
+          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Bienvenido, {u.name.split(' ')[0]}</div>
           <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Configura tu cuenta en {STEPS.length} pasos rápidos</div>
         </div>
 

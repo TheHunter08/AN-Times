@@ -2,6 +2,7 @@
 import { PageTitle } from '../components/PageTitle.js'
 import { Button } from '../components/Button.js'
 import { Search } from '../components/Search.js'
+import { ProductState } from '../components/ProductState.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconShield, IconDownload, IconClock, IconUsers, IconFileText, IconMapPin, IconSettings } from '../components/Icons.js'
@@ -87,7 +88,12 @@ export function Audit({ entries, onExport }: AuditProps) {
       {/* Timeline */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative' }}>
         {filtered.length === 0 && (
-          <div style={{ padding: '32px', textAlign: 'center', color: colors.text[500], fontSize: 13 }}>Sin registros de auditoría</div>
+          <ProductState
+            compact
+            title={entries.length ? 'No encontramos registros' : 'Aún no hay actividad de auditoría'}
+            description={entries.length ? 'Prueba con otra búsqueda o categoría.' : 'Las acciones importantes del equipo aparecerán aquí automáticamente.'}
+            icon={<IconShield />}
+          />
         )}
         {filtered.map((entry, i) => {
           const s = catStyle[entry.category]

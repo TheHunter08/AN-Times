@@ -162,6 +162,10 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-page-loader span { display:block; height:84px; border-radius:18px; background:linear-gradient(100deg,var(--uiv2-bg-600) 20%,var(--uiv2-bg-500) 45%,var(--uiv2-bg-600) 70%); background-size:220% 100%; animation:ti-loader 1.25s ease-in-out infinite; }
 .ti-page-loader span:first-child { height:58px; width:min(100%,420px); }
 @keyframes ti-loader { to { background-position:-220% 0; } }
+.ti-employee-loader { display:grid; gap:12px; width:100%; padding:20px; box-sizing:border-box; }
+.ti-employee-loader span { display:block; height:96px; border-radius:18px; background:linear-gradient(100deg,var(--uiv2-bg-600) 20%,var(--uiv2-bg-500) 45%,var(--uiv2-bg-600) 70%); background-size:220% 100%; animation:ti-loader 1.25s ease-in-out infinite; }
+.ti-employee-loader span:first-child { height:52px; width:min(64%,360px); }
+.ti-modal-loader { position:fixed; z-index:2000; left:50%; bottom:max(28px,env(safe-area-inset-bottom)); transform:translateX(-50%); padding:10px 14px; border:1px solid var(--premium-line); border-radius:12px; background:var(--uiv2-bg-700); color:var(--uiv2-text-700); box-shadow:var(--shadow-lg); font-size:12px; font-weight:700; }
 
 /* Preview aislada para comparar las tres superficies sin sesión. */
 .ti-preview { height:100dvh; overflow-y:auto; background:var(--premium-canvas); color:var(--uiv2-text-900); overscroll-behavior:contain; }
@@ -189,5 +193,12 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 }
 
 @media (prefers-reduced-motion:reduce) {
-  .ti-preview *,#sAdmin *,#sEmp * { scroll-behavior:auto !important; }
+  .ti-preview *,#sAdmin *,#sEmp *,
+  .ti-preview *::before,#sAdmin *::before,#sEmp *::before,
+  .ti-preview *::after,#sAdmin *::after,#sEmp *::after {
+    scroll-behavior:auto !important;
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
 }

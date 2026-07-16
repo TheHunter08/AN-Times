@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store/appStore.js'
+import { lazy, Suspense } from 'react'
 import { useTimer } from '../hooks/useTimer.js'
 import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, localDateStr } from '../utils/time.js'
 import { calcStreak } from '../utils/streaks.js'
@@ -8,39 +9,44 @@ import { EmployeeHome } from '../ui-v2/pages/EmployeeHome.tsx'
 import { VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
-import WellbeingModal from '../components/WellbeingModal.jsx'
-import TabTurnos from '../components/TabTurnos.jsx'
 import { shouldIgnoreAppGesture } from '../utils/gesture.js'
 import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
-import { ModalSelCentro } from '../components/employee/ModalSelCentro.jsx'
-import { ModalQRScan } from '../components/employee/ModalQRScan.jsx'
-import { ModalMyQR } from '../components/employee/ModalMyQR.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
-import { ModalNotis } from '../components/employee/ModalNotis.jsx'
-import { ModalVacForm } from '../components/employee/ModalVacForm.jsx'
-import { ModalSign } from '../components/employee/ModalSign.jsx'
-import { ModalAI } from '../components/employee/ModalAI.jsx'
-import { ModalInfoPersonal } from '../components/employee/ModalInfoPersonal.jsx'
-import { ModalDocumentos } from '../components/employee/ModalDocumentos.jsx'
-import { ModalConfiguracion } from '../components/employee/ModalConfiguracion.jsx'
-import { ModalCierreSign } from '../components/employee/ModalCierreSign.jsx'
-import { Confetti } from '../components/employee/Confetti.jsx'
-import { ModalLogros } from '../components/employee/ModalLogros.jsx'
-import { ModalTemas } from '../components/employee/ModalTemas.jsx'
-import { WelcomeSlides } from '../components/employee/WelcomeSlides.jsx'
-import { OnboardingModal } from '../components/employee/OnboardingModal.jsx'
-import { ModalChat } from '../components/employee/ModalChat.jsx'
-import { ModalCorreccion } from '../components/employee/ModalCorreccion.jsx'
-import { TabMensajes } from '../components/employee/TabMensajes.jsx'
-import { TabVacaciones } from '../components/employee/TabVacaciones.jsx'
-import { TabCalendario } from '../components/employee/TabCalendario.jsx'
-import { TabPerfil } from '../components/employee/TabPerfil.jsx'
-import { TabInicio } from '../components/employee/TabInicio.jsx'
-import { TabJornada } from '../components/employee/TabJornada.jsx'
+
+const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
+const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
+const TabTurnos = lazy(() => import('../components/TabTurnos.jsx'))
+const ModalSelCentro = lazyNamed(() => import('../components/employee/ModalSelCentro.jsx'), 'ModalSelCentro')
+const ModalQRScan = lazyNamed(() => import('../components/employee/ModalQRScan.jsx'), 'ModalQRScan')
+const ModalMyQR = lazyNamed(() => import('../components/employee/ModalMyQR.jsx'), 'ModalMyQR')
+const ModalNotis = lazyNamed(() => import('../components/employee/ModalNotis.jsx'), 'ModalNotis')
+const ModalVacForm = lazyNamed(() => import('../components/employee/ModalVacForm.jsx'), 'ModalVacForm')
+const ModalSign = lazyNamed(() => import('../components/employee/ModalSign.jsx'), 'ModalSign')
+const ModalAI = lazyNamed(() => import('../components/employee/ModalAI.jsx'), 'ModalAI')
+const ModalInfoPersonal = lazyNamed(() => import('../components/employee/ModalInfoPersonal.jsx'), 'ModalInfoPersonal')
+const ModalDocumentos = lazyNamed(() => import('../components/employee/ModalDocumentos.jsx'), 'ModalDocumentos')
+const ModalConfiguracion = lazyNamed(() => import('../components/employee/ModalConfiguracion.jsx'), 'ModalConfiguracion')
+const ModalCierreSign = lazyNamed(() => import('../components/employee/ModalCierreSign.jsx'), 'ModalCierreSign')
+const Confetti = lazyNamed(() => import('../components/employee/Confetti.jsx'), 'Confetti')
+const ModalLogros = lazyNamed(() => import('../components/employee/ModalLogros.jsx'), 'ModalLogros')
+const ModalTemas = lazyNamed(() => import('../components/employee/ModalTemas.jsx'), 'ModalTemas')
+const WelcomeSlides = lazyNamed(() => import('../components/employee/WelcomeSlides.jsx'), 'WelcomeSlides')
+const OnboardingModal = lazyNamed(() => import('../components/employee/OnboardingModal.jsx'), 'OnboardingModal')
+const ModalChat = lazyNamed(() => import('../components/employee/ModalChat.jsx'), 'ModalChat')
+const ModalCorreccion = lazyNamed(() => import('../components/employee/ModalCorreccion.jsx'), 'ModalCorreccion')
+const TabMensajes = lazyNamed(() => import('../components/employee/TabMensajes.jsx'), 'TabMensajes')
+const TabVacaciones = lazyNamed(() => import('../components/employee/TabVacaciones.jsx'), 'TabVacaciones')
+const TabCalendario = lazyNamed(() => import('../components/employee/TabCalendario.jsx'), 'TabCalendario')
+const TabPerfil = lazyNamed(() => import('../components/employee/TabPerfil.jsx'), 'TabPerfil')
+const TabJornada = lazyNamed(() => import('../components/employee/TabJornada.jsx'), 'TabJornada')
+
+function EmployeeSectionLoader() {
+  return <div className="ti-employee-loader" role="status" aria-label="Cargando sección"><span /><span /><span /></div>
+}
 
 // Opciones de geolocalización para el fichaje — timeout más generoso y
 // maximumAge no-cero. `enableHighAccuracy` pide al chip GPS un fix preciso,
@@ -1040,6 +1046,29 @@ export default function EmployeePage() {
     { id:'perfil',     label:'Perfil',     icon:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
   ]
 
+  const employeeOverlays = (
+    <Suspense fallback={<div className="ti-modal-loader" role="status">Abriendo…</div>}>
+      {showWellbeing && <WellbeingModal visible onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />}
+      {activeModal === 'selCentro' && <ModalSelCentro visible data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />}
+      {qrScanOpen && <ModalQRScan visible onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />}
+      {activeModal === 'miQR' && <ModalMyQR visible u={u} onClose={closeModal} />}
+      {activeModal === 'notis' && <ModalNotis visible db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />}
+      {activeModal === 'ai' && <ModalAI visible db={db} u={u} onClose={closeModal} />}
+      {activeModal === 'vacForm' && <ModalVacForm visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'sign' && <ModalSign visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'infoPersonal' && <ModalInfoPersonal visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'documentos' && <ModalDocumentos visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'configuracion' && <ModalConfiguracion visible u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'logros' && <ModalLogros visible db={db} u={u} onClose={closeModal} saveDB={saveDB} />}
+      {activeModal === 'temas' && <ModalTemas visible db={db} u={u} onClose={closeModal} saveDB={saveDB} />}
+      {activeModal === 'cierreSign' && <ModalCierreSign visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
+      {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
+      {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
+      {showConfetti && <Confetti visible />}
+      {u.onboardingDone ? <WelcomeSlides /> : <OnboardingModal visible u={u} db={db} saveDB={saveDB} toast={toast} />}
+    </Suspense>
+  )
+
   if (winW >= 1024) return (
     <div className="screen active emp-dsk" id="sEmp">
       <aside className="emp-dsk-sidebar">
@@ -1173,34 +1202,18 @@ export default function EmployeePage() {
               </div>
             </div>
           )}
-          {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
-          {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
-          {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
-          {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-          {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-          {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+          <Suspense fallback={<EmployeeSectionLoader />}>
+            {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
+            {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
+            {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+            {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
+            {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
+            {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+          </Suspense>
         </div>
       </div>
 
-      <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
-      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />
-      <ModalQRScan visible={qrScanOpen} onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />
-      <ModalMyQR visible={activeModal==='miQR'} u={u} onClose={closeModal} />
-      <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />
-      <ModalAI visible={activeModal==='ai'} db={db} u={u} onClose={closeModal} />
-      <ModalVacForm visible={activeModal==='vacForm'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
-      <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
-      <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
-      <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
-      <Confetti visible={showConfetti} />
-      {u.onboardingDone && <WelcomeSlides />}
-      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
+      {employeeOverlays}
     </div>
   )
 
@@ -1353,12 +1366,14 @@ export default function EmployeePage() {
             </div>
           </div>
         )}
-        {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
-        {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
-        {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
-        {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-        {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-        {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+        <Suspense fallback={<EmployeeSectionLoader />}>
+          {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
+          {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+          {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
+          {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
+          {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+        </Suspense>
       </div>
 
       {/* Bottom nav */}
@@ -1383,31 +1398,13 @@ export default function EmployeePage() {
       </div>
 
       {/* Modals */}
-      <WellbeingModal visible={showWellbeing} onClose={() => setShowWellbeing(false)} onSubmit={handleWellbeingSubmit} userName={u.name.split(' ')[0]} />
-      <ModalSelCentro visible={activeModal==='selCentro'} data={modalData} onConfirm={confirmarCentro} onClose={() => { startingRef.current = false; geoAbortRef.current = true; closeModal() }} />
-      <ModalQRScan visible={qrScanOpen} onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />
-      <ModalMyQR visible={activeModal==='miQR'} u={u} onClose={closeModal} />
-      <ModalNotis visible={activeModal==='notis'} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} />
-      <ModalAI visible={activeModal==='ai'} db={db} u={u} onClose={closeModal} />
-      <ModalVacForm visible={activeModal==='vacForm'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalSign visible={activeModal==='sign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalInfoPersonal visible={activeModal==='infoPersonal'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalDocumentos visible={activeModal==='documentos'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalConfiguracion visible={activeModal==='configuracion'} u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalLogros visible={activeModal==='logros'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
-      <ModalTemas visible={activeModal==='temas'} db={db} u={u} onClose={closeModal} saveDB={saveDB} />
-      <ModalCierreSign visible={activeModal==='cierreSign'} db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />
-      <ModalChat visible={activeModal==='chat'} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
-      <ModalCorreccion visible={activeModal==='correccion'} data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />
+      {employeeOverlays}
 
       {/* Confetti al cerrar jornada */}
-      <Confetti visible={showConfetti} />
 
       {/* Welcome slides: solo si ya completó el onboarding (no bloquear al nuevo empleado) */}
-      {u.onboardingDone && <WelcomeSlides />}
 
       {/* Onboarding: primer login — aparece siempre si no está completado */}
-      <OnboardingModal visible={!u.onboardingDone} u={u} db={db} saveDB={saveDB} toast={toast} />
     </div>
   )
 }

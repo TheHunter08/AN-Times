@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -17,13 +18,14 @@ export function ModalSelCentro({ visible, data, onConfirm, onClose }) {
   const [sel, setSel] = useState('')
   useEffect(() => { if (data?.current) setSel(data.current) }, [data])
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible) return null
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="select-center-dialog-title" style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
-        <h2 style={{ margin:'0 0 20px', fontSize:18, fontWeight:800, color:colors.text[900] }}>📍 Seleccionar centro de trabajo</h2>
+        <h2 id="select-center-dialog-title" style={{ margin:'0 0 20px', fontSize:18, fontWeight:800, color:colors.text[900] }}>📍 Seleccionar centro de trabajo</h2>
         <div style={{ marginBottom:6 }}>
           <label style={LBL}>Centro</label>
           <select value={sel} onChange={e => setSel(e.target.value)} style={SEL}>

@@ -2,6 +2,7 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
@@ -35,6 +36,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
 
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible && Boolean(selCierre), onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   if (!visible || !selCierre) return null
 
@@ -68,7 +70,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
 
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Firma de cierre mensual" style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
           <h2 style={{ margin:0, fontSize:16, fontWeight:800, color:colors.text[900] }}>📋 Cierre mensual · {selCierre.mes}</h2>

@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 export function WelcomeSlides() {
   const [visible, setVisible] = useState(() => {
@@ -16,6 +17,7 @@ export function WelcomeSlides() {
       setVisible(false)
     }, 350)
   }
+  const dialogRef = useDialogA11y(visible && !exiting, dismiss)
 
   if (!visible) return null
 
@@ -33,7 +35,7 @@ export function WelcomeSlides() {
       animation: exiting ? 'wsFadeOut .35s forwards' : 'wsFadeIn .3s',
     }}>
       <style>{`@keyframes wsFadeIn{from{opacity:0}to{opacity:1}}@keyframes wsFadeOut{from{opacity:1}to{opacity:0}}`}</style>
-      <div style={{
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="welcome-slide-title" tabIndex={-1} style={{
         width:'100%', maxWidth:480, margin:'0 auto',
         background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`,
         border:`1px solid ${colors.border.subtle}`, borderBottom:'none',
@@ -58,7 +60,7 @@ export function WelcomeSlides() {
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, margin:'0 auto 20px' }}>
             {s.emoji}
           </div>
-          <div style={{ fontSize:22, fontWeight:800, color:colors.text[900], marginBottom:10, letterSpacing:'-.4px' }}>{s.title}</div>
+          <div id="welcome-slide-title" style={{ fontSize:22, fontWeight:800, color:colors.text[900], marginBottom:10, letterSpacing:'-.4px' }}>{s.title}</div>
           <div style={{ fontSize:14, color:colors.text[500], lineHeight:1.65, marginBottom:32 }}>{s.sub}</div>
         </div>
 

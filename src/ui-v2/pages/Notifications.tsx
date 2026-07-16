@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
+import { ProductState } from '../components/ProductState.js'
 import {
   IconBell, IconCheck, IconX, IconAlertCircle, IconClock,
   IconCalendar, IconUsers, IconChat,
@@ -119,15 +120,11 @@ export function Notifications({ items, onMarkRead, onMarkAllRead, onDismiss }: N
 
       {/* Empty */}
       {filtered.length === 0 && (
-        <div style={{
-          padding: '56px 24px', textAlign: 'center',
-          background: colors.bg[700], borderRadius: radius.xl,
-          border: `1px solid ${colors.border.subtle}`,
-        }}>
-          <div style={{ width: 44, height: 44, margin: '0 auto 12px', borderRadius: radius.md, background: colors.primary.dim, color: colors.primary.light, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconBell width={20} height={20} /></div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[700] }}>Todo al día</div>
-          <div style={{ fontSize: 12, color: colors.text[400], marginTop: 4 }}>No tienes notificaciones{tab === 'unread' ? ' sin leer' : ''}</div>
-        </div>
+        <ProductState
+          title={tab === 'unread' ? 'Todo está al día' : 'Aún no hay notificaciones'}
+          description={tab === 'unread' ? 'No quedan notificaciones pendientes de lectura.' : 'La actividad relevante de tu equipo aparecerá aquí.'}
+          icon={<IconBell />}
+        />
       )}
 
       {/* Grouped list */}

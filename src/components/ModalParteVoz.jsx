@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useModalBack } from '../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { buildParte } from '../utils/parteTrabajo.js'
 import { fds } from '../utils/time.js'
 
@@ -20,6 +21,7 @@ export function ModalParteVoz({ visible, db, autor, saveDB, toast, onClose }) {
   const baseTextRef = useRef('')
 
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
 
   const speechOk = !!getSpeechRecognition()
@@ -89,13 +91,13 @@ export function ModalParteVoz({ visible, db, autor, saveDB, toast, onClose }) {
 
   return (
     <div className="modal-ov" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, ...modalStyle }}>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="voice-report-dialog-title" tabIndex={-1} onClick={e => e.stopPropagation()} style={{ maxWidth: 480, ...modalStyle }}>
         <div className="modal-drag" {...dragHandlers} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{ width: 40, height: 40, borderRadius: 14, background: 'linear-gradient(135deg,#F59E0B,#EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎙️</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>Parte de trabajo</div>
+            <div id="voice-report-dialog-title" style={{ fontSize: 15, fontWeight: 800 }}>Parte de trabajo</div>
             <div style={{ fontSize: 11, color: 'var(--text3)' }}>Dicta el resumen del día — {fds(new Date().toISOString())}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }} aria-label="Cerrar">×</button>

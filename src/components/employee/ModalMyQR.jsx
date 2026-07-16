@@ -2,6 +2,7 @@
 import QRCode from 'qrcode'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -16,6 +17,7 @@ const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.defa
 export function ModalMyQR({ visible, u, onClose }) {
   const canvasRef = useRef(null)
   useModalBack(visible, onClose)
+  const dialogRef = useDialogA11y(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
 
   useEffect(() => {
@@ -28,11 +30,11 @@ export function ModalMyQR({ visible, u, onClose }) {
 
   return (
     <div style={OV} onClick={onClose}>
-      <div style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="my-qr-dialog-title" style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:colors.text[900] }}>Mi código QR</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:colors.text[500], fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>×</button>
+          <h2 id="my-qr-dialog-title" style={{ margin:0, fontSize:18, fontWeight:800, color:colors.text[900] }}>Mi código QR</h2>
+          <button onClick={onClose} aria-label="Cerrar código QR" style={{ background:'none', border:'none', color:colors.text[500], fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>×</button>
         </div>
         <div style={{ background:'#fff', borderRadius:radius.xl, padding:12, display:'inline-block' }}>
           <canvas ref={canvasRef} />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialogA11y } from '../hooks/useDialogA11y.js';
 
 const MOODS = [
   { emoji: '😴', label: 'Cansado', value: 'cansado' },
@@ -11,6 +12,7 @@ const MOODS = [
 export default function WellbeingModal({ visible, onClose, onSubmit, userName }) {
   const [selected, setSelected] = useState(null);
   const [nota, setNota] = useState('');
+  const dialogRef = useDialogA11y(visible, onClose);
 
   if (!visible) return null;
 
@@ -44,6 +46,11 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wellbeing-dialog-title"
+        tabIndex={-1}
         style={{
           background: 'var(--bg-800)',
           borderRadius: '20px',
@@ -63,6 +70,7 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
 
         {/* Header */}
         <h2
+          id="wellbeing-dialog-title"
           style={{
             margin: '0 0 6px',
             fontSize: '1.25rem',
