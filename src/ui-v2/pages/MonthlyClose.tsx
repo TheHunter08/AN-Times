@@ -44,6 +44,7 @@ export interface MonthlyCloseProps {
   onSignMany?: (ids: string[]) => void
   onGenerateAll?: () => void
   onDelete?: (id: string) => void
+  onDeleteMonth?: (mes: string) => void
   onReopen?: (id: string) => void
   onReopenMonth?: (mes: string) => void
   onDownloadConsolidated?: (mes: string) => void
@@ -83,7 +84,7 @@ function generateExcel(item: ClosureItem) {
   downloadXlsx(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onReopen, onReopenMonth, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
+export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onDeleteMonth, onReopen, onReopenMonth, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'signed' | 'pending'>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
@@ -167,6 +168,15 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: '1px solid rgba(245,158,11,.35)', background: 'rgba(245,158,11,.08)', color: colors.semantic.orange, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
             >
               Reabrir mes completo
+            </button>
+          )}
+          {onDeleteMonth && monthFilter !== 'all' && monthItems.length > 0 && (
+            <button
+              onClick={() => selectedMonthMes && onDeleteMonth(selectedMonthMes)}
+              title={`Eliminar los ${monthItems.length} cierres de ${monthFilter}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.sm, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: colors.semantic.red, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <IconX width={13} height={13} /> Eliminar mes completo
             </button>
           )}
         </div>

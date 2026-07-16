@@ -1697,7 +1697,28 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  // Borrado en lote de todos los cierres de un mes — a diferencia de
+  // handleDeleteClosure, aquí se permite borrar aunque estén firmados: se usa
+  // para deshacer una generación entera hecha por error antes de que el mes
+  // terminara (no son documentos legales válidos, ya que nunca debieron
+  // poder firmarse — ver canCloseMonth).
+  const handleDeleteMonth = (mes: string) => {
+    const affected = (db.cierres || []).filter((c: any) => c.mes === mes)
+    if (!affected.length) { toast(`No hay cierres de ${mes}`, 3000, 'warn'); return }
+    if (!window.confirm(`¿Eliminar TODOS los cierres de ${mes} (${affected.length})? Esta acción no se puede deshacer.`)) return
+    const actor = session?.user?.name || 'Admin'
+    const ids = affected.map((c: any) => c.id)
+    saveDB((fresh: any) => {
+      const withAudit = auditLog(fresh, 'Cierres de mes eliminados', `${mes} · ${affected.length} cierres`, actor, { category:'documento', entityType:'cierre_batch', entityId:ids.join(','), device:currentDeviceLabel(), before:{ count:affected.length }, after:{ count:0 } })
+      return { cierres: (fresh.cierres || []).filter((c: any) => c.mes !== mes), audit: withAudit.audit }
+    })
+    if (supabase) supabase.from('cierres').delete().eq('mes', mes).then(({ error }: any) => {
+      if (error) toast('Eliminado localmente — no se pudo confirmar con el servidor', 4000, 'warn')
+    })
+    toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} eliminado${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
+  }
+
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
