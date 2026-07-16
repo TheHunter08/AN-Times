@@ -2,11 +2,27 @@ import { create } from 'zustand'
 import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
+import { sanitizeSession } from '../utils/sessionSecurity.js'
 
 const storedSes = (() => {
-  try { return JSON.parse(localStorage.getItem('an_times_ses') || 'null') } catch { return null }
+  try {
+    const raw = JSON.parse(localStorage.getItem('an_times_ses') || 'null')
+    if (!raw) return null
+    const safe = sanitizeSession(raw)
+    // Migra silenciosamente sesiones antiguas que contenían la ficha completa,
+    // incluido el hash del PIN, a la representación mínima.
+    localStorage.setItem('an_times_ses', JSON.stringify(safe))
+    return safe
+  } catch { return null }
 })()
 const initialDb = loadLocal()
+
+function _runtimeSession(session, db) {
+  const safe = sanitizeSession(session)
+  if (!safe.user?.id) return safe
+  const profile = (db?.employees || []).find(employee => employee.id === safe.user.id && !employee.baja)
+  return profile ? { ...safe, user: profile } : safe
+}
 
 // Detecta qué ids (o valores, en arrays de strings) desaparecieron respecto al
 // estado anterior — son eliminaciones intencionadas del usuario (borrar un
@@ -153,9 +169,9 @@ export const useAppStore = create((set, get) => ({
         if (!freshEmp || freshEmp.baja) {
           get().logout()
         } else {
-          const updatedSes = { ...ses, user: freshEmp }
-          set({ session: updatedSes })
-          try { localStorage.setItem('an_times_ses', JSON.stringify(updatedSes)) } catch {}
+          const persistedSes = sanitizeSession({ ...ses, user: freshEmp })
+          set({ session: { ...persistedSes, user: freshEmp } })
+          try { localStorage.setItem('an_times_ses', JSON.stringify(persistedSes)) } catch {}
         }
       }
     } finally {
@@ -198,20 +214,21 @@ export const useAppStore = create((set, get) => ({
   // ── Session ─────────────────────────────────────────────────────────
   session: (() => {
     if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false }
+    const localDB = loadLocal()
     if (storedSes.user) {
-      const localDB = loadLocal()
       const stillActive = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
       if (!stillActive) {
         try { localStorage.removeItem('an_times_ses') } catch {}
         return { user: null, isAdmin: false, isEnc: false, isJO: false }
       }
     }
-    return storedSes
+    return _runtimeSession(storedSes, localDB)
   })(),
 
   setSession: ses => {
-    set({ session: ses })
-    try { localStorage.setItem('an_times_ses', JSON.stringify(ses)) } catch {}
+    const safe = sanitizeSession(ses)
+    set({ session: ses?.user ? { ...safe, user: ses.user } : safe })
+    try { localStorage.setItem('an_times_ses', JSON.stringify(safe)) } catch {}
   },
 
   logout: () => {

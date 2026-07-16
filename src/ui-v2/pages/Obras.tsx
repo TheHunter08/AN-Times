@@ -16,6 +16,8 @@ export interface ObraItem {
   status: 'activa' | 'completada'
   employeeCount: number
   hoursToday: string
+  hoursMonth?: string
+  activeNow?: number
   manager: string
   startDate: string
 }
@@ -105,12 +107,13 @@ export function Obras({ items, onAdd, onViewEmployees }: ObrasProps) {
                 {obra.address}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
                   { icon: <IconUsers width={12} height={12} />, label: `${obra.employeeCount} empleados` },
                   { icon: <IconClock width={12} height={12} />, label: `${obra.hoursToday} hoy` },
+                  { icon: <IconClock width={12} height={12} />, label: `${obra.activeNow || 0} ahora` },
                 ].map((stat, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', borderRadius: radius.sm, background: colors.bg[600], fontSize: 11.5, color: colors.text[700] }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent:'center', gap: 5, padding: '7px 6px', borderRadius: radius.sm, background: colors.bg[600], fontSize: 10.5, color: colors.text[700], whiteSpace:'nowrap' }}>
                     {stat.icon} {stat.label}
                   </div>
                 ))}
@@ -158,6 +161,8 @@ export function Obras({ items, onAdd, onViewEmployees }: ObrasProps) {
               {[
                 { label: 'Equipo asignado', value: `${detail.employeeCount} empleados`, icon: <IconUsers width={14} height={14} /> },
                 { label: 'Jornada de hoy', value: detail.hoursToday, icon: <IconClock width={14} height={14} /> },
+                { label: 'Trabajando ahora', value: `${detail.activeNow || 0} personas`, icon: <IconUsers width={14} height={14} /> },
+                { label: 'Horas del mes', value: detail.hoursMonth || '0h', icon: <IconClock width={14} height={14} /> },
               ].map(stat => (
                 <div key={stat.label} style={{ padding: '12px 14px', borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, background: colors.bg[700] }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: colors.text[500], marginBottom: 5 }}>{stat.icon}{stat.label}</div>

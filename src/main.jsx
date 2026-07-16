@@ -1,6 +1,5 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import * as Sentry from '@sentry/react'
 import './styles/globals.css'
 import './styles/v5.css'
 import './styles/v7.css'
@@ -11,12 +10,16 @@ import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.MODE,
-    tracesSampleRate: 0.2,
-    integrations: [Sentry.browserTracingIntegration()],
-  })
+  // La telemetría no debe retrasar el login ni el fichaje. Solo se descarga
+  // cuando existe un DSN y se inicializa en segundo plano.
+  import('@sentry/react').then(Sentry => {
+    Sentry.init({
+      dsn: import.meta.env.VITE_SENTRY_DSN,
+      environment: import.meta.env.MODE,
+      tracesSampleRate: 0.2,
+      integrations: [Sentry.browserTracingIntegration()],
+    })
+  }).catch(() => {})
 }
 
 function removeSplash() {

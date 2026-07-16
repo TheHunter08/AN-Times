@@ -15,8 +15,11 @@ import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
 import { resolveEmployeeNotificationDestination } from '../utils/notificationNavigation.js'
+import { employeeObraOptions } from '../utils/obraAttribution.js'
+import { normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
+import { canCloseMonth } from '../utils/adminHelpers.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -63,7 +66,7 @@ const GEO_OPTS = { enableHighAccuracy: true, timeout: 25000, maximumAge: 120000 
 const STARTING_LOCK_MS = GEO_OPTS.timeout + 2000
 
 export default function EmployeePage() {
-  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus } = useAppStore(
+  const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus, offlinePending } = useAppStore(
     useShallow((state) => ({
       db: state.db,
       session: state.session,
@@ -80,6 +83,7 @@ export default function EmployeePage() {
       modalData: state.modalData,
       syncStatus: state.syncStatus,
       realtimeStatus: state.realtimeStatus,
+      offlinePending: state.offlinePending,
     })),
   )
   const winW = useWindowWidth()
@@ -218,7 +222,9 @@ export default function EmployeePage() {
   // ── Geofencing: aviso al entrar (iniciar jornada) y al salir (fichar salida) ──
   useEffect(() => {
     if (!u?.id || !navigator.geolocation) return
-    const obras = (dbRef.current?.obras || []).filter(o => o.coords && o.radio)
+    const obras = (dbRef.current?.obras || [])
+      .map(o => ({ ...o, coords:normalizeObraCoords(o.coords) }))
+      .filter(o => o.coords && o.radio)
     if (!obras.length) return
     const distTo = (lat, lng, o) => {
       const R = 6371e3
@@ -640,7 +646,7 @@ export default function EmployeePage() {
     if (activeModal === 'selCentro') return
     startingRef.current = true
     setTimeout(() => { startingRef.current = false }, STARTING_LOCK_MS)
-    const cs = db.centrosTrabajo || []
+    const cs = employeeObraOptions(u, db.obras || [], db.centrosTrabajo || [])
     openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
     geoAbortRef.current = false
     const myNonce = ++geoNonceRef.current
@@ -692,7 +698,7 @@ export default function EmployeePage() {
     setGpsStatus('idle')
     closeModal()
     const rec = {
-      id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, empId: u.id, empName: u.name, empresa: u.empresa || '',
+      id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: u.id, empName: u.name, empresa: u.empresa || '',
       centro, inicio: new Date().toISOString(), fin: null,
       workSecs: 0, breakSecs: 0, enDescanso: false, bStartTs: null, breaks: [], closed: false,
       _upd: new Date().toISOString()
@@ -701,8 +707,9 @@ export default function EmployeePage() {
     // Geofencing: warn if employee is outside the obra's defined radius
     if (effectiveGPS) {
       const obraGeo = (db.obras || []).find(o => o.nombre === centro)
-      if (obraGeo?.coords) {
-        const dist = haversine(effectiveGPS.lat, effectiveGPS.lng, obraGeo.coords.lat, obraGeo.coords.lng)
+      const obraCoords = normalizeObraCoords(obraGeo?.coords)
+      if (obraCoords) {
+        const dist = haversine(effectiveGPS.lat, effectiveGPS.lng, obraCoords.lat, obraCoords.lng)
         const radio = obraGeo.radio != null ? obraGeo.radio : 200
         if (dist > radio) {
           rec.geoAlert = { dist, radio, ts: new Date().toISOString() }
@@ -712,7 +719,7 @@ export default function EmployeePage() {
     }
     saveDB(freshDb => ({
       records: [...freshDb.records, rec],
-      employees: freshDb.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro } : e)
+      employees: freshDb.employees.map(e => e.id === u.id ? { ...e, centroTrabajo: centro, _upd: rec._upd } : e)
     }))
     try { navigator.vibrate(15) } catch {}
     toast('Jornada iniciada en ' + centro, 3000, 'ok')
@@ -829,7 +836,7 @@ export default function EmployeePage() {
     setQrScanOpen(false)
     const centro = decodeCentroQR(text)
     if (centro) {
-      const cs = db.centrosTrabajo || []
+      const cs = employeeObraOptions(u, db.obras || [], db.centrosTrabajo || [])
       if (!cs.includes(centro)) { toast(`"${centro}" no es un centro de trabajo registrado`, 4000, 'err'); return }
       const o = openRec()
       if (!o) {
@@ -1021,6 +1028,8 @@ export default function EmployeePage() {
   }, [db.cierres, db.employees, db.config, isSuper, u.centroTrabajo, u.id])
 
   const handleSignSupervisor = (cierreId) => {
+    const cierre = (db.cierres || []).find(c => c.id === cierreId)
+    if (cierre && !canCloseMonth(cierre.mes)) { toast('Ese mes todavía no ha terminado — no se puede firmar hasta su último día', 4500, 'warn'); return }
     saveDB(freshDb => ({
       cierres: (freshDb.cierres || []).map(c =>
         c.id === cierreId
@@ -1058,7 +1067,7 @@ export default function EmployeePage() {
       {qrScanOpen && <ModalQRScan visible onScan={handleQRScan} onClose={() => setQrScanOpen(false)} />}
       {activeModal === 'miQR' && <ModalMyQR visible u={u} onClose={closeModal} />}
       {activeModal === 'notis' && <ModalNotis visible db={db} onClose={closeModal} toast={toast} saveDB={saveDB} u={u} onNavigate={handleNotificationNavigate} />}
-      {activeModal === 'ai' && <ModalAI visible db={db} u={u} onClose={closeModal} />}
+      {activeModal === 'ai' && <ModalAI visible db={{ ...db, _runtimeSync:{ syncStatus, realtimeStatus, offlinePending } }} u={u} onClose={closeModal} />}
       {activeModal === 'vacForm' && <ModalVacForm visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'sign' && <ModalSign visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'infoPersonal' && <ModalInfoPersonal visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}

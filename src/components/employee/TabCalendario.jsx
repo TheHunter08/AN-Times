@@ -3,6 +3,7 @@ import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
 import { useRef } from 'react'
 import { WK, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from './PullToRefresh.jsx'
+import { buildEmployeeCalendarICS, downloadICS } from '../../utils/calendarExport.js'
 
 const colors = {
   bg: { 400: 'var(--bg-card-hover)', 500: 'var(--bg-elevated)', 600: 'var(--bg-card)' },
@@ -48,6 +49,11 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
 
   const todayStr = today()
   const monthStr = `${y}-${p2(m+1)}`
+  const exportMonth = () => {
+    const from = new Date(y, m, 1)
+    const to = new Date(y, m + 1, 1)
+    downloadICS(buildEmployeeCalendarICS(db, u, { from, to }), `calendario-laboral-${monthStr}.ics`)
+  }
 
   const lds = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`
 
@@ -203,9 +209,10 @@ export function TabCalendario({ db, u, calMonth, setCalMonth }) {
         style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 760, margin: '0 auto', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
 
         {/* Header */}
-        <header style={{ display: 'grid', gap: 'var(--space-1)', padding: 'var(--space-2) 2px var(--space-1)' }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', color: colors.text[900], letterSpacing: '-.035em', lineHeight: 'var(--leading-heading)' }}>Calendario</h1>
-          <p style={{ margin: 0, fontSize: 'var(--font-body-sm)', color: colors.text[500], lineHeight: 'var(--leading-body)' }}>Jornadas, ausencias y vacaciones en una sola vista.</p>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', padding: 'var(--space-2) 2px var(--space-1)' }}>
+          <div style={{ display:'grid', gap:'var(--space-1)', minWidth:0 }}><h1 style={{ margin: 0, fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', color: colors.text[900], letterSpacing: '-.035em', lineHeight: 'var(--leading-heading)' }}>Calendario</h1>
+          <p style={{ margin: 0, fontSize: 'var(--font-body-sm)', color: colors.text[500], lineHeight: 'var(--leading-body)' }}>Jornadas, ausencias y vacaciones en una sola vista.</p></div>
+          <button type="button" onClick={exportMonth} aria-label="Exportar mes al calendario" style={{ flexShrink:0, minHeight:40, padding:'8px 12px', borderRadius:radius.sm, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontFamily:'inherit', fontSize:11.5, fontWeight:700, cursor:'pointer' }}>.ics</button>
         </header>
 
         <section className="employee-calendar-v8__monthbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>

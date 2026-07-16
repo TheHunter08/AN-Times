@@ -8,3 +8,5 @@ functions/node_modules/
 dist/
 .vercel
 test-results/
+.codex/
+graphify-out/

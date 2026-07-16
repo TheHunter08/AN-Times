@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getScopedOnlineRecords } from './supervisorScope.js'
+import { getScopedEmployees, getScopedOnlineRecords } from './supervisorScope.js'
 
 const supervisor = { id: 'boss', centroTrabajo: 'Centro Norte', obrasAsignadas: ['obra-a'] }
 const obras = [{ id: 'obra-a', nombre: 'Reforma A' }, { id: 'obra-b', nombre: 'Reforma B' }]
@@ -35,5 +35,16 @@ describe('getScopedOnlineRecords', () => {
   it('permite a un administrador global ver todos los fichajes abiertos', () => {
     expect(getScopedOnlineRecords({ records, employees, obras, supervisor: {}, unrestricted: true })).toHaveLength(3)
   })
-})
 
+  it('limita el directorio del supervisor a su centro y obra', () => {
+    expect(getScopedEmployees({ employees, supervisor }).map(item => item.id)).toEqual(['same'])
+  })
+
+  it('no incluye administradores ni bajas en el ámbito global', () => {
+    const result = getScopedEmployees({
+      employees:[...employees, { id:'admin', isAdmin:true }, { id:'inactive', baja:true }],
+      supervisor:{}, unrestricted:true,
+    })
+    expect(result).toHaveLength(3)
+  })
+})

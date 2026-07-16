@@ -57,10 +57,11 @@ import {
 
 // ── Mappers DB→App (snake_case → camelCase) ──────────────────────────────────
 
-function fromEmployee(e) {
+export function fromEmployee(e) {
   return {
     ...(e.data ?? {}),
     id: e.id, name: e.name, email: e.email ?? null,
+    authId: e.auth_id ?? null,
     pin: e.pin_hash ?? null, pinLen: e.pin_len ?? null, role: e.role ?? 'empleado',
     centroTrabajo: e.centro_trabajo ?? null,
     obrasAsignadas: e.obras_asignadas ?? [],

@@ -61,8 +61,8 @@ test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
 
   await openAdminPage(page, 'Sistema', 'Centro operativo')
-  await page.getByRole('button', { name:'Abrir informes', exact:true }).click()
-  await expect(page.getByRole('heading', { name:'Informes', exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Abrir cumplimiento', exact:true }).click()
+  await expect(page.getByRole('heading', { name:'Centro de cumplimiento', exact:true })).toBeVisible()
 })
 
 test('solicitudes, gastos y documentos abren su contexto', async ({ page }) => {
@@ -147,6 +147,54 @@ test('cierres, auditoría y obras ofrecen contexto interactivo', async ({ page }
   await expect(page.getByRole('dialog', { name:'Detalle de la obra Obra Premium', exact:true })).toBeVisible()
   await page.getByRole('button', { name:/Ver equipo de empleados/i }).click()
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
+})
+
+test('las horas se atribuyen a la obra fichada sin duplicarse entre asignaciones', async ({ page }) => {
+  const now = new Date()
+  const startA = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0)
+  const endA = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0)
+  const startB = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 11, 0)
+  const endB = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0)
+  await loginAsAdmin(page, {
+    employees:[{ ...employee, obrasAsignadas:['obra-a', 'obra-b'] }],
+    obras:[
+      { id:'obra-a', nombre:'Reforma Centro', activa:true },
+      { id:'obra-b', nombre:'Nave Norte', activa:true },
+    ],
+    records:[
+      { id:'r-a', empId:employee.id, inicio:startA.toISOString(), fin:endA.toISOString(), centro:'Reforma Centro', breaks:[] },
+      { id:'r-b', empId:employee.id, inicio:startB.toISOString(), fin:endB.toISOString(), centro:'Nave Norte', breaks:[] },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Gestión', 'Obras')
+
+  await page.getByRole('button', { name:'Ver detalle de la obra Reforma Centro', exact:true }).click()
+  const detailA = page.getByRole('dialog', { name:'Detalle de la obra Reforma Centro', exact:true })
+  await expect(detailA.getByText('2h', { exact:true })).toBeVisible()
+  await detailA.getByRole('button', { name:'Cerrar detalle de la obra', exact:true }).click()
+
+  await page.getByRole('button', { name:'Ver detalle de la obra Nave Norte', exact:true }).click()
+  const detailB = page.getByRole('dialog', { name:'Detalle de la obra Nave Norte', exact:true })
+  await expect(detailB.getByText('1h', { exact:true })).toBeVisible()
+})
+
+test('una obra nueva conserva coordenadas válidas para geofencing', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Gestión', 'Obras')
+  await page.getByRole('button', { name:'Nueva obra', exact:true }).click()
+
+  const dialog = page.getByRole('dialog', { name:'Nueva obra', exact:true })
+  await dialog.getByRole('textbox', { name:'Nombre de la obra', exact:true }).fill('Obra Geovalla')
+  await dialog.getByRole('textbox', { name:'Coordenadas GPS', exact:true }).fill('18.4861, -69.9312')
+  await dialog.getByRole('button', { name:'Crear obra', exact:true }).click()
+
+  await page.getByRole('button', { name:'Ver detalle de la obra Obra Geovalla', exact:true }).click()
+  const detail = page.getByRole('dialog', { name:'Detalle de la obra Obra Geovalla', exact:true })
+  await expect(detail.getByText('GPS: 18.48610, -69.93120', { exact:true })).toBeVisible()
 })
 
 test('una modificación conserva trazabilidad en auditoría y cierre mensual', async ({ page }) => {

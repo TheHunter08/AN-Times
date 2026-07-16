@@ -6,6 +6,23 @@ function assignedWorks(employee) {
   return new Set((employee?.obrasAsignadas || []).map(normalize).filter(Boolean))
 }
 
+export function getScopedEmployees({ employees = [], supervisor, unrestricted = false }) {
+  const active = employees.filter(employee => employee && !employee.baja && !employee.isAdmin && employee.role !== 'admin')
+  if (unrestricted) return active
+
+  const supervisorCenter = normalize(supervisor?.centroTrabajo || supervisor?.dept)
+  const supervisorWorks = assignedWorks(supervisor)
+  if (!supervisorCenter && supervisorWorks.size === 0) return []
+
+  return active.filter(employee => {
+    const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
+    const employeeWorks = assignedWorks(employee)
+    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter
+    const workMatches = supervisorWorks.size === 0 || [...supervisorWorks].some(work => employeeWorks.has(work))
+    return centerMatches && workMatches
+  })
+}
+
 /**
  * Devuelve los fichajes abiertos que pertenecen al ámbito del supervisor.
  * Si tiene centro y obras asignadas, ambos deben coincidir para evitar fugas
@@ -43,4 +60,3 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
       return centerMatches && workMatches
     })
 }
-

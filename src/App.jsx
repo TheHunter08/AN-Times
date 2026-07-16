@@ -5,6 +5,7 @@ import PrivacyModal from './components/PrivacyModal.jsx'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
 import { parseNavigationTarget, resolveEmployeeNotificationDestination } from './utils/notificationNavigation.js'
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
+import { getAuthSession, onAuthStateChange } from './services/authService.js'
 // v2 UI — nuevas pantallas con datos reales
 import LoginV2 from './ui-v2/LoginV2.tsx'
 const AppV2Admin = lazy(() => import('./ui-v2/AppV2Admin.tsx'))
@@ -318,6 +319,8 @@ function LoadingBar() { return null }
 
 export default function App() {
   const currentScreen  = useAppStore(s => s.currentScreen)
+  const session        = useAppStore(s => s.session)
+  const logout         = useAppStore(s => s.logout)
   const fetchDB        = useAppStore(s => s.fetchDB)
   const initRealtime       = useAppStore(s => s.initRealtime)
   const stopRealtime       = useAppStore(s => s.stopRealtime)
@@ -325,6 +328,25 @@ export default function App() {
   const stopTableRealtime  = useAppStore(s => s.stopTableRealtime)
   const initPresence       = useAppStore(s => s.initPresence)
   const toast          = useAppStore(s => s.toast)
+
+  // Las sesiones iniciadas mediante Supabase deben seguir respaldadas por una
+  // sesión Auth válida. El PIN y la biometría mantienen su funcionamiento
+  // offline y no pasan por este guard.
+  useEffect(() => {
+    if (!['email', 'oauth'].includes(session?.authMethod)) return
+    let active = true
+    getAuthSession().then(authSession => {
+      if (active && !authSession && navigator.onLine) logout()
+    }).catch(() => {})
+    const { data: { subscription } } = onAuthStateChange((event) => {
+      if (event !== 'SIGNED_OUT' || !active) return
+      setTimeout(() => {
+        const current = useAppStore.getState().session
+        if (['email', 'oauth'].includes(current?.authMethod)) useAppStore.getState().logout()
+      }, 0)
+    })
+    return () => { active = false; subscription.unsubscribe() }
+  }, [session?.authMethod, logout])
 
   // Aviso cuando el servidor reconcilia datos de otro usuario con los nuestros
   useEffect(() => {

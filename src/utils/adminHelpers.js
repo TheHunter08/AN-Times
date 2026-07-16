@@ -69,6 +69,20 @@ export const downloadDataUrl = (dataUrl, filename) => {
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
 }
 
+// Un cierre solo puede firmarse (y por tanto bloquear el mes) una vez que ese
+// mes ya ha terminado de verdad: el día de hoy debe ser el último día natural
+// de `mes` o posterior. Antes solo se validaba la fecha al GENERAR el cierre;
+// firmar (empleado o admin) no comprobaba nada, así que un cierre generado o
+// insertado antes de tiempo podía firmarse y bloquear un mes aún en curso.
+export const canCloseMonth = (mes, now = new Date()) => {
+  if (!mes) return false
+  const [year, month] = mes.split('-').map(Number)
+  if (!year || !month) return false
+  const lastDay = new Date(year, month, 0)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return today >= lastDay
+}
+
 export const isRecordMonthLocked = (cierresList, empId, inicio) => {
   const mes = localMonthKey(inicio)
   if (!mes || !empId) return false

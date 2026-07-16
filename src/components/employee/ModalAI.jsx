@@ -2,7 +2,7 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { aiAnswer, buildAIContext, AI_CHIPS } from '../../utils/aiAssistant.js'
+import { aiAnswer, buildAIContext, getAIChips } from '../../utils/aiAssistant.js'
 import { isWebGPUSupported, hasLocalAIConsent, setLocalAIConsent, loadLocalModel, isLocalModelReady, askLocalModel } from '../../utils/localAI.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -176,7 +176,7 @@ export function ModalAI({ visible, db, u, onClose }) {
 
         {/* Suggestion chips */}
         <div style={{ display:'flex', flexWrap:'wrap', gap:6, margin:'0 0 12px' }}>
-          {AI_CHIPS.map(c => (
+          {getAIChips(u).map(c => (
             <button key={c} onClick={() => ask(c)} style={{ padding:'6px 12px', borderRadius:radius.pill, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontSize:11, fontWeight:600, fontFamily:'inherit', cursor:'pointer', whiteSpace:'nowrap' }}>{c}</button>
           ))}
         </div>

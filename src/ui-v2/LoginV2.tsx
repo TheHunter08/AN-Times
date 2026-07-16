@@ -82,6 +82,7 @@ export default function LoginV2() {
 
   const verifyingRef = useRef(false)
   const opIdRef      = useRef(0)
+  const interactiveEmailRef = useRef(false)
 
   const emps = sortedEmps(db).filter((e: any) => !e.isAdmin && !e.baja)
 
@@ -119,13 +120,15 @@ export default function LoginV2() {
     return () => clearInterval(id)
   }, [selectedEmpId, db])
 
-  const doLogin = useCallback((emp: any) => {
+  const doLogin = useCallback((emp: any, authMethod = 'pin') => {
     const isAdminRole = emp.role === 'admin' || emp.role === 'jefe_obra' || emp.isAdmin === true
     const ses = {
       user: emp,
       isAdmin: isAdminRole,
       isEnc: emp.role === 'encargado',
       isJO: emp.role === 'jefe_obra',
+      authMethod,
+      authenticatedAt: Date.now(),
     }
     setSession(ses)
     try { localStorage.setItem('an_times_rem', JSON.stringify({ empId: emp.id })) } catch {}
@@ -133,8 +136,8 @@ export default function LoginV2() {
     else setScreen('emp', true)
   }, [setSession, setScreen])
 
-  const doAdminLogin = useCallback(() => {
-    setSession({ user: null, isAdmin: true, isEnc: false, isJO: false })
+  const doAdminLogin = useCallback((authMethod = 'admin') => {
+    setSession({ user: null, isAdmin: true, isEnc: false, isJO: false, authMethod, authenticatedAt: Date.now() })
     setScreen('admin', true)
     toast('Modo admin activado')
   }, [setSession, setScreen, toast])
@@ -221,7 +224,7 @@ export default function LoginV2() {
     setBioLoading(true)
     try {
       const ok = await authenticateBiometric(emp.id)
-      if (ok) doLogin(emp)
+      if (ok) doLogin(emp, 'biometric')
       else setPinError('Autenticación biométrica fallida')
     } catch {
       setPinError('Error en autenticación biométrica')
@@ -240,6 +243,7 @@ export default function LoginV2() {
     }
     if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
     setEmailLoading(true)
+    interactiveEmailRef.current = true
     try {
       const result = await signInEmail(email.trim(), password)
       const userEmail = result.user?.email
@@ -251,18 +255,19 @@ export default function LoginV2() {
       const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
       const configuredAdmin = configuredEmails.includes(em || '')
       const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
-      await authSignOut()
       if (emp && employeeAdmin) {
-        doLogin(emp)
+        doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
-        doAdminLogin()
+        doAdminLogin('email')
       } else if (emp) {
-        doLogin(emp)
+        doLogin(emp, 'email')
       } else {
+        await authSignOut()
         recordEmailFailed()
         setEmailError('Tu cuenta no está registrada. Contacta al administrador.')
       }
     } catch (ex: any) {
+      await authSignOut()
       const newLk: any = recordEmailFailed()
       if (newLk.locked) {
         const m = Math.floor((newLk.remainingSecs || 0) / 60), s = (newLk.remainingSecs || 0) % 60
@@ -272,6 +277,7 @@ export default function LoginV2() {
         setEmailError((ex?.message || 'Email o contraseña incorrectos') + remaining)
       }
     }
+    interactiveEmailRef.current = false
     setEmailLoading(false)
   }
 
@@ -295,19 +301,25 @@ export default function LoginV2() {
     const { data: { subscription } } = onAuthStateChange(async (event: string, session: any) => {
       if (event === 'PASSWORD_RECOVERY') { setMode('email'); return }
       if (event === 'SIGNED_IN' && session?.user?.email) {
+        // signInWithPassword ya completa este flujo en handleEmailLogin. El
+        // listener queda reservado para OAuth/restauración y evita dos fetches
+        // y dos transiciones de pantalla compitiendo por la misma sesión.
+        if (interactiveEmailRef.current) return
         const url = new URL(window.location.href)
         if (url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')) return
         const userEmail = session.user.email.toLowerCase()
         await useAppStore.getState().fetchDB()
         const freshDB = useAppStore.getState().db
         const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
-        await authSignOut()
         if (emp) {
-          doLogin(emp)
+          doLogin(emp, 'oauth')
         } else {
           const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
-          if (configuredEmails.includes(userEmail)) doAdminLogin()
-          else setEmailError('Cuenta no registrada. Contacta al administrador.')
+          if (configuredEmails.includes(userEmail)) doAdminLogin('oauth')
+          else {
+            await authSignOut()
+            setEmailError('Cuenta no registrada. Contacta al administrador.')
+          }
         }
         window.history.replaceState({}, '', window.location.pathname)
       }

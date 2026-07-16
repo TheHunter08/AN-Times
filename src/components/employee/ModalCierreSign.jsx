@@ -6,6 +6,7 @@ import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
+import { canCloseMonth } from '../../utils/adminHelpers.js'
 import { WM } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -33,6 +34,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     return { ...record, workSecs: totals.work, breakSecs: totals.brk }
   })
   const previewTotalMin = Math.floor(previewSnapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
+  const closable = selCierre ? canCloseMonth(selCierre.mes) : false
 
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
 
@@ -42,6 +44,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   if (!visible || !selCierre) return null
 
   const firmar = async () => {
+    if (!closable) { toast('Este mes todavía no ha terminado — no se puede firmar hasta su último día', 4500, 'warn'); return }
     const signatureData = getSignatureData()
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     setFirmando(true)
@@ -101,14 +104,19 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
           })}
         </div>
 
+        {!closable && (
+          <div style={{ background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, fontSize:12, color:colors.semantic.orange, fontWeight:600 }}>
+            Este mes aún no ha terminado. Podrás firmar el cierre a partir de su último día.
+          </div>
+        )}
         <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:colors.text[700] }}>Firma digital</div>
         <canvas ref={canvasRef} width={640} height={180}
-          style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8 }}
+          style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor: closable ? 'crosshair' : 'not-allowed', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8, opacity: closable ? 1 : .5, pointerEvents: closable ? 'auto' : 'none' }}
           {...handlers} />
-        <button style={{ ...btnSmSec, marginBottom:16 }} onClick={clearCanvas}>Borrar</button>
+        <button style={{ ...btnSmSec, marginBottom:16 }} onClick={clearCanvas} disabled={!closable}>Borrar</button>
         <div style={{ display:'flex', gap:8 }}>
           <button style={btnSecondary} onClick={onClose} disabled={firmando}>Cancelar</button>
-          <button style={btnPrimary} onClick={firmar} disabled={firmando}>{firmando ? 'Generando PDF…' : '✅ Firmar y enviar'}</button>
+          <button style={{ ...btnPrimary, opacity: closable ? 1 : .5, cursor: closable ? 'pointer' : 'not-allowed' }} onClick={firmar} disabled={firmando || !closable}>{firmando ? 'Generando PDF…' : '✅ Firmar y enviar'}</button>
         </div>
       </div>
     </div>

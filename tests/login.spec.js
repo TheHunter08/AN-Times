@@ -34,3 +34,15 @@ test('un empleado bloqueado ve el contador', async ({ page }) => {
   await page.getByRole('button', { name: /Empleado$/ }).click()
   await expect(page.getByText(/Bloqueado.*\d:\d{2}/i)).toBeVisible({ timeout: 5000 })
 })
+
+test('un directorio grande no expone nombres hasta buscar dos letras', async ({ page }) => {
+  const employees = ['Empleado Prueba', 'Ana Campo', 'Bruno Obra', 'Carla Norte', 'Diego Sur'].map((name, index) => ({
+    id:`e${index + 1}`, name, pin:'1111', pinLen:4, role:'empleado', baja:false,
+  }))
+  await seedLogin(page, { employees })
+  await page.goto('/')
+  await expect(page.getByLabel('Buscar perfil de empleado')).toBeVisible({ timeout:10000 })
+  await expect(page.getByRole('button', { name:/Ana$/ })).toHaveCount(0)
+  await page.getByLabel('Buscar perfil de empleado').fill('An')
+  await expect(page.getByRole('button', { name:/Ana$/ })).toBeVisible()
+})

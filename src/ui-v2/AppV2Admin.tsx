@@ -24,7 +24,7 @@ import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
-import { buildRecordSnapshot, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
+import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
@@ -1416,8 +1416,8 @@ function MonthlyClosePage() {
   const toast   = useAppStore(s => s.toast)
   const autoGenRef = useRef(false)
   const nowForClose = new Date()
-  const isLastDayOfMonth = nowForClose.getDate() === new Date(nowForClose.getFullYear(), nowForClose.getMonth() + 1, 0).getDate()
   const currentCloseMonth = `${nowForClose.getFullYear()}-${String(nowForClose.getMonth() + 1).padStart(2, '0')}`
+  const isLastDayOfMonth = canCloseMonth(currentCloseMonth, nowForClose)
 
   // El cierre, manual o automático, solo puede generarse el último día natural del mes.
   useEffect(() => {
@@ -1567,11 +1567,16 @@ function MonthlyClosePage() {
   }
 
   const handleSignAdmin = (id: string) => {
+    const target = (db.cierres || []).find((c: any) => c.id === id)
+    if (target && !canCloseMonth(target.mes)) {
+      toast(`El mes ${target.mes} todavía no ha terminado — no se puede firmar hasta su último día`, 4500, 'warn')
+      return
+    }
     const nowIso = new Date().toISOString()
     const actor = session?.user?.name || 'Admin'
     saveDB((fresh: any) => {
       const closure = (fresh.cierres || []).find((c: any) => c.id === id)
-      if (!closure || closure.firmaAdmin) return null
+      if (!closure || closure.firmaAdmin || !canCloseMonth(closure.mes)) return null
       const cierres = (fresh.cierres || []).map((c: any) =>
         c.id === id ? { ...c, firmaAdmin:true, firmaAdminAt:nowIso, firmaAdminBy:actor, estado:(c.firmaEmp || c.firma) ? 'firmado' : c.estado, _upd:nowIso } : c
       )
@@ -1585,13 +1590,14 @@ function MonthlyClosePage() {
     const requested = new Set(ids)
     const actor = session?.user?.name || 'Admin'
     const nowIso = new Date().toISOString()
-    const signedCount = (db.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin).length
+    const blockedByDate = (db.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin && !canCloseMonth(c.mes)).length
+    const signedCount = (db.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin && canCloseMonth(c.mes)).length
     if (!signedCount) {
-      toast('No había cierres pendientes de firma administrativa', 3200, 'warn')
+      toast('Ninguno de los meses seleccionados ha terminado todavía', 3200, 'warn')
       return
     }
     saveDB((fresh: any) => {
-      const eligible = (fresh.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin)
+      const eligible = (fresh.cierres || []).filter((c: any) => requested.has(c.id) && !c.firmaAdmin && canCloseMonth(c.mes))
       if (!eligible.length) return null
       const eligibleIds = new Set(eligible.map((c: any) => c.id))
       const cierres = (fresh.cierres || []).map((c: any) => eligibleIds.has(c.id)
@@ -1601,7 +1607,7 @@ function MonthlyClosePage() {
       const withAudit = auditLog(fresh, 'Cierres firmados en lote', `${eligible.length} cierres · ${eligible.map((c: any) => c.mes).filter((mes: string, index: number, all: string[]) => all.indexOf(mes) === index).join(', ')}`, actor, { category:'documento', entityType:'cierre_batch', entityId:eligible.map((c: any) => c.id).join(','), device:currentDeviceLabel(), before:{ count:eligible.length, firmaAdmin:false }, after:{ count:eligible.length, firmaAdmin:true } })
       return { cierres, audit:withAudit.audit }
     })
-    toast(`${signedCount} cierre${signedCount !== 1 ? 's' : ''} firmado${signedCount !== 1 ? 's' : ''} y auditado${signedCount !== 1 ? 's' : ''}`, 3200, 'ok')
+    toast(`${signedCount} cierre${signedCount !== 1 ? 's' : ''} firmado${signedCount !== 1 ? 's' : ''} y auditado${signedCount !== 1 ? 's' : ''}${blockedByDate ? ` — ${blockedByDate} omitido${blockedByDate !== 1 ? 's' : ''} por mes no terminado` : ''}`, 3800, 'ok')
   }
 
   const handleDownloadConsolidated = async (mes: string) => {
@@ -1644,9 +1650,34 @@ function MonthlyClosePage() {
         : c
       )
       const withAudit = auditLog(fresh, 'Cierre reabierto', `${empName} · ${closure.mes}`, actor, { category:'documento', entityType:'cierre', entityId:id, device:currentDeviceLabel(), before:{ estado: closure.estado }, after:{ estado:'pendiente' } })
-      return { cierres, audit: withAudit.audit }
+      const noti = { id: gid(), empId: closure.empId, action: 'Cierre reabierto', detail: `Tu cierre de ${closure.mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, ts: nowIso, leido: false }
+      return { cierres, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
+    if (closure.empId) queuePush(closure.empId, 'Cierre reabierto', `Tu cierre de ${closure.mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil')
     toast('Cierre reabierto — vuelve a estado pendiente de firma', 3500, 'ok')
+  }
+
+  // Reabrir de una sola vez todos los cierres firmados de un mes — evita tener
+  // que reabrir empleado a empleado cuando el mes entero se cerró/firmó por
+  // error (p.ej. julio 2026 se generó y firmó antes de que el mes terminara).
+  const handleReopenMonth = (mes: string) => {
+    const affected = (db.cierres || []).filter((c: any) => c.mes === mes && (c.firmaAdmin || c.firmaEmp || c.firma))
+    if (!affected.length) { toast(`No hay cierres firmados en ${mes}`, 3000, 'warn'); return }
+    if (!window.confirm(`¿Reabrir TODOS los cierres de ${mes}? Se borrarán las firmas y PDFs de ${affected.length} empleado${affected.length !== 1 ? 's' : ''}; habrá que volver a firmarlos.`)) return
+    const nowIso = new Date().toISOString()
+    const actor = session?.user?.name || 'Admin'
+    const ids = new Set(affected.map((c: any) => c.id))
+    saveDB((fresh: any) => {
+      const cierres = (fresh.cierres || []).map((c: any) => ids.has(c.id)
+        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, _upd: nowIso }
+        : c
+      )
+      const withAudit = auditLog(fresh, 'Mes completo reabierto', `${mes} · ${affected.length} cierres`, actor, { category:'documento', entityType:'cierre_batch', entityId:[...ids].join(','), device:currentDeviceLabel(), before:{ count:affected.length }, after:{ count:affected.length, estado:'pendiente' } })
+      const nuevasNotis = affected.map((c: any) => ({ id: gid(), empId: c.empId, action: 'Cierre reabierto', detail: `Tu cierre de ${mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, ts: nowIso, leido: false }))
+      return { cierres, audit: withAudit.audit, notis: [...(fresh.notis || []), ...nuevasNotis] }
+    })
+    affected.forEach((c: any) => { if (c.empId) queuePush(c.empId, 'Cierre reabierto', `Tu cierre de ${mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil') })
+    toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} reabierto${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
   }
 
   const handleDeleteClosure = (id: string) => {
@@ -1663,7 +1694,7 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onReopen={handleReopenClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {

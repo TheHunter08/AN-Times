@@ -5,6 +5,7 @@ import { ProductState } from '../components/ProductState.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Icons.js'
+import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
 
 export interface ReportSchedule {
   id: string
@@ -146,7 +147,7 @@ export function Operations(props: OperationsProps) {
         </Card>
 
         <Card>
-          <div className="ti-operations__section-title"><div><strong>Programar informe</strong><span>Configuración lista para el servicio automático</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('informes')}>Abrir informes</button></div>
+          <div className="ti-operations__section-title"><div><strong>Programar informe</strong><span>Crea un recordatorio recurrente compatible con tu calendario</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('informes')}>Abrir cumplimiento</button></div>
           <div className="ti-operations__form">
             <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} aria-label="Nombre del informe" placeholder="Nombre del informe" />
             <div><select style={inputStyle} value={frequency} onChange={e => setFrequency(e.target.value as 'weekly' | 'monthly')} aria-label="Frecuencia"><option value="weekly">Semanal</option><option value="monthly">Mensual</option></select><select style={inputStyle} value={format} onChange={e => setFormat(e.target.value as 'pdf' | 'excel')} aria-label="Formato"><option value="pdf">PDF</option><option value="excel">Excel</option></select></div>
@@ -157,9 +158,9 @@ export function Operations(props: OperationsProps) {
       </section>
 
       <Card>
-        <div className="ti-operations__section-title"><div><strong>Informes programados</strong><span>Se ejecutarán cuando el servicio de automatización esté conectado</span></div><span className="ti-operations__pill">{props.schedules.length}</span></div>
+        <div className="ti-operations__section-title"><div><strong>Informes programados</strong><span>Añádelos a Google Calendar, Outlook o Apple Calendar</span></div><span className="ti-operations__pill">{props.schedules.length}</span></div>
         {!props.schedules.length ? <ProductState compact title="Aún no hay informes programados" description="Crea una programación semanal o mensual para dejarla preparada." icon={<IconFileText />} /> : (
-          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span></div><div><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
+          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span></div><div><button type="button" onClick={() => downloadICS(buildReportScheduleICS(schedule), `informe-${schedule.id}.ics`)}>Calendario</button><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
         )}
       </Card>
     </div>

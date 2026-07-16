@@ -58,9 +58,11 @@ export function Login({
   }
 
   const selEmp = employees.find(e => e.id === selectedEmpId)
-  const visibleEmployees = employees.length > 8 && !employeeSearch.trim()
+  const protectedDirectory = employees.length > 4
+  const normalizedEmployeeSearch = employeeSearch.trim().toLocaleLowerCase('es')
+  const visibleEmployees = protectedDirectory && normalizedEmployeeSearch.length < 2
     ? employees.filter(e => e.id === selectedEmpId)
-    : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(employeeSearch.trim().toLocaleLowerCase('es')))
+    : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(normalizedEmployeeSearch))
   const pinDotCount = Math.min(6, Math.max(4, selEmp?.pinLen || 4))
 
   return (
@@ -160,12 +162,12 @@ export function Login({
               <label style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 8 }}>
                 Empleado
               </label>
-              {employees.length > 8 && (
+              {protectedDirectory && (
                 <input
                   type="search"
                   value={employeeSearch}
                   onChange={e => setEmployeeSearch(e.target.value)}
-                  placeholder="Busca tu nombre o centro"
+                  placeholder="Escribe al menos 2 letras"
                   autoComplete="off"
                   aria-label="Buscar perfil de empleado"
                   style={{ width:'100%', boxSizing:'border-box', minHeight:42, marginBottom:9, padding:'0 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13 }}
@@ -205,7 +207,7 @@ export function Login({
                       {e.name.split(' ')[0]}
                     </button>
                   ))}
-                  {employees.length > 8 && !employeeSearch.trim() && !selectedEmpId && <div style={{ padding:'10px 4px', color:colors.text[400], fontSize:12 }}>Escribe tu nombre para mostrar el perfil.</div>}
+                  {protectedDirectory && normalizedEmployeeSearch.length < 2 && !selectedEmpId && <div role="status" style={{ padding:'10px 4px', color:colors.text[400], fontSize:12 }}>Por privacidad, escribe al menos 2 letras de tu nombre.</div>}
                 </div>
               )}
             </div>

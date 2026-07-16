@@ -63,6 +63,13 @@ export function isAuthReady() {
   return !!supabase
 }
 
+export async function getAuthSession() {
+  if (!supabase) return null
+  const { data, error } = await supabase.auth.getSession()
+  if (error) return null
+  return data?.session || null
+}
+
 export function onAuthStateChange(cb) {
   if (!supabase) return { data: { subscription: { unsubscribe: () => {} } } }
   return supabase.auth.onAuthStateChange(cb)
