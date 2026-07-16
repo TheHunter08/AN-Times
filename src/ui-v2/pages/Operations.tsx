@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { ProductState } from '../components/ProductState.js'
@@ -25,6 +25,7 @@ interface OperationsProps {
   lastSyncTime?: number | null
   authReady: number
   authTotal: number
+  documentCount: number
   schedules: ReportSchedule[]
   visibleWidgets: string[]
   onSync: () => Promise<void>
@@ -51,15 +52,10 @@ const inputStyle = {
 
 export function Operations(props: OperationsProps) {
   const [syncing, setSyncing] = useState(false)
-  const [storage, setStorage] = useState<{ used: number; quota: number } | null>(null)
   const [name, setName] = useState('Informe mensual de jornada')
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly')
   const [format, setFormat] = useState<'pdf' | 'excel'>('pdf')
   const [recipients, setRecipients] = useState('')
-
-  useEffect(() => {
-    navigator.storage?.estimate?.().then(result => setStorage({ used: result.usage || 0, quota: result.quota || 0 })).catch(() => {})
-  }, [])
 
   const syncNow = async () => {
     if (syncing) return
@@ -78,7 +74,6 @@ export function Operations(props: OperationsProps) {
   }
 
   const authPct = props.authTotal ? Math.round((props.authReady / props.authTotal) * 100) : 0
-  const storagePct = storage?.quota ? Math.round((storage.used / storage.quota) * 100) : 0
   const syncHealthy = props.syncStatus === 'synced' && !props.offlinePending
   const realtimeHealthy = props.realtimeStatus === 'SUBSCRIBED'
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
@@ -106,7 +101,7 @@ export function Operations(props: OperationsProps) {
           { label: 'Datos', value: syncHealthy ? 'Sincronizados' : props.offlinePending ? 'Cambios pendientes' : 'Revisar conexión', ok: syncHealthy, icon: <IconCheck />, page: 'auditoria', detail: 'Abrir auditoría' },
           { label: 'Tiempo real', value: realtimeHealthy ? 'Activo' : 'Reconectando', ok: realtimeHealthy, icon: <IconClock />, page: 'en_linea', detail: 'Ver equipo conectado' },
           { label: 'Acceso seguro', value: `${props.authReady}/${props.authTotal} vinculados`, ok: authPct === 100, icon: <IconShield />, page: 'empleados', detail: 'Revisar empleados' },
-          { label: 'Almacenamiento', value: storage ? `${storagePct}% utilizado` : 'Calculando…', ok: storagePct < 85, icon: <IconFileText />, page: 'documentos', detail: 'Abrir documentos' },
+          { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, page: 'documentos', detail: 'Abrir documentos' },
         ].map(item => (
           <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={() => props.onNavigate(item.page)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onNavigate(item.page) } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>
             <div className={`ti-operations__health-icon${item.ok ? ' is-ok' : ''}`}>{item.icon}</div>
@@ -132,6 +127,13 @@ export function Operations(props: OperationsProps) {
           <div className="ti-operations__progress"><span style={{ width: `${authPct}%` }} /></div>
           <p className="ti-operations__hint">Las políticas seguras están preparadas, pero solo deben activarse cuando todos los usuarios tengan un auth_id vinculado.</p>
         </Card>
+
+        {!props.documentCount && (
+          <Card>
+            <div className="ti-operations__section-title"><div><strong>Archivo de documentos</strong><span>Contratos, nóminas y certificados</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('documentos')}>Subir el primero</button></div>
+            <p className="ti-operations__hint">Aún no has guardado ningún documento. Sube contratos, nóminas o certificados por empleado para tenerlos centralizados y listos ante una inspección.</p>
+          </Card>
+        )}
       </section>
 
       <section className="ti-operations__grid">

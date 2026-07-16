@@ -1530,6 +1530,9 @@ function MonthlyClosePage() {
           estado: c.estado || 'pendiente',
           records: dayRecs,
           pdfData: c.pdfData || null,
+          reopenCount: c.reopenCount || 0,
+          lastReopenAt: c.lastReopenAt ? fmtDate(c.lastReopenAt) : null,
+          lastReopenBy: c.lastReopenBy || null,
         } as any
       })
   }, [db.cierres, db.employees, db.records])
@@ -1646,7 +1649,7 @@ function MonthlyClosePage() {
     const actor = session?.user?.name || 'Admin'
     saveDB((fresh: any) => {
       const cierres = (fresh.cierres || []).map((c: any) => c.id === id
-        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, _upd: nowIso }
+        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, reopenCount: (c.reopenCount || 0) + 1, lastReopenAt: nowIso, lastReopenBy: actor, _upd: nowIso }
         : c
       )
       const withAudit = auditLog(fresh, 'Cierre reabierto', `${empName} · ${closure.mes}`, actor, { category:'documento', entityType:'cierre', entityId:id, device:currentDeviceLabel(), before:{ estado: closure.estado }, after:{ estado:'pendiente' } })
@@ -1669,7 +1672,7 @@ function MonthlyClosePage() {
     const ids = new Set(affected.map((c: any) => c.id))
     saveDB((fresh: any) => {
       const cierres = (fresh.cierres || []).map((c: any) => ids.has(c.id)
-        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, _upd: nowIso }
+        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, reopenCount: (c.reopenCount || 0) + 1, lastReopenAt: nowIso, lastReopenBy: actor, _upd: nowIso }
         : c
       )
       const withAudit = auditLog(fresh, 'Mes completo reabierto', `${mes} · ${affected.length} cierres`, actor, { category:'documento', entityType:'cierre_batch', entityId:[...ids].join(','), device:currentDeviceLabel(), before:{ count:affected.length }, after:{ count:affected.length, estado:'pendiente' } })
@@ -2180,6 +2183,7 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     .map((id: string) => legacyWidgetIds[id] || id)
   const employees = (db.employees || []).filter((employee: any) => !employee.baja)
   const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
+  const documentCount = (db.documentos || []).length
 
   const updateConfig = (patch: any) => saveDB((fresh: any) => ({
     config: { ...(fresh.config || {}), ...patch, _upd: new Date().toISOString() },
@@ -2199,6 +2203,7 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     lastSyncTime={lastSyncTime}
     authReady={authReady}
     authTotal={employees.length}
+    documentCount={documentCount}
     schedules={schedules}
     visibleWidgets={visibleWidgets}
     onSync={onSync}

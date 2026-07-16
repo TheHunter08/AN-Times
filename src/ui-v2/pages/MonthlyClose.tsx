@@ -32,6 +32,9 @@ export interface ClosureItem {
   // PDF oficial ya generado y firmado (data URL) — si existe, descargar ESTE
   // documento (tiene firma + hash) en vez de regenerar uno en texto plano.
   pdfData?: string | null
+  reopenCount?: number
+  lastReopenAt?: string | null
+  lastReopenBy?: string | null
 }
 
 export interface MonthlyCloseProps {
@@ -226,7 +229,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                 <Avatar name={item.empName} size={30} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: colors.text[900] }}>{item.empName}</div>
-                  <div style={{ fontSize: 11, color: colors.text[500] }}>{item.role || item.dept}</div>
+                  <div style={{ fontSize: 11, color: colors.text[500] }}>{item.role || item.dept}{!!item.reopenCount && ` · reabierto ${item.reopenCount}×`}</div>
                 </div>
               </div>
               <div style={{ fontSize: 13, color: colors.text[700] }}>{item.month}</div>
@@ -374,6 +377,11 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                   </div>
                 ))}
               </div>
+              {!!detail.reopenCount && (
+                <div style={{ marginTop: 10, fontSize: 11, color: colors.semantic.orange }}>
+                  Reabierto {detail.reopenCount} {detail.reopenCount === 1 ? 'vez' : 'veces'} — la última el {detail.lastReopenAt || '—'}{detail.lastReopenBy ? ` por ${detail.lastReopenBy}` : ''}.
+                </div>
+              )}
             </div>
 
             {/* Registro diario */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRecordSnapshot, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from './adminHelpers.js'
+import { buildRecordSnapshot, canCloseMonth, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from './adminHelpers.js'
 
 describe('buildRecordSnapshot', () => {
   it('conserva una copia independiente del historial de modificaciones', () => {
@@ -33,6 +33,40 @@ describe('recordTimesFromClock', () => {
   it('rechaza horas o fechas inválidas', () => {
     expect(recordTimesFromClock({ inicio: '2026-07-13T06:00:00.000Z' }, '25:00', '17:00')).toBeNull()
     expect(recordTimesFromClock({ inicio: 'fecha-invalida' }, '09:00', '17:00')).toBeNull()
+  })
+})
+
+describe('canCloseMonth', () => {
+  it('bloquea antes del último día natural del mes', () => {
+    expect(canCloseMonth('2026-07', new Date(2026, 6, 30))).toBe(false)
+    expect(canCloseMonth('2026-07', new Date(2026, 6, 1))).toBe(false)
+  })
+
+  it('permite firmar el último día del mes y cualquier día posterior', () => {
+    expect(canCloseMonth('2026-07', new Date(2026, 6, 31))).toBe(true)
+    expect(canCloseMonth('2026-07', new Date(2026, 7, 5))).toBe(true)
+  })
+
+  it('respeta meses de 30, 29 y 28 días', () => {
+    expect(canCloseMonth('2026-04', new Date(2026, 3, 29))).toBe(false)
+    expect(canCloseMonth('2026-04', new Date(2026, 3, 30))).toBe(true)
+    expect(canCloseMonth('2026-02', new Date(2026, 1, 27))).toBe(false)
+    expect(canCloseMonth('2026-02', new Date(2026, 1, 28))).toBe(true)
+    // 2024 es bisiesto: 29 de febrero
+    expect(canCloseMonth('2024-02', new Date(2024, 1, 28))).toBe(false)
+    expect(canCloseMonth('2024-02', new Date(2024, 1, 29))).toBe(true)
+  })
+
+  it('resuelve el cambio de año en diciembre', () => {
+    expect(canCloseMonth('2026-12', new Date(2026, 11, 30))).toBe(false)
+    expect(canCloseMonth('2026-12', new Date(2026, 11, 31))).toBe(true)
+    expect(canCloseMonth('2026-12', new Date(2027, 0, 3))).toBe(true)
+  })
+
+  it('devuelve false para mes vacío o malformado', () => {
+    expect(canCloseMonth('')).toBe(false)
+    expect(canCloseMonth(null)).toBe(false)
+    expect(canCloseMonth('2026-13')).toBe(false)
   })
 })
 
