@@ -30,7 +30,9 @@ export function toEmployeeRow(e, nowIso = new Date().toISOString()) {
     centro_trabajo: e.centroTrabajo ?? null,
     obras_asignadas: e.obrasAsignadas ?? [],
     reminder_time: e.reminderTime ?? '08:30', salida_time: e.salidaTime ?? null,
-    telefono: e.telefono ?? null, baja: !!e.baja, data: e, updated_at: e._upd ?? nowIso,
+    telefono: e.telefono ?? null, baja: !!e.baja,
+    auth_id: e.authId ?? e.auth_id ?? null,
+    data: e, updated_at: e._upd ?? nowIso,
   }
 }
 

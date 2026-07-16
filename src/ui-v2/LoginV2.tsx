@@ -136,6 +136,17 @@ export default function LoginV2() {
     else setScreen('emp', true)
   }, [setSession, setScreen])
 
+  // Vincula el empleado a su usuario de Supabase Auth la primera vez que
+  // inicia sesión por email/OAuth. Sin esto, auth_id nunca se rellena y las
+  // políticas RLS por rol (policies_auth.sql) no se pueden activar nunca,
+  // porque siempre habría 0 empleados "vinculados".
+  const linkAuthIdIfMissing = useCallback((emp: any, authUserId?: string | null) => {
+    if (!authUserId || emp.authId === authUserId) return
+    saveDB((fresh: any) => ({
+      employees: (fresh.employees || []).map((e: any) => e.id === emp.id ? { ...e, authId: authUserId } : e),
+    }))
+  }, [saveDB])
+
   const doAdminLogin = useCallback((authMethod = 'admin') => {
     setSession({ user: null, isAdmin: true, isEnc: false, isJO: false, authMethod, authenticatedAt: Date.now() })
     setScreen('admin', true)
@@ -255,6 +266,7 @@ export default function LoginV2() {
       const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
       const configuredAdmin = configuredEmails.includes(em || '')
       const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
+      if (emp) linkAuthIdIfMissing(emp, result.user?.id)
       if (emp && employeeAdmin) {
         doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
@@ -312,6 +324,7 @@ export default function LoginV2() {
         const freshDB = useAppStore.getState().db
         const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
         if (emp) {
+          linkAuthIdIfMissing(emp, session.user.id)
           doLogin(emp, 'oauth')
         } else {
           const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
