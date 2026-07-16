@@ -25,10 +25,14 @@ import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
 import { buildRecordSnapshot, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
+import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
+import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
+import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
+import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { WM } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -49,6 +53,7 @@ const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ defa
 const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
 const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
 const Operations = lazy(() => import('./pages/Operations.js').then(module => ({ default: module.Operations })))
+const ModalAI = lazy(() => import('../components/employee/ModalAI.jsx').then(module => ({ default: module.ModalAI })))
 
 function PageLoader() {
   return (
@@ -73,7 +78,7 @@ const PAGES = [
   { id: 'centros',        label: 'Centros de trabajo',group: 'Gestión', icon: <IconMapPin /> },
   { id: 'documentos',     label: 'Documentos',        group: 'Gestión', icon: <IconFolder /> },
   { id: 'estadisticas',   label: 'Estadísticas',      group: 'Análisis', icon: <IconChart /> },
-  { id: 'informes',       label: 'Informes',          group: 'Análisis', icon: <IconFileText /> },
+  { id: 'informes',       label: 'Cumplimiento',      group: 'Análisis', icon: <IconFileText /> },
   { id: 'cierre',         label: 'Cierre mensual',    group: 'Análisis', icon: <IconSeal /> },
   { id: 'anomalias',      label: 'Anomalías',         group: 'Análisis', icon: <IconAlertCircle /> },
   { id: 'auditoria',      label: 'Auditoría',         group: 'Análisis', icon: <IconShield /> },
@@ -1109,9 +1114,10 @@ function DocumentsPage() {
   </>
 }
 
-function ReportsPage() {
+function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const toast = useAppStore(s => s.toast)
+  const compliance = useMemo(() => buildComplianceSummary(db), [db.records, db.cierres])
 
   const months = useMemo(() => {
     const set = new Set<string>()
@@ -1186,6 +1192,76 @@ function ReportsPage() {
     await downloadSimplePdf(`Informe mensual - ${label}`, pdfLines, `informe-${mes}.pdf`)
   }
 
+  const handleExportAudit = () => {
+    const auditRows = (db.audit || [])
+      .slice()
+      .sort((a: any, b: any) => String(a.ts || '').localeCompare(String(b.ts || '')))
+      .map((entry: any) => [
+        entry.ts ? new Date(entry.ts).toLocaleString('es-ES') : '',
+        entry.action || '', entry.user || entry.who || '', entry.detail || entry.target || '',
+        entry.category || '', entry.entityType || '', entry.entityId || '', entry.reason || '',
+        entry.device || '', JSON.stringify(entry.before || ''), JSON.stringify(entry.after || ''),
+      ])
+    downloadCsv(
+      ['Fecha', 'Acción', 'Usuario', 'Detalle', 'Categoría', 'Tipo', 'ID registro', 'Motivo', 'Dispositivo', 'Antes', 'Después'],
+      auditRows,
+      `auditoria-completa-${today()}.csv`,
+    )
+    toast('Auditoría completa exportada', 2500, 'ok')
+  }
+
+  const handleExportInspection = async () => {
+    const employeesById = new Map((db.employees || []).map((employee: any) => [employee.id, employee]))
+    const cutoff = new Date(compliance.retentionCutoff).getTime()
+    const retained = (db.records || [])
+      .filter((record: any) => record.inicio && new Date(record.inicio).getTime() >= cutoff)
+      .sort((a: any, b: any) => String(a.inicio).localeCompare(String(b.inicio)))
+    const lines = [
+      `Generado: ${new Date().toLocaleString('es-ES')}`,
+      'Base legal: articulo 34.9 del Estatuto de los Trabajadores',
+      `Indice documental: ${compliance.score}%`,
+      `Registros conservados: ${compliance.retainedRecords}`,
+      `Jornadas completas: ${compliance.completionPct}%`,
+      `Trazabilidad de cambios: ${compliance.traceabilityPct}%`,
+      `Registros validados: ${compliance.validationPct}%`,
+      `Cierres firmados: ${compliance.closurePct}%`,
+      '', 'DETALLE DE REGISTROS',
+      ...retained.map((record: any) => {
+        const employee = employeesById.get(record.empId) as any
+        const workedMinutes = record.fin ? Math.round(recWorkSecs(record) / 60) : 0
+        return `${localDateStr(new Date(record.inicio))} | ${employee?.name || record.empName || record.empId || '—'} | ${new Date(record.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}-${record.fin ? new Date(record.fin).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : 'ABIERTA'} | ${Math.floor(workedMinutes / 60)}h ${workedMinutes % 60}m | ${record.centro || employee?.centroTrabajo || '—'} | ${record.validado || record.aceptada ? 'VALIDADA' : 'PENDIENTE'} | ${(record.correcciones || []).length} cambios`
+      }),
+      '', 'RIESGOS DETECTADOS',
+      ...compliance.risks.map((risk: any) => `${risk.label}: ${risk.count}`),
+    ]
+    await downloadSimplePdf('TIMES INC - Paquete de inspeccion', lines, `inspeccion-registro-horario-${today()}.pdf`)
+    toast('Paquete de inspección generado', 3000, 'ok')
+  }
+
+  const handleExportPayroll = () => {
+    const month = months[0] || localMonthKey(new Date())
+    const employees = (db.employees || []).filter((employee: any) => !employee.isAdmin && !employee.baja)
+    const monthRecords = (db.records || []).filter((record: any) => record.inicio && record.fin && localMonthKey(record.inicio) === month)
+    const payrollRows = employees.map((employee: any) => {
+      const records = monthRecords.filter((record: any) => record.empId === employee.id)
+      const workedMinutes = Math.round(records.reduce((sum: number, record: any) => sum + recWorkSecs(record) / 60, 0))
+      const regularMinutes = Math.min(workedMinutes, WM)
+      const overtimeMinutes = Math.max(0, workedMinutes - WM)
+      return [
+        employee.id, employee.name || '', employee.email || '', employee.centroTrabajo || employee.dept || '',
+        month, records.length, regularMinutes, overtimeMinutes,
+        `${Math.floor(regularMinutes / 60)}:${String(regularMinutes % 60).padStart(2, '0')}`,
+        `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`,
+      ]
+    })
+    downloadCsv(
+      ['ID empleado', 'Empleado', 'Email', 'Centro', 'Mes', 'Jornadas', 'Minutos ordinarios', 'Minutos extra', 'Horas ordinarias', 'Horas extra'],
+      payrollRows,
+      `nomina-times-inc-${month}.csv`,
+    )
+    toast(`Exportación de nómina preparada · ${month}`, 2800, 'ok')
+  }
+
   const rows = useMemo(() => months.map((m) => {
     const [year, mon] = m.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -1207,7 +1283,7 @@ function ReportsPage() {
     }
   }), [months, db.records])
 
-  return <Reports rows={rows} />
+  return <Reports rows={rows} compliance={compliance} onExportInspection={handleExportInspection} onExportAudit={handleExportAudit} onExportPayroll={handleExportPayroll} onNavigate={onNavigate} />
 }
 
 function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -1551,6 +1627,28 @@ function MonthlyClosePage() {
     }
   }
 
+  // Reabrir un cierre firmado: no existía ninguna forma de corregir horas de
+  // un mes ya firmado (ni por el empleado ni por el admin) — isRecordMonthLocked
+  // bloqueaba Validar horas/Fichajes indefinidamente sin salida posible.
+  const handleReopenClosure = (id: string) => {
+    const closure = (db.cierres || []).find((c: any) => c.id === id)
+    if (!closure) return
+    if (!(closure.firmaAdmin || closure.firmaEmp || closure.firma)) return
+    const empName = closure.empName || (db.employees || []).find((e: any) => e.id === closure.empId)?.name || closure.empId
+    if (!window.confirm(`¿Reabrir el cierre de ${empName} (${closure.mes})? Se borrarán las firmas y el PDF firmado; habrá que volver a firmarlo.`)) return
+    const nowIso = new Date().toISOString()
+    const actor = session?.user?.name || 'Admin'
+    saveDB((fresh: any) => {
+      const cierres = (fresh.cierres || []).map((c: any) => c.id === id
+        ? { ...c, firmaAdmin: false, firmaEmp: false, firma: null, firmaSupervisor: false, estado: 'pendiente', pdfData: null, pdfUrl: null, documentoId: null, desactualizado: false, _upd: nowIso }
+        : c
+      )
+      const withAudit = auditLog(fresh, 'Cierre reabierto', `${empName} · ${closure.mes}`, actor, { category:'documento', entityType:'cierre', entityId:id, device:currentDeviceLabel(), before:{ estado: closure.estado }, after:{ estado:'pendiente' } })
+      return { cierres, audit: withAudit.audit }
+    })
+    toast('Cierre reabierto — vuelve a estado pendiente de firma', 3500, 'ok')
+  }
+
   const handleDeleteClosure = (id: string) => {
     const closure = (db.cierres || []).find((c: any) => c.id === id)
     if (closure && (closure.firmaAdmin || closure.firmaEmp || closure.firma)) {
@@ -1565,7 +1663,7 @@ function MonthlyClosePage() {
     toast('Cierre eliminado', 2500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onReopen={handleReopenClosure} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -1708,13 +1806,16 @@ function ObraModal({ onClose }: { onClose: () => void }) {
   const [coords, setCoords] = useState('')
   const [radio, setRadio] = useState('200')
   const [fechaInicio, setFechaInicio] = useState(() => today())
+  const dialogRef = useDialogA11y(true, onClose)
 
   const handleSave = () => {
     if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    const normalizedCoords = coords.trim() ? normalizeObraCoords(coords) : null
+    if (coords.trim() && !normalizedCoords) { toast('Usa coordenadas válidas: latitud, longitud', 3500, 'warn'); return }
     const nowIso = new Date().toISOString()
     const obra = {
       id: gid(), nombre: nombre.trim(),
-      coords: coords.trim() || null,
+      coords: normalizedCoords,
       radio: Number(radio) > 0 ? Number(radio) : 200,
       activa: true,
       fechaInicio: fechaInicio || null,
@@ -1730,27 +1831,27 @@ function ObraModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Nueva obra" onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Nueva obra</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
+          <button type="button" aria-label="Cerrar nueva obra" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
         </div>
         <div>
           <div style={labelStyle}>Nombre</div>
-          <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Gecama" style={fieldStyle} />
+          <input value={nombre} onChange={e => setNombre(e.target.value)} aria-label="Nombre de la obra" placeholder="Ej: Gecama" style={fieldStyle} />
         </div>
         <div>
           <div style={labelStyle}>Coordenadas GPS (opcional)</div>
-          <input value={coords} onChange={e => setCoords(e.target.value)} placeholder="Ej: 18.4861,-69.9312" style={fieldStyle} />
+          <input value={coords} onChange={e => setCoords(e.target.value)} aria-label="Coordenadas GPS" placeholder="Ej: 18.4861,-69.9312" style={fieldStyle} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div>
             <div style={labelStyle}>Radio de geovalla (m)</div>
-            <input type="number" min="0" value={radio} onChange={e => setRadio(e.target.value)} style={fieldStyle} />
+            <input type="number" min="0" value={radio} onChange={e => setRadio(e.target.value)} aria-label="Radio de geovalla" style={fieldStyle} />
           </div>
           <div>
             <div style={labelStyle}>Fecha de inicio</div>
-            <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} style={fieldStyle} />
+            <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} aria-label="Fecha de inicio de la obra" style={fieldStyle} />
           </div>
         </div>
         <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
@@ -1765,6 +1866,7 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const [showAdd, setShowAdd] = useState(false)
   const todayStr = today()
+  const currentMonth = localMonthKey(new Date())
 
   const items = useMemo(() => {
     const obras = db.obras || []
@@ -1772,37 +1874,45 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const records: any[] = db.records || []
 
     return obras.map((o: any) => {
-      const assigned = employees.filter((e: any) =>
-        Array.isArray(e.obrasAsignadas) && e.obrasAsignadas.includes(o.id)
+      const assigned = employees.filter((employee: any) => employeeBelongsToObra(employee, o))
+      const employeesById = new Map(employees.map((employee: any) => [employee.id, employee]))
+      const obraRecords = records.filter((record: any) =>
+        resolveRecordObraId(record, employeesById.get(record.empId), obras) === o.id
       )
-      const assignedIds = new Set(assigned.map((e: any) => e.id))
       // localDateStr(new Date(r.inicio)) (no r.inicio.startsWith(todayStr)): inicio
       // se guarda en UTC — un fichaje nocturno no contaba como "hoy" en esta obra.
-      const todayRecs = records.filter((r: any) =>
-        assignedIds.has(r.empId) && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr
+      const todayRecs = obraRecords.filter((r: any) =>
+        r.fin && r.inicio && localDateStr(new Date(r.inicio)) === todayStr
       )
       const todayMins = todayRecs.reduce((s: number, r: any) => {
         return s + recWorkSecs(r) / 60
       }, 0)
+      const monthRecs = obraRecords.filter((r: any) =>
+        r.fin && r.inicio && localMonthKey(r.inicio) === currentMonth
+      )
+      const monthMins = monthRecs.reduce((sum: number, record: any) => sum + recWorkSecs(record) / 60, 0)
+      const activeNow = obraRecords.filter((record: any) => record.inicio && !record.fin).length
       // e.role || isEnc/isJO: mismo fallback legacy que EmployeesPage.openEdit,
       // si no, un encargado marcado solo por isEnc/isJO no se detectaba aquí.
       const manager = employees.find((e: any) => {
         const role = e.role || (e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : '')
         return (role === 'encargado' || role === 'jefe_obra') &&
-          Array.isArray(e.obrasAsignadas) && e.obrasAsignadas.includes(o.id)
+          employeeBelongsToObra(e, o)
       })
       return {
         id: o.id,
         name: o.nombre || o.id,
-        address: o.coords ? `GPS: ${String(o.coords).slice(0, 30)}` : '—',
+        address: formatObraCoords(o.coords) ? `GPS: ${formatObraCoords(o.coords)}` : '—',
         status: (o.activa === false ? 'completada' : 'activa') as 'activa' | 'completada',
         employeeCount: assigned.length,
         hoursToday: todayMins > 0 ? `${Math.floor(todayMins / 60)}h${todayMins % 60 > 0 ? Math.floor(todayMins % 60) + 'm' : ''}` : '0h',
+        hoursMonth: monthMins > 0 ? `${Math.floor(monthMins / 60)}h ${Math.floor(monthMins % 60)}m` : '0h',
+        activeNow,
         manager: manager?.name || '—',
         startDate: fmtDate(o.fechaInicio || o.createdAt || o.ts),
       }
     })
-  }, [db, todayStr])
+  }, [db, todayStr, currentMonth])
 
   return <>
     <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} />
@@ -2097,7 +2207,9 @@ export default function AppV2Admin() {
   const [fichajesSearch, setFichajesSearch] = useState('')
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
   const [manualSyncing, setManualSyncing] = useState(false)
+  const [showAI, setShowAI] = useState(false)
   const name = session?.user?.name || 'Admin'
+  const aiUser = session?.user || { id:'__admin__', name, role:'admin', isAdmin:true }
   const notis = useNotificationsData()
   const unreadCount = useMemo(() => notis.items.filter(n => !n.read).length, [notis.items])
 
@@ -2194,7 +2306,7 @@ export default function AppV2Admin() {
     if (page === 'gastos')         return <ExpensesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
     if (page === 'documentos')     return <DocumentsPage />
     if (page === 'estadisticas')   return <StatsPage onNavigate={setAdminPage} />
-    if (page === 'informes')       return <ReportsPage />
+    if (page === 'informes')       return <ReportsPage onNavigate={setAdminPage} />
     if (page === 'cierre')         return <MonthlyClosePage />
     if (page === 'mensajes')       return <MessagesPage />
     if (page === 'notificaciones') return <NotificationsPage onNavigate={setAdminPage} />
@@ -2269,6 +2381,15 @@ export default function AppV2Admin() {
           </button>
           <button
             type="button"
+            onClick={() => setShowAI(true)}
+            aria-label="Abrir Times AI"
+            title="Times AI · análisis operativo"
+            style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:9, border:`1px solid ${colors.primary.glow}`, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer', fontSize:11, fontWeight:800 }}
+          >
+            ✦ <span className="uiv2-sync-label" style={{ marginLeft:5 }}>IA</span>
+          </button>
+          <button
+            type="button"
             aria-label={isLight ? 'Activar modo oscuro' : 'Activar modo claro'}
             title={isLight ? 'Modo oscuro' : 'Modo claro'}
             onClick={() => { toggleTheme(); setIsLight(v => !v) }}
@@ -2300,6 +2421,11 @@ export default function AppV2Admin() {
     >
       <Suspense fallback={<PageLoader />}>{renderPage()}</Suspense>
     </AppShell>
+    {showAI && (
+      <Suspense fallback={null}>
+        <ModalAI visible db={{ ...db, _runtimeSync:{ syncStatus, syncError, offlinePending, lastSyncTime } }} u={aiUser} onClose={() => setShowAI(false)} />
+      </Suspense>
+    )}
     </div>
   )
 }

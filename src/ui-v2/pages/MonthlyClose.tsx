@@ -41,6 +41,7 @@ export interface MonthlyCloseProps {
   onSignMany?: (ids: string[]) => void
   onGenerateAll?: () => void
   onDelete?: (id: string) => void
+  onReopen?: (id: string) => void
   onDownloadConsolidated?: (mes: string) => void
   canGenerate?: boolean
   generationHint?: string
@@ -78,7 +79,7 @@ function generateExcel(item: ClosureItem) {
   downloadXlsx(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`)
 }
 
-export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
+export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onReopen, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'signed' | 'pending'>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
@@ -255,6 +256,15 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                 >
                   Ver
                 </button>
+                {onReopen && (item.firmaAdmin || item.firmaEmp) && (
+                  <button
+                    onClick={() => onReopen(item.id)}
+                    title="Reabrir cierre para corregir horas"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
+                  >
+                    Reabrir
+                  </button>
+                )}
                 {onDelete && !(item.firmaAdmin || item.firmaEmp) && (
                   <button
                     onClick={() => onDelete(item.id)}
@@ -402,6 +412,14 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                   style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
                   <IconCheck width={14} height={14} /> Firmar como admin
+                </button>
+              )}
+              {onReopen && (detail.firmaAdmin || detail.firmaEmp) && (
+                <button
+                  onClick={() => { onReopen(detail.id); setDetail(null) }}
+                  style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Reabrir cierre
                 </button>
               )}
             </div>
