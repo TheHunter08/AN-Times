@@ -29,4 +29,13 @@ test.describe('Pantalla del empleado', () => {
     await page.getByRole('button', { name: 'Calendario', exact: true }).last().click()
     await expect(page.getByText(/Calendario|Leyenda/i).first()).toBeVisible({ timeout: 8000 })
   })
+
+  test('permite gestionar el modelo de IA local desde configuración', async ({ page }) => {
+    await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
+    await page.getByRole('button', { name:'Configuración', exact:true }).click()
+    const dialog = page.getByRole('dialog', { name:'Configuración', exact:true })
+    await expect(dialog.getByText('IA avanzada sin conexión', { exact:true })).toBeVisible()
+    await expect(dialog.getByText(/Qwen 2\.5 · 0\.5B · descarga aproximada de 430 MB/)).toBeVisible()
+    await expect(dialog.getByText('Descargar solo mediante Wi‑Fi', { exact:true })).toBeVisible()
+  })
 })
