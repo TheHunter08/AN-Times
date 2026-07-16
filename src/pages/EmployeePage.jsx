@@ -14,6 +14,7 @@ import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
+import { resolveEmployeeNotificationDestination } from '../utils/notificationNavigation.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 
@@ -999,14 +1000,10 @@ export default function EmployeePage() {
   )
 
   const handleNotificationNavigate = useCallback((item) => {
-    const text = `${item?.action || item?.title || ''} ${item?.detail || item?.body || ''}`.toLowerCase()
+    const destination = resolveEmployeeNotificationDestination(item)
     closeModal()
-    if (text.includes('vacac') || text.includes('solicitud')) setEmpTab('vacaciones')
-    else if (text.includes('document')) { setEmpTab('perfil'); openModal('documentos') }
-    else if (text.includes('cierre') || text.includes('firma')) { setEmpTab('perfil'); openModal('cierreSign') }
-    else if (text.includes('mensaje') || text.includes('administración')) openModal('chat')
-    else if (text.includes('jornada') || text.includes('fich') || text.includes('salida') || text.includes('hora')) setEmpTab('jornada')
-    else setEmpTab('inicio')
+    setEmpTab(destination.tab)
+    if (destination.modal) openModal(destination.modal)
   }, [closeModal, openModal, setEmpTab])
 
   // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)

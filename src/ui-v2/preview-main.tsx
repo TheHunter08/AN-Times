@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard.js'
 import { EmployeeHome, type ClockState } from './pages/EmployeeHome.js'
 import { Login, type LoginMode } from './pages/Login.js'
 import { ProductState } from './components/ProductState.js'
+import { Notifications, type NotificationItem } from './pages/Notifications.js'
 import { Search } from './components/Search.js'
 import { Avatar } from './components/Avatar.js'
 import {
@@ -51,6 +52,13 @@ const dashboardKpis = [
 function AdminPreview() {
   const [active, setActive] = useState('dashboard')
   const title = adminNav.find(item => item.id === active)?.label || 'Dashboard'
+  const [previewNotis, setPreviewNotis] = useState<NotificationItem[]>([
+    { id:'n1',type:'solicitud',title:'Nueva solicitud de vacaciones',body:'Franklin solicita vacaciones del 22 al 26 de julio.',time:'Hace 8 min',read:false,group:'hoy',destination:'solicitudes' },
+    { id:'n2',type:'fichaje',title:'Horas pendientes de validación',body:'Hay 7 jornadas esperando revisión.',time:'Hace 21 min',read:false,group:'hoy',destination:'validar' },
+    { id:'n3',type:'sistema',title:'Documento próximo a caducar',body:'Revisa la documentación de Mariano.',time:'Hace 1h',read:false,group:'hoy',destination:'empleados' },
+    { id:'n4',type:'mensaje',title:'Nuevo mensaje del equipo',body:'Tienes una conversación pendiente.',time:'Ayer',read:false,group:'ayer',destination:'notificaciones' },
+  ])
+  const kpiDestinations = ['empleados','fichajes','validar','solicitudes','planning']
   return (
     <div id="sAdmin" style={{ minHeight:'100dvh' }}>
       <AppShell
@@ -75,6 +83,7 @@ function AdminPreview() {
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
             <Search placeholder="Buscar empleado o sección…" />
             <button type="button" aria-label="Estado sincronizado" style={{ minHeight:38,padding:'0 12px',borderRadius:10,border:`1px solid ${colors.border.default}`,background:colors.bg[600],color:colors.semantic.green,fontWeight:700 }}>● <span className="uiv2-sync-label">Al día</span></button>
+            <button type="button" aria-label={`Notificaciones, ${previewNotis.filter(item => !item.read).length} sin leer`} onClick={()=>setActive('notificaciones')} style={{ width:38,height:38,display:'grid',placeItems:'center',borderRadius:10,border:`1px solid ${colors.border.default}`,background:colors.bg[600],color:colors.text[700],cursor:'pointer',position:'relative' }}><IconBell width={17} height={17} /></button>
             <Avatar name="Ismael Admin" size={30} />
           </div>
         }
@@ -83,12 +92,12 @@ function AdminPreview() {
           <Dashboard
             greeting="Buenas tardes, Ismael"
             greetingSub="Todo lo importante está bajo control."
-            kpis={dashboardKpis}
+            kpis={dashboardKpis.map((kpi,index)=>({ ...kpi,onClick:()=>setActive(kpiDestinations[index] || 'dashboard') }))}
             activity={[
-              { id:'1',text:'Carlos inició su jornada en Obra Centro',time:'08:02',tone:'green' },
-              { id:'2',text:'Nueva solicitud de vacaciones de Franklin',time:'08:14',tone:'orange' },
-              { id:'3',text:'Documento de Mariano próximo a caducar',time:'09:05',tone:'red' },
-              { id:'4',text:'Johnny reanudó su jornada',time:'09:18',tone:'purple' },
+              { id:'1',text:'Carlos inició su jornada en Obra Centro',time:'08:02',tone:'green',onClick:()=>setActive('fichajes') },
+              { id:'2',text:'Nueva solicitud de vacaciones de Franklin',time:'08:14',tone:'orange',onClick:()=>setActive('solicitudes') },
+              { id:'3',text:'Documento de Mariano próximo a caducar',time:'09:05',tone:'red',onClick:()=>setActive('empleados') },
+              { id:'4',text:'Johnny reanudó su jornada',time:'09:18',tone:'purple',onClick:()=>setActive('fichajes') },
             ]}
             trend={[
               { label:'L',value:126 },{ label:'M',value:139 },{ label:'X',value:132 },{ label:'J',value:148 },{ label:'V',value:121 },
@@ -96,13 +105,13 @@ function AdminPreview() {
             compareTrend={[
               { label:'L',value:118 },{ label:'M',value:125 },{ label:'X',value:129 },{ label:'J',value:135 },{ label:'V',value:116 },
             ]}
-            nextEvent={{ label:'Franklin — Vacaciones',time:'22 jul' }}
+            nextEvent={{ label:'Franklin — Vacaciones',time:'22 jul',onClick:()=>setActive('solicitudes') }}
             teamSlot={{
               shown:[
                 { id:'1',name:'Carlos Peña' },{ id:'2',name:'Franklin Melo' },{ id:'3',name:'Johnny Cruz' },
                 { id:'4',name:'Jose Santos' },{ id:'5',name:'Mariano Díaz' },{ id:'6',name:'Melky Reyes' },
               ],
-              extra:12,activeCount:12,pauseCount:2,total:18,
+              extra:12,activeCount:12,pauseCount:2,total:18,onClick:()=>setActive('empleados'),
             }}
             quickLinks={[
               { id:'pendientes',label:'Centro de pendientes',value:'12',onClick:()=>setActive('pendientes') },
@@ -112,6 +121,15 @@ function AdminPreview() {
               { id:'empleados',label:'Empleados activos',value:'18',onClick:()=>setActive('empleados') },
               { id:'fichajes',label:'Trabajando ahora',value:'12',onClick:()=>setActive('fichajes') },
             ]}
+              onTrendClick={()=>setActive('fichajes')}
+            />
+        ) : active === 'notificaciones' ? (
+          <Notifications
+            items={previewNotis}
+            onMarkRead={id=>setPreviewNotis(items=>items.map(item=>item.id===id?{...item,read:true}:item))}
+            onMarkAllRead={()=>setPreviewNotis(items=>items.map(item=>({...item,read:true})))}
+            onDismiss={id=>setPreviewNotis(items=>items.filter(item=>item.id!==id))}
+            onOpen={item=>{ setPreviewNotis(items=>items.map(current=>current.id===item.id?{...current,read:true}:current)); setActive(item.destination || 'dashboard') }}
           />
         ) : (
           <ProductState title={title} description="Esta vista conserva su funcionalidad actual y adopta el nuevo sistema visual premium." actionLabel="Volver al dashboard" onAction={()=>setActive('dashboard')} />

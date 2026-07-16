@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/appStore.js'
+import { resolveAdminNotificationDestination } from '../../utils/notificationNavigation.js'
 import type { NotificationItem } from '../pages/Notifications.js'
 
 interface DbNoti {
@@ -46,23 +47,6 @@ function classifyAction(action?: string): NotificationItem['type'] {
   return 'sistema'
 }
 
-function notificationDestination(action = '', explicit?: string): string {
-  if (explicit) {
-    const match = explicit.match(/go=admin:([^:&]+)/)
-    if (match?.[1]) return match[1]
-  }
-  const a = action.toLowerCase()
-  if (a.includes('correcci')) return 'solicitudes'
-  if (a.includes('vacac') || a.includes('solicitud')) return 'solicitudes'
-  if (a.includes('mensaje') || a.includes('chat')) return 'mensajes'
-  if (a.includes('document')) return 'documentos'
-  if (a.includes('cierre') || a.includes('firma')) return 'cierre'
-  if (a.includes('anomal')) return 'anomalias'
-  if (a.includes('fichaj') || a.includes('entrada') || a.includes('salida') || a.includes('jornada')) return 'fichajes'
-  if (a.includes('emplead') || a.includes('aniversario') || a.includes('cumple')) return 'empleados'
-  return 'auditoria'
-}
-
 export function useNotificationsData(): {
   items: NotificationItem[]
   markRead: (id: string) => void
@@ -89,7 +73,7 @@ export function useNotificationsData(): {
       time: relativeTime(n.ts),
       read: !!n.leido,
       group: ageGroup(n.ts),
-      destination: notificationDestination(n.action, n.target || n.url),
+      destination: resolveAdminNotificationDestination(n),
     }))
 
   const markRead = (id: string) => {

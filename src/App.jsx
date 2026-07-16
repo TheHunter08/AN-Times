@@ -4,6 +4,7 @@ import { ToastContainer } from './components/Toast.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
 import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
+import { parseNavigationTarget, resolveEmployeeNotificationDestination } from './utils/notificationNavigation.js'
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
 // v2 UI — nuevas pantallas con datos reales
 import LoginV2 from './ui-v2/LoginV2.tsx'
@@ -266,24 +267,18 @@ const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'pe
 
 function applyDeepLink(url) {
   try {
-    const u = new URL(url, window.location.origin)
-    const go  = u.searchParams.get('go')
-    const tab = u.searchParams.get('tab')
-    if (!go && !tab) return
+    const parsed = parseNavigationTarget(url)
+    if (!parsed) return
     const { setScreen, setAdminPage, setEmpTab, openModal } = useAppStore.getState()
-    if (go) {
-      const [screen, target, subtab] = go.split(':')
-      if (screen === 'admin') {
-        setScreen('admin', true)
-        if (target) setAdminPage(target)
-        if (subtab) window.dispatchEvent(new CustomEvent('admin-panel-subtab', { detail: { panel: target, tab: subtab } }))
-      } else if (screen === 'emp') {
-        setScreen('emp', true)
-        if (target === 'documentos') { setEmpTab('perfil'); openModal('documentos') }
-        else if (target) setEmpTab(target)
-      }
-    } else if (tab && EMP_TABS.includes(tab)) {
-      setEmpTab(tab)
+    if (parsed.role === 'admin') {
+      setScreen('admin', true)
+      if (parsed.target) setAdminPage(parsed.target)
+      if (parsed.subtab) window.dispatchEvent(new CustomEvent('admin-panel-subtab', { detail: { panel: parsed.target, tab: parsed.subtab } }))
+    } else if (parsed.role === 'emp' || EMP_TABS.includes(parsed.target)) {
+      const destination = resolveEmployeeNotificationDestination({ url })
+      setScreen('emp', true)
+      setEmpTab(destination.tab)
+      if (destination.modal) openModal(destination.modal)
     }
     window.history.replaceState({}, '', window.location.pathname)
   } catch {}

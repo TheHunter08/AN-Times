@@ -204,6 +204,20 @@ test('una notificación admin abre la pantalla relacionada', async ({ page }) =>
   await expect(page.getByRole('heading', { name:'Solicitudes', exact:true })).toBeVisible()
 })
 
+test('una notificación admin respeta un destino explícito', async ({ page }) => {
+  await loginAsAdmin(page, {
+    notis: [{
+      id:'n-admin-target', empId:'__admin__', action:'Aviso del sistema',
+      detail:'Hay documentación pendiente', target:'/?go=admin%3Adocumentos',
+      ts:new Date().toISOString(), leido:false,
+    }],
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name:/Notificaciones, 1 sin leer/i }).click()
+  await page.getByRole('button', { name:/Aviso del sistema.*Abrir detalle/i }).click()
+  await expect(page.getByRole('heading', { name:'Documentos', exact:true })).toBeVisible()
+})
+
 test('una notificación de empleado abre su sección', async ({ page }) => {
   await loginAsEmployee(page, {
     notis: [{
@@ -216,4 +230,26 @@ test('una notificación de empleado abre su sección', async ({ page }) => {
   await page.getByRole('button', { name:/Notificaciones/i }).last().click()
   await page.getByRole('button', { name:/Vacaciones aprobadas.*Abrir detalle/i }).click()
   await expect(page.getByText(/Solicitar vacaciones|Vacaciones/i).first()).toBeVisible()
+})
+
+test('una notificación de empleado respeta el destino explícito', async ({ page }) => {
+  await loginAsEmployee(page, {
+    notis: [{
+      id:'n-employee-target', empId:employee.id, action:'Tienes una novedad',
+      detail:'Abre tus documentos', target:'/?go=emp%3Adocumentos',
+      ts:new Date().toISOString(), leido:false,
+    }],
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name:/Notificaciones/i }).last().click()
+  await page.getByRole('button', { name:/Tienes una novedad.*Abrir detalle/i }).click()
+  await expect(page.getByRole('dialog', { name:'Documentos' })).toBeVisible()
+})
+
+test('un clic push abre también los destinos que son modales', async ({ page }) => {
+  await loginAsEmployee(page)
+  await page.goto('/')
+  await expect(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })).toBeVisible({ timeout:15000 })
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('push-deeplink', { detail:'/?go=emp%3Amensajes' })))
+  await expect(page.getByText('Chat con administración', { exact:true })).toBeVisible()
 })
