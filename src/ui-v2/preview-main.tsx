@@ -18,6 +18,7 @@ import {
   IconAlertCircle,
   IconBell,
   IconCalendar,
+  IconChat,
   IconCheck,
   IconClipboard,
   IconClock,
@@ -38,6 +39,7 @@ const adminNav = [
   { id:'validar', label:'Validar horas', group:'Gestión', icon:<IconCheck />, badge:7 },
   { id:'solicitudes', label:'Solicitudes', group:'Gestión', icon:<IconClipboard />, badge:3 },
   { id:'gastos', label:'Gastos', group:'Gestión', icon:<IconReceipt />, badge:2 },
+  { id:'mensajes', label:'Mensajes', group:'Comunicación', icon:<IconChat /> },
   { id:'notificaciones', label:'Notificaciones', group:'Comunicación', icon:<IconBell />, badge:4 },
 ]
 
@@ -56,7 +58,7 @@ function AdminPreview() {
     { id:'n1',type:'solicitud',title:'Nueva solicitud de vacaciones',body:'Franklin solicita vacaciones del 22 al 26 de julio.',time:'Hace 8 min',read:false,group:'hoy',destination:'solicitudes' },
     { id:'n2',type:'fichaje',title:'Horas pendientes de validación',body:'Hay 7 jornadas esperando revisión.',time:'Hace 21 min',read:false,group:'hoy',destination:'validar' },
     { id:'n3',type:'sistema',title:'Documento próximo a caducar',body:'Revisa la documentación de Mariano.',time:'Hace 1h',read:false,group:'hoy',destination:'empleados' },
-    { id:'n4',type:'mensaje',title:'Nuevo mensaje del equipo',body:'Tienes una conversación pendiente.',time:'Ayer',read:false,group:'ayer',destination:'notificaciones' },
+    { id:'n4',type:'mensaje',title:'Nuevo mensaje del equipo',body:'Tienes una conversación pendiente.',time:'Ayer',read:false,group:'ayer',destination:'mensajes' },
   ])
   const kpiDestinations = ['empleados','fichajes','validar','solicitudes','planning']
   return (

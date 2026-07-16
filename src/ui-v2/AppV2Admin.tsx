@@ -504,8 +504,10 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     tone: (k as any).tone ?? (['primary', 'accent', 'cyan', 'cyan', 'amber'] as const)[i],
     onClick: () => onNavigate(kpiDestinations[i] || 'dashboard'),
   }))
-  const widgetIds = ['employees', 'working', 'validation', 'requests', 'coverage']
-  const visibleWidgets: string[] = db.config?.adminDashboard?.visibleWidgets || widgetIds
+  const widgetIds = ['employees', 'working', 'break', 'absent', 'hoursToday']
+  const legacyWidgetIds: Record<string, string> = { validation: 'break', requests: 'absent', coverage: 'hoursToday' }
+  const visibleWidgets: string[] = (db.config?.adminDashboard?.visibleWidgets || widgetIds)
+    .map((id: string) => legacyWidgetIds[id] || id)
   const visibleKpis = visibleWidgets
     .map(id => kpisWithExtra[widgetIds.indexOf(id)])
     .filter(Boolean)
@@ -2030,8 +2032,10 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
   const lastSyncTime = useAppStore(s => s.lastSyncTime)
   const fetchDB = useAppStore(s => s.fetchDB)
   const schedules = db.config?.reportSchedules || []
-  const defaultWidgets = ['employees', 'working', 'validation', 'requests', 'coverage']
-  const visibleWidgets = db.config?.adminDashboard?.visibleWidgets || defaultWidgets
+  const defaultWidgets = ['employees', 'working', 'break', 'absent', 'hoursToday']
+  const legacyWidgetIds: Record<string, string> = { validation: 'break', requests: 'absent', coverage: 'hoursToday' }
+  const visibleWidgets = (db.config?.adminDashboard?.visibleWidgets || defaultWidgets)
+    .map((id: string) => legacyWidgetIds[id] || id)
   const employees = (db.employees || []).filter((employee: any) => !employee.baja)
   const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
 

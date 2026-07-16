@@ -39,9 +39,9 @@ interface OperationsProps {
 const WIDGETS = [
   { id: 'employees', label: 'Empleados activos' },
   { id: 'working', label: 'Trabajando ahora' },
-  { id: 'validation', label: 'Horas por validar' },
-  { id: 'requests', label: 'Solicitudes' },
-  { id: 'coverage', label: 'Cobertura semanal' },
+  { id: 'break', label: 'En descanso' },
+  { id: 'absent', label: 'Ausentes hoy' },
+  { id: 'hoursToday', label: 'Horas trabajadas hoy' },
 ]
 
 const inputStyle = {
