@@ -80,7 +80,7 @@ export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: Sta
         </div>
         {donut && (
           <div style={{ ...darkPanel, padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], marginBottom: 12 }}>Distribución por departamento</div>
+            <div style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], marginBottom: 12 }}>Distribución de jornadas</div>
             <DonutChart slices={donut.slices} centerValue={donut.centerValue} centerLabel={donut.centerLabel} />
           </div>
         )}

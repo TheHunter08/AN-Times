@@ -4,6 +4,7 @@
 
 import { createHash } from 'crypto'
 import { buildCierreIndividualPDF } from './src/utils/cierrePdf.js'
+import { WM } from './src/config/workRules.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -105,6 +106,7 @@ async function main() {
       generadoPor: 'Sistema (automático)',
       generadoAt: new Date().toISOString(),
       totalMin,
+      extraMin: Math.max(0, totalMin - WM),
       dias: eRecs.length,
       estado: 'pendiente',
       firma: null,

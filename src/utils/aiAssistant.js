@@ -1,5 +1,5 @@
 import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm, localDateStr } from './time.js'
-import { WD, WK } from '../config/constants.js'
+import { WD, WK, WM } from '../config/constants.js'
 
 export const AI_CHIPS = [
   '¿Por qué trabajé menos esta semana?',
@@ -36,7 +36,7 @@ export function buildAIContext(db, u) {
     `Empleado: ${u.name}`,
     `Horas trabajadas esta semana: ${mhm(weekMin)} (objetivo ${mhm(WK)})`,
     `Horas trabajadas este mes: ${mhm(monthMin)}`,
-    `Horas extra netas este mes: ${mhm(mExt.netExtraMin || 0)}`,
+    `Horas extra este mes (exceso sobre 160h): ${mhm(mExt.netExtraMin || 0)}`,
     mExt.deficitMin > 0 ? `Déficit este mes: ${mhm(mExt.deficitMin)}` : null,
     `Vacaciones disponibles: ${vac.available} días (${vac.generated} generados, ${vac.used} usados)`,
     (u.role === 'encargado' || u.role === 'jefe_obra' || u.isAdmin)
@@ -64,7 +64,7 @@ export function aiAnswer(q, db, u) {
   // "horas trabajadas este mes" y además desincronizaba monthMin de
   // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
   const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-  // Regla TIMES INC: extras = semanas >40h, descontando déficit hasta 160h/mes
+  // Regla TIMES INC: >40h en semana; en el resumen mensual, >160h en el mes.
   const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0 }
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
 
@@ -79,17 +79,14 @@ export function aiAnswer(q, db, u) {
 
   // ¿Cuántas horas extra tengo?
   if (ql.includes('extra')) {
-    const { netExtraMin, deficitMin, weeklyExtraMin, shortfallMin } = mExt
+    const { netExtraMin, deficitMin } = mExt
     if (netExtraMin > 0) {
-      const comp = shortfallMin > 0
-        ? ` (${mhm(weeklyExtraMin)} semanales − ${mhm(shortfallMin)} de déficit mensual)`
-        : ''
-      return `⚡ Tienes **${mhm(netExtraMin)}** de horas extra netas este mes${comp}. Llevas **${mhm(monthMin)}** trabajados sobre el objetivo de 160h.`
+      return `⚡ Tienes **${mhm(netExtraMin)}** de horas extra este mes. Llevas **${mhm(monthMin)}** trabajados; todo lo que supera 160h se considera extra.`
     }
     if (deficitMin > 0) {
-      return `⚠️ Este mes tienes un déficit de **${mhm(deficitMin)}** para llegar a 160h. Llevas **${mhm(monthMin)}** trabajados.${weeklyExtraMin > 0 ? ` Las ${mhm(weeklyExtraMin)} extra semanales ya se usaron para compensar.` : ''}`
+      return `⚠️ Este mes te faltan **${mhm(deficitMin)}** para llegar a 160h. Llevas **${mhm(monthMin)}** trabajados y todavía no hay horas extra mensuales.`
     }
-    return `✅ Este mes llevas **${mhm(monthMin)}** trabajados. ${monthMin >= 9600 ? '¡Ya has cubierto las 160h objetivo!' : `Te faltan ${mhm(9600 - monthMin)} para llegar a 160h.`} Sin horas extra acumuladas todavía.`
+    return `✅ Este mes llevas **${mhm(monthMin)}** trabajados. ${monthMin >= WM ? '¡Ya has cubierto las 160h objetivo!' : `Te faltan ${mhm(WM - monthMin)} para llegar a 160h.`} Sin horas extra acumuladas todavía.`
   }
 
   // ¿Quién olvidó fichar? (visión de equipo si eres admin/encargado)

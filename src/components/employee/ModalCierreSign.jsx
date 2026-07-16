@@ -6,6 +6,7 @@ import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
+import { WM } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -48,7 +49,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const records_snapshot = previewSnapshot
     const totalMin = previewTotalMin
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
-    const firmado = { ...selCierre, records_snapshot, totalMin, dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+    const firmado = { ...selCierre, records_snapshot, totalMin, extraMin:Math.max(0, totalMin - WM), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     try {
       const { dataUrl } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })

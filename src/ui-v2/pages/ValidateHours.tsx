@@ -117,7 +117,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
     .filter(r => (r.empName + r.dept + r.date).toLowerCase().includes(search.toLowerCase()))
 
   const pendingCount = localRows.filter(r => r.status === 'pending').length
-  const totalOvertime = localRows.filter(r => r.diffTone === 'over').length
+  const totalLongDays = localRows.filter(r => r.diffTone === 'over').length
 
   const inputStyle = {
     padding: '8px 10px', borderRadius: radius.sm,
@@ -154,7 +154,7 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {[
           { label: 'Pendientes', value: String(pendingCount), color: colors.semantic.orange, bg: 'rgba(245,158,11,.10)' },
-          { label: 'Horas extra', value: String(totalOvertime), color: colors.primary.light, bg: colors.primary.dim },
+          { label: 'Jornadas largas', value: String(totalLongDays), color: colors.primary.light, bg: colors.primary.dim },
           { label: 'Total', value: String(localRows.length), color: colors.text[700], bg: colors.bg[600] },
         ].map((k, i) => (
           <div key={i} style={{ padding: '10px 14px', borderRadius: radius.md, background: k.bg, border: `1px solid rgba(var(--uiv2-overlay-rgb),.06)` }}>

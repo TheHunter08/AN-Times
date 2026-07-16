@@ -57,6 +57,7 @@ describe('refreshUnsignedClosures', () => {
     const records = [{ id:'r1', empId:'e1', inicio:'2026-07-08T06:00:00', fin:'2026-07-08T15:00:00', breaks:[] }]
     const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z')
     expect(updated.totalMin).toBe(540)
+    expect(updated.extraMin).toBe(0)
     expect(updated.records_snapshot[0].workSecs).toBe(9 * 3600)
     expect(updated.pdfData).toBeNull()
     expect(updated.desactualizado).toBe(false)

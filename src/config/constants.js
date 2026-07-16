@@ -28,9 +28,7 @@ const _isValidVapid = (s) => /^[A-Za-z0-9_-]{86,90}$/.test(s)
 const _candidate = _sanitizeVapid(import.meta.env.VITE_VAPID_PUB)
 export const VAPID_PUB = _isValidVapid(_candidate) ? _candidate : _VAPID_FALLBACK
 
-export const WK = 40 * 60   // weekly minutes norm
-export const WD = 8 * 60    // daily minutes norm
-export const WM = 160 * 60  // monthly minutes norm
+export { WK, WD, WM } from './workRules.js'
 export const VPM = 2.5      // vacation days per month
 
 // Festivos Comunidad de Madrid — 2026 + 2027

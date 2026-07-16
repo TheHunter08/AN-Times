@@ -1,5 +1,6 @@
 import { mhm, p2, recWorkSecs } from './time.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal } from './pdfReport.js'
+import { WM } from '../config/workRules.js'
 
 async function sha256Hex(str) {
   try {
@@ -56,6 +57,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   const recs = cierre.records_snapshot || []
   const totalMin = Math.floor(recs.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
+  const extraMin = Math.max(0, totalMin - WM)
   recs.forEach((r, i) => {
     if (y - ROW_H < 140) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
     const d = new Date(r.inicio)
@@ -72,7 +74,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   if (y - 90 < 30) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
   y -= 12
   page.drawRectangle({ x:ML, y:y-38, width:CW, height:38, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
-  page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''} trabajado${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:11, font:fontB, color:colors.pri })
+  page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  EXTRA MES: ${mhm(extraMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:10, font:fontB, color:colors.pri })
   y -= 58
 
   const corrections = recs.flatMap(record => (record.correcciones || []).map(correction => ({ record, correction })))
@@ -134,8 +136,9 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
   const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
   const COLS = [
-    { label:'Empleado', w:190 }, { label:'Días', w:50 },
-    { label:'Horas', w:80 }, { label:'Estado', w:90 }, { label:'Fecha firma', w:105 },
+    { label:'Empleado', w:155 }, { label:'Días', w:40 },
+    { label:'Horas', w:65 }, { label:'Extra', w:65 },
+    { label:'Estado', w:80 }, { label:'Fecha firma', w:110 },
   ]
   const ROW_H = 20, HEAD_H = 20
 
@@ -155,20 +158,23 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
   y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
 
   let totalMin = 0
+  let totalExtraMin = 0
   let firmadosCount = 0
   let correctionCount = 0
   cierres.forEach((c, i) => {
     if (y - ROW_H < 60) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
     totalMin += c.totalMin || 0
+    const employeeExtraMin = Math.max(0, (c.totalMin || 0) - WM)
+    totalExtraMin += employeeExtraMin
     correctionCount += (c.records_snapshot || []).reduce((sum, record) => sum + (record.correcciones || []).length, 0)
     const firmado = c.estado === 'firmado'
     if (firmado) firmadosCount++
-    const vals = [c.empName, String(c.dias || 0), mhm(c.totalMin || 0), '', '']
+    const vals = [c.empName, String(c.dias || 0), mhm(c.totalMin || 0), mhm(employeeExtraMin), '', '']
     const yAfter = drawTableDataRow(page, { ml:ML, cw:CW, y, vals, cols:COLS, striped: i%2!==0, colors, fontR, fontB, rowH:ROW_H })
     // Estado y fecha de firma se dibujan aparte para conservar el color-coding
-    const xEstado = ML + COLS[0].w + COLS[1].w + COLS[2].w
+    const xEstado = ML + COLS[0].w + COLS[1].w + COLS[2].w + COLS[3].w
     page.drawText(firmado ? 'OK Firmado' : 'Pendiente', { x:xEstado+4, y:y-ROW_H+4, size:7.5, font:fontB, color: firmado ? colors.green : colors.orange })
-    const xFecha = xEstado + COLS[3].w
+    const xFecha = xEstado + COLS[4].w
     const fechaTxt = firmado && c.firma?.firmadoAt ? new Date(c.firma.firmadoAt).toLocaleDateString('es-ES') : '—'
     page.drawText(fechaTxt, { x:xFecha+4, y:y-ROW_H+4, size:7, font:fontR, color:colors.gray })
     y = yAfter
@@ -177,7 +183,7 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
   if (y - 44 < 30) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
   y -= 14
   page.drawRectangle({ x:ML, y:y-44, width:CW, height:44, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
-  page.drawText(`TOTAL EMPRESA: ${mhm(totalMin)}`, { x:ML+10, y:y-19, size:11, font:fontB, color:colors.pri })
+  page.drawText(`TOTAL EMPRESA: ${mhm(totalMin)}  ·  EXTRA MES: ${mhm(totalExtraMin)}`, { x:ML+10, y:y-19, size:10, font:fontB, color:colors.pri })
   page.drawText(pdfSafe(`${firmadosCount} de ${cierres.length} cierres firmados`), { x:ML+10, y:y-34, size:8.5, font:fontR, color: firmadosCount===cierres.length ? colors.green : colors.orange })
   if (correctionCount) page.drawText(pdfSafe(`${correctionCount} modificación${correctionCount!==1?'es':''} con trazabilidad incluida${correctionCount!==1?'s':''}`), { x:ML+250, y:y-34, size:8, font:fontB, color:colors.orange, maxWidth:CW-260 })
 

@@ -130,18 +130,51 @@ describe('monthlyExtras', () => {
     expect(r.weeklyExtraMin).toBe(5 * 60) // 5h extra esa semana
   })
 
-  it('compensa déficit con extras acumuladas antes de marcar déficit real', () => {
-    // Una semana con 45h de extra (5h) pero el mes completo se queda corto
+  it('40h exactas no son extra semanal y el primer minuto adicional sí', () => {
+    const records = Array.from({ length: 5 }, (_, i) => ({
+      empId: 'e1',
+      inicio: `2026-06-0${i + 1}T08:00:00`,
+      fin: `2026-06-0${i + 1}T16:00:00`,
+    }))
+    expect(monthlyExtras(records, 'e1', '2026-06').weeklyExtraMin).toBe(0)
+    records[4] = { ...records[4], fin: '2026-06-05T16:01:00' }
+    expect(monthlyExtras(records, 'e1', '2026-06').weeklyExtraMin).toBe(1)
+  })
+
+  it('no considera extra mensual mientras el total no supere 160h', () => {
+    // Una semana supera 40h, pero el acumulado mensual todavía está en 45h.
     const records = Array.from({ length: 5 }, (_, i) => ({
       empId: 'e1',
       inicio: `2026-06-0${i + 1}T08:00:00`,
       fin: `2026-06-0${i + 1}T17:00:00`, // 9h x5 = 45h
     }))
     const r = monthlyExtras(records, 'e1', '2026-06', { weeklyH: 40, monthlyH: 160 })
-    // workedMin = 45h, shortfall = 160-45=115h, weeklyExtra=5h → deficit real = 110h, netExtra=0
+    // La vista semanal muestra 5h extra; la mensual aún tiene 115h pendientes.
     expect(r.workedMin).toBe(45 * 60)
+    expect(r.weeklyExtraMin).toBe(5 * 60)
     expect(r.netExtraMin).toBe(0)
-    expect(r.deficitMin).toBe(110 * 60)
+    expect(r.deficitMin).toBe(115 * 60)
+  })
+
+  it('considera extra mensual únicamente el exceso sobre 160h', () => {
+    const baseRecords = Array.from({ length: 20 }, (_, i) => ({
+        empId: 'e1',
+        inicio: `2026-06-${String(i + 1).padStart(2, '0')}T08:00:00`,
+        fin: `2026-06-${String(i + 1).padStart(2, '0')}T16:00:00`,
+      }))
+    const exact = monthlyExtras(baseRecords, 'e1', '2026-06')
+    expect(exact.workedMin).toBe(160 * 60)
+    expect(exact.netExtraMin).toBe(0)
+
+    const records = [
+      ...baseRecords,
+      { empId: 'e1', inicio: '2026-06-21T08:00:00', fin: '2026-06-21T13:00:00' },
+    ]
+    const r = monthlyExtras(records, 'e1', '2026-06')
+    expect(r.workedMin).toBe(165 * 60)
+    expect(r.netExtraMin).toBe(5 * 60)
+    expect(r.shortfallMin).toBe(0)
+    expect(r.deficitMin).toBe(0)
   })
 
   it('ignora registros de otro empleado o mes', () => {

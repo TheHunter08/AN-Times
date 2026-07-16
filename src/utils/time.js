@@ -1,3 +1,5 @@
+import { WK, WM } from '../config/workRules.js'
+
 export const p2 = n => String(n).padStart(2, '0')
 
 // Fecha LOCAL de un Date como "YYYY-MM-DD" — NO usar d.toISOString().slice(0,10)
@@ -162,24 +164,19 @@ export const sortedEmps = db =>
   (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => (a.name||'').localeCompare(b.name||'', 'es', { sensitivity: 'base' }))
 
 // ── Horas extra del mes (regla TIMES INC) ─────────────────────────────────────
-// • Las extras se acumulan por semana: cualquier minuto por encima de 40h/sem
-//   (o `weeklyH`/sem si el empleado tiene jornada parcial) cuenta como extra.
-// • El mes tiene un objetivo de 160h (o `monthlyH`).
-// • Si al final del mes el total trabajado no llega al objetivo, el déficit se
-//   resta primero del banco de extras semanales. Solo si las extras no cubren
-//   el déficit aparece como "Déficit" real en el informe.
+// • Vista semanal: cualquier minuto por encima de 40h cuenta como extra.
+// • Vista mensual: solo cuenta como extra lo trabajado por encima de 160h.
+// • Una jornada larga no es extra por sí sola: manda el acumulado del periodo.
 //
 // Devuelve: { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
 //   workedMin       — total minutos trabajados ese mes
 //   weeklyExtraMin  — suma de minutos por encima de 40h en cada semana
 //   shortfallMin    — minutos que faltan para el objetivo mensual (0 si llega)
-//   netExtraMin     — extras finales tras compensar déficit (≥0)
-//   deficitMin      — déficit real tras agotar el banco de extras (≥0)
+//   netExtraMin     — minutos por encima del objetivo mensual (≥0)
+//   deficitMin      — minutos pendientes para alcanzar el objetivo mensual (≥0)
 export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
-  const weeklyH  = Math.max(1, opts.weeklyH  || 40)
-  const monthlyH = Math.max(1, opts.monthlyH || 160)
-  const weeklyTarget  = weeklyH  * 60
-  const monthlyTarget = monthlyH * 60
+  const weeklyTarget = Math.max(1, opts.weeklyH ? opts.weeklyH * 60 : WK)
+  const monthlyTarget = Math.max(1, opts.monthlyH ? opts.monthlyH * 60 : WM)
 
   const localMonth = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
   const recs = (records || []).filter(r =>
@@ -202,8 +199,8 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
   }
 
   const shortfallMin = Math.max(0, monthlyTarget - workedMin)
-  const netExtraMin  = Math.max(0, weeklyExtraMin - shortfallMin)
-  const deficitMin   = Math.max(0, shortfallMin - weeklyExtraMin)
+  const netExtraMin  = Math.max(0, workedMin - monthlyTarget)
+  const deficitMin   = shortfallMin
 
   return { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
 }

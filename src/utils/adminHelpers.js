@@ -1,5 +1,6 @@
 import { queuePush } from '../services/dataService.js'
 import { calcSecs, localDateStr, localMonthKey, recWorkSecs } from './time.js'
+import { WM } from '../config/constants.js'
 
 export const buildRecordSnapshot = record => {
   const totals = calcSecs(record)
@@ -43,10 +44,12 @@ export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) 
       record.empId === empId && record.inicio && record.fin && localMonthKey(record.inicio) === cierre.mes
     )
     const records_snapshot = monthRecords.map(buildRecordSnapshot)
+    const totalMin = Math.floor(records_snapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
     return {
       ...cierre,
       records_snapshot,
-      totalMin: Math.floor(records_snapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60),
+      totalMin,
+      extraMin: Math.max(0, totalMin - WM),
       dias: new Set(monthRecords.map(record => localDateStr(new Date(record.inicio)))).size,
       desactualizado: false,
       pdfData: null,

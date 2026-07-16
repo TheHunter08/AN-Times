@@ -28,6 +28,7 @@ import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
+import { WM } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -1219,7 +1220,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const employeesById = new Map(emps.map((employee: any) => [employee.id, employee]))
     const minutesByEmployee = new Map<string, number>()
     const centroMap = new Map<string, number>()
-    const distribution = { full: 0, partial: 0, overtime: 0 }
+    const distribution = { full: 0, partial: 0, long: 0 }
     let totalMins = 0
 
     for (const record of monthRecs) {
@@ -1231,16 +1232,15 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       centroMap.set(centro, (centroMap.get(centro) || 0) + minutes)
       if (minutes >= 420 && minutes <= 540) distribution.full += 1
       else if (minutes > 0 && minutes < 420) distribution.partial += 1
-      else if (minutes > 540) distribution.overtime += 1
+      else if (minutes > 540) distribution.long += 1
     }
     const empCount = emps.length || 1
-    const avgMins = totalMins / Math.max(monthRecs.length, 1)
-    const avgH = Math.floor(avgMins / 60)
-    const avgM = Math.floor(avgMins % 60)
+    const monthlyExtraMin = [...minutesByEmployee.values()]
+      .reduce((sum, employeeMinutes) => sum + Math.max(0, employeeMinutes - WM), 0)
 
     const kpis = [
       { label: 'Horas este mes', value: `${Math.floor(totalMins / 60)}h`, tone: 'primary' as const },
-      { label: 'Media por fichaje', value: `${avgH}h${avgM > 0 ? avgM + 'm' : ''}`, tone: 'accent' as const },
+      { label: 'Horas extra del mes', value: mhm(monthlyExtraMin), tone: monthlyExtraMin > 0 ? 'amber' as const : 'accent' as const },
       { label: 'Empleados activos', value: String(empCount), tone: 'cyan' as const },
       { label: 'Fichajes totales', value: String(monthRecs.length), tone: 'amber' as const },
     ]
@@ -1248,7 +1248,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     // Hours per employee bar
     const bars = emps.slice(0, 8).map((e: any) => {
       const empMins = minutesByEmployee.get(e.id) || 0
-      const maxPossible = 160 * 60 // 160h/month
+      const maxPossible = WM
       return { label: e.name?.split(' ')[0] || e.id, value: Math.min(100, Math.round(empMins / maxPossible * 100)) }
     })
 
@@ -1261,7 +1261,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const rawSlices = [
       { label: 'Jornada completa', value: distribution.full, color: colors.semantic.green },
       { label: 'Jornada parcial', value: distribution.partial, color: colors.semantic.orange },
-      { label: 'Horas extra', value: distribution.overtime, color: colors.primary.base },
+      { label: 'Jornada larga', value: distribution.long, color: colors.primary.base },
     ]
     const sliceTotal = rawSlices.reduce((s, x) => s + x.value, 0) || 1
     const donut = {
@@ -1282,7 +1282,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       donut={donut}
       comparison={[
         { label: 'Jornada completa', value: `${Math.round((rawSlices[0].value / Math.max(rawSlices.reduce((s, x) => s + x.value, 0), 1)) * 100)}%`, deltaTone: 'up' },
-        { label: 'Jornadas extra', value: `${rawSlices[2].value}`, deltaTone: 'up' },
+        { label: 'Jornadas largas', value: `${rawSlices[2].value}`, deltaTone: 'up' },
       ]}
     />
   )
@@ -1360,7 +1360,7 @@ function MonthlyClosePage() {
         const generadoAt = new Date().toISOString()
         return [{
           id: gid(), empId: e.id, empName: e.name, mes: mesPasado,
-          totalMin, dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
+          totalMin, extraMin: Math.max(0, totalMin - WM), dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
           generadoPor: 'Sistema', generadoAt,
           firma: null, firmaEmp: null, firmaAdmin: null, _upd: generadoAt,
         }]
@@ -1414,7 +1414,7 @@ function MonthlyClosePage() {
         const totalMins = recs.reduce((s: number, r: any) =>
           s + recWorkSecs(r) / 60, 0
         )
-        const extraMins = Math.max(0, totalMins - 160 * 60)
+        const extraMins = Math.max(0, totalMins - WM)
 
         const dayRecs = recs.map((r: any) => ({
           date:  new Date(r.inicio).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
@@ -1476,7 +1476,7 @@ function MonthlyClosePage() {
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
         const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
-        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
+        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, extraMin:Math.max(0, totalMin - WM), dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
       if (!nuevos.length) { toast(`Sin registros de ${mesPasado}`, 3000, 'warn'); return null }
       const withAudit = auditLog(fresh, `Cierre mensual generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')

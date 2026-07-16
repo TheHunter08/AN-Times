@@ -536,7 +536,7 @@ export default function EmployeePage() {
         }
       })
 
-      // 8. Horas extra: aviso cuando se superan 9h en un día o 45h en la semana
+      // 8. Aviso preventivo a las 9h y aviso de extras al superar 40h semanales.
       {
         const openR = (db.records || []).find(r => r.empId === u.id && !r.fin)
         if (openR) {
@@ -552,18 +552,19 @@ export default function EmployeePage() {
             }
           }
         }
-        // Aviso semanal: si las horas semanales superan 45h
-        const wkKey = 'an_extra45h_' + todayStr.slice(0, 7)
-        if (!hasSent(wkKey, 'week_' + todayStr)) {
-          const ws = wkStart(new Date())
+        // Aviso semanal: el exceso sobre 40h se considera hora extra.
+        const ws = wkStart(new Date())
+        const wkKey = 'an_extra40h_' + localDateStr(ws)
+        if (!hasSent(wkKey)) {
           const weekMin = (db.records || [])
             .filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
-            .reduce((s, r) => s + calcMin(r), 0)
-          if (weekMin >= 2700) {  // 45h = 2700 min
-            markSent(wkKey, 'week_' + todayStr)
-            const _msg45h = `Llevas ${mhm(weekMin)} esta semana. Has superado las 45h semanales.`
-            sendPush(u.id, '⚡ Semana de horas extra', _msg45h, 'jornada', '/?tab=inicio')
-            addBell('⚡ Semana de horas extra', _msg45h)
+            .reduce((s, r) => s + calcMin(r), 0) + (openR ? Math.floor(calcSecs(openR).work / 60) : 0)
+          if (weekMin > WK) {
+            markSent(wkKey)
+            const extraWeekMin = weekMin - WK
+            const _msg40h = `Llevas ${mhm(weekMin)} esta semana. ${mhm(extraWeekMin)} se consideran horas extra al superar las 40h.`
+            sendPush(u.id, '⚡ Semana de horas extra', _msg40h, 'jornada', '/?tab=inicio')
+            addBell('⚡ Semana de horas extra', _msg40h)
           }
         }
       }
@@ -956,7 +957,7 @@ export default function EmployeePage() {
     const currentRec = (db.records || []).find(r => r.empId === u.id && !r.fin)
     const siteLabel = currentRec?.centro || u.centroTrabajo || undefined
     const dateLabel = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
-    const extraMin = Math.max(0, weekMin - empWKmin)
+    const extraMin = Math.max(0, weekMin - WK)
     const overtimeLabel = extraMin > 0 ? `+${Math.floor(extraMin / 60)}h ${p2(extraMin % 60)}m extra esta semana` : undefined
 
     return {
