@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from './store/appStore.js'
 import { ToastContainer } from './components/Toast.jsx'
 import PrivacyModal from './components/PrivacyModal.jsx'
-import { applyBrandColor } from './utils/webauthn.js'
 import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
 import { parseNavigationTarget, resolveEmployeeNotificationDestination } from './utils/notificationNavigation.js'
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
@@ -325,13 +324,7 @@ export default function App() {
   const initTableRealtime  = useAppStore(s => s.initTableRealtime)
   const stopTableRealtime  = useAppStore(s => s.stopTableRealtime)
   const initPresence       = useAppStore(s => s.initPresence)
-  const primaryColor   = useAppStore(s => s.db?.config?.primaryColor)
   const toast          = useAppStore(s => s.toast)
-
-  // Aplicar color de marca globalmente en cuanto carga (afecta login, empleado y admin)
-  useEffect(() => {
-    if (primaryColor) applyBrandColor(primaryColor)
-  }, [primaryColor])
 
   // Aviso cuando el servidor reconcilia datos de otro usuario con los nuestros
   useEffect(() => {

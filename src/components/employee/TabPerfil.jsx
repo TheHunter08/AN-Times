@@ -1,7 +1,6 @@
 ﻿import { useMemo, useCallback } from 'react'
 import { vacData, p2, calcMin, mhm, today, localDateStr } from '../../utils/time.js'
 import { calcStreak } from '../../utils/streaks.js'
-import { applyBrandColor } from '../../utils/webauthn.js'
 import TabGastos from '../TabGastos.jsx'
 import TabDenuncia from '../TabDenuncia.jsx'
 import { PullToRefresh } from './PullToRefresh.jsx'
@@ -64,12 +63,6 @@ function MenuRow({ icon, iconBg, label, sub, badge, badgeColor, onClick }) {
 
 export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, perfilView = 'perfil', setPerfilView }) {
   const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
-
-  const saveAccentColor = useCallback((color) => {
-    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, accentColor: color || undefined } : e)
-    saveDB({ employees: emps2 })
-    if (color) applyBrandColor(color)
-  }, [db.employees, u.id, saveDB])
 
   const saveReminderTime = useCallback((time) => {
     const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e)
@@ -300,13 +293,6 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
 
         {/* ── Section: Personalización ──────────────────────── */}
         <SectionCard title="Personalización">
-          <MenuRow
-            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent-400)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>}
-            iconBg={toneSoft('var(--accent-400)', 13)}
-            label="Temas y colores"
-            onClick={() => openModal('temas')}
-          />
-          <RowDivider />
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.secondary.base} strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>}
             iconBg={colors.secondary.dim}

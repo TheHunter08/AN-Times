@@ -10,7 +10,6 @@ import { VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
 import { shouldIgnoreAppGesture } from '../utils/gesture.js'
-import { applyBrandColor, removeBrandColor } from '../utils/webauthn.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
@@ -34,7 +33,6 @@ const ModalConfiguracion = lazyNamed(() => import('../components/employee/ModalC
 const ModalCierreSign = lazyNamed(() => import('../components/employee/ModalCierreSign.jsx'), 'ModalCierreSign')
 const Confetti = lazyNamed(() => import('../components/employee/Confetti.jsx'), 'Confetti')
 const ModalLogros = lazyNamed(() => import('../components/employee/ModalLogros.jsx'), 'ModalLogros')
-const ModalTemas = lazyNamed(() => import('../components/employee/ModalTemas.jsx'), 'ModalTemas')
 const WelcomeSlides = lazyNamed(() => import('../components/employee/WelcomeSlides.jsx'), 'WelcomeSlides')
 const OnboardingModal = lazyNamed(() => import('../components/employee/OnboardingModal.jsx'), 'OnboardingModal')
 const ModalChat = lazyNamed(() => import('../components/employee/ModalChat.jsx'), 'ModalChat')
@@ -171,12 +169,6 @@ export default function EmployeePage() {
     const id = setInterval(check, 60_000)
     return () => clearInterval(id)
   }, [u?.reminderTime, u?.id])
-
-  // Color de acento personal del empleado (override brand color when logged in)
-  useEffect(() => {
-    if (u?.accentColor) applyBrandColor(u.accentColor)
-    return () => { if (typeof removeBrandColor === 'function') removeBrandColor() }
-  }, [u?.accentColor])
 
   // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
   useEffect(() => {
@@ -867,21 +859,6 @@ export default function EmployeePage() {
     })
   }
 
-  // Company theme: apply --primary from db config if set
-  useEffect(() => {
-    const color = db.config?.primaryColor
-    if (color) {
-      document.documentElement.style.setProperty('--primary', color)
-      document.documentElement.style.setProperty('--primary-glow', color + '30')
-      document.documentElement.style.setProperty('--primary-dim', color + '22')
-    }
-    return () => {
-      document.documentElement.style.removeProperty('--primary')
-      document.documentElement.style.removeProperty('--primary-glow')
-      document.documentElement.style.removeProperty('--primary-dim')
-    }
-  }, [db.config?.primaryColor])
-
   if (!u) return null
 
   const initials = useMemo(
@@ -1069,7 +1046,6 @@ export default function EmployeePage() {
       {activeModal === 'documentos' && <ModalDocumentos visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'configuracion' && <ModalConfiguracion visible u={u} db={db} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'logros' && <ModalLogros visible db={db} u={u} onClose={closeModal} saveDB={saveDB} />}
-      {activeModal === 'temas' && <ModalTemas visible db={db} u={u} onClose={closeModal} saveDB={saveDB} />}
       {activeModal === 'cierreSign' && <ModalCierreSign visible db={db} u={u} onClose={closeModal} toast={toast} saveDB={saveDB} />}
       {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}

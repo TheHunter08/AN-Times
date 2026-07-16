@@ -26,13 +26,11 @@ interface OperationsProps {
   authTotal: number
   schedules: ReportSchedule[]
   visibleWidgets: string[]
-  brandColor: string
   onSync: () => Promise<void>
   onSaveSchedule: (schedule: ReportSchedule) => void
   onToggleSchedule: (id: string) => void
   onDeleteSchedule: (id: string) => void
   onChangeWidgets: (ids: string[]) => void
-  onChangeBrandColor: (color: string) => void
   onNavigate: (page: string) => void
 }
 
@@ -145,7 +143,6 @@ export function Operations(props: OperationsProps) {
               return <label key={widget.id}><input type="checkbox" checked={checked} onChange={() => props.onChangeWidgets(checked ? props.visibleWidgets.filter(id => id !== widget.id) : [...props.visibleWidgets, widget.id])} /> <span>{widget.label}</span>{checked && <span className="ti-operations__order"><button type="button" aria-label={`Subir ${widget.label}`} disabled={index === 0} onClick={event => { event.preventDefault(); moveWidget(widget.id, -1) }}>↑</button><button type="button" aria-label={`Bajar ${widget.label}`} disabled={index === props.visibleWidgets.length - 1} onClick={event => { event.preventDefault(); moveWidget(widget.id, 1) }}>↓</button></span>}</label>
             })}
           </div>
-          <div className="ti-operations__brand"><div><strong>Color de marca compartido</strong><span>Se aplicará a empleado y administración</span></div><input type="color" value={props.brandColor} onChange={event => props.onChangeBrandColor(event.target.value)} aria-label="Color de marca" /></div>
         </Card>
 
         <Card>

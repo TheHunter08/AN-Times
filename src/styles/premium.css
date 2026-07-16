@@ -16,6 +16,13 @@
   --premium-shadow:0 24px 70px rgba(0,0,0,.32);
   --premium-shadow-soft:0 10px 30px rgba(0,0,0,.20);
 
+  /* Marca canónica: estable desde el primer render, sin overrides remotos. */
+  --primary:var(--premium-brand) !important;
+  --primary-light:var(--premium-brand-soft) !important;
+  --primary-dim:rgba(124,58,237,.15) !important;
+  --primary-glow:rgba(124,58,237,.28) !important;
+  --grad-primary:linear-gradient(135deg,#8b5cf6 0%,#7c3aed 52%,#5b21b6 100%) !important;
+
   /* ui-v2 + UI clásica comparten desde aquí la misma marca. */
   --uiv2-primary-base:var(--premium-brand);
   --uiv2-primary-light:var(--premium-brand-soft);
@@ -47,6 +54,10 @@
   --premium-line-strong:rgba(109,40,217,.24);
   --premium-shadow:0 24px 70px rgba(50,35,85,.12);
   --premium-shadow-soft:0 10px 30px rgba(50,35,85,.08);
+  --primary:#6d28d9 !important;
+  --primary-light:#7c3aed !important;
+  --primary-dim:rgba(109,40,217,.10) !important;
+  --primary-glow:rgba(109,40,217,.17) !important;
   --uiv2-primary-base:#6d28d9;
   --uiv2-primary-light:#7c3aed;
   --uiv2-primary-dim:rgba(109,40,217,.10);
@@ -204,11 +215,6 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__order { display:flex; gap:3px; }
 .ti-operations__order button { width:27px; height:27px; border:1px solid var(--premium-line); border-radius:7px; background:var(--uiv2-bg-500); color:var(--uiv2-text-700); cursor:pointer; }
 .ti-operations__order button:disabled { opacity:.3; cursor:default; }
-.ti-operations__brand { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; padding-top:12px; border-top:1px solid var(--premium-line); }
-.ti-operations__brand > div { display:flex; flex-direction:column; gap:3px; }
-.ti-operations__brand strong { color:var(--uiv2-text-900); font-size:12px; }
-.ti-operations__brand span { color:var(--uiv2-text-500); font-size:10.5px; }
-.ti-operations__brand input { width:44px; height:34px; padding:3px; border:1px solid var(--premium-line); border-radius:9px; background:var(--uiv2-bg-500); cursor:pointer; }
 .ti-operations__form { display:grid; gap:9px; }
 .ti-operations__form > div { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .ti-operations__schedules { display:flex; flex-direction:column; }

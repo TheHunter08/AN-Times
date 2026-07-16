@@ -9,7 +9,7 @@ test.describe('Acceso con PIN y email', () => {
   })
 
   test('muestra marca, modos y empleado', async ({ page }) => {
-    await expect(page.getByText('TIMES INC').first()).toBeVisible()
+    await expect(page.getByRole('main').getByText('TIMES INC', { exact:true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Email', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /Empleado$/ })).toBeVisible()
   })

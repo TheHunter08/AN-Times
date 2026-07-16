@@ -2059,7 +2059,6 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     authTotal={employees.length}
     schedules={schedules}
     visibleWidgets={visibleWidgets}
-    brandColor={db.config?.primaryColor || '#7C3AED'}
     onSync={onSync}
     onSaveSchedule={(schedule: any) => {
       updateConfig({ reportSchedules: [...schedules, schedule] })
@@ -2068,7 +2067,6 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     onToggleSchedule={(id: string) => updateConfig({ reportSchedules: schedules.map((schedule: any) => schedule.id === id ? { ...schedule, enabled: !schedule.enabled, _upd: new Date().toISOString() } : schedule) })}
     onDeleteSchedule={(id: string) => updateConfig({ reportSchedules: schedules.filter((schedule: any) => schedule.id !== id) })}
     onChangeWidgets={(ids: string[]) => updateConfig({ adminDashboard: { ...(db.config?.adminDashboard || {}), visibleWidgets: ids } })}
-    onChangeBrandColor={(color: string) => updateConfig({ primaryColor:color })}
     onNavigate={onNavigate}
   />
 }
