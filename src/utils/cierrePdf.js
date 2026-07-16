@@ -122,7 +122,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   const bytes = await pdfDoc.save()
   const dataUrl = 'data:application/pdf;base64,' + arrayBufferToBase64(bytes)
-  return { dataUrl, blob: new Blob([bytes], { type:'application/pdf' }) }
+  return { dataUrl, blob: new Blob([bytes], { type:'application/pdf' }), hash }
 }
 
 // PDF consolidado: horas de todos los empleados de un mes, con estado de firma.

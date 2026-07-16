@@ -54,13 +54,15 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
     const firmado = { ...selCierre, records_snapshot, totalMin, extraMin:Math.max(0, totalMin - WM), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
+    let integrityHash = null
     try {
-      const { dataUrl } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
+      const { dataUrl, hash } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
       pdfData = dataUrl
+      integrityHash = hash || null
     } catch (e) {
       console.warn('[cierre] No se pudo generar el PDF firmado:', e)
     }
-    const cierreFinal = pdfData ? { ...firmado, pdfData } : firmado
+    const cierreFinal = pdfData ? { ...firmado, pdfData, integrityHash } : firmado
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
     saveDB(fresh => ({
       cierres:(fresh.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci),
@@ -86,8 +88,15 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
             </div>
           )}
         </div>
-        <div style={{ fontSize:12, color:colors.text[500], marginBottom:14 }}>
+        <div style={{ fontSize:12, color:colors.text[500], marginBottom:4 }}>
           Generado por {selCierre.generadoPor} · {new Set(previewSnapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size} días trabajados · {mhm(previewTotalMin)}
+        </div>
+        <div style={{ fontSize:12, color: previewTotalMin > WM ? colors.primary.light : colors.text[500], marginBottom:14, fontWeight: previewTotalMin > WM ? 700 : 400 }}>
+          {previewTotalMin > WM
+            ? `${mhm(previewTotalMin - WM)} por encima de tu jornada mensual (${mhm(WM)})`
+            : previewTotalMin < WM
+              ? `${mhm(WM - previewTotalMin)} por debajo de tu jornada mensual (${mhm(WM)})`
+              : `Coincide exactamente con tu jornada mensual (${mhm(WM)})`}
         </div>
 
         {/* Records snapshot */}

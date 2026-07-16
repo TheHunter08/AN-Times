@@ -1211,7 +1211,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   }
 
   const handleExportInspection = async () => {
-    const employeesById = new Map((db.employees || []).map((employee: any) => [employee.id, employee]))
+    const employeesById = new Map<string, any>((db.employees || []).map((employee: any) => [employee.id, employee]))
     const cutoff = new Date(compliance.retentionCutoff).getTime()
     const retained = (db.records || [])
       .filter((record: any) => record.inicio && new Date(record.inicio).getTime() >= cutoff)
@@ -1233,6 +1233,10 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       }),
       '', 'RIESGOS DETECTADOS',
       ...compliance.risks.map((risk: any) => `${risk.label}: ${risk.count}`),
+      '', 'INTEGRIDAD DE CIERRES FIRMADOS (SHA-256)',
+      ...(db.cierres || [])
+        .filter((cierre: any) => cierre.integrityHash)
+        .map((cierre: any) => `${cierre.mes} · ${cierre.empName || employeesById.get(cierre.empId)?.name || cierre.empId}: ${cierre.integrityHash}`),
     ]
     await downloadSimplePdf('TIMES INC - Paquete de inspeccion', lines, `inspeccion-registro-horario-${today()}.pdf`)
     toast('Paquete de inspección generado', 3000, 'ok')
@@ -1533,6 +1537,7 @@ function MonthlyClosePage() {
           reopenCount: c.reopenCount || 0,
           lastReopenAt: c.lastReopenAt ? fmtDate(c.lastReopenAt) : null,
           lastReopenBy: c.lastReopenBy || null,
+          integrityHash: c.integrityHash || null,
         } as any
       })
   }, [db.cierres, db.employees, db.records])

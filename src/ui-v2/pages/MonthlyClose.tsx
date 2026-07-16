@@ -35,6 +35,7 @@ export interface ClosureItem {
   reopenCount?: number
   lastReopenAt?: string | null
   lastReopenBy?: string | null
+  integrityHash?: string | null
 }
 
 export interface MonthlyCloseProps {
@@ -390,6 +391,11 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               {!!detail.reopenCount && (
                 <div style={{ marginTop: 10, fontSize: 11, color: colors.semantic.orange }}>
                   Reabierto {detail.reopenCount} {detail.reopenCount === 1 ? 'vez' : 'veces'} — la última el {detail.lastReopenAt || '—'}{detail.lastReopenBy ? ` por ${detail.lastReopenBy}` : ''}.
+                </div>
+              )}
+              {detail.integrityHash && (
+                <div style={{ marginTop: 10, fontSize: 10.5, color: colors.text[500], wordBreak: 'break-all' }}>
+                  Integridad SHA-256 del PDF firmado: <span style={{ fontFamily: 'monospace', color: colors.text[700] }}>{detail.integrityHash}</span>
                 </div>
               )}
             </div>
