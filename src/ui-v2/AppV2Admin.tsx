@@ -23,7 +23,7 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
-import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs } from '../utils/time.js'
+import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs, vacData as vacDataUtil } from '../utils/time.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
@@ -53,6 +53,7 @@ const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ defa
 const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
 const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
 const Operations = lazy(() => import('./pages/Operations.js').then(module => ({ default: module.Operations })))
+const VacacionesPage = lazy(() => import('./pages/Vacaciones.js').then(module => ({ default: module.Vacaciones })))
 const ModalAI = lazy(() => import('../components/employee/ModalAI.jsx').then(module => ({ default: module.ModalAI })))
 
 function PageLoader() {
@@ -73,6 +74,7 @@ const PAGES = [
   { id: 'turnos',         label: 'Turnos',            group: 'Equipo', icon: <IconRows /> },
   { id: 'validar',        label: 'Validar horas',     group: 'Gestión', icon: <IconCheck /> },
   { id: 'solicitudes',    label: 'Solicitudes',       group: 'Gestión', icon: <IconClipboard /> },
+  { id: 'vacaciones',     label: 'Vacaciones',        group: 'Gestión', icon: <IconCalendar /> },
   { id: 'gastos',         label: 'Gastos',            group: 'Gestión', icon: <IconReceipt /> },
   { id: 'obras',          label: 'Obras',             group: 'Gestión', icon: <IconBuilding /> },
   { id: 'centros',        label: 'Centros de trabajo',group: 'Gestión', icon: <IconMapPin /> },
@@ -435,6 +437,102 @@ function useRequestsActions() {
   }))
   const rows = [...correctionRows, ...vacationRows]
   return { rows, approve, reject }
+}
+
+// ─── VacacionesAdminPage ───────────────────────────────────────────────────────
+
+function VacacionesAdminPage() {
+  const db      = useAppStore(s => s.db) as any
+  const saveDB  = useAppStore(s => s.saveDB)
+  const session = useAppStore(s => s.session)
+  const toast   = useAppStore(s => s.toast)
+
+  const emps = (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin)
+
+  const employees = emps.map((e: any) => {
+    const vd = vacDataUtil(e.id, db)
+    return { id: e.id, name: e.name || '', generated: vd.generated, used: vd.used, pending: vd.pending, available: vd.available, extra: vd.extra, months: vd.months }
+  })
+
+  const requests = [...(db.vacaciones || [])]
+    .filter((v: any) => !v.tipo || v.tipo === 'vacaciones' || !v.tipo)
+    .sort((a: any, b: any) => String(b.ts || '').localeCompare(String(a.ts || '')))
+    .map((v: any) => ({
+      id: v.id, empId: v.empId || '', empName: v.empName || '—',
+      fechaInicio: v.fechaInicio || '', fechaFin: v.fechaFin || '',
+      dias: v.dias || 0, estado: v.estado as 'pendiente' | 'aprobada' | 'rechazada',
+      motivo: v.motivo, motivoRechazo: v.motivoRechazo,
+    }))
+
+  const onAdjust = (empId: string, extra: number) => {
+    saveDB((fresh: any) => ({
+      employees: (fresh.employees || []).map((e: any) =>
+        e.id === empId ? { ...e, vacacionesExtra: extra } : e
+      ),
+    }))
+    const emp = emps.find((e: any) => e.id === empId)
+    if (emp) queuePush(empId, 'Saldo de vacaciones actualizado', `Tu administrador ha ajustado tu saldo de vacaciones.`, 'vacaciones', '/?go=emp:vacaciones')
+    toast('Ajuste guardado', 2500, 'ok')
+  }
+
+  const onAssign = (empId: string, fechaInicio: string, fechaFin: string, motivo: string) => {
+    const emp = emps.find((e: any) => e.id === empId)
+    if (!emp) return
+    const dias = Math.max(1, Math.round((new Date(fechaFin + 'T00:00:00').getTime() - new Date(fechaInicio + 'T00:00:00').getTime()) / 86400000) + 1)
+    const who = session?.user?.name || 'Admin'
+    const nowIso = new Date().toISOString()
+    const vac = { id: gid(), empId, empName: emp.name, fechaInicio, fechaFin, dias, motivo: motivo || 'Vacaciones', estado: 'aprobada', ts: nowIso, _upd: nowIso, asignadoPor: who }
+    saveDB((fresh: any) => {
+      const noti = { id: gid(), empId, action: 'Vacaciones asignadas', detail: `${fechaInicio} → ${fechaFin}`, ts: nowIso, leido: false }
+      const withAudit = auditLog(fresh, 'vacaciones_asignadas', `${emp.name}: ${fechaInicio}–${fechaFin}`, who)
+      return { vacaciones: [...(fresh.vacaciones || []), vac], notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
+    })
+    queuePush(empId, 'Vacaciones asignadas', `${fechaInicio} → ${fechaFin}`, 'vacaciones', '/?go=emp:vacaciones')
+    toast('Vacaciones asignadas y aprobadas', 3000, 'ok')
+  }
+
+  const onApprove = (id: string) => {
+    const vac = (db.vacaciones || []).find((v: any) => v.id === id)
+    if (!vac) return
+    const nowIso = new Date().toISOString()
+    saveDB((fresh: any) => {
+      const updated = (fresh.vacaciones || []).map((v: any) =>
+        v.id === id ? { ...v, estado: 'aprobada', resolvedAt: nowIso, _upd: nowIso } : v
+      )
+      const withAudit = auditLog(fresh, 'Solicitud aprobada', vac.empName || '', session?.user?.name || 'Admin')
+      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones aprobadas', detail: '', ts: nowIso, leido: false }
+      return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
+    })
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones')
+    toast('Solicitud aprobada', 3000, 'ok')
+  }
+
+  const onReject = (id: string, motivoRechazo: string) => {
+    const vac = (db.vacaciones || []).find((v: any) => v.id === id)
+    if (!vac) return
+    const nowIso = new Date().toISOString()
+    saveDB((fresh: any) => {
+      const updated = (fresh.vacaciones || []).map((v: any) =>
+        v.id === id ? { ...v, estado: 'rechazada', motivoRechazo: motivoRechazo || '', resolvedAt: nowIso, _upd: nowIso } : v
+      )
+      const withAudit = auditLog(fresh, 'Solicitud rechazada', vac.empName || '', session?.user?.name || 'Admin')
+      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones rechazadas', detail: motivoRechazo || '', ts: nowIso, leido: false }
+      return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
+    })
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', motivoRechazo || '', 'vacaciones', '/?go=emp:vacaciones')
+    toast('Solicitud rechazada', 3000, 'warn')
+  }
+
+  const onDelete = (id: string) => {
+    saveDB((fresh: any) => ({ vacaciones: (fresh.vacaciones || []).filter((v: any) => v.id !== id) }))
+    toast('Solicitud eliminada', 2500, 'warn')
+  }
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <VacacionesPage employees={employees} requests={requests} onAdjust={onAdjust} onAssign={onAssign} onApprove={onApprove} onReject={onReject} onDelete={onDelete} />
+    </Suspense>
+  )
 }
 
 function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
@@ -2379,10 +2477,12 @@ export default function AppV2Admin() {
       + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length,
     pendingExpenses: (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length,
   }), [db.records, db.vacaciones, db.correccionesFichaje, db.gastos])
+  const pendingVac = (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
   const navBadges: Record<string, number> = {
     pendientes: pendingHours + pendingRequests + pendingExpenses,
     validar: pendingHours,
     solicitudes: pendingRequests,
+    vacaciones: pendingVac,
     gastos: pendingExpenses,
     notificaciones: unreadCount,
   }
@@ -2457,6 +2557,7 @@ export default function AppV2Admin() {
     if (page === 'turnos')         return <ShiftsPage onOpenEmployee={goToFichajes} />
     if (page === 'validar')        return <ValidateHoursPage />
     if (page === 'solicitudes')    return <RequestsPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
+    if (page === 'vacaciones')     return <VacacionesAdminPage />
     if (page === 'gastos')         return <ExpensesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
     if (page === 'documentos')     return <DocumentsPage />
     if (page === 'estadisticas')   return <StatsPage onNavigate={setAdminPage} />
