@@ -16,4 +16,7 @@ jobs:
         with:
           node-version: '20'
       - name: Archivar registros antiguos
+        env:
+          VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
+          VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
         run: node archive-records.js
