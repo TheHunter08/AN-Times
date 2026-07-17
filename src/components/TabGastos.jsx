@@ -125,7 +125,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
     background: 'var(--bg-700)',
     border: '1px solid rgba(255,255,255,.08)',
     borderRadius: '10px',
-    color: 'var(--text1)',
+    color: 'var(--text)',
     fontSize: '.9rem',
     padding: '10px 12px',
     outline: 'none',
@@ -150,7 +150,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
       )}
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text1)', fontWeight: 700 }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text)', fontWeight: 700 }}>
           Mis gastos
         </h3>
         <button
@@ -337,7 +337,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <span
                     style={{
-                      color: 'var(--text1)',
+                      color: 'var(--text)',
                       fontWeight: 600,
                       fontSize: '.95rem',
                       overflow: 'hidden',
@@ -349,7 +349,7 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
                   </span>
                   <span
                     style={{
-                      color: 'var(--text1)',
+                      color: 'var(--text)',
                       fontWeight: 700,
                       fontSize: '1rem',
                       flexShrink: 0,

@@ -75,7 +75,7 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
             margin: '0 0 6px',
             fontSize: '1.25rem',
             fontWeight: 700,
-            color: 'var(--text1)',
+            color: 'var(--text)',
             textAlign: 'center',
           }}
         >
@@ -152,7 +152,7 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
             background: 'var(--bg-700)',
             border: '1px solid rgba(255,255,255,.08)',
             borderRadius: '10px',
-            color: 'var(--text1)',
+            color: 'var(--text)',
             fontSize: '.9rem',
             padding: '10px 12px',
             resize: 'none',

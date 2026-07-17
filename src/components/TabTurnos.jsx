@@ -111,7 +111,7 @@ export default function TabTurnos({ db, u }) {
                   }}
                 >
                   <div>
-                    <span style={{ color: 'var(--text1)', fontWeight: 600, fontSize: '.95rem' }}>
+                    <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '.95rem' }}>
                       {DAY_NAMES_FULL[d.getDay()]}
                     </span>
                     <span style={{ color: 'var(--text3)', fontSize: '.85rem', marginLeft: '8px' }}>
@@ -133,7 +133,7 @@ export default function TabTurnos({ db, u }) {
                       </span>
                     )}
                   </div>
-                  <span style={{ color: 'var(--text1)', fontSize: '.9rem', fontWeight: 500 }}>
+                  <span style={{ color: 'var(--text)', fontSize: '.9rem', fontWeight: 500 }}>
                     {t.horaInicio} → {t.horaFin}
                   </span>
                 </div>
@@ -158,7 +158,7 @@ export default function TabTurnos({ db, u }) {
             background: 'var(--bg-800)',
             border: 'none',
             borderRadius: '8px',
-            color: 'var(--text1)',
+            color: 'var(--text)',
             width: '36px',
             height: '36px',
             fontSize: '1.1rem',
@@ -179,7 +179,7 @@ export default function TabTurnos({ db, u }) {
             background: 'var(--bg-800)',
             border: 'none',
             borderRadius: '8px',
-            color: 'var(--text1)',
+            color: 'var(--text)',
             width: '36px',
             height: '36px',
             fontSize: '1.1rem',
@@ -232,14 +232,14 @@ export default function TabTurnos({ db, u }) {
                   <span style={{ fontSize: '.6rem', color: isToday ? '#fff' : 'var(--text3)', lineHeight: 1 }}>
                     {DAY_NAMES[day.getDay()]}
                   </span>
-                  <span style={{ fontSize: '.85rem', color: isToday ? '#fff' : 'var(--text1)', fontWeight: 700, lineHeight: 1 }}>
+                  <span style={{ fontSize: '.85rem', color: isToday ? '#fff' : 'var(--text)', fontWeight: 700, lineHeight: 1 }}>
                     {day.getDate()}
                   </span>
                 </div>
                 <div>
                   {turno ? (
                     <>
-                      <div style={{ color: 'var(--text1)', fontWeight: 600, fontSize: '.9rem' }}>
+                      <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: '.9rem' }}>
                         {turno.horaInicio} → {turno.horaFin}
                       </div>
                       {turno.notas && (

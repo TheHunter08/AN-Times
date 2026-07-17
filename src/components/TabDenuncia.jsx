@@ -35,7 +35,7 @@ const inputStyle = {
   background: 'var(--bg-700)',
   border: '1px solid rgba(255,255,255,.08)',
   borderRadius: '10px',
-  color: 'var(--text1)',
+  color: 'var(--text)',
   fontSize: '.9rem',
   padding: '10px 12px',
   outline: 'none',
@@ -131,7 +131,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
           <span style={{ fontSize: '1.4rem' }}>🔒</span>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text1)' }}>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
             Canal de denuncias anónimo
           </h2>
         </div>
@@ -171,7 +171,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
           }}
         >
           <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✅</div>
-          <p style={{ margin: '0 0 12px', color: 'var(--text1)', fontWeight: 600, fontSize: '.95rem' }}>
+          <p style={{ margin: '0 0 12px', color: 'var(--text)', fontWeight: 600, fontSize: '.95rem' }}>
             Denuncia enviada correctamente
           </p>
           <p style={{ margin: '0 0 8px', color: 'var(--text3)', fontSize: '.82rem' }}>
@@ -227,7 +227,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
             gap: '14px',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '.95rem', color: 'var(--text1)', fontWeight: 700 }}>
+          <h3 style={{ margin: 0, fontSize: '.95rem', color: 'var(--text)', fontWeight: 700 }}>
             Nueva denuncia
           </h3>
 
@@ -306,7 +306,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
           padding: '16px',
         }}
       >
-        <h3 style={{ margin: '0 0 4px', fontSize: '.95rem', color: 'var(--text1)', fontWeight: 700 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '.95rem', color: 'var(--text)', fontWeight: 700 }}>
           Consultar estado
         </h3>
         <p style={{ margin: '0 0 12px', color: 'var(--text3)', fontSize: '.82rem' }}>
@@ -368,7 +368,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: 'var(--text3)', fontSize: '.82rem' }}>
-                  Código: <strong style={{ color: 'var(--text1)', fontFamily: 'monospace' }}>{trackResult.anonId}</strong>
+                  Código: <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{trackResult.anonId}</strong>
                 </span>
                 <span
                   style={{
@@ -384,7 +384,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
                 </span>
               </div>
               <p style={{ margin: '0 0 6px', color: 'var(--text3)', fontSize: '.78rem' }}>
-                Tipo: <span style={{ color: 'var(--text1)', textTransform: 'capitalize' }}>{trackResult.tipo}</span>
+                Tipo: <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>{trackResult.tipo}</span>
               </p>
               <p style={{ margin: '0 0 6px', color: 'var(--text3)', fontSize: '.78rem' }}>
                 Enviada: {new Date(trackResult.ts).toLocaleDateString('es')}
@@ -402,7 +402,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
                   <p style={{ margin: '0 0 4px', fontSize: '.78rem', color: 'var(--primary-light)', fontWeight: 600 }}>
                     Respuesta del equipo:
                   </p>
-                  <p style={{ margin: 0, fontSize: '.88rem', color: 'var(--text1)' }}>
+                  <p style={{ margin: 0, fontSize: '.88rem', color: 'var(--text)' }}>
                     {trackResult.respuesta}
                   </p>
                 </div>
