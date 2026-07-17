@@ -2167,7 +2167,13 @@ function MessagesPage() {
   const session = useAppStore(s => s.session)
   const saveDB  = useAppStore(s => s.saveDB)
 
-  const adminId = session?.user?.id || 'admin'
+  // Identidad fija del canal "administración" en el chat — NUNCA el id real
+  // de sesión. Un jefe de obra o encargado inicia sesión con isAdmin=true
+  // pero session.user.id es su propio id de empleado; si se usara ese id
+  // aquí, el mensaje se guardaría con un `from` distinto de 'admin' y el
+  // empleado nunca lo vería (ModalChat.jsx/TabMensajes.jsx/EmployeePage.jsx
+  // solo escuchan mensajes de/hacia el literal 'admin').
+  const adminId = 'admin'
   const adminName = session?.user?.name || 'Admin'
   const chats: any[] = db.chats || []
   const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
