@@ -81,7 +81,7 @@ export function ModalParteVoz({ visible, db, autor, saveDB, toast, onClose }) {
 
   const guardar = () => {
     if (!preview) return
-    saveDB({ partesTrabajo: [...(db.partesTrabajo || []), preview] })
+    saveDB(fresh => ({ partesTrabajo: [...(fresh.partesTrabajo || []), preview] }))
     toast('✅ Parte de trabajo guardado', 3000, 'ok')
     setText(''); setPreview(null)
     onClose()

@@ -64,8 +64,9 @@ export function AchievementsSection({ myRecs, streak, u, saveDB, db }) {
         })
         localStorage.setItem(key, JSON.stringify([...unlocked]))
         if (saveDB && db && newOnes.length > 0) {
-          const emps = (db.employees || []).map(e => e.id === u.id ? { ...e, achievements: [...unlocked] } : e)
-          saveDB({ employees: emps })
+          saveDB(fresh => ({
+            employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, achievements: [...unlocked] } : e),
+          }))
         }
       }
     } catch {}

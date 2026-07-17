@@ -22,19 +22,18 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u, onNavigate 
   const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
   const markRead = () => {
-    const updated = (db.notis || []).map(n => n.empId === u?.id && !n.deleted ? { ...n, leido: true } : n)
-    saveDB({ notis: updated })
+    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.empId === u?.id && !n.deleted ? { ...n, leido: true } : n) }))
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   const delNoti = (id) => {
-    saveDB({ notis: (db.notis || []).map(n => n.id === id ? { ...n, deleted: true, leido: true } : n) })
+    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.id === id ? { ...n, deleted: true, leido: true } : n) }))
   }
   const openNoti = (item) => {
-    if (item?.id) saveDB({ notis: (db.notis || []).map(n => n.id === item.id ? { ...n, leido: true } : n) })
+    if (item?.id) saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.id === item.id ? { ...n, leido: true } : n) }))
     onNavigate?.(item)
   }
   const clearAll = () => {
-    saveDB({ notis: (db.notis || []).map(n => n.empId === u?.id ? { ...n, deleted: true, leido: true } : n) })
+    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.empId === u?.id ? { ...n, deleted: true, leido: true } : n) }))
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   return (

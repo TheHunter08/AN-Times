@@ -35,9 +35,10 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
   const finish = () => {
     const signatureData = getSignatureData()
     const firma = signatureData ? { data: signatureData, ts: new Date().toISOString() } : null
-    const updatedEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e)
-    const updatedFirmas = firma ? { ...(db.firmas || {}), [u.id]: { main: firma } } : (db.firmas || {})
-    saveDB({ employees: updatedEmps, firmas: updatedFirmas })
+    saveDB(fresh => ({
+      employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e),
+      firmas: firma ? { ...(fresh.firmas || {}), [u.id]: { main: firma } } : (fresh.firmas || {}),
+    }))
     try { localStorage.setItem('cfg_reminderTime', reminderTime) } catch {}
     setDone(true)
     toast('¡Configuración lista! Ya puedes usar la app.', 3000, 'ok')

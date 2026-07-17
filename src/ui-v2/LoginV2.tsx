@@ -186,15 +186,15 @@ export default function LoginV2() {
     if (opId !== opIdRef.current) return
 
     if (ok) {
-      const clearedLockouts = clearLockout(emp.id, db)
-      saveDB({ pinLockouts: clearedLockouts })
+      saveDB((fresh: any) => ({ pinLockouts: clearLockout(emp.id, fresh) }))
       // Migrar PIN plano → hash automáticamente
       if (!isPinHashed(emp.pin) || !emp.pinLen) {
         const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
-        const emps2 = (db.employees || []).map((e: any) =>
-          e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
-        )
-        useAppStore.getState().saveDB({ employees: emps2 })
+        useAppStore.getState().saveDB((fresh: any) => ({
+          employees: (fresh.employees || []).map((e: any) =>
+            e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
+          ),
+        }))
       }
       doLogin(emp)
       setPin('')
@@ -202,7 +202,7 @@ export default function LoginV2() {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
     } else {
       const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db) as any
-      if (lockoutData) saveDB({ pinLockouts: lockoutData })
+      if (lockoutData) saveDB((fresh: any) => ({ pinLockouts: recordFailedAttempt(emp.id, fresh).lockoutData }))
       setPinShaking(true)
       if (lk.locked) {
         const secs = lk.remainingSecs || 0

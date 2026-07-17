@@ -31,8 +31,10 @@ export function ModalSign({ visible, db, u, onClose, toast, saveDB }) {
     const data = getSignatureData()
     if (!data) { toast('Dibuja tu firma antes de guardar'); return }
     if (data.length > 200000) { toast('Firma muy grande, simplifica los trazos'); return }
-    const firmas = { ...(db.firmas || {}), [u.id]: { ...(db.firmas?.[u.id] || {}), main: { data, updatedAt: new Date().toISOString(), empName: u.name } } }
-    saveDB({ firmas })
+    const updatedAt = new Date().toISOString()
+    saveDB(fresh => ({
+      firmas: { ...(fresh.firmas || {}), [u.id]: { ...(fresh.firmas?.[u.id] || {}), main: { data, updatedAt, empName: u.name } } },
+    }))
     toast('Firma guardada correctamente', 3000, 'ok')
     onClose()
   }

@@ -51,9 +51,10 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
     setCfg('notiFichaje', notiFichaje); setCfg('notiSalida', notiSalida)
     setCfg('gpsAuto', gpsAuto); setCfg('reminderTime', reminderTime)
     setCfg('salidaTime', salidaTime); setCfg('idioma', idioma); setCfg('formato', formato)
-    if (u?.id && saveDB && db) {
-      const updEmps = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime } : e)
-      saveDB({ employees: updEmps })
+    if (u?.id && saveDB) {
+      saveDB(fresh => ({
+        employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, reminderTime } : e),
+      }))
     }
     toast('Configuración guardada')
     onClose()

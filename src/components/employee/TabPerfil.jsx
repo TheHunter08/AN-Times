@@ -65,13 +65,14 @@ export function TabPerfil({ u, session, db, saveDB, toast, doLogout, openModal, 
   const myRecs = useMemo(() => (db.records || []).filter(r => r.empId === u.id && r.fin), [db.records, u.id])
 
   const saveReminderTime = useCallback((time) => {
-    const emps2 = (db.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e)
-    saveDB({ employees: emps2 })
+    saveDB(fresh => ({
+      employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, reminderTime: time || undefined } : e),
+    }))
     if (time && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
     toast(time ? `Recordatorio activado a las ${time}` : 'Recordatorio desactivado', 2500, 'ok')
-  }, [db.employees, u.id, saveDB, toast])
+  }, [u.id, saveDB, toast])
 
   if (perfilView === 'gastos')   return <TabGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
   if (perfilView === 'denuncia') return <TabDenuncia db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />

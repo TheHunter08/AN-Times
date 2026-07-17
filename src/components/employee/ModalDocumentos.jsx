@@ -55,13 +55,17 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
       console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
       toast('⚠️ No se pudo insertar la firma en el archivo, se guardó solo el registro')
     }
-    const updated = (db.documentos || []).map(d => d.id === doc.id ? {
-      ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
-    } : d)
-    const noti = { id: gid(), empId: '__admin__', action: 'Documento firmado', detail: `${u.name} firmó "${doc.titulo}"`, ts: firmadoAt, leido: false }
-    const withAudit = auditLog(db, 'Documento firmado', `${u.name}: "${doc.titulo}"`, u.name)
-    saveDB({ documentos: updated, notis: [...(db.notis || []), noti], audit: withAudit.audit })
-    queuePush('__admin__', noti.action, noti.detail, 'times-doc', '/?go=admin:documentos')
+    const notiAction = 'Documento firmado'
+    const notiDetail = `${u.name} firmó "${doc.titulo}"`
+    saveDB(fresh => {
+      const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
+        ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
+      } : d)
+      const noti = { id: gid(), empId: '__admin__', action: notiAction, detail: notiDetail, ts: firmadoAt, leido: false }
+      const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
+      return { documentos: updated, notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
+    })
+    queuePush('__admin__', notiAction, notiDetail, 'times-doc', '/?go=admin:documentos')
     setStamping(false)
     toast('Documento firmado correctamente', 3000, 'ok')
     setSigning(null)

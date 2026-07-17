@@ -30,8 +30,9 @@ export function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
   if (!visible) return null
 
   const save = () => {
-    const updated = db.employees.map(e => e.id === u.id ? { ...e, name: nombre, email, tel } : e)
-    saveDB({ employees: updated })
+    saveDB(fresh => ({
+      employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, name: nombre, email, tel } : e),
+    }))
     toast('Datos actualizados')
     onClose()
   }
