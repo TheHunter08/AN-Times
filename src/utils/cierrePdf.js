@@ -118,7 +118,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   const hash = await sha256Hex(hashInput)
   if (hash) {
     page.drawText(pdfSafe(`SHA-256: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
-    page.drawText(pdfSafe(`Verificar en: https://an-times.vercel.app/api/verify-cierre?hash=${hash}`), { x: ML, y: 7, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
+    page.drawText(pdfSafe(`Verificar en: https://times-inc.vercel.app/api/verify-cierre?hash=${hash}`), { x: ML, y: 7, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
   }
 
   const bytes = await pdfDoc.save()
