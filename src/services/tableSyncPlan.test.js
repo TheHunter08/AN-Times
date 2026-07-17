@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTableSyncPlan, entityRowId, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
+import { buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -92,5 +92,19 @@ describe('plan de sincronización offline V2', () => {
     expect(plan.upserts.find(op => op.table === 'cierres').rows).toHaveLength(0)
     expect(plan.skipped.records).toBe(1)
     expect(plan.skipped.cierres).toBe(1)
+  })
+
+  it('persiste auth_id al vincular un empleado a su sesión de Supabase Auth', () => {
+    const row = toEmployeeRow({ id: 'e1', name: 'Ana', authId: '11111111-1111-4111-8111-111111111111' })
+    expect(row.auth_id).toBe('11111111-1111-4111-8111-111111111111')
+  })
+
+  it('no rompe empleados sin auth_id vinculado', () => {
+    expect(toEmployeeRow({ id: 'e1', name: 'Ana' }).auth_id).toBeNull()
+  })
+
+  it('conserva integrityHash del cierre dentro de data para la verificación pública', () => {
+    const row = toClosureRow({ id: 'c1', empId: 'e1', mes: '2026-06', integrityHash: 'abc123' })
+    expect(row.data.integrityHash).toBe('abc123')
   })
 })

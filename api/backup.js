@@ -1,5 +1,9 @@
-// Vercel Cron: backup semanal de app_data a Supabase Storage.
-// Corre los domingos a las 03:00 UTC (ver vercel.json).
+// Vercel Cron: backup diario de app_data a Supabase Storage.
+// Corre todos los días a las 03:00 UTC (ver vercel.json: "0 3 * * *").
+// El comentario decía "semanal / domingos" pero el cron real está configurado
+// a diario — se corrige aquí la documentación para que coincida con lo que
+// de verdad ejecuta Vercel (un backup diario da más puntos de recuperación
+// y el coste de almacenamiento de estos JSON es marginal).
 // Requiere:
 //   1. Bucket privado "backups" en Supabase Storage (Dashboard > Storage > New bucket)
 //   2. Opcional: SB_SERVICE_KEY para subir con service role y saltarse RLS en Storage.
