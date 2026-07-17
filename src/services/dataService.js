@@ -275,7 +275,12 @@ export function mergeDB(base, incoming) {
     partesTrabajo:       _unionById(base.partesTrabajo,       incoming.partesTrabajo,       'partesTrabajo'),
     anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           mergedNotisSent,
-    pinLockouts:         { ...(incoming.pinLockouts || {}), ...(base.pinLockouts || {}) },
+    // El servidor debe ganar por clave (igual que `config` justo debajo) — al
+    // revés, un bloqueo de PIN impuesto en un dispositivo se descartaba en
+    // cuanto otro dispositivo compartido (con una entrada local distinta para
+    // ese mismo empId) volvía a sincronizar, dejando fichar sin límite de
+    // intentos en ese segundo aparato.
+    pinLockouts:         { ...(base.pinLockouts || {}), ...(incoming.pinLockouts || {}) },
     config:              { ...(base.config || {}), ...(incoming.config || {}) },
     _ts:                 incoming._ts                  || 0
   }

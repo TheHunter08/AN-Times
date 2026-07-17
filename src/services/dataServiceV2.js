@@ -104,16 +104,18 @@ function fromVac(v) {
 function fromCierre(c) {
   // firma_emp se guarda como JSON string en la columna text
   const firmaObj = (() => { try { return c.firma_emp ? JSON.parse(c.firma_emp) : null } catch { return null } })()
+  // empName, dias, generadoPor y generadoAt no son columnas reales (ver
+  // toClosureRow) — se recuperan del blob `data`, ya incluido en el spread;
+  // no sobreescribir con `c.emp_name`/`c.dias`/etc, que al no existir la
+  // columna siempre serían `undefined` y borrarían el valor bueno del blob.
   return {
     ...(c.data ?? {}),
-    id: c.id, empId: c.emp_id, empName: c.emp_name ?? null, mes: c.mes,
+    id: c.id, empId: c.emp_id, mes: c.mes,
     totalMin: c.total_min ?? 0, extraMin: c.extra_min ?? 0,
-    dias: c.dias ?? null,
     estado: c.estado ?? 'pendiente',
     firma: firmaObj,          // campo canónico que usa la app
     firmaEmp: firmaObj,       // alias usado en algunos filtros
     firmaAdmin: c.firma_admin ?? null,
-    generadoPor: c.generado_por ?? null, generadoAt: c.generado_at ?? null,
     desactualizado: !!c.desactualizado, _upd: c.updated_at,
   }
 }
@@ -453,10 +455,13 @@ async function _upsertResilient(table, rows) {
     const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
     if (rowErr) {
       // Errores 22xxx/23xxx son datos legacy incompatibles (fecha inválida,
-      // NOT NULL, FK, UNIQUE...). Reintentarlos nunca los arreglará y mantener
-      // la cola PWA bloqueada impide subir incluso fichajes perfectamente
-      // válidos. El blob principal conserva la fila para no perder información.
-      if (/^(22|23)/.test(rowErr.code || '')) {
+      // NOT NULL, FK, UNIQUE...); 42xxx son de sintaxis/permisos (columna
+      // inexistente, RLS denegando la fila — p.ej. si algún día se activa
+      // policies_auth.sql y una fila no cumple la política). Ninguno de los
+      // tres se arregla reintentando, y mantener la cola PWA bloqueada
+      // impide subir incluso fichajes perfectamente válidos. El blob
+      // principal conserva la fila para no perder información.
+      if (/^(22|23|42)/.test(rowErr.code || '')) {
         quarantined.push(row)
         console.warn(`[v2] ${table} row ${row.id} quarantined:`, rowErr.message)
       } else {
@@ -470,13 +475,20 @@ async function _upsertResilient(table, rows) {
   return { quarantined }
 }
 
+// Solo se cachea el resultado POSITIVO para siempre (una vez desplegada, la
+// tabla no desaparece). Un error puntual (blip de red durante la primera
+// comprobación) ya NO se fija en `false` de por vida para el resto de la
+// sesión — sin esto, un solo fallo transitorio al arrancar apagaba la
+// sincronización de medicos/gastos/denuncias/wellbeing/turnos/chats/config/
+// pinLockouts hacia la tabla normalizada durante toda la sesión, sin ningún
+// aviso salvo un console.info que nadie ve.
 let _entitiesTableAvailable = null
 async function hasEntitiesTable() {
-  if (_entitiesTableAvailable !== null) return _entitiesTableAvailable
+  if (_entitiesTableAvailable === true) return true
   const { error } = await supabase.from('app_entities').select('id').limit(1)
-  _entitiesTableAvailable = !error
-  if (error) console.info('[v2] app_entities aún no está desplegada; se mantiene app_data como respaldo')
-  return _entitiesTableAvailable
+  if (!error) { _entitiesTableAvailable = true; return true }
+  console.info('[v2] app_entities no disponible (aún no desplegada o error transitorio); se mantiene app_data como respaldo:', error.message)
+  return false
 }
 
 // Escribe en las tablas lo que acaba de cambiar en el blob.

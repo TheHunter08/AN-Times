@@ -278,12 +278,12 @@ function CentrosPage() {
     const name = newName.trim()
     if (!name) return
     if (centros.includes(name)) { toast('Ya existe ese centro', 2000, 'warn'); return }
-    saveDB(() => ({ centrosTrabajo: [...centros, name] }))
+    saveDB((fresh: any) => ({ centrosTrabajo: [...(fresh.centrosTrabajo || fresh.config?.centros || []), name] }))
     setNewName('')
     toast('Centro creado', 2000, 'ok')
   }
   const removeCentro = (c: string) => {
-    saveDB(() => ({ centrosTrabajo: centros.filter((x: string) => x !== c) }))
+    saveDB((fresh: any) => ({ centrosTrabajo: (fresh.centrosTrabajo || fresh.config?.centros || []).filter((x: string) => x !== c) }))
     toast('Centro eliminado', 2000, 'ok')
   }
 
@@ -1312,9 +1312,12 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const headers = ['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)', 'Modificado', 'Historial de cambios']
     const rows = recs.map((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
-      const mins = recWorkSecs(r) / 60
+      // recWorkSecs ya descuenta el descanso del tiempo trabajado (calcSecs:
+      // work = transcurrido - descanso) — restar brk aquí otra vez descontaba
+      // la pausa dos veces, mostrando menos horas trabajadas de las reales
+      // (y horas negativas en turnos cortos con más pausa que trabajo neto).
       const brk = Math.round((r.breakSecs || 0) / 60)
-      const worked = Math.round(mins - brk)
+      const worked = Math.round(recWorkSecs(r) / 60)
       // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
       // guarda en UTC — un fichaje nocturno mostraba la fecha del día siguiente.
       return [
@@ -1555,17 +1558,33 @@ function PendingCenterPage({ onNavigate }: { onNavigate: (page: string) => void 
   const lastSyncTime = useAppStore(s => s.lastSyncTime)
   const now = Date.now()
   const openTooLong = (db.records || []).filter((r:any) => !r.fin && r.inicio && now - new Date(r.inicio).getTime() > 10 * 3600000).length
-  const pendingHours = (db.records || []).filter((r:any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length
+  // Misma ventana (14 días + tope de 60 filas) que ValidateHoursPage — igual
+  // que se arregló para la insignia de la barra lateral: sin esto, esta
+  // tarjeta contaba pendientes que ni aparecen en "Validar horas".
+  const pendingHours = (db.records || [])
+    .filter((r:any) => r.fin && r.inicio && daysDiff(r.inicio) <= 14)
+    .sort((a:any, b:any) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
+    .slice(0, 60)
+    .filter((r:any) => !r.aceptada && !r.validado && !r.rechazado).length
   const pendingVacations = (db.vacaciones || []).filter((v:any) => v.estado === 'pendiente').length
   const pendingExpenses = (db.gastos || []).filter((g:any) => g.estado === 'pendiente').length
-  const pendingDocuments = (db.documentos || []).filter((d:any) => !d.firma).length
+  // Los documentos no tienen ningún campo `firma` ni funcionalidad de firma
+  // (eso solo existe para `cierres`) — `!d.firma` era siempre true para
+  // cualquier documento, así que esta tarjeta mostraba el total de
+  // documentos, no algo que requiera atención. "A revisar" (caducan en
+  // ≤30 días) es la misma métrica ya usada en la campana de notificaciones.
+  const pendingDocuments = (db.documentos || []).filter((d: any) => {
+    if (!d.expiresOn) return false
+    const days = (new Date(`${d.expiresOn}T23:59:59`).getTime() - Date.now()) / 86400000
+    return days <= 30
+  }).length
   const pendingClosures = (db.cierres || []).filter((c:any) => !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
   const cards = [
     { label:'Jornadas abiertas +10h', value:openTooLong, page:'en_linea', tone:colors.semantic.red },
     { label:'Horas por validar', value:pendingHours, page:'validar', tone:colors.semantic.orange },
     { label:'Vacaciones pendientes', value:pendingVacations, page:'solicitudes', tone:colors.primary.light },
     { label:'Gastos pendientes', value:pendingExpenses, page:'gastos', tone:colors.semantic.orange },
-    { label:'Documentos sin firma', value:pendingDocuments, page:'documentos', tone:colors.accent.base },
+    { label:'Documentos a revisar', value:pendingDocuments, page:'documentos', tone:colors.accent.base },
     { label:'Cierres sin completar', value:pendingClosures, page:'cierre', tone:colors.text[700] },
   ]
   const exportBackup = () => {
@@ -2317,19 +2336,30 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
       })
     if (!closedRecords.length) return
 
-    try { await Promise.all(closedRecords.map((r: any) => persistRecordRow(r))) } catch (error: any) {
-      toast(`No se pudieron finalizar todas las jornadas: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
-      return
-    }
+    // Promise.allSettled (no Promise.all): con .all, si UNA sola escritura
+    // fallaba, la función salía sin llamar a saveDB — así que las que sí se
+    // habían guardado en Supabase con éxito se quedaban desactualizadas en
+    // el estado local (seguían viéndose "en curso" hasta el siguiente
+    // fetchDB completo). Ahora cada jornada se confirma en local solo si su
+    // propia escritura tuvo éxito, igual que el patrón ya usado en
+    // ValidateHoursPage.handleBulkDecision.
+    const results = await Promise.allSettled(closedRecords.map((r: any) => persistRecordRow(r)))
+    const successfulRecords = closedRecords.filter((_: any, i: number) => results[i].status === 'fulfilled')
+    if (!successfulRecords.length) { toast('No se pudo finalizar ninguna jornada', 4000, 'warn'); return }
 
-    const closedById = new Map(closedRecords.map((r: any) => [r.id, r]))
+    const closedById = new Map(successfulRecords.map((r: any) => [r.id, r]))
     saveDB((fresh:any) => {
       const records = (fresh.records || []).map((record:any) => closedById.get(record.id) || record)
       const next = { ...fresh, records }
-      return auditLog(next, 'Jornadas finalizadas en lote', `${selectedRows.length} empleados · ${reason}`, actor)
+      return auditLog(next, 'Jornadas finalizadas en lote', `${successfulRecords.length} empleados · ${reason}`, actor)
     })
-    selectedRows.forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
-    toast(`${closedRecords.length} jornadas finalizadas`, 3000, 'ok')
+    const successfulIds = new Set(successfulRecords.map((r: any) => r.id))
+    selectedRows.filter(row => successfulIds.has(row.id)).forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
+    if (successfulRecords.length < closedRecords.length) {
+      toast(`${successfulRecords.length}/${closedRecords.length} jornadas finalizadas — el resto no se pudo sincronizar`, 5000, 'warn')
+    } else {
+      toast(`${successfulRecords.length} jornadas finalizadas`, 3000, 'ok')
+    }
   }
 
   return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} onOpenEmployee={row => onOpenEmployee(row.employeeId)} />

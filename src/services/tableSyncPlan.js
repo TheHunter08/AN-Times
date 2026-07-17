@@ -66,13 +66,20 @@ export function toVacationRow(v, nowIso = new Date().toISOString()) {
 
 export function toClosureRow(c, nowIso = new Date().toISOString()) {
   const firmaVal = c.firma ?? c.firmaEmp ?? null
+  // emp_name, dias, generado_por y generado_at NO son columnas reales de
+  // `cierres` (solo existen id, company_id, emp_id, mes, total_min, extra_min,
+  // estado, firma_admin, firma_emp, desactualizado, data, deleted*, updated_at
+  // — ver supabase/schema.sql). Enviarlas como columnas sueltas hacía fallar
+  // CADA upsert con "columna desconocida" (PGRST204, fuera del rango 22xxx/
+  // 23xxx que el cliente sabe poner en cuarentena, así que se reintentaba sin
+  // éxito en cada sincronización). Quedan preservadas igualmente dentro de
+  // `data: c`, que ya se guarda completo.
   return {
-    id: c.id, company_id: COMPANY_ID, emp_id: c.empId, emp_name: c.empName ?? null,
+    id: c.id, company_id: COMPANY_ID, emp_id: c.empId,
     mes: c.mes, total_min: c.totalMin ?? 0, extra_min: c.extraMin ?? 0,
-    dias: c.dias ?? null, estado: c.estado ?? 'pendiente',
+    estado: c.estado ?? 'pendiente',
     firma_admin: c.firmaAdmin ?? null,
     firma_emp: firmaVal ? JSON.stringify(firmaVal) : null,
-    generado_por: c.generadoPor ?? null, generado_at: c.generadoAt ?? null,
     desactualizado: !!c.desactualizado, data: c, deleted: false, deleted_at: null,
     updated_at: c._upd ?? nowIso,
   }
