@@ -1183,7 +1183,7 @@ export default function EmployeePage() {
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 100 }}>
               {pendingCierresEmp.length > 0 && (
                 <div style={{ margin: '16px 20px 0', padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ display:'flex', color:'var(--warning)' }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
+                  <span style={{ display:'flex', color:'var(--orange)' }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--orange)' }}>
                       {pendingCierresEmp.length === 1 ? 'Tienes 1 cierre mensual pendiente de firma' : `Tienes ${pendingCierresEmp.length} cierres mensuales pendientes de firma`}
@@ -1347,7 +1347,7 @@ export default function EmployeePage() {
           <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 116, boxSizing: 'border-box' }}>
             {pendingCierresEmp.length > 0 && (
               <div style={{ margin: '12px 16px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ display:'flex', color:'var(--warning)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
+                <span style={{ display:'flex', color:'var(--orange)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange)' }}>
                     {pendingCierresEmp.length === 1 ? 'Cierre mensual pendiente de firma' : `${pendingCierresEmp.length} cierres pendientes de firma`}
