@@ -2492,7 +2492,16 @@ export default function AppV2Admin() {
   // Filtrar páginas según rol
   const visiblePages = useMemo(() => isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES, [isEnc])
   const { pendingHours, pendingRequests, pendingExpenses } = useMemo(() => ({
-    pendingHours: (db.records || []).filter((r: any) => r.fin && !r.aceptada && !r.validado && !r.rechazado).length,
+    // Misma ventana que ValidateHoursPage (últimos 14 días + tope de 60 filas
+    // más recientes) antes de contar pendientes: si no, la insignia contaba
+    // pendientes que ni siquiera aparecen en la lista de "Validar horas"
+    // (por estar fuera del rango o del tope), mostrando un número que nunca
+    // coincidía con lo visible en pantalla.
+    pendingHours: (db.records || [])
+      .filter((r: any) => r.fin && r.inicio && daysDiff(r.inicio) <= 14)
+      .sort((a: any, b: any) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
+      .slice(0, 60)
+      .filter((r: any) => !r.aceptada && !r.validado && !r.rechazado).length,
     pendingRequests: (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
       + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length,
     pendingExpenses: (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length,
