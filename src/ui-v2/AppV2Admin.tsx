@@ -1110,7 +1110,26 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
     toast('Gasto rechazado', 3000, 'warn')
   }
 
-  return <Expenses items={items} onApprove={approve} onReject={reject} onOpen={item => onOpenEmployee(item.empName)} />
+  const employees = useMemo(() =>
+    (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin).map((e: any) => ({ id: e.id, name: e.name || '' })),
+    [db.employees])
+
+  const addManual = (empId: string, concepto: string, importe: number, categoria: string, fecha: string) => {
+    const emp = (db.employees || []).find((e: any) => e.id === empId)
+    if (!emp) return
+    const who = session?.user?.name || 'Admin'
+    const nowIso = new Date().toISOString()
+    const gasto = { id: gid(), empId, empName: emp.name, concepto, importe, categoria, fecha, estado: 'aprobado', ts: nowIso, resolvedAt: nowIso, resolvedBy: who, _upd: nowIso }
+    saveDB((freshDb: any) => {
+      const noti = { id: gid(), empId, action: 'Gasto registrado por administración', detail: `${concepto} · ${importe}€`, ts: nowIso, leido: false }
+      const withAudit = auditLog(freshDb, 'Gasto manual añadido', `${emp.name}: ${concepto} ${importe}€`, who)
+      return { gastos: [...(freshDb.gastos || []), gasto], notis: [...(freshDb.notis || []), noti], audit: withAudit.audit }
+    })
+    queuePush(empId, 'Gasto registrado', `${concepto} · ${importe}€`, 'gastos', '/?tab=perfil')
+    toast('Gasto añadido y aprobado', 3000, 'ok')
+  }
+
+  return <Expenses items={items} employees={employees} onApprove={approve} onReject={reject} onOpen={item => onOpenEmployee(item.empName)} onAddManual={addManual} />
 }
 
 function DocumentsPage() {

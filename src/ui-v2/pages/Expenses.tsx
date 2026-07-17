@@ -3,8 +3,9 @@ import { Badge } from '../components/Badge.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconCheck, IconX, IconReceipt } from '../components/Icons.js'
+import { IconCheck, IconX, IconReceipt, IconPlus } from '../components/Icons.js'
 import { ProductState } from '../components/ProductState.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 export interface ExpenseItem {
   id: string
@@ -18,9 +19,11 @@ export interface ExpenseItem {
 
 export interface ExpensesProps {
   items: ExpenseItem[]
+  employees?: { id: string; name: string }[]
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   onOpen?: (item: ExpenseItem) => void
+  onAddManual?: (empId: string, concepto: string, importe: number, categoria: ExpenseItem['category'], fecha: string) => void
 }
 
 const catLabel: Record<ExpenseItem['category'], string> = {
@@ -43,8 +46,101 @@ const catBg: Record<ExpenseItem['category'], string> = {
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export function Expenses({ items, onApprove, onReject, onOpen }: ExpensesProps) {
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function AddManualModal({ employees, onClose, onSave }: { employees: { id: string; name: string }[]; onClose: () => void; onSave: (empId: string, concepto: string, importe: number, categoria: ExpenseItem['category'], fecha: string) => void }) {
+  const [empId, setEmpId] = useState(employees[0]?.id || '')
+  const [concepto, setConcepto] = useState('')
+  const [importe, setImporte] = useState('')
+  const [categoria, setCategoria] = useState<ExpenseItem['category']>('dieta')
+  const [fecha, setFecha] = useState(todayStr())
+  const ref = useDialogA11y(true, onClose)
+
+  const importeNum = parseFloat(importe) || 0
+  const canSave = empId && concepto.trim() && importeNum > 0
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Añadir gasto manual"
+        onClick={e => e.stopPropagation()}
+        style={{ background: colors.bg[900], borderRadius: radius.xl, border: `1px solid ${colors.border.default}`, padding: 28, width: '100%', maxWidth: 400, boxShadow: '0 24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Añadir gasto manual</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4, display: 'flex' }}>
+            <IconX width={18} height={18} />
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: colors.text[500], marginTop: -10 }}>
+          Se registra directamente como aprobado — úsalo para reembolsos que gestionas fuera de la app.
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Empleado</div>
+          <select value={empId} onChange={e => setEmpId(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Concepto</div>
+          <input type="text" value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Ej: Reembolso peajes"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Importe €</div>
+            <input type="number" min={0.01} step={0.01} value={importe} onChange={e => setImporte(e.target.value)} placeholder="0.00"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Fecha</div>
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Categoría</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            {(Object.keys(catLabel) as ExpenseItem['category'][]).map(c => (
+              <button key={c} type="button" onClick={() => setCategoria(c)}
+                style={{
+                  padding: '8px 4px', borderRadius: radius.sm, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5, fontWeight: 700,
+                  border: `1px solid ${categoria === c ? catColor[c] : colors.border.default}`,
+                  background: categoria === c ? catBg[c] : 'transparent',
+                  color: categoria === c ? catColor[c] : colors.text[500],
+                }}>
+                {catLabel[c]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button onClick={() => { if (canSave) { onSave(empId, concepto.trim(), importeNum, categoria, fecha); onClose() } }}
+            disabled={!canSave}
+            style={{ flex: 1, padding: '11px', borderRadius: radius.md, border: 'none', background: canSave ? colors.primary.base : colors.bg[500], color: canSave ? '#fff' : colors.text[500], fontSize: 14, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+            Guardar aprobado
+          </button>
+          <button onClick={onClose}
+            style={{ padding: '11px 18px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function Expenses({ items, employees = [], onApprove, onReject, onOpen, onAddManual }: ExpensesProps) {
   const [tab, setTab] = useState<'pendiente' | 'aprobado' | 'rechazado'>('pendiente')
+  const [showAdd, setShowAdd] = useState(false)
 
   const counts = {
     pendiente: items.filter(i => i.status === 'pendiente').length,
@@ -63,7 +159,24 @@ export function Expenses({ items, onApprove, onReject, onOpen }: ExpensesProps) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 820 }}>
-      <PageTitle>Gastos</PageTitle>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <PageTitle>Gastos</PageTitle>
+        {onAddManual && employees.length > 0 && (
+          <button
+            onClick={() => setShowAdd(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '10px 18px', borderRadius: radius.md, border: 'none',
+              background: colors.gradients.brand,
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit', letterSpacing: '-.1px',
+              boxShadow: '0 8px 24px var(--uiv2-primary-glow)',
+            }}
+          >
+            <IconPlus width={14} height={14} /> Añadir gasto
+          </button>
+        )}
+      </div>
 
       {/* Summary KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -129,6 +242,14 @@ export function Expenses({ items, onApprove, onReject, onOpen }: ExpensesProps) 
           </div>
         ))}
       </div>
+
+      {showAdd && onAddManual && (
+        <AddManualModal
+          employees={employees}
+          onClose={() => setShowAdd(false)}
+          onSave={onAddManual}
+        />
+      )}
     </div>
   )
 }
