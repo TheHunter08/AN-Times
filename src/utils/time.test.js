@@ -190,7 +190,7 @@ describe('monthlyExtras', () => {
 describe('vacData', () => {
   it('devuelve ceros si el empleado no existe', () => {
     const db = { employees: [], vacaciones: [] }
-    expect(vacData('nope', db)).toEqual({ months: 0, generated: 0, used: 0, pending: 0, available: 0 })
+    expect(vacData('nope', db)).toEqual({ months: 0, generated: 0, used: 0, pending: 0, available: 0, extra: 0 })
   })
 
   it('resta vacaciones usadas y pendientes de las disponibles', () => {
