@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useDialogA11y } from '../hooks/useDialogA11y.js';
 
+const colors = {
+  bg: { 600: 'var(--bg-card)', 400: 'var(--bg-card-hover)' },
+  primary: { base: 'var(--brand-500)', light: 'var(--brand-400)' },
+  text: { 900: 'var(--text-primary)', 500: 'var(--text-tertiary)', 300: 'var(--text-disabled)' },
+  border: { subtle: 'var(--border-subtle)', default: 'var(--border-default)' },
+};
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radius-lg)', xl: 'var(--radius-xl)', '2xl': 'var(--radius-2xl)' };
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`;
+
 const MOODS = [
   { emoji: '😴', label: 'Cansado', value: 'cansado' },
   { emoji: '🙂', label: 'Normal',  value: 'normal'  },
@@ -31,20 +40,12 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,.75)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        padding: '16px',
-      }}
-    >
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+      padding: 16,
+    }}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -52,11 +53,8 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
         aria-labelledby="wellbeing-dialog-title"
         tabIndex={-1}
         style={{
-          background: 'var(--bg-800)',
-          borderRadius: '20px',
-          padding: '28px 24px 24px',
-          width: '100%',
-          maxWidth: '400px',
+          background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius['2xl'],
+          padding: '28px 24px 24px', width: '100%', maxWidth: 400,
           boxShadow: '0 24px 60px rgba(0,0,0,.5)',
           animation: 'wbSlideIn .22s cubic-bezier(.34,1.56,.64,1) both',
         }}
@@ -68,71 +66,32 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
           }
         `}</style>
 
-        {/* Header */}
-        <h2
-          id="wellbeing-dialog-title"
-          style={{
-            margin: '0 0 6px',
-            fontSize: '1.25rem',
-            fontWeight: 700,
-            color: 'var(--text)',
-            textAlign: 'center',
-          }}
-        >
+        <h2 id="wellbeing-dialog-title" style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: colors.text[900], textAlign: 'center' }}>
           ¿Cómo llegas hoy{userName ? `, ${userName.split(' ')[0]}` : ''}?
         </h2>
-        <p
-          style={{
-            margin: '0 0 24px',
-            fontSize: '.85rem',
-            color: 'var(--text3)',
-            textAlign: 'center',
-          }}
-        >
+        <p style={{ margin: '0 0 24px', fontSize: 13, color: colors.text[500], textAlign: 'center' }}>
           Cuéntanos tu estado de ánimo al empezar la jornada
         </p>
 
         {/* Mood buttons */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '8px',
-            marginBottom: '20px',
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 20 }}>
           {MOODS.map((m) => {
             const isSelected = selected === m.value;
             return (
               <button
                 key={m.value}
                 onClick={() => setSelected(m.value)}
+                type="button"
                 style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: isSelected ? 'rgba(99,102,241,.15)' : 'var(--bg-700)',
-                  border: isSelected
-                    ? '2px solid var(--primary)'
-                    : '2px solid transparent',
-                  borderRadius: '12px',
-                  padding: '10px 4px',
-                  cursor: 'pointer',
-                  transition: 'all .15s ease',
-                  outline: 'none',
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  background: isSelected ? toneSoft(colors.primary.base, 15) : colors.bg[400],
+                  border: `2px solid ${isSelected ? colors.primary.base : 'transparent'}`,
+                  borderRadius: radius.md, padding: '10px 4px', cursor: 'pointer',
+                  transition: 'all .15s ease', outline: 'none', fontFamily: 'inherit',
                 }}
               >
-                <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{m.emoji}</span>
-                <span
-                  style={{
-                    fontSize: '.65rem',
-                    color: isSelected ? 'var(--primary-light)' : 'var(--text3)',
-                    fontWeight: isSelected ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+                <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji}</span>
+                <span style={{ fontSize: 10.5, color: isSelected ? colors.primary.light : colors.text[500], fontWeight: isSelected ? 700 : 500, whiteSpace: 'nowrap' }}>
                   {m.label}
                 </span>
               </button>
@@ -147,18 +106,10 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
           placeholder="¿Algo que quieras comentar? (opcional)"
           rows={3}
           style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            background: 'var(--bg-700)',
-            border: '1px solid rgba(255,255,255,.08)',
-            borderRadius: '10px',
-            color: 'var(--text)',
-            fontSize: '.9rem',
-            padding: '10px 12px',
-            resize: 'none',
-            outline: 'none',
-            marginBottom: '16px',
-            fontFamily: 'inherit',
+            width: '100%', boxSizing: 'border-box', background: colors.bg[400],
+            border: `1px solid ${colors.border.default}`, borderRadius: radius.md,
+            color: colors.text[900], fontSize: 13, padding: '10px 12px', resize: 'none',
+            outline: 'none', marginBottom: 16, fontFamily: 'inherit',
           }}
         />
 
@@ -166,41 +117,21 @@ export default function WellbeingModal({ visible, onClose, onSubmit, userName })
         <button
           onClick={handleSubmit}
           disabled={!selected}
+          type="button"
           style={{
-            width: '100%',
-            padding: '13px',
-            borderRadius: '12px',
-            border: 'none',
-            background: selected ? 'var(--primary)' : 'var(--bg-700)',
-            color: selected ? '#fff' : 'var(--text4)',
-            fontWeight: 700,
-            fontSize: '1rem',
-            cursor: selected ? 'pointer' : 'not-allowed',
-            transition: 'background .2s',
-            marginBottom: '12px',
+            width: '100%', padding: 13, borderRadius: radius.md, border: 'none',
+            background: selected ? 'var(--gradient-brand)' : colors.bg[400],
+            color: selected ? '#fff' : colors.text[300],
+            fontWeight: 700, fontSize: 15, cursor: selected ? 'pointer' : 'not-allowed',
+            transition: 'opacity .2s', marginBottom: 12, fontFamily: 'inherit',
           }}
         >
           Continuar →
         </button>
 
         {/* Skip */}
-        <p
-          style={{
-            textAlign: 'center',
-            margin: 0,
-          }}
-        >
-          <button
-            onClick={handleSkip}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text4)',
-              fontSize: '.85rem',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
-          >
+        <p style={{ textAlign: 'center', margin: 0 }}>
+          <button onClick={handleSkip} type="button" style={{ background: 'none', border: 'none', color: colors.text[300], fontSize: 12.5, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>
             Omitir
           </button>
         </p>
