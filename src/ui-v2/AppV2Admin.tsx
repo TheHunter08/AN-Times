@@ -1631,11 +1631,15 @@ function MonthlyClosePage() {
     const filename = `cierre-${closure.mes}-${(closure.empName || '').replace(/\s+/g, '_')}.pdf`
     if (closure.pdfData) { downloadDataUrl(closure.pdfData, filename); return }
     if (closure.documentoId && supabase) {
-      const { data, error } = await supabase.storage.from(CIERRE_PDF_BUCKET).createSignedUrl(closure.documentoId, 3600, { download: filename })
-      if (error || !data?.signedUrl) { toast('No se pudo generar el enlace de descarga del PDF firmado', 4000, 'warn'); return }
-      const a = document.createElement('a')
-      a.href = data.signedUrl
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      try {
+        const { data, error } = await supabase.storage.from(CIERRE_PDF_BUCKET).createSignedUrl(closure.documentoId, 3600, { download: filename })
+        if (error || !data?.signedUrl) { toast('No se pudo generar el enlace de descarga del PDF firmado', 4000, 'warn'); return }
+        const a = document.createElement('a')
+        a.href = data.signedUrl
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      } catch {
+        toast('No se pudo generar el enlace de descarga del PDF firmado', 4000, 'warn')
+      }
       return
     }
     toast('Este cierre todavía no tiene un PDF firmado generado', 3000, 'warn')

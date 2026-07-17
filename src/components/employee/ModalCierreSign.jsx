@@ -66,10 +66,17 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
       // Si no hay conexión o falla la subida, se cae al comportamiento anterior
       // (guardar pdfData) para no bloquear la firma por un problema de red.
       if (supabase) {
-        const path = `${firmado.empId}/${firmado.mes}.pdf`
-        const { error } = await supabase.storage.from(CIERRE_PDF_BUCKET).upload(path, blob, { contentType: 'application/pdf', upsert: true })
-        if (!error) documentoId = path
-        else console.warn('[cierre] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
+        try {
+          const path = `${firmado.empId}/${firmado.mes}.pdf`
+          const { error } = await supabase.storage.from(CIERRE_PDF_BUCKET).upload(path, blob, { contentType: 'application/pdf', upsert: true })
+          if (!error) documentoId = path
+          else console.warn('[cierre] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
+        } catch (uploadErr) {
+          // Una excepción aquí (red caída, CORS, etc.) no debe perder el PDF
+          // entero — sin este catch propio, saltaba al catch exterior sin
+          // llegar nunca a la línea de abajo que guarda pdfData de respaldo.
+          console.warn('[cierre] Error al subir el PDF a Storage, se guarda localmente:', uploadErr.message)
+        }
       }
       if (!documentoId) pdfData = dataUrl
     } catch (e) {
