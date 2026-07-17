@@ -406,19 +406,50 @@ export function cloudPush(db, deleted, onSuccess, onError) {
   _v1Push(db, deleted, onSuccess, onError)
 }
 
+// Filas que Postgres rechazó de forma permanente (22xxx/23xxx — nunca se
+// arreglan solas reintentando) se recuerdan aquí entre sincronizaciones.
+// Sin esto, cada ciclo de sync las volvía a intentar, las volvía a rechazar
+// y las volvía a "poner en cuarentena" para siempre, generando tráfico y
+// ruido en consola sin ningún efecto (la fila nunca se sincronizaba de
+// todos modos). Se guarda en localStorage, no en el blob, porque es un
+// detalle de transporte de este dispositivo, no un dato de negocio.
+// Se guarda "id → updated_at" (no solo el id) para que, si la fila cambia
+// de verdad más adelante (p.ej. un admin reabre y vuelve a firmar un cierre
+// después de fin de mes), deje de coincidir con lo ya intentado y se
+// reintente sola — la cuarentena no debe esconder para siempre una
+// corrección legítima posterior.
+const _QUARANTINE_KEY = 'an_v2_quarantine'
+function _loadQuarantine() {
+  try { return JSON.parse(localStorage.getItem(_QUARANTINE_KEY) || '{}') } catch { return {} }
+}
+function _saveQuarantine(map) {
+  try { localStorage.setItem(_QUARANTINE_KEY, JSON.stringify(map)) } catch {}
+}
+function _isQuarantined(table, row) {
+  const map = _loadQuarantine()
+  return map[`${table}:${row.id}`] === (row.updated_at ?? null)
+}
+function _addQuarantined(table, rows) {
+  if (!rows.length) return
+  const map = _loadQuarantine()
+  rows.forEach(row => { map[`${table}:${row.id}`] = row.updated_at ?? null })
+  _saveQuarantine(map)
+}
+
 // Sube un lote de filas a una tabla en un único upsert. Si Postgres rechaza
 // el lote (una sola fila con datos inválidos — FK a un empleado borrado,
 // constraint violada, etc. — hace fallar el INSERT...ON CONFLICT entero),
 // reintenta fila a fila para aislar el problema en vez de perder en
 // silencio los cambios de TODAS las demás filas del lote.
 async function _upsertResilient(table, rows) {
-  if (!rows.length) return
-  const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' })
+  const pending = rows.filter(row => !_isQuarantined(table, row))
+  if (!pending.length) return
+  const { error } = await supabase.from(table).upsert(pending, { onConflict: 'id' })
   if (!error) return
   console.warn(`[v2] batch upsert failed for ${table}, retrying individually:`, error.message)
   const failures = []
   const quarantined = []
-  for (const row of rows) {
+  for (const row of pending) {
     const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
     if (rowErr) {
       // Errores 22xxx/23xxx son datos legacy incompatibles (fecha inválida,
@@ -426,7 +457,7 @@ async function _upsertResilient(table, rows) {
       // la cola PWA bloqueada impide subir incluso fichajes perfectamente
       // válidos. El blob principal conserva la fila para no perder información.
       if (/^(22|23)/.test(rowErr.code || '')) {
-        quarantined.push(row.id)
+        quarantined.push(row)
         console.warn(`[v2] ${table} row ${row.id} quarantined:`, rowErr.message)
       } else {
         failures.push(row.id)
@@ -434,6 +465,7 @@ async function _upsertResilient(table, rows) {
       }
     }
   }
+  if (quarantined.length) _addQuarantined(table, quarantined)
   if (failures.length) throw new Error(`${table}: ${failures.length} filas no sincronizadas`)
   return { quarantined }
 }

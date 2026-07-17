@@ -901,8 +901,9 @@ function ValidateHoursPage() {
       const worked = recWorkSecs(r) / 60
       const expected = Number(db.config?.wdMin) || 480
       const diff = worked - expected
-      const diffH = Math.abs(Math.floor(diff / 60))
-      const diffM = Math.abs(Math.floor(diff % 60))
+      const absDiffMin = Math.abs(diff)
+      const diffH = Math.floor(absDiffMin / 60)
+      const diffM = Math.floor(absDiffMin % 60)
       const diffStr = diff === 0 ? '0h' : `${diff > 0 ? '+' : '-'}${diffH}h${diffM > 0 ? diffM + 'm' : ''}`
       return {
         id: r.id,
