@@ -1,9 +1,16 @@
 name: Archivado mensual de registros
 
+# DESACTIVADO (2026-07-17): este cron sacaba de la fila principal de app_data
+# los registros de más de 90 días para que no viajaran en cada sincronización.
+# Eso dejó de ser necesario tras la migración a tablas (Fase 2, 2026-07-14):
+# el sync ahora es incremental (solo filas modificadas desde el último updated_at
+# conocido), así que un registro antiguo sin tocar ya no se re-descarga aunque
+# siga en la tabla `records`. Portar este script a la tabla habría arriesgado
+# ocultar registros dentro del periodo legal de conservación (4 años, RD 8/2019)
+# a los informes de cumplimiento (Paquete de inspección, etc.), que leen
+# directamente de `records`. Se deja workflow_dispatch por si hace falta
+# volver a activarlo bajo un umbral distinto en el futuro.
 on:
-  schedule:
-    # El 1º de cada mes a las 03:00 UTC (madrugada, mínimo impacto)
-    - cron: '0 3 1 * *'
   workflow_dispatch:
 
 jobs:
