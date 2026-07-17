@@ -125,18 +125,19 @@ export const gid = () => {
 
 export const vacData = (empId, db) => {
   const emp = (db.employees || []).find(e => e.id === empId)
-  if (!emp) return { months: 0, generated: 0, used: 0, pending: 0, available: 0 }
+  if (!emp) return { months: 0, generated: 0, used: 0, pending: 0, available: 0, extra: 0 }
   // Días/mes: 2.5 para jornada completa (30 días/año). Ajuste proporcional para jornadas parciales.
   const jornadaH = emp.jornadaHoras || emp.weeklyHours || 40
   const VPM = parseFloat(((30 / 12) * Math.min(jornadaH, 40) / 40).toFixed(4))
-  const sd = new Date(emp.fechaInicioContrato || emp.startDate || emp.fechaAlta || new Date().toISOString().slice(0, 10))
+  const sd = new Date(emp.fechaInicioContrato || emp.startDate || emp.fechaAlta || today())
   const n = new Date()
   let m = (n.getFullYear() - sd.getFullYear()) * 12 + (n.getMonth() - sd.getMonth())
   const sdDay = sd.getDate()
   const lastDayOfMonth = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()
   if (sdDay <= lastDayOfMonth && n.getDate() < sdDay) m--
   m = Math.max(0, m)
-  const gen = parseFloat((m * VPM).toFixed(1))
+  const extra = emp.vacacionesExtra || 0
+  const gen = parseFloat((m * VPM + extra).toFixed(1))
   const countDays = v => {
     if (v.fechaInicio && v.fechaFin) {
       const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
@@ -147,7 +148,7 @@ export const vacData = (empId, db) => {
   }
   const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada').reduce((s, v) => s + countDays(v), 0)
   const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente').reduce((s, v) => s + countDays(v), 0)
-  return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used - pend).toFixed(1))) }
+  return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used - pend).toFixed(1))), extra }
 }
 
 export const recWorkSecs = r => {

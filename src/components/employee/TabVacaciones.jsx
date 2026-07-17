@@ -24,7 +24,7 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
 
   const cancelVac = (id) => {
     showConfirm('¿Cancelar esta solicitud de vacaciones?', () => {
-      saveDB({ vacaciones: (db.vacaciones || []).filter(v => v.id !== id || v.estado !== 'pendiente') })
+      saveDB(freshDb => ({ vacaciones: (freshDb.vacaciones || []).filter(v => v.id !== id || v.estado !== 'pendiente') }))
       toast('Solicitud cancelada', 3000, 'warn')
     })
   }
@@ -147,6 +147,11 @@ export function TabVacaciones({ db, u, vac, toast, saveDB }) {
           </div>
           <div style={{ fontSize: 11, color: colors.text[300] }}>
             Generadas según antigüedad · {vac.months} meses trabajados
+            {vac.extra !== 0 && (
+              <span style={{ marginLeft: 6, color: vac.extra > 0 ? colors.semantic.green : colors.semantic.red }}>
+                {vac.extra > 0 ? `+${vac.extra}` : vac.extra} días ajuste
+              </span>
+            )}
           </div>
         </div>
 

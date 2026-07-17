@@ -99,7 +99,7 @@ interface EmpForm {
   pin: string; pinLen: number | null
   centroTrabajo: string; telefono: string; obrasAsignadas: string[]
   fechaInicioContrato: string; turnoInicio: string; turnoFin: string
-  crearTurnos: boolean
+  crearTurnos: boolean; vacacionesExtra: number
 }
 
 function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () => void }) {
@@ -109,7 +109,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
-  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false }
+  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false, vacacionesExtra: 0 }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
   const isEdit = !!initial
 
@@ -140,6 +140,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         isEnc: form.role === 'encargado',
         isJO: form.role === 'jefe_obra',
         baja: false,
+        vacacionesExtra: form.vacacionesExtra || 0,
       }
       const updated = isEdit
         ? emps.map((e: any) => e.id === form.id ? emp : e)
@@ -186,6 +187,19 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {iField('Inicio del turno', 'turnoInicio', 'time')}
           {iField('Fin del turno', 'turnoFin', 'time')}
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Ajuste días de vacaciones</div>
+          <input
+            type="number" min={-365} max={365} step={0.5}
+            value={form.vacacionesExtra}
+            onChange={e => setF('vacacionesExtra', parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
+          />
+          <div style={{ fontSize: 11, color: colors.text[500], marginTop: 4 }}>
+            Días extra o descuento sobre los generados por antigüedad (positivo = más días, negativo = descuento).
+          </div>
         </div>
         <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'11px 12px', borderRadius:10, border:`1px solid ${colors.border.default}`, background:form.crearTurnos ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)', cursor:'pointer' }}>
           <input type="checkbox" checked={form.crearTurnos} onChange={e => setF('crearTurnos', e.target.checked)} style={{ marginTop:2, accentColor:colors.primary.base }}/>
@@ -576,6 +590,7 @@ function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) =
       turnoInicio: emp.turnoInicio || emp.shiftStart || '08:00',
       turnoFin: emp.turnoFin || emp.shiftEnd || '16:00',
       crearTurnos: false,
+      vacacionesExtra: emp.vacacionesExtra || 0,
     }})
   }
 
