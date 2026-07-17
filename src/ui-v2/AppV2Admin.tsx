@@ -968,28 +968,32 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
   const approve = (id: string) => {
     const g = (db.gastos || []).find((x: any) => x.id === id)
     if (!g) return
+    const nowIso = new Date().toISOString()
     saveDB((freshDb: any) => {
-      const nowIso = new Date().toISOString()
       const updated = (freshDb.gastos || []).map((x: any) =>
         x.id === id ? { ...x, estado: 'aprobado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto aprobado', `${g.empName}: ${g.concepto} ${g.importe}€`, session?.user?.name || 'Admin')
-      return { gastos: updated, audit: withAudit.audit }
+      const noti = { id: gid(), empId: g.empId, action: 'Gasto aprobado', detail: `${g.concepto} · ${g.importe}€`, ts: nowIso, leido: false }
+      return { gastos: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
+    if (g.empId) queuePush(g.empId, 'Gasto aprobado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil')
     toast('Gasto aprobado', 3000, 'ok')
   }
 
   const reject = (id: string) => {
     const g = (db.gastos || []).find((x: any) => x.id === id)
     if (!g) return
+    const nowIso = new Date().toISOString()
     saveDB((freshDb: any) => {
-      const nowIso = new Date().toISOString()
       const updated = (freshDb.gastos || []).map((x: any) =>
         x.id === id ? { ...x, estado: 'rechazado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto rechazado', `${g.empName}: ${g.concepto}`, session?.user?.name || 'Admin')
-      return { gastos: updated, audit: withAudit.audit }
+      const noti = { id: gid(), empId: g.empId, action: 'Gasto rechazado', detail: `${g.concepto} · ${g.importe}€`, ts: nowIso, leido: false }
+      return { gastos: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
+    if (g.empId) queuePush(g.empId, 'Gasto rechazado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil')
     toast('Gasto rechazado', 3000, 'warn')
   }
 
