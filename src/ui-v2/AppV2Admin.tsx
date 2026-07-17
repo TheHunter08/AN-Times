@@ -33,7 +33,7 @@ import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
-import { WM, CIERRE_PDF_BUCKET } from '../config/constants.js'
+import { WM, CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -1017,25 +1017,38 @@ function DocumentsPage() {
     certificado: 'certificado',
   }
 
-  const handleDownload = (id: string) => {
-    const doc = (db.documentos || []).find((d: any) => d.id === id)
-    if (!doc) return
-    const url = doc.url || doc.pdfData || doc.fileUrl || doc.data
-    if (url) {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = doc.nombre || doc.name || `documento-${id}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    } else {
-      toast('Archivo no disponible (sin URL de descarga)', 3000, 'warn')
+  // Resuelve una URL utilizable: si el documento vive en Storage (subida
+  // reciente), pide una URL firmada de corta duración; si no, usa el
+  // base64/URL guardado directamente en el registro (documentos antiguos,
+  // o si Storage no estaba disponible al subirlo).
+  const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
+    if (doc.storagePath && supabase) {
+      try {
+        const { data, error } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600, filename ? { download: filename } : undefined)
+        if (!error && data?.signedUrl) return data.signedUrl
+      } catch { /* cae al respaldo de abajo */ }
     }
+    return doc.url || doc.pdfData || doc.fileUrl || doc.data || null
   }
 
-  const handlePreview = (id: string) => {
+  const handleDownload = async (id: string) => {
     const doc = (db.documentos || []).find((d: any) => d.id === id)
-    const url = doc?.url || doc?.pdfData || doc?.fileUrl || doc?.data
+    if (!doc) return
+    const filename = doc.nombre || doc.name || `documento-${id}`
+    const url = await resolveDocUrl(doc, filename)
+    if (!url) { toast('Archivo no disponible (sin URL de descarga)', 3000, 'warn'); return }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const handlePreview = async (id: string) => {
+    const doc = (db.documentos || []).find((d: any) => d.id === id)
+    if (!doc) return
+    const url = await resolveDocUrl(doc)
     if (!url) { toast('Vista previa no disponible', 3000, 'warn'); return }
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -1067,24 +1080,51 @@ function DocumentsPage() {
     uploadRef.current?.click()
   }
 
-  const uploadFile = (file?: File) => {
+  const readAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('read error'))
+    reader.readAsDataURL(file)
+  })
+
+  const uploadFile = async (file?: File) => {
     const meta = uploadMeta.current
     if (!file || !meta) return
     if (file.size > 8 * 1024 * 1024) { toast('El archivo supera el máximo de 8 MB', 3500, 'warn'); return }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const now = new Date().toISOString()
-      saveDB((fresh: any) => ({ documentos: [...(fresh.documentos || []), {
-        id: gid(), empId: meta.empId, empName: meta.empName, tipo: meta.tipo,
-        nombre: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-        mime: file.type, data: reader.result, createdAt: now, expiresOn: meta.expiresOn || null, _upd: now,
-      }] }))
-      toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
-      uploadMeta.current = null
-      setUploadOpen(false)
+    const docId = gid()
+    let storagePath: string | null = null
+    let data: string | null = null
+    // Igual que con los PDFs de cierre: preferimos Storage (cuota separada,
+    // 1 GB) sobre guardar el archivo en base64 dentro del JSONB (se come la
+    // cuota de base de datos, 500 MB). Si falla o no hay bucket todavía, cae
+    // al comportamiento anterior para no bloquear la subida.
+    if (supabase) {
+      try {
+        const path = `${meta.empId}/${docId}-${file.name}`
+        const { error } = await supabase.storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: true })
+        if (!error) storagePath = path
+        else console.warn('[documentos] No se pudo subir a Storage, se guarda localmente:', error.message)
+      } catch (uploadErr: any) {
+        console.warn('[documentos] Error al subir a Storage, se guarda localmente:', uploadErr?.message)
+      }
     }
-    reader.onerror = () => toast('No se pudo leer el documento', 3000, 'warn')
-    reader.readAsDataURL(file)
+    if (!storagePath) {
+      try {
+        data = await readAsDataUrl(file)
+      } catch {
+        toast('No se pudo leer el documento', 3000, 'warn')
+        return
+      }
+    }
+    const now = new Date().toISOString()
+    saveDB((fresh: any) => ({ documentos: [...(fresh.documentos || []), {
+      id: docId, empId: meta.empId, empName: meta.empName, tipo: meta.tipo,
+      nombre: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      mime: file.type, storagePath, data, createdAt: now, expiresOn: meta.expiresOn || null, _upd: now,
+    }] }))
+    toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
+    uploadMeta.current = null
+    setUploadOpen(false)
   }
 
   return <>

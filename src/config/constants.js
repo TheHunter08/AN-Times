@@ -39,6 +39,13 @@ export const VPM = 2.5      // vacation days per month
 // acceso público) antes de que la subida funcione.
 export const CIERRE_PDF_BUCKET = 'cierres-pdf'
 
+// Mismo razonamiento que CIERRE_PDF_BUCKET: los documentos de empleados
+// (contratos, nóminas, certificados) admiten hasta 8 MB por archivo y se
+// guardaban en base64 dentro de la columna JSONB de app_entities — con
+// varios documentos por empleado, este es el mayor riesgo real de agotar
+// los 500 MB gratuitos de base de datos, más que los PDFs de cierre.
+export const DOCUMENTOS_BUCKET = 'documentos-empleado'
+
 // Festivos Comunidad de Madrid — 2026 + 2027
 export const FESTIVOS_MADRID = {
   // 2026
