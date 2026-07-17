@@ -7,6 +7,9 @@ import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, l
 import { calcStreak } from '../utils/streaks.js'
 import { WK } from '../config/constants.js'
 import { EmployeeHome } from '../ui-v2/pages/EmployeeHome.tsx'
+import { useJornadaData } from '../ui-v2/hooks/useJornadaData.ts'
+import { useJornadaPdfExport } from '../ui-v2/hooks/useJornadaPdfExport.ts'
+import { useVacacionesData } from '../ui-v2/hooks/useVacacionesData.ts'
 import { VAPID_PUB } from '../config/constants.js'
 import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
@@ -23,7 +26,6 @@ import { canCloseMonth } from '../utils/adminHelpers.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
-const TabTurnos = lazy(() => import('../components/TabTurnos.jsx'))
 const ModalSelCentro = lazyNamed(() => import('../components/employee/ModalSelCentro.jsx'), 'ModalSelCentro')
 const ModalQRScan = lazyNamed(() => import('../components/employee/ModalQRScan.jsx'), 'ModalQRScan')
 const ModalMyQR = lazyNamed(() => import('../components/employee/ModalMyQR.jsx'), 'ModalMyQR')
@@ -42,10 +44,11 @@ const OnboardingModal = lazyNamed(() => import('../components/employee/Onboardin
 const ModalChat = lazyNamed(() => import('../components/employee/ModalChat.jsx'), 'ModalChat')
 const ModalCorreccion = lazyNamed(() => import('../components/employee/ModalCorreccion.jsx'), 'ModalCorreccion')
 const TabMensajes = lazyNamed(() => import('../components/employee/TabMensajes.jsx'), 'TabMensajes')
-const TabVacaciones = lazyNamed(() => import('../components/employee/TabVacaciones.jsx'), 'TabVacaciones')
-const TabCalendario = lazyNamed(() => import('../components/employee/TabCalendario.jsx'), 'TabCalendario')
-const TabPerfil = lazyNamed(() => import('../components/employee/TabPerfil.jsx'), 'TabPerfil')
-const TabJornada = lazyNamed(() => import('../components/employee/TabJornada.jsx'), 'TabJornada')
+const EmployeeJornada = lazyNamed(() => import('../ui-v2/pages/EmployeeJornada.tsx'), 'EmployeeJornada')
+const EmployeeVacaciones = lazyNamed(() => import('../ui-v2/pages/EmployeeVacaciones.tsx'), 'EmployeeVacaciones')
+const EmployeeCalendario = lazyNamed(() => import('../ui-v2/pages/EmployeeCalendario.tsx'), 'EmployeeCalendario')
+const EmployeeTurnos = lazyNamed(() => import('../ui-v2/pages/EmployeeTurnos.tsx'), 'EmployeeTurnos')
+const EmployeePerfil = lazyNamed(() => import('../ui-v2/pages/EmployeePerfil.tsx'), 'EmployeePerfil')
 
 function EmployeeSectionLoader() {
   return <div className="ti-employee-loader" role="status" aria-label="Cargando sección"><span /><span /><span /></div>
@@ -990,6 +993,10 @@ export default function EmployeePage() {
     }
   }, [db.records, timer.state, timer.ws, u.id, u.horasSemanales, u.centroTrabajo, greeting, syncStatus, realtimeStatus])
 
+  const jornadaStats = useJornadaData(db, u, timer)
+  const jornadaPdf = useJornadaPdfExport(db, u, toast)
+  const vacacionesData = useVacacionesData(db, u, vac, toast, saveDB, showConfirm)
+
   const handleWellbeingSubmit = ({ mood, nota }) => {
     if (!mood || !wellbeingRecId) return
     const entry = { id: gid(), empId: u.id, mood, nota: nota || '', ts: new Date().toISOString(), recordId: wellbeingRecId }
@@ -1216,12 +1223,12 @@ export default function EmployeePage() {
             </div>
           )}
           <Suspense fallback={<EmployeeSectionLoader />}>
-            {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
-            {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
-            {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+            {currentEmpTab === 'jornada' && <EmployeeJornada db={db} u={u} timer={timer} stats={jornadaStats} pdf={jornadaPdf} openModal={openModal} />}
+            {currentEmpTab === 'vacaciones' && <EmployeeVacaciones vac={vac} data={vacacionesData} onRequestVacation={() => openModal('vacForm')} />}
+            {currentEmpTab === 'calendario' && <EmployeeCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
             {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-            {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-            {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+            {currentEmpTab === 'turnos' && <EmployeeTurnos db={db} u={u} />}
+            {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
           </Suspense>
         </div>
       </div>
@@ -1380,12 +1387,12 @@ export default function EmployeePage() {
           </div>
         )}
         <Suspense fallback={<EmployeeSectionLoader />}>
-          {currentEmpTab === 'jornada' && <TabJornada timer={timer} db={db} u={u} toast={toast} saveDB={saveDB} openModal={openModal} closeModal={closeModal} activeModal={activeModal} modalData={modalData} openCorreccion={openModal} />}
-          {currentEmpTab === 'vacaciones' && <TabVacaciones db={db} u={u} vac={vac} toast={toast} saveDB={saveDB} />}
-          {currentEmpTab === 'calendario' && <TabCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
+          {currentEmpTab === 'jornada' && <EmployeeJornada db={db} u={u} timer={timer} stats={jornadaStats} pdf={jornadaPdf} openModal={openModal} />}
+          {currentEmpTab === 'vacaciones' && <EmployeeVacaciones vac={vac} data={vacacionesData} onRequestVacation={() => openModal('vacForm')} />}
+          {currentEmpTab === 'calendario' && <EmployeeCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
           {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
-          {currentEmpTab === 'turnos' && <TabTurnos db={db} u={u} />}
-          {currentEmpTab === 'perfil' && <TabPerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+          {currentEmpTab === 'turnos' && <EmployeeTurnos db={db} u={u} />}
+          {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
         </Suspense>
       </div>
 
