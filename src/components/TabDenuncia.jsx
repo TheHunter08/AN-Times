@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { gid } from '../utils/time.js';
 
+const colors = {
+  bg: { 600: 'var(--bg-card)', 400: 'var(--bg-card-hover)' },
+  primary: { base: 'var(--brand-500)', light: 'var(--brand-400)', dim: 'color-mix(in srgb, var(--brand-500) 13%, transparent)' },
+  semantic: { green: 'var(--success-400)', orange: 'var(--warning-400)', red: 'var(--danger-400)' },
+  text: { 900: 'var(--text-primary)', 500: 'var(--text-tertiary)', 300: 'var(--text-disabled)' },
+  border: { subtle: 'var(--border-subtle)', default: 'var(--border-default)' },
+};
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radius-lg)', xl: 'var(--radius-xl)', pill: 'var(--radius-pill)' };
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`;
+
 // value debe coincidir con las claves TIPO_LABELS/TIPO_COLORS de PanelDenuncias.jsx
 // (admin) — antes 'seguridad en obra' aquí vs 'seguridad' allí no casaban nunca,
 // así que esas denuncias mostraban el icono/color genérico en el panel del admin.
@@ -17,10 +27,10 @@ const TIPOS = [
 // espacio y tilde), que nunca coincidía, así que el empleado veía el string
 // crudo "en_proceso" en vez de "En revisión".
 function estadoLabel(estado) {
-  if (estado === 'nueva')      return { text: 'Recibida',    color: '#f59e0b' };
-  if (estado === 'en_proceso') return { text: 'En revisión', color: 'var(--primary-light)' };
-  if (estado === 'resuelta')   return { text: 'Resuelta',    color: 'var(--green)' };
-  return                              { text: estado,        color: 'var(--text3)' };
+  if (estado === 'nueva')      return { text: 'Recibida',    color: colors.semantic.orange };
+  if (estado === 'en_proceso') return { text: 'En revisión', color: colors.primary.light };
+  if (estado === 'resuelta')   return { text: 'Resuelta',    color: colors.semantic.green };
+  return                              { text: estado,        color: colors.text[500] };
 }
 
 function genAnonId() {
@@ -32,11 +42,11 @@ function genAnonId() {
 const inputStyle = {
   width: '100%',
   boxSizing: 'border-box',
-  background: 'var(--bg-700)',
-  border: '1px solid rgba(255,255,255,.08)',
-  borderRadius: '10px',
-  color: 'var(--text)',
-  fontSize: '.9rem',
+  background: colors.bg[400],
+  border: `1px solid ${colors.border.default}`,
+  borderRadius: radius.md,
+  color: colors.text[900],
+  fontSize: 13,
   padding: '10px 12px',
   outline: 'none',
   fontFamily: 'inherit',
@@ -44,10 +54,12 @@ const inputStyle = {
 
 const labelStyle = {
   display: 'block',
-  color: 'var(--text3)',
-  fontSize: '.78rem',
-  marginBottom: '4px',
-  fontWeight: 500,
+  color: colors.text[500],
+  fontSize: 11,
+  marginBottom: 5,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '.4px',
 };
 
 export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
@@ -112,101 +124,60 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
   }
 
   return (
-    <div style={{ padding: '16px', paddingBottom: '40px' }}>
+    <div style={{ padding: 'var(--space-4)', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto' }}>
       {onBack && (
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'10px 0 14px', fontSize:14, fontWeight:600, minHeight:44 }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: colors.text[500], cursor: 'pointer', padding: '2px 0', fontSize: 14, fontWeight: 600, minHeight: 44, alignSelf: 'flex-start' }}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Perfil
         </button>
       )}
+
       {/* Header */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, rgba(99,102,241,.12), rgba(99,102,241,.04))',
-          border: '1px solid rgba(99,102,241,.25)',
-          borderRadius: '14px',
-          padding: '16px',
-          marginBottom: '20px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '1.4rem' }}>🔒</span>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${toneSoft(colors.primary.base, 12)}, ${toneSoft(colors.primary.base, 4)})`,
+        border: `1px solid ${toneSoft(colors.primary.base, 25)}`,
+        borderRadius: radius.xl,
+        padding: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <span style={{ fontSize: 22 }}>🔒</span>
+          <h1 style={{ margin: 0, fontSize: 'var(--font-heading-md)', fontWeight: 'var(--font-semibold)', color: colors.text[900] }}>
             Canal de denuncias anónimo
-          </h2>
+          </h1>
         </div>
-        <p style={{ margin: '0 0 8px', fontSize: '.82rem', color: 'var(--text3)', lineHeight: 1.5 }}>
+        <p style={{ margin: '0 0 8px', fontSize: 13, color: colors.text[500], lineHeight: 1.5 }}>
           Este canal es completamente anónimo y cumple con la{' '}
-          <strong style={{ color: 'var(--primary-light)' }}>Directiva UE 2019/1937</strong> sobre
+          <strong style={{ color: colors.primary.light }}>Directiva UE 2019/1937</strong> sobre
           protección de personas que informen sobre infracciones del Derecho de la Unión.
         </p>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(34,197,94,.1)',
-            border: '1px solid rgba(34,197,94,.25)',
-            borderRadius: '8px',
-            padding: '4px 10px',
-            fontSize: '.75rem',
-            color: 'var(--green)',
-            fontWeight: 600,
-          }}
-        >
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: toneSoft(colors.semantic.green, 10), border: `1px solid ${toneSoft(colors.semantic.green, 25)}`,
+          borderRadius: radius.sm, padding: '4px 10px', fontSize: 11.5, color: colors.semantic.green, fontWeight: 700,
+        }}>
           ✓ Tu identidad está protegida. TIMES INC no puede identificarte.
         </div>
       </div>
 
       {/* Submission success */}
       {submittedCode && (
-        <div
-          style={{
-            background: 'rgba(34,197,94,.1)',
-            border: '1.5px solid rgba(34,197,94,.35)',
-            borderRadius: '14px',
-            padding: '20px',
-            marginBottom: '20px',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✅</div>
-          <p style={{ margin: '0 0 12px', color: 'var(--text)', fontWeight: 600, fontSize: '.95rem' }}>
+        <div style={{ background: toneSoft(colors.semantic.green, 10), border: `1.5px solid ${toneSoft(colors.semantic.green, 35)}`, borderRadius: radius.xl, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+          <p style={{ margin: '0 0 12px', color: colors.text[900], fontWeight: 700, fontSize: 14 }}>
             Denuncia enviada correctamente
           </p>
-          <p style={{ margin: '0 0 8px', color: 'var(--text3)', fontSize: '.82rem' }}>
+          <p style={{ margin: '0 0 8px', color: colors.text[500], fontSize: 12.5 }}>
             Guarda este código para consultar el estado:
           </p>
-          <div
-            style={{
-              background: 'var(--bg-700)',
-              borderRadius: '10px',
-              padding: '12px',
-              fontSize: '1.8rem',
-              fontWeight: 900,
-              letterSpacing: '.2em',
-              color: 'var(--green)',
-              fontFamily: 'monospace',
-              marginBottom: '12px',
-            }}
-          >
+          <div style={{ background: colors.bg[400], borderRadius: radius.md, padding: 12, fontSize: 28, fontWeight: 900, letterSpacing: '.2em', color: colors.semantic.green, fontFamily: 'monospace', marginBottom: 12 }}>
             {submittedCode}
           </div>
-          <p style={{ margin: 0, color: 'var(--text4)', fontSize: '.78rem' }}>
+          <p style={{ margin: 0, color: colors.text[300], fontSize: 11.5 }}>
             Sin este código no podrás consultar el estado de tu denuncia.
           </p>
           <button
             onClick={() => setSubmittedCode(null)}
-            style={{
-              marginTop: '14px',
-              background: 'none',
-              border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px',
-              color: 'var(--text3)',
-              fontSize: '.82rem',
-              padding: '6px 16px',
-              cursor: 'pointer',
-            }}
+            style={{ marginTop: 14, background: 'none', border: `1px solid ${colors.border.default}`, borderRadius: radius.sm, color: colors.text[500], fontSize: 12.5, padding: '6px 16px', cursor: 'pointer', fontFamily: 'inherit' }}
           >
             Enviar otra denuncia
           </button>
@@ -215,33 +186,16 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
 
       {/* New report form */}
       {!submittedCode && (
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            background: 'var(--bg-800)',
-            borderRadius: '14px',
-            padding: '16px',
-            marginBottom: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '.95rem', color: 'var(--text)', fontWeight: 700 }}>
+        <form onSubmit={handleSubmit} style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 14.5, color: colors.text[900], fontWeight: 700 }}>
             Nueva denuncia
           </h3>
 
           <div>
             <label style={labelStyle}>Tipo de irregularidad</label>
-            <select
-              style={{ ...inputStyle, appearance: 'none' }}
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-            >
+            <select style={{ ...inputStyle, appearance: 'none' }} value={tipo} onChange={(e) => setTipo(e.target.value)}>
               {TIPOS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
+                <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
           </div>
@@ -249,7 +203,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
           <div>
             <label style={labelStyle}>
               Descripción *{' '}
-              <span style={{ color: mensaje.length < 20 ? 'var(--danger)' : 'var(--green)', fontWeight: 400 }}>
+              <span style={{ color: mensaje.length < 20 ? colors.semantic.red : colors.semantic.green, fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
                 ({mensaje.length} / mín. 20 caracteres)
               </span>
             </label>
@@ -263,17 +217,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
             />
           </div>
 
-          <div
-            style={{
-              background: 'rgba(239,68,68,.06)',
-              border: '1px solid rgba(239,68,68,.15)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '.78rem',
-              color: 'var(--text3)',
-              lineHeight: 1.5,
-            }}
-          >
+          <div style={{ background: toneSoft(colors.semantic.red, 6), border: `1px solid ${toneSoft(colors.semantic.red, 15)}`, borderRadius: radius.sm, padding: '10px 12px', fontSize: 11.5, color: colors.text[500], lineHeight: 1.5 }}>
             ⚠️ No incluyas tu nombre, número de empleado ni ningún dato que pueda identificarte.
             Esta denuncia se enviará sin ningún vínculo a tu cuenta.
           </div>
@@ -282,47 +226,31 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
             type="submit"
             disabled={submitting || mensaje.trim().length < 20}
             style={{
-              background: mensaje.trim().length >= 20 ? 'var(--primary)' : 'var(--bg-700)',
-              border: 'none',
-              borderRadius: '10px',
-              color: mensaje.trim().length >= 20 ? '#fff' : 'var(--text4)',
-              fontWeight: 700,
-              fontSize: '.95rem',
-              padding: '13px',
+              background: mensaje.trim().length >= 20 ? 'var(--gradient-brand)' : colors.bg[400],
+              border: 'none', borderRadius: radius.md,
+              color: mensaje.trim().length >= 20 ? '#fff' : colors.text[300],
+              fontWeight: 700, fontSize: 14, padding: 13,
               cursor: submitting || mensaje.trim().length < 20 ? 'not-allowed' : 'pointer',
-              transition: 'background .2s',
+              fontFamily: 'inherit', transition: 'opacity .2s',
             }}
           >
-            {submitting ? 'Enviando...' : 'Enviar denuncia de forma anónima'}
+            {submitting ? 'Enviando…' : 'Enviar denuncia de forma anónima'}
           </button>
         </form>
       )}
 
       {/* Track status */}
-      <div
-        style={{
-          background: 'var(--bg-800)',
-          borderRadius: '14px',
-          padding: '16px',
-        }}
-      >
-        <h3 style={{ margin: '0 0 4px', fontSize: '.95rem', color: 'var(--text)', fontWeight: 700 }}>
+      <div style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 14.5, color: colors.text[900], fontWeight: 700 }}>
           Consultar estado
         </h3>
-        <p style={{ margin: '0 0 12px', color: 'var(--text3)', fontSize: '.82rem' }}>
+        <p style={{ margin: '0 0 12px', color: colors.text[500], fontSize: 12.5 }}>
           Introduce el código de 6 caracteres que recibiste al enviar tu denuncia.
         </p>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <input
-            style={{
-              ...inputStyle,
-              flex: 1,
-              fontFamily: 'monospace',
-              fontSize: '1rem',
-              letterSpacing: '.1em',
-              textTransform: 'uppercase',
-            }}
+            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 15, letterSpacing: '.1em', textTransform: 'uppercase' }}
             type="text"
             placeholder="XXXXXX"
             maxLength={6}
@@ -335,74 +263,41 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
           />
           <button
             onClick={handleTrack}
-            style={{
-              background: 'var(--primary)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontWeight: 600,
-              fontSize: '.9rem',
-              padding: '10px 18px',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
+            type="button"
+            style={{ background: colors.primary.base, border: 'none', borderRadius: radius.md, color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '10px 18px', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}
           >
             Buscar
           </button>
         </div>
 
         {trackError && (
-          <p style={{ marginTop: '10px', color: 'var(--danger)', fontSize: '.85rem' }}>{trackError}</p>
+          <p style={{ marginTop: 10, color: colors.semantic.red, fontSize: 13 }}>{trackError}</p>
         )}
 
         {trackResult && (() => {
           const { text, color } = estadoLabel(trackResult.estado);
           return (
-            <div
-              style={{
-                marginTop: '14px',
-                background: 'var(--bg-700)',
-                borderRadius: '10px',
-                padding: '14px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text3)', fontSize: '.82rem' }}>
-                  Código: <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{trackResult.anonId}</strong>
+            <div style={{ marginTop: 14, background: colors.bg[400], borderRadius: radius.md, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: colors.text[500], fontSize: 12.5 }}>
+                  Código: <strong style={{ color: colors.text[900], fontFamily: 'monospace' }}>{trackResult.anonId}</strong>
                 </span>
-                <span
-                  style={{
-                    background: `${color}22`,
-                    color,
-                    borderRadius: '6px',
-                    padding: '2px 10px',
-                    fontSize: '.75rem',
-                    fontWeight: 700,
-                  }}
-                >
+                <span style={{ background: toneSoft(color, 14), color, borderRadius: radius.sm, padding: '2px 10px', fontSize: 11.5, fontWeight: 700 }}>
                   {text}
                 </span>
               </div>
-              <p style={{ margin: '0 0 6px', color: 'var(--text3)', fontSize: '.78rem' }}>
-                Tipo: <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>{trackResult.tipo}</span>
+              <p style={{ margin: '0 0 6px', color: colors.text[500], fontSize: 12 }}>
+                Tipo: <span style={{ color: colors.text[900], textTransform: 'capitalize' }}>{trackResult.tipo}</span>
               </p>
-              <p style={{ margin: '0 0 6px', color: 'var(--text3)', fontSize: '.78rem' }}>
+              <p style={{ margin: '0 0 6px', color: colors.text[500], fontSize: 12 }}>
                 Enviada: {new Date(trackResult.ts).toLocaleDateString('es')}
               </p>
               {trackResult.respuesta && (
-                <div
-                  style={{
-                    marginTop: '10px',
-                    background: 'rgba(99,102,241,.1)',
-                    border: '1px solid rgba(99,102,241,.2)',
-                    borderRadius: '8px',
-                    padding: '10px',
-                  }}
-                >
-                  <p style={{ margin: '0 0 4px', fontSize: '.78rem', color: 'var(--primary-light)', fontWeight: 600 }}>
+                <div style={{ marginTop: 10, background: toneSoft(colors.primary.base, 10), border: `1px solid ${toneSoft(colors.primary.base, 20)}`, borderRadius: radius.sm, padding: 10 }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 12, color: colors.primary.light, fontWeight: 700 }}>
                     Respuesta del equipo:
                   </p>
-                  <p style={{ margin: 0, fontSize: '.88rem', color: 'var(--text)' }}>
+                  <p style={{ margin: 0, fontSize: 13.5, color: colors.text[900] }}>
                     {trackResult.respuesta}
                   </p>
                 </div>
@@ -413,15 +308,7 @@ export default function TabDenuncia({ db, u, toast, saveDB, onBack }) {
       </div>
 
       {/* EU Directive badge */}
-      <div
-        style={{
-          marginTop: '20px',
-          textAlign: 'center',
-          color: 'var(--text4)',
-          fontSize: '.72rem',
-          lineHeight: 1.5,
-        }}
-      >
+      <div style={{ textAlign: 'center', color: colors.text[300], fontSize: 11, lineHeight: 1.5 }}>
         Conforme a la Directiva UE 2019/1937 del Parlamento Europeo
         <br />
         sobre la protección de las personas que informen sobre infracciones

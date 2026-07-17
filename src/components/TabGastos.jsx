@@ -2,16 +2,22 @@ import { useState } from 'react';
 import { gid, today } from '../utils/time.js';
 import { resizeImageToDataUrl } from '../utils/imageResize.js';
 
+const colors = {
+  bg: { 600: 'var(--bg-card)', 400: 'var(--bg-card-hover)' },
+  primary: { base: 'var(--brand-500)', light: 'var(--brand-400)', dim: 'color-mix(in srgb, var(--brand-500) 13%, transparent)' },
+  semantic: { green: 'var(--success-400)', orange: 'var(--warning-400)', red: 'var(--danger-400)' },
+  text: { 900: 'var(--text-primary)', 500: 'var(--text-tertiary)', 300: 'var(--text-disabled)' },
+  border: { subtle: 'var(--border-subtle)', default: 'var(--border-default)' },
+};
+const radius = { sm: 'var(--radius-sm)', md: 'var(--radius-md)', lg: 'var(--radius-lg)', xl: 'var(--radius-xl)', pill: 'var(--radius-pill)' };
+const toneSoft = (color, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`;
+
 const CATEGORIAS = ['dieta', 'transporte', 'material', 'otro'];
 
-function estadoBadgeStyle(estado) {
-  if (estado === 'aprobado')  return { background: 'rgba(34,197,94,.15)',  color: 'var(--green)' };
-  if (estado === 'rechazado') return { background: 'rgba(239,68,68,.15)',  color: 'var(--danger)' };
-  return                             { background: 'rgba(245,158,11,.15)', color: '#f59e0b' };
-}
-
-function categoriaBadgeStyle() {
-  return { background: 'rgba(99,102,241,.15)', color: 'var(--primary-light)' };
+function estadoTone(estado) {
+  if (estado === 'aprobado')  return colors.semantic.green;
+  if (estado === 'rechazado') return colors.semantic.red;
+  return colors.semantic.orange;
 }
 
 function todayYMD() {
@@ -21,7 +27,6 @@ function todayYMD() {
 function fmt(n) {
   return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 
 export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   const [open, setOpen] = useState(false);
@@ -122,11 +127,11 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
   const inputStyle = {
     width: '100%',
     boxSizing: 'border-box',
-    background: 'var(--bg-700)',
-    border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: '10px',
-    color: 'var(--text)',
-    fontSize: '.9rem',
+    background: colors.bg[400],
+    border: `1px solid ${colors.border.default}`,
+    borderRadius: radius.md,
+    color: colors.text[900],
+    fontSize: 13,
     padding: '10px 12px',
     outline: 'none',
     fontFamily: 'inherit',
@@ -134,283 +139,149 @@ export default function TabGastos({ db, u, toast, saveDB, onBack }) {
 
   const labelStyle = {
     display: 'block',
-    color: 'var(--text3)',
-    fontSize: '.78rem',
-    marginBottom: '4px',
-    fontWeight: 500,
+    color: colors.text[500],
+    fontSize: 11,
+    marginBottom: 5,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '.4px',
   };
 
   return (
-    <div style={{ padding: '16px', paddingBottom: '32px' }}>
+    <div style={{ padding: 'var(--space-4)', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 520, margin: '0 auto' }}>
       {onBack && (
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:'10px 0 14px', fontSize:14, fontWeight:600, minHeight:44 }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: colors.text[500], cursor: 'pointer', padding: '2px 0', fontSize: 14, fontWeight: 600, minHeight: 44, alignSelf: 'flex-start' }}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Perfil
         </button>
       )}
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text)', fontWeight: 700 }}>
-          Mis gastos
-        </h3>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          style={{
-            background: open ? 'var(--bg-700)' : 'var(--primary)',
-            border: 'none',
-            borderRadius: '10px',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: '.85rem',
-            padding: '8px 16px',
-            cursor: 'pointer',
-          }}
-        >
-          {open ? 'Cancelar' : '+ Nuevo gasto'}
-        </button>
-      </div>
+
+      <header style={{ display: 'grid', gap: 4 }}>
+        <h1 style={{ margin: 0, color: colors.text[900], fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', letterSpacing: '-.035em' }}>Mis gastos</h1>
+        <p style={{ margin: 0, color: colors.text[500], fontSize: 'var(--font-body-sm)' }}>Registra dietas, transporte y material para reembolso.</p>
+      </header>
+
+      {/* Stats row */}
+      {misGastos.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '14px 10px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: colors.semantic.green, letterSpacing: '-.7px' }}>{fmt(aprobadosMes)} €</div>
+            <div style={{ fontSize: 10, color: colors.text[500], marginTop: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>Aprobados este mes</div>
+          </div>
+          <div style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '14px 10px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: colors.semantic.orange, letterSpacing: '-.7px' }}>{fmt(pendientesMes)} €</div>
+            <div style={{ fontSize: 10, color: colors.text[500], marginTop: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>Pendientes este mes</div>
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', minHeight: 48, padding: '12px 20px', borderRadius: radius.md,
+          border: open ? `1px solid ${colors.border.default}` : 'none',
+          background: open ? colors.bg[600] : 'var(--gradient-brand)',
+          color: open ? colors.text[700] || colors.text[900] : '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'inherit', boxShadow: open ? 'none' : 'var(--shadow-brand)',
+        }}
+      >
+        {open ? 'Cancelar' : (
+          <>
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            Nuevo gasto
+          </>
+        )}
+      </button>
 
       {/* Inline form */}
       {open && (
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            background: 'var(--bg-800)',
-            borderRadius: '14px',
-            padding: '16px',
-            marginBottom: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
+        <form onSubmit={handleSubmit} style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <label style={labelStyle}>Concepto *</label>
-            <input
-              style={inputStyle}
-              type="text"
-              placeholder="¿Qué fue?"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              required
-            />
+            <input style={inputStyle} type="text" placeholder="¿Qué fue?" value={concepto} onChange={(e) => setConcepto(e.target.value)} required />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>Importe € *</label>
-              <input
-                style={inputStyle}
-                type="number"
-                placeholder="0.00"
-                step="0.01"
-                min="0.01"
-                value={importe}
-                onChange={(e) => setImporte(e.target.value)}
-                required
-              />
+              <input style={inputStyle} type="number" placeholder="0.00" step="0.01" min="0.01" value={importe} onChange={(e) => setImporte(e.target.value)} required />
             </div>
             <div>
               <label style={labelStyle}>Fecha</label>
-              <input
-                style={inputStyle}
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
+              <input style={inputStyle} type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
           </div>
 
           <div>
             <label style={labelStyle}>Categoría</label>
-            <select
-              style={{ ...inputStyle, appearance: 'none' }}
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-            >
+            <select style={{ ...inputStyle, appearance: 'none' }} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               {CATEGORIAS.map((c) => (
-                <option key={c} value={c}>
-                  {c.charAt(0).toUpperCase() + c.slice(1)}
-                </option>
+                <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
               ))}
             </select>
           </div>
 
           <div>
             <label style={labelStyle}>Foto / ticket (opcional)</label>
-            <input
-              style={{ ...inputStyle, padding: '8px 12px' }}
-              type="file"
-              accept="image/*"
-              onChange={handleFoto}
-            />
+            <input style={{ ...inputStyle, padding: '8px 12px' }} type="file" accept="image/*" onChange={handleFoto} />
             {fotoPreview && (
-              <img
-                src={fotoPreview}
-                alt="preview"
-                style={{
-                  marginTop: '8px',
-                  width: '80px',
-                  height: '80px',
-                  objectFit: 'cover',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255,255,255,.1)',
-                }}
-              />
+              <img src={fotoPreview} alt="preview" style={{ marginTop: 8, width: 80, height: 80, objectFit: 'cover', borderRadius: radius.sm, border: `1px solid ${colors.border.default}` }} />
             )}
           </div>
 
           <div>
             <label style={labelStyle}>Notas (opcional)</label>
-            <textarea
-              style={{ ...inputStyle, resize: 'none' }}
-              rows={2}
-              placeholder="Información adicional..."
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-            />
+            <textarea style={{ ...inputStyle, resize: 'none' }} rows={2} placeholder="Información adicional..." value={notas} onChange={(e) => setNotas(e.target.value)} />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
             style={{
-              background: 'var(--primary)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '.95rem',
-              padding: '12px',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.7 : 1,
+              background: 'var(--gradient-brand)', border: 'none', borderRadius: radius.md,
+              color: '#fff', fontWeight: 700, fontSize: 14, padding: 12,
+              cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, fontFamily: 'inherit',
             }}
           >
-            {submitting ? 'Enviando...' : 'Enviar gasto'}
+            {submitting ? 'Enviando…' : 'Enviar gasto'}
           </button>
         </form>
       )}
 
       {/* Gastos list */}
       {misGastos.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            color: 'var(--text4)',
-            fontSize: '.9rem',
-            marginTop: '32px',
-          }}
-        >
-          No has registrado ningún gasto todavía
+        <div style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: '40px 24px', textAlign: 'center' }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: colors.bg[400], display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={colors.text[500]} strokeWidth="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: colors.text[900], marginBottom: 6 }}>Sin gastos</div>
+          <div style={{ fontSize: 12, color: colors.text[500] }}>No has registrado ningún gasto todavía</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {misGastos.map((g) => (
-            <div
-              key={g.id}
-              style={{
-                background: 'var(--bg-800)',
-                borderRadius: '12px',
-                padding: '14px',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'flex-start',
-              }}
-            >
-              {/* Thumbnail */}
+        <div style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, overflow: 'hidden' }}>
+          {misGastos.map((g, i) => (
+            <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px 16px', borderTop: i > 0 ? `1px solid ${colors.border.subtle}` : 'none' }}>
               {g.foto && (
-                <img
-                  src={g.foto}
-                  alt="ticket"
-                  style={{
-                    width: '52px',
-                    height: '52px',
-                    objectFit: 'cover',
-                    borderRadius: '8px',
-                    flexShrink: 0,
-                    border: '1px solid rgba(255,255,255,.08)',
-                  }}
-                />
+                <img src={g.foto} alt="ticket" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius.sm, flexShrink: 0, border: `1px solid ${colors.border.default}` }} />
               )}
-
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                  <span
-                    style={{
-                      color: 'var(--text)',
-                      fontWeight: 600,
-                      fontSize: '.95rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {g.concepto}
-                  </span>
-                  <span
-                    style={{
-                      color: 'var(--text)',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      flexShrink: 0,
-                    }}
-                  >
-                    €{fmt(g.importe)}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ color: colors.text[900], fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.concepto}</span>
+                  <span style={{ color: colors.text[900], fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{fmt(g.importe)} €</span>
                 </div>
-
-                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span
-                    style={{
-                      ...categoriaBadgeStyle(),
-                      borderRadius: '6px',
-                      padding: '2px 8px',
-                      fontSize: '.72rem',
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {g.categoria}
-                  </span>
-                  <span
-                    style={{
-                      ...estadoBadgeStyle(g.estado),
-                      borderRadius: '6px',
-                      padding: '2px 8px',
-                      fontSize: '.72rem',
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {g.estado}
-                  </span>
-                  <span style={{ color: 'var(--text4)', fontSize: '.75rem', marginLeft: 'auto' }}>
-                    {g.fecha}
-                  </span>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ background: colors.primary.dim, color: colors.primary.light, borderRadius: radius.pill, padding: '2px 9px', fontSize: 10.5, fontWeight: 700, textTransform: 'capitalize' }}>{g.categoria}</span>
+                  <span style={{ background: toneSoft(estadoTone(g.estado), 12), color: estadoTone(g.estado), borderRadius: radius.pill, padding: '2px 9px', fontSize: 10.5, fontWeight: 700, textTransform: 'capitalize' }}>{g.estado}</span>
+                  <span style={{ color: colors.text[300], fontSize: 11, marginLeft: 'auto' }}>{g.fecha}</span>
                 </div>
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Monthly stats */}
-      {misGastos.length > 0 && (
-        <div
-          style={{
-            marginTop: '20px',
-            background: 'var(--bg-800)',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            color: 'var(--text3)',
-            fontSize: '.85rem',
-            textAlign: 'center',
-          }}
-        >
-          Este mes:{' '}
-          <span style={{ color: 'var(--green)', fontWeight: 700 }}>€{fmt(aprobadosMes)} aprobados</span>
-          {' · '}
-          <span style={{ color: '#f59e0b', fontWeight: 700 }}>€{fmt(pendientesMes)} pendientes</span>
         </div>
       )}
     </div>
