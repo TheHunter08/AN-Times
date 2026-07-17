@@ -31,6 +31,14 @@ export const VAPID_PUB = _isValidVapid(_candidate) ? _candidate : _VAPID_FALLBAC
 export { WK, WD, WM } from './workRules.js'
 export const VPM = 2.5      // vacation days per month
 
+// Bucket privado de Supabase Storage para los PDFs de cierre firmados.
+// Antes se guardaban en base64 dentro de la columna JSONB `cierres.data`,
+// lo que infla ~33% el tamaño y consume la cuota gratuita de BASE DE DATOS
+// (500 MB) en vez de la de Storage (1 GB, separada). Hay que crear este
+// bucket manualmente una vez en el dashboard de Supabase (privado, sin
+// acceso público) antes de que la subida funcione.
+export const CIERRE_PDF_BUCKET = 'cierres-pdf'
+
 // Festivos Comunidad de Madrid — 2026 + 2027
 export const FESTIVOS_MADRID = {
   // 2026

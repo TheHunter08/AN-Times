@@ -33,7 +33,7 @@ import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
-import { WM } from '../config/constants.js'
+import { WM, CIERRE_PDF_BUCKET } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -1538,6 +1538,7 @@ function MonthlyClosePage() {
           lastReopenAt: c.lastReopenAt ? fmtDate(c.lastReopenAt) : null,
           lastReopenBy: c.lastReopenBy || null,
           integrityHash: c.integrityHash || null,
+          documentoId: c.documentoId || null,
         } as any
       })
   }, [db.cierres, db.employees, db.records])
@@ -1616,6 +1617,28 @@ function MonthlyClosePage() {
       return { cierres, audit:withAudit.audit }
     })
     toast(`${signedCount} cierre${signedCount !== 1 ? 's' : ''} firmado${signedCount !== 1 ? 's' : ''} y auditado${signedCount !== 1 ? 's' : ''}${blockedByDate ? ` — ${blockedByDate} omitido${blockedByDate !== 1 ? 's' : ''} por mes no terminado` : ''}`, 3800, 'ok')
+  }
+
+  // Descarga el PDF oficial firmado. Los cierres firmados a partir de la
+  // migracion a Storage solo guardan `documentoId` (ruta en el bucket
+  // privado cierres-pdf), ya no el PDF entero en base64 dentro de la fila —
+  // hay que pedir una URL firmada de corta duracion en el momento de la
+  // descarga. Los cierres firmados antes de ese cambio siguen teniendo
+  // `pdfData` y se descargan igual que siempre.
+  const handleDownloadPdf = async (id: string) => {
+    const closure = (db.cierres || []).find((c: any) => c.id === id)
+    if (!closure) return
+    const filename = `cierre-${closure.mes}-${(closure.empName || '').replace(/\s+/g, '_')}.pdf`
+    if (closure.pdfData) { downloadDataUrl(closure.pdfData, filename); return }
+    if (closure.documentoId && supabase) {
+      const { data, error } = await supabase.storage.from(CIERRE_PDF_BUCKET).createSignedUrl(closure.documentoId, 3600, { download: filename })
+      if (error || !data?.signedUrl) { toast('No se pudo generar el enlace de descarga del PDF firmado', 4000, 'warn'); return }
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      return
+    }
+    toast('Este cierre todavía no tiene un PDF firmado generado', 3000, 'warn')
   }
 
   const handleDownloadConsolidated = async (mes: string) => {
@@ -1723,7 +1746,7 @@ function MonthlyClosePage() {
     toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} eliminado${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
   }
 
-  return <MonthlyClose items={items} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onDownload={handleDownloadPdf} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {

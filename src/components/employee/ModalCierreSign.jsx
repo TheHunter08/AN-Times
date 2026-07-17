@@ -4,9 +4,10 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
-import { queuePush } from '../../services/dataService.js'
+import { queuePush, supabase } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
+import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
 import { WM } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -54,15 +55,27 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
     const firmado = { ...selCierre, records_snapshot, totalMin, extraMin:Math.max(0, totalMin - WM), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
+    let documentoId = null
     let integrityHash = null
     try {
-      const { dataUrl, hash } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
-      pdfData = dataUrl
+      const { dataUrl, blob, hash } = await buildCierreIndividualPDF({ cierre: firmado, empresa: u.empresa })
       integrityHash = hash || null
+      // Preferimos subir el PDF a Storage (bucket privado) en vez de guardar el
+      // base64 dentro de la fila de `cierres` — el base64 infla ~33% el tamaño
+      // y se come la cuota gratuita de base de datos en vez de la de Storage.
+      // Si no hay conexión o falla la subida, se cae al comportamiento anterior
+      // (guardar pdfData) para no bloquear la firma por un problema de red.
+      if (supabase) {
+        const path = `${firmado.empId}/${firmado.mes}.pdf`
+        const { error } = await supabase.storage.from(CIERRE_PDF_BUCKET).upload(path, blob, { contentType: 'application/pdf', upsert: true })
+        if (!error) documentoId = path
+        else console.warn('[cierre] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
+      }
+      if (!documentoId) pdfData = dataUrl
     } catch (e) {
       console.warn('[cierre] No se pudo generar el PDF firmado:', e)
     }
-    const cierreFinal = pdfData ? { ...firmado, pdfData, integrityHash } : firmado
+    const cierreFinal = (pdfData || documentoId) ? { ...firmado, pdfData, documentoId, integrityHash } : firmado
     const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
     saveDB(fresh => ({
       cierres:(fresh.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci),

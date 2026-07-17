@@ -32,6 +32,7 @@ export interface ClosureItem {
   // PDF oficial ya generado y firmado (data URL) — si existe, descargar ESTE
   // documento (tiene firma + hash) en vez de regenerar uno en texto plano.
   pdfData?: string | null
+  documentoId?: string | null
   reopenCount?: number
   lastReopenAt?: string | null
   lastReopenBy?: string | null
@@ -269,7 +270,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   onClick={() => { onDownload ? onDownload(item.id) : downloadPdf(item) }}
-                  title={item.pdfData ? 'Descargar PDF firmado' : 'Generar PDF'}
+                  title={(item.pdfData || item.documentoId) ? 'Descargar PDF firmado' : 'Generar PDF'}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}
                 >
                   <IconDownload width={13} height={13} /> PDF
@@ -435,10 +436,10 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
             {/* Actions */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => downloadPdf(detail)}
+                onClick={() => { onDownload ? onDownload(detail.id) : downloadPdf(detail) }}
                 style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
-                <IconDownload width={14} height={14} /> {detail.pdfData ? 'Descargar PDF firmado' : 'Descargar PDF'}
+                <IconDownload width={14} height={14} /> {(detail.pdfData || detail.documentoId) ? 'Descargar PDF firmado' : 'Descargar PDF'}
               </button>
               <button onClick={() => generateExcel(detail)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Descargar Excel
