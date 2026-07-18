@@ -1,5 +1,9 @@
 export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
+// 'denuncias' NO está aquí a propósito — tiene tabla y RPCs propios
+// (submit_denuncia/track_denuncia, ver migration-2026-07-18-denuncias-
+// privadas.sql) precisamente para que no se sincronice en bloque a todos
+// los clientes como el resto de estas colecciones.
+export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo']
 export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
 
 export function entityRowId(collection, entityId) {

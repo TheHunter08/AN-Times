@@ -2,7 +2,7 @@
 // TabDenuncia.jsx (legacy), relocalizada y restilizada con los tokens v7.
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { gid } from '../../utils/time.js'
+import { supabase } from '../../services/dataServiceV2.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 
 const TIPOS = [
@@ -34,9 +34,9 @@ const inputStyle: any = {
 }
 const labelStyle: any = { display: 'block', color: colors.text[500], fontSize: '.78rem', marginBottom: 4, fontWeight: 600 }
 
-export interface EmployeeDenunciaProps { db: any; u: any; toast: (...args: any[]) => void; saveDB: (updater: any) => void; onBack?: () => void }
+export interface EmployeeDenunciaProps { toast: (...args: any[]) => void; onBack?: () => void }
 
-export function EmployeeDenuncia({ db, toast, saveDB, onBack }: EmployeeDenunciaProps) {
+export function EmployeeDenuncia({ toast, onBack }: EmployeeDenunciaProps) {
   const [tipo, setTipo] = useState('acoso')
   const [mensaje, setMensaje] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -45,6 +45,7 @@ export function EmployeeDenuncia({ db, toast, saveDB, onBack }: EmployeeDenuncia
   const [trackCode, setTrackCode] = useState('')
   const [trackResult, setTrackResult] = useState<any>(null)
   const [trackError, setTrackError] = useState('')
+  const [tracking, setTracking] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -55,8 +56,11 @@ export function EmployeeDenuncia({ db, toast, saveDB, onBack }: EmployeeDenuncia
     setSubmitting(true)
     try {
       const anonId = genAnonId()
-      const nueva = { id: gid(), anonId, tipo, mensaje: mensaje.trim(), ts: new Date().toISOString(), estado: 'nueva', respuesta: null }
-      await saveDB((freshDb: any) => ({ denuncias: [...(freshDb.denuncias || []), nueva] }))
+      // RPC en vez de saveDB: `denuncias` ya no se sincroniza al blob general
+      // (ver migration-2026-07-18-denuncias-privadas.sql) — nadie más que un
+      // admin real o quien tenga este código puede leerla.
+      const { error } = await supabase.rpc('submit_denuncia', { p_anon_id: anonId, p_tipo: tipo, p_mensaje: mensaje.trim() })
+      if (error) throw error
       setSubmittedCode(anonId)
       setMensaje('')
       setTipo('acoso')
@@ -68,16 +72,27 @@ export function EmployeeDenuncia({ db, toast, saveDB, onBack }: EmployeeDenuncia
     }
   }
 
-  function handleTrack() {
+  async function handleTrack() {
     const code = trackCode.trim().toUpperCase()
     if (!code) return
-    const found = (db.denuncias || []).find((d: any) => d.anonId === code)
-    if (!found) {
+    setTracking(true)
+    try {
+      const { data, error } = await supabase.rpc('track_denuncia', { p_anon_id: code })
+      if (error) throw error
+      const found = data?.[0]
+      if (!found) {
+        setTrackResult(null)
+        setTrackError('No se encontró ninguna denuncia con ese código.')
+      } else {
+        setTrackResult({ ...found, anonId: found.anon_id, ts: found.created_at })
+        setTrackError('')
+      }
+    } catch (err) {
+      console.error('Error al consultar denuncia:', err)
       setTrackResult(null)
-      setTrackError('No se encontró ninguna denuncia con ese código.')
-    } else {
-      setTrackResult(found)
-      setTrackError('')
+      setTrackError('Error al consultar — inténtalo de nuevo.')
+    } finally {
+      setTracking(false)
     }
   }
 
@@ -179,8 +194,8 @@ export function EmployeeDenuncia({ db, toast, saveDB, onBack }: EmployeeDenuncia
             type="text" placeholder="XXXXXX" maxLength={6} value={trackCode}
             onChange={e => { setTrackCode(e.target.value.toUpperCase()); setTrackResult(null); setTrackError('') }}
           />
-          <button onClick={handleTrack} style={{ background: colors.primary.base, border: 'none', borderRadius: 10, color: '#fff', fontWeight: 600, fontSize: '.9rem', padding: '10px 18px', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
-            Buscar
+          <button onClick={handleTrack} disabled={tracking} style={{ background: colors.primary.base, border: 'none', borderRadius: 10, color: '#fff', fontWeight: 600, fontSize: '.9rem', padding: '10px 18px', cursor: tracking ? 'not-allowed' : 'pointer', opacity: tracking ? .7 : 1, flexShrink: 0, fontFamily: 'inherit' }}>
+            {tracking ? 'Buscando…' : 'Buscar'}
           </button>
         </div>
 

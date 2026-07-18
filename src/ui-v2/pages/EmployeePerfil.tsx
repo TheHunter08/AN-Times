@@ -75,7 +75,7 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, perf
   const myRecs = useMemo(() => (db.records || []).filter((r: any) => r.empId === u.id && r.fin), [db.records, u.id])
 
   if (perfilView === 'gastos') return <EmployeeGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
-  if (perfilView === 'denuncia') return <EmployeeDenuncia db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
+  if (perfilView === 'denuncia') return <EmployeeDenuncia toast={toast} onBack={() => setPerfilView('perfil')} />
 
   if (!db.records) return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
