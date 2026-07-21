@@ -31,7 +31,7 @@ import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
-import { getScopedOnlineRecords } from '../utils/supervisorScope.js'
+import { getScopedOnlineRecords, getScopedEmployees } from '../utils/supervisorScope.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { WM, CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 
@@ -2267,18 +2267,22 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     onBreak: Boolean(record.enDescanso),
   })), [db.records, db.employees, db.obras, user, isScopedRole])
 
+  // Mismo ámbito que getScopedOnlineRecords (arriba) — reutiliza
+  // getScopedEmployees en vez de una comparación propia para que el vínculo
+  // obra→centro (obraCenterMap en supervisorScope.js) también aplique aquí.
+  // Antes esta lista usaba solo coincidencia directa de centroTrabajo/obra,
+  // así que un empleado visible en "En línea" gracias al vínculo por obra
+  // podía desaparecer de "sin fichar" en cuanto cerraba su jornada.
   const missingTeam = useMemo(() => {
     const liveIds = new Set((db.records || []).filter((record:any) => !record.fin).map((record:any) => record.empId))
-    const center = String(user.centroTrabajo || user.dept || '').toLocaleLowerCase('es')
-    const works = new Set((user.obrasAsignadas || []).map((value:string) => String(value).toLocaleLowerCase('es')))
-    return (db.employees || []).filter((employee:any) => {
-      if (employee.baja || employee.isAdmin || employee.id === user.id || liveIds.has(employee.id)) return false
-      if (!isScopedRole) return true
-      const employeeCenter = String(employee.centroTrabajo || employee.dept || '').toLocaleLowerCase('es')
-      const employeeWorks = (employee.obrasAsignadas || []).map((value:string) => String(value).toLocaleLowerCase('es'))
-      return (!!center && employeeCenter === center) || employeeWorks.some((value:string) => works.has(value))
+    const scoped = getScopedEmployees({
+      employees: db.employees || [],
+      obras: db.obras || [],
+      supervisor: user,
+      unrestricted: !isScopedRole,
     })
-  }, [db.records, db.employees, user, isScopedRole])
+    return scoped.filter((employee:any) => employee.id !== user.id && !liveIds.has(employee.id))
+  }, [db.records, db.employees, db.obras, user, isScopedRole])
 
   // persistRecordRow primero (igual que Fichajes/Validar horas): la
   // mutación de un record solo se confirma en local si el guardado
