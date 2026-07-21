@@ -11,6 +11,7 @@ import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { clearLocalModelCache, formatModelBytes, getLocalAIWifiOnly, getLocalModelNetworkState, getLocalModelStorageInfo, isLocalModelReady, isWebGPUSupported, loadLocalModel, LOCAL_MODEL_INFO, setLocalAIConsent, setLocalAIWifiOnly } from '../../utils/localAI.js'
+import { getNotificationPermissionGuide, notificationGuideText } from '../../utils/notificationPermission.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:400, maxHeight:'92vh', overflowY:'auto' }
@@ -38,9 +39,20 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [loadingAI, setLoadingAI] = useState(false)
   const [aiProgress, setAiProgress] = useState({ progress:0, text:'' })
   const [aiWifiOnly, setAiWifiOnly] = useState(() => getLocalAIWifiOnly())
+  const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 
   const refreshAIStorage = () => getLocalModelStorageInfo().then(setAiStorage)
   useEffect(() => { if (visible) refreshAIStorage() }, [visible])
+  useEffect(() => {
+    if (!visible || typeof Notification === 'undefined') return
+    const refreshPermission = () => setNotificationPermission(Notification.permission)
+    window.addEventListener('focus', refreshPermission)
+    document.addEventListener('visibilitychange', refreshPermission)
+    return () => {
+      window.removeEventListener('focus', refreshPermission)
+      document.removeEventListener('visibilitychange', refreshPermission)
+    }
+  }, [visible])
 
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
@@ -69,7 +81,8 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
     </div>
   )
 
-  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'granted'
+  const perm = notificationPermission
+  const permissionGuide = getNotificationPermissionGuide(navigator.userAgent, !!(window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone))
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
   const netLabel = checking ? 'Comprobando conexión…' : !online ? 'Sin conexión'
     : connection?.effectiveType ? `${connection.effectiveType.toUpperCase()}${connection.downlink ? ` · ${connection.downlink} Mb/s` : ''}`
@@ -105,9 +118,20 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
 
         {/* System notifications */}
         {perm === 'denied' && (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:SEP }}>
-            <span style={{ fontSize:14, color:colors.text[900] }}>Notificaciones del sistema</span>
-            <span style={{ fontSize:11, color:colors.semantic.red, fontWeight:600 }}>Bloqueadas — activa en ajustes del navegador</span>
+          <div style={{ padding:'14px 0', borderBottom:SEP }}>
+            <div style={{ fontSize:14, color:colors.text[900], fontWeight:700 }}>Notificaciones bloqueadas</div>
+            <div style={{ fontSize:11, color:colors.text[500], lineHeight:1.55, marginTop:5 }}>{notificationGuideText(permissionGuide)}</div>
+            <button type="button" onClick={async () => {
+              const current = Notification.permission
+              setNotificationPermission(current)
+              if (current !== 'granted') {
+                toast('El permiso sigue bloqueado. Completa los pasos y vuelve a comprobar.', 5000, 'warn')
+                return
+              }
+              toast('Permiso detectado. Registrando dispositivo…', 3000, 'ok')
+              const result = await pushSubscribe(u.id, VAPID_PUB)
+              toast(result?.ok ? 'Notificaciones activadas en este dispositivo' : 'No se pudo registrar el dispositivo. Revisa la conexión e inténtalo de nuevo.', 5000, result?.ok ? 'ok' : 'err')
+            }} style={{ ...btnPrimary, width:'auto', padding:'7px 12px', fontSize:12 }}>Ya lo activé · Comprobar</button>
           </div>
         )}
         {perm === 'granted' && (
@@ -139,6 +163,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
             <button onClick={async () => {
               try {
                 const p = await Notification.requestPermission()
+                setNotificationPermission(p)
                 if (p === 'granted') { toast('Notificaciones activadas', 3000, 'ok'); onClose() }
                 else toast('Permiso denegado', 3000, 'err')
               } catch { toast('No soportado en este dispositivo', 3000) }

@@ -1019,6 +1019,14 @@ export async function pushSubscribe(userId, vapidPub) {
       console.error('[PUSH] Suscripción sin claves p256dh/auth')
       return { ok: false, reason: 'no_keys' }
     }
+    // Un endpoint representa un dispositivo, no una persona. Si en el mismo
+    // móvil inició sesión otro empleado anteriormente, eliminar esa asociación
+    // evita que el usuario actual reciba sus avisos privados.
+    const { error: cleanupError } = await supabase.from(PUSH_TABLE)
+      .delete()
+      .eq('endpoint', sub.endpoint)
+      .neq('user_id', userId)
+    if (cleanupError) console.warn('[PUSH] no se pudieron limpiar asociaciones antiguas:', cleanupError.message)
     const { error } = await supabase.from(PUSH_TABLE).upsert({
       user_id: userId,
       endpoint: sub.endpoint,

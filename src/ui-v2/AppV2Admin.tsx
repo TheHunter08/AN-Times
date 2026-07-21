@@ -1312,7 +1312,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     return [...set].sort().reverse().slice(0, 12)
   }, [db.records])
 
-  const handleDownloadExcel = (mes: string) => {
+  const handleDownloadExcel = async (mes: string) => {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
@@ -1340,8 +1340,12 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
         (r.correcciones || []).map((c: any) => `${c.ts || ''} · ${c.by || '—'} · ${c.motivo || 'Sin motivo'} · ${c.device || 'Dispositivo no registrado'} · ${c.oldInicio || '—'}–${c.oldFin || '—'} → ${c.newInicio || '—'}–${c.newFin || '—'}`).join(' | '),
       ]
     })
-    downloadXlsx(headers, rows, `fichajes-${mes}.xlsx`, label)
-    toast(`Excel descargado — ${label}`, 3000, 'ok')
+    try {
+      await downloadXlsx(headers, rows, `fichajes-${mes}.xlsx`, `Fichajes ${label}`)
+      toast(`Excel descargado — ${label}`, 3000, 'ok')
+    } catch (error: any) {
+      toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err')
+    }
   }
 
   const handleDownload = async (mes: string) => {

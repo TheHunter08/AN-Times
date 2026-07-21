@@ -96,6 +96,28 @@ test('exporta un recordatorio recurrente de informe al calendario', async ({ pag
   expect(download.suggestedFilename()).toBe('informe-weekly-hours.ics')
 })
 
+test('descarga informes mensuales reales en PDF y Excel', async ({ page }) => {
+  const inicio = new Date(2026, 6, 15, 8, 0).toISOString()
+  const fin = new Date(2026, 6, 15, 16, 0).toISOString()
+  await loginAsAdmin(page, {
+    records:[{ id:'export-1', empId:'e1', empName:'Empleado Prueba', inicio, fin, centro:'Obra Principal', workSecs:28800, breakSecs:0 }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Análisis', 'Cumplimiento')
+  await expect(page.getByText('Informes mensuales', { exact:true })).toBeVisible()
+  const reportRow = page.locator('.uiv2-report-row').filter({ hasText:'Informe mensual' })
+  await expect(reportRow).toHaveCount(1)
+
+  const excelDownload = page.waitForEvent('download')
+  await reportRow.getByRole('button', { name:'Excel', exact:true }).click()
+  expect((await excelDownload).suggestedFilename()).toBe('fichajes-2026-07.xlsx')
+
+  const pdfDownload = page.waitForEvent('download')
+  await reportRow.getByRole('button', { name:'PDF', exact:true }).click()
+  expect((await pdfDownload).suggestedFilename()).toBe('informe-2026-07.pdf')
+})
+
 test('Times AI resume la actividad operativa por obra', async ({ page }) => {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0).toISOString()

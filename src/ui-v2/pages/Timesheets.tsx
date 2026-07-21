@@ -9,6 +9,7 @@ import { radius } from '../design-system/radius'
 import { IconEdit, IconX, IconCheck, IconDownload } from '../components/Icons.js'
 import { downloadXlsx, downloadCsv } from '../../utils/exportFiles.js'
 import { today } from '../../utils/time.js'
+import { useAppStore } from '../../store/appStore.js'
 
 export interface TimesheetRow {
   id: string
@@ -30,6 +31,7 @@ export interface TimesheetsProps {
 }
 
 export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }: TimesheetsProps) {
+  const toast = useAppStore(s => s.toast)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
@@ -92,7 +94,14 @@ export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }:
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Badge tone="purple">{rows.length} registros</Badge>
         <div style={{ flex: 1 }} />
-        <button type="button" style={exportBtnStyle} onClick={() => downloadXlsx(exportHeaders, exportRows(), `fichajes-${today()}.xlsx`)}>
+        <button type="button" style={exportBtnStyle} onClick={async () => {
+          try {
+            await downloadXlsx(exportHeaders, exportRows(), `fichajes-${today()}.xlsx`, 'Fichajes')
+            toast('Excel profesional generado correctamente', 3000, 'ok')
+          } catch (error: any) {
+            toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err')
+          }
+        }}>
           <IconDownload width={13} height={13} /> Excel
         </button>
         <button type="button" style={exportBtnStyle} onClick={() => downloadCsv(exportHeaders, exportRows(), `fichajes-${today()}.csv`)}>

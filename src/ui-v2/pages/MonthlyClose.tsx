@@ -7,6 +7,7 @@ import { IconDownload, IconCheck, IconChevronDown, IconX } from '../components/I
 import { downloadSimplePdf, downloadXlsx, downloadDataUrl } from '../../utils/exportFiles.js'
 import { ProductState } from '../components/ProductState.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
+import { useAppStore } from '../../store/appStore.js'
 
 export interface ClosureItem {
   id: string
@@ -75,19 +76,25 @@ async function generatePDF(item: ClosureItem) {
 // Si el cierre ya está firmado existe un PDF oficial (con firma + hash SHA-256)
 // generado en el momento de la firma — descargar ESE documento, nunca uno
 // regenerado, para no perder la firma ni invalidar el hash.
-function downloadPdf(item: ClosureItem) {
+async function downloadPdf(item: ClosureItem) {
   if (item.pdfData) {
     downloadDataUrl(item.pdfData, `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.pdf`)
     return
   }
-  generatePDF(item)
+  await generatePDF(item)
 }
 
-function generateExcel(item: ClosureItem) {
-  downloadXlsx(['Fecha', 'Entrada', 'Salida', 'Horas'], (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]), `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`)
+async function generateExcel(item: ClosureItem) {
+  await downloadXlsx(
+    ['Fecha', 'Entrada', 'Salida', 'Horas'],
+    (item.records || []).map(r => [r.date, r.entry, r.exit, r.hours]),
+    `cierre-${item.mes}-${item.empName.replace(/\s+/g, '_')}.xlsx`,
+    `Cierre ${item.mes}`,
+  )
 }
 
 export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGenerateAll, onDelete, onDeleteMonth, onReopen, onReopenMonth, onDownloadConsolidated, canGenerate = true, generationHint }: MonthlyCloseProps) {
+  const toast = useAppStore(s => s.toast)
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'signed' | 'pending'>('all')
   const [detail, setDetail] = useState<ClosureItem | null>(null)
@@ -276,7 +283,10 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                 >
                   <IconDownload width={13} height={13} /> PDF
                 </button>
-                <button onClick={() => generateExcel(item)} title="Generar Excel" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}>
+                <button onClick={async () => {
+                  try { await generateExcel(item); toast('Excel del cierre generado correctamente', 3000, 'ok') }
+                  catch (error: any) { toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err') }
+                }} title="Generar Excel" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}>
                   <IconDownload width={13} height={13} /> Excel
                 </button>
                 <button
@@ -442,7 +452,10 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               >
                 <IconDownload width={14} height={14} /> {(detail.pdfData || detail.documentoId) ? 'Descargar PDF firmado' : 'Descargar PDF'}
               </button>
-              <button onClick={() => generateExcel(detail)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={async () => {
+                try { await generateExcel(detail); toast('Excel del cierre generado correctamente', 3000, 'ok') }
+                catch (error: any) { toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err') }
+              }} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Descargar Excel
               </button>
               {!detail.firmaAdmin && detail.canSignAdmin && onSignAdmin && (

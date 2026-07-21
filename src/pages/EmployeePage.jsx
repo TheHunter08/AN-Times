@@ -18,6 +18,7 @@ import { useWindowWidth } from '../hooks/useWindowWidth.js'
 import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
 import { resolveEmployeeNotificationDestination } from '../utils/notificationNavigation.js'
+import { getNotificationPermissionGuide, notificationGuideText } from '../utils/notificationPermission.js'
 import { employeeObraOptions } from '../utils/obraAttribution.js'
 import { normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
@@ -194,7 +195,8 @@ export default function EmployeePage() {
   const handleNotifActivate = async () => {
     try {
       if (Notification.permission === 'denied') {
-        toast('Activa las notificaciones de TIMES INC desde los ajustes del teléfono para sincronizar con la app cerrada.', 7000, 'warn')
+        const guide = getNotificationPermissionGuide(navigator.userAgent, !!(window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone))
+        toast(notificationGuideText(guide), 10000, 'warn')
         return
       }
       const p = Notification.permission === 'granted'

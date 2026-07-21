@@ -5,6 +5,7 @@ import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { TextField } from '../../ui-v2/components/FormField.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
+import { getNotificationPermissionGuide } from '../../utils/notificationPermission.js'
 
 const btnPrimary = { padding:'12px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
 const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
@@ -19,6 +20,10 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
   const dialogRef = useDialogA11y(visible && !done)
   const existingSignature = db.firmas?.[u?.id]?.main?.data || null
+  const permissionGuide = getNotificationPermissionGuide(
+    typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    typeof window !== 'undefined' && !!(window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone),
+  )
 
   useEffect(() => { if (step === 1 && !existingSignature) initCanvas() }, [step, existingSignature, initCanvas])
 
@@ -107,12 +112,23 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
               </div>
             ) : (
               <>
-                <button style={{ ...btnPrimary, width:'100%', marginBottom:10 }} onClick={onActivateNotifications}>🔔 Activar y comprobar</button>
-                <div style={{ fontSize:11, color:colors.semantic.orange, lineHeight:1.5, marginBottom:12, textAlign:'center' }}>
-                  {notificationPermission === 'denied'
-                    ? 'El permiso está bloqueado. Actívalo en los ajustes del teléfono para TIMES INC.'
-                    : 'Este requisito permite enviar fichajes pendientes incluso con la app cerrada.'}
-                </div>
+                <button style={{ ...btnPrimary, width:'100%', marginBottom:10 }} onClick={onActivateNotifications}>
+                  {notificationPermission === 'denied' ? '✓ Ya lo activé · Comprobar' : '🔔 Activar y comprobar'}
+                </button>
+                {notificationPermission === 'denied' ? (
+                  <div style={{ background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.lg, padding:'11px 12px', marginBottom:12 }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:colors.text[900], marginBottom:7 }}>{permissionGuide.title}</div>
+                    {permissionGuide.steps.map((instruction, index) => (
+                      <div key={instruction} style={{ display:'flex', gap:8, fontSize:11, color:colors.text[500], lineHeight:1.45, marginTop:index ? 5 : 0 }}>
+                        <strong style={{ color:colors.primary.light }}>{index + 1}</strong><span>{instruction}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize:11, color:colors.semantic.orange, lineHeight:1.5, marginBottom:12, textAlign:'center' }}>
+                    Este requisito permite recibir avisos operativos con la app cerrada.
+                  </div>
+                )}
               </>
             )}
             <button disabled={!pushReady} style={{ ...btnSecondary, width:'100%', opacity:pushReady ? 1 : .45, cursor:pushReady ? 'pointer' : 'not-allowed' }} onClick={() => pushReady && setStep(1)}>
