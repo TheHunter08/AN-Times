@@ -148,11 +148,19 @@ export const useAppStore = create((set, get) => ({
 
   dbLoading: false,
 
-  fetchDB: async () => {
+  dbRefreshPending: false,
+
+  fetchDB: async (options = {}) => {
+    const forceTables = options?.forceTables === true
     // Broadcast, postgres_changes y el sondeo de seguridad pueden coincidir.
     // Una sola descarga es suficiente; la siguiente notificacion o sondeo
     // recuperara cualquier cambio que llegue mientras esta sigue en curso.
-    if (get().dbLoading) return
+    if (get().dbLoading) {
+      // Un postgres_changes puede llegar mientras otra descarga sigue activa.
+      // No se pierde: al terminar se repite una lectura forzada de tablas.
+      if (forceTables) set({ dbRefreshPending: true })
+      return
+    }
     const { db } = get()
     set({ dbLoading: true })
     try {
@@ -165,7 +173,7 @@ export const useAppStore = create((set, get) => ({
       // Comparar contra _serverTs (no db._ts): db._ts puede estar inflado por
       // Date.now() de guardados locales del encargado, haciendo que tsResult.ts
       // (updated_at del servidor) parezca "más viejo" y se salte la descarga.
-      if (tsResult.ts && get()._serverTs && tsResult.ts <= get()._serverTs) {
+      if (!forceTables && tsResult.ts && get()._serverTs && tsResult.ts <= get()._serverTs) {
         set({ syncStatus: 'synced', lastSyncTime: Date.now() })
         return
       }
@@ -194,6 +202,10 @@ export const useAppStore = create((set, get) => ({
       }
     } finally {
       set({ dbLoading: false })
+      if (get().dbRefreshPending) {
+        set({ dbRefreshPending: false })
+        queueMicrotask(() => get().fetchDB({ forceTables: true }))
+      }
     }
   },
 
@@ -214,7 +226,9 @@ export const useAppStore = create((set, get) => ({
 
   // ── postgres_changes Realtime ────────────────────────────────────────
   initTableRealtime: () => {
-    startTableRealtime(() => get().fetchDB())
+    // postgres_changes ya confirma que una tabla cambió. Forzar la lectura evita
+    // descartarla por un reloj legacy/app_data todavía sin actualizar.
+    startTableRealtime(() => get().fetchDB({ forceTables: true }))
   },
   stopTableRealtime,
 

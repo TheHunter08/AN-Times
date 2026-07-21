@@ -567,5 +567,7 @@ export function stopTableRealtime() {
 
 function _debouncedRefresh(fn) {
   clearTimeout(_tableDebounce)
-  _tableDebounce = setTimeout(fn, 1500)
+  // Agrupa la ráfaga de escrituras de un mismo guardado sin añadir un retraso
+  // visible al fichaje en los demás dispositivos.
+  _tableDebounce = setTimeout(fn, 120)
 }

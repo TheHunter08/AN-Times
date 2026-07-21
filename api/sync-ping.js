@@ -9,7 +9,7 @@
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
-import { isSyncCandidate, PUSH_ACTIVE_WINDOW_MS } from '../src/server/syncPingPolicy.js'
+import { getDeviceCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -20,6 +20,7 @@ const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(pr
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
 const CRON_SECRET   = process.env.CRON_SECRET
+const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
 let _vapidError = null
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
@@ -35,18 +36,31 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 }
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
-async function getCandidateSubs() {
-  if (!SB_URL || !SB_ANON) return []
-  // Una sola señal se conserva en APNs/FCM hasta siete días. La ventana de 24h
-  // limita suscripciones abandonadas, pero cubre turnos completos sin abrir la app.
-  const activeSince = new Date(Date.now() - PUSH_ACTIVE_WINDOW_MS).toISOString()
-  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync&last_online=gt.${activeSince}`
+async function getSyncState() {
+  if (!SB_URL || !SB_ANON) return { candidates: [], coverage: getDeviceCoverage() }
+  const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`
+  const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync`
   try {
-    const r = await fetch(url, { headers: SB_H })
-    if (!r.ok) { console.warn('[sync-ping] getPushSubs error', r.status); return [] }
-    const subs = await r.json()
-    return subs.filter(s => isSyncCandidate(s))
-  } catch (e) { console.error('[sync-ping] fetch subs error:', e.message); return [] }
+    const [employeesResponse, subscriptionsResponse] = await Promise.all([
+      fetch(employeesUrl, { headers: SB_H }),
+      fetch(subscriptionsUrl, { headers: SB_H }),
+    ])
+    if (!employeesResponse.ok || !subscriptionsResponse.ok) {
+      throw new Error(`coverage fetch failed: ${employeesResponse.status}/${subscriptionsResponse.status}`)
+    }
+    const coverage = getDeviceCoverage(
+      await employeesResponse.json(),
+      await subscriptionsResponse.json()
+    )
+    return {
+      coverage,
+      // El total registrado y los móviles que necesitan un ping son métricas distintas.
+      candidates: coverage.activeSubscriptions.filter(subscription => isSyncCandidate(subscription)),
+    }
+  } catch (e) {
+    console.error('[sync-ping] fetch coverage error:', e.message)
+    throw e
+  }
 }
 
 async function deleteSub(userId) {
@@ -68,8 +82,17 @@ export default async function handler(req, res) {
   if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
 
   try {
-    const candidates = await getCandidateSubs()
-    if (!candidates.length) return res.status(200).json({ ok: true, sent: 0, reason: 'no candidates' })
+    const { candidates, coverage } = await getSyncState()
+    const coverageResult = {
+      expectedDevices: coverage.expectedWorkers,
+      registeredDevices: coverage.registeredWorkers,
+      missingDevices: coverage.missingWorkerIds.length,
+      orphanSubscriptions: coverage.orphanSubscriptions.length,
+    }
+    if (!candidates.length) {
+      console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} missing=${coverageResult.missingDevices} candidates=0 sent=0`)
+      return res.status(200).json({ ok: true, ...coverageResult, candidates: 0, sent: 0, reason: 'no candidates' })
+    }
 
     const payload = JSON.stringify({
       type: 'SYNC_PING',
@@ -101,8 +124,8 @@ export default async function handler(req, res) {
       }
     }))
 
-    console.log(`[sync-ping] candidates=${candidates.length} sent=${sent} expired=${expired} errors=${errors}`)
-    return res.status(200).json({ ok: true, sent, expired, errors })
+    console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} missing=${coverageResult.missingDevices} candidates=${candidates.length} sent=${sent} expired=${expired} errors=${errors}`)
+    return res.status(200).json({ ok: true, ...coverageResult, candidates: candidates.length, sent, expired, errors })
   } catch (e) {
     console.error('[sync-ping] fatal:', e)
     return res.status(500).json({ error: e.message })

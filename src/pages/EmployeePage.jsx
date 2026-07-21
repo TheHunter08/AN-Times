@@ -130,19 +130,54 @@ export default function EmployeePage() {
   useEffect(() => { dbRef.current = db }, [db])
 
   // ── Notification permission banner (global, all tabs) ─────────────────────────
-  const _notifDismissKey = 'an_notif_dismiss_ts'
-  const _isNotifDismissed = () => {
-    try {
-      const ts = parseInt(localStorage.getItem(_notifDismissKey) || '0', 10)
-      return ts > 0 && (Date.now() - ts) < 30 * 24 * 60 * 60 * 1000  // 30 days
-    } catch { return false }
-  }
   const [notifPerm, setNotifPerm] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'granted'
   )
-  const [notifBannerDismissed, setNotifBannerDismissed] = useState(_isNotifDismissed)
-  const showSyncProtectionBanner = offlinePending && notifPerm !== 'granted'
-  const showNotifBanner = showSyncProtectionBanner || (notifPerm === 'default' && !notifBannerDismissed)
+  const [pushStatus, setPushStatus] = useState(() =>
+    typeof Notification === 'undefined'
+      ? 'unsupported'
+      : Notification.permission === 'granted' ? 'checking' : 'permission'
+  )
+  const pushAttemptRef = useRef(false)
+  const pushReadyRef = useRef(false)
+  const showNotifBanner = pushStatus !== 'ready'
+  const pushBannerTitle = notifPerm === 'denied'
+    ? 'Falta activar la sincronización cerrada'
+    : pushStatus === 'checking' ? 'Comprobando este dispositivo…' : 'Protege el envío de tus fichajes'
+  const pushBannerText = pushStatus === 'unsupported'
+    ? 'Instala TIMES INC como app para permitir el envío automático sin abrirla'
+    : notifPerm === 'denied'
+      ? 'Activa las notificaciones de TIMES INC desde los ajustes del teléfono'
+      : notifPerm === 'granted' && pushStatus === 'failed'
+        ? 'No se pudo registrar este móvil; pulsa Reintentar cuando tengas cobertura'
+        : 'Es necesario registrar este móvil para sincronizar automáticamente con la app cerrada'
+
+  const ensurePushReady = useCallback(async (showFeedback = false) => {
+    if (!u?.id || pushAttemptRef.current || typeof Notification === 'undefined') return false
+    const permission = Notification.permission
+    setNotifPerm(permission)
+    if (permission !== 'granted') {
+      setPushStatus('permission')
+      return false
+    }
+    pushAttemptRef.current = true
+    setPushStatus('checking')
+    try {
+      const result = await pushSubscribe(u.id, VAPID_PUB)
+      pushReadyRef.current = !!result?.ok
+      setPushStatus(result?.ok ? 'ready' : 'failed')
+      if (showFeedback) {
+        toast(
+          result?.ok ? 'Dispositivo protegido para sincronizar con la app cerrada' : (result?.error || result?.hint || 'No se pudo registrar este dispositivo. Vuelve a intentarlo con cobertura.'),
+          result?.ok ? 3500 : 7000,
+          result?.ok ? 'ok' : 'warn'
+        )
+      }
+      return !!result?.ok
+    } finally {
+      pushAttemptRef.current = false
+    }
+  }, [u?.id, toast])
 
   const handleNotifActivate = async () => {
     try {
@@ -150,33 +185,36 @@ export default function EmployeePage() {
         toast('Activa las notificaciones de TIMES INC desde los ajustes del teléfono para sincronizar con la app cerrada.', 7000, 'warn')
         return
       }
-      const p = await Notification.requestPermission()
+      const p = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission()
       setNotifPerm(p)
       if (p === 'granted' && u?.id) {
-        pushSubscribe(u.id, VAPID_PUB)
-        toast('Notificaciones activadas', 3000, 'ok')
+        await ensurePushReady(true)
       }
     } catch {}
-    try { localStorage.setItem(_notifDismissKey, String(Date.now())) } catch {}
-    setNotifBannerDismissed(true)
-  }
-  const handleNotifDismiss = () => {
-    try { localStorage.setItem(_notifDismissKey, String(Date.now())) } catch {}
-    setNotifBannerDismissed(true)
   }
 
-  // Fast-path: if permission already granted, register subscription immediately
+  // Registro confirmado y con reintento: conceder permiso no basta si la fila de
+  // push_subs falló por mala cobertura. Mientras no haya confirmación, el aviso
+  // permanece visible y se reintenta al recuperar red o volver a la app.
   useEffect(() => {
     if (!u?.id || !('Notification' in window)) return
-    if (Notification.permission === 'granted') {
-      pushSubscribe(u.id, VAPID_PUB)
-    }
-    // Keep banner in sync with actual permission (e.g. user granted from browser settings)
-    const id = setInterval(() => {
+    pushReadyRef.current = false
+    const retry = () => {
       setNotifPerm(Notification.permission)
-    }, 4000)
-    return () => clearInterval(id)
-  }, [u?.id])
+      if (Notification.permission === 'granted' && !pushReadyRef.current) ensurePushReady(false)
+    }
+    retry()
+    const id = setInterval(retry, 30_000)
+    window.addEventListener('online', retry)
+    window.addEventListener('focus', retry)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('online', retry)
+      window.removeEventListener('focus', retry)
+    }
+  }, [u?.id, ensurePushReady])
 
   // Recordatorio de fichaje — verifica cada minuto si hay que notificar
   useEffect(() => {
@@ -1170,11 +1208,10 @@ export default function EmployeePage() {
           <div className="v3-notif-banner" style={{ borderRadius:0, borderLeft:'none', borderRight:'none', borderTop:'none' }}>
             <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
             <div className="v3-notif-banner-text">
-              <div className="v3-notif-banner-title">{showSyncProtectionBanner ? 'Protege el envío de tus fichajes' : 'Activa las notificaciones'}</div>
-              <div className="v3-notif-banner-sub">{showSyncProtectionBanner ? 'Son necesarias para sincronizar automáticamente con la app cerrada' : 'Recibe avisos de jornada, documentos y mensajes'}</div>
+              <div className="v3-notif-banner-title">{pushBannerTitle}</div>
+              <div className="v3-notif-banner-sub">{pushBannerText}</div>
             </div>
-            <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : 'Activar'}</button>
-            {!showSyncProtectionBanner && <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>}
+            {pushStatus !== 'checking' && pushStatus !== 'unsupported' && <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : notifPerm === 'granted' ? 'Reintentar' : 'Activar'}</button>}
           </div>
         )}
 
@@ -1331,11 +1368,10 @@ export default function EmployeePage() {
         <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(177,138,82,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
           <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
           <div className="v3-notif-banner-text">
-            <div className="v3-notif-banner-title">{showSyncProtectionBanner ? 'Protege el envío de tus fichajes' : 'Activa las notificaciones'}</div>
-            <div className="v3-notif-banner-sub">{showSyncProtectionBanner ? 'Son necesarias para sincronizar automáticamente con la app cerrada' : 'Recibe avisos de jornada, documentos y mensajes'}</div>
+            <div className="v3-notif-banner-title">{pushBannerTitle}</div>
+            <div className="v3-notif-banner-sub">{pushBannerText}</div>
           </div>
-          <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : 'Activar'}</button>
-          {!showSyncProtectionBanner && <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>}
+          {pushStatus !== 'checking' && pushStatus !== 'unsupported' && <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : notifPerm === 'granted' ? 'Reintentar' : 'Activar'}</button>}
         </div>
       )}
 
