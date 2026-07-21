@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { auditLog, mergeDB, recordTombstones, mergePendingDeletes, mergeSyncHints } from './dataService.js'
+import { auditLog, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -87,6 +87,13 @@ describe('cola offline', () => {
       { changedKeys: ['vacaciones', 'records'], recordIds: ['r2'] },
     )).toEqual({ changedKeys: ['records', 'vacaciones'], recordIds: ['r1', 'r2'] })
     expect(mergeSyncHints({ full: true }, { changedKeys: ['records'], recordIds: ['r3'] })).toEqual({ full: true })
+  })
+
+  it('conserva tombstones remotos para proteger otros dispositivos desactualizados', () => {
+    expect(mergePersistentDeletes(
+      { records:['r-old'], notis:['n1'] },
+      { records:['r-new', 'r-old'] },
+    )).toEqual({ records:['r-old', 'r-new'], notis:['n1'] })
   })
 })
 

@@ -27,7 +27,7 @@ async function rows(path) {
 }
 
 const [employees, subscriptions, records, closures, blobRows] = await Promise.all([
-  rows('employees?select=id,role,baja,auth_id'),
+  rows('employees?select=id,role,baja,email,auth_id'),
   rows('push_subs?select=user_id,endpoint'),
   rows('records?select=id,fin,aceptada,validado,rechazado,closed,deleted'),
   rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,deleted'),
@@ -35,7 +35,8 @@ const [employees, subscriptions, records, closures, blobRows] = await Promise.al
 ])
 
 const blob = blobRows[0]?.data || {}
-const workers = employees.filter(item => !item.baja && item.role !== 'admin')
+const workers = employees.filter(item => !item.baja && item.role !== 'admin' && !item.isAdmin)
+const activeEmployees = employees.filter(item => !item.baja)
 const workerIds = new Set(workers.map(item => item.id))
 const subscribed = new Set(subscriptions.map(item => item.user_id).filter(id => workerIds.has(id)))
 const endpointCounts = new Map()
@@ -51,6 +52,8 @@ const blobRecordIds = new Set((blob.records || []).map(item => item.id))
 const missingInTables = [...blobRecordIds].filter(id => !tableRecordIds.has(id)).length
 const missingInBlob = [...tableRecordIds].filter(id => !blobRecordIds.has(id)).length
 const pendingValidation = activeRecords.filter(item => item.fin && !item.aceptada && !item.validado && !item.rechazado).length
+const authCounts = new Map()
+for (const item of activeEmployees) if (item.auth_id) authCounts.set(item.auth_id, (authCounts.get(item.auth_id) || 0) + 1)
 
 const checks = {
   supabaseProject: new URL(url).hostname.split('.')[0],
@@ -62,7 +65,10 @@ const checks = {
   duplicatedEndpoints: [...endpointCounts.values()].filter(count => count > 1).length,
   workersWithSignature: signed.length,
   missingSignatures: workers.length - signed.length,
-  employeesMissingAuth: employees.filter(item => !item.baja && !item.auth_id).length,
+  employeesWithEmail: activeEmployees.filter(item => String(item.email || '').includes('@')).length,
+  employeesMissingEmail: activeEmployees.filter(item => !String(item.email || '').includes('@')).length,
+  employeesMissingAuth: activeEmployees.filter(item => !item.auth_id).length,
+  duplicatedAuthIdentities: [...authCounts.values()].filter(count => count > 1).length,
   normalizedRecords: activeRecords.length,
   blobRecords: blobRecordIds.size,
   missingInTables,
@@ -74,5 +80,5 @@ const checks = {
 
 console.log(JSON.stringify(checks, null, 2))
 const blockers = checks.missingDeviceSubscriptions + checks.missingSignatures + checks.employeesMissingAuth +
-  checks.missingInTables + checks.missingInBlob + checks.invalidCurrentClosures
+  checks.employeesMissingEmail + checks.duplicatedAuthIdentities + checks.missingInTables + checks.missingInBlob + checks.invalidCurrentClosures
 if (process.argv.includes('--strict') && blockers) process.exitCode = 1

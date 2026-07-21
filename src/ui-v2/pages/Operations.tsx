@@ -25,6 +25,12 @@ interface OperationsProps {
   lastSyncTime?: number | null
   authReady: number
   authTotal: number
+  emailReady: number
+  signatureReady: number
+  signatureTotal: number
+  pushReady: number | null
+  pushTotal: number
+  pendingValidation: number
   documentCount: number
   schedules: ReportSchedule[]
   visibleWidgets: string[]
@@ -101,6 +107,10 @@ export function Operations(props: OperationsProps) {
           { label: 'Datos', value: syncHealthy ? 'Sincronizados' : props.offlinePending ? 'Cambios pendientes' : 'Revisar conexión', ok: syncHealthy, icon: <IconCheck />, page: 'auditoria', detail: 'Abrir auditoría' },
           { label: 'Tiempo real', value: realtimeHealthy ? 'Activo' : 'Reconectando', ok: realtimeHealthy, icon: <IconClock />, page: 'en_linea', detail: 'Ver equipo conectado' },
           { label: 'Acceso seguro', value: `${props.authReady}/${props.authTotal} vinculados`, ok: authPct === 100, icon: <IconShield />, page: 'empleados', detail: 'Revisar empleados' },
+          { label: 'Correos de acceso', value: `${props.emailReady}/${props.authTotal} configurados`, ok: props.emailReady === props.authTotal, icon: <IconShield />, page: 'empleados', detail: 'Completar perfiles' },
+          { label: 'Firmas obligatorias', value: `${props.signatureReady}/${props.signatureTotal} registradas`, ok: props.signatureReady === props.signatureTotal, icon: <IconFileText />, page: 'empleados', detail: 'Revisar empleados' },
+          { label: 'Dispositivos', value: props.pushReady == null ? 'Comprobando…' : `${props.pushReady}/${props.pushTotal} registrados`, ok: props.pushReady === props.pushTotal, icon: <IconCheck />, page: 'empleados', detail: 'Revisar cobertura' },
+          { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, page: 'validar', detail: 'Abrir validación' },
           { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, page: 'documentos', detail: 'Abrir documentos' },
         ].map(item => (
           <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={() => props.onNavigate(item.page)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onNavigate(item.page) } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>

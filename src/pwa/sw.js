@@ -437,18 +437,32 @@ function _mergeRecordsSW(base, incoming) {
 const _LIST_KEYS = ['empresas', 'obras', 'centrosTrabajo', 'employees', 'vacaciones', 'medicos', 'ausencias', 'mensajes', 'notis', 'cierres', 'documentos', 'audit', 'correccionesFichaje', 'chats', 'gastos', 'denuncias', 'wellbeing', 'turnos', 'partesTrabajo', 'anomalias_vistas']
 const _MAP_KEYS  = ['monthSnapshots', 'firmas', 'notisSent', 'pinLockouts', 'config']
 
+function _mergeDeletedSW(...groups) {
+  const out = {}
+  for (const group of groups) {
+    if (!group || typeof group !== 'object') continue
+    for (const [key, ids] of Object.entries(group)) {
+      if (!Array.isArray(ids)) continue
+      out[key] = [...new Set([...(out[key] || []), ...ids])].slice(-5000)
+    }
+  }
+  return Object.keys(out).length ? out : null
+}
+
 function _mergeForPushSW(server, local, deleted) {
-  if (!server) return local
+  server = server || {}
+  const persistentDeleted = _mergeDeletedSW(server._deleted, local._deleted, deleted)
   const out = { ...local }
   for (const k of _LIST_KEYS) out[k] = _unionByIdSW(server[k], local[k])
   out.records = _mergeRecordsSW(server.records, (local.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())))
   for (const k of _MAP_KEYS) out[k] = { ...(server[k] || {}), ...(local[k] || {}) }
   // Una unión solo puede añadir/actualizar, nunca "quitar" — sin esto, un
   // elemento borrado offline resucitaba porque el servidor todavía lo tenía.
-  if (deleted) {
-    for (const k of Object.keys(deleted)) {
+  if (persistentDeleted) {
+    out._deleted = persistentDeleted
+    for (const k of Object.keys(persistentDeleted)) {
       if (!Array.isArray(out[k])) continue
-      const delSet = new Set(deleted[k])
+      const delSet = new Set(persistentDeleted[k])
       out[k] = out[k].filter(item => !delSet.has(item && typeof item === 'object' ? item.id : item))
     }
   }

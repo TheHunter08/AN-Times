@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
+import { linkAuthIdentity } from '../utils/authIdentity.js'
 import { useShallow } from 'zustand/react/shallow'
 import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
 import { sortedEmps } from '../utils/time.js'
@@ -141,10 +142,14 @@ export default function LoginV2() {
   // políticas RLS por rol (policies_auth.sql) no se pueden activar nunca,
   // porque siempre habría 0 empleados "vinculados".
   const linkAuthIdIfMissing = useCallback((emp: any, authUserId?: string | null) => {
-    if (!authUserId || emp.authId === authUserId) return
+    if (!authUserId) return false
+    const linkedEmployee = linkAuthIdentity(emp, authUserId)
+    if (!linkedEmployee) return false
+    if ((emp.authId || emp.auth_id) === authUserId) return true
     saveDB((fresh: any) => ({
-      employees: (fresh.employees || []).map((e: any) => e.id === emp.id ? { ...e, authId: authUserId } : e),
+      employees: (fresh.employees || []).map((e: any) => e.id === emp.id ? linkedEmployee : e),
     }))
+    return true
   }, [saveDB])
 
   const doAdminLogin = useCallback((authMethod = 'admin') => {
@@ -266,7 +271,11 @@ export default function LoginV2() {
       const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
       const configuredAdmin = configuredEmails.includes(em || '')
       const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
-      if (emp) linkAuthIdIfMissing(emp, result.user?.id)
+      if (emp && !linkAuthIdIfMissing(emp, result.user?.id)) {
+        await authSignOut()
+        setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+        return
+      }
       if (emp && employeeAdmin) {
         doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
@@ -324,8 +333,11 @@ export default function LoginV2() {
         const freshDB = useAppStore.getState().db
         const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
         if (emp) {
-          linkAuthIdIfMissing(emp, session.user.id)
-          doLogin(emp, 'oauth')
+          if (linkAuthIdIfMissing(emp, session.user.id)) doLogin(emp, 'oauth')
+          else {
+            await authSignOut()
+            setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+          }
         } else {
           const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
           if (configuredEmails.includes(userEmail)) doAdminLogin('oauth')

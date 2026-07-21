@@ -303,8 +303,8 @@ export function mergeDB(base, incoming) {
 // antes/después de cada saveDB) son los ids que el usuario borró a propósito
 // en este guardado — se eliminan del resultado ya fusionado, explícitamente.
 function _mergeForPush(serverData, localPayload, deleted) {
-  if (!serverData) return localPayload
-  const s = serverData, l = localPayload
+  const s = serverData || {}, l = localPayload
+  const persistentDeleted = mergePersistentDeletes(s._deleted, l._deleted, deleted)
   const out = {
     ...l,
     empresas:            _unionById(s.empresas,            l.empresas),
@@ -333,11 +333,12 @@ function _mergeForPush(serverData, localPayload, deleted) {
     notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
     config:              { ...(s.config || {}), ...(l.config || {}) },
+    ...(persistentDeleted ? { _deleted:persistentDeleted } : {}),
   }
-  if (deleted) {
-    for (const key of Object.keys(deleted)) {
+  if (persistentDeleted) {
+    for (const key of Object.keys(persistentDeleted)) {
       if (!Array.isArray(out[key])) continue
-      const delSet = new Set(deleted[key])
+      const delSet = new Set(persistentDeleted[key])
       out[key] = out[key].filter(item => !delSet.has(item && typeof item === 'object' ? item.id : item))
     }
   }
@@ -479,6 +480,15 @@ export function mergePendingDeletes(previous, incoming) {
     }
   }
   return Object.keys(out).length ? out : null
+}
+
+// Tombstones compartidos en app_data: una eliminación confirmada debe vencer
+// también a dispositivos que llevaban días sin abrir y aún conservan el item.
+export function mergePersistentDeletes(...groups) {
+  let merged = null
+  for (const group of groups) merged = mergePendingDeletes(merged, group)
+  if (!merged) return null
+  return Object.fromEntries(Object.entries(merged).map(([key, ids]) => [key, ids.slice(-5000)]))
 }
 
 export function mergeSyncHints(previous, incoming) {
@@ -1062,6 +1072,25 @@ export async function detachPushUser(userId) {
     }
     await _idbDel('push_user_id')
   } catch {}
+}
+
+// Cobertura real de Web Push para el centro de lanzamiento. Solo devuelve
+// conteos e ids, nunca endpoints ni claves criptográficas de los dispositivos.
+export async function getPushCoverage(employeeIds = []) {
+  const wanted = new Set((employeeIds || []).filter(Boolean))
+  if (!supabase || wanted.size === 0) return { registered:0, total:wanted.size, missingIds:[...wanted] }
+  try {
+    const { data, error } = await supabase.from(PUSH_TABLE).select('user_id')
+    if (error) throw error
+    const registeredIds = new Set((data || []).map(row => row.user_id).filter(id => wanted.has(id)))
+    return {
+      registered:registeredIds.size,
+      total:wanted.size,
+      missingIds:[...wanted].filter(id => !registeredIds.has(id)),
+    }
+  } catch {
+    return { registered:null, total:wanted.size, missingIds:[] }
+  }
 }
 
 // Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 5 min.

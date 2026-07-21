@@ -52,10 +52,17 @@ test('los KPI y filas de anomalías filtran y abren fichajes', async ({ page }) 
 })
 
 test('el centro operativo abre los detalles relacionados', async ({ page }) => {
-  await loginAsAdmin(page, { employees:[employee] })
+  await loginAsAdmin(page, { employees:[{ ...employee, email:'empleado@times.test', authId:'auth-e1' }] })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200, contentType:'application/json', body:JSON.stringify([{ user_id:employee.id }]),
+  }))
   await page.goto('/')
   await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
   await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  await expect(page.getByRole('button', { name:/Firmas obligatorias: 1\/1 registradas/i })).toBeVisible()
+  await expect(page.getByRole('button', { name:/Dispositivos: 1\/1 registrados/i })).toBeVisible()
+  await expect(page.getByRole('button', { name:/Validaciones reales: Ninguna pendiente/i })).toBeVisible()
 
   await page.getByRole('button', { name:/Acceso seguro: \d+\/\d+ vinculados.*Revisar empleados/i }).click()
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()

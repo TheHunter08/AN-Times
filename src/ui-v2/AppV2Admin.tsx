@@ -21,7 +21,7 @@ import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 import { useEmployeesData } from './hooks/useEmployeesData.js'
 import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
-import { auditLog, queuePush, uploadPendingIfAny } from '../services/dataService.js'
+import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs, vacData as vacDataUtil } from '../utils/time.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
@@ -2484,8 +2484,22 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
   const visibleWidgets = (db.config?.adminDashboard?.visibleWidgets || defaultWidgets)
     .map((id: string) => legacyWidgetIds[id] || id)
   const employees = (db.employees || []).filter((employee: any) => !employee.baja)
+  const workers = employees.filter((employee: any) => employee.role !== 'admin' && !employee.isAdmin)
   const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
+  const emailReady = employees.filter((employee: any) => String(employee.email || '').includes('@')).length
+  const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
+  const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
+  const [pushReady, setPushReady] = useState<number | null>(null)
   const documentCount = (db.documentos || []).length
+
+  const workerIdsKey = workers.map((employee: any) => employee.id).sort().join('|')
+  useEffect(() => {
+    let active = true
+    getPushCoverage(workerIdsKey ? workerIdsKey.split('|') : []).then(result => {
+      if (active) setPushReady(result.registered)
+    })
+    return () => { active = false }
+  }, [workerIdsKey])
 
   const updateConfig = (patch: any) => saveDB((fresh: any) => ({
     config: { ...(fresh.config || {}), ...patch, _upd: new Date().toISOString() },
@@ -2505,6 +2519,12 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     lastSyncTime={lastSyncTime}
     authReady={authReady}
     authTotal={employees.length}
+    emailReady={emailReady}
+    signatureReady={signatureReady}
+    signatureTotal={workers.length}
+    pushReady={pushReady}
+    pushTotal={workers.length}
+    pendingValidation={pendingValidation}
     documentCount={documentCount}
     schedules={schedules}
     visibleWidgets={visibleWidgets}

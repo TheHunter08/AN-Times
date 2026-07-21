@@ -36,6 +36,7 @@ export {
   uploadPendingIfAny,
   pushSubscribe,
   detachPushUser,
+  getPushCoverage,
   queuePush,
   flushPushQueue,
   auditLog,

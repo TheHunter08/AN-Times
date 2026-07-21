@@ -19,6 +19,7 @@
     "repair:push-subscriptions": "node scripts/repair-push-subscriptions.mjs",
     "audit:notifications": "node scripts/audit-notifications.mjs",
     "repair:notifications": "node scripts/repair-notifications.mjs",
+    "repair:record-tombstones": "node scripts/repair-record-tombstones.mjs",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
     "typecheck": "tsc --noEmit"
   },
