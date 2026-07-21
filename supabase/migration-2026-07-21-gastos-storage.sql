@@ -1,7 +1,7 @@
 -- ================================================================
 -- Times INC – Políticas RLS para el bucket de Storage "gastos-fotos"
 -- Aplicar en: Dashboard > SQL Editor > New Query
--- (requiere haber creado ya el bucket privado "gastos-fotos" en Storage)
+-- Crea también el bucket privado "gastos-fotos" si todavía no existe.
 -- ================================================================
 --
 -- Mismo caso que documentos-empleado y cierres-pdf: las fotos de tickets
@@ -27,6 +27,25 @@
 -- conozca/adivine el empId) en vez de romper la vista previa del ticket.
 -- Pendiente de resolver junto con cierres-pdf cuando las sesiones por PIN
 -- tengan una identidad verificable en el servidor.
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'gastos-fotos',
+  'gastos-fotos',
+  false,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- Los DROP hacen que la migración sea repetible: es seguro volver a
+-- ejecutarla si el bucket ya existía o una ejecución anterior quedó a medias.
+DROP POLICY IF EXISTS "gastos_fotos_insert_anon" ON storage.objects;
+DROP POLICY IF EXISTS "gastos_fotos_select_anon" ON storage.objects;
+DROP POLICY IF EXISTS "gastos_fotos_update_anon" ON storage.objects;
 
 CREATE POLICY "gastos_fotos_insert_anon"
   ON storage.objects FOR INSERT TO anon

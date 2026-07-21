@@ -118,7 +118,7 @@ test('cierres, auditoría y obras ofrecen contexto interactivo', async ({ page }
   await loginAsAdmin(page, {
     cierres:[
       { id:'c-signed', empId:employee.id, empName:employee.name, mes:'2026-06', estado:'firmado', firmaEmp:{ ts }, firmaAdmin:true, records_snapshot:[], _upd:ts },
-      { id:'c-pending', empId:employee.id, empName:employee.name, mes:'2026-07', estado:'pendiente', firmaEmp:null, firmaAdmin:null, records_snapshot:[], _upd:ts },
+      { id:'c-pending', empId:employee.id, empName:employee.name, mes:'2026-05', estado:'pendiente', firmaEmp:null, firmaAdmin:null, records_snapshot:[], _upd:ts },
     ],
     audit:[{ id:'a-doc', action:'Documento descargado', user:'Admin', detail:'Contrato de prueba', ts }],
     obras:[{ id:'o1', nombre:'Obra Premium', coords:'40.4168,-3.7038', activa:true, fechaInicio:'2026-07-01', createdAt:ts }],

@@ -1731,6 +1731,7 @@ function MonthlyClosePage() {
           workedDays: new Set(recs.map((r: any) => localDateStr(new Date(r.inicio)))).size,
           signedBy: (c.firmaAdmin && (c.firmaEmp || c.firma)) ? 'all' : (c.firmaEmp || c.firma) ? 'emp' : 'none',
           firmaAdmin: !!c.firmaAdmin,
+          canSignAdmin: canCloseMonth(c.mes),
           firmaEmp: !!c.firmaEmp || !!c.firma,
           firmaSupervisor: !!c.firmaSupervisor,
           supervisorName: supervisor?.name,

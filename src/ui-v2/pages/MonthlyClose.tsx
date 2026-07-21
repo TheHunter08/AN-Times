@@ -23,6 +23,7 @@ export interface ClosureItem {
   workedDays: number
   signedBy: 'none' | 'emp' | 'supervisor' | 'all'
   firmaAdmin: boolean
+  canSignAdmin: boolean
   firmaEmp: boolean
   firmaSupervisor: boolean  // encargado o jefe de obra
   supervisorName?: string
@@ -107,8 +108,8 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
 
   const totalSigned  = monthItems.filter(i => i.firmaAdmin && i.firmaEmp).length
   const totalPending = monthItems.filter(i => !(i.firmaAdmin && i.firmaEmp)).length
-  const selectable = filtered.filter(i => !i.firmaAdmin)
-  const selectedItems = items.filter(i => selectedIds.has(i.id) && !i.firmaAdmin)
+  const selectable = filtered.filter(i => !i.firmaAdmin && i.canSignAdmin)
+  const selectedItems = items.filter(i => selectedIds.has(i.id) && !i.firmaAdmin && i.canSignAdmin)
   const allVisibleSelected = selectable.length > 0 && selectable.every(i => selectedIds.has(i.id))
   const toggleSelected = (id: string) => setSelectedIds(current => {
     const next = new Set(current)
@@ -237,11 +238,11 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${colors.border.subtle}`,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {onSignMany && <input type="checkbox" aria-label={`Seleccionar cierre de ${item.empName}`} checked={selectedIds.has(item.id)} disabled={item.firmaAdmin} onChange={() => toggleSelected(item.id)} />}
+                {onSignMany && <input type="checkbox" aria-label={`Seleccionar cierre de ${item.empName}`} checked={selectedIds.has(item.id)} disabled={item.firmaAdmin || !item.canSignAdmin} title={!item.canSignAdmin ? 'El mes todavía no ha terminado' : undefined} onChange={() => toggleSelected(item.id)} />}
                 <Avatar name={item.empName} size={30} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: colors.text[900] }}>{item.empName}</div>
-                  <div style={{ fontSize: 11, color: colors.text[500] }}>{item.role || item.dept}{!!item.reopenCount && ` · reabierto ${item.reopenCount}×`}</div>
+                  <div style={{ fontSize: 11, color: colors.text[500] }}>{item.role || item.dept}{!!item.reopenCount && ` · reabierto ${item.reopenCount}×`}{!item.canSignAdmin && !item.firmaAdmin && ' · mes en curso'}</div>
                 </div>
               </div>
               <div style={{ fontSize: 13, color: colors.text[700] }}>{item.month}</div>
@@ -444,7 +445,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               <button onClick={() => generateExcel(detail)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Descargar Excel
               </button>
-              {!detail.firmaAdmin && onSignAdmin && (
+              {!detail.firmaAdmin && detail.canSignAdmin && onSignAdmin && (
                 <button
                   onClick={() => { onSignAdmin(detail.id); setDetail(null) }}
                   style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
