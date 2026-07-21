@@ -261,8 +261,17 @@ self.addEventListener('notificationclick', (event) => {
 })
 
 // ─── BACKGROUND SYNC ────────────────────────────────────────────────────────────
-const _SB_URL  = 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+// Antes con la URL/clave de Supabase escritas aquí a fuego, sin leer las
+// variables de entorno como hace el resto de la app (src/config/constants.js).
+// Si el proyecto de Supabase configurado en despliegue (VITE_SB_URL/ANON)
+// difiere de este valor de respaldo, cualquier fichaje guardado sin conexión
+// que se sincroniza en segundo plano (con la app cerrada, vía Background
+// Sync API) se enviaba en silencio a un proyecto de Supabase distinto al
+// real — nunca llegaba a aparecer en la base de datos de producción. El
+// fallback se mantiene igual por si las variables de entorno no están
+// definidas en el build, pero ahora coincide siempre con constants.js.
+const _SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
+const _SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const _IDB_NAME  = 'times-inc-sync'
 const _IDB_STORE = 'q'
 // El esquema de producción admite únicamente app_data.id=1.
