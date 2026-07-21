@@ -22,6 +22,15 @@ test.describe('Panel de administración', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   })
 
+  test('informa al administrador de una reconciliación sin presentarla como error', async ({ page }) => {
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('times-conflict', { detail:{ count:2 } }))
+    })
+
+    await expect(page.getByText('Se aplicaron las versiones más recientes de 2 fichajes')).toBeVisible()
+    await expect(page.getByText(/Datos actualizados por otro usuario/)).toHaveCount(0)
+  })
+
   for (const destination of [
     ['Equipo', 'Fichajes', 'Fichajes'],
     ['Equipo', 'Empleados', 'Empleados'],

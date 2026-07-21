@@ -8,6 +8,19 @@ test('la pantalla de acceso se renderiza', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'PIN', exact: true })).toBeVisible({ timeout: 10000 })
 })
 
+test('actualiza datos de otros usuarios sin molestar al empleado con avisos técnicos', async ({ page }) => {
+  await loginAsEmployee(page)
+  await page.goto('/')
+  await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('times-conflict', { detail:{ count:2 } }))
+  })
+  await page.waitForTimeout(300)
+
+  await expect(page.getByText(/versiones más recientes|actualizados por otro usuario/i)).toHaveCount(0)
+})
+
 test('muestra las obras asignadas por id al iniciar una jornada', async ({ page }) => {
   await loginAsEmployee(page, {
     employees:[{ ...employee, centroTrabajo:'', obrasAsignadas:['obra-norte', 'obra-centro'] }],

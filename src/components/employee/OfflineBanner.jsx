@@ -46,7 +46,7 @@ const IcoError = () => (
 )
 
 const ActionBtn = ({ onClick, disabled, children }) => (
-  <button onClick={onClick} disabled={disabled} style={{
+  <button type="button" onClick={onClick} disabled={disabled} style={{
     background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.18)',
     borderRadius: radius.md, padding: '5px 13px', fontSize: 11, fontWeight: 700,
     color: '#fff', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
@@ -59,25 +59,28 @@ const ActionBtn = ({ onClick, disabled, children }) => (
 export function OfflineBanner() {
   const syncStatus     = useAppStore(s => s.syncStatus)
   const offlinePending = useAppStore(s => s.offlinePending)
+  const lastSyncTime   = useAppStore(s => s.lastSyncTime)
   const fetchDB        = useAppStore(s => s.fetchDB)
   const { online } = useConnectivity()
   const [retrying, setRetrying] = useState(false)
   const [justSynced, setJustSynced] = useState(false)
-  const wasOfflineRef = useRef(!online)
+  const hadSyncIssueRef = useRef(!online || offlinePending)
 
   const isEffectivelyOffline = !online
 
   useEffect(() => {
-    if (isEffectivelyOffline) wasOfflineRef.current = true
-  }, [isEffectivelyOffline])
+    if (isEffectivelyOffline || offlinePending || syncStatus === 'error') {
+      hadSyncIssueRef.current = true
+    }
+  }, [isEffectivelyOffline, offlinePending, syncStatus])
 
   useEffect(() => {
-    if (syncStatus !== 'synced' || !wasOfflineRef.current) return
-    wasOfflineRef.current = false
+    if (syncStatus !== 'synced' || offlinePending || !hadSyncIssueRef.current) return
+    hadSyncIssueRef.current = false
     setJustSynced(true)
     const t = setTimeout(() => setJustSynced(false), 3500)
     return () => clearTimeout(t)
-  }, [syncStatus])
+  }, [offlinePending, syncStatus])
 
   const handleRetry = async () => {
     if (retrying) return
@@ -95,7 +98,7 @@ export function OfflineBanner() {
   }
 
   if (isEffectivelyOffline) return (
-    <div style={{ ...BASE, background: 'rgba(30,20,10,.88)', borderBottom: '1px solid rgba(251,146,60,.25)' }}>
+    <div role="status" aria-live="polite" style={{ ...BASE, background: 'rgba(30,20,10,.88)', borderBottom: '1px solid rgba(251,146,60,.25)' }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <IcoOffline />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -109,17 +112,21 @@ export function OfflineBanner() {
   )
 
   if (justSynced) return (
-    <div style={{ ...BASE, background: 'rgba(5,25,15,.88)', borderBottom: '1px solid rgba(16,185,129,.25)' }}>
+    <div role="status" aria-live="polite" style={{ ...BASE, background: 'rgba(5,25,15,.88)', borderBottom: '1px solid rgba(16,185,129,.25)' }}>
       <IcoSynced />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, color: '#10b981', fontSize: 13 }}>Sincronizado</div>
-        <div style={{ fontSize: 11, color: 'rgba(16,185,129,.7)', marginTop: 1 }}>Todos los datos actualizados en tiempo real</div>
+        <div style={{ fontSize: 11, color: 'rgba(16,185,129,.7)', marginTop: 1 }}>
+          {lastSyncTime
+            ? `Todos los cambios están en el servidor · ${new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}`
+            : 'Todos los cambios están en el servidor'}
+        </div>
       </div>
     </div>
   )
 
   if (offlinePending) return (
-    <div style={{ ...BASE, background: 'rgba(15,10,30,.88)', borderBottom: '1px solid rgba(139,92,246,.25)' }}>
+    <div role="status" aria-live="polite" style={{ ...BASE, background: 'rgba(15,10,30,.88)', borderBottom: '1px solid rgba(139,92,246,.25)' }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <IcoSpinner />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -135,7 +142,7 @@ export function OfflineBanner() {
   )
 
   if (syncStatus === 'error') return (
-    <div style={{ ...BASE, background: 'rgba(25,5,5,.88)', borderBottom: '1px solid rgba(239,68,68,.22)' }}>
+    <div role="alert" style={{ ...BASE, background: 'rgba(25,5,5,.88)', borderBottom: '1px solid rgba(239,68,68,.22)' }}>
       <IcoError />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: '#f87171', fontWeight: 700, fontSize: 13 }}>No se pudo sincronizar</div>

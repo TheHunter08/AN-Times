@@ -348,11 +348,20 @@ export default function App() {
     return () => { active = false; subscription.unsubscribe() }
   }, [session?.authMethod, logout])
 
-  // Aviso cuando el servidor reconcilia datos de otro usuario con los nuestros
+  // La reconciliación es transparente para empleados: reciben los datos nuevos
+  // sin un aviso técnico que parece un error. El administrador sí conserva una
+  // confirmación discreta cuando prevalece una versión más reciente del servidor.
   useEffect(() => {
     const handler = (e) => {
+      if (useAppStore.getState().currentScreen !== 'admin') return
       const count = e.detail?.count || 1
-      toast(`Datos actualizados por otro usuario (${count} fichaje${count > 1 ? 's' : ''})`, 4500, 'warn')
+      toast(
+        count === 1
+          ? 'Se aplicó la versión más reciente de un fichaje'
+          : `Se aplicaron las versiones más recientes de ${count} fichajes`,
+        3500,
+        'ok',
+      )
     }
     window.addEventListener('times-conflict', handler)
     return () => window.removeEventListener('times-conflict', handler)
