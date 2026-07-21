@@ -723,8 +723,8 @@ const employeeHomeStyles = `
     position: absolute;
     inset: 28px;
     border-radius: 50%;
-    background: rgba(53, 104, 255, 0.08);
-    box-shadow: 0 0 58px rgba(53, 104, 255, 0.2), inset 0 0 32px rgba(53, 104, 255, 0.08);
+    background: var(--clock-glow-bg);
+    box-shadow: 0 0 58px var(--clock-glow-shadow), inset 0 0 32px var(--clock-glow-bg);
     transition: background var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard);
   }
 
@@ -748,7 +748,7 @@ const employeeHomeStyles = `
 
   .employee-home-v7__orbit--outer { stroke-width: 1; stroke-dasharray: 2 7; }
   .employee-home-v7__orbit--inner { stroke: rgba(124, 92, 255, 0.36); stroke-width: 1.5; }
-  .employee-home-v7__track { stroke: rgba(255, 255, 255, 0.065); stroke-width: 8; }
+  .employee-home-v7__track { stroke: var(--clock-track); stroke-width: 8; }
 
   .employee-home-v7__progress-ring,
   .employee-home-v7__hold-ring {
@@ -784,10 +784,10 @@ const employeeHomeStyles = `
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--clock-center-border);
     border-radius: 50%;
-    background: rgba(6, 8, 13, 0.8);
-    box-shadow: inset 0 0 30px rgba(53, 104, 255, 0.055), 0 10px 30px rgba(0, 0, 0, 0.24);
+    background: var(--clock-center);
+    box-shadow: inset 0 0 30px var(--clock-glow-bg), var(--shadow-md);
   }
 
   .employee-home-v7__clock-label {
@@ -945,7 +945,7 @@ const employeeHomeStyles = `
     height: 6px;
     overflow: hidden;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--clock-soft-fill);
   }
 
   .employee-home-v7__progress-bar > span {
@@ -1066,7 +1066,7 @@ const employeeHomeStyles = `
 
   .employee-home-v7__week-day { min-width: 0; display: grid; grid-template-rows: 18px 1fr 16px; justify-items: center; gap: 5px; }
   .employee-home-v7__week-hours { color: var(--text-tertiary); font-size: 9px; font-variant-numeric: tabular-nums; }
-  .employee-home-v7__week-track { width: 100%; max-width: 24px; display: flex; align-items: flex-end; overflow: hidden; border-radius: 7px; background: rgba(255, 255, 255, 0.045); }
+  .employee-home-v7__week-track { width: 100%; max-width: 24px; display: flex; align-items: flex-end; overflow: hidden; border-radius: 7px; background: var(--clock-week-track); }
   .employee-home-v7__week-track > span { width: 100%; min-height: 4px; border-radius: 7px; background: rgba(53, 104, 255, 0.36); transition: height var(--duration-slow) var(--ease-standard); }
   .employee-home-v7__week-day[data-today="true"] .employee-home-v7__week-track > span { background: var(--brand-500); box-shadow: 0 0 14px rgba(53, 104, 255, 0.34); }
   .employee-home-v7__week-day[data-today="true"] .employee-home-v7__week-hours,

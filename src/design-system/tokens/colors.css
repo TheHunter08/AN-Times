@@ -16,6 +16,10 @@
   --gradient-brand:linear-gradient(135deg,#2450e6 0%,#3568ff 48%,#7c5cff 100%);
   --gradient-clock:radial-gradient(circle at 50% 45%,rgba(53,104,255,.34) 0%,rgba(53,104,255,.1) 42%,rgba(53,104,255,0) 72%);
   --gradient-card:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.006));
+  --clock-track:rgba(255,255,255,.065); --clock-center:rgba(6,8,13,.80);
+  --clock-center-border:rgba(255,255,255,.07); --clock-soft-fill:rgba(255,255,255,.07);
+  --clock-week-track:rgba(255,255,255,.045);
+  --clock-glow-bg:rgba(124,58,237,.09); --clock-glow-shadow:rgba(124,58,237,.22);
 }
 
 :root[data-theme="light"] {
@@ -23,4 +27,10 @@
   --bg-elevated:#fff; --bg-card:#fff; --bg-card-hover:#f7f9fc; --bg-card-active:#edf3ff;
   --border-subtle:rgba(15,23,42,.07); --border-default:rgba(15,23,42,.12); --border-strong:rgba(15,23,42,.18);
   --text-primary:#111827; --text-secondary:#475467; --text-tertiary:#667085; --text-disabled:#98a2b3; --text-inverse:#fff;
+  --gradient-clock:radial-gradient(circle at 50% 45%,rgba(109,40,217,.13) 0%,rgba(109,40,217,.045) 45%,rgba(109,40,217,0) 74%);
+  --gradient-card:linear-gradient(180deg,rgba(109,40,217,.025),rgba(109,40,217,0));
+  --clock-track:rgba(15,23,42,.10); --clock-center:#fff;
+  --clock-center-border:rgba(109,40,217,.16); --clock-soft-fill:rgba(15,23,42,.075);
+  --clock-week-track:rgba(15,23,42,.075);
+  --clock-glow-bg:rgba(109,40,217,.07); --clock-glow-shadow:rgba(109,40,217,.16);
 }

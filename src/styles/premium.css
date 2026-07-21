@@ -268,3 +268,254 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
     transition-duration:.01ms !important;
   }
 }
+
+/* Light mode is the final authority in the cascade. Older v5/v7 skins still
+   contain dark !important declarations, so every live shell is normalized
+   here with the canonical white/violet product palette. */
+:root[data-theme="light"] {
+  color-scheme:light;
+  --premium-canvas:#f7f7fc;
+  --premium-surface:#ffffff;
+  --premium-card:#ffffff;
+  --premium-card-hover:#f7f3ff;
+  --premium-line:rgba(46,16,101,.10);
+  --premium-line-strong:rgba(109,40,217,.24);
+
+  --v7-bg:var(--premium-canvas);
+  --v7-surface:var(--premium-surface);
+  --v7-card:var(--premium-card);
+  --v7-hover:var(--premium-card-hover);
+  --v7-line:var(--premium-line);
+  --v7-text:#171221;
+  --v7-sub:#51495f;
+  --v7-muted:#70677e;
+  --v7-text2:#51495f;
+  --v7-text3:#70677e;
+  --v7-border:var(--premium-line);
+
+  --bg-900:#f7f7fc !important;
+  --bg-800:#ffffff !important;
+  --bg-700:#ffffff !important;
+  --bg-600:#f8f6fc !important;
+  --bg-500:#f1edf7 !important;
+  --bg-400:#e8e1f1 !important;
+  --bg-300:#d7cfdf !important;
+  --bg-200:#c5bacf !important;
+  --bg:#f7f7fc !important;
+  --bg2:#ffffff !important;
+  --bg3:#f8f6fc !important;
+  --bg4:#f1edf7 !important;
+  --bg5:#e8e1f1 !important;
+  --text:#171221;
+  --text2:#40384b;
+  --text3:#635a70;
+  --text4:#797083;
+  --border:rgba(46,16,101,.07);
+  --border2:rgba(46,16,101,.11);
+  --border3:rgba(46,16,101,.18);
+  --glass-bg:rgba(255,255,255,.88);
+  --glass-border:rgba(46,16,101,.08);
+
+  --bg-canvas:var(--premium-canvas);
+  --bg-canvas-soft:#f2eff8;
+  --bg-sidebar:var(--premium-surface);
+  --bg-elevated:var(--premium-surface);
+  --bg-card:var(--premium-card);
+  --bg-card-hover:var(--premium-card-hover);
+  --bg-card-active:#eee7fb;
+  --bg-overlay:rgba(24,13,42,.42);
+  --text-primary:#171221;
+  --text-secondary:#51495f;
+  --text-tertiary:#70677e;
+  --text-disabled:#9b93a5;
+  --border-subtle:rgba(46,16,101,.07);
+  --border-default:rgba(46,16,101,.12);
+  --border-strong:rgba(46,16,101,.19);
+  --brand-50:#f5f0ff;
+  --brand-100:#ede3ff;
+  --brand-200:#6d28d9;
+  --brand-300:#7c3aed;
+  --brand-400:#7c3aed;
+  --brand-500:#6d28d9;
+  --brand-600:#5b21b6;
+  --brand-700:#4c1d95;
+  --accent-400:#2563eb;
+  --accent-500:#1d4ed8;
+  --gradient-card:linear-gradient(180deg,rgba(109,40,217,.025),rgba(109,40,217,0));
+  --clock-track:rgba(46,16,101,.10);
+  --clock-center:#fff;
+  --clock-center-border:rgba(109,40,217,.16);
+  --clock-soft-fill:rgba(46,16,101,.075);
+  --clock-week-track:rgba(46,16,101,.075);
+  --clock-glow-bg:rgba(109,40,217,.065);
+  --clock-glow-shadow:rgba(109,40,217,.16);
+
+  --uiv2-bg-900:var(--premium-canvas);
+  --uiv2-bg-800:#f2eff8;
+  --uiv2-bg-700:var(--premium-surface);
+  --uiv2-bg-600:var(--premium-card);
+  --uiv2-bg-500:var(--premium-card-hover);
+  --uiv2-bg-400:#eee7fb;
+  --uiv2-bg-300:#d7cfdf;
+  --uiv2-bg-200:#a69dac;
+  --uiv2-text-900:#171221;
+  --uiv2-text-700:#51495f;
+  --uiv2-text-500:#70677e;
+  --uiv2-text-300:#9b93a5;
+  --uiv2-border-subtle:rgba(46,16,101,.07);
+  --uiv2-border-default:rgba(46,16,101,.12);
+  --uiv2-border-strong:rgba(46,16,101,.19);
+  --uiv2-overlay-rgb:46,16,101;
+}
+
+:root[data-theme="light"] body,
+:root[data-theme="light"] #root,
+:root[data-theme="light"] .ti-preview {
+  background:var(--premium-canvas) !important;
+  color:var(--text-primary) !important;
+}
+
+/* Employee shell and clock. */
+[data-theme="light"] #sEmp,
+[data-theme="light"] #sEmp .emp-body,
+[data-theme="light"] #sEmp.emp-dsk,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-main {
+  background:var(--premium-canvas) !important;
+  color:var(--text-primary) !important;
+}
+[data-theme="light"] #sEmp .emp-topbar,
+[data-theme="light"] #sEmp .emp-nav,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-sidebar,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-topbar {
+  background:color-mix(in srgb,var(--premium-surface) 94%,transparent) !important;
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+[data-theme="light"] #sEmp .emp-nav-item.on,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-nav-item.on {
+  color:var(--premium-brand-strong) !important;
+  background:rgba(109,40,217,.10) !important;
+  box-shadow:inset 2px 0 0 var(--premium-brand) !important;
+}
+[data-theme="light"] #sEmp .emp-nav-item.on svg,
+[data-theme="light"] #sEmp.emp-dsk .emp-dsk-nav-item.on svg { stroke:var(--premium-brand) !important; }
+[data-theme="light"] #sEmp .employee-home-v7__hero,
+[data-theme="light"] #sEmp .employee-home-v7__panel,
+[data-theme="light"] #sEmp .v7-clock-hero,
+[data-theme="light"] #sEmp .jor-main-card,
+[data-theme="light"] #sEmp .jor-stat-card {
+  background:var(--premium-card) !important;
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+[data-theme="light"] #sEmp .employee-home-v7__hero {
+  background:radial-gradient(circle at 50% 42%,rgba(109,40,217,.07),transparent 19rem),var(--premium-card) !important;
+}
+[data-theme="light"] #sEmp .employee-home-v7__clock-center {
+  background:var(--clock-center) !important;
+  border-color:var(--clock-center-border) !important;
+  box-shadow:inset 0 0 28px var(--clock-glow-bg),0 12px 34px rgba(46,16,101,.10) !important;
+}
+[data-theme="light"] #sEmp .employee-home-v7__track { stroke:var(--clock-track) !important; }
+[data-theme="light"] #sEmp .employee-home-v7__clock-glow {
+  background:var(--clock-glow-bg) !important;
+  box-shadow:0 0 54px var(--clock-glow-shadow),inset 0 0 30px var(--clock-glow-bg) !important;
+}
+[data-theme="light"] #sEmp .employee-home-v7__orbit { stroke:rgba(109,40,217,.18) !important; }
+[data-theme="light"] #sEmp .employee-home-v7__orbit--inner { stroke:rgba(37,99,235,.26) !important; }
+[data-theme="light"] #sEmp .employee-home-v7__progress-ring { filter:drop-shadow(0 0 5px rgba(109,40,217,.24)); }
+[data-theme="light"] #sEmp .employee-home-v7__shift,
+[data-theme="light"] #sEmp .employee-home-v7__quick-action,
+[data-theme="light"] #sEmp .employee-home-v7__timeline-list time {
+  background:#fbfaff !important;
+  border-color:var(--premium-line) !important;
+}
+
+/* Secondary employee pages: remove the dark cards left by v7 selectors. */
+[data-theme="light"] #sEmp .employee-calendar-v2 > header,
+[data-theme="light"] #sEmp .employee-vacations-v2 > header,
+[data-theme="light"] #sEmp .employee-profile-v2 > header { border-color:var(--premium-line) !important; }
+[data-theme="light"] #sEmp .employee-calendar-v2 > header p,
+[data-theme="light"] #sEmp .employee-vacations-v2 > header p,
+[data-theme="light"] #sEmp .employee-profile-v2 > header p { color:var(--text-tertiary) !important; }
+[data-theme="light"] #sEmp .employee-calendar-v2 > :nth-child(4),
+[data-theme="light"] #sEmp .employee-vacations-v2 > :nth-child(2),
+[data-theme="light"] #sEmp .employee-vacations-v2 > :nth-child(3),
+[data-theme="light"] #sEmp .employee-profile-v2 > :nth-child(2),
+[data-theme="light"] #sEmp .employee-profile-v2 > :nth-child(3),
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(2),
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(3),
+[data-theme="light"] #sEmp .employee-shifts-v2 > :nth-child(3) > div {
+  background:var(--premium-card) !important;
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+
+/* Admin shell, tables, forms and overlays. */
+[data-theme="light"] #sAdmin,
+[data-theme="light"] #sAdmin .uiv2-app-shell,
+[data-theme="light"] #sAdmin .uiv2-main-column,
+[data-theme="light"] #sAdmin main,
+[data-theme="light"] #sAdmin .uiv2-page-container {
+  background:var(--premium-canvas) !important;
+  color:var(--text-primary) !important;
+}
+[data-theme="light"] #sAdmin .uiv2-sidebar,
+[data-theme="light"] #sAdmin .uiv2-desktop-topbar,
+[data-theme="light"] #sAdmin .uiv2-mobile-drawer {
+  background:color-mix(in srgb,var(--premium-surface) 95%,transparent) !important;
+  border-color:var(--premium-line) !important;
+}
+[data-theme="light"] #sAdmin .uiv2-sidebar-item.uiv2-active {
+  color:var(--premium-brand-strong) !important;
+  background:rgba(109,40,217,.10) !important;
+  border-color:rgba(109,40,217,.16) !important;
+  box-shadow:inset 2px 0 0 var(--premium-brand) !important;
+}
+[data-theme="light"] #sAdmin .uiv2-sidebar-item.uiv2-active .uiv2-sidebar-badge {
+  background:rgba(109,40,217,.12) !important;
+  color:var(--premium-brand-strong) !important;
+}
+[data-theme="light"] #sAdmin .ti-panel,
+[data-theme="light"] #sAdmin .ti-kpi-card,
+[data-theme="light"] #sAdmin .uiv2-card,
+[data-theme="light"] #sAdmin .uiv2-kpi-card,
+[data-theme="light"] #sAdmin .uiv2-emp-card,
+[data-theme="light"] #sAdmin .uiv2-quicklink,
+[data-theme="light"] #sAdmin .uiv2-table-row,
+[data-theme="light"] #sAdmin .uiv2-table-mobile-card,
+[data-theme="light"] #sAdmin .uiv2-req-card,
+[data-theme="light"] #sAdmin .uiv2-notif-card,
+[data-theme="light"] #sAdmin .uiv2-stat-kpi,
+[data-theme="light"] #sAdmin .uiv2-report-row,
+[data-theme="light"] #sAdmin .uiv2-project-row {
+  background:var(--premium-card) !important;
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow-soft) !important;
+}
+[data-theme="light"] #sAdmin .uiv2-table-row:hover,
+[data-theme="light"] #sAdmin tr:hover td,
+[data-theme="light"] #sAdmin .uiv2-list-row:hover { background:var(--premium-card-hover) !important; }
+[data-theme="light"] #sAdmin input,
+[data-theme="light"] #sAdmin select,
+[data-theme="light"] #sAdmin textarea,
+[data-theme="light"] #sEmp input,
+[data-theme="light"] #sEmp select,
+[data-theme="light"] #sEmp textarea {
+  background:var(--premium-surface) !important;
+  border-color:var(--border-default) !important;
+  color:var(--text-primary) !important;
+}
+
+/* Login keeps a branded panel, but never a black island inside light mode. */
+[data-theme="light"] .v7-login-shell,
+[data-theme="light"] #sLogin { background:var(--premium-canvas) !important; color:var(--text-primary) !important; }
+[data-theme="light"] .v7-login-brand-panel {
+  background:radial-gradient(circle at 12% 20%,rgba(124,58,237,.20),transparent 25rem),linear-gradient(155deg,#6d28d9,#4c1d95) !important;
+}
+[data-theme="light"] #sLogin .login-card {
+  background:var(--premium-surface) !important;
+  border-color:var(--premium-line) !important;
+  box-shadow:var(--premium-shadow) !important;
+}
+[data-theme="light"] #sLogin .login-tab.active { background:rgba(109,40,217,.10) !important; color:var(--premium-brand-strong) !important; }
