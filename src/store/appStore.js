@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
@@ -68,8 +68,19 @@ export const useAppStore = create((set, get) => ({
     // evitando sobrescrituras cuando dos saves se encadenan rápido o llega un sync de realtime
     let merged
     let deleted
+    let syncHint
+    let priorityRecords = []
     set(state => {
       const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
+      const changedKeys = Object.keys(partial || {}).filter(key => key !== '_ts' && key !== '_serverTs')
+      if (Array.isArray(partial?.records)) {
+        const previous = new Map((state.db.records || []).map(record => [record.id, record]))
+        priorityRecords = partial.records.filter(record => {
+          const old = previous.get(record?.id)
+          return record?.id && (!old || (old !== record && JSON.stringify(old) !== JSON.stringify(record)))
+        })
+      }
+      syncHint = { changedKeys, recordIds: priorityRecords.map(record => record.id) }
       deleted = _diffDeleted(state.db, partial)
       // Registrar tombstones ANTES de subir: si un fetchDB (sondeo/realtime) gana
       // la carrera al push de este borrado, mergeDB ya sabe ignorar el id borrado
@@ -97,6 +108,11 @@ export const useAppStore = create((set, get) => ({
       // parpadear el banner "Modo sin cobertura" entre cada tick de guardado).
       return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: state.offlinePending || !navigator.onLine }
     })
+    // El fichaje concreto viaja directamente a la tabla normalizada para que
+    // Realtime lo publique sin esperar a la reconciliación del blob completo.
+    // No se espera esta promesa: la UI y el guardado local ya son inmediatos y
+    // cloudPush mantiene la cola offline como respaldo si la red falla.
+    for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
     cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
       // en dataService.js) y devuelve ese resultado reconciliado — lo incorporamos
@@ -123,7 +139,8 @@ export const useAppStore = create((set, get) => ({
           offlinePending: !!meta?.pending
         }))
       },
-      () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true })
+      () => set({ syncStatus: navigator.onLine ? 'error' : 'offline', offlinePending: true }),
+      syncHint
     )
     return merged
   },

@@ -107,4 +107,19 @@ describe('plan de sincronización offline V2', () => {
     const row = toClosureRow({ id: 'c1', empId: 'e1', mes: '2026-06', integrityHash: 'abc123' })
     expect(row.data.integrityHash).toBe('abc123')
   })
+
+  it('limita una mutación de fichaje a su fila y no reenvía las demás tablas', () => {
+    const plan = buildTableSyncPlan({
+      employees: [{ id: 'e1', name: 'Ana' }],
+      records: [
+        { id: 'changed', empId: 'e1', inicio: '2026-07-13T08:00:00Z', _upd: '2026-07-13T11:00:00Z' },
+        { id: 'unchanged', empId: 'e1', inicio: '2026-07-13T08:00:00Z', _upd: '2026-07-13T11:00:00Z' },
+      ],
+      vacaciones: [{ id: 'v1', empId: 'e1', fechaInicio: '2026-08-01' }],
+      gastos: [{ id: 'g1', concepto: 'Taxi' }],
+    }, null, now, { changedKeys: ['records'], recordIds: ['changed'] })
+
+    expect(plan.upserts.find(op => op.table === 'records').rows.map(row => row.id)).toEqual(['changed'])
+    expect(plan.upserts.filter(op => op.table !== 'records').every(op => op.rows.length === 0)).toBe(true)
+  })
 })

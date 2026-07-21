@@ -404,8 +404,8 @@ async function cloudFetchLegacy() {
 }
 
 // ── cloudPush V2: blob (V1) primario + tablas en background ──────────────────
-export function cloudPush(db, deleted, onSuccess, onError) {
-  _v1Push(db, deleted, onSuccess, onError)
+export function cloudPush(db, deleted, onSuccess, onError, syncHint) {
+  _v1Push(db, deleted, onSuccess, onError, syncHint)
 }
 
 // Filas que Postgres rechazó de forma permanente (22xxx/23xxx — nunca se
@@ -496,10 +496,13 @@ async function hasEntitiesTable() {
 // • Fichajes: solo los abiertos + los cerrados con _upd reciente (48h).
 //   Los históricos los tiene la migración inicial y no cambian.
 // • Borrados: DELETE directo en tablas.
-async function _syncToTables(db, deleted) {
+async function _syncToTables(db, deleted, syncHint) {
   if (!supabase) return
-  const plan = buildTableSyncPlan(db, deleted)
-  const entitiesEnabled = await hasEntitiesTable()
+  const plan = buildTableSyncPlan(db, deleted, Date.now(), syncHint)
+  const entityUpsert = plan.upserts.find(op => op.table === 'app_entities')
+  const entityDelete = plan.deletes.find(op => op.table === 'app_entities')
+  const entitiesNeeded = !!(entityUpsert?.rows.length || entityDelete?.ids.length)
+  const entitiesEnabled = entitiesNeeded ? await hasEntitiesTable() : false
   const skipped = Object.entries(plan.skipped || {}).filter(([, count]) => count > 0)
   if (skipped.length) {
     console.warn('[v2] filas legacy omitidas sin bloquear la sincronización:', Object.fromEntries(skipped))

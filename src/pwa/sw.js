@@ -311,8 +311,8 @@ async function _restUpsertResilient(table, rows) {
   if (firstFailure) throw firstFailure
 }
 
-async function _syncTablesSW(data, deleted) {
-  const plan = buildTableSyncPlan(data, deleted)
+async function _syncTablesSW(data, deleted, syncHint) {
+  const plan = buildTableSyncPlan(data, deleted, Date.now(), syncHint)
   const employees = plan.upserts.find(op => op.table === 'employees')
   if (employees?.rows.length) await _restUpsertResilient(employees.table, employees.rows)
   for (const operation of plan.upserts) {
@@ -466,6 +466,7 @@ async function _bgSync() {
     const isNewFmt = stored !== null && typeof stored === 'object' && 'payload' in stored
     const pending = isNewFmt ? stored.payload : stored
     const deleted = isNewFmt ? stored.deleted : undefined
+    const syncHint = isNewFmt ? stored.syncHint : undefined
     const revision = isNewFmt ? stored.revision : undefined
     if (!pending) return false
     const server = await _fetchServerData()
@@ -495,7 +496,7 @@ async function _bgSync() {
     // El blob y las tablas V2 forman una sola confirmación offline. Si una
     // tabla falla, conservamos la revisión en IDB para reintentar; así informes,
     // planning y otros dispositivos no quedan leyendo horas antiguas.
-    await _syncTablesSW(data, deleted)
+    await _syncTablesSW(data, deleted, syncHint)
     const current = await _idbGet('pending')
     const hasNewerPending = revision != null && current?.revision != null && current.revision !== revision
     if (!hasNewerPending) await _idbDel('pending')

@@ -23,6 +23,7 @@ import { normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
+import { finalizeRecord } from '../utils/recordLifecycle.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -775,14 +776,8 @@ export default function EmployeePage() {
     const o = openRec()
     if (!o) return
     showConfirm('¿Terminar la jornada ahora?', () => {
-      const now = new Date().toISOString()
-      const breaks = [...(o.breaks || [])]
-      let enDescanso = o.enDescanso
-      let bStartTs = o.bStartTs
-      if (enDescanso && bStartTs) { breaks.push({ start: bStartTs, end: now }); enDescanso = false; bStartTs = null }
-      const closed = { ...o, fin: now, enDescanso, bStartTs, breaks, closed: true, operationId: globalThis.crypto?.randomUUID?.() ?? o.operationId ?? null, _rev: (o._rev || 0) + 1, _upd: now }
+      const closed = finalizeRecord(o)
       const t = calcSecs(closed)
-      closed.workSecs = t.work; closed.breakSecs = t.brk
       saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? closed : r) }))
       try { navigator.vibrate([15, 50, 30]) } catch {}
       toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
@@ -866,11 +861,20 @@ export default function EmployeePage() {
         (isJO || !encCentros.length || !e.centroTrabajo || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
       )
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
+      const recs = db.records || []
+      const targetOpen = recs.find(r => r.empId === emp.id && !r.fin)
+      if (targetOpen) {
+        showConfirm(`¿Finalizar la jornada de ${emp.name}?`, () => {
+          const closed = finalizeRecord(targetOpen, { actor: u })
+          saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === targetOpen.id ? closed : r) }))
+          queuePush(emp.id, '■ Jornada finalizada', `${u.name} ha finalizado tu jornada laboral mediante QR.`, 'jornada', '/?tab=inicio')
+          toast(`Jornada finalizada para ${emp.name} — ${mhm(Math.floor(closed.workSecs / 60))}`, 3500, 'ok')
+        })
+        return
+      }
       const todayQR = today()
       const empVac = (db.vacaciones || []).find(v => v.empId === emp.id && v.estado === 'aprobada' && v.fechaInicio <= todayQR && v.fechaFin >= todayQR)
       if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
-      const recs = db.records || []
-      if (recs.some(r => r.empId === emp.id && !r.fin)) { toast(`${emp.name} ya tiene jornada abierta`, 3000, 'warn'); return }
       const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
       saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
       queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
@@ -879,7 +883,7 @@ export default function EmployeePage() {
     }
 
     toast('Código QR no reconocido', 4000, 'err')
-  }, [db, openRec, doStartWithCentro, doStop, toast, u, saveDB])
+  }, [db, openRec, doStartWithCentro, doStop, toast, u, saveDB, showConfirm])
 
   const doLogout = () => {
     showConfirm('¿Cerrar sesión? Si tienes una jornada activa, seguirá registrada.', () => {
@@ -1428,4 +1432,3 @@ export default function EmployeePage() {
     </div>
   )
 }
-

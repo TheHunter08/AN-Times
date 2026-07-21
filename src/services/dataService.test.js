@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { auditLog, mergeDB, recordTombstones, mergePendingDeletes } from './dataService.js'
+import { auditLog, mergeDB, recordTombstones, mergePendingDeletes, mergeSyncHints } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -69,6 +69,14 @@ describe('cola offline', () => {
 
   it('no crea grupos vacíos de eliminaciones', () => {
     expect(mergePendingDeletes(null, null)).toBeNull()
+  })
+
+  it('acumula el alcance de varios cambios y conserva compatibilidad con colas antiguas', () => {
+    expect(mergeSyncHints(
+      { changedKeys: ['records'], recordIds: ['r1'] },
+      { changedKeys: ['vacaciones', 'records'], recordIds: ['r2'] },
+    )).toEqual({ changedKeys: ['records', 'vacaciones'], recordIds: ['r1', 'r2'] })
+    expect(mergeSyncHints({ full: true }, { changedKeys: ['records'], recordIds: ['r3'] })).toEqual({ full: true })
   })
 })
 

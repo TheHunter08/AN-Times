@@ -480,6 +480,13 @@ export function mergePendingDeletes(previous, incoming) {
   return Object.keys(out).length ? out : null
 }
 
+export function mergeSyncHints(previous, incoming) {
+  if (previous?.full || incoming?.full) return { full: true }
+  const changedKeys = [...new Set([...(previous?.changedKeys || []), ...(incoming?.changedKeys || [])])]
+  const recordIds = [...new Set([...(previous?.recordIds || []), ...(incoming?.recordIds || [])])]
+  return changedKeys.length || recordIds.length ? { changedKeys, recordIds } : null
+}
+
 function _fallbackPendingGet() {
   try { return JSON.parse(localStorage.getItem(_PENDING_FALLBACK_KEY) || 'null') } catch { return null }
 }
@@ -503,7 +510,7 @@ async function _writePending(value) {
   }
 }
 
-async function _storeForBgSync(data, deleted) {
+async function _storeForBgSync(data, deleted, syncHint) {
   try {
     // Se envuelve junto con `deleted` (ids borrados a propósito en este guardado)
     // para que, cuando por fin se sincronice offline, sw.js/_bgSyncFallback puedan
@@ -515,6 +522,7 @@ async function _storeForBgSync(data, deleted) {
       await _writePending({
         payload: data,
         deleted: mergePendingDeletes(previous?.deleted, deleted),
+        syncHint: mergeSyncHints(previous && !('syncHint' in previous) ? { full: true } : previous?.syncHint, syncHint),
         revision,
       })
     }))
@@ -622,7 +630,7 @@ async function _runBgSyncFallback() {
   try {
     const stored = await _readPending()
     if (!stored || !supabase) { _bgSyncRetries = 0; return { ok: true, pending: false } }
-    const { payload: data, deleted, revision } = stored
+    const { payload: data, deleted, syncHint, revision } = stored
     // NO se comprueba navigator.onLine aquí: en iOS es conocidamente poco fiable
     // (puede quedarse pegado en `false` tras un cambio de red WiFi↔datos, o no
     // reflejar nunca una señal débil real) — confiar en él para decidir si
@@ -638,7 +646,7 @@ async function _runBgSyncFallback() {
     // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
     const merged = await _mergeWithServer(data, deleted)
     await _upsertHotCold(merged)
-    if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted)
+    if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted, syncHint)
     merged._ts = Date.now()
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
@@ -683,27 +691,28 @@ function _drainQueue() {
   const entry = _pushQueue.shift()
   const freshDb = entry.db || JSON.parse(localStorage.getItem('an_times_v1') || 'null')
   if (!freshDb) return
-  _doCloudPush(freshDb, entry.deleted, entry.onSuccess, entry.onError)
+  _doCloudPush(freshDb, entry.deleted, entry.onSuccess, entry.onError, entry.syncHint)
 }
 
-function _markPendingFallback(payload, deleted) {
+function _markPendingFallback(payload, deleted, syncHint) {
   const previous = _fallbackPendingGet()
   const revision = Math.max(Date.now(), (Number(previous?.revision) || 0) + 1)
   const effectiveDeleted = mergePendingDeletes(previous?.deleted, deleted)
+  const effectiveSyncHint = mergeSyncHints(previous && !('syncHint' in previous) ? { full: true } : previous?.syncHint, syncHint)
   try {
-    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify({ payload, deleted: effectiveDeleted, revision }))
+    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify({ payload, deleted: effectiveDeleted, syncHint: effectiveSyncHint, revision }))
   } catch {}
-  return { revision, effectiveDeleted }
+  return { revision, effectiveDeleted, effectiveSyncHint }
 }
 
-function _doCloudPush(db, deleted, onSuccess, onError) {
+function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
   _pushFlight = true
   const payload = { ...db, _ts: Date.now() }
   saveLocal(payload)
   // Escribir una marca síncrona ANTES de iniciar la red. Si iOS/Android mata
   // el proceso durante el primer timeout, el siguiente arranque aún sabe que
   // debe subir esta foto local aunque IndexedDB no llegara a prepararse.
-  const { revision: fallbackRevision, effectiveDeleted } = _markPendingFallback(payload, deleted)
+  const { revision: fallbackRevision, effectiveDeleted, effectiveSyncHint } = _markPendingFallback(payload, deleted, syncHint)
 
   // NO se comprueba navigator.onLine aquí — ver el mismo razonamiento en
   // _bgSyncFallback: en iOS puede quedarse pegado en `false` con red real
@@ -715,7 +724,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
   _mergeWithServer(payload, effectiveDeleted)
     .then(async merged => {
       await _upsertHotCold(merged)
-      if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted)
+      if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted, effectiveSyncHint)
       return merged
     })
     .then((merged) => {
@@ -747,7 +756,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       // Guardar en IDB desde el primer fallo: si el usuario cierra la app
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
-      _storeForBgSync(payload, effectiveDeleted)
+      _storeForBgSync(payload, effectiveDeleted, effectiveSyncHint)
       // Solo 2 reintentos en primer plano (antes 5): el dato YA está a salvo en
       // IDB desde la línea de arriba, así que insistir aquí solo añade tiempo de
       // espera en pantalla sin más seguridad — en señal débil es mejor rendirse
@@ -755,7 +764,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
       // termine el trabajo sin bloquear al usuario.
       if (_saveRetry < 2) {
         _saveRetry++
-        _pushQueue.unshift({ db: null, deleted: effectiveDeleted, onSuccess, onError })
+        _pushQueue.unshift({ db: null, deleted: effectiveDeleted, syncHint: effectiveSyncHint, onSuccess, onError })
         // Backoff: 1s, 2s
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
@@ -766,7 +775,7 @@ function _doCloudPush(db, deleted, onSuccess, onError) {
     })
 }
 
-export function cloudPush(db, deleted, onSuccess, onError) {
+export function cloudPush(db, deleted, onSuccess, onError, syncHint) {
   if (!supabase) { onError?.(); return }
   if (_pushFlight) {
     // Do not retain a stale snapshot while another push is in flight. At
@@ -774,11 +783,11 @@ export function cloudPush(db, deleted, onSuccess, onError) {
     // the tombstones/callback from this queued mutation need to be preserved.
     const latestPayload = { ...db, _ts: Date.now() }
     saveLocal(latestPayload)
-    const { effectiveDeleted } = _markPendingFallback(latestPayload, deleted)
-    _pushQueue.push({ db: null, deleted: effectiveDeleted, onSuccess, onError })
+    const { effectiveDeleted, effectiveSyncHint } = _markPendingFallback(latestPayload, deleted, syncHint)
+    _pushQueue.push({ db: null, deleted: effectiveDeleted, syncHint: effectiveSyncHint, onSuccess, onError })
     return
   }
-  _doCloudPush(db, deleted, onSuccess, onError)
+  _doCloudPush(db, deleted, onSuccess, onError, syncHint)
 }
 
 export function scheduleSave(db, deleted, onSuccess, onError, delay = 0) {

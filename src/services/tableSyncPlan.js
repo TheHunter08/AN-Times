@@ -105,47 +105,56 @@ function isDateValue(value) {
   return hasValue(value) && !Number.isNaN(Date.parse(value))
 }
 
-export function buildTableSyncPlan(db, deleted, now = Date.now()) {
+export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = null) {
   const nowIso = new Date(now).toISOString()
   const cutoff = new Date(now - 48 * 60 * 60 * 1000).toISOString()
+  const changedKeys = Array.isArray(syncHint?.changedKeys) ? new Set(syncHint.changedKeys) : null
+  const recordIds = Array.isArray(syncHint?.recordIds) ? new Set(syncHint.recordIds) : null
+  const includes = key => !changedKeys || changedKeys.has(key)
   const deletedRecords = new Set(deleted?.records ?? [])
   const deletedVacations = new Set(deleted?.vacaciones ?? [])
   const deletedClosures = new Set(deleted?.cierres ?? [])
   const deletedWorksites = new Set(deleted?.obras ?? [])
   const employees = (db.employees ?? []).filter(e => hasValue(e?.id) && hasValue(e?.name))
   const employeeIds = new Set(employees.map(e => e.id))
-  const recentRecords = (db.records ?? []).filter(
-    r => !deletedRecords.has(r.id) && hasValue(r?.id) && employeeIds.has(r?.empId) && isDateValue(r?.inicio) && (!r.fin || !r._upd || r._upd > cutoff)
+  const recordCandidates = (db.records ?? []).filter(
+    r => includes('records') && (!recordIds || recordIds.has(r?.id)) && !deletedRecords.has(r?.id) && (!r?.fin || !r?._upd || r._upd > cutoff)
+  )
+  const recentRecords = recordCandidates.filter(
+    r => hasValue(r?.id) && employeeIds.has(r?.empId) && isDateValue(r?.inicio)
   )
   // El blob legacy puede contener solicitudes antiguas incompletas. La tabla
   // normalizada aplica constraints más estrictas; esas filas se conservan en
   // el blob, pero no deben bloquear la sincronización de todos los fichajes.
-  const vacations = (db.vacaciones ?? []).filter(v =>
-    !deletedVacations.has(v?.id) &&
+  const vacationCandidates = (db.vacaciones ?? []).filter(v => includes('vacaciones') && !deletedVacations.has(v?.id))
+  const vacations = vacationCandidates.filter(v =>
     hasValue(v?.id) &&
     employeeIds.has(v?.empId) &&
     isDateValue(v?.fechaInicio ?? v?.desde)
   )
-  const closures = (db.cierres ?? []).filter(c =>
-    !deletedClosures.has(c?.id) && hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
+  const closureCandidates = (db.cierres ?? []).filter(c => includes('cierres') && !deletedClosures.has(c?.id))
+  const closures = closureCandidates.filter(c =>
+    hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
   )
-  const worksites = (db.obras ?? []).filter(o => !deletedWorksites.has(o?.id) && hasValue(o?.id) && hasValue(o?.nombre))
+  const worksiteCandidates = (db.obras ?? []).filter(o => includes('obras') && !deletedWorksites.has(o?.id))
+  const worksites = worksiteCandidates.filter(o => hasValue(o?.id) && hasValue(o?.nombre))
+  const entityRows = toEntityRows(db, nowIso).filter(row => includes(row.collection))
 
   return {
     upserts: [
-      { table: 'employees', rows: employees.map(e => toEmployeeRow(e, nowIso)) },
+      { table: 'employees', rows: includes('employees') ? employees.map(e => toEmployeeRow(e, nowIso)) : [] },
       { table: 'records', rows: recentRecords.map(r => toRecordRow(r, nowIso)) },
       { table: 'vacaciones', rows: vacations.map(v => toVacationRow(v, nowIso)) },
       { table: 'cierres', rows: closures.map(c => toClosureRow(c, nowIso)) },
       { table: 'obras', rows: worksites.map(o => toWorksiteRow(o, nowIso)) },
-      { table: 'app_entities', rows: toEntityRows(db, nowIso) },
+      { table: 'app_entities', rows: entityRows },
     ],
     skipped: {
-      employees: (db.employees ?? []).length - employees.length,
-      records: (db.records ?? []).filter(r => !deletedRecords.has(r?.id) && (!r?.fin || !r?._upd || r._upd > cutoff)).length - recentRecords.length,
-      vacaciones: (db.vacaciones ?? []).filter(v => !deletedVacations.has(v?.id)).length - vacations.length,
-      cierres: (db.cierres ?? []).length - closures.length,
-      obras: (db.obras ?? []).length - worksites.length,
+      employees: includes('employees') ? (db.employees ?? []).length - employees.length : 0,
+      records: recordCandidates.length - recentRecords.length,
+      vacaciones: vacationCandidates.length - vacations.length,
+      cierres: closureCandidates.length - closures.length,
+      obras: worksiteCandidates.length - worksites.length,
     },
     deletes: [
       { table: 'records', ids: [...deletedRecords], mode: 'soft_delete' },
