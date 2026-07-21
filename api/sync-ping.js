@@ -8,7 +8,7 @@
 // El SW maneja SYNC_PING en el push handler (sw.js), ejecuta _bgSync() y
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
-import { authorizeSyncRequest } from '../src/server/syncAuth.js'
+import { timingSafeEqual } from 'crypto'
 import { isSyncCandidate, PUSH_ACTIVE_WINDOW_MS } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -19,6 +19,7 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const CRON_SECRET   = process.env.CRON_SECRET
 
 let _vapidError = null
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
@@ -56,9 +57,12 @@ async function deleteSub(userId) {
 }
 
 export default async function handler(req, res) {
-  // Vercel Cron usa CRON_SECRET; GitHub Actions usa un JWT OIDC efímero y
-  // verificable, sin guardar otra contraseña de larga duración.
-  if (!await authorizeSyncRequest(req)) return res.status(401).json({ error: 'Unauthorized' })
+  // Vercel Cron y GitHub Actions comparten el CRON_SECRET ya configurado en
+  // ambos servicios. Comparación constante para no filtrar información.
+  const token = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+  const authorized = !!CRON_SECRET && token.length === CRON_SECRET.length &&
+    timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
+  if (!authorized) return res.status(401).json({ error: 'Unauthorized' })
 
   if (_vapidError) return res.status(500).json({ error: _vapidError })
   if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
