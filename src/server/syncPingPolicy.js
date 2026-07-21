@@ -1,10 +1,18 @@
-export const PUSH_ACTIVE_WINDOW_MS = 24 * 60 * 60_000
+// Un cambio creado totalmente sin cobertura no puede avisar al servidor de que
+// existe. Por eso cada dispositivo usado recientemente recibe una comprobación
+// periódica aunque last_online no haya podido actualizarse.
+export const PUSH_ACTIVE_WINDOW_MS = 7 * 24 * 60 * 60_000
+export const PUSH_RECHECK_INTERVAL_MS = 4 * 60_000
 
 export function isSyncCandidate(subscription, now = Date.now()) {
-  const lastOnline = Date.parse(subscription?.last_online || '')
-  if (!Number.isFinite(lastOnline) || lastOnline < now - PUSH_ACTIVE_WINDOW_MS) return false
+  const timestamps = [subscription?.last_online, subscription?.updated_at]
+    .map(value => Date.parse(value || ''))
+    .filter(Number.isFinite)
+  const lastSeen = timestamps.length ? Math.max(...timestamps) : NaN
+  if (!Number.isFinite(lastSeen) || lastSeen < now - PUSH_ACTIVE_WINDOW_MS) return false
   const lastSync = Date.parse(subscription?.last_sync || '')
-  return !Number.isFinite(lastSync) || lastOnline > lastSync
+  if (!Number.isFinite(lastSync)) return true
+  return lastSync <= now - PUSH_RECHECK_INTERVAL_MS
 }
 
 export function getDeviceCoverage(employees = [], subscriptions = []) {

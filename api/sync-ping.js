@@ -2,8 +2,9 @@
 // Detecta dispositivos con datos offline pendientes (basándose en heartbeats)
 // y les envía un push SYNC_PING para despertar el Service Worker en iOS/Android.
 //
-// Un dispositivo "podría tener datos pendientes" si estuvo activo durante las
-// últimas 24h y last_online es posterior a last_sync.
+// Comprueba periódicamente los dispositivos usados en los últimos siete días.
+// Es intencionado: un fichaje creado totalmente offline no puede actualizar
+// last_online y el servidor no tendría otra forma de saber que existe.
 //
 // El SW maneja SYNC_PING en el push handler (sw.js), ejecuta _bgSync() y
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
@@ -39,7 +40,7 @@ const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 async function getSyncState() {
   if (!SB_URL || !SB_ANON) return { candidates: [], coverage: getDeviceCoverage() }
   const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`
-  const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync`
+  const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync,updated_at`
   try {
     const [employeesResponse, subscriptionsResponse] = await Promise.all([
       fetch(employeesUrl, { headers: SB_H }),

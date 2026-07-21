@@ -886,8 +886,10 @@ export function broadcastSync(ts) { _broadcastUpdate(ts) }
 
 // ── Heartbeat para background sync iOS ──────────────────────────────────────
 // Actualiza push_subs.last_online mientras el empleado tiene la app abierta y online.
-// El cron /api/sync-ping compara last_online con last_sync para detectar dispositivos
-// que podrían tener datos offline pendientes y les envía un push de wake-up.
+// El cron /api/sync-ping usa last_online para mantener el dispositivo dentro de
+// la ventana activa y lo despierta periódicamente. Un cambio completamente
+// offline no puede avisar al servidor de que existe, así que el heartbeat no es
+// la única condición para comprobar la cola.
 export async function sendHeartbeat() {
   if (!navigator.onLine || !supabase) return
   try {
@@ -900,8 +902,8 @@ export async function sendHeartbeat() {
   } catch {}
 }
 
-// Marca last_sync tras una subida exitosa. El cron no enviará push mientras
-// last_sync sea reciente, evitando pings innecesarios. Exportado para que
+// Marca last_sync tras una subida exitosa. El cron espera hasta la siguiente
+// comprobación periódica, evitando pings duplicados. Exportado para que
 // App.jsx lo llame al recibir BG_SYNC_DONE del SW (app en primer plano).
 export async function _updateLastSync() {
   if (!supabase) return

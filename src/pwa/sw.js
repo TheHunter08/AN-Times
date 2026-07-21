@@ -502,7 +502,7 @@ async function _bgSync() {
     if (!hasNewerPending) await _idbDel('pending')
     // Borrar badge del icono de la app (si el navegador lo soporta)
     try { await self.navigator?.clearAppBadge?.() } catch {}
-    // Marcar last_sync en BD para que el cron no siga enviando SYNC_PING
+    // Marcar last_sync en BD para espaciar la siguiente comprobación periódica
     // ahora que ya no hay datos pendientes. Se identifica por endpoint de
     // suscripción (sin auth): mismo acceso anon que usa sync-ping.js para SELECT.
     try {
@@ -571,9 +571,8 @@ async function _handleSyncPing() {
   let synced = false
   try { synced = await _bgSync() } catch {}
   // Si el despertador comprobó una cola realmente vacía, confirmarlo al
-  // servidor. Así no vuelve a enviar pings cada cinco minutos hasta que un
-  // heartbeat posterior indique nueva actividad. Si queda pending, no se toca
-  // last_sync y el siguiente cron reintentará automáticamente.
+  // servidor. Así espera al siguiente ciclo antes de comprobar otra vez. Si
+  // queda pending, no se toca last_sync y el siguiente cron reintentará.
   if (!synced) {
     try {
       if (!await _idbGet('pending')) await _markEmptyQueueChecked()

@@ -4,16 +4,24 @@ import { getDeviceCoverage, isSyncCandidate } from './syncPingPolicy.js'
 describe('selección de dispositivos para sincronización cerrada', () => {
   const now = Date.parse('2026-07-21T18:00:00.000Z')
 
-  it('despierta el dispositivo en cuanto su actividad supera la última sincronización', () => {
-    expect(isSyncCandidate({ last_online: '2026-07-21T17:58:00Z', last_sync: '2026-07-21T17:57:59Z' }, now)).toBe(true)
+  it('despierta un dispositivo usado recientemente cuando toca la comprobación', () => {
+    expect(isSyncCandidate({ last_online: '2026-07-21T17:58:00Z', last_sync: '2026-07-21T17:55:00Z' }, now)).toBe(true)
   })
 
-  it('no repite el push si ya confirmó una sincronización posterior', () => {
-    expect(isSyncCandidate({ last_online: '2026-07-21T17:55:00Z', last_sync: '2026-07-21T17:56:00Z' }, now)).toBe(false)
+  it('no repite el push inmediatamente si acaba de comprobar la cola', () => {
+    expect(isSyncCandidate({ last_online: '2026-07-21T17:55:00Z', last_sync: '2026-07-21T17:59:00Z' }, now)).toBe(false)
   })
 
-  it('ignora suscripciones inactivas desde hace más de un día', () => {
-    expect(isSyncCandidate({ last_online: '2026-07-19T17:00:00Z', last_sync: null }, now)).toBe(false)
+  it('vuelve a despertar aunque no hubiera heartbeat posterior al último sync', () => {
+    expect(isSyncCandidate({ last_online: '2026-07-21T12:00:00Z', last_sync: '2026-07-21T17:50:00Z' }, now)).toBe(true)
+  })
+
+  it('usa la fecha de alta si el primer heartbeat todavía no llegó', () => {
+    expect(isSyncCandidate({ updated_at: '2026-07-21T17:50:00Z', last_online: null, last_sync: null }, now)).toBe(true)
+  })
+
+  it('ignora suscripciones inactivas desde hace más de siete días', () => {
+    expect(isSyncCandidate({ last_online: '2026-07-10T17:00:00Z', last_sync: null }, now)).toBe(false)
   })
 })
 
