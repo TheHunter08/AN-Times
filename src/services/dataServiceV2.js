@@ -27,6 +27,7 @@ export {
   startRealtime,
   stopRealtime,
   recordTombstones,
+  mergePendingDeletes,
   startPresence,
   stopPresence,
   broadcastSync,

@@ -55,9 +55,9 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
     .sort((a: any, b: any) => (b.ts || '').localeCompare(a.ts || ''))
 
   const thisMonth = today().slice(0, 7)
-  const gastosEsteMes = misGastos.filter((g: any) => g.fecha.startsWith(thisMonth))
-  const aprobadosMes = gastosEsteMes.filter((g: any) => g.estado === 'aprobado').reduce((s: number, g: any) => s + g.importe, 0)
-  const pendientesMes = gastosEsteMes.filter((g: any) => g.estado === 'pendiente').reduce((s: number, g: any) => s + g.importe, 0)
+  const gastosEsteMes = misGastos.filter((g: any) => String(g.fecha || g.ts || '').slice(0, 7) === thisMonth)
+  const aprobadosMes = gastosEsteMes.filter((g: any) => g.estado === 'aprobado').reduce((s: number, g: any) => s + (Number(g.importe) || 0), 0)
+  const pendientesMes = gastosEsteMes.filter((g: any) => g.estado === 'pendiente').reduce((s: number, g: any) => s + (Number(g.importe) || 0), 0)
 
   // Las fotos subidas a Storage viven en un bucket privado — hay que pedir
   // una URL firmada de corta duración para poder mostrarlas como miniatura.
@@ -86,7 +86,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 15 * 1024 * 1024) {
-      toast?.('La imagen es demasiado grande', 'error')
+      toast?.('La imagen es demasiado grande', 4000, 'err')
       e.target.value = ''
       return
     }
@@ -95,7 +95,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
       setFoto(dataUrl)
       setFotoPreview(dataUrl)
     } catch {
-      toast?.('Error al cargar la imagen', 'error')
+      toast?.('Error al cargar la imagen', 4000, 'err')
     }
   }
 
@@ -106,13 +106,14 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!concepto.trim()) { toast?.('Indica el concepto', 'error'); return }
-    if (!importe || +importe <= 0) { toast?.('El importe debe ser mayor que 0', 'error'); return }
+    if (!concepto.trim()) { toast?.('Indica el concepto', 3500, 'err'); return }
+    if (!importe || +importe <= 0) { toast?.('El importe debe ser mayor que 0', 3500, 'err'); return }
     setSubmitting(true)
     try {
+      const nowIso = new Date().toISOString()
       const nuevo: any = {
         id: gid(), empId: u.id, empName: u.name, concepto: concepto.trim(), importe: +importe,
-        fecha, foto: null, fotoPath: null, estado: 'pendiente', ts: new Date().toISOString(), categoria, notas: notas.trim(),
+        fecha, foto: null, fotoPath: null, estado: 'pendiente', ts: nowIso, _upd: nowIso, categoria, notas: notas.trim(),
       }
       // Preferimos Storage (cuota separada, 1 GB) sobre guardar la foto en
       // base64 dentro del JSONB de app_data (se come la cuota de base de
@@ -135,12 +136,12 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
         nuevo.foto = foto
       }
       await saveDB((freshDb: any) => ({ gastos: [...(freshDb.gastos || []), nuevo] }))
-      toast?.('Gasto enviado correctamente', 'success')
+      toast?.('Gasto enviado correctamente', 3000, 'ok')
       resetForm()
       setOpen(false)
     } catch (err) {
       console.error('Error al guardar gasto:', err)
-      toast?.('Error al guardar el gasto. Inténtalo de nuevo.', 'error')
+      toast?.('Error al guardar el gasto. Inténtalo de nuevo.', 4500, 'err')
     } finally {
       setSubmitting(false)
     }

@@ -1,8 +1,10 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
+import { normalizeToastOptions } from '../utils/toastOptions.js'
+import { pruneDbRetention } from '../utils/dbRetention.js'
 
 const storedSes = (() => {
   try {
@@ -82,26 +84,13 @@ export const useAppStore = create((set, get) => ({
       }
       syncHint = { changedKeys, recordIds: priorityRecords.map(record => record.id) }
       deleted = _diffDeleted(state.db, partial)
-      // Registrar tombstones ANTES de subir: si un fetchDB (sondeo/realtime) gana
-      // la carrera al push de este borrado, mergeDB ya sabe ignorar el id borrado
-      // en vez de resucitarlo desde el servidor (que todavía no se ha enterado).
-      recordTombstones(deleted)
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
-      if (merged.audit?.length > 300) {
-        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
-        const recent = merged.audit.filter(a => new Date(a.ts).getTime() > cutoff)
-        merged.audit = recent.length >= 50 ? recent : merged.audit.slice(-300)
-      }
-      // Limpiar notis soft-deleted con más de 7 días: con soft delete el array
-      // nunca pierde elementos, así que hay que podar periódicamente para que
-      // no crezca sin límite. Solo se eliminan las marcadas deleted:true y antiguas;
-      // las activas y las recién borradas se preservan.
-      if (merged.notis?.length > 150) {
-        const cutoffNotis = Date.now() - 7 * 24 * 60 * 60 * 1000
-        merged.notis = merged.notis.filter(n =>
-          !n.deleted || new Date(n.ts || 0).getTime() > cutoffNotis
-        )
-      }
+      const retained = pruneDbRetention(merged)
+      merged = retained.db
+      deleted = mergePendingDeletes(deleted, retained.deleted)
+      // Incluye los tombstones de la retencion automatica: asi las filas
+      // antiguas tampoco resucitan desde app_entities ni consumen cuota.
+      recordTombstones(deleted)
       saveLocal(merged)
       // offlinePending: true si no hay red, o si ya había un guardado pendiente anterior
       // (evita que el timer cada 30s lo resetee a false en señal débil, lo que hacía
@@ -382,9 +371,10 @@ export const useAppStore = create((set, get) => ({
   // ── Toasts ───────────────────────────────────────────────────────────
   toasts: [],
   toast: (msg, dur = 3000, type = '') => {
+    const normalized = normalizeToastOptions(dur, type)
     const id = Date.now() + Math.random()
-    set(s => ({ toasts: [...s.toasts, { id, msg, dur, type }] }))
-    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), dur + 400)
+    set(s => ({ toasts: [...s.toasts, { id, msg, dur:normalized.duration, type:normalized.type }] }))
+    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), normalized.duration + 400)
   },
   toastOk:   (msg) => get().toast(msg, 3000, 'ok'),
   toastErr:  (msg) => get().toast(msg, 4000, 'err'),

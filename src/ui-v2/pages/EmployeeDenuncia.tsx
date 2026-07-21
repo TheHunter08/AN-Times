@@ -50,7 +50,7 @@ export function EmployeeDenuncia({ toast, onBack }: EmployeeDenunciaProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (mensaje.trim().length < 20) {
-      toast?.('El mensaje debe tener al menos 20 caracteres', 'error')
+      toast?.('El mensaje debe tener al menos 20 caracteres', 3500, 'err')
       return
     }
     setSubmitting(true)
@@ -66,7 +66,7 @@ export function EmployeeDenuncia({ toast, onBack }: EmployeeDenunciaProps) {
       setTipo('acoso')
     } catch (err) {
       console.error('Error al guardar denuncia:', err)
-      toast?.('Error al enviar la denuncia. Inténtalo de nuevo.', 'error')
+      toast?.('Error al enviar la denuncia. Inténtalo de nuevo.', 4500, 'err')
     } finally {
       setSubmitting(false)
     }

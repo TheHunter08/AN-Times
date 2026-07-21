@@ -121,4 +121,26 @@ test.describe('Pantalla del empleado', () => {
     await expect(dialog.getByText('Descargar solo mediante Wi‑Fi', { exact:true })).toBeVisible()
   })
 
+  test('muestra gastos legacy y guarda un gasto nuevo con control de sincronización', async ({ page }) => {
+    const month = new Date().toISOString().slice(0, 7)
+    await loginAsEmployee(page, { gastos:[
+      { id:'legacy-1', empId:employee.id, concepto:'Taxi', importe:'10', estado:'aprobado', ts:`${month}-02T10:00:00Z` },
+      { id:'legacy-2', empId:employee.id, concepto:'Dieta', importe:'5', estado:'aprobado', ts:`${month}-03T10:00:00Z` },
+    ] })
+    await page.goto('/')
+    await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
+    await page.getByRole('button', { name:'Gastos', exact:true }).click()
+
+    await expect(page.getByText(/15,00.*aprobados/)).toBeVisible()
+    await page.getByRole('button', { name:'+ Nuevo gasto', exact:true }).click()
+    await page.getByPlaceholder(/Qué fue/).fill('Aparcamiento')
+    await page.getByPlaceholder('0.00').fill('7.50')
+    await page.getByRole('button', { name:'Enviar gasto', exact:true }).click()
+    await expect(page.getByText(/Gasto enviado correctamente/)).toBeVisible()
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).gastos.find(item => item.concepto === 'Aparcamiento'))
+    expect(saved).toMatchObject({ importe:7.5, estado:'pendiente' })
+    expect(saved._upd).toBeTruthy()
+  })
+
 })

@@ -108,6 +108,11 @@ describe('plan de sincronización offline V2', () => {
     expect(row.data.integrityHash).toBe('abc123')
   })
 
+  it('no convierte una firma administrativa falsa en el texto firmado "false"', () => {
+    expect(toClosureRow({ id:'pending', empId:'e1', mes:'2026-07', firmaAdmin:false }).firma_admin).toBeNull()
+    expect(toClosureRow({ id:'signed', empId:'e1', mes:'2026-06', firmaAdmin:true }).firma_admin).toBe('true')
+  })
+
   it('limita una mutación de fichaje a su fila y no reenvía las demás tablas', () => {
     const plan = buildTableSyncPlan({
       employees: [{ id: 'e1', name: 'Ana' }],

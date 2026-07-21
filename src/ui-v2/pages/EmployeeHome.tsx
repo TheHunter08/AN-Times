@@ -138,6 +138,7 @@ export function EmployeeHome({
   const [holdProgress, setHoldProgress] = useState(0)
   const holdActiveRef = useRef(false)
   const holdCompletedRef = useRef(false)
+  const holdStartedAtRef = useRef(0)
   const frameRef = useRef<number | null>(null)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintId = useId()
@@ -196,6 +197,7 @@ export function EmployeeHome({
     setHoldProgress(0)
     setHoldPhase('holding')
     const startedAt = performance.now()
+    holdStartedAtRef.current = startedAt
 
     const update = (now: number) => {
       if (!holdActiveRef.current) return
@@ -210,6 +212,17 @@ export function EmployeeHome({
 
     frameRef.current = requestAnimationFrame(update)
   }, [completeHold, holdPhase])
+
+  const finishHold = useCallback(() => {
+    if (
+      holdActiveRef.current
+      && performance.now() - holdStartedAtRef.current >= HOLD_DURATION
+    ) {
+      completeHold()
+      return
+    }
+    cancelHold()
+  }, [cancelHold, completeHold])
 
   useEffect(() => () => {
     clearFrame()
@@ -230,11 +243,13 @@ export function EmployeeHome({
   }
 
   const handlePointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    // Comprueba también el tiempo real: en dispositivos lentos el último
+    // requestAnimationFrame puede no ejecutarse antes de que el usuario suelte.
+    finishHold()
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
     pointerStartRef.current.id = -1
-    cancelHold()
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -247,7 +262,7 @@ export function EmployeeHome({
   const handleKeyUp = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      cancelHold()
+      finishHold()
     }
   }
 
@@ -308,7 +323,7 @@ export function EmployeeHome({
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerEnd}
-              onPointerCancel={handlePointerEnd}
+              onPointerCancel={cancelHold}
               onLostPointerCapture={cancelHold}
               onPointerLeave={cancelHold}
               onKeyDown={handleKeyDown}
