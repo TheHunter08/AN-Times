@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, sendHeartbeat } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
@@ -112,7 +112,6 @@ export const useAppStore = create((set, get) => ({
     // Realtime lo publique sin esperar a la reconciliación del blob completo.
     // No se espera esta promesa: la UI y el guardado local ya son inmediatos y
     // cloudPush mantiene la cola offline como respaldo si la red falla.
-    sendHeartbeat().catch(() => {})
     for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
     cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
@@ -210,14 +209,22 @@ export const useAppStore = create((set, get) => ({
   },
 
   // ── Realtime Supabase ────────────────────────────────────────────────
-  // El broadcast solo trae un aviso ("algo cambió"), no los datos — al
-  // recibirlo pedimos los datos con fetchDB(), que ya sabe no descargar nada
-  // si resulta que no hay nada nuevo (comprueba el timestamp primero).
+  // El broadcast solo trae un aviso. postgres_changes incorpora la fila completa;
+  // el fetch queda como respaldo si ese evento de tabla no llega.
   realtimeStatus: 'idle',
+  _lastTableRealtimeAt: 0,
   initRealtime: () => {
     startRealtime(
       () => get().db,
-      () => { get().fetchDB() },
+      (event) => {
+        if (event?.reason === 'reconnect') { get().fetchDB(); return }
+        // Normally postgres_changes has already supplied the full row. Wait a
+        // moment and only use the HTTP fetch as a fallback when no table event
+        // arrived (publication/channel unavailable).
+        setTimeout(() => {
+          if (Date.now() - get()._lastTableRealtimeAt > 1500) get().fetchDB()
+        }, 650)
+      },
       () => get()._serverTs,
       (status) => set({ realtimeStatus: status })
     )
@@ -226,9 +233,34 @@ export const useAppStore = create((set, get) => ({
 
   // ── postgres_changes Realtime ────────────────────────────────────────
   initTableRealtime: () => {
-    // postgres_changes ya confirma que una tabla cambió. Forzar la lectura evita
-    // descartarla por un reloj legacy/app_data todavía sin actualizar.
-    startTableRealtime(() => get().fetchDB({ forceTables: true }))
+    // postgres_changes ya incluye la fila completa: se incorpora localmente sin
+    // gastar una nueva lectura HTTP de todas las tablas.
+    startTableRealtime((changes) => {
+      set({ _lastTableRealtimeAt: Date.now() })
+      let merged = get().db
+      let needsFallback = false
+      for (const change of (changes || [])) {
+        const patch = tableChangeToPatch(change.table, change.payload)
+        if (!patch) { needsFallback = true; continue }
+        merged = mergeDB(merged, patch)
+      }
+      if (merged !== get().db) {
+        saveLocal(merged)
+        set({ db: merged, syncStatus: 'synced', lastSyncTime: Date.now() })
+        const ses = get().session
+        if (ses?.user?.id) {
+          const freshEmp = (merged.employees || []).find(e => e.id === ses.user.id)
+          if (!freshEmp || freshEmp.baja) get().logout()
+          else {
+            const persistedSes = sanitizeSession({ ...ses, user: freshEmp })
+            set({ session: { ...persistedSes, user: freshEmp } })
+            try { localStorage.setItem('an_times_ses', JSON.stringify(persistedSes)) } catch {}
+          }
+        }
+      }
+      // Keep the safe HTTP fallback for exceptional incomplete DELETE payloads.
+      if (needsFallback) get().fetchDB({ forceTables: true })
+    })
   },
   stopTableRealtime,
 

@@ -822,14 +822,14 @@ export function startRealtime(currentGetDB, onUpdate, getServerTs, onStatusChang
       const refTs = getServerTs ? getServerTs() : currentGetDB()._ts
       if (remoteTs != null && refTs != null && refTs > 0 && remoteTs < refTs) return
       _realtimeRetry = 0
-      onUpdate?.()
+      onUpdate?.({ reason: 'broadcast', remoteTs })
     })
     .subscribe((status) => {
       onStatusChange?.(status)
       if (status === 'SUBSCRIBED') {
         // Si veníamos de un error/cierre, hacer fetch al reconectar para recuperar
         // cualquier cambio que llegó mientras el canal estaba caído.
-        if (_realtimeRetry > 0) onUpdate?.()
+        if (_realtimeRetry > 0) onUpdate?.({ reason: 'reconnect' })
         _realtimeRetry = 0
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         // Reconexión exponencial: máx 15s (antes 60s). CLOSED ocurre cuando Android suspende la red.
@@ -890,15 +890,27 @@ export function broadcastSync(ts) { _broadcastUpdate(ts) }
 // la ventana activa y lo despierta periódicamente. Un cambio completamente
 // offline no puede avisar al servidor de que existe, así que el heartbeat no es
 // la única condición para comprobar la cola.
+const _HEARTBEAT_MIN_INTERVAL_MS = 2 * 60 * 1000
+let _lastHeartbeatAt = 0
+let _heartbeatFlight = null
+
 export async function sendHeartbeat() {
   if (!navigator.onLine || !supabase) return
+  const now = Date.now()
+  if (_heartbeatFlight) return _heartbeatFlight
+  if (now - _lastHeartbeatAt < _HEARTBEAT_MIN_INTERVAL_MS) return
+  // Reserve the window before the IndexedDB await so simultaneous saveDB()
+  // calls cannot all start their own heartbeat request.
+  _lastHeartbeatAt = now
   try {
     const userId = await _idbGet('push_user_id')
     if (!userId) return
-    supabase.from('push_subs')
+    _heartbeatFlight = supabase.from('push_subs')
       .update({ last_online: new Date().toISOString() })
       .eq('user_id', userId)
       .then(() => {}).catch(() => {})
+      .finally(() => { _heartbeatFlight = null })
+    return _heartbeatFlight
   } catch {}
 }
 

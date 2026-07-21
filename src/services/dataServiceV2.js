@@ -534,7 +534,7 @@ async function _syncToTables(db, deleted, syncHint) {
 // offline no se considera terminada hasta que blob y tablas coinciden.
 setPostBlobSyncHandler(_syncToTables)
 
-// ── postgres_changes: detecta cambios en tablas y dispara un re-fetch ────────
+// ── postgres_changes: aplica directamente las filas recibidas ────────────
 // Complementa el canal broadcast con escucha directa en las tablas — cubre
 // cambios del cron, la API de migración y escrituras externas que no
 // pasen por el broadcast (p.ej. ediciones desde el dashboard de Supabase).
@@ -545,29 +545,77 @@ setPostBlobSyncHandler(_syncToTables)
 // (ver supabase/realtime.sql)
 let _tableRealtimeCh = null
 let _tableDebounce   = null
+let _pendingTableChanges = []
+
+// Realtime already delivers the complete changed row. Converting that payload
+// to a mergeDB patch avoids an HTTP download of every table after each event.
+export function tableChangeToPatch(table, payload) {
+  const eventType = payload?.eventType
+  const row = eventType === 'DELETE' ? payload?.old : payload?.new
+  if (!row || typeof row !== 'object') return null
+
+  const isDeleted = eventType === 'DELETE' || row.deleted === true
+  const deletedPatch = (collection, id) => id == null
+    ? null
+    : { _partial: true, _deleted: { [collection]: [id] }, _ts: Date.now() }
+
+  if (table === 'app_entities') {
+    const collection = row.collection
+    const entityId = row.entity_id
+    if (!ENTITY_COLLECTIONS.includes(collection) && !SINGLETON_COLLECTIONS.includes(collection)) return null
+    if (isDeleted) return SINGLETON_COLLECTIONS.includes(collection) ? null : deletedPatch(collection, entityId)
+    if (!row.data || typeof row.data !== 'object') return null
+    if (SINGLETON_COLLECTIONS.includes(collection)) {
+      return { _partial: true, [collection]: row.data, _ts: Date.now() }
+    }
+    return {
+      _partial: true,
+      [collection]: [{ ...row.data, _rev: row.revision ?? row.data?._rev, _upd: row.updated_at ?? row.data?._upd }],
+      _ts: Date.now(),
+    }
+  }
+
+  const definitions = {
+    employees: fromEmployee,
+    records: fromRecord,
+    vacaciones: fromVac,
+    cierres: fromCierre,
+    obras: fromObra,
+  }
+  const mapper = definitions[table]
+  if (!mapper || row.id == null) return null
+  if (isDeleted) return deletedPatch(table, row.id)
+  return { _partial: true, [table]: [mapper(row)], _ts: Date.now() }
+}
 
 export function startTableRealtime(onRefresh) {
   if (!supabase) return
   stopTableRealtime()
   _tableRealtimeCh = supabase
     .channel('db-table-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'records',    filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees',  filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'vacaciones', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres',    filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'obras',      filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities', filter: `company_id=eq.${COMPANY_ID}` }, () => _debouncedRefresh(onRefresh))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'records',    filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'records', payload))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'employees',  filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'employees', payload))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'vacaciones', filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'vacaciones', payload))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres',    filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'cierres', payload))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'obras',      filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'obras', payload))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities', filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'app_entities', payload))
     .subscribe()
 }
 
 export function stopTableRealtime() {
   if (_tableRealtimeCh) { supabase?.removeChannel(_tableRealtimeCh); _tableRealtimeCh = null }
   clearTimeout(_tableDebounce)
+  _pendingTableChanges = []
 }
 
-function _debouncedRefresh(fn) {
+function _debouncedRefresh(fn, table, payload) {
+  _pendingTableChanges.push({ table, payload })
   clearTimeout(_tableDebounce)
   // Agrupa la ráfaga de escrituras de un mismo guardado sin añadir un retraso
   // visible al fichaje en los demás dispositivos.
-  _tableDebounce = setTimeout(fn, 120)
+  _tableDebounce = setTimeout(() => {
+    const changes = _pendingTableChanges
+    _pendingTableChanges = []
+    fn?.(changes)
+  }, 120)
 }
