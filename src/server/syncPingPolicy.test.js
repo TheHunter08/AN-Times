@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDeviceCoverage, isSyncCandidate } from './syncPingPolicy.js'
+import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from './syncPingPolicy.js'
 
 describe('selección de dispositivos para sincronización cerrada', () => {
   const now = Date.parse('2026-07-21T18:00:00.000Z')
@@ -45,5 +45,15 @@ describe('cobertura real de dispositivos', () => {
     expect(coverage.missingWorkerIds).toEqual(['jorge'])
     expect(coverage.orphanSubscriptions.map(item => item.user_id)).toEqual(['antiguo'])
     expect(coverage.activeSubscriptions.map(item => item.user_id)).toEqual(['__admin__', 'ana'])
+  })
+
+  it('solo considera listo al trabajador con firma y dispositivo registrado', () => {
+    const coverage = getLaunchCoverage(employees, subscriptions, {
+      ana: { main: { data:'firma' } },
+      jorge: { main: { data:'firma' } },
+    })
+    expect(coverage.signatureReadyWorkers).toBe(2)
+    expect(coverage.fullyReadyWorkers).toBe(1)
+    expect(coverage.missingSignatureIds).toEqual([])
   })
 })

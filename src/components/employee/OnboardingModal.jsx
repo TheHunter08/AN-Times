@@ -1,8 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { getCfg } from '../../utils/userConfig.js'
-import { pushSubscribe } from '../../services/dataService.js'
-import { VAPID_PUB } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { TextField } from '../../ui-v2/components/FormField.js'
@@ -13,31 +11,42 @@ const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid
 const btnSmSec = { padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
 
 // ─── ONBOARDING (primer login empleado) ─────────────────────────────────────
-export function OnboardingModal({ visible, u, db, saveDB, toast }) {
+export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, notificationPermission, onActivateNotifications, hasOpenShift, onFinishOpenShift }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
-  const [notifGranted, setNotifGranted] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted')
+  const [capturedSignature, setCapturedSignature] = useState(null)
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
   const dialogRef = useDialogA11y(visible && !done)
+  const existingSignature = db.firmas?.[u?.id]?.main?.data || null
 
-  useEffect(() => { if (step === 1) initCanvas() }, [step])
+  useEffect(() => { if (step === 1 && !existingSignature) initCanvas() }, [step, existingSignature, initCanvas])
 
   if (!visible || done) return null
 
-  const requestNotif = async () => {
-    if (!('Notification' in window)) return
-    const perm = await Notification.requestPermission()
-    setNotifGranted(perm === 'granted')
-    if (perm === 'granted' && u?.id) pushSubscribe(u.id, VAPID_PUB).catch(() => {})
+  const saveSignatureAndContinue = () => {
+    const data = existingSignature || getSignatureData()
+    if (!data) { toast('La firma es obligatoria. Dibuja tu firma antes de continuar.', 5000, 'warn'); return }
+    if (data.length > 200000) { toast('Firma muy grande, simplifica los trazos', 4000, 'warn'); return }
+    if (!existingSignature) {
+      const updatedAt = new Date().toISOString()
+      setCapturedSignature(data)
+      saveDB(fresh => ({
+        firmas: {
+          ...(fresh.firmas || {}),
+          [u.id]: { ...(fresh.firmas?.[u.id] || {}), main: { data, updatedAt, empName: u.name } },
+        },
+      }))
+    }
+    setStep(2)
   }
 
   const finish = () => {
-    const signatureData = getSignatureData()
-    const firma = signatureData ? { data: signatureData, ts: new Date().toISOString() } : null
+    const signatureData = existingSignature || capturedSignature
+    if (!pushReady) { setStep(0); toast('Debes activar y registrar las notificaciones para continuar.', 5000, 'warn'); return }
+    if (!signatureData) { setStep(1); toast('Debes guardar tu firma para continuar.', 5000, 'warn'); return }
     saveDB(fresh => ({
       employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, onboardingDone: true, reminderTime } : e),
-      firmas: firma ? { ...(fresh.firmas || {}), [u.id]: { main: firma } } : (fresh.firmas || {}),
     }))
     try { localStorage.setItem('cfg_reminderTime', reminderTime) } catch {}
     setDone(true)
@@ -52,8 +61,8 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
           <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
-          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Bienvenido, {u.name.split(' ')[0]}</div>
-          <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Configura tu cuenta en {STEPS.length} pasos rápidos</div>
+          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>{u.onboardingDone ? 'Completa los requisitos obligatorios' : `Bienvenido, ${u.name.split(' ')[0]}`}</div>
+          <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Verifica tu cuenta en {STEPS.length} pasos para poder utilizar TIMES INC</div>
         </div>
 
         {/* Step indicator */}
@@ -74,6 +83,15 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
           ))}
         </div>
 
+        {hasOpenShift && (
+          <div style={{ background:`color-mix(in srgb, ${colors.semantic.orange} 10%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 28%, transparent)`, borderRadius:radius.lg, padding:12, marginBottom:16 }}>
+            <div style={{ fontSize:12, color:colors.semantic.orange, fontWeight:700, marginBottom:8 }}>Tienes una jornada abierta</div>
+            <button style={{ ...btnSecondary, width:'100%' }} onClick={() => {
+              if (window.confirm('¿Finalizar tu jornada actual antes de completar la configuración?')) onFinishOpenShift?.()
+            }}>Finalizar jornada actual</button>
+          </div>
+        )}
+
         {/* Step 0: Notifications */}
         {step === 0 && (
           <div>
@@ -82,16 +100,23 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
               <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:6 }}>Activar notificaciones</div>
               <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>Recibe alertas de jornadas largas, vacaciones aprobadas y comunicados del administrador.</div>
             </div>
-            {notifGranted ? (
+            {pushReady ? (
               <div style={{ background:`color-mix(in srgb, ${colors.semantic.green} 7%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 15%, transparent)`, borderRadius:radius.lg, padding:'12px 16px', display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
                 <span style={{ fontSize:20 }}>✅</span>
-                <span style={{ fontSize:13, color:colors.semantic.green, fontWeight:600 }}>Notificaciones activadas</span>
+                <span style={{ fontSize:13, color:colors.semantic.green, fontWeight:600 }}>Dispositivo registrado y protegido</span>
               </div>
             ) : (
-              <button style={{ ...btnPrimary, width:'100%', marginBottom:10 }} onClick={requestNotif}>🔔 Activar notificaciones</button>
+              <>
+                <button style={{ ...btnPrimary, width:'100%', marginBottom:10 }} onClick={onActivateNotifications}>🔔 Activar y comprobar</button>
+                <div style={{ fontSize:11, color:colors.semantic.orange, lineHeight:1.5, marginBottom:12, textAlign:'center' }}>
+                  {notificationPermission === 'denied'
+                    ? 'El permiso está bloqueado. Actívalo en los ajustes del teléfono para TIMES INC.'
+                    : 'Este requisito permite enviar fichajes pendientes incluso con la app cerrada.'}
+                </div>
+              </>
             )}
-            <button style={{ ...btnSecondary, width:'100%' }} onClick={() => setStep(1)}>
-              {notifGranted ? 'Continuar →' : 'Omitir por ahora →'}
+            <button disabled={!pushReady} style={{ ...btnSecondary, width:'100%', opacity:pushReady ? 1 : .45, cursor:pushReady ? 'pointer' : 'not-allowed' }} onClick={() => pushReady && setStep(1)}>
+              Continuar →
             </button>
           </div>
         )}
@@ -103,13 +128,19 @@ export function OnboardingModal({ visible, u, db, saveDB, toast }) {
               <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:4 }}>Dibuja tu firma</div>
               <div style={{ fontSize:12, color:colors.text[500] }}>Se usará para firmar documentos y cierres mensuales</div>
             </div>
-            <canvas ref={canvasRef} width={640} height={180}
-              style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8 }}
-              {...handlers} />
+            {existingSignature ? (
+              <div style={{ background:colors.bg[500], border:`1px solid ${colors.border.default}`, borderRadius:radius.lg, padding:8, marginBottom:10 }}>
+                <img src={existingSignature} alt="Firma guardada" style={{ width:'100%', height:110, objectFit:'contain', display:'block' }} />
+                <div style={{ textAlign:'center', fontSize:11, color:colors.semantic.green, marginTop:6 }}>Firma comprobada</div>
+              </div>
+            ) : (
+              <canvas ref={canvasRef} width={640} height={180}
+                style={{ width:'100%', height:120, borderRadius:radius.lg, background:'#0D1218', cursor:'crosshair', touchAction:'none', border:`1px solid ${colors.border.subtle}`, display:'block', marginBottom:8 }}
+                {...handlers} />
+            )}
             <div style={{ display:'flex', gap:8, marginBottom:4 }}>
-              <button style={btnSmSec} onClick={clearCanvas}>Borrar</button>
-              <button style={{ ...btnSecondary, flex:1 }} onClick={() => setStep(2)}>Omitir →</button>
-              <button style={btnPrimary} onClick={() => setStep(2)}>Guardar →</button>
+              {!existingSignature && <button style={btnSmSec} onClick={clearCanvas}>Borrar</button>}
+              <button style={{ ...btnPrimary, flex:1 }} onClick={saveSignatureAndContinue}>{existingSignature ? 'Continuar →' : 'Guardar firma →'}</button>
             </div>
           </div>
         )}

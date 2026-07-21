@@ -10,7 +10,7 @@
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
-import { getDeviceCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
+import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -41,18 +41,20 @@ async function getSyncState() {
   if (!SB_URL || !SB_ANON) return { candidates: [], coverage: getDeviceCoverage() }
   const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`
   const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync,updated_at`
+  const signaturesUrl = `${SB_URL}/rest/v1/app_entities?select=data&company_id=eq.${COMPANY_ID}&collection=eq.firmas&entity_id=eq.__singleton__`
   try {
-    const [employeesResponse, subscriptionsResponse] = await Promise.all([
+    const [employeesResponse, subscriptionsResponse, signaturesResponse] = await Promise.all([
       fetch(employeesUrl, { headers: SB_H }),
       fetch(subscriptionsUrl, { headers: SB_H }),
+      fetch(signaturesUrl, { headers: SB_H }),
     ])
-    if (!employeesResponse.ok || !subscriptionsResponse.ok) {
-      throw new Error(`coverage fetch failed: ${employeesResponse.status}/${subscriptionsResponse.status}`)
+    if (!employeesResponse.ok || !subscriptionsResponse.ok || !signaturesResponse.ok) {
+      throw new Error(`coverage fetch failed: ${employeesResponse.status}/${subscriptionsResponse.status}/${signaturesResponse.status}`)
     }
-    const coverage = getDeviceCoverage(
-      await employeesResponse.json(),
-      await subscriptionsResponse.json()
-    )
+    const employees = await employeesResponse.json()
+    const subscriptions = await subscriptionsResponse.json()
+    const signatureRows = await signaturesResponse.json()
+    const coverage = getLaunchCoverage(employees, subscriptions, signatureRows?.[0]?.data || {})
     return {
       coverage,
       // El total registrado y los móviles que necesitan un ping son métricas distintas.
@@ -89,9 +91,12 @@ export default async function handler(req, res) {
       registeredDevices: coverage.registeredWorkers,
       missingDevices: coverage.missingWorkerIds.length,
       orphanSubscriptions: coverage.orphanSubscriptions.length,
+      signatureReadyDevices: coverage.signatureReadyWorkers,
+      fullyReadyDevices: coverage.fullyReadyWorkers,
+      missingSignatures: coverage.missingSignatureIds.length,
     }
     if (!candidates.length) {
-      console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} missing=${coverageResult.missingDevices} candidates=0 sent=0`)
+      console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} signed=${coverageResult.signatureReadyDevices} ready=${coverageResult.fullyReadyDevices} missing=${coverageResult.missingDevices} candidates=0 sent=0`)
       return res.status(200).json({ ok: true, ...coverageResult, candidates: 0, sent: 0, reason: 'no candidates' })
     }
 
@@ -125,7 +130,7 @@ export default async function handler(req, res) {
       }
     }))
 
-    console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} missing=${coverageResult.missingDevices} candidates=${candidates.length} sent=${sent} expired=${expired} errors=${errors}`)
+    console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} signed=${coverageResult.signatureReadyDevices} ready=${coverageResult.fullyReadyDevices} missing=${coverageResult.missingDevices} candidates=${candidates.length} sent=${sent} expired=${expired} errors=${errors}`)
     return res.status(200).json({ ok: true, ...coverageResult, candidates: candidates.length, sent, expired, errors })
   } catch (e) {
     console.error('[sync-ping] fatal:', e)

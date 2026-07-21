@@ -48,3 +48,20 @@ export function getDeviceCoverage(employees = [], subscriptions = []) {
     ),
   }
 }
+
+export function getLaunchCoverage(employees = [], subscriptions = [], signatures = {}) {
+  const deviceCoverage = getDeviceCoverage(employees, subscriptions)
+  const workers = employees.filter(employee => employee?.id && !employee.baja && employee.role !== 'admin')
+  const registeredIds = new Set(subscriptions.map(subscription => String(subscription?.user_id || '')))
+  const signedWorkerIds = workers
+    .filter(employee => Boolean(signatures?.[employee.id]?.main?.data))
+    .map(employee => String(employee.id))
+  const fullyReadyIds = signedWorkerIds.filter(id => registeredIds.has(id))
+
+  return {
+    ...deviceCoverage,
+    signatureReadyWorkers: signedWorkerIds.length,
+    fullyReadyWorkers: fullyReadyIds.length,
+    missingSignatureIds: workers.map(employee => String(employee.id)).filter(id => !signedWorkerIds.includes(id)),
+  }
+}

@@ -24,6 +24,7 @@ import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
 import { finalizeRecord } from '../utils/recordLifecycle.js'
+import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -68,6 +69,8 @@ const GEO_OPTS = { enableHighAccuracy: true, timeout: 25000, maximumAge: 120000 
 // arriba — si se soltara antes, un segundo toque mientras la primera
 // petición de ubicación sigue en curso dispararía una jornada duplicada.
 const STARTING_LOCK_MS = GEO_OPTS.timeout + 2000
+const PUSH_READY_TTL_MS = 30 * 24 * 60 * 60_000
+const pushReadyStorageKey = employeeId => `an_push_ready_${employeeId}`
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus, offlinePending } = useAppStore(
@@ -140,6 +143,10 @@ export default function EmployeePage() {
   )
   const pushAttemptRef = useRef(false)
   const pushReadyRef = useRef(false)
+  const launchRequirements = useMemo(
+    () => getLaunchRequirements(db, u?.id, pushStatus === 'ready'),
+    [db.firmas, u?.id, pushStatus]
+  )
   const showNotifBanner = pushStatus !== 'ready'
   const pushBannerTitle = notifPerm === 'denied'
     ? 'Falta activar la sincronización cerrada'
@@ -157,6 +164,8 @@ export default function EmployeePage() {
     const permission = Notification.permission
     setNotifPerm(permission)
     if (permission !== 'granted') {
+      try { localStorage.removeItem(pushReadyStorageKey(u.id)) } catch {}
+      pushReadyRef.current = false
       setPushStatus('permission')
       return false
     }
@@ -165,6 +174,9 @@ export default function EmployeePage() {
     try {
       const result = await pushSubscribe(u.id, VAPID_PUB)
       pushReadyRef.current = !!result?.ok
+      if (result?.ok) {
+        try { localStorage.setItem(pushReadyStorageKey(u.id), String(Date.now())) } catch {}
+      }
       setPushStatus(result?.ok ? 'ready' : 'failed')
       if (showFeedback) {
         toast(
@@ -200,10 +212,34 @@ export default function EmployeePage() {
   // permanece visible y se reintenta al recuperar red o volver a la app.
   useEffect(() => {
     if (!u?.id || !('Notification' in window)) return
-    pushReadyRef.current = false
+    let cachedReady = false
+    try {
+      const verifiedAt = Number(localStorage.getItem(pushReadyStorageKey(u.id)) || 0)
+      cachedReady = Notification.permission === 'granted' && verifiedAt > 0 && Date.now() - verifiedAt < PUSH_READY_TTL_MS
+    } catch {}
+    pushReadyRef.current = cachedReady
+    setPushStatus(cachedReady ? 'ready' : Notification.permission === 'granted' ? 'checking' : 'permission')
+    if (cachedReady && navigator.onLine) {
+      // Revalidación silenciosa: el último registro confirmado permite trabajar
+      // offline, pero con red renovamos la fila de Supabase sin bloquear la app.
+      pushSubscribe(u.id, VAPID_PUB).then(result => {
+        if (result?.ok) {
+          try { localStorage.setItem(pushReadyStorageKey(u.id), String(Date.now())) } catch {}
+        } else if (result?.reason === 'permission_denied') {
+          pushReadyRef.current = false
+          setPushStatus('permission')
+          try { localStorage.removeItem(pushReadyStorageKey(u.id)) } catch {}
+        }
+      }).catch(() => {})
+    }
     const retry = () => {
       setNotifPerm(Notification.permission)
       if (Notification.permission === 'granted' && !pushReadyRef.current) ensurePushReady(false)
+      if (Notification.permission !== 'granted') {
+        pushReadyRef.current = false
+        setPushStatus('permission')
+        try { localStorage.removeItem(pushReadyStorageKey(u.id)) } catch {}
+      }
     }
     retry()
     const id = setInterval(retry, 30_000)
@@ -677,6 +713,16 @@ export default function EmployeePage() {
   // se aplique a ambos flujos de fichaje sin tener que actualizar dos sitios.
   const checkFichajePreconditions = useCallback(() => {
     if (timer.state !== 'idle' || startingRef.current) return false
+    if (!launchRequirements.ready) {
+      toast(
+        !launchRequirements.notificationsReady
+          ? 'Activa las notificaciones y confirma el registro de este dispositivo antes de fichar.'
+          : 'Guarda tu firma digital obligatoria antes de fichar.',
+        6000,
+        'warn'
+      )
+      return false
+    }
     const todayStr = today()
     const activeVac = (db.vacaciones || []).find(v =>
       v.empId === u?.id && v.estado === 'aprobada' && v.fechaInicio <= todayStr && v.fechaFin >= todayStr
@@ -686,7 +732,7 @@ export default function EmployeePage() {
       return false
     }
     return true
-  }, [timer.state, db.vacaciones, u?.id, toast])
+  }, [timer.state, db.vacaciones, u?.id, toast, launchRequirements])
 
   const doStart = () => {
     if (!checkFichajePreconditions()) return
@@ -815,33 +861,36 @@ export default function EmployeePage() {
     )
   }, [checkFichajePreconditions, confirmarCentro])
 
-  const doStop = useCallback(() => {
+  const finishCurrentShift = useCallback(() => {
     const o = openRec()
     if (!o) return
-    showConfirm('¿Terminar la jornada ahora?', () => {
-      const closed = finalizeRecord(o)
-      const t = calcSecs(closed)
-      saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? closed : r) }))
-      try { navigator.vibrate([15, 50, 30]) } catch {}
-      toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
-      setShowConfetti(true)
-      setTimeout(() => setShowConfetti(false), 2600)
-      // Capturar GPS en background y actualizar el registro cuando resuelva
-      if (navigator.geolocation) {
-        const stopId = closed.id
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
-            useAppStore.getState().saveDB(freshDb => ({
-              records: freshDb.records.map(r => r.id === stopId ? { ...r, locFin, _upd: new Date().toISOString() } : r)
-            }))
-          },
-          () => {},
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        )
-      }
-    })
-  }, [db, openRec, saveDB, toast, showConfirm])
+    const closed = finalizeRecord(o)
+    const t = calcSecs(closed)
+    saveDB(freshDb => ({ records: freshDb.records.map(r => r.id === o.id ? closed : r) }))
+    try { navigator.vibrate([15, 50, 30]) } catch {}
+    toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
+    setShowConfetti(true)
+    setTimeout(() => setShowConfetti(false), 2600)
+    // Capturar GPS en background y actualizar el registro cuando resuelva
+    if (navigator.geolocation) {
+      const stopId = closed.id
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const locFin = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), ts: new Date().toISOString() }
+          useAppStore.getState().saveDB(freshDb => ({
+            records: freshDb.records.map(r => r.id === stopId ? { ...r, locFin, _upd: new Date().toISOString() } : r)
+          }))
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    }
+  }, [openRec, saveDB, toast])
+
+  const doStop = useCallback(() => {
+    if (!openRec()) return
+    showConfirm('¿Terminar la jornada ahora?', finishCurrentShift)
+  }, [openRec, showConfirm, finishCurrentShift])
 
   const doBreak = useCallback(() => {
     if (breakingRef.current) return
@@ -904,6 +953,10 @@ export default function EmployeePage() {
         (isJO || !encCentros.length || !e.centroTrabajo || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
       )
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
+      if (!hasEmployeeSignature(db, emp.id)) {
+        toast(`${emp.name} debe completar y guardar su firma obligatoria antes de iniciar una jornada.`, 5000, 'warn')
+        return
+      }
       const recs = db.records || []
       const targetOpen = recs.find(r => r.empId === emp.id && !r.fin)
       if (targetOpen) {
@@ -1132,7 +1185,20 @@ export default function EmployeePage() {
       {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {showConfetti && <Confetti visible />}
-      {u.onboardingDone ? <WelcomeSlides /> : <OnboardingModal visible u={u} db={db} saveDB={saveDB} toast={toast} />}
+      {!u.onboardingDone || !launchRequirements.ready
+        ? <OnboardingModal
+            visible
+            u={u}
+            db={db}
+            saveDB={saveDB}
+            toast={toast}
+            pushReady={launchRequirements.notificationsReady}
+            notificationPermission={notifPerm}
+            onActivateNotifications={handleNotifActivate}
+            hasOpenShift={Boolean(openRec())}
+            onFinishOpenShift={finishCurrentShift}
+          />
+        : <WelcomeSlides />}
     </Suspense>
   )
 
