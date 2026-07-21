@@ -26,6 +26,7 @@ export function getAIChips(user) {
 function scopedEmployees(db, user) {
   return getScopedEmployees({
     employees:db.employees || [],
+    obras:db.obras || [],
     supervisor:user,
     unrestricted:isGlobalAdmin(user),
   })

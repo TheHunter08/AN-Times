@@ -6,7 +6,25 @@ function assignedWorks(employee) {
   return new Set((employee?.obrasAsignadas || []).map(normalize).filter(Boolean))
 }
 
-export function getScopedEmployees({ employees = [], supervisor, unrestricted = false }) {
+// Centro de trabajo al que está adscrita cada obra (campo opcional en la
+// ficha de la obra, ver ObraModal/ObrasPage) — permite que un supervisor
+// con centro asignado vea también a los empleados de las obras adscritas a
+// ese centro, sin tener que replicar manualmente el centro en cada
+// empleado uno a uno además de marcarle la obra.
+function obraCenterMap(obras) {
+  const map = new Map()
+  for (const obra of obras || []) {
+    const center = normalize(obra?.centroTrabajo)
+    if (!center) continue
+    const id = normalize(obra?.id)
+    const name = normalize(obra?.nombre || obra?.name)
+    if (id) map.set(id, center)
+    if (name) map.set(name, center)
+  }
+  return map
+}
+
+export function getScopedEmployees({ employees = [], obras = [], supervisor, unrestricted = false }) {
   const active = employees.filter(employee => employee && !employee.baja && !employee.isAdmin && employee.role !== 'admin')
   if (unrestricted) return active
 
@@ -14,10 +32,13 @@ export function getScopedEmployees({ employees = [], supervisor, unrestricted = 
   const supervisorWorks = assignedWorks(supervisor)
   if (!supervisorCenter && supervisorWorks.size === 0) return []
 
+  const centersByWork = obraCenterMap(obras)
+
   return active.filter(employee => {
     const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
     const employeeWorks = assignedWorks(employee)
-    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter
+    const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
+    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter)
     const workMatches = supervisorWorks.size === 0 || [...supervisorWorks].some(work => employeeWorks.has(work))
     return centerMatches && workMatches
   })
@@ -26,7 +47,9 @@ export function getScopedEmployees({ employees = [], supervisor, unrestricted = 
 /**
  * Devuelve los fichajes abiertos que pertenecen al ámbito del supervisor.
  * Si tiene centro y obras asignadas, ambos deben coincidir para evitar fugas
- * de información entre centros u obras.
+ * de información entre centros u obras — salvo que la propia obra del
+ * empleado/fichaje esté adscrita al centro del supervisor (obraCenterMap),
+ * en cuyo caso ese vínculo cuenta también como coincidencia de centro.
  */
 export function getScopedOnlineRecords({ records = [], employees = [], obras = [], supervisor, unrestricted = false }) {
   const employeeById = new Map(employees.map(employee => [employee.id, employee]))
@@ -37,6 +60,7 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
     const name = normalize(work.nombre || work.name)
     return [[id, id], [name, id]].filter(([key]) => key)
   }))
+  const centersByWork = obraCenterMap(obras)
 
   return records
     .filter(record => record && !record.fin && record.inicio)
@@ -47,10 +71,17 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
 
       const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
       const recordCenter = normalize(record.centro)
-      const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter || recordCenter === supervisorCenter
-
       const employeeWorks = assignedWorks(employee)
       const recordWorkId = workNames.get(recordCenter) || recordCenter
+
+      const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
+      const recordWorkCenter = centersByWork.get(recordWorkId)
+      const centerMatches = !supervisorCenter ||
+        employeeCenter === supervisorCenter ||
+        recordCenter === supervisorCenter ||
+        employeeWorkCenters.includes(supervisorCenter) ||
+        recordWorkCenter === supervisorCenter
+
       const workMatches = supervisorWorks.size === 0 ||
         [...supervisorWorks].some(workId => employeeWorks.has(workId)) ||
         supervisorWorks.has(recordWorkId)

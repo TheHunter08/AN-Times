@@ -2090,14 +2090,18 @@ function AnomaliesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => v
   return <Anomalies items={items} onResolve={resolveAnomaly} onOpen={item => onOpenEmployee(item.empName)} />
 }
 
-function ObraModal({ onClose }: { onClose: () => void }) {
+function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void }) {
+  const db     = useAppStore(s => s.db) as any
   const saveDB = useAppStore(s => s.saveDB)
   const toast  = useAppStore(s => s.toast)
-  const [nombre, setNombre] = useState('')
-  const [coords, setCoords] = useState('')
-  const [radio, setRadio] = useState('200')
-  const [fechaInicio, setFechaInicio] = useState(() => today())
+  const isEdit = !!initial
+  const [nombre, setNombre] = useState(initial?.nombre || '')
+  const [coords, setCoords] = useState(initial?.coords ? formatObraCoords(initial.coords) : '')
+  const [radio, setRadio] = useState(String(initial?.radio || 200))
+  const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
+  const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
   const dialogRef = useDialogA11y(true, onClose)
+  const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
   const handleSave = () => {
     if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
@@ -2105,15 +2109,21 @@ function ObraModal({ onClose }: { onClose: () => void }) {
     if (coords.trim() && !normalizedCoords) { toast('Usa coordenadas válidas: latitud, longitud', 3500, 'warn'); return }
     const nowIso = new Date().toISOString()
     const obra = {
-      id: gid(), nombre: nombre.trim(),
+      ...(initial || {}),
+      id: initial?.id || gid(), nombre: nombre.trim(),
       coords: normalizedCoords,
       radio: Number(radio) > 0 ? Number(radio) : 200,
-      activa: true,
+      activa: initial?.activa ?? true,
       fechaInicio: fechaInicio || null,
+      centroTrabajo: centroTrabajo || null,
       _upd: nowIso,
     }
-    saveDB((fresh: any) => ({ obras: [...(fresh.obras || []), obra] }))
-    toast('Obra creada', 2500, 'ok')
+    saveDB((fresh: any) => ({
+      obras: isEdit
+        ? (fresh.obras || []).map((o: any) => o.id === obra.id ? obra : o)
+        : [...(fresh.obras || []), obra],
+    }))
+    toast(isEdit ? 'Obra actualizada' : 'Obra creada', 2500, 'ok')
     onClose()
   }
 
@@ -2122,10 +2132,10 @@ function ObraModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Nueva obra" onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={isEdit ? 'Editar obra' : 'Nueva obra'} onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 420, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>Nueva obra</div>
-          <button type="button" aria-label="Cerrar nueva obra" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>{isEdit ? 'Editar obra' : 'Nueva obra'}</div>
+          <button type="button" aria-label={isEdit ? 'Cerrar edición de obra' : 'Cerrar nueva obra'} onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
         </div>
         <div>
           <div style={labelStyle}>Nombre</div>
@@ -2145,8 +2155,22 @@ function ObraModal({ onClose }: { onClose: () => void }) {
             <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} aria-label="Fecha de inicio de la obra" style={fieldStyle} />
           </div>
         </div>
+        <div>
+          <div style={labelStyle}>Centro de trabajo</div>
+          {centros.length > 0 ? (
+            <select value={centroTrabajo} onChange={e => setCentroTrabajo(e.target.value)} aria-label="Centro de trabajo de la obra" style={fieldStyle}>
+              <option value="">Sin asignar</option>
+              {centros.map((c: string) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          ) : (
+            <input value={centroTrabajo} onChange={e => setCentroTrabajo(e.target.value)} aria-label="Centro de trabajo de la obra" placeholder="Ej: Oficina Central" style={fieldStyle} />
+          )}
+          <div style={{ fontSize: 11, color: colors.text[500], marginTop: 4 }}>
+            Los empleados asignados a esta obra quedarán visibles para los encargados/jefes de obra de este centro, aunque no tengan la obra marcada directamente.
+          </div>
+        </div>
         <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
-          Crear obra
+          {isEdit ? 'Guardar cambios' : 'Crear obra'}
         </button>
       </div>
     </div>
@@ -2201,13 +2225,18 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
         activeNow,
         manager: manager?.name || '—',
         startDate: fmtDate(o.fechaInicio || o.createdAt || o.ts),
+        centroTrabajo: o.centroTrabajo || '',
       }
     })
   }, [db, todayStr, currentMonth])
 
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editingObra = editingId ? (db.obras || []).find((o: any) => o.id === editingId) : null
+
   return <>
-    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} />
+    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} onEdit={(id: string) => setEditingId(id)} />
     {showAdd && <ObraModal onClose={() => setShowAdd(false)} />}
+    {editingObra && <ObraModal initial={editingObra} onClose={() => setEditingId(null)} />}
   </>
 }
 

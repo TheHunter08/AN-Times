@@ -20,12 +20,14 @@ export interface ObraItem {
   activeNow?: number
   manager: string
   startDate: string
+  centroTrabajo?: string
 }
 
 export interface ObrasProps {
   items: ObraItem[]
   onAdd?: () => void
   onViewEmployees?: () => void
+  onEdit?: (id: string) => void
 }
 
 const statusTone: Record<ObraItem['status'], 'green' | 'orange' | 'gray'> = {
@@ -35,7 +37,7 @@ const statusLabel: Record<ObraItem['status'], string> = {
   activa: 'Activa', completada: 'Completada',
 }
 
-export function Obras({ items, onAdd, onViewEmployees }: ObrasProps) {
+export function Obras({ items, onAdd, onViewEmployees, onEdit }: ObrasProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ObraItem['status'] | 'all'>('all')
   const [detail, setDetail] = useState<ObraItem | null>(null)
@@ -102,10 +104,16 @@ export function Obras({ items, onAdd, onViewEmployees }: ObrasProps) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: colors.text[500], marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: colors.text[500], marginBottom: obra.centroTrabajo ? 4 : 12 }}>
                 <IconMapPin width={12} height={12} />
                 {obra.address}
               </div>
+
+              {obra.centroTrabajo ? (
+                <div style={{ fontSize: 11, color: colors.primary.light, marginBottom: 12 }}>Centro: {obra.centroTrabajo}</div>
+              ) : (
+                <div style={{ fontSize: 11, color: colors.semantic.orange, marginBottom: 12 }}>Sin centro de trabajo asignado</div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
@@ -173,14 +181,22 @@ export function Obras({ items, onAdd, onViewEmployees }: ObrasProps) {
 
             <div style={{ display: 'grid', gap: 8, fontSize: 12, color: colors.text[500] }}>
               <div>Encargado: <strong style={{ color: colors.text[700] }}>{detail.manager}</strong></div>
+              <div>Centro de trabajo: <strong style={{ color: detail.centroTrabajo ? colors.text[700] : colors.semantic.orange }}>{detail.centroTrabajo || 'Sin asignar'}</strong></div>
               <div>Fecha de inicio: <strong style={{ color: colors.text[700] }}>{detail.startDate}</strong></div>
             </div>
 
-            {onViewEmployees && (
-              <button type="button" onClick={() => { setDetail(null); onViewEmployees() }} style={{ padding: '11px 14px', borderRadius: radius.md, border: 0, background: colors.primary.base, color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 750, cursor: 'pointer' }}>
-                Ver equipo de empleados →
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              {onEdit && (
+                <button type="button" onClick={() => { const id = detail.id; setDetail(null); onEdit(id) }} style={{ flex: 1, padding: '11px 14px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  Editar obra
+                </button>
+              )}
+              {onViewEmployees && (
+                <button type="button" onClick={() => { setDetail(null); onViewEmployees() }} style={{ flex: 1, padding: '11px 14px', borderRadius: radius.md, border: 0, background: colors.primary.base, color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 750, cursor: 'pointer' }}>
+                  Ver equipo de empleados →
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

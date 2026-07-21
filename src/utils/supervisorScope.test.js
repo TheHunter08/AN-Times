@@ -48,3 +48,35 @@ describe('getScopedOnlineRecords', () => {
     expect(result).toHaveLength(3)
   })
 })
+
+describe('vínculo obra→centro de trabajo', () => {
+  const linkedObras = [{ id: 'obra-c', nombre: 'Reforma C', centroTrabajo: 'Centro Norte' }]
+
+  it('getScopedOnlineRecords: un supervisor con solo centro ve a un empleado fichado en una obra adscrita a ese centro', () => {
+    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+    const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
+    const records = [{ id: 'dani-rec', empId: 'dani', inicio: '2026-07-13T08:00:00Z', centro: 'Reforma C' }]
+    const result = getScopedOnlineRecords({ records, employees: [employee], obras: linkedObras, supervisor: supervisorSoloCentro })
+    expect(result).toHaveLength(1)
+  })
+
+  it('getScopedOnlineRecords: sin el vínculo obra→centro, el mismo empleado no aparece (regresión del bug original)', () => {
+    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+    const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
+    const records = [{ id: 'dani-rec', empId: 'dani', inicio: '2026-07-13T08:00:00Z', centro: 'Reforma C' }]
+    const obrasSinCentro = [{ id: 'obra-c', nombre: 'Reforma C' }]
+    const result = getScopedOnlineRecords({ records, employees: [employee], obras: obrasSinCentro, supervisor: supervisorSoloCentro })
+    expect(result).toHaveLength(0)
+  })
+
+  it('getScopedEmployees: un supervisor con solo centro ve a un empleado asignado a una obra adscrita a ese centro', () => {
+    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+    const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
+    const result = getScopedEmployees({ employees: [employee], obras: linkedObras, supervisor: supervisorSoloCentro })
+    expect(result.map(item => item.id)).toEqual(['dani'])
+  })
+
+  it('el comportamiento original (mismo centro y obra exigidos a la vez) se mantiene si la obra no está adscrita a ningún centro', () => {
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id)).toEqual(['ok'])
+  })
+})
