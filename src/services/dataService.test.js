@@ -39,6 +39,16 @@ describe('tombstones: borrar una jornada no debe resucitar en el siguiente fetch
     expect(merged.records).toEqual([])
   })
 
+  it('una notificación borrada no reaparece al recibir una copia antigua del servidor', () => {
+    const staleNotification = {
+      id: 'noti-deleted-1', empId: 'e1', action: 'Jornada validada', detail: '',
+      ts: '2026-07-09T16:00:00.000Z', _upd: '2026-07-09T16:00:00.000Z',
+    }
+    recordTombstones({ notis: [staleNotification.id] })
+    const merged = mergeDB({ ...BASE, notis: [] }, { notis: [staleNotification] })
+    expect(merged.notis).toEqual([])
+  })
+
   it('una descarga incremental actualiza filas sin borrar las no modificadas', () => {
     const local = {
       ...BASE,

@@ -3,7 +3,7 @@ import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { calcSecs, gid, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
+import { calcSecs, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
 import { queuePush, supabase } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
@@ -11,6 +11,7 @@ import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
 import { monthlyTargetMinutes } from '../../utils/workTargets.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { createNotification } from '../../utils/notifications.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'92vh', overflowY:'auto' }
@@ -84,12 +85,12 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
       console.warn('[cierre] No se pudo generar el PDF firmado:', e)
     }
     const cierreFinal = (pdfData || documentoId) ? { ...firmado, pdfData, documentoId, integrityHash } : firmado
-    const noti = { id: gid(), empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, ts: firmadoAt, leido:false }
+    const noti = createNotification({ empId:'__admin__', action:'Cierre firmado', detail:`${u.name} firmó el cierre de ${selCierre.mes}`, dedupeKey:`cierre:${selCierre.id}:firma:${u.id}`, ts:firmadoAt })
     saveDB(fresh => ({
       cierres:(fresh.cierres || []).map(ci => ci.id === selCierre.id ? cierreFinal : ci),
       notis:[...(fresh.notis || []), noti],
     }))
-    queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes')
+    queuePush('__admin__', noti.action, noti.detail, 'cierre', '/?go=admin:informes', `cierre:${selCierre.id}:firma:${u.id}`)
     toast('Cierre mensual firmado correctamente', 3000, 'ok')
     setFirmando(false)
     onClose()

@@ -2,12 +2,12 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { gid } from '../../utils/time.js'
 import { auditLog, queuePush } from '../../services/dataService.js'
 import { DocPreview } from '../DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../../utils/pdfSign.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { createNotification } from '../../utils/notifications.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:560, maxHeight:'92vh', overflowY:'auto' }
@@ -61,11 +61,11 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
       const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
         ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
       } : d)
-      const noti = { id: gid(), empId: '__admin__', action: notiAction, detail: notiDetail, ts: firmadoAt, leido: false }
+      const noti = createNotification({ empId:'__admin__', action:notiAction, detail:notiDetail, dedupeKey:`documento:${doc.id}:firma:${u.id}`, ts:firmadoAt })
       const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
       return { documentos: updated, notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
     })
-    queuePush('__admin__', notiAction, notiDetail, 'times-doc', '/?go=admin:documentos')
+    queuePush('__admin__', notiAction, notiDetail, 'times-doc', '/?go=admin:documentos', `documento:${doc.id}:firma:${u.id}`)
     setStamping(false)
     toast('Documento firmado correctamente', 3000, 'ok')
     setSigning(null)

@@ -28,7 +28,7 @@ async function rows(path) {
 
 const [employees, subscriptions, records, closures, blobRows] = await Promise.all([
   rows('employees?select=id,role,baja,auth_id'),
-  rows('push_subs?select=user_id'),
+  rows('push_subs?select=user_id,endpoint'),
   rows('records?select=id,fin,aceptada,validado,rechazado,closed,deleted'),
   rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,deleted'),
   rows('app_data?select=data,updated_at&id=eq.1'),
@@ -38,6 +38,8 @@ const blob = blobRows[0]?.data || {}
 const workers = employees.filter(item => !item.baja && item.role !== 'admin')
 const workerIds = new Set(workers.map(item => item.id))
 const subscribed = new Set(subscriptions.map(item => item.user_id).filter(id => workerIds.has(id)))
+const endpointCounts = new Map()
+for (const item of subscriptions) endpointCounts.set(item.endpoint, (endpointCounts.get(item.endpoint) || 0) + 1)
 const signatures = blob.firmas || {}
 const signed = workers.filter(item => Boolean(signatures[item.id]?.main?.data))
 const nowMonth = new Date().toLocaleDateString('en-CA', { timeZone:'Europe/Madrid', year:'numeric', month:'2-digit' }).slice(0, 7)
@@ -55,6 +57,9 @@ const checks = {
   activeWorkers: workers.length,
   registeredWorkerDevices: subscribed.size,
   missingDeviceSubscriptions: workers.length - subscribed.size,
+  adminAliasSubscriptions: subscriptions.filter(item => item.user_id === '__admin__').length,
+  orphanSubscriptions: subscriptions.filter(item => !workerIds.has(item.user_id) && item.user_id !== '__admin__').length,
+  duplicatedEndpoints: [...endpointCounts.values()].filter(count => count > 1).length,
   workersWithSignature: signed.length,
   missingSignatures: workers.length - signed.length,
   employeesMissingAuth: employees.filter(item => !item.baja && !item.auth_id).length,

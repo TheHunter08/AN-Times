@@ -35,6 +35,7 @@ export {
   _updateLastSync,
   uploadPendingIfAny,
   pushSubscribe,
+  detachPushUser,
   queuePush,
   flushPushQueue,
   auditLog,

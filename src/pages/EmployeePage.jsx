@@ -26,6 +26,7 @@ import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
 import { finalizeRecord } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
+import { createNotification } from '../utils/notifications.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -495,12 +496,10 @@ export default function EmployeePage() {
 
       // Acumulador de notis a añadir a db.notis (para que aparezcan en la campana)
       const bellNotis = []
-      const addBell = (action, detail) => {
-        bellNotis.push({
-          id: 'sn_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(36).slice(2, 9)),
-          empId: u.id, action, detail,
-          ts: new Date().toISOString(), leido: false
-        })
+      const addBell = (eventKey, action, detail) => {
+        bellNotis.push(createNotification({
+          empId:u.id, action, detail, dedupeKey:`smart:${u.id}:${eventKey}`,
+        }))
       }
 
       // 1. Recordatorio diario de fichaje
@@ -517,8 +516,8 @@ export default function EmployeePage() {
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
             markSent(lastKey, todayStr)
             const _msgRem = '¿Has fichado hoy? No olvides registrar tu jornada laboral.'
-            sendPush(u.id, '⏰ Recordatorio de fichaje', _msgRem, 'reminder-fichar', '/?tab=inicio')
-            addBell('⏰ Recordatorio de fichaje', _msgRem)
+            sendPush(u.id, '⏰ Recordatorio de fichaje', _msgRem, 'reminder-fichar', '/?tab=inicio', `${lastKey}:${todayStr}`)
+            addBell(`${lastKey}:${todayStr}`, '⏰ Recordatorio de fichaje', _msgRem)
           }
         }
       }
@@ -531,8 +530,8 @@ export default function EmployeePage() {
         if (elapsed >= 465 && elapsed < 475 && !hasSent(warn14h)) {
           markSent(warn14h)
           const _msgLong = 'Llevas más de 7h 45min trabajando. Recuerda fichar la salida.'
-          sendPush(u.id, '⏳ Jornada larga', _msgLong, 'jornada', '/')
-          addBell('⏳ Jornada larga', _msgLong)
+          sendPush(u.id, '⏳ Jornada larga', _msgLong, 'jornada', '/', warn14h)
+          addBell(warn14h, '⏳ Jornada larga', _msgLong)
         }
       }
 
@@ -547,8 +546,8 @@ export default function EmployeePage() {
             markSent(sKey)
             const elapsedSalida = Math.floor((Date.now() - new Date(openRec.inicio).getTime()) / 60000)
             const _msgSal = `Llevas ${mhm(elapsedSalida)} con la jornada abierta. ¿Ya has terminado?`
-            sendPush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio')
-            addBell('🔔 ¿Olvidaste fichar la salida?', _msgSal)
+            sendPush(u.id, '🔔 ¿Olvidaste fichar la salida?', _msgSal, 'jornada', '/?tab=inicio', sKey)
+            addBell(sKey, '🔔 ¿Olvidaste fichar la salida?', _msgSal)
           }
         }
       }
@@ -561,13 +560,13 @@ export default function EmployeePage() {
           markPermSent(key)
           if (v.estado === 'aprobada') {
             const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido aprobada.`
-            sendPush(u.id, '🎉 Vacaciones aprobadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
-            addBell('🎉 Vacaciones aprobadas', _msgVac)
+            sendPush(u.id, '🎉 Vacaciones aprobadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones', `${key}:aprobada`)
+            addBell(`${key}:aprobada`, '🎉 Vacaciones aprobadas', _msgVac)
           } else {
             const motivoTxt = v.motivoRechazo ? ` Motivo: ${v.motivoRechazo}` : ''
             const _msgVac = `Tu solicitud de ${v.dias} día(s) ha sido rechazada.${motivoTxt}`
-            sendPush(u.id, '❌ Vacaciones rechazadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones')
-            addBell('❌ Vacaciones rechazadas', _msgVac)
+            sendPush(u.id, '❌ Vacaciones rechazadas', _msgVac, 'vacaciones', '/?go=emp:vacaciones', `${key}:rechazada`)
+            addBell(`${key}:rechazada`, '❌ Vacaciones rechazadas', _msgVac)
           }
         }
       })
@@ -579,8 +578,8 @@ export default function EmployeePage() {
         if (!hasSent(key, todayStr) && hh >= 9) {
           markSent(key, todayStr)
           const _msgDoc = `Tienes ${pendDocs.length} documento(s) pendiente(s) de firma.`
-          sendPush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos')
-          addBell('📄 Documentos pendientes', _msgDoc)
+          sendPush(u.id, '📄 Documentos pendientes', _msgDoc, 'documentos', '/?go=emp:documentos', `${key}:${todayStr}`)
+          addBell(`${key}:${todayStr}`, '📄 Documentos pendientes', _msgDoc)
         }
       }
 
@@ -591,8 +590,8 @@ export default function EmployeePage() {
         if (!hasSent(key, todayStr) && hh >= 9) {
           markSent(key, todayStr)
           const _msgCi = `Tienes ${pendCierres.length} resumen${pendCierres.length > 1 ? 'es' : ''} mensual pendiente${pendCierres.length > 1 ? 's' : ''} de firma.`
-          sendPush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil')
-          addBell('📋 Cierre mensual pendiente', _msgCi)
+          sendPush(u.id, '📋 Cierre mensual pendiente', _msgCi, 'cierre', '/?go=emp:perfil', `${key}:${todayStr}`)
+          addBell(`${key}:${todayStr}`, '📋 Cierre mensual pendiente', _msgCi)
         }
       }
 
@@ -605,8 +604,8 @@ export default function EmployeePage() {
           const warnKey = 'an_autoclose_warn_' + stale.id
           if (!hasSent(warnKey)) {
             markSent(warnKey)
-            sendPush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio')
-            addBell('⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
+            sendPush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio', warnKey)
+            addBell(warnKey, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
             toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
           }
         }
@@ -627,7 +626,7 @@ export default function EmployeePage() {
             // UTC — un cierre automático de madrugada mostraba el día siguiente al real.
             const _autoCloseDay = localDateStr(new Date(freshRec.inicio))
             const _msgAc = `Tu jornada del ${_autoCloseDay} se cerró por inactividad (${mhm(Math.floor(t2.work/60))}).`
-            addBell('⏱️ Jornada cerrada automáticamente', _msgAc)
+            addBell(acKey, '⏱️ Jornada cerrada automáticamente', _msgAc)
             const bellSnapshot = [...bellNotis]
             bellNotis.length = 0
             saveDB(latestDb => {
@@ -635,7 +634,7 @@ export default function EmployeePage() {
               const dbWithAudit = auditLog(latestDb, 'Auto-cierre jornada', `${u.name} · ${_autoCloseDay} · ${mhm(Math.floor(t2.work/60))}`, u.name)
               return { records: updRecs, notisSent: { ...(latestDb.notisSent || {}), ...notisSent }, audit: dbWithAudit.audit, notis: [...(latestDb.notis || []), ...bellSnapshot] }
             })
-            sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada')
+            sendPush(u.id, '⏱️ Jornada cerrada automáticamente', _msgAc, 'jornada', '/?tab=jornada', acKey)
             return
           }
         }
@@ -652,8 +651,8 @@ export default function EmployeePage() {
             if (!hasSent(key9h)) {
               markSent(key9h)
               const _msg9h = 'Llevas 9 horas trabajando hoy. Recuerda descansar.'
-              sendPush(u.id, '⚡ 9 horas trabajadas', _msg9h, 'jornada', '/?tab=inicio')
-              addBell('⚡ 9 horas trabajadas', _msg9h)
+              sendPush(u.id, '⚡ 9 horas trabajadas', _msg9h, 'jornada', '/?tab=inicio', key9h)
+              addBell(key9h, '⚡ 9 horas trabajadas', _msg9h)
             }
           }
         }
@@ -668,8 +667,8 @@ export default function EmployeePage() {
             markSent(wkKey)
             const extraWeekMin = weekMin - WK
             const _msg40h = `Llevas ${mhm(weekMin)} esta semana. ${mhm(extraWeekMin)} se consideran horas extra al superar las 40h.`
-            sendPush(u.id, '⚡ Semana de horas extra', _msg40h, 'jornada', '/?tab=inicio')
-            addBell('⚡ Semana de horas extra', _msg40h)
+            sendPush(u.id, '⚡ Semana de horas extra', _msg40h, 'jornada', '/?tab=inicio', wkKey)
+            addBell(wkKey, '⚡ Semana de horas extra', _msg40h)
           }
         }
       }

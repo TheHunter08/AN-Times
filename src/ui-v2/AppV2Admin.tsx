@@ -37,6 +37,7 @@ import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
 import { monthlyTargetMinutes } from '../utils/workTargets.js'
 import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
+import { createNotification } from '../utils/notifications.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -362,10 +363,10 @@ function useRequestsActions() {
         v.id === id ? { ...v, estado: 'aprobada', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(freshDb, 'Solicitud aprobada', vac.empName || '', session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones aprobadas', detail: '', ts: new Date().toISOString(), leido: false }
+      const noti = createNotification({ empId:vac.empId, action:'Vacaciones aprobadas', dedupeKey:`vac:${vac.id}:aprobada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
-    if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones')
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:aprobada`)
     toast('Solicitud aprobada', 3000, 'ok')
   }
 
@@ -378,10 +379,10 @@ function useRequestsActions() {
         v.id === id ? { ...v, estado: 'rechazada', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(freshDb, 'Solicitud rechazada', vac.empName || '', session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones rechazadas', detail: '', ts: new Date().toISOString(), leido: false }
+      const noti = createNotification({ empId:vac.empId, action:'Vacaciones rechazadas', dedupeKey:`vac:${vac.id}:rechazada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
-    if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', '', 'vacaciones', '/?go=emp:vacaciones')
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:rechazada`)
     toast('Solicitud rechazada', 3000, 'warn')
   }
 
@@ -418,7 +419,7 @@ function useRequestsActions() {
       const cierres = updatedRecord
         ? refreshUnsignedClosures(fresh.cierres || [], records, corr.empId, [rec.inicio, updatedRecord.inicio], nowIso)
         : (fresh.cierres || [])
-      const noti = { id:gid(), empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', ts:nowIso, leido:false }
+      const noti = createNotification({ empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', dedupeKey:`correccion:${corr.id}:${estado}`, ts:nowIso })
       const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who, {
         category:'jornada', entityType:'record', entityId:corr.recId, reason:corr.motivo || '', device:currentDeviceLabel(),
         before:rec ? { inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs } : null,
@@ -426,7 +427,7 @@ function useRequestsActions() {
       })
       return { correccionesFichaje, records, cierres, notis:[...(fresh.notis || []), noti], audit:withAudit.audit }
     })
-    queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada')
+    queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada', `correccion:${corr.id}:${estado}`)
     toast(estado === 'aprobada' ? 'Corrección aplicada y sincronizada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
 
@@ -489,11 +490,11 @@ function VacacionesAdminPage() {
     const nowIso = new Date().toISOString()
     const vac = { id: gid(), empId, empName: emp.name, fechaInicio, fechaFin, dias, motivo: motivo || 'Vacaciones', estado: 'aprobada', ts: nowIso, _upd: nowIso, asignadoPor: who }
     saveDB((fresh: any) => {
-      const noti = { id: gid(), empId, action: 'Vacaciones asignadas', detail: `${fechaInicio} → ${fechaFin}`, ts: nowIso, leido: false }
+      const noti = createNotification({ empId, action:'Vacaciones asignadas', detail:`${fechaInicio} → ${fechaFin}`, dedupeKey:`vac:${vac.id}:asignada`, ts:nowIso })
       const withAudit = auditLog(fresh, 'vacaciones_asignadas', `${emp.name}: ${fechaInicio}–${fechaFin}`, who)
       return { vacaciones: [...(fresh.vacaciones || []), vac], notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
     })
-    queuePush(empId, 'Vacaciones asignadas', `${fechaInicio} → ${fechaFin}`, 'vacaciones', '/?go=emp:vacaciones')
+    queuePush(empId, 'Vacaciones asignadas', `${fechaInicio} → ${fechaFin}`, 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:asignada`)
     toast('Vacaciones asignadas y aprobadas', 3000, 'ok')
   }
 
@@ -506,10 +507,10 @@ function VacacionesAdminPage() {
         v.id === id ? { ...v, estado: 'aprobada', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(fresh, 'Solicitud aprobada', vac.empName || '', session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones aprobadas', detail: '', ts: nowIso, leido: false }
+      const noti = createNotification({ empId:vac.empId, action:'Vacaciones aprobadas', dedupeKey:`vac:${vac.id}:aprobada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
-    if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones')
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:aprobada`)
     toast('Solicitud aprobada', 3000, 'ok')
   }
 
@@ -522,10 +523,10 @@ function VacacionesAdminPage() {
         v.id === id ? { ...v, estado: 'rechazada', motivoRechazo: motivoRechazo || '', resolvedAt: nowIso, _upd: nowIso } : v
       )
       const withAudit = auditLog(fresh, 'Solicitud rechazada', vac.empName || '', session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: vac.empId, action: 'Vacaciones rechazadas', detail: motivoRechazo || '', ts: nowIso, leido: false }
+      const noti = createNotification({ empId:vac.empId, action:'Vacaciones rechazadas', detail:motivoRechazo || '', dedupeKey:`vac:${vac.id}:rechazada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
-    if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', motivoRechazo || '', 'vacaciones', '/?go=emp:vacaciones')
+    if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', motivoRechazo || '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:rechazada`)
     toast('Solicitud rechazada', 3000, 'warn')
   }
 
@@ -1090,10 +1091,10 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
         x.id === id ? { ...x, estado: 'aprobado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto aprobado', `${g.empName}: ${g.concepto} ${g.importe}€`, session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: g.empId, action: 'Gasto aprobado', detail: `${g.concepto} · ${g.importe}€`, ts: nowIso, leido: false }
+      const noti = createNotification({ empId:g.empId, action:'Gasto aprobado', detail:`${g.concepto} · ${g.importe}€`, dedupeKey:`gasto:${g.id}:aprobado`, ts:nowIso })
       return { gastos: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
-    if (g.empId) queuePush(g.empId, 'Gasto aprobado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil')
+    if (g.empId) queuePush(g.empId, 'Gasto aprobado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil', `gasto:${g.id}:aprobado`)
     toast('Gasto aprobado', 3000, 'ok')
   }
 
@@ -1106,10 +1107,10 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
         x.id === id ? { ...x, estado: 'rechazado', resolvedAt: nowIso, resolvedBy: session?.user?.name || 'Admin', _upd: nowIso } : x
       )
       const withAudit = auditLog(freshDb, 'Gasto rechazado', `${g.empName}: ${g.concepto}`, session?.user?.name || 'Admin')
-      const noti = { id: gid(), empId: g.empId, action: 'Gasto rechazado', detail: `${g.concepto} · ${g.importe}€`, ts: nowIso, leido: false }
+      const noti = createNotification({ empId:g.empId, action:'Gasto rechazado', detail:`${g.concepto} · ${g.importe}€`, dedupeKey:`gasto:${g.id}:rechazado`, ts:nowIso })
       return { gastos: updated, audit: withAudit.audit, notis: [...(freshDb.notis || []), noti] }
     })
-    if (g.empId) queuePush(g.empId, 'Gasto rechazado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil')
+    if (g.empId) queuePush(g.empId, 'Gasto rechazado', `${g.concepto} · ${g.importe}€`, 'gastos', '/?tab=perfil', `gasto:${g.id}:rechazado`)
     toast('Gasto rechazado', 3000, 'warn')
   }
 
@@ -1124,11 +1125,11 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
     const nowIso = new Date().toISOString()
     const gasto = { id: gid(), empId, empName: emp.name, concepto, importe, categoria, fecha, estado: 'aprobado', ts: nowIso, resolvedAt: nowIso, resolvedBy: who, _upd: nowIso }
     saveDB((freshDb: any) => {
-      const noti = { id: gid(), empId, action: 'Gasto registrado por administración', detail: `${concepto} · ${importe}€`, ts: nowIso, leido: false }
+      const noti = createNotification({ empId, action:'Gasto registrado por administración', detail:`${concepto} · ${importe}€`, dedupeKey:`gasto:${gasto.id}:registrado`, ts:nowIso })
       const withAudit = auditLog(freshDb, 'Gasto manual añadido', `${emp.name}: ${concepto} ${importe}€`, who)
       return { gastos: [...(freshDb.gastos || []), gasto], notis: [...(freshDb.notis || []), noti], audit: withAudit.audit }
     })
-    queuePush(empId, 'Gasto registrado', `${concepto} · ${importe}€`, 'gastos', '/?tab=perfil')
+    queuePush(empId, 'Gasto registrado', `${concepto} · ${importe}€`, 'gastos', '/?tab=perfil', `gasto:${gasto.id}:registrado`)
     toast('Gasto añadido y aprobado', 3000, 'ok')
   }
 
@@ -1882,10 +1883,11 @@ function MonthlyClosePage() {
         : c
       )
       const withAudit = auditLog(fresh, 'Cierre reabierto', `${empName} · ${closure.mes}`, actor, { category:'documento', entityType:'cierre', entityId:id, device:currentDeviceLabel(), before:{ estado: closure.estado }, after:{ estado:'pendiente' } })
-      const noti = { id: gid(), empId: closure.empId, action: 'Cierre reabierto', detail: `Tu cierre de ${closure.mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, ts: nowIso, leido: false }
+      const reopenKey = `cierre:${closure.id}:reopen:${(closure.reopenCount || 0) + 1}`
+      const noti = createNotification({ empId:closure.empId, action:'Cierre reabierto', detail:`Tu cierre de ${closure.mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, dedupeKey:reopenKey, ts:nowIso })
       return { cierres, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
-    if (closure.empId) queuePush(closure.empId, 'Cierre reabierto', `Tu cierre de ${closure.mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil')
+    if (closure.empId) queuePush(closure.empId, 'Cierre reabierto', `Tu cierre de ${closure.mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil', `cierre:${closure.id}:reopen:${(closure.reopenCount || 0) + 1}`)
     toast('Cierre reabierto — vuelve a estado pendiente de firma', 3500, 'ok')
   }
 
@@ -1905,10 +1907,10 @@ function MonthlyClosePage() {
         : c
       )
       const withAudit = auditLog(fresh, 'Mes completo reabierto', `${mes} · ${affected.length} cierres`, actor, { category:'documento', entityType:'cierre_batch', entityId:[...ids].join(','), device:currentDeviceLabel(), before:{ count:affected.length }, after:{ count:affected.length, estado:'pendiente' } })
-      const nuevasNotis = affected.map((c: any) => ({ id: gid(), empId: c.empId, action: 'Cierre reabierto', detail: `Tu cierre de ${mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, ts: nowIso, leido: false }))
+      const nuevasNotis = affected.map((c: any) => createNotification({ empId:c.empId, action:'Cierre reabierto', detail:`Tu cierre de ${mes} se ha reabierto para corregir horas. Vuelve a firmarlo cuando esté listo.`, dedupeKey:`cierre:${c.id}:reopen:${(c.reopenCount || 0) + 1}`, ts:nowIso }))
       return { cierres, audit: withAudit.audit, notis: [...(fresh.notis || []), ...nuevasNotis] }
     })
-    affected.forEach((c: any) => { if (c.empId) queuePush(c.empId, 'Cierre reabierto', `Tu cierre de ${mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil') })
+    affected.forEach((c: any) => { if (c.empId) queuePush(c.empId, 'Cierre reabierto', `Tu cierre de ${mes} se ha reabierto para corregir horas.`, 'cierre', '/?go=emp:perfil', `cierre:${c.id}:reopen:${(c.reopenCount || 0) + 1}`) })
     toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} reabierto${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
   }
 

@@ -16,6 +16,9 @@
     "test:bundle": "node scripts/check-bundle.mjs",
     "audit:launch": "node scripts/audit-launch-readiness.mjs",
     "repair:launch-data": "node scripts/repair-launch-data.mjs",
+    "repair:push-subscriptions": "node scripts/repair-push-subscriptions.mjs",
+    "audit:notifications": "node scripts/audit-notifications.mjs",
+    "repair:notifications": "node scripts/repair-notifications.mjs",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
     "typecheck": "tsc --noEmit"
   },

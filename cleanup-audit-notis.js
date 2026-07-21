@@ -58,7 +58,12 @@ async function run() {
   const auditDeleted = await deleteOldEntities('audit', auditCutoff)
   console.log(`✓ ${auditDeleted} entradas de audit borradas`)
 
-  console.log(`Total: ${notisDeleted + auditDeleted} filas eliminadas`)
+  const pushDeliveryCutoff = isoMonthsAgo(1)
+  console.log(`Borrando claves de deduplicación push anteriores a ${pushDeliveryCutoff}...`)
+  const pushDeliveryDeleted = await deleteOldEntities('push_delivery', pushDeliveryCutoff)
+  console.log(`Claves push borradas: ${pushDeliveryDeleted}`)
+
+  console.log(`Total: ${notisDeleted + auditDeleted + pushDeliveryDeleted} filas eliminadas`)
 }
 
 run().catch(e => { console.error('Error:', e.message); process.exit(1) })

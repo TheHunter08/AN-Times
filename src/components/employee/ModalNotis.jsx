@@ -4,6 +4,7 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { dedupeNotifications, updateNotification } from '../../utils/notifications.js'
 
 const OV  = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'90vh', overflowY:'auto', position:'relative' }
@@ -11,29 +12,32 @@ const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.defa
 
 export function ModalNotis({ visible, db, onClose, toast, saveDB, u, onNavigate }) {
   const [search, setSearch] = useState('')
-  const notis = (db.notis || [])
+  const notis = dedupeNotifications(db.notis || [])
     .filter(n => n.empId === u?.id && !n.deleted)
     .slice(-50)
     .reverse()
     .filter(n => !search || (n.action||'').toLowerCase().includes(search.toLowerCase()) || (n.detail||'').toLowerCase().includes(search.toLowerCase()))
-  const mensajes = (db.mensajes || []).filter(m => m.to === 'all' || m.to === u?.id).slice(-10).reverse()
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
   const markRead = () => {
-    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.empId === u?.id && !n.deleted ? { ...n, leido: true } : n) }))
+    const nowIso = new Date().toISOString()
+    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.empId === u?.id && !n.deleted ? updateNotification(n, { leido:true }, nowIso) : n) }))
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   const delNoti = (id) => {
-    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.id === id ? { ...n, deleted: true, leido: true } : n) }))
+    saveDB(fresh => ({ notis: (fresh.notis || []).filter(n => n.id !== id) }))
   }
   const openNoti = (item) => {
-    if (item?.id) saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.id === item.id ? { ...n, leido: true } : n) }))
+    if (item?.id) {
+      const nowIso = new Date().toISOString()
+      saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.id === item.id ? updateNotification(n, { leido:true }, nowIso) : n) }))
+    }
     onNavigate?.(item)
   }
   const clearAll = () => {
-    saveDB(fresh => ({ notis: (fresh.notis || []).map(n => n.empId === u?.id ? { ...n, deleted: true, leido: true } : n) }))
+    saveDB(fresh => ({ notis: (fresh.notis || []).filter(n => n.empId !== u?.id) }))
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
   }
   return (
@@ -57,17 +61,7 @@ export function ModalNotis({ visible, db, onClose, toast, saveDB, u, onNavigate 
           style={{ width:'100%', padding:'8px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13, fontFamily:'inherit', outline:'none', marginBottom:10, boxSizing:'border-box' }}
         />
         <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
-          {mensajes.map(m => (
-            <button type="button" key={'msg-'+m.id} onClick={() => openNoti({ ...m, action:'Mensaje de administración' })} style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:colors.bg[600], color:'inherit', textAlign:'left', font:'inherit', cursor:'pointer', border:`1px solid color-mix(in srgb, ${colors.primary.base} 19%, transparent)`, borderLeft:`3px solid ${colors.primary.base}`, borderRadius:radius.lg }}>
-              <div style={{ width:36, height:36, borderRadius:radius.md, background:colors.primary.dim, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16 }}>📢</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:colors.primary.light, marginBottom:2 }}>{m.title}</div>
-                <div style={{ fontSize:12, color:colors.text[700], lineHeight:1.45 }}>{m.body}</div>
-                <div style={{ fontSize:10, color:colors.text[300], marginTop:4 }}>Administración · {m.ts ? new Date(m.ts).toLocaleString('es-ES') : ''}</div>
-              </div>
-            </button>
-          ))}
-          {!notis.length && !mensajes.length ? (
+          {!notis.length ? (
             <div style={{ textAlign:'center', padding:'32px 0', color:colors.text[300], fontSize:13 }}>Sin notificaciones</div>
           ) : notis.map(n => (
             <div key={n.id} role="button" tabIndex={0} onClick={() => openNoti(n)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNoti(n) } }} aria-label={`${n.action || n.title || 'Notificación'}. Abrir detalle`} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 42px 12px 14px', background:n.leido ? colors.bg[600] : `color-mix(in srgb, ${colors.primary.base} 3%, transparent)`, border:`1px solid ${n.leido ? colors.border.subtle : `color-mix(in srgb, ${colors.primary.base} 15%, transparent)`}`, borderRadius:radius.lg, position:'relative', cursor:'pointer' }}>

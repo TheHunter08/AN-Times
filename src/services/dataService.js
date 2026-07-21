@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
+import { dedupeNotifications } from '../utils/notifications.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -242,7 +243,7 @@ export function mergeDB(base, incoming) {
     medicos:             _unionById(base.medicos,             incoming.medicos,             'medicos'),
     ausencias:           _unionById(base.ausencias,           incoming.ausencias,           'ausencias'),
     mensajes:            _unionById(base.mensajes,            incoming.mensajes,            'mensajes'),
-    notis:               _unionById(base.notis,               incoming.notis,               'notis'),
+    notis:               dedupeNotifications(_unionById(base.notis, incoming.notis, 'notis')),
     cierres:             (() => {
       const merged  = _unionById(base.cierres, incoming.cierres, 'cierres')
       const baseMap = new Map((base.cierres || []).map(c => [c.id, c]))
@@ -315,7 +316,7 @@ function _mergeForPush(serverData, localPayload, deleted) {
     medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
     ausencias:           _unionById(s.ausencias,           l.ausencias,           'ausencias'),
     mensajes:            _unionById(s.mensajes,            l.mensajes,            'mensajes'),
-    notis:               _unionById(s.notis,               l.notis,               'notis'),
+    notis:               dedupeNotifications(_unionById(s.notis, l.notis, 'notis')),
     cierres:             _unionById(s.cierres,             l.cierres,             'cierres'),
     monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
     firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
@@ -1045,6 +1046,24 @@ export async function pushSubscribe(userId, vapidPub) {
   }
 }
 
+// Un dispositivo compartido no debe seguir recibiendo avisos privados del
+// usuario que cerró sesión. Conservamos la suscripción del navegador para que
+// el siguiente usuario pueda asociarla sin volver a pedir permiso.
+export async function detachPushUser(userId) {
+  if (!userId || !supabase || !('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    if (sub?.endpoint) {
+      await supabase.from(PUSH_TABLE)
+        .delete()
+        .eq('user_id', userId)
+        .eq('endpoint', sub.endpoint)
+    }
+    await _idbDel('push_user_id')
+  } catch {}
+}
+
 // Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 5 min.
 // Evita que la misma smart-noti se reenvíe en checks consecutivos del bucle 60s.
 function _pushDedupHit(to, tag, title, body) {
@@ -1085,15 +1104,15 @@ function _enqueueFailedPush(item) {
 // Envío real, sin pasar por el dedupe (usado tanto por el envío normal como
 // por los reintentos de la cola — un reintento NUNCA debe poder "deduplicarse"
 // contra su propio intento fallido original).
-async function _doSendPush(to, title, body, tag, safeUrl) {
-  const payload = { to, title, body, tag, url: safeUrl }
+async function _doSendPush(to, title, body, tag, safeUrl, dedupeKey = null) {
+  const payload = { to, title, body, tag, url: safeUrl, dedupeKey }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     _enqueueFailedPush(payload)
     return { ok: false, queued: true }
   }
   try {
     const headers = { 'Content-Type': 'application/json' }
-    const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl }) })
+    const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl, dedupeKey }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       // Vite no ejecuta las funciones serverless de /api. Un 404 local no es
@@ -1114,12 +1133,13 @@ async function _doSendPush(to, title, body, tag, safeUrl) {
   }
 }
 
-export async function queuePush(to, title, body, tag = 'times', url = '/') {
+/** @param {string | null} [dedupeKey] */
+export async function queuePush(to, title, body, tag = 'times', url = '/', dedupeKey = null) {
   if (_pushDedupHit(to, tag, title, body)) {
     return { ok: true, deduped: true }
   }
   const safeUrl = (typeof url === 'string' && url.startsWith('/')) ? url : '/'
-  return _doSendPush(to, title, body, tag, safeUrl)
+  return _doSendPush(to, title, body, tag, safeUrl, dedupeKey)
 }
 
 // Reintenta los pushes que fallaron por conexión. Se llama al recuperar
@@ -1137,7 +1157,7 @@ export async function flushPushQueue() {
   for (const item of queue) {
     // Descarta reintentos con más de 24h: la notificación ya no es relevante.
     if (Date.now() - (item.ts || 0) > 24 * 60 * 60 * 1000) continue
-    await _doSendPush(item.to, item.title, item.body, item.tag, item.url)
+    await _doSendPush(item.to, item.title, item.body, item.tag, item.url, item.dedupeKey)
   }
 }
 

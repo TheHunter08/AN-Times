@@ -16,7 +16,7 @@ export function toEntityRows(db, nowIso = new Date().toISOString()) {
     for (const item of (db[collection] ?? [])) {
       if (!item || !hasValue(String(item.id ?? ''))) continue
       const entityId = String(item.id)
-      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:entityId, data:item, revision:Math.max(1, Number(item._rev) || 1), deleted:false, updated_at:item._upd ?? nowIso })
+      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:entityId, data:item, revision:Math.max(1, Number(item._rev) || 1), deleted:false, updated_at:item._upd ?? item.ts ?? nowIso })
     }
   }
   for (const collection of SINGLETON_COLLECTIONS) {

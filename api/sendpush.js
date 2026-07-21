@@ -1,7 +1,7 @@
 // API endpoint: POST /api/sendpush — envía Web Push a un usuario via Supabase.
 // Formato ESM porque package.json tiene "type": "module".
 import webpush from 'web-push'
-import { timingSafeEqual } from 'crypto'
+import { createHash, timingSafeEqual } from 'crypto'
 import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
@@ -64,6 +64,7 @@ const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
 if (!SB_URL || !SB_ANON) console.error('[sendpush] VITE_SB_URL / VITE_SB_ANON not set')
 const PUSH_SECRET   = process.env.PUSH_SECRET
+const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
 let _loadError = null
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
@@ -101,6 +102,43 @@ async function sbDelete(userId) {
   await fetch(url, { method: 'DELETE', headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }).catch(() => {})
 }
 
+async function claimPushDelivery(userId, dedupeKey, tag, title, body) {
+  if (!SB_URL || !SB_ANON) return { claimed: true, id: null }
+  const bucket = Math.floor(Date.now() / _DEDUPE_TTL)
+  const semantic = dedupeKey
+    ? `event|${userId}|${dedupeKey}`
+    : `window|${bucket}|${userId}|${tag}|${title}|${body}`
+  const digest = createHash('sha256').update(semantic).digest('hex')
+  try {
+    const response = await fetch(`${SB_URL}/rest/v1/app_entities?on_conflict=id`, {
+      method:'POST',
+      headers:{ apikey:SB_ANON, Authorization:`Bearer ${SB_ANON}`, 'Content-Type':'application/json', Prefer:'resolution=ignore-duplicates,return=representation' },
+      body:JSON.stringify({
+        id:`push_delivery:${digest}`, company_id:COMPANY_ID, collection:'push_delivery', entity_id:digest,
+        data:{ userId, dedupeKey:dedupeKey || null, expiresAt:new Date(Date.now() + 30 * 86400000).toISOString() },
+        revision:1, deleted:false, updated_at:new Date().toISOString(),
+      }),
+    })
+    if (!response.ok) {
+      console.warn('[sendpush] persistent dedupe unavailable:', response.status)
+      return { claimed: true, id: null }
+    }
+    const inserted = await response.json().catch(() => [])
+    return { claimed: inserted.length > 0, id: `push_delivery:${digest}` }
+  } catch {
+    return { claimed: true, id: null }
+  }
+}
+
+async function releasePushDelivery(id) {
+  if (!id || !SB_URL || !SB_ANON) return
+  const url = `${SB_URL}/rest/v1/app_entities?id=eq.${encodeURIComponent(id)}`
+  await fetch(url, {
+    method: 'DELETE',
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` },
+  }).catch(() => {})
+}
+
 async function sendOne(sub, payload) {
   await webpush.sendNotification(
     { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -131,7 +169,7 @@ export default async function handler(req, res) {
 
     if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Missing Supabase config' })
 
-    const { userId, title, body, tag, url } = req.body || {}
+    const { userId, title, body, tag, url, dedupeKey } = req.body || {}
     if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' })
     if (userId === '__all__' && !hasValidToken) return res.status(403).json({ error: 'Broadcast requires server authorization' })
 
@@ -139,13 +177,12 @@ export default async function handler(req, res) {
     const _tag = tag || 'times'
     const _body = body || ''
 
-    if (isDuplicate(userId, _tag, title, _body)) {
-      return res.status(200).json({ ok: true, deduped: true })
-    }
-
     const payload = JSON.stringify({ title, body: _body, tag: _tag, url: safeUrl })
 
     if (userId === '__all__') {
+      if (isDuplicate(userId, _tag, title, _body)) {
+        return res.status(200).json({ ok: true, deduped: true })
+      }
       if (rateLimitAll(ip)) return res.status(429).json({ error: 'Too many broadcast requests' })
       const subs = await sbGetAll()
       await Promise.allSettled(subs.map(async sub => {
@@ -158,7 +195,15 @@ export default async function handler(req, res) {
     try {
       const sub = await sbGet(userId)
       if (!sub || !sub.endpoint) return res.status(200).json({ skipped: true, reason: 'no subscription' })
-      await sendOne(sub, payload)
+      const claim = await claimPushDelivery(userId, dedupeKey, _tag, title, _body)
+      if (!claim.claimed) return res.status(200).json({ ok:true, deduped:true, persistent:true })
+      try {
+        await sendOne(sub, payload)
+      } catch (sendError) {
+        // Un envío fallido debe poder reintentarse: libera la reserva persistente.
+        await releasePushDelivery(claim.id)
+        throw sendError
+      }
       return res.status(200).json({ ok: true })
     } catch (err) {
       if (err.statusCode === 410) {

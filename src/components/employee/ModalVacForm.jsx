@@ -6,6 +6,7 @@ import { vacData, gid, fds } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { createNotification } from '../../utils/notifications.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'90vh', overflowY:'auto' }
@@ -35,9 +36,9 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     if (days > availDays) { toast(`Solo tienes ${availDays} día${availDays !== 1 ? 's' : ''} disponibles`, 4000, 'warn'); return }
     const nowIso = new Date().toISOString()
     const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: nowIso, _upd: nowIso }
-    const noti = { id: gid(), empId: '__admin__', action: 'Nueva solicitud de vacaciones', detail: `${u.name}: ${fds(fi)} → ${fds(ff)}`, ts: new Date().toISOString(), leido: false }
+    const noti = createNotification({ empId:'__admin__', action:'Nueva solicitud de vacaciones', detail:`${u.name}: ${fds(fi)} → ${fds(ff)}`, dedupeKey:`vac:${vac.id}:solicitud`, ts:nowIso })
     saveDB(fresh => ({ vacaciones:[...(fresh.vacaciones || []), vac], notis:[...(fresh.notis || []), noti] }))
-    queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes')
+    queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:solicitudes', `vac:${vac.id}:solicitud`)
     toast('Solicitud enviada', 3000, 'ok')
     onClose()
     setFi(''); setFf(''); setMotivo('')

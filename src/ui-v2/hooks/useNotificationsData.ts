@@ -1,6 +1,7 @@
 import { useAppStore } from '../../store/appStore.js'
 import { resolveAdminNotificationDestination } from '../../utils/notificationNavigation.js'
 import type { NotificationItem } from '../pages/Notifications.js'
+import { dedupeNotifications, updateNotification } from '../../utils/notifications.js'
 
 interface DbNoti {
   id: string
@@ -61,7 +62,7 @@ export function useNotificationsData(): {
   // también los recordatorios personales de cada empleado (fichaje,
   // vacaciones, cierre pendiente…), pareciendo notis "duplicadas" cuando en
   // realidad eran avisos de distintos empleados con el mismo texto genérico.
-  const items: NotificationItem[] = (db.notis || [])
+  const items: NotificationItem[] = dedupeNotifications(db.notis || [])
     .filter(n => !n.deleted && n.empId === '__admin__')
     .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')))
     .slice(0, 50)
@@ -77,20 +78,22 @@ export function useNotificationsData(): {
     }))
 
   const markRead = (id: string) => {
+    const nowIso = new Date().toISOString()
     saveDB((freshDb: { notis?: DbNoti[] }) => ({
-      notis: (freshDb.notis || []).map(n => n.id === id ? { ...n, leido: true } : n)
+      notis: (freshDb.notis || []).map(n => n.id === id ? updateNotification(n, { leido:true }, nowIso) : n)
     }))
   }
 
   const markAllRead = () => {
+    const nowIso = new Date().toISOString()
     saveDB((freshDb: { notis?: DbNoti[] }) => ({
-      notis: (freshDb.notis || []).map(n => n.empId === '__admin__' ? { ...n, leido: true } : n)
+      notis: (freshDb.notis || []).map(n => n.empId === '__admin__' ? updateNotification(n, { leido:true }, nowIso) : n)
     }))
   }
 
   const dismiss = (id: string) => {
     saveDB((freshDb: { notis?: DbNoti[] }) => ({
-      notis: (freshDb.notis || []).map(n => n.id === id ? { ...n, deleted: true } : n)
+      notis: (freshDb.notis || []).filter(n => n.id !== id)
     }))
   }
 

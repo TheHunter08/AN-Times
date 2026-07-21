@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch, detachPushUser } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
@@ -285,6 +285,8 @@ export const useAppStore = create((set, get) => ({
   },
 
   logout: () => {
+    const userId = get().session?.user?.id
+    if (userId) detachPushUser(userId).catch(() => {})
     authSignOut().catch(() => {})
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}

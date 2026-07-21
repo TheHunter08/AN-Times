@@ -294,6 +294,23 @@ test('una notificación de empleado respeta el destino explícito', async ({ pag
   await expect(page.getByRole('dialog', { name:'Documentos' })).toBeVisible()
 })
 
+test('una notificación eliminada por el empleado se quita también del almacenamiento', async ({ page }) => {
+  await loginAsEmployee(page, {
+    notis: [{
+      id:'n-employee-delete', empId:employee.id, action:'Aviso para eliminar',
+      detail:'No debe volver', ts:new Date().toISOString(), leido:false,
+    }],
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name:/Notificaciones/i }).last().click()
+  await page.getByRole('button', { name:'Eliminar notificación', exact:true }).click()
+  await expect(page.getByText('Sin notificaciones', { exact:true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => {
+    const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
+    return (db.notis || []).some(item => item.id === 'n-employee-delete')
+  })).toBe(false)
+})
+
 test('un clic push abre también los destinos que son modales', async ({ page }) => {
   await loginAsEmployee(page)
   await page.goto('/')

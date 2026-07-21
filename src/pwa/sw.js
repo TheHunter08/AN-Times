@@ -138,12 +138,12 @@ self.addEventListener('push', (event) => {
     silent: false,
   }
 
-  // waitUntil SIEMPRE (obligatorio iOS aunque sea duplicado — iOS mata la app si no)
+  // waitUntil SIEMPRE: incluso un duplicado debe completar su trabajo asíncrono.
   event.waitUntil((async () => {
+    let duplicate = false
     // Dedupe persistente en IDB — sobrevive reinicios del SW.
-    // IMPORTANTE: NO hacemos return antes de showNotification.
-    // iOS exige que SIEMPRE se muestre una notificación en el push handler.
-    // El dedup visual lo hacen tag + renotify:false (reemplaza silenciosamente).
+    // El registro IDB decide si este evento ya se mostró en este dispositivo.
+    // Un evento nuevo muestra el aviso; uno ya registrado solo sincroniza.
     try {
       // Transacción atómica: leer + escribir en la misma tx para evitar race conditions
       // si dos push llegan simultáneamente (ambos pasarían el check de lectura por separado)
@@ -163,6 +163,8 @@ self.addEventListener('push', (event) => {
                 if (cur.key.startsWith('psh|') && now - cur.value > 30 * 60_000) cur.delete()
                 cur.continue()
               }
+            } else {
+              duplicate = true
             }
           }
           tx.oncomplete = resolve
@@ -173,9 +175,15 @@ self.addEventListener('push', (event) => {
       // IDB no disponible — continuar sin dedup
     }
 
-    // 1) Mostrar notificación (requisito iOS Web Push — siempre, incluso duplicados)
+    // 1) Mostrar una sola vez; los duplicados sincronizan datos sin repetir el aviso.
     // try/catch obligatorio: si showNotification lanza, el waitUntil rechaza y
     // iOS puede terminar la suscripción push de forma permanente.
+    // event.waitUntil mantiene vivo el evento. Si es repetido, no recreamos el
+    // banner visible (en iOS se mostraba dos veces aun compartiendo el tag).
+    if (duplicate) {
+      try { await _bgSync() } catch {}
+      return
+    }
     try { await self.registration.showNotification(title, options) } catch {}
 
     // 2) Avisar a clientes abiertos para banner in-app
