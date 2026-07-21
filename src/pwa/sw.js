@@ -546,6 +546,21 @@ async function _bgSync() {
 //   · Cuando sí se sincronizaron datos: mostrar "✓ Fichaje sincronizado" con
 //     renotify:true (el usuario quiere ver esta), cerrar a los 8s.
 //   · Siempre cerrar notificaciones sync-ping previas primero.
+async function _markEmptyQueueChecked() {
+  try {
+    const sub = await self.registration.pushManager.getSubscription()
+    if (!sub) return
+    await _sbFetch(
+      `${_SB_URL}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
+      {
+        method: 'PATCH',
+        headers: { ..._restHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ last_sync: new Date().toISOString() }),
+      }
+    )
+  } catch {}
+}
+
 async function _handleSyncPing() {
   // Cerrar cualquier sync-ping anterior (puede haber quedado si el close anterior falló)
   try {
@@ -555,6 +570,15 @@ async function _handleSyncPing() {
 
   let synced = false
   try { synced = await _bgSync() } catch {}
+  // Si el despertador comprobó una cola realmente vacía, confirmarlo al
+  // servidor. Así no vuelve a enviar pings cada cinco minutos hasta que un
+  // heartbeat posterior indique nueva actividad. Si queda pending, no se toca
+  // last_sync y el siguiente cron reintentará automáticamente.
+  if (!synced) {
+    try {
+      if (!await _idbGet('pending')) await _markEmptyQueueChecked()
+    } catch {}
+  }
 
   // ¿Descartó el usuario la notificación recientemente (< 2h)?
   // Si es así y no hay datos reales que informar, acortamos al máximo los delays

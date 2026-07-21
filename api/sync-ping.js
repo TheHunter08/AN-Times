@@ -1,16 +1,15 @@
-// Vercel Cron: cada 5 minutos (ver vercel.json) — antes era cada 15 min.
+// GitHub Actions: cada 5 minutos (Vercel Hobby solo admite cron diario).
 // Detecta dispositivos con datos offline pendientes (basándose en heartbeats)
 // y les envía un push SYNC_PING para despertar el Service Worker en iOS/Android.
 //
-// Un dispositivo "podría tener datos pendientes" si:
-//   - last_online reciente (activo en los últimos 60 min)
-//   - last_sync es null O last_online > last_sync + SYNC_LAG_THRESHOLD
-//     (el dispositivo estuvo activo pero no sincronizó desde entonces)
+// Un dispositivo "podría tener datos pendientes" si estuvo activo durante las
+// últimas 24h y last_online es posterior a last_sync.
 //
 // El SW maneja SYNC_PING en el push handler (sw.js), ejecuta _bgSync() y
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
-import { timingSafeEqual } from 'crypto'
+import { authorizeSyncRequest } from '../src/server/syncAuth.js'
+import { isSyncCandidate, PUSH_ACTIVE_WINDOW_MS } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -20,7 +19,6 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
-const CRON_SECRET   = process.env.CRON_SECRET
 
 let _vapidError = null
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
@@ -36,29 +34,17 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 }
 
 const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
-// Tiempo mínimo entre last_online y last_sync para considerar que puede haber datos offline.
-// 10 min evita pingar dispositivos activos que simplemente no tienen datos que subir.
-// El cron corre cada 15 min, así que un threshold de 10 min solo pinga dispositivos
-// que llevan al menos 10 min sin sincronizar aunque estuvieron online recientemente.
-const SYNC_LAG_THRESHOLD = 10 * 60_000
-
 async function getCandidateSubs() {
   if (!SB_URL || !SB_ANON) return []
-  // Dispositivos activos en los últimos 60 min (ventana más amplia para cubrir el ciclo de 15 min)
-  const sixtyMinAgo = new Date(Date.now() - 60 * 60_000).toISOString()
-  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync&last_online=gt.${sixtyMinAgo}`
+  // Una sola señal se conserva en APNs/FCM hasta siete días. La ventana de 24h
+  // limita suscripciones abandonadas, pero cubre turnos completos sin abrir la app.
+  const activeSince = new Date(Date.now() - PUSH_ACTIVE_WINDOW_MS).toISOString()
+  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync&last_online=gt.${activeSince}`
   try {
     const r = await fetch(url, { headers: SB_H })
     if (!r.ok) { console.warn('[sync-ping] getPushSubs error', r.status); return [] }
     const subs = await r.json()
-    // Filtrar: last_online supera a last_sync por más de SYNC_LAG_THRESHOLD
-    // Esto indica que el dispositivo estuvo online pero no sincronizó en ese periodo —
-    // posiblemente tenía datos guardados offline cuando se quedó sin señal.
-    return subs.filter(s => {
-      if (!s.last_online) return false
-      if (!s.last_sync) return true
-      return new Date(s.last_online).getTime() > new Date(s.last_sync).getTime() + SYNC_LAG_THRESHOLD
-    })
+    return subs.filter(s => isSyncCandidate(s))
   } catch (e) { console.error('[sync-ping] fetch subs error:', e.message); return [] }
 }
 
@@ -70,13 +56,9 @@ async function deleteSub(userId) {
 }
 
 export default async function handler(req, res) {
-  // Autorización: token Bearer para llamadas server-to-server (Vercel Cron lo incluye auto)
-  if (CRON_SECRET) {
-    const token = (req.headers['authorization'] || '').replace('Bearer ', '')
-    const valid = token.length === CRON_SECRET.length &&
-      timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
-    if (!valid) return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // Vercel Cron usa CRON_SECRET; GitHub Actions usa un JWT OIDC efímero y
+  // verificable, sin guardar otra contraseña de larga duración.
+  if (!await authorizeSyncRequest(req)) return res.status(401).json({ error: 'Unauthorized' })
 
   if (_vapidError) return res.status(500).json({ error: _vapidError })
   if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
@@ -97,7 +79,12 @@ export default async function handler(req, res) {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
+          payload,
+          {
+            TTL: 7 * 24 * 60 * 60,
+            urgency: 'high',
+            topic: 'times-sync',
+          }
         )
         sent++
       } catch (err) {

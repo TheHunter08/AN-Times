@@ -141,10 +141,15 @@ export default function EmployeePage() {
     typeof Notification !== 'undefined' ? Notification.permission : 'granted'
   )
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(_isNotifDismissed)
-  const showNotifBanner = notifPerm === 'default' && !notifBannerDismissed
+  const showSyncProtectionBanner = offlinePending && notifPerm !== 'granted'
+  const showNotifBanner = showSyncProtectionBanner || (notifPerm === 'default' && !notifBannerDismissed)
 
   const handleNotifActivate = async () => {
     try {
+      if (Notification.permission === 'denied') {
+        toast('Activa las notificaciones de TIMES INC desde los ajustes del teléfono para sincronizar con la app cerrada.', 7000, 'warn')
+        return
+      }
       const p = await Notification.requestPermission()
       setNotifPerm(p)
       if (p === 'granted' && u?.id) {
@@ -1165,11 +1170,11 @@ export default function EmployeePage() {
           <div className="v3-notif-banner" style={{ borderRadius:0, borderLeft:'none', borderRight:'none', borderTop:'none' }}>
             <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
             <div className="v3-notif-banner-text">
-              <div className="v3-notif-banner-title">Activa las notificaciones</div>
-              <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
+              <div className="v3-notif-banner-title">{showSyncProtectionBanner ? 'Protege el envío de tus fichajes' : 'Activa las notificaciones'}</div>
+              <div className="v3-notif-banner-sub">{showSyncProtectionBanner ? 'Son necesarias para sincronizar automáticamente con la app cerrada' : 'Recibe avisos de jornada, documentos y mensajes'}</div>
             </div>
-            <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>Activar</button>
-            <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>
+            <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : 'Activar'}</button>
+            {!showSyncProtectionBanner && <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>}
           </div>
         )}
 
@@ -1326,11 +1331,11 @@ export default function EmployeePage() {
         <div className="v3-notif-banner" style={{ margin:'0', borderRadius:0, borderBottom:'1px solid rgba(177,138,82,.2)', borderTop:'none', borderLeft:'none', borderRight:'none' }}>
           <div className="v3-notif-banner-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
           <div className="v3-notif-banner-text">
-            <div className="v3-notif-banner-title">Activa las notificaciones</div>
-            <div className="v3-notif-banner-sub">Recibe avisos de jornada, documentos y mensajes</div>
+            <div className="v3-notif-banner-title">{showSyncProtectionBanner ? 'Protege el envío de tus fichajes' : 'Activa las notificaciones'}</div>
+            <div className="v3-notif-banner-sub">{showSyncProtectionBanner ? 'Son necesarias para sincronizar automáticamente con la app cerrada' : 'Recibe avisos de jornada, documentos y mensajes'}</div>
           </div>
-          <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>Activar</button>
-          <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>
+          <button className="v3-notif-banner-btn" onClick={handleNotifActivate}>{notifPerm === 'denied' ? 'Ver ajustes' : 'Activar'}</button>
+          {!showSyncProtectionBanner && <button className="v3-notif-banner-close" onClick={handleNotifDismiss} aria-label="Cerrar">×</button>}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow } from '../services/dataServiceV2.js'
+import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, sendHeartbeat } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
@@ -112,6 +112,7 @@ export const useAppStore = create((set, get) => ({
     // Realtime lo publique sin esperar a la reconciliación del blob completo.
     // No se espera esta promesa: la UI y el guardado local ya son inmediatos y
     // cloudPush mantiene la cola offline como respaldo si la red falla.
+    sendHeartbeat().catch(() => {})
     for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
     cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
