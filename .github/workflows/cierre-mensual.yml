@@ -33,4 +33,5 @@ jobs:
           VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
           VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
           PUSH_URL: ${{ secrets.PUSH_URL }}
+          PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
         run: node auto-cierre-mensual.js

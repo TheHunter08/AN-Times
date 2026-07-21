@@ -8,6 +8,7 @@ import { EmployeeGastos } from './EmployeeGastos.js'
 import { EmployeeDenuncia } from './EmployeeDenuncia.js'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
+import { canCloseMonth } from '../../utils/adminHelpers.js'
 
 
 
@@ -89,7 +90,7 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, perf
   const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`
   const monthMin = (db.records || []).filter((r: any) => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s: number, r: any) => s + calcMin(r), 0)
   const pendingDocs = (db.documentos || []).filter((d: any) => d.empId === u.id && !d.firma).length
-  const pendingCierres = (db.cierres || []).filter((c: any) => c.empId === u.id && c.estado === 'pendiente' && !c.desactualizado)
+  const pendingCierres = (db.cierres || []).filter((c: any) => c.empId === u.id && c.estado === 'pendiente' && canCloseMonth(c.mes) && !c.desactualizado)
   const hasFirma = !!db.firmas?.[u?.id]?.main
 
   const yearStr = `${now.getFullYear()}-`

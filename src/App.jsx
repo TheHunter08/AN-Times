@@ -150,7 +150,10 @@ function UpdateBanner() {
 
       // Comprobación inmediata, periódica y al volver a abrir/recuperar conexión.
       checkNow()
-      updateInterval = setInterval(checkNow, 60 * 1000)
+      // Los assets llevan hash y la comprobación también se ejecuta al volver
+      // a la app o recuperar red. Cinco minutos evita una petición por minuto
+      // en cada uno de los dispositivos sin retrasar una actualización crítica.
+      updateInterval = setInterval(checkNow, 5 * 60 * 1000)
     }).catch(() => {})
     window.addEventListener('online', checkNow)
     document.addEventListener('visibilitychange', checkNow)
@@ -557,14 +560,14 @@ export default function App() {
     const pendingRetryInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && useAppStore.getState().offlinePending) uploadPendingIfAny()
     }, 8 * 1000)
-    // Heartbeat para iOS background sync: actualiza push_subs.last_online cada 3 min
+    // Heartbeat para iOS background sync: actualiza push_subs.last_online cada 10 min
     // mientras el empleado tiene la app abierta y hay red. El cron /api/sync-ping
     // usa este timestamp para detectar dispositivos activos que podrían tener datos
     // offline pendientes y les envía un push para despertar el Service Worker.
     sendHeartbeat()
     const heartbeatInterval = setInterval(() => {
       if (document.visibilityState === 'visible' && navigator.onLine) sendHeartbeat()
-    }, 3 * 60 * 1000)
+    }, 10 * 60 * 1000)
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onMsg)
       window.removeEventListener('push-deeplink', onDeepLink)

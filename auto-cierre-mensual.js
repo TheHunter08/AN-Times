@@ -2,23 +2,21 @@
 // Genera automáticamente los cierres del mes anterior para todos los empleados activos
 // y envía notificación push para que los firmen.
 
-import { createHash } from 'crypto'
-import { buildCierreIndividualPDF } from './src/utils/cierrePdf.js'
-import { WM } from './src/config/workRules.js'
+import { toClosureRow } from './src/services/tableSyncPlan.js'
+import { monthlyTargetMinutes } from './src/utils/workTargets.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL   = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON  = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
 const PUSH_URL = cleanEnv(process.env.PUSH_URL) || 'https://times-inc.vercel.app/api/sendpush'
+const PUSH_SECRET = cleanEnv(process.env.PUSH_SECRET)
 
 const SB_HEADERS = {
   apikey: SB_ANON,
   Authorization: `Bearer ${SB_ANON}`,
   'Content-Type': 'application/json',
 }
-
-const gid = () => createHash('sha1').update(Date.now() + Math.random().toString()).digest('hex').slice(0,12)
 
 // El runner de GitHub Actions corre en UTC, no en hora de España — a diferencia del
 // navegador (donde new Date().getHours() etc. ya son locales), aquí hay que forzar
@@ -49,14 +47,27 @@ async function writeDB(data, expectedTs) {
 
 async function sendPush(empId, title, body) {
   try {
-    await fetch(PUSH_URL, {
+    const response = await fetch(PUSH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(PUSH_SECRET ? { Authorization:`Bearer ${PUSH_SECRET}` } : {}) },
       body: JSON.stringify({ userId: empId, title, body, tag: 'cierre', url: '/?go=emp:perfil' }),
     })
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 120)}`)
+    return true
   } catch (e) {
     console.warn(`Push a ${empId} falló:`, e.message)
+    return false
   }
+}
+
+async function upsertClosures(cierres) {
+  const rows = cierres.map(cierre => toClosureRow(cierre, cierre._upd))
+  const response = await fetch(`${SB_URL}/rest/v1/cierres?on_conflict=id`, {
+    method:'POST',
+    headers:{ ...SB_HEADERS, Prefer:'resolution=merge-duplicates,return=minimal' },
+    body:JSON.stringify(rows),
+  })
+  if (!response.ok) throw new Error(`cierres upsert failed: ${response.status} ${(await response.text()).slice(0, 160)}`)
 }
 
 function calcMin(r) {
@@ -84,8 +95,6 @@ async function main() {
   const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
   const cierres = db.cierres || []
   const records = db.records || []
-  const empresa = db.config?.companyName || db.empresas?.[0] || 'TIMES INC'
-
   const nuevos = []
   for (const e of emps) {
     if (cierres.find(c => c.empId === e.id && c.mes === mes)) {
@@ -98,28 +107,26 @@ async function main() {
       continue
     }
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
+    const targetMin = monthlyTargetMinutes(e, mes)
+    const generadoAt = new Date().toISOString()
     const cierre = {
-      id: gid(),
+      // Id estable para que un reintento tras fallo parcial sea idempotente.
+      id: `cierre_${mes}_${e.id}`,
       empId: e.id,
       empName: e.name,
       mes,
       generadoPor: 'Sistema (automático)',
-      generadoAt: new Date().toISOString(),
+      generadoAt,
+      _upd: generadoAt,
       totalMin,
-      extraMin: Math.max(0, totalMin - WM),
-      dias: eRecs.length,
+      targetMin,
+      extraMin: Math.max(0, totalMin - targetMin),
+      dias: new Set(eRecs.map(r => madridDateStr(r.inicio))).size,
       estado: 'pendiente',
       firma: null,
       records_snapshot: eRecs.map(r => ({
         inicio: r.inicio, fin: r.fin, centro: r.centro, workSecs: r.workSecs || 0,
       })),
-    }
-    try {
-      const { dataUrl } = await buildCierreIndividualPDF({ cierre, empresa })
-      cierre.pdfData = dataUrl
-      console.log(`  ${e.name}: PDF generado`)
-    } catch (err) {
-      console.warn(`  ${e.name}: no se pudo generar el PDF —`, err.message)
     }
     nuevos.push(cierre)
   }
@@ -129,6 +136,7 @@ async function main() {
     return
   }
 
+  await upsertClosures(nuevos)
   await writeDB({ ...db, cierres: [...cierres, ...nuevos] }, dbTs)
   console.log(`✅ ${nuevos.length} cierre(s) generado(s)`)
 

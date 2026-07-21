@@ -77,10 +77,10 @@ export const downloadDataUrl = (dataUrl, filename) => {
 export const canCloseMonth = (mes, now = new Date()) => {
   if (!mes) return false
   const [year, month] = mes.split('-').map(Number)
-  if (!year || !month) return false
-  const lastDay = new Date(year, month, 0)
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return today >= lastDay
+  if (!year || month < 1 || month > 12) return false
+  // El cierre solo es definitivo cuando ya empezó el mes siguiente. El último
+  // día todavía puede contener fichajes y no debe quedar bloqueado a medianoche.
+  return now >= new Date(year, month, 1)
 }
 
 export const isRecordMonthLocked = (cierresList, empId, inicio) => {

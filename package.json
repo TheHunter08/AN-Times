@@ -14,6 +14,8 @@
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:e2e",
     "test:bundle": "node scripts/check-bundle.mjs",
+    "audit:launch": "node scripts/audit-launch-readiness.mjs",
+    "repair:launch-data": "node scripts/repair-launch-data.mjs",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
     "typecheck": "tsc --noEmit"
   },

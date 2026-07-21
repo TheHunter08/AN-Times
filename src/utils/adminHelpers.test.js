@@ -42,24 +42,29 @@ describe('canCloseMonth', () => {
     expect(canCloseMonth('2026-07', new Date(2026, 6, 1))).toBe(false)
   })
 
-  it('permite firmar el último día del mes y cualquier día posterior', () => {
-    expect(canCloseMonth('2026-07', new Date(2026, 6, 31))).toBe(true)
+  it('solo permite firmar cuando el mes ya ha terminado', () => {
+    expect(canCloseMonth('2026-07', new Date(2026, 6, 31, 23, 59, 59))).toBe(false)
+    expect(canCloseMonth('2026-07', new Date(2026, 7, 1))).toBe(true)
     expect(canCloseMonth('2026-07', new Date(2026, 7, 5))).toBe(true)
   })
 
   it('respeta meses de 30, 29 y 28 días', () => {
     expect(canCloseMonth('2026-04', new Date(2026, 3, 29))).toBe(false)
-    expect(canCloseMonth('2026-04', new Date(2026, 3, 30))).toBe(true)
+    expect(canCloseMonth('2026-04', new Date(2026, 3, 30))).toBe(false)
+    expect(canCloseMonth('2026-04', new Date(2026, 4, 1))).toBe(true)
     expect(canCloseMonth('2026-02', new Date(2026, 1, 27))).toBe(false)
-    expect(canCloseMonth('2026-02', new Date(2026, 1, 28))).toBe(true)
+    expect(canCloseMonth('2026-02', new Date(2026, 1, 28))).toBe(false)
+    expect(canCloseMonth('2026-02', new Date(2026, 2, 1))).toBe(true)
     // 2024 es bisiesto: 29 de febrero
     expect(canCloseMonth('2024-02', new Date(2024, 1, 28))).toBe(false)
-    expect(canCloseMonth('2024-02', new Date(2024, 1, 29))).toBe(true)
+    expect(canCloseMonth('2024-02', new Date(2024, 1, 29))).toBe(false)
+    expect(canCloseMonth('2024-02', new Date(2024, 2, 1))).toBe(true)
   })
 
   it('resuelve el cambio de año en diciembre', () => {
     expect(canCloseMonth('2026-12', new Date(2026, 11, 30))).toBe(false)
-    expect(canCloseMonth('2026-12', new Date(2026, 11, 31))).toBe(true)
+    expect(canCloseMonth('2026-12', new Date(2026, 11, 31))).toBe(false)
+    expect(canCloseMonth('2026-12', new Date(2027, 0, 1))).toBe(true)
     expect(canCloseMonth('2026-12', new Date(2027, 0, 3))).toBe(true)
   })
 

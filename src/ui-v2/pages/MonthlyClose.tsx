@@ -148,7 +148,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               title={generationHint}
               style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${canGenerate ? colors.primary.base : colors.border.default}`, background: canGenerate ? colors.primary.dim : colors.bg[500], color: canGenerate ? colors.primary.light : colors.text[400], fontSize: 12, fontWeight: 700, cursor: canGenerate ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: canGenerate ? 1 : .75 }}
             >
-              {canGenerate ? '+ Generar cierre del mes' : 'Disponible el último día'}
+              {canGenerate ? '+ Generar cierre del mes' : 'Disponible al terminar el mes'}
             </button>
           )}
           <div style={{ position: 'relative' }}>
@@ -407,7 +407,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               )}
               {detail.integrityHash && (
                 <div style={{ marginTop: 10, fontSize: 10.5, color: colors.text[500], wordBreak: 'break-all' }}>
-                  Integridad SHA-256 del PDF firmado: <span style={{ fontFamily: 'monospace', color: colors.text[700] }}>{detail.integrityHash}</span>
+                  Huella SHA-256 de los datos firmados: <span style={{ fontFamily: 'monospace', color: colors.text[700] }}>{detail.integrityHash}</span>
                 </div>
               )}
             </div>

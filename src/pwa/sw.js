@@ -3,6 +3,7 @@ import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { buildTableSyncPlan } from '../services/tableSyncPlan.js'
+import { pickNewestSyncItem } from './syncConflict.js'
 
 // ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
 // El cliente invoca skipWaiting mediante 'SKIP_WAITING' cuando ha comprobado que
@@ -326,7 +327,13 @@ async function _syncTablesSW(data, deleted, syncHint) {
     const url = `${_SB_URL}/rest/v1/${operation.table}?id=in.(${idFilter})`
     const response = operation.mode === 'deactivate'
       ? await _sbFetch(url, { method: 'PATCH', headers: _restHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ baja: true }) })
-      : await _sbFetch(url, { method: 'DELETE', headers: _restHeaders({ Prefer: 'return=minimal' }) })
+      : operation.mode === 'soft_delete'
+        ? await _sbFetch(url, {
+            method: 'PATCH',
+            headers: _restHeaders({ Prefer: 'return=minimal' }),
+            body: JSON.stringify({ deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+          })
+        : await _sbFetch(url, { method: 'DELETE', headers: _restHeaders({ Prefer: 'return=minimal' }) })
     if (!response.ok) throw new Error(`table delete ${operation.table}: ${response.status}`)
   }
 }
@@ -394,7 +401,11 @@ function _unionByIdSW(base, incoming) {
   }
   const map = new Map()
   for (const item of b) map.set(item.id, item)
-  for (const item of i) map.set(item.id, item)
+  for (const item of i) {
+    const current = map.get(item.id)
+    if (!current) { map.set(item.id, item); continue }
+    map.set(item.id, pickNewestSyncItem(current, item))
+  }
   return [...map.values()]
 }
 

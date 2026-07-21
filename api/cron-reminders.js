@@ -12,6 +12,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { toClosureRow } from '../src/services/tableSyncPlan.js'
+import { monthlyTargetMinutes } from '../src/utils/workTargets.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -47,13 +49,16 @@ async function getAppData() {
 }
 
 async function markNotisSent(current, keys) {
-  if (!current) return
-  const merged = { ...current, notisSent: { ...(current.notisSent || {}), ...keys }, _ts: Date.now() }
-  await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+  if (!current || !Object.keys(keys || {}).length) return
+  const latest = await getAppData()
+  if (!latest) throw new Error('no app_data while marking notifications')
+  const merged = { ...latest, notisSent: { ...(latest.notisSent || {}), ...keys }, _ts: Date.now() }
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
     method: 'PATCH',
     headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ data: merged, updated_at: new Date().toISOString() })
-  }).catch(e => console.warn('[cron] markNotisSent patch error', e.message))
+  })
+  if (!response.ok) throw new Error(`markNotisSent patch ${response.status}`)
 }
 
 async function getPushSubs() {
@@ -76,6 +81,29 @@ function nowInSpain() {
 function todayInSpain() {
   const d = nowInSpain()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+function madridDateKey(value) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit',
+  }).format(new Date(value))
+}
+
+async function mergeClosuresIntoBlob(nuevos) {
+  const latest = await getAppData()
+  if (!latest) throw new Error('no app_data while merging closures')
+  const incomingIds = new Set(nuevos.map(c => c.id))
+  const updatedDb = {
+    ...latest,
+    cierres:[...(latest.cierres || []).filter(c => !incomingIds.has(c.id)), ...nuevos],
+    _ts:Date.now(),
+  }
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method:'PATCH',
+    headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body:JSON.stringify({ data:updatedDb, updated_at:new Date().toISOString() }),
+  })
+  if (!response.ok) throw new Error(`auto-cierre blob patch ${response.status}`)
 }
 
 function p2(n) { return String(n).padStart(2, '0') }
@@ -433,7 +461,7 @@ export default async function handler(req, res) {
         for (const emp of empActivos) {
           if (existenCierres.find(c => c.empId === emp.id)) continue
           const eRecs = (db.records || []).filter(r =>
-            r.empId === emp.id && r.fin && r.inicio && r.inicio.startsWith(mes)
+            r.empId === emp.id && r.fin && r.inicio && madridDateKey(r.inicio).startsWith(mes)
           )
           if (!eRecs.length) continue
           const totalMin = Math.floor(eRecs.reduce((s, r) => {
@@ -441,39 +469,30 @@ export default async function handler(req, res) {
             const fin = new Date(r.fin).getTime()
             return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
           }, 0))
-          const id = nowMs.toString(36) + emp.id.slice(0, 4) + Math.random().toString(36).slice(2, 6)
+          const targetMin = monthlyTargetMinutes(emp, mes)
+          // Id determinista: si una escritura parcial falla, el siguiente cron
+          // reintenta el mismo cierre en vez de crear un duplicado lógico.
+          const id = `cierre_${mes}_${emp.id}`
+          const updatedAt = new Date().toISOString()
           nuevos.push({
             id, empId: emp.id, empName: emp.name, mes,
             generadoPor: 'Sistema', generadoPorId: null,
-            generadoAt: new Date().toISOString(),
-            totalMin, dias: eRecs.length, estado: 'pendiente', firma: null,
+            generadoAt: updatedAt, _upd: updatedAt,
+            totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias: new Set(eRecs.map(r => madridDateKey(r.inicio))).size, estado: 'pendiente', firma: null,
             records_snapshot: eRecs.map(r => ({ inicio: r.inicio, fin: r.fin, centro: r.centro, workSecs: r.workSecs || 0 }))
           })
         }
         if (nuevos.length > 0) {
-          const updatedDb = { ...db, cierres: [...(db.cierres || []), ...nuevos], _ts: Date.now() }
-          // Escribir al blob (V1)
-          await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
-            method: 'PATCH',
-            headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify({ data: updatedDb, updated_at: new Date().toISOString() })
-          }).catch(e => console.warn('[cron] auto-cierre patch error:', e.message))
-          // Escribir también a la tabla cierres (V2) — best-effort
-          const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-          const cierresRows = nuevos.map(c => ({
-            id: c.id, company_id: COMPANY_ID, emp_id: c.empId,
-            emp_name: c.empName ?? null, mes: c.mes,
-            total_min: c.totalMin ?? 0, extra_min: 0, dias: c.dias ?? null,
-            estado: 'pendiente', firma_admin: null, firma_emp: null,
-            generado_por: c.generadoPor ?? null,
-            generado_at: c.generadoAt ? new Date(c.generadoAt).toISOString() : null,
-            desactualizado: false, updated_at: new Date().toISOString(),
-          }))
-          await fetch(`${SB_URL}/rest/v1/cierres?on_conflict=id`, {
+          // Tabla primero y blob después. Con ids deterministas, cualquier fallo
+          // intermedio se puede reintentar sin duplicar cierres.
+          const cierresRows = nuevos.map(c => toClosureRow(c, c._upd))
+          const tableResponse = await fetch(`${SB_URL}/rest/v1/cierres?on_conflict=id`, {
             method: 'POST',
             headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
             body: JSON.stringify(cierresRows)
-          }).catch(e => console.warn('[cron] auto-cierre table insert error:', e.message))
+          })
+          if (!tableResponse.ok) throw new Error(`auto-cierre table insert ${tableResponse.status}: ${(await tableResponse.text()).slice(0, 160)}`)
+          await mergeClosuresIntoBlob(nuevos)
           // Notificar a cada empleado
           for (const c of nuevos) {
             const sub = subMap.get(c.empId)

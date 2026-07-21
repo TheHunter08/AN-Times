@@ -1,3 +1,5 @@
+import { canCloseMonth } from './adminHelpers.js'
+
 const FOUR_YEARS_MS = 4 * 365.25 * 24 * 60 * 60 * 1000
 const STALE_OPEN_SHIFT_MS = 12 * 60 * 60 * 1000
 
@@ -26,7 +28,7 @@ export function buildComplianceSummary(db, now = Date.now()) {
   const corrections = modifiedRecords.flatMap(record => record.correcciones || [])
   const untraceableCorrections = corrections.filter(correction => !correctionIsTraceable(correction))
   const validatedRecords = completeRecords.filter(record => record.validado || record.aceptada)
-  const closures = db?.cierres || []
+  const closures = (db?.cierres || []).filter(closure => !closure.mes || canCloseMonth(closure.mes, new Date(now)))
   const signedClosures = closures.filter(closure => closure.firmaAdmin && (closure.firmaEmp || closure.firma))
   const oldestTime = records.reduce((oldest, record) => {
     const time = validTime(record.inicio)

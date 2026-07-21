@@ -1,4 +1,4 @@
-// Endpoint público de verificación de integridad de un cierre mensual firmado.
+// Endpoint público de verificación de la huella de datos de un cierre firmado.
 // GET /api/verify-cierre?hash=<sha256 impreso al pie del PDF firmado>
 //
 // No requiere login: el objetivo es que cualquiera con el PDF en la mano
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       estado: row.estado,
       firmadoAt: firma?.firmadoAt || null,
       generadoAt: row.generado_at || null,
-      message: 'El hash coincide con un cierre mensual firmado en TIMES INC. El documento no ha sido alterado desde su firma.',
+      message: 'La huella coincide con los datos de un cierre mensual firmado conservado en TIMES INC.',
     })
   } catch (e) {
     return res.status(500).json({ error: e.message })

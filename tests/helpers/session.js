@@ -46,6 +46,7 @@ export async function loginAsEmployee(page, extraDB = {}, options = {}) {
   const db = baseDB(extraDB)
   const user = db.employees.find(item => item.id === employee.id) || employee
   await page.addInitScript(({ db, user, pushReady }) => {
+    window.__TIMES_E2E__ = true
     localStorage.clear()
     if (!('Notification' in window)) {
       window.Notification = class Notification {}

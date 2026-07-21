@@ -1100,6 +1100,9 @@ async function _doSendPush(to, title, body, tag, safeUrl) {
       // falta de cobertura y no debe llenar la cola persistente de producción.
       if (import.meta.env.DEV && res.status === 404) return { ok: false, skipped: true, reason: 'dev_api_unavailable' }
       console.error('[PUSH] sendpush error', res.status, text)
+      // Un rechazo de autorización no mejorará al recuperar cobertura. No
+      // llenar la cola ni repetir indefinidamente una configuración inválida.
+      if (res.status === 401 || res.status === 403) return { ok: false, status: res.status, error: text, reason: 'push_unauthorized' }
       _enqueueFailedPush(payload)
       return { ok: false, status: res.status, error: text }
     }

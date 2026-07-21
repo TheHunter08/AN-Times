@@ -1,7 +1,7 @@
 import { calcSecs, localDateStr } from './time.js'
 import { recordValidationState } from './recordValidation.js'
 import { downloadBlob } from './exportFiles.js'
-import { WM } from '../config/workRules.js'
+import { monthlyTargetMinutes } from './workTargets.js'
 
 const COLORS = {
   primary:'#7C3AED', primaryDark:'#5B21B6', primarySoft:'#F3E8FF',
@@ -130,15 +130,17 @@ function employeeSummary(employee, records, closures, monthKey) {
   const breakMinutes = Math.round(metrics.reduce((sum, item) => sum + item.breakHours * 60, 0))
   const states = own.map(statusLabel)
   const closure = closures.find(item => item.empId === employee.id && item.mes === monthKey && !item.desactualizado)
+  const targetMinutes = monthlyTargetMinutes(employee, monthKey)
   return {
     employee,
     records:own,
     days:new Set(own.map(record => localDateStr(new Date(record.inicio)))).size,
     netHours:netMinutes / 60,
     breakHours:breakMinutes / 60,
-    regularHours:Math.min(netMinutes, WM) / 60,
-    overtimeHours:Math.max(0, netMinutes - WM) / 60,
-    targetDiffHours:(netMinutes - WM) / 60,
+    targetHours:targetMinutes / 60,
+    regularHours:Math.min(netMinutes, targetMinutes) / 60,
+    overtimeHours:Math.max(0, netMinutes - targetMinutes) / 60,
+    targetDiffHours:(netMinutes - targetMinutes) / 60,
     pending:states.filter(state => state === 'PENDIENTE').length,
     approved:states.filter(state => state === 'VALIDADA').length,
     rejected:states.filter(state => state === 'RECHAZADA').length,
@@ -209,7 +211,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
   const validationPct = totalRecords ? decided / totalRecords : 0
   const rows = [
     titleRow('TIMES INC · RESUMEN GENERAL DE HORAS', columns),
-    subtitleRow(`Periodo: ${monthLabel} (${monthKey}) · Generado: ${generatedAt.toLocaleString('es-ES')} · Objetivo mensual: 160 h por empleado`, columns),
+    subtitleRow(`Periodo: ${monthLabel} (${monthKey}) · Generado: ${generatedAt.toLocaleString('es-ES')} · Objetivo calculado según contrato y días laborables`, columns),
     Array(columns).fill(null),
     sectionRow('RESUMEN EJECUTIVO', columns),
     metricRow(['Empleados con actividad', 'Jornadas', 'Horas netas', 'Descanso', 'Horas extra', 'Pendientes', 'Validación'], columns),
@@ -223,7 +225,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
       { value:validationPct, format:'0%' },
     ], columns, true),
     Array(columns).fill(null),
-    headerRow(['Empleado', 'Centro / Obra', 'Días', 'Fichajes', 'Horas netas', 'Descanso', 'Ordinarias', 'Extra', 'Pendientes', 'Validadas', 'Rechazadas', 'Modificaciones', 'Cierre firmado', 'Diferencia 160 h']),
+    headerRow(['Empleado', 'Centro / Obra', 'Días', 'Fichajes', 'Horas netas', 'Descanso', 'Objetivo', 'Extra', 'Pendientes', 'Validadas', 'Rechazadas', 'Modificaciones', 'Cierre firmado', 'Diferencia objetivo']),
   ]
   summaries.forEach((item, index) => {
     rows.push([
@@ -233,7 +235,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
       dataCell(item.records.length, index, { type:Number, format:'0', align:'right' }),
       dataCell(item.netHours, index, { type:Number, format:HOURS_FORMAT, align:'right', fontWeight:'bold' }),
       dataCell(item.breakHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
-      dataCell(item.regularHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
+      dataCell(item.targetHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
       dataCell(item.overtimeHours, index, { type:Number, format:HOURS_FORMAT, align:'right', textColor:item.overtimeHours ? COLORS.orange : COLORS.ink }),
       dataCell(item.pending, index, { type:Number, format:'0', align:'right', ...(item.pending ? statusStyle('PENDIENTE') : {}) }),
       dataCell(item.approved, index, { type:Number, format:'0', align:'right' }),
@@ -294,12 +296,13 @@ function buildEmployeeSheet(summary, sheetName, monthLabel, generatedAt) {
     subtitleRow(`Periodo: ${monthLabel} · Centro: ${summary.employee.centroTrabajo || summary.employee.dept || 'Sin asignar'} · Generado: ${generatedAt.toLocaleString('es-ES')}`, columns),
     Array(columns).fill(null),
     sectionRow('RESUMEN DEL EMPLEADO', columns),
-    metricRow(['Días', 'Jornadas', 'Horas netas', 'Descanso', 'Extra'], columns),
+    metricRow(['Días', 'Jornadas', 'Horas netas', 'Descanso', 'Objetivo', 'Extra'], columns),
     metricRow([
       { value:summary.days, format:'0' },
       { value:summary.records.length, format:'0' },
       { value:summary.netHours, format:HOURS_FORMAT },
       { value:summary.breakHours, format:HOURS_FORMAT },
+      { value:summary.targetHours, format:HOURS_FORMAT },
       { value:summary.overtimeHours, format:HOURS_FORMAT },
     ], columns, true),
     Array(columns).fill(null),

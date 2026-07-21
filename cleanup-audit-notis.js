@@ -39,12 +39,11 @@ function isoYearsAgo(years) {
   return d.toISOString()
 }
 
-async function deleteOlderThan(table, dateColumn, cutoffIso, extraFilter = '') {
-  const url = `${SB_URL}/rest/v1/${table}?${dateColumn}=lt.${encodeURIComponent(cutoffIso)}${extraFilter}`
-  const res = await fetch(url, { method: 'DELETE', headers: SB_HEADERS })
-  if (!res.ok) throw new Error(`[${table}] DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const count = parseInt(res.headers.get('content-range')?.split('/')[1] || '0', 10)
-  return count
+async function deleteOldEntities(collection, cutoffIso, extraFilter = '') {
+  const url = `${SB_URL}/rest/v1/app_entities?collection=eq.${collection}&updated_at=lt.${encodeURIComponent(cutoffIso)}${extraFilter}`
+  const res = await fetch(url, { method:'DELETE', headers:SB_HEADERS })
+  if (!res.ok) throw new Error(`[app_entities/${collection}] DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  return parseInt(res.headers.get('content-range')?.split('/')[1] || '0', 10)
 }
 
 async function run() {
@@ -52,11 +51,11 @@ async function run() {
   const auditCutoff = isoYearsAgo(AUDIT_RETENTION_YEARS)
 
   console.log(`Borrando notis leídas anteriores a ${notisCutoff}...`)
-  const notisDeleted = await deleteOlderThan('notis', 'created_at', notisCutoff, '&leido=eq.true')
+  const notisDeleted = await deleteOldEntities('notis', notisCutoff, '&data->>leido=eq.true')
   console.log(`✓ ${notisDeleted} notis borradas`)
 
   console.log(`Borrando audit anterior a ${auditCutoff}...`)
-  const auditDeleted = await deleteOlderThan('audit', 'created_at', auditCutoff)
+  const auditDeleted = await deleteOldEntities('audit', auditCutoff)
   console.log(`✓ ${auditDeleted} entradas de audit borradas`)
 
   console.log(`Total: ${notisDeleted + auditDeleted} filas eliminadas`)

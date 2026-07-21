@@ -17,6 +17,43 @@ test.describe('Fichaje por QR', () => {
   })
 })
 
+test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ page }) => {
+  const target = { id:'e2', name:'Trabajador QR', pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false }
+  await loginAsEmployee(page, {
+    employees:[
+      { id:'e1', name:'Encargado', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false },
+      target,
+    ],
+    firmas:{
+      e1:{ main:{ data:'data:image/jpeg;base64,firma-encargado' } },
+      e2:{ main:{ data:'data:image/jpeg;base64,firma-trabajador' } },
+    },
+  })
+  await page.goto('/')
+
+  const scan = async () => {
+    await page.getByRole('button', { name:'Fichar a un empleado' }).click()
+    await expect(page.getByRole('dialog', { name:'Fichar con QR' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => typeof window.__TIMES_E2E_QR_SCAN__)).toBe('function')
+    await page.evaluate(() => window.__TIMES_E2E_QR_SCAN__(`${window.location.origin}/?emp=e2`))
+  }
+
+  await scan()
+  await expect.poll(() => page.evaluate(() => {
+    const db = JSON.parse(localStorage.getItem('an_times_v1'))
+    return db.records.some(record => record.empId === 'e2' && !record.fin)
+  })).toBe(true)
+  await scan()
+  await expect(page.getByText('¿Finalizar la jornada de Trabajador QR?')).toBeVisible()
+  await page.getByRole('button', { name:'Confirmar', exact:true }).click()
+  await expect(page.getByText(/Jornada finalizada para Trabajador QR/)).toBeVisible()
+
+  const targetRecords = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records.filter(record => record.empId === 'e2'))
+  expect(targetRecords).toHaveLength(1)
+  expect(targetRecords[0].fin).toBeTruthy()
+  expect(targetRecords[0].closed).toBe(true)
+})
+
 test.describe('Código QR del perfil', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsEmployee(page)

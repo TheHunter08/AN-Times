@@ -585,7 +585,7 @@ export default function EmployeePage() {
       }
 
       // 6. Cierre mensual pendiente (una vez al día a partir de las 9h)
-      const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente' && !c.desactualizado)
+      const pendCierres = (db.cierres || []).filter(c => c.empId === u.id && c.estado === 'pendiente' && canCloseMonth(c.mes) && !c.desactualizado)
       if (pendCierres.length > 0) {
         const key = 'an_cierre_' + u.id
         if (!hasSent(key, todayStr) && hh >= 9) {
@@ -617,10 +617,12 @@ export default function EmployeePage() {
             const freshRec = dbRef.current.records.find(r => r.id === stale.id)
             if (!freshRec || freshRec.fin) return
             markSent(acKey)
-            const closeTime = new Date().toISOString()
-            const breaks2 = [...(freshRec.breaks || [])]
-            const t2 = calcSecs({ ...freshRec, fin: closeTime, breaks: breaks2 })
-            const closed2 = { ...freshRec, fin: closeTime, breaks: breaks2, workSecs: t2.work, breakSecs: t2.brk, closed: true, autoClosedAt: closeTime, _upd: closeTime }
+            // El cierre se fija exactamente a las 12 h, aunque el navegador se
+            // despierte más tarde. finalizeRecord también incorpora un descanso
+            // que siguiera activo y evita contabilizarlo como trabajo.
+            const closeTime = new Date(new Date(freshRec.inicio).getTime() + 12 * 60 * 60 * 1000).toISOString()
+            const closed2 = { ...finalizeRecord(freshRec, { now: closeTime }), autoClosedAt: new Date().toISOString() }
+            const t2 = { work: closed2.workSecs, brk: closed2.breakSecs }
             // localDateStr(new Date(inicio)) (no inicio.slice(0,10)): inicio se guarda en
             // UTC — un cierre automático de madrugada mostraba el día siguiente al real.
             const _autoCloseDay = localDateStr(new Date(freshRec.inicio))
@@ -1107,7 +1109,7 @@ export default function EmployeePage() {
 
   // Cierres pendientes de firma del empleado actual
   const pendingCierresEmp = useMemo(
-    () => (db.cierres || []).filter(c => c.empId === u.id && !c.firma && !c.firmaEmp && c.estado !== 'rechazado'),
+    () => (db.cierres || []).filter(c => c.empId === u.id && canCloseMonth(c.mes) && !c.firma && !c.firmaEmp && c.estado !== 'rechazado'),
     [db.cierres, u.id]
   )
 
@@ -1138,7 +1140,7 @@ export default function EmployeePage() {
 
   const handleSignSupervisor = (cierreId) => {
     const cierre = (db.cierres || []).find(c => c.id === cierreId)
-    if (cierre && !canCloseMonth(cierre.mes)) { toast('Ese mes todavía no ha terminado — no se puede firmar hasta su último día', 4500, 'warn'); return }
+    if (cierre && !canCloseMonth(cierre.mes)) { toast('Ese mes todavía no ha terminado', 4500, 'warn'); return }
     saveDB(freshDb => ({
       cierres: (freshDb.cierres || []).map(c =>
         c.id === cierreId

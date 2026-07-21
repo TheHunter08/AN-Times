@@ -78,9 +78,9 @@ export default async function handler(req, res) {
 
   const secret = (req.headers['x-admin-secret'] || req.headers['authorization'] || '').replace('Bearer ', '')
   const hasValidSecret = CRON_SECRET && secret && secret.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(secret), Buffer.from(CRON_SECRET))
-  const hasValidOrigin = (req.headers.origin || '').startsWith('https://') && req.headers.origin === (process.env.PUSH_ALLOWED_ORIGIN || '')
-  // Server-to-server calls: require CRON_SECRET. Browser calls: require valid origin.
-  if (!hasValidSecret && !hasValidOrigin) return res.status(401).json({ error: 'Unauthorized' })
+  // Un broadcast nunca se autoriza solo por Origin: ese encabezado se puede
+  // falsificar fuera del navegador. Solo procesos internos con CRON_SECRET.
+  if (!hasValidSecret) return res.status(401).json({ error: 'Unauthorized' })
 
   const { title, body, url = '/', target = 'all' } = req.body || {}
   if (!title || !body) return res.status(400).json({ error: 'title y body son requeridos' })

@@ -23,6 +23,18 @@ export function ModalQRScan({ visible, onScan, onClose }) {
 
   useEffect(() => { onScanRef.current = onScan }, [onScan])
 
+  // Entrada determinista para la regresión E2E. Solo se activa cuando el propio
+  // test define la bandera antes de cargar la aplicación.
+  useEffect(() => {
+    if (!visible || !window.__TIMES_E2E__) return
+    window.__TIMES_E2E_QR_SCAN__ = value => {
+      if (typeof value !== 'string' || scannedRef.current) return
+      scannedRef.current = true
+      onScanRef.current(value)
+    }
+    return () => { delete window.__TIMES_E2E_QR_SCAN__ }
+  }, [visible])
+
   useModalBack(visible, onClose)
   const dialogRef = useDialogA11y(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)

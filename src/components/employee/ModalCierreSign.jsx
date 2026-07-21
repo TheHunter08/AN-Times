@@ -8,7 +8,7 @@ import { queuePush, supabase } from '../../services/dataService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
 import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
-import { WM } from '../../config/constants.js'
+import { monthlyTargetMinutes } from '../../utils/workTargets.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -24,7 +24,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !(c.firmaAdmin || c.firmaEmp || c.firma))
+  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && canCloseMonth(c.mes) && !(c.firmaAdmin || c.firmaEmp || c.firma))
   const selCierre = pendingCierres[selIdx] || null
   const liveRecords = selCierre
     ? (db.records || []).filter(record => record.empId === u?.id && record.inicio && record.fin && localMonthKey(record.inicio) === selCierre.mes)
@@ -35,6 +35,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     return { ...record, workSecs: totals.work, breakSecs: totals.brk }
   })
   const previewTotalMin = Math.floor(previewSnapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
+  const targetMin = selCierre ? (selCierre.targetMin || monthlyTargetMinutes(u, selCierre.mes)) : 0
   const closable = selCierre ? canCloseMonth(selCierre.mes) : false
 
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
@@ -45,7 +46,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   if (!visible || !selCierre) return null
 
   const firmar = async () => {
-    if (!closable) { toast('Este mes todavía no ha terminado — no se puede firmar hasta su último día', 4500, 'warn'); return }
+    if (!closable) { toast('Este mes todavía no ha terminado', 4500, 'warn'); return }
     const signatureData = getSignatureData()
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     setFirmando(true)
@@ -53,7 +54,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const records_snapshot = previewSnapshot
     const totalMin = previewTotalMin
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
-    const firmado = { ...selCierre, records_snapshot, totalMin, extraMin:Math.max(0, totalMin - WM), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+    const firmado = { ...selCierre, records_snapshot, totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     let documentoId = null
     let integrityHash = null
@@ -111,12 +112,12 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
         <div style={{ fontSize:12, color:colors.text[500], marginBottom:4 }}>
           Generado por {selCierre.generadoPor} · {new Set(previewSnapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size} días trabajados · {mhm(previewTotalMin)}
         </div>
-        <div style={{ fontSize:12, color: previewTotalMin > WM ? colors.primary.light : colors.text[500], marginBottom:14, fontWeight: previewTotalMin > WM ? 700 : 400 }}>
-          {previewTotalMin > WM
-            ? `${mhm(previewTotalMin - WM)} por encima de tu jornada mensual (${mhm(WM)})`
-            : previewTotalMin < WM
-              ? `${mhm(WM - previewTotalMin)} por debajo de tu jornada mensual (${mhm(WM)})`
-              : `Coincide exactamente con tu jornada mensual (${mhm(WM)})`}
+        <div style={{ fontSize:12, color: previewTotalMin > targetMin ? colors.primary.light : colors.text[500], marginBottom:14, fontWeight: previewTotalMin > targetMin ? 700 : 400 }}>
+          {previewTotalMin > targetMin
+            ? `${mhm(previewTotalMin - targetMin)} por encima de tu objetivo contractual (${mhm(targetMin)})`
+            : previewTotalMin < targetMin
+              ? `${mhm(targetMin - previewTotalMin)} por debajo de tu objetivo contractual (${mhm(targetMin)})`
+              : `Coincide exactamente con tu objetivo contractual (${mhm(targetMin)})`}
         </div>
 
         {/* Records snapshot */}
@@ -135,7 +136,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
 
         {!closable && (
           <div style={{ background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, fontSize:12, color:colors.semantic.orange, fontWeight:600 }}>
-            Este mes aún no ha terminado. Podrás firmar el cierre a partir de su último día.
+            Este mes aún no ha terminado. Podrás firmarlo cuando comience el mes siguiente.
           </div>
         )}
         <div style={{ fontSize:12, fontWeight:700, marginBottom:6, color:colors.text[700] }}>Firma digital</div>

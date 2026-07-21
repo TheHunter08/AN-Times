@@ -56,7 +56,9 @@ test('completa una entrada y una salida y conserva el fichaje cerrado', async ({
     expect(box).not.toBeNull()
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
-    await page.waitForTimeout(400)
+    // Margen sobre HOLD_DURATION: en emulación móvil requestAnimationFrame
+    // puede perder un frame cuando el estado acaba de cambiar.
+    await page.waitForTimeout(550)
     await page.mouse.up()
   }
 

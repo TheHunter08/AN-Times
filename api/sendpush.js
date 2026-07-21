@@ -2,6 +2,7 @@
 // Formato ESM porque package.json tiene "type": "module".
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
 const _rl = new Map()
@@ -109,9 +110,7 @@ async function sendOne(sub, payload) {
 
 export default async function handler(req, res) {
   try {
-    const _cleanHeader = s => String(s || '').replace(/[\r\n\t]/g, '').replace(/^["']|["']$/g, '').trim()
-    const allowedOrigin = _cleanHeader(process.env.PUSH_ALLOWED_ORIGIN)
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin || '*')
+    res.setHeader('Access-Control-Allow-Origin', CANONICAL_APP_ORIGIN)
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
@@ -126,21 +125,15 @@ export default async function handler(req, res) {
     const authHeader = req.headers['authorization'] || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
     const hasValidToken = PUSH_SECRET && token && token.length === PUSH_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(PUSH_SECRET))
-    const hasValidOrigin = allowedOrigin && req.headers.origin
+    const hasValidOrigin = isTrustedAppOrigin(req.headers.origin)
     // Server-to-server calls: require PUSH_SECRET. Browser calls: require valid origin.
     if (!hasValidToken && !hasValidOrigin) return res.status(401).json({ error: 'Unauthorized' })
-
-    if (allowedOrigin) {
-      const origin = req.headers.origin || ''
-      let originHost = ''; try { originHost = new URL(origin).origin } catch {}
-      let allowedHost = ''; try { allowedHost = new URL(allowedOrigin).origin } catch { allowedHost = allowedOrigin }
-      if (!origin || originHost !== allowedHost) return res.status(401).json({ error: 'Unauthorized' })
-    }
 
     if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Missing Supabase config' })
 
     const { userId, title, body, tag, url } = req.body || {}
     if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' })
+    if (userId === '__all__' && !hasValidToken) return res.status(403).json({ error: 'Broadcast requires server authorization' })
 
     const safeUrl = typeof url === 'string' && url.startsWith('/') ? url : '/'
     const _tag = tag || 'times'

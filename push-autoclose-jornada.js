@@ -5,6 +5,8 @@
  */
 
 import webpush from 'web-push'
+import { finalizeRecord } from './src/utils/recordLifecycle.js'
+import { toRecordRow } from './src/services/tableSyncPlan.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
@@ -46,6 +48,17 @@ async function writeDB(data, expectedTs) {
   if (!res.ok) throw new Error(`DB write failed: ${res.status}`)
   const count = parseInt(res.headers.get('Content-Range')?.split('/')[1] || '1', 10)
   if (count === 0) throw new Error('Escritura rechazada: la BD cambió mientras procesábamos.')
+}
+
+async function upsertRecordRows(records) {
+  if (!records.length) return
+  const rows = records.map(record => toRecordRow(record, record._upd))
+  const res = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(rows),
+  })
+  if (!res.ok) throw new Error(`records upsert failed: ${res.status} ${(await res.text()).slice(0, 180)}`)
 }
 
 async function readPushSubs() {
@@ -99,23 +112,23 @@ async function run() {
   const pushSubs = await readPushSubs()
   const subsMap  = Object.fromEntries(pushSubs.map(s => [s.user_id, s]))
 
-  const closedIds = new Set()
+  const closedRecords = []
   const updatedRecords = db.records.map(r => {
     if (!toClose.find(c => c.id === r.id)) return r
     const closeTime = new Date(new Date(r.inicio).getTime() + TWELVE_HOURS_MS).toISOString()
-    const workMs    = new Date(closeTime) - new Date(r.inicio)
-    const breakMs   = (r.breakSecs || 0) * 1000
-    const workSecs  = Math.max(0, Math.floor((workMs - breakMs) / 1000))
-    closedIds.add(r.id)
-    return { ...r, fin: closeTime, workSecs, closed: true, autoClosedAt: new Date().toISOString(), _upd: new Date().toISOString() }
+    const closed = { ...finalizeRecord(r, { now: closeTime }), autoClosedAt: new Date().toISOString() }
+    closedRecords.push(closed)
+    return closed
   })
 
   const newDB = { ...db, records: updatedRecords, _ts: now }
+  await upsertRecordRows(closedRecords)
   await writeDB(newDB, row.ts)
   console.log('BD actualizada.')
 
   for (const rec of toClose) {
-    const workMin = Math.floor((TWELVE_HOURS_MS - (rec.breakSecs || 0) * 1000) / 60000)
+    const closed = closedRecords.find(item => item.id === rec.id)
+    const workMin = Math.floor((closed?.workSecs || 0) / 60)
     const sub = subsMap[rec.empId]
     if (!sub?.endpoint) { console.log(`  ! Sin suscripción push: ${rec.empId}`); continue }
     const sent = await sendPush(

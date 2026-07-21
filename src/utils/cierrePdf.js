@@ -1,6 +1,5 @@
 import { mhm, p2, recWorkSecs } from './time.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawDocumentFooters, addReportPage } from './pdfReport.js'
-import { WM } from '../config/workRules.js'
 
 async function sha256Hex(str) {
   try {
@@ -69,7 +68,8 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   const recs = cierre.records_snapshot || []
   const totalMin = Math.floor(recs.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
-  const extraMin = Math.max(0, totalMin - WM)
+  const targetMin = cierre.targetMin || 160 * 60
+  const extraMin = Math.max(0, totalMin - targetMin)
   recs.forEach((r, i) => {
     if (y - ROW_H < 140) newPage({ withTable: true })
     const d = new Date(r.inicio)
@@ -122,15 +122,16 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   drawDocumentFooters(pdfDoc, { ml:ML, cw:CW, colors, fontR })
 
-  // Hash de integridad SHA-256: firma los datos clave del documento
-  // para que inspección de trabajo pueda verificar que no ha sido alterado.
+  // Huella SHA-256 de los datos canónicos del cierre. No se presenta como una
+  // firma criptográfica del archivo PDF: permite verificar que el resumen
+  // coincide con el registro conservado por la aplicación.
   const hashInput = JSON.stringify({
     empId:cierre.empId, mes:cierre.mes, totalMin, generadoAt:cierre.generadoAt || '',
     records:recs.map(r => ({ id:r.id, inicio:r.inicio, fin:r.fin, workSecs:r.workSecs, breakSecs:r.breakSecs, correcciones:r.correcciones || [] })),
   })
   const hash = await sha256Hex(hashInput)
   if (hash) {
-    page.drawText(pdfSafe(`SHA-256: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
+    page.drawText(pdfSafe(`SHA-256 de datos: ${hash}`), { x: ML, y: 12, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
     page.drawText(pdfSafe(`Verificar en: https://times-inc.vercel.app/api/verify-cierre?hash=${hash}`), { x: ML, y: 7, size: 4.5, font: fontR, color: colors.gray, maxWidth: CW })
   }
 
@@ -190,7 +191,7 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
   cierres.forEach((c, i) => {
     if (y - ROW_H < 60) newPage({ withTable: true })
     totalMin += c.totalMin || 0
-    const employeeExtraMin = Math.max(0, (c.totalMin || 0) - WM)
+    const employeeExtraMin = Math.max(0, (c.totalMin || 0) - (c.targetMin || 160 * 60))
     totalExtraMin += employeeExtraMin
     correctionCount += (c.records_snapshot || []).reduce((sum, record) => sum + (record.correcciones || []).length, 0)
     const firmado = c.estado === 'firmado'

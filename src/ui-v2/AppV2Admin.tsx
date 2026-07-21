@@ -35,7 +35,8 @@ import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords, getScopedEmployees } from '../utils/supervisorScope.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
-import { WM, CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
+import { monthlyTargetMinutes } from '../utils/workTargets.js'
+import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -1427,8 +1428,9 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const payrollRows = employees.map((employee: any) => {
       const records = monthRecords.filter((record: any) => record.empId === employee.id)
       const workedMinutes = Math.round(records.reduce((sum: number, record: any) => sum + recWorkSecs(record) / 60, 0))
-      const regularMinutes = Math.min(workedMinutes, WM)
-      const overtimeMinutes = Math.max(0, workedMinutes - WM)
+      const targetMinutes = monthlyTargetMinutes(employee, month)
+      const regularMinutes = Math.min(workedMinutes, targetMinutes)
+      const overtimeMinutes = Math.max(0, workedMinutes - targetMinutes)
       return [
         employee.id, employee.name || '', employee.email || '', employee.centroTrabajo || employee.dept || '',
         month, records.length, regularMinutes, overtimeMinutes,
@@ -1500,8 +1502,8 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       else if (minutes > 540) distribution.long += 1
     }
     const empCount = emps.length || 1
-    const monthlyExtraMin = [...minutesByEmployee.values()]
-      .reduce((sum, employeeMinutes) => sum + Math.max(0, employeeMinutes - WM), 0)
+    const monthlyExtraMin = emps.reduce((sum:any, employee:any) =>
+      sum + Math.max(0, (minutesByEmployee.get(employee.id) || 0) - monthlyTargetMinutes(employee, thisMonth)), 0)
 
     const kpis = [
       { label: 'Horas este mes', value: `${Math.floor(totalMins / 60)}h`, tone: 'primary' as const },
@@ -1513,7 +1515,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     // Hours per employee bar
     const bars = emps.slice(0, 8).map((e: any) => {
       const empMins = minutesByEmployee.get(e.id) || 0
-      const maxPossible = WM
+      const maxPossible = monthlyTargetMinutes(e, thisMonth) || 1
       return { label: e.name?.split(' ')[0] || e.id, value: Math.min(100, Math.round(empMins / maxPossible * 100)) }
     })
 
@@ -1575,7 +1577,7 @@ function PendingCenterPage({ onNavigate }: { onNavigate: (page: string) => void 
     const days = (new Date(`${d.expiresOn}T23:59:59`).getTime() - Date.now()) / 86400000
     return days <= 30
   }).length
-  const pendingClosures = (db.cierres || []).filter((c:any) => !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
+  const pendingClosures = (db.cierres || []).filter((c:any) => canCloseMonth(c.mes) && !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
   const cards = [
     { label:'Jornadas abiertas +10h', value:openTooLong, page:'en_linea', tone:colors.semantic.red },
     { label:'Horas por validar', value:pendingHours, page:'validar', tone:colors.semantic.orange },
@@ -1613,15 +1615,15 @@ function MonthlyClosePage() {
   const toast   = useAppStore(s => s.toast)
   const autoGenRef = useRef(false)
   const nowForClose = new Date()
-  const currentCloseMonth = `${nowForClose.getFullYear()}-${String(nowForClose.getMonth() + 1).padStart(2, '0')}`
+  const previousMonthDate = new Date(nowForClose.getFullYear(), nowForClose.getMonth() - 1, 1)
+  const currentCloseMonth = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`
   const isLastDayOfMonth = canCloseMonth(currentCloseMonth, nowForClose)
 
-  // El cierre, manual o automático, solo puede generarse el último día natural del mes.
+  // El cierre, manual o automático, solo puede generarse cuando el mes terminó.
   useEffect(() => {
     if (autoGenRef.current || !isLastDayOfMonth) return
     autoGenRef.current = true
-    const now = new Date()
-    const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const mesPasado = currentCloseMonth
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
@@ -1636,7 +1638,7 @@ function MonthlyClosePage() {
         const generadoAt = new Date().toISOString()
         return [{
           id: gid(), empId: e.id, empName: e.name, mes: mesPasado,
-          totalMin, extraMin: Math.max(0, totalMin - WM), dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
+          totalMin, targetMin:monthlyTargetMinutes(e, mesPasado), extraMin: Math.max(0, totalMin - monthlyTargetMinutes(e, mesPasado)), dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
           generadoPor: 'Sistema', generadoAt,
           firma: null, firmaEmp: null, firmaAdmin: null, _upd: generadoAt,
         }]
@@ -1647,7 +1649,7 @@ function MonthlyClosePage() {
       const cierres = (fresh.cierres || []).filter((c: any) => !(c.mes === mesPasado && c.desactualizado && reemplazados.has(c.empId)))
       return { cierres: [...cierres, ...nuevos], audit: withAudit.audit }
     })
-  }, [isLastDayOfMonth]) // eslint-disable-line
+  }, [isLastDayOfMonth, currentCloseMonth]) // eslint-disable-line
 
   // Build closure items from db.cierres, enriched with records
   const items = useMemo(() => {
@@ -1690,7 +1692,8 @@ function MonthlyClosePage() {
         const totalMins = recs.reduce((s: number, r: any) =>
           s + recWorkSecs(r) / 60, 0
         )
-        const extraMins = Math.max(0, totalMins - WM)
+        const targetMins = c.targetMin || monthlyTargetMinutes(emp, c.mes)
+        const extraMins = Math.max(0, totalMins - targetMins)
 
         const dayRecs = recs.map((r: any) => ({
           date:  new Date(r.inicio).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
@@ -1740,11 +1743,10 @@ function MonthlyClosePage() {
   // Generate closures for the previous (completed) month only
   const handleGenerateAll = () => {
     if (!isLastDayOfMonth) {
-      toast('El cierre mensual solo puede generarse el último día natural del mes', 4500, 'warn')
+      toast('El cierre mensual solo puede generarse cuando el mes haya terminado', 4500, 'warn')
       return
     }
-    const now = new Date()
-    const mesPasado = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const mesPasado = currentCloseMonth
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
     const toCreate = emps.filter((e: any) => !existing.has(e.id))
@@ -1758,7 +1760,8 @@ function MonthlyClosePage() {
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
         const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
-        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, extraMin:Math.max(0, totalMin - WM), dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
+        const targetMin = monthlyTargetMinutes(e, mesPasado)
+        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
       if (!nuevos.length) { toast(`Sin registros de ${mesPasado}`, 3000, 'warn'); return null }
       const withAudit = auditLog(fresh, `Cierre mensual generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
@@ -1772,7 +1775,7 @@ function MonthlyClosePage() {
   const handleSignAdmin = (id: string) => {
     const target = (db.cierres || []).find((c: any) => c.id === id)
     if (target && !canCloseMonth(target.mes)) {
-      toast(`El mes ${target.mes} todavía no ha terminado — no se puede firmar hasta su último día`, 4500, 'warn')
+      toast(`El mes ${target.mes} todavía no ha terminado`, 4500, 'warn')
       return
     }
     const nowIso = new Date().toISOString()
@@ -1944,7 +1947,7 @@ function MonthlyClosePage() {
     toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} eliminado${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
   }
 
-  return <MonthlyClose items={items} onDownload={handleDownloadPdf} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'Solo se permite el último día natural del mes'} />
+  return <MonthlyClose items={items} onDownload={handleDownloadPdf} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'El mes todavía no ha terminado'} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
