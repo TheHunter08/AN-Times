@@ -1,10 +1,12 @@
 // Página "Gastos" — versión ui-v2. Misma lógica que TabGastos.jsx (legacy),
 // relocalizada y restilizada con los tokens v7.
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { CSSProperties, ChangeEvent, FormEvent } from 'react'
 import { gid, today } from '../../utils/time.js'
 import { resizeImageToDataUrl } from '../../utils/imageResize.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
+import { supabase } from '../../services/dataServiceV2.js'
+import { GASTOS_BUCKET } from '../../config/constants.js'
 
 const CATEGORIAS = ['dieta', 'transporte', 'material', 'otro']
 
@@ -23,6 +25,17 @@ function fmt(n: number) {
   return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Convierte el data URL que produce resizeImageToDataUrl en un Blob subible
+// a Storage — mismo decodificado base64→bytes que usa DocPreview.jsx.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
+
 export interface EmployeeGastosProps { db: any; u: any; toast: (...args: any[]) => void; saveDB: (updater: any) => void; onBack?: () => void }
 
 export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosProps) {
@@ -35,6 +48,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const [notas, setNotas] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [signedUrls, setSignedUrls] = useState<Record<string, string | null>>({})
 
   const misGastos = (db.gastos || [])
     .filter((g: any) => g.empId === u.id)
@@ -44,6 +58,29 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
   const gastosEsteMes = misGastos.filter((g: any) => g.fecha.startsWith(thisMonth))
   const aprobadosMes = gastosEsteMes.filter((g: any) => g.estado === 'aprobado').reduce((s: number, g: any) => s + g.importe, 0)
   const pendientesMes = gastosEsteMes.filter((g: any) => g.estado === 'pendiente').reduce((s: number, g: any) => s + g.importe, 0)
+
+  // Las fotos subidas a Storage viven en un bucket privado — hay que pedir
+  // una URL firmada de corta duración para poder mostrarlas como miniatura.
+  // Los gastos antiguos (o subidos sin conexión) siguen con `foto` en base64
+  // y no necesitan esto.
+  const pendingFotoIds = misGastos.filter((g: any) => g.fotoPath && !(g.id in signedUrls)).map((g: any) => g.id).join(',')
+  useEffect(() => {
+    if (!pendingFotoIds || !supabase) return
+    let cancelled = false
+    const ids = pendingFotoIds.split(',')
+    ;(async () => {
+      const entries = await Promise.all(ids.map(async (id: string) => {
+        const g = misGastos.find((x: any) => x.id === id)
+        if (!g) return [id, null]
+        try {
+          const { data, error } = await supabase.storage.from(GASTOS_BUCKET).createSignedUrl(g.fotoPath, 3600)
+          return [id, error ? null : (data?.signedUrl || null)]
+        } catch { return [id, null] }
+      }))
+      if (!cancelled) setSignedUrls(prev => ({ ...prev, ...Object.fromEntries(entries) }))
+    })()
+    return () => { cancelled = true }
+  }, [pendingFotoIds])
 
   async function handleFoto(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -73,9 +110,29 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
     if (!importe || +importe <= 0) { toast?.('El importe debe ser mayor que 0', 'error'); return }
     setSubmitting(true)
     try {
-      const nuevo = {
+      const nuevo: any = {
         id: gid(), empId: u.id, empName: u.name, concepto: concepto.trim(), importe: +importe,
-        fecha, foto: foto || null, estado: 'pendiente', ts: new Date().toISOString(), categoria, notas: notas.trim(),
+        fecha, foto: null, fotoPath: null, estado: 'pendiente', ts: new Date().toISOString(), categoria, notas: notas.trim(),
+      }
+      // Preferimos Storage (cuota separada, 1 GB) sobre guardar la foto en
+      // base64 dentro del JSONB de app_data (se come la cuota de base de
+      // datos, 500 MB) — mismo criterio que documentos y PDFs de cierre. Si
+      // falla la subida (sin conexión, bucket no configurado todavía), cae
+      // al comportamiento anterior en vez de bloquear el envío del gasto.
+      if (foto && supabase) {
+        try {
+          const blob = dataUrlToBlob(foto)
+          const ext = blob.type === 'image/png' ? 'png' : 'jpg'
+          const path = `${u.id}/${nuevo.id}.${ext}`
+          const { error } = await supabase.storage.from(GASTOS_BUCKET).upload(path, blob, { contentType: blob.type, upsert: true })
+          if (!error) nuevo.fotoPath = path
+          else { console.warn('[gastos] No se pudo subir la foto a Storage, se guarda en base64:', error.message); nuevo.foto = foto }
+        } catch (uploadErr: any) {
+          console.warn('[gastos] Error al subir la foto a Storage, se guarda en base64:', uploadErr?.message)
+          nuevo.foto = foto
+        }
+      } else if (foto) {
+        nuevo.foto = foto
       }
       await saveDB((freshDb: any) => ({ gastos: [...(freshDb.gastos || []), nuevo] }))
       toast?.('Gasto enviado correctamente', 'success')
@@ -160,9 +217,11 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {misGastos.map((g: any) => (
+          {misGastos.map((g: any) => {
+            const thumbSrc = g.foto || (g.fotoPath ? signedUrls[g.id] : null)
+            return (
             <div key={g.id} style={{ background: colors.bg[600], borderRadius: 12, padding: 14, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              {g.foto && <img src={g.foto} alt="ticket" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: `1px solid ${colors.border.default}` }} />}
+              {thumbSrc && <img src={thumbSrc} alt="ticket" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: `1px solid ${colors.border.default}` }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: colors.text[900], fontWeight: 600, fontSize: '.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.concepto}</span>
@@ -175,7 +234,8 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

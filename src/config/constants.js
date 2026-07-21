@@ -46,6 +46,13 @@ export const CIERRE_PDF_BUCKET = 'cierres-pdf'
 // los 500 MB gratuitos de base de datos, más que los PDFs de cierre.
 export const DOCUMENTOS_BUCKET = 'documentos-empleado'
 
+// Mismo razonamiento que CIERRE_PDF_BUCKET/DOCUMENTOS_BUCKET: las fotos de
+// tickets de gastos se guardaban en base64 dentro del gasto, dentro del
+// blob único de app_data — con un gasto por empleado con foto siendo algo
+// habitual (no ocasional, como un contrato), este era uno de los mayores
+// focos de crecimiento continuo de la cuota de base de datos.
+export const GASTOS_BUCKET = 'gastos-fotos'
+
 // Festivos Comunidad de Madrid — 2026 + 2027
 export const FESTIVOS_MADRID = {
   // 2026
