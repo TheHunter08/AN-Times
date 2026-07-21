@@ -26,6 +26,16 @@ test.describe('Acceso con PIN y email', () => {
     await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /olvidaste/i })).toBeVisible()
   })
+
+  test('permite iniciar el alta segura de la primera cuenta', async ({ page }) => {
+    await page.getByRole('button', { name: 'Email', exact: true }).click()
+    await page.getByRole('button', { name: 'Primera vez: crear cuenta' }).click()
+    await expect(page.getByText('Crea tu acceso seguro')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Crear acceso seguro' })).toBeVisible()
+    await expect(page.getByRole('note')).toContainText('enlace de confirmación')
+    await page.getByRole('button', { name: 'Ya tengo cuenta' }).click()
+    await expect(page.getByText('Accede a TIMES INC')).toBeVisible()
+  })
 })
 
 test('un empleado bloqueado ve el contador', async ({ page }) => {

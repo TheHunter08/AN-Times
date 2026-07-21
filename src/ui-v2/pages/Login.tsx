@@ -25,9 +25,11 @@ export interface LoginProps {
   bioLoading?: boolean
   // Email
   onLogin?: (email: string, password: string) => void
+  onRegister?: (email: string, password: string) => void
   onForgotPassword?: (email: string) => void
   resetLoading?: boolean
   emailLoading?: boolean
+  registerLoading?: boolean
   emailError?: string
   // Mode
   mode?: LoginMode
@@ -43,18 +45,20 @@ const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 export function Login({
   employees = [], pin = '', selectedEmpId = '', onSelectEmp, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
-  onLogin, onForgotPassword, resetLoading, emailLoading, emailError,
+  onLogin, onRegister, onForgotPassword, resetLoading, emailLoading, registerLoading, emailError,
   mode = 'pin', onSetMode,
   loading, error, online = true, lastSyncLabel,
 }: LoginProps) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [creatingAccount, setCreatingAccount] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin?.(email, password)
+    if (creatingAccount) onRegister?.(email, password)
+    else onLogin?.(email, password)
   }
 
   const selEmp = employees.find(e => e.id === selectedEmpId)
@@ -298,10 +302,12 @@ export function Login({
           }}>
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: colors.text[900], letterSpacing: '-.4px', marginBottom: 4 }}>
-                Accede a TIMES INC
+                {creatingAccount ? 'Crea tu acceso seguro' : 'Accede a TIMES INC'}
               </div>
               <div style={{ fontSize: 12, color: colors.text[500] }}>
-                Detectaremos automáticamente tu perfil y permisos.
+                {creatingAccount
+                  ? 'Usa el mismo email que figura en tu perfil de empleado.'
+                  : 'Detectaremos automáticamente tu perfil y permisos.'}
               </div>
             </div>
 
@@ -337,9 +343,9 @@ export function Login({
                   <label htmlFor="login-password" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px' }}>
                     Contraseña
                   </label>
-                  <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
+                  {!creatingAccount && <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
                     {resetLoading ? 'Enviando…' : '¿La olvidaste?'}
-                  </button>
+                  </button>}
                 </div>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: colors.text[500], display: 'flex' }}>
@@ -348,7 +354,7 @@ export function Login({
                   <input
                     id="login-password"
                     type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••" required autoComplete="current-password"
+                    placeholder="••••••••" required minLength={creatingAccount ? 8 : undefined} autoComplete={creatingAccount ? 'new-password' : 'current-password'}
                     className="uiv2-login-input"
                     style={{
                       width: '100%', boxSizing: 'border-box',
@@ -373,22 +379,35 @@ export function Login({
 
               <button
                 type="submit"
-                disabled={emailLoading || loading || !email || !password}
+                disabled={emailLoading || registerLoading || loading || !email || !password}
                 className="uiv2-login-submit"
                 style={{
                   marginTop: 4, padding: '12px', borderRadius: radius.md, border: 'none',
-                  background: emailLoading || loading || !email || !password
+                  background: emailLoading || registerLoading || loading || !email || !password
                     ? colors.bg[400]
                     : colors.gradients.brand,
-                  color: emailLoading || loading || !email || !password ? colors.text[500] : '#fff',
-                  fontSize: 13.5, fontWeight: 800, cursor: emailLoading || loading ? 'wait' : 'pointer',
+                  color: emailLoading || registerLoading || loading || !email || !password ? colors.text[500] : '#fff',
+                  fontSize: 13.5, fontWeight: 800, cursor: emailLoading || registerLoading || loading ? 'wait' : 'pointer',
                   fontFamily: 'inherit',
-                  boxShadow: emailLoading || loading || !email || !password ? 'none' : '0 10px 28px var(--uiv2-primary-glow)',
+                  boxShadow: emailLoading || registerLoading || loading || !email || !password ? 'none' : '0 10px 28px var(--uiv2-primary-glow)',
                   transition: 'all .2s',
                 }}
               >
-                {emailLoading || loading ? 'Entrando…' : 'Continuar'}
+                {creatingAccount
+                  ? (registerLoading ? 'Creando cuenta…' : 'Crear acceso seguro')
+                  : (emailLoading || loading ? 'Entrando…' : 'Continuar')}
               </button>
+              <button
+                type="button"
+                disabled={emailLoading || registerLoading || loading}
+                onClick={() => { setCreatingAccount(value => !value); setPassword('') }}
+                style={{ padding: 5, border: 'none', background: 'transparent', color: colors.primary.light, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {creatingAccount ? 'Ya tengo cuenta' : 'Primera vez: crear cuenta'}
+              </button>
+              {creatingAccount && <div role="note" style={{ color: colors.text[400], fontSize: 10.5, lineHeight: 1.45, textAlign: 'center' }}>
+                Te enviaremos un enlace de confirmación. Si tu email no está en tu ficha, pide al administrador que lo añada.
+              </div>}
             </form>
           </div>
         )}

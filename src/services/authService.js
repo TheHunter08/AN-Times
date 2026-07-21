@@ -6,6 +6,9 @@ export const AUTH_ERRORS = {
   'User not found':                 'No existe cuenta con ese email',
   'Too many requests':              'Demasiados intentos. Espera unos minutos.',
   'Network request failed':         'Sin conexión. Verifica tu internet.',
+  'User already registered':        'Ya existe una cuenta con ese email. Entra o recupera la contraseña.',
+  'Signups not allowed':             'El alta de cuentas no está disponible. Contacta al administrador.',
+  'Password should be at least':     'La contraseña no cumple la longitud mínima.',
   'popup_closed_by_user':          null,
   'access_denied':                  null,
 }
@@ -61,6 +64,17 @@ export async function signOut() {
 
 export function isAuthReady() {
   return !!supabase
+}
+
+export async function signUpEmail(email, pass) {
+  if (!supabase) throw new Error('Sin conexión con el servidor')
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password: pass,
+    options: { emailRedirectTo: `${window.location.origin}/?auth=confirmed` },
+  })
+  if (error) throw { code: error.message, message: mapError(error) }
+  return data
 }
 
 export async function getAuthSession() {

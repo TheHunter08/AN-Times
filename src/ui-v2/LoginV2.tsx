@@ -6,7 +6,8 @@ import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
 import { linkAuthIdentity } from '../utils/authIdentity.js'
 import { useShallow } from 'zustand/react/shallow'
-import { signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
+import { signInEmail, signUpEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
+import { getRegistrationEligibility, normalizeAccountEmail, validateAccountPassword } from '../utils/authRegistration.js'
 import { sortedEmps } from '../utils/time.js'
 import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
@@ -77,6 +78,7 @@ export default function LoginV2() {
 
   // Email state
   const [emailLoading, setEmailLoading] = useState(false)
+  const [registerLoading, setRegisterLoading] = useState(false)
   const [emailError, setEmailError]     = useState('')
   const [resetLoading, setResetLoading] = useState(false)
   const { online } = useConnectivity()
@@ -316,6 +318,44 @@ export default function LoginV2() {
     }
   }
 
+  const handleRegister = async (email: string, password: string) => {
+    setEmailError('')
+    if (!online) { setEmailError('Crear la cuenta requiere conexión. Puedes seguir entrando con PIN.'); return }
+    if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
+
+    const eligibility: any = getRegistrationEligibility(db.employees, email)
+    if (!eligibility.ok) {
+      setEmailError(eligibility.reason === 'already_linked'
+        ? 'Ya existe una cuenta para este empleado. Entra o recupera la contraseña.'
+        : 'Ese email no figura en ningún empleado activo. Pide al administrador que revise tu ficha.')
+      return
+    }
+    const passwordError = validateAccountPassword(password)
+    if (passwordError) { setEmailError(passwordError); return }
+
+    setRegisterLoading(true)
+    interactiveEmailRef.current = true
+    try {
+      const result = await signUpEmail(normalizeAccountEmail(email), password)
+      if (result.session && result.user?.id) {
+        if (!linkAuthIdIfMissing(eligibility.employee, result.user.id)) {
+          await authSignOut()
+          setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+          return
+        }
+        doLogin(eligibility.employee, 'email')
+        toast('Cuenta creada y vinculada correctamente', 5000, 'ok')
+      } else {
+        toast('Cuenta creada. Revisa tu correo y confirma el enlace antes de entrar.', 7000, 'ok')
+      }
+    } catch (error: any) {
+      setEmailError(error?.message || 'No se pudo crear la cuenta. Inténtalo de nuevo.')
+    } finally {
+      interactiveEmailRef.current = false
+      setRegisterLoading(false)
+    }
+  }
+
   // ── Auth state change (Google OAuth / password reset) ─────────────────────
 
   useEffect(() => {
@@ -370,9 +410,11 @@ export default function LoginV2() {
       onBioLogin={handleBioLogin}
       bioLoading={bioLoading}
       onLogin={handleEmailLogin}
+      onRegister={handleRegister}
       onForgotPassword={handleForgotPassword}
       resetLoading={resetLoading}
       emailLoading={emailLoading}
+      registerLoading={registerLoading}
       emailError={emailError}
       online={online}
       lastSyncLabel={lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : undefined}
