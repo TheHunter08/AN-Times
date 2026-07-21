@@ -180,6 +180,16 @@ export async function cloudFetchTs() {
   }
 }
 
+export function mergeRecordVersions(tableRecord, blobRecord) {
+  if (!blobRecord) return tableRecord
+  if (!tableRecord) return blobRecord
+  const blobTs = Date.parse(blobRecord._upd || '') || 0
+  const tableTs = Date.parse(tableRecord._upd || '') || 0
+  return blobTs > tableTs
+    ? { ...tableRecord, ...blobRecord }
+    : { ...blobRecord, ...tableRecord }
+}
+
 function noteRemoteDelete(deleted, collection, id) {
   if (!id) return
   if (!deleted[collection]) deleted[collection] = []
@@ -348,23 +358,16 @@ async function cloudFetchLegacy() {
 
     const blobRecordMap = new Map((blobData.records ?? []).map(r => [r.id, r]))
     const tableRecords = (recsR.data ?? []).map(fromRecord)
-    // Workflow metadata such as rejected/validated flags still lives in the
-    // legacy blob. Keep it when a realtime table snapshot is merged; otherwise
-    // a refresh can make an edited row look pending again.
+    // La tabla y el blob contienen ya los mismos campos de workflow. Resolver
+    // el registro completo por `_upd` evita que una copia legacy antigua pise
+    // una validación recién confirmada en la tabla durante la ventana entre
+    // ambos writes.
     const records = tableRecords.map(record => {
       const blobRecord = blobRecordMap.get(record.id)
       if (!blobRecord) return record
-      const blobTs = Date.parse(blobRecord._upd || '') || 0
-      const tableTs = Date.parse(record._upd || '') || 0
       // Si el blob contiene una corrección más reciente que la tabla (ventana
       // entre ambos writes u operación offline), conservar también sus horas.
-      const merged = blobTs > tableTs
-        ? { ...record, ...blobRecord }
-        : { ...blobRecord, ...record }
-      for (const key of ['validado', 'rechazado', 'modificado', 'validadoBy', 'validadoAt', 'aceptadaPor', 'aceptadaAt']) {
-        if (blobRecord[key] !== undefined) merged[key] = blobRecord[key]
-      }
-      return merged
+      return mergeRecordVersions(record, blobRecord)
     })
     // El blob sigue siendo una escritura primaria. Si una fila aún no alcanzó
     // la tabla (modo offline o fallo aislado de FK), no puede desaparecer al

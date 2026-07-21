@@ -34,6 +34,39 @@ test('muestra las obras asignadas por id al iniciar una jornada', async ({ page 
   await expect(dialog.getByRole('option', { name:'Centro legacy', exact:true })).toHaveCount(0)
 })
 
+test('completa una entrada y una salida y conserva el fichaje cerrado', async ({ page }) => {
+  await loginAsEmployee(page, { centrosTrabajo:['Obra Principal'] })
+  await page.goto('/')
+
+  const hold = async (button) => {
+    const box = await button.boundingBox()
+    expect(box).not.toBeNull()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(400)
+    await page.mouse.up()
+  }
+
+  await hold(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i }))
+  const centerDialog = page.getByRole('dialog', { name:/Seleccionar centro de trabajo/i })
+  await expect(centerDialog).toBeVisible()
+  await centerDialog.getByRole('button', { name:'Iniciar jornada', exact:true }).click()
+
+  const stopButton = page.getByRole('button', { name:/Finalizar jornada.*Mantén pulsado/i })
+  await expect(stopButton).toBeVisible()
+  await hold(stopButton)
+  await expect(page.getByText('¿Terminar la jornada ahora?', { exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Confirmar', exact:true }).click()
+  await expect(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })).toBeVisible()
+
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)
+  expect(records).toHaveLength(1)
+  expect(records[0]).toMatchObject({ empId:employee.id, closed:true })
+  expect(records[0].aceptada).toBeUndefined()
+  expect(records[0].inicio).toBeTruthy()
+  expect(records[0].fin).toBeTruthy()
+})
+
 test('Times AI protege los datos del equipo para un empleado normal', async ({ page }) => {
   await loginAsEmployee(page, {
     employees:[{ ...employee, role:'empleado', isEnc:false, isJO:false }],

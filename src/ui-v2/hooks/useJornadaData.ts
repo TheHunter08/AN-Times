@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { calcSecs, calcMin, recWorkSecs, wkStart, p2, localDateStr } from '../../utils/time.js'
 import { WD, WK } from '../../config/constants.js'
+import { isRecordPendingValidation } from '../../utils/recordValidation.js'
 
 export function useJornadaData(db: any, u: any, timer: any) {
   return useMemo(() => {
@@ -42,7 +43,7 @@ export function useJornadaData(db: any, u: any, timer: any) {
       .map(ds => ({ ds, recs: (db.records || []).filter((r: any) => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin) }))
       .filter(h => h.recs.length > 0)
 
-    const pendingValidation = (db.records || []).filter((r: any) => r.empId === u.id && r.fin && !r.aceptada).length
+    const pendingValidation = (db.records || []).filter((r: any) => r.empId === u.id && isRecordPendingValidation(r)).length
 
     return { now, o, totMin, brkMin, monthMin, weekMin, extraMin, normMin, wdEfectivo, tlItems, histWithRecs, pendingValidation }
     // localDateStr(new Date()) como dependencia (no solo timer/db): sin ella, si el

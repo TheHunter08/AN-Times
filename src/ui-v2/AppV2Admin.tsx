@@ -33,6 +33,7 @@ import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords, getScopedEmployees } from '../utils/supervisorScope.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
+import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
 import { WM, CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -340,11 +341,6 @@ function fmtDate(ts?: string) {
 function fmtTime(ts?: string) {
   if (!ts) return ''
   try { return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
-}
-
-function daysDiff(ts?: string) {
-  if (!ts) return 999
-  return Math.floor((Date.now() - new Date(ts).getTime()) / 86400000)
 }
 
 // ─── Page wrappers ─────────────────────────────────────────────────────────────
@@ -898,11 +894,7 @@ function ValidateHoursPage() {
   const toast   = useAppStore(s => s.toast)
 
   const rows = useMemo(() => {
-    const records: any[] = (db.records || [])
-      .filter((r: any) => r.fin && r.inicio)
-      .filter((r: any) => daysDiff(r.inicio) <= 14)
-      .sort((a: any, b: any) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
-      .slice(0, 60)
+    const records: any[] = selectValidationRecords(db.records || [])
 
     return records.map((r: any) => {
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
@@ -924,7 +916,7 @@ function ValidateHoursPage() {
         expected: mhm(expected),
         diff: diffStr,
         diffTone: Math.abs(diff) < 15 ? 'ok' : diff > 0 ? 'over' : 'under',
-        status: (r.aceptada || r.validado) ? 'approved' : r.rechazado ? 'rejected' : 'pending',
+        status: recordValidationState(r),
       } as any
     })
   }, [db.records, db.employees, db.config?.wdMin])
@@ -1570,14 +1562,9 @@ function PendingCenterPage({ onNavigate }: { onNavigate: (page: string) => void 
   const lastSyncTime = useAppStore(s => s.lastSyncTime)
   const now = Date.now()
   const openTooLong = (db.records || []).filter((r:any) => !r.fin && r.inicio && now - new Date(r.inicio).getTime() > 10 * 3600000).length
-  // Misma ventana (14 días + tope de 60 filas) que ValidateHoursPage — igual
-  // que se arregló para la insignia de la barra lateral: sin esto, esta
-  // tarjeta contaba pendientes que ni aparecen en "Validar horas".
-  const pendingHours = (db.records || [])
-    .filter((r:any) => r.fin && r.inicio && daysDiff(r.inicio) <= 14)
-    .sort((a:any, b:any) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
-    .slice(0, 60)
-    .filter((r:any) => !r.aceptada && !r.validado && !r.rechazado).length
+  // Todos los pendientes permanecen visibles hasta que exista una decisión;
+  // el límite temporal solo se aplica al historial ya revisado.
+  const pendingHours = (db.records || []).filter(isRecordPendingValidation).length
   const pendingVacations = (db.vacaciones || []).filter((v:any) => v.estado === 'pendiente').length
   const pendingExpenses = (db.gastos || []).filter((g:any) => g.estado === 'pendiente').length
   // Los documentos no tienen ningún campo `firma` ni funcionalidad de firma
@@ -2568,16 +2555,7 @@ export default function AppV2Admin() {
   // Filtrar páginas según rol
   const visiblePages = useMemo(() => isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES, [isEnc])
   const { pendingHours, pendingRequests, pendingExpenses } = useMemo(() => ({
-    // Misma ventana que ValidateHoursPage (últimos 14 días + tope de 60 filas
-    // más recientes) antes de contar pendientes: si no, la insignia contaba
-    // pendientes que ni siquiera aparecen en la lista de "Validar horas"
-    // (por estar fuera del rango o del tope), mostrando un número que nunca
-    // coincidía con lo visible en pantalla.
-    pendingHours: (db.records || [])
-      .filter((r: any) => r.fin && r.inicio && daysDiff(r.inicio) <= 14)
-      .sort((a: any, b: any) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
-      .slice(0, 60)
-      .filter((r: any) => !r.aceptada && !r.validado && !r.rechazado).length,
+    pendingHours: (db.records || []).filter(isRecordPendingValidation).length,
     pendingRequests: (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
       + (db.correccionesFichaje || []).filter((c: any) => !c.estado || c.estado === 'pendiente').length,
     pendingExpenses: (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length,

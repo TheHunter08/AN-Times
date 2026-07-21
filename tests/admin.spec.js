@@ -118,6 +118,21 @@ test('descarga informes mensuales reales en PDF y Excel', async ({ page }) => {
   expect((await pdfDownload).suggestedFilename()).toBe('informe-2026-07.pdf')
 })
 
+test('mantiene resolubles las jornadas antiguas pendientes y no cuenta las validadas', async ({ page }) => {
+  await loginAsAdmin(page, {
+    records:[
+      { id:'pending-old', empId:'e1', empName:'Empleado Prueba', inicio:'2026-05-01T08:00:00Z', fin:'2026-05-01T16:00:00Z', workSecs:28800, aceptada:false, validado:false, rechazado:false },
+      { id:'approved-old', empId:'e1', empName:'Empleado Prueba', inicio:'2026-05-02T08:00:00Z', fin:'2026-05-02T16:00:00Z', workSecs:28800, aceptada:false, validado:true, rechazado:false },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Gestión', 'Validar horas')
+  await expect(page.getByRole('heading', { name:'Validar horas' })).toBeVisible()
+  await expect(page.getByRole('button', { name:'Pendientes (1)', exact:true })).toBeVisible()
+  await expect(page.getByText('Empleado Prueba', { exact:true })).toBeVisible()
+})
+
 test('Times AI resume la actividad operativa por obra', async ({ page }) => {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0).toISOString()

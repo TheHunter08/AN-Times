@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromEmployee, tableChangeToPatch } from './dataServiceV2.js'
+import { fromEmployee, mergeRecordVersions, tableChangeToPatch } from './dataServiceV2.js'
 
 describe('mapeo de empleados desde tablas V2', () => {
   it('expone la vinculación Auth necesaria para auditar la preparación RLS', () => {
@@ -10,6 +10,24 @@ describe('mapeo de empleados desde tablas V2', () => {
 
     expect(employee.authId).toBe('11111111-1111-4111-8111-111111111111')
     expect(employee.pin).toBe('pbkdf2:salt:hash')
+  })
+})
+
+describe('reconciliación tabla/blob de jornadas', () => {
+  it('conserva una validación más reciente de la tabla', () => {
+    const merged = mergeRecordVersions(
+      { id:'r1', aceptada:true, validado:true, rechazado:false, _upd:'2026-07-21T12:01:00Z' },
+      { id:'r1', aceptada:false, validado:false, rechazado:false, _upd:'2026-07-21T12:00:00Z' },
+    )
+    expect(merged).toMatchObject({ aceptada:true, validado:true, rechazado:false })
+  })
+
+  it('conserva una edición offline cuando el blob es realmente más reciente', () => {
+    const merged = mergeRecordVersions(
+      { id:'r1', fin:'2026-07-21T16:00:00Z', _upd:'2026-07-21T16:00:00Z' },
+      { id:'r1', fin:'2026-07-21T16:10:00Z', _upd:'2026-07-21T16:10:00Z' },
+    )
+    expect(merged.fin).toBe('2026-07-21T16:10:00Z')
   })
 })
 

@@ -2,6 +2,7 @@
 import { calcMin, ftime, recWorkSecs, mhm } from '../../utils/time.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
+import { recordValidationState } from '../../utils/recordValidation.js'
 
 export function HistorialReciente({ histWithRecs, openModal, u }) {
   const [open, setOpen] = useState(false)
@@ -37,13 +38,15 @@ export function HistorialReciente({ histWithRecs, openModal, u }) {
                 </div>
                 {recs.map(r => {
                   const wm = Math.floor(recWorkSecs(r) / 60)
+                  const validationState = recordValidationState(r)
                   return (
                     <div key={r.id} style={{ paddingTop:4, borderTop:`1px solid ${colors.border.subtle}` }}>
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:colors.text[500], gap:8, flexWrap:'wrap' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                           <span>{ftime(r.inicio)} → {r.fin ? ftime(r.fin) : '—'}</span>
-                          {!r.aceptada && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.orange} 7%, transparent)`, color:colors.semantic.orange, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
-                          {r.aceptada  && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.green} 7%, transparent)`, color:colors.semantic.green, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                          {validationState === 'pending' && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.orange} 7%, transparent)`, color:colors.semantic.orange, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>⏳ Por validar</span>}
+                          {validationState === 'approved' && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.green} 7%, transparent)`, color:colors.semantic.green, border:`1px solid color-mix(in srgb, ${colors.semantic.green} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>✓ Validada</span>}
+                          {validationState === 'rejected' && <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:8, background:`color-mix(in srgb, ${colors.semantic.red} 7%, transparent)`, color:colors.semantic.red, border:`1px solid color-mix(in srgb, ${colors.semantic.red} 19%, transparent)`, textTransform:'uppercase', letterSpacing:'.3px' }}>✕ Rechazada</span>}
                         </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                           <span style={{ fontWeight:600 }}>{mhm(wm)}</span>
