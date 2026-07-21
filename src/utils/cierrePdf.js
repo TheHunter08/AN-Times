@@ -1,5 +1,5 @@
 import { mhm, p2, recWorkSecs } from './time.js'
-import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal } from './pdfReport.js'
+import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawDocumentFooters, addReportPage } from './pdfReport.js'
 import { WM } from '../config/workRules.js'
 
 async function sha256Hex(str) {
@@ -55,11 +55,23 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
 
+  let pageNum = 1
+  const newPage = ({ withTable = false, section = 'Detalle de jornadas' } = {}) => {
+    pageNum++
+    ;({ page, y } = addReportPage(pdfDoc, {
+      ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors, fontR, fontB,
+      empresa: empresa || 'TIMES INC',
+      title: 'CIERRE MENSUAL DE JORNADA',
+      subtitle: `${cierre.empName} · ${mesLabel} · ${section}`,
+    }))
+    if (withTable) y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
+  }
+
   const recs = cierre.records_snapshot || []
   const totalMin = Math.floor(recs.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
   const extraMin = Math.max(0, totalMin - WM)
   recs.forEach((r, i) => {
-    if (y - ROW_H < 140) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+    if (y - ROW_H < 140) newPage({ withTable: true })
     const d = new Date(r.inicio)
     const wm = Math.floor(recWorkSecs(r) / 60)
     const vals = [
@@ -71,7 +83,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
     y = drawTableDataRow(page, { ml:ML, cw:CW, y, vals, cols:COLS, striped: i%2!==0, colors, fontR, fontB, highlightIdx:3, rowH:ROW_H })
   })
 
-  if (y - 90 < 30) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+  if (y - 90 < 30) newPage({ section: 'Resumen mensual' })
   y -= 12
   page.drawRectangle({ x:ML, y:y-38, width:CW, height:38, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
   page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  EXTRA MES: ${mhm(extraMin)}  ·  ${cierre.dias} día${cierre.dias!==1?'s':''}`), { x:ML+10, y:y-22, size:10, font:fontB, color:colors.pri })
@@ -79,11 +91,11 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
 
   const corrections = recs.flatMap(record => (record.correcciones || []).map(correction => ({ record, correction })))
   if (corrections.length) {
-    if (y - 42 < 100) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+    if (y - 42 < 100) newPage({ section: 'Historial de modificaciones' })
     page.drawText(`HISTORIAL DE MODIFICACIONES (${corrections.length})`, { x:ML, y, size:8, font:fontB, color:colors.pri })
     y -= 14
     corrections.forEach(({ record, correction }) => {
-      if (y - 38 < 100) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+      if (y - 38 < 100) newPage({ section: 'Historial de modificaciones' })
       const oldIn = correction.oldInicio ? new Date(correction.oldInicio).toLocaleString('es-ES') : '—'
       const oldOut = correction.oldFin ? new Date(correction.oldFin).toLocaleString('es-ES') : '—'
       const newIn = correction.newInicio ? new Date(correction.newInicio).toLocaleString('es-ES') : '—'
@@ -97,6 +109,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
     y -= 8
   }
 
+  if (y - 90 < 30) newPage({ section: 'Firma del trabajador' })
   page.drawText('FIRMA DEL TRABAJADOR', { x:ML, y:y-11, size:7, font:fontB, color:colors.gray })
   await drawSignatureBlock(pdfDoc, page, {
     x: ML, y, width: 150, colors, fontR, fontB,
@@ -107,7 +120,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
     sublabel: cierre.firma ? 'Firma verificada' : null,
   })
 
-  drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
+  drawDocumentFooters(pdfDoc, { ml:ML, cw:CW, colors, fontR })
 
   // Hash de integridad SHA-256: firma los datos clave del documento
   // para que inspección de trabajo pueda verificar que no ha sido alterado.
@@ -158,12 +171,24 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
 
   y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
 
+  let pageNum = 1
+  const newPage = ({ withTable = false, section = 'Resumen por empleado' } = {}) => {
+    pageNum++
+    ;({ page, y } = addReportPage(pdfDoc, {
+      ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors, fontR, fontB,
+      empresa: empresa || 'TIMES INC',
+      title: 'CIERRE MENSUAL CONSOLIDADO',
+      subtitle: `${mesLabel} · ${cierres.length} empleados · ${section}`,
+    }))
+    if (withTable) y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:COLS, colors, fontB, headH:HEAD_H })
+  }
+
   let totalMin = 0
   let totalExtraMin = 0
   let firmadosCount = 0
   let correctionCount = 0
   cierres.forEach((c, i) => {
-    if (y - ROW_H < 60) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+    if (y - ROW_H < 60) newPage({ withTable: true })
     totalMin += c.totalMin || 0
     const employeeExtraMin = Math.max(0, (c.totalMin || 0) - WM)
     totalExtraMin += employeeExtraMin
@@ -181,14 +206,14 @@ export async function buildCierreConsolidadoPDF({ cierres, mes, empresa }) {
     y = yAfter
   })
 
-  if (y - 44 < 30) { page = pdfDoc.addPage([PW, PH]); y = PH - 50 }
+  if (y - 44 < 30) newPage({ section: 'Totales de empresa' })
   y -= 14
   page.drawRectangle({ x:ML, y:y-44, width:CW, height:44, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
   page.drawText(`TOTAL EMPRESA: ${mhm(totalMin)}  ·  EXTRA MES: ${mhm(totalExtraMin)}`, { x:ML+10, y:y-19, size:10, font:fontB, color:colors.pri })
   page.drawText(pdfSafe(`${firmadosCount} de ${cierres.length} cierres firmados`), { x:ML+10, y:y-34, size:8.5, font:fontR, color: firmadosCount===cierres.length ? colors.green : colors.orange })
   if (correctionCount) page.drawText(pdfSafe(`${correctionCount} modificación${correctionCount!==1?'es':''} con trazabilidad incluida${correctionCount!==1?'s':''}`), { x:ML+250, y:y-34, size:8, font:fontB, color:colors.orange, maxWidth:CW-260 })
 
-  drawFooterLegal(page, { ml:ML, cw:CW, colors, fontR })
+  drawDocumentFooters(pdfDoc, { ml:ML, cw:CW, colors, fontR })
 
   const bytes = await pdfDoc.save()
   const dataUrl = 'data:application/pdf;base64,' + arrayBufferToBase64(bytes)

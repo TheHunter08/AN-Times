@@ -115,10 +115,23 @@ function excelValue(value) {
   return String(value ?? '')
 }
 
+function normalizedLabel(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+function excelStatusStyle(value) {
+  const status = normalizedLabel(value)
+  if (/valid|aprobad|firmad|completad/.test(status)) return { textColor:'#047857', backgroundColor:'#ECFDF5', fontWeight:'bold' }
+  if (/rechaz|anulad|incidencia|error/.test(status)) return { textColor:'#B91C1C', backgroundColor:'#FEF2F2', fontWeight:'bold' }
+  if (/pendiente|sin firma|por validar/.test(status)) return { textColor:'#B45309', backgroundColor:'#FFFBEB', fontWeight:'bold' }
+  return null
+}
+
 export async function buildXlsxBlob(headers, rows, sheetName = 'Informe') {
   const writeXlsxFile = (await import('write-excel-file/browser')).default
   const safeHeaders = (headers || []).map(value => String(value ?? ''))
   const safeRows = (rows || []).map(row => safeHeaders.map((_, index) => excelValue(row?.[index])))
+  const statusColumn = safeHeaders.findIndex(header => /estado|validacion/.test(normalizedLabel(header)))
   const widths = safeHeaders.map((header, column) => {
     const longest = Math.max(header.length, ...safeRows.slice(0, 300).map(row => String(row[column] ?? '').length))
     return { width:Math.min(45, Math.max(12, longest + 2)) }
@@ -127,17 +140,21 @@ export async function buildXlsxBlob(headers, rows, sheetName = 'Informe') {
     value, fontWeight:'bold', textColor:'#FFFFFF', backgroundColor:BRAND.primary,
     borderColor:BRAND.primaryDark, borderStyle:'thin', alignVertical:'center', wrap:true, height:30,
   }))
-  const dataRows = safeRows.map((row, rowIndex) => row.map(value => ({
-    value,
-    backgroundColor:rowIndex % 2 ? BRAND.stripe : '#FFFFFF',
-    borderColor:BRAND.border,
-    bottomBorderColor:BRAND.border,
-    bottomBorderStyle:'thin',
-    textColor:BRAND.ink,
-    alignVertical:'top',
-    wrap:true,
-    height:22,
-  })))
+  const dataRows = safeRows.map((row, rowIndex) => row.map((value, columnIndex) => {
+    const statusStyle = columnIndex === statusColumn ? excelStatusStyle(value) : null
+    return {
+      value,
+      backgroundColor:statusStyle?.backgroundColor || (rowIndex % 2 ? BRAND.stripe : '#FFFFFF'),
+      borderColor:BRAND.border,
+      bottomBorderColor:BRAND.border,
+      bottomBorderStyle:'thin',
+      textColor:statusStyle?.textColor || BRAND.ink,
+      fontWeight:statusStyle?.fontWeight,
+      alignVertical:'top',
+      wrap:true,
+      height:22,
+    }
+  }))
   return writeXlsxFile([headerRow, ...dataRows], {
     sheet:cleanSheetName(sheetName),
     columns:widths,

@@ -102,6 +102,24 @@ export function drawFooterLegal(page, { ml, cw, colors, fontR, y = 24 }) {
   )
 }
 
+// Añade el pie legal y la numeración a todas las páginas del documento.
+// startPage permite omitir una portada que ya tenga su propio pie.
+export function drawDocumentFooters(pdfDoc, { ml, cw, colors, fontR, startPage = 0 }) {
+  const pages = pdfDoc.getPages()
+  pages.forEach((page, index) => {
+    if (index < startPage) return
+    drawFooterLegal(page, { ml, cw: cw - 80, colors, fontR })
+    const label = `Página ${index + 1} de ${pages.length}`
+    page.drawText(label, {
+      x: ml + cw - fontR.widthOfTextAtSize(label, 5.5),
+      y: 24,
+      size: 5.5,
+      font: fontR,
+      color: colors.gray,
+    })
+  })
+}
+
 // Añade una página nueva con la banda de cabecera (empresa + título + subtítulo + nº de página).
 // Devuelve { page, y } con y ya posicionado justo debajo de la banda.
 export function addReportPage(pdfDoc, { ml, mr, cw, pw, ph, empresa, title, subtitle, pageNum, colors, fontR, fontB }) {

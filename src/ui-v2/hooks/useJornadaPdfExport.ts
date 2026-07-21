@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { today, calcMin, recWorkSecs, wkStart, p2, ftime, mhm, monthlyExtras, localDateStr } from '../../utils/time.js'
 import { WM } from '../../config/constants.js'
-import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawFooterLegal, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
+import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawDocumentFooters, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
 
 export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => void) {
   const [informeUrl, setInformeUrl] = useState<string | null>(null)
@@ -46,27 +46,21 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
         { label: 'Centro / Obra', w: 279 }, { label: 'Horas netas', w: 70 },
       ]
       const ROW_H = 15, HEAD_H = 17
-      const cPri = rgb(0.36, 0.38, 0.82), cPriLt = rgb(0.94, 0.93, 1.0)
-      const cDark = rgb(0.10, 0.10, 0.15), cGray = rgb(0.45, 0.45, 0.50)
-      const cWhite = rgb(1, 1, 1)
-      let page = pdfDoc.addPage([PW, PH])
-      let y = PH - 45
-      page.drawText('INFORME DE JORNADA — RANGO', { x: ML, y, size: 13, font: fontB, color: cPri })
-      y -= 18
-      page.drawText(safe(u.name), { x: ML, y, size: 10, font: fontB, color: cDark })
-      y -= 14
-      page.drawText(`Período: ${rangeLabel}`, { x: ML, y, size: 8, font: fontR, color: cGray })
-      y -= 18
-      let cx = ML
-      COLS.forEach(col => {
-        page.drawRectangle({ x: cx, y: y - HEAD_H + 3, width: col.w, height: HEAD_H, color: cPri })
-        page.drawText(col.label, { x: cx + 4, y: y - HEAD_H + 8, size: 7, font: fontB, color: cWhite, maxWidth: col.w - 8 })
-        cx += col.w
-      })
-      y -= HEAD_H
+      const pdfCols = pdfColors(rgb)
+      let page: any, y = 0, pageNum = 0
+      const newPage = () => {
+        pageNum++
+        ;({ page, y } = addReportPage(pdfDoc, {
+          ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors: pdfCols, fontR, fontB,
+          empresa: u.empresa || 'TIMES INC',
+          title: 'INFORME DE JORNADA - RANGO',
+          subtitle: `Trabajador: ${u.name} · Período: ${rangeLabel}`,
+        }))
+        y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: COLS, colors: pdfCols, fontB, headH: HEAD_H })
+      }
+      newPage()
       rangeRecs.forEach((r: any, idx: number) => {
-        if (y - ROW_H < 50) { page = pdfDoc.addPage([PW, PH]); y = PH - 45 }
-        if (idx % 2 === 0) page.drawRectangle({ x: ML, y: y - ROW_H + 3, width: CW, height: ROW_H, color: cPriLt })
+        if (y - ROW_H < 50) newPage()
         const d = new Date(r.inicio)
         const cols2 = [
           `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`,
@@ -75,15 +69,11 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
           safe(r.centro || ''),
           mhm(calcMin(r)),
         ]
-        let cx2 = ML
-        cols2.forEach((val, ci) => {
-          page.drawText(val, { x: cx2 + 4, y: y - ROW_H + 7, size: 7, font: fontR, color: cDark, maxWidth: COLS[ci].w - 8 })
-          cx2 += COLS[ci].w
-        })
-        y -= ROW_H
+        y = drawTableDataRow(page, { ml: ML, cw: CW, y, vals: cols2, cols: COLS, striped: idx % 2 !== 0, colors: pdfCols, fontR, fontB, highlightIdx: 4, rowH: ROW_H })
       })
       y -= 10
-      page.drawText(`Total: ${mhm(totalMin2)} en ${rangeRecs.length} registros`, { x: ML, y, size: 9, font: fontB, color: cPri })
+      page.drawText(`Total: ${mhm(totalMin2)} en ${rangeRecs.length} registros`, { x: ML, y, size: 9, font: fontB, color: pdfCols.pri })
+      drawDocumentFooters(pdfDoc, { ml: ML, cw: CW, colors: pdfCols, fontR })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       setInformeBlob(blob)
@@ -119,7 +109,8 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       ]
       const ROW_H = 15, HEAD_H = 17, SIG_AREA = 110
       const cGreen = pdfCols.green
-      let page: any, y = 0, pageNum = 0
+      // La portada es la página 1; el primer bloque de detalle empieza en la 2.
+      let page: any, y = 0, pageNum = 1
       const newPage = () => {
         pageNum++
         const obras = u.obrasAsignadas?.length ? u.obrasAsignadas.join(', ') : (u.centroTrabajo || '-')
@@ -210,7 +201,7 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
       const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
       const shortHash = hashHex.slice(0, 16) + '…'
-      drawFooterLegal(page, { ml: ML, cw: CW, colors: pdfCols, fontR })
+      drawDocumentFooters(pdfDoc, { ml: ML, cw: CW, colors: pdfCols, fontR, startPage: 1 })
       page.drawText(`SHA-256: ${shortHash}  ·  Generado: ${new Date().toLocaleString('es-ES')}`, { x: ML, y: 20, size: 5.5, font: fontR, color: pdfCols.gray, maxWidth: CW })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
@@ -293,7 +284,7 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
         label: responsableNombreW,
         sublabel: undefined,
       })
-      drawFooterLegal(page, { ml: ML, cw: CW, colors: pdfCols, fontR })
+      drawDocumentFooters(pdfDoc, { ml: ML, cw: CW, colors: pdfCols, fontR })
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       setInformeBlob(blob)
