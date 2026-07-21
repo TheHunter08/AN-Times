@@ -29,6 +29,7 @@ import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribu
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
 import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
+import { downloadHoursReportXlsx } from '../utils/hoursReportXlsx.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords, getScopedEmployees } from '../utils/supervisorScope.js'
@@ -1308,35 +1309,28 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const [year, mon] = mes.split('-')
     const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
-    const headers = ['Empleado', 'Centro', 'Fecha', 'Entrada', 'Salida', 'Horas trabajadas', 'Descanso (min)', 'Modificado', 'Historial de cambios']
-    const rows = recs.map((r: any) => {
-      const emp = emps.find((e: any) => e.id === r.empId)
-      // recWorkSecs ya descuenta el descanso del tiempo trabajado (calcSecs:
-      // work = transcurrido - descanso) — restar brk aquí otra vez descontaba
-      // la pausa dos veces, mostrando menos horas trabajadas de las reales
-      // (y horas negativas en turnos cortos con más pausa que trabajo neto).
-      const brk = Math.round((r.breakSecs || 0) / 60)
-      const worked = Math.round(recWorkSecs(r) / 60)
-      // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
-      // guarda en UTC — un fichaje nocturno mostraba la fecha del día siguiente.
-      return [
-        emp?.name || r.empName || r.empId || '',
-        r.centro || emp?.centroTrabajo || '',
-        localDateStr(new Date(r.inicio)),
-        new Date(r.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        new Date(r.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        `${Math.floor(worked / 60)}h ${worked % 60}m`,
-        String(brk),
-        r.correcciones?.length ? 'Sí' : 'No',
-        (r.correcciones || []).map((c: any) => `${c.ts || ''} · ${c.by || '—'} · ${c.motivo || 'Sin motivo'} · ${c.device || 'Dispositivo no registrado'} · ${c.oldInicio || '—'}–${c.oldFin || '—'} → ${c.newInicio || '—'}–${c.newFin || '—'}`).join(' | '),
-      ]
-    })
+    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && (!e.baja || recs.some((record: any) => record.empId === e.id)))
     try {
-      await downloadXlsx(headers, rows, `fichajes-${mes}.xlsx`, `Fichajes ${label}`)
-      toast(`Excel descargado — ${label}`, 3000, 'ok')
+      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees:emps, records:recs, closures:db.cierres || [] }, `informe-horas-general-${mes}.xlsx`)
+      toast(`Excel general completo descargado — ${label}`, 3000, 'ok')
     } catch (error: any) {
       toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err')
+    }
+  }
+
+  const handleDownloadEmployeeExcel = async (mes: string, employeeId: string) => {
+    const [year, mon] = mes.split('-')
+    const label = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('es-ES', { month:'long', year:'numeric' })
+    const employees = (db.employees || []).filter((employee: any) => !employee.isAdmin)
+    const employee = employees.find((item: any) => item.id === employeeId)
+    if (!employee) return
+    const recs = (db.records || []).filter((record: any) => record.inicio && record.fin && record.empId === employeeId && localMonthKey(record.inicio) === mes)
+    const safeName = String(employee.name || employee.id).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '')
+    try {
+      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees, records:recs, closures:db.cierres || [], employeeId }, `informe-horas-${safeName}-${mes}.xlsx`)
+      toast(`Informe individual descargado — ${employee.name}`, 3000, 'ok')
+    } catch (error: any) {
+      toast(`No se pudo generar el informe individual: ${error?.message || 'error desconocido'}`, 6000, 'err')
     }
   }
 
@@ -1468,8 +1462,12 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       generatedOn: label,
       onDownload: handleDownload,
       onDownloadExcel: handleDownloadExcel,
+      onDownloadEmployeeExcel: handleDownloadEmployeeExcel,
+      employees:(db.employees || [])
+        .filter((employee: any) => !employee.isAdmin && (!employee.baja || recs.some((record: any) => record.empId === employee.id)))
+        .map((employee: any) => ({ id:employee.id, name:employee.name || employee.id })),
     }
-  }), [months, db.records])
+  }), [months, db.records, db.employees, db.cierres])
 
   return <Reports rows={rows} compliance={compliance} onExportInspection={handleExportInspection} onExportAudit={handleExportAudit} onExportPayroll={handleExportPayroll} onNavigate={onNavigate} />
 }

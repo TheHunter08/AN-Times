@@ -110,8 +110,13 @@ test('descarga informes mensuales reales en PDF y Excel', async ({ page }) => {
   await expect(reportRow).toHaveCount(1)
 
   const excelDownload = page.waitForEvent('download')
-  await reportRow.getByRole('button', { name:'Excel', exact:true }).click()
-  expect((await excelDownload).suggestedFilename()).toBe('fichajes-2026-07.xlsx')
+  await reportRow.getByRole('button', { name:'Excel general', exact:true }).click()
+  expect((await excelDownload).suggestedFilename()).toBe('informe-horas-general-2026-07.xlsx')
+
+  await reportRow.getByText('Individual', { exact:true }).click()
+  const individualDownload = page.waitForEvent('download')
+  await reportRow.getByRole('button', { name:'Empleado Prueba', exact:true }).click()
+  expect((await individualDownload).suggestedFilename()).toBe('informe-horas-Empleado-Prueba-2026-07.xlsx')
 
   const pdfDownload = page.waitForEvent('download')
   await reportRow.getByRole('button', { name:'PDF', exact:true }).click()
