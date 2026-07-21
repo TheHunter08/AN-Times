@@ -258,6 +258,14 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             </div>
           </div>
         )}
+        {!form.centroTrabajo && form.obrasAsignadas.length === 0 && (obras.length > 0 || centros.length > 0) && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px', borderRadius: 10, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)' }}>
+            <span style={{ fontSize: 15, lineHeight: 1 }}>⚠️</span>
+            <span style={{ fontSize: 12, color: colors.text[700], lineHeight: 1.4 }}>
+              Sin centro de trabajo ni obra asignada, este empleado no será visible en "En línea" para ningún jefe de obra o encargado, aunque fiche su jornada.
+            </span>
+          </div>
+        )}
         <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
           {isEdit ? 'Guardar cambios' : 'Crear empleado'}
         </button>
