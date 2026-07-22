@@ -2228,8 +2228,31 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const [radio, setRadio] = useState(String(initial?.radio || 200))
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
+  const [locating, setLocating] = useState(false)
   const dialogRef = useDialogA11y(true, onClose)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { toast('Este dispositivo no permite geolocalización', 3000, 'warn'); return }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setLocating(false)
+        const lat = +pos.coords.latitude.toFixed(5)
+        const lng = +pos.coords.longitude.toFixed(5)
+        setCoords(`${lat},${lng}`)
+        toast('Ubicación detectada — revisa el mapa antes de guardar', 3000, 'ok')
+      },
+      error => {
+        setLocating(false)
+        const msg = error.code === error.PERMISSION_DENIED
+          ? 'Permiso de ubicación denegado — actívalo en los ajustes del navegador'
+          : 'No se pudo obtener tu ubicación — introduce las coordenadas manualmente'
+        toast(msg, 4500, 'warn')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }
 
   const handleSave = () => {
     if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
@@ -2271,7 +2294,28 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
         </div>
         <div>
           <div style={labelStyle}>Coordenadas GPS (opcional)</div>
-          <input value={coords} onChange={e => setCoords(e.target.value)} aria-label="Coordenadas GPS" placeholder="Ej: 18.4861,-69.9312" style={fieldStyle} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={coords} onChange={e => setCoords(e.target.value)} aria-label="Coordenadas GPS" placeholder="Ej: 18.4861,-69.9312" style={{ ...fieldStyle, flex: 1 }} />
+            <button
+              type="button"
+              onClick={useMyLocation}
+              disabled={locating}
+              aria-label="Usar mi ubicación actual"
+              title="Usar mi ubicación actual"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, padding: '9px 10px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: locating ? colors.bg[600] : colors.primary.dim, color: colors.primary.light, cursor: locating ? 'wait' : 'pointer', flexShrink: 0 }}
+            >
+              <IconMapPin width={16} height={16} />
+            </button>
+          </div>
+          {normalizeObraCoords(coords) && (
+            <a
+              href={`https://www.google.com/maps?q=${normalizeObraCoords(coords)!.lat},${normalizeObraCoords(coords)!.lng}`}
+              target="_blank" rel="noreferrer"
+              style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: colors.primary.light, textDecoration: 'underline' }}
+            >
+              Ver en el mapa para comprobar la ubicación →
+            </a>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div>
