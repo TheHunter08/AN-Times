@@ -47,6 +47,7 @@ interface OperationsProps {
   onDeleteSchedule: (id: string) => void
   onChangeWidgets: (ids: string[]) => void
   onNavigate: (page: string) => void
+  onReviewEmployee: (employeeId: string) => void
 }
 
 const WIDGETS = [
@@ -139,7 +140,7 @@ export function Operations(props: OperationsProps) {
         ) : (
           <div className="ti-operations__blockers">
             {props.launchBlockers.map(blocker => (
-              <button key={blocker.employeeId} type="button" onClick={() => props.onNavigate('empleados')} aria-label={`Revisar ${blocker.employeeName}: ${blocker.issues.join(', ')}`}>
+              <button key={blocker.employeeId} type="button" onClick={() => props.onReviewEmployee(blocker.employeeId)} aria-label={`Revisar ${blocker.employeeName}: ${blocker.issues.join(', ')}`}>
                 <strong>{blocker.employeeName}</strong>
                 <span>{blocker.issues.map(issue => <small key={issue}>{issue}</small>)}</span>
                 <b>Revisar perfil →</b>

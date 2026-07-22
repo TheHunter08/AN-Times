@@ -682,7 +682,7 @@ function NotificationsPage({ onNavigate }: { onNavigate: (page: string) => void 
   return <Notifications items={items} onMarkRead={markRead} onMarkAllRead={markAllRead} onDismiss={dismiss} onOpen={item => { markRead(item.id); onNavigate(item.destination || 'auditoria') }} />
 }
 
-function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) => void }) {
+function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed }: { onViewTimesheets?: (id: string) => void; initialEditId?: string | null; onInitialEditConsumed?: () => void }) {
   const rows   = useEmployeesData()
   const db     = useAppStore(s => s.db) as any
   const [modal, setModal] = useState<{ mode: 'create' } | { mode: 'edit'; emp: EmpForm } | null>(null)
@@ -703,6 +703,12 @@ function EmployeesPage({ onViewTimesheets }: { onViewTimesheets?: (id: string) =
       vacacionesExtra: emp.vacacionesExtra || 0,
     }})
   }
+
+  useEffect(() => {
+    if (!initialEditId) return
+    openEdit(initialEditId)
+    onInitialEditConsumed?.()
+  }, [initialEditId])
 
   return (
     <>
@@ -2473,7 +2479,7 @@ function MessagesPage() {
   return <Messages conversations={conversations} adminName={adminName} onSend={handleSend} onSelectConversation={handleMarkRead} />
 }
 
-function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: string) => void; onReviewEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const saveDB = useAppStore(s => s.saveDB)
   const toast = useAppStore(s => s.toast)
@@ -2548,6 +2554,7 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     onDeleteSchedule={(id: string) => updateConfig({ reportSchedules: schedules.filter((schedule: any) => schedule.id !== id) })}
     onChangeWidgets={(ids: string[]) => updateConfig({ adminDashboard: { ...(db.config?.adminDashboard || {}), visibleWidgets: ids } })}
     onNavigate={onNavigate}
+    onReviewEmployee={onReviewEmployee}
   />
 }
 
@@ -2574,6 +2581,7 @@ export default function AppV2Admin() {
   ) as any
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
+  const [employeeEditId, setEmployeeEditId] = useState<string | null>(null)
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
   const [manualSyncing, setManualSyncing] = useState(false)
   const [showAI, setShowAI] = useState(false)
@@ -2667,7 +2675,7 @@ export default function AppV2Admin() {
     const page = effectivePage
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
     if (page === 'pendientes')     return <PendingCenterPage onNavigate={setAdminPage} />
-    if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} />
+    if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} initialEditId={employeeEditId} onInitialEditConsumed={() => setEmployeeEditId(null)} />
     if (page === 'en_linea')       return <OnlineTeamPage onOpenEmployee={goToFichajes} />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
     if (page === 'planning')       return <PlanningPage onOpenEmployee={goToFichajes} />
@@ -2686,7 +2694,7 @@ export default function AppV2Admin() {
     if (page === 'auditoria')      return <AuditPage onNavigate={setAdminPage} />
     if (page === 'obras')          return <ObrasPage onNavigate={setAdminPage} />
     if (page === 'centros')        return <CentrosPage />
-    if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} />
+    if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} onReviewEmployee={employeeId => { setEmployeeEditId(employeeId); setAdminPage('empleados') }} />
     return null
   }
 

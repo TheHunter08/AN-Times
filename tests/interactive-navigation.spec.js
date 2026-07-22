@@ -89,6 +89,8 @@ test('el centro operativo identifica cada perfil incompleto', async ({ page }) =
   await expect(blocker).toBeVisible()
   await blocker.click()
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
+  await expect(page.getByText('Editar empleado', { exact:true })).toBeVisible()
+  await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Empleado Prueba')
 })
 
 test('solicitudes, gastos y documentos abren su contexto', async ({ page }) => {
