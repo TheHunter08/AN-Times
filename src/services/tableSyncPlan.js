@@ -6,6 +6,39 @@ export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo']
 export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
 
+function valuesEqual(before, after) {
+  if (before === after) return true
+  try { return JSON.stringify(before) === JSON.stringify(after) } catch { return false }
+}
+
+function changedArrayIds(before, after) {
+  if (!Array.isArray(after)) return null
+  const previous = new Map((Array.isArray(before) ? before : []).map(item => [String(item?.id ?? ''), item]))
+  const ids = []
+  for (const item of after) {
+    const id = String(item?.id ?? '')
+    if (!id) continue
+    if (!valuesEqual(previous.get(id), item)) ids.push(id)
+  }
+  return ids
+}
+
+// saveDB recibe a veces un parche pequeño y otras veces una copia completa de
+// db. Comparar contra el estado anterior evita interpretar esa copia completa
+// como si todas las tablas hubieran cambiado. Para las colecciones granulares
+// se conservan además los ids exactos tocados.
+export function buildSyncHint(before, partial) {
+  const changedKeys = []
+  const entityIds = {}
+  for (const [key, value] of Object.entries(partial || {})) {
+    if (key === '_ts' || key === '_serverTs' || valuesEqual(before?.[key], value)) continue
+    changedKeys.push(key)
+    const ids = changedArrayIds(before?.[key], value)
+    if (ids) entityIds[key] = ids
+  }
+  return { changedKeys, entityIds, recordIds: entityIds.records || [] }
+}
+
 export function entityRowId(collection, entityId) {
   return `${collection}:${entityId}`
 }
@@ -113,13 +146,19 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
   const cutoff = new Date(now - 48 * 60 * 60 * 1000).toISOString()
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? new Set(syncHint.changedKeys) : null
   const recordIds = Array.isArray(syncHint?.recordIds) ? new Set(syncHint.recordIds) : null
+  const hintedIds = collection => Array.isArray(syncHint?.entityIds?.[collection])
+    ? new Set(syncHint.entityIds[collection])
+    : null
   const includes = key => !changedKeys || changedKeys.has(key)
   const deletedRecords = new Set(deleted?.records ?? [])
   const deletedVacations = new Set(deleted?.vacaciones ?? [])
   const deletedClosures = new Set(deleted?.cierres ?? [])
   const deletedWorksites = new Set(deleted?.obras ?? [])
-  const employees = (db.employees ?? []).filter(e => hasValue(e?.id) && hasValue(e?.name))
-  const employeeIds = new Set(employees.map(e => e.id))
+  const employeeHintIds = hintedIds('employees')
+  const allEmployees = (db.employees ?? []).filter(e => hasValue(e?.id) && hasValue(e?.name))
+  const employeeIds = new Set(allEmployees.map(e => e.id))
+  const employeeCandidates = (db.employees ?? []).filter(e => !employeeHintIds || employeeHintIds.has(String(e?.id)))
+  const employees = employeeCandidates.filter(e => hasValue(e?.id) && hasValue(e?.name))
   const recordCandidates = (db.records ?? []).filter(
     r => includes('records') && (!recordIds || recordIds.has(r?.id)) && !deletedRecords.has(r?.id) && (!r?.fin || !r?._upd || r._upd > cutoff)
   )
@@ -129,19 +168,26 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
   // El blob legacy puede contener solicitudes antiguas incompletas. La tabla
   // normalizada aplica constraints más estrictas; esas filas se conservan en
   // el blob, pero no deben bloquear la sincronización de todos los fichajes.
-  const vacationCandidates = (db.vacaciones ?? []).filter(v => includes('vacaciones') && !deletedVacations.has(v?.id))
+  const vacationHintIds = hintedIds('vacaciones')
+  const vacationCandidates = (db.vacaciones ?? []).filter(v => includes('vacaciones') && (!vacationHintIds || vacationHintIds.has(String(v?.id))) && !deletedVacations.has(v?.id))
   const vacations = vacationCandidates.filter(v =>
     hasValue(v?.id) &&
     employeeIds.has(v?.empId) &&
     isDateValue(v?.fechaInicio ?? v?.desde)
   )
-  const closureCandidates = (db.cierres ?? []).filter(c => includes('cierres') && !deletedClosures.has(c?.id))
+  const closureHintIds = hintedIds('cierres')
+  const closureCandidates = (db.cierres ?? []).filter(c => includes('cierres') && (!closureHintIds || closureHintIds.has(String(c?.id))) && !deletedClosures.has(c?.id))
   const closures = closureCandidates.filter(c =>
     hasValue(c?.id) && employeeIds.has(c?.empId) && hasValue(c?.mes)
   )
-  const worksiteCandidates = (db.obras ?? []).filter(o => includes('obras') && !deletedWorksites.has(o?.id))
+  const worksiteHintIds = hintedIds('obras')
+  const worksiteCandidates = (db.obras ?? []).filter(o => includes('obras') && (!worksiteHintIds || worksiteHintIds.has(String(o?.id))) && !deletedWorksites.has(o?.id))
   const worksites = worksiteCandidates.filter(o => hasValue(o?.id) && hasValue(o?.nombre))
-  const entityRows = toEntityRows(db, nowIso).filter(row => includes(row.collection))
+  const entityRows = toEntityRows(db, nowIso).filter(row => {
+    if (!includes(row.collection)) return false
+    const ids = hintedIds(row.collection)
+    return !ids || ids.has(String(row.entity_id))
+  })
 
   return {
     upserts: [
@@ -153,7 +199,7 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
       { table: 'app_entities', rows: entityRows },
     ],
     skipped: {
-      employees: includes('employees') ? (db.employees ?? []).length - employees.length : 0,
+      employees: includes('employees') ? employeeCandidates.length - employees.length : 0,
       records: recordCandidates.length - recentRecords.length,
       vacaciones: vacationCandidates.length - vacations.length,
       cierres: closureCandidates.length - closures.length,

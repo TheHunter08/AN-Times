@@ -5,6 +5,7 @@ import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
 import { normalizeToastOptions } from '../utils/toastOptions.js'
 import { pruneDbRetention } from '../utils/dbRetention.js'
+import { buildSyncHint } from '../services/tableSyncPlan.js'
 
 const storedSes = (() => {
   try {
@@ -72,31 +73,38 @@ export const useAppStore = create((set, get) => ({
     let deleted
     let syncHint
     let priorityRecords = []
+    let skipNetwork = false
     set(state => {
       const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
-      const changedKeys = Object.keys(partial || {}).filter(key => key !== '_ts' && key !== '_serverTs')
+      syncHint = buildSyncHint(state.db, partial)
       if (Array.isArray(partial?.records)) {
-        const previous = new Map((state.db.records || []).map(record => [record.id, record]))
-        priorityRecords = partial.records.filter(record => {
-          const old = previous.get(record?.id)
-          return record?.id && (!old || (old !== record && JSON.stringify(old) !== JSON.stringify(record)))
-        })
+        const changedRecordIds = new Set(syncHint.recordIds)
+        priorityRecords = partial.records.filter(record => record?.id && changedRecordIds.has(String(record.id)))
       }
-      syncHint = { changedKeys, recordIds: priorityRecords.map(record => record.id) }
       deleted = _diffDeleted(state.db, partial)
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
       const retained = pruneDbRetention(merged)
       merged = retained.db
       deleted = mergePendingDeletes(deleted, retained.deleted)
+      if (retained.deleted) {
+        const retentionKeys = Object.keys(retained.deleted)
+        syncHint.changedKeys = [...new Set([...syncHint.changedKeys, ...retentionKeys])]
+        for (const key of retentionKeys) syncHint.entityIds[key] ||= []
+      }
       // Incluye los tombstones de la retencion automatica: asi las filas
       // antiguas tampoco resucitan desde app_entities ni consumen cuota.
       recordTombstones(deleted)
       saveLocal(merged)
+      skipNetwork = !syncHint?.changedKeys?.length && !deleted
+      if (skipNetwork) return { db:merged }
       // offlinePending: true si no hay red, o si ya había un guardado pendiente anterior
       // (evita que el timer cada 30s lo resetee a false en señal débil, lo que hacía
       // parpadear el banner "Modo sin cobertura" entre cada tick de guardado).
       return { db: merged, syncStatus: navigator.onLine ? 'syncing' : 'offline', offlinePending: state.offlinePending || !navigator.onLine }
     })
+    // No generar tráfico ni reescribir el blob cuando un formulario entrega el
+    // mismo valor que ya estaba guardado.
+    if (skipNetwork) return merged
     // El fichaje concreto viaja directamente a la tabla normalizada para que
     // Realtime lo publique sin esperar a la reconciliación del blob completo.
     // No se espera esta promesa: la UI y el guardado local ya son inmediatos y

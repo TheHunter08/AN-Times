@@ -34,7 +34,13 @@ const [blobRows, entityRows] = await Promise.all([
 const blobRow = blobRows[0]
 if (!blobRow) throw new Error('No existe app_data id=1')
 const blobItems = blobRow.data?.notis || []
-const activeBlob = blobItems.filter(item => !item?.deleted)
+// Un tombstone granular es una eliminación ya confirmada. No volver a tratar
+// como activa la copia antigua que todavía pueda quedar en el blob de respaldo.
+const tombstonedIds = new Set(entityRows
+  .filter(item => item.deleted || item.data?.deleted)
+  .map(item => String(item.entity_id || item.data?.id || ''))
+  .filter(Boolean))
+const activeBlob = blobItems.filter(item => !item?.deleted && !tombstonedIds.has(String(item?.id || '')))
 const activeEntities = entityRows.filter(item => !item.deleted && !item.data?.deleted).map(item => ({
   ...(item.data || {}), id:item.entity_id || item.data?.id, _upd:item.data?._upd || item.updated_at,
 }))
@@ -47,6 +53,7 @@ console.log(JSON.stringify({
   blobBefore:blobItems.length,
   activeBefore:activeBlob.length,
   activeAfter:cleaned.length,
+  removedByTombstone:blobItems.filter(item => tombstonedIds.has(String(item?.id || ''))).length,
   tableRowsToMarkDeleted:rowsToDelete.length,
 }, null, 2))
 if (!apply) process.exit(0)

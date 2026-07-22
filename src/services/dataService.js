@@ -464,6 +464,7 @@ let _onlineListenerPending = false
 let _bgSyncRetries = 0
 let _pendingWriteFlight = Promise.resolve()
 let _postBlobSyncHandler = null
+let _deltaRpcAvailable = null
 
 // dataServiceV2 registra aquí la escritura de tablas. Mantener el hook en la
 // capa primaria permite que la misma transacción lógica se ejecute también al
@@ -482,6 +483,55 @@ export function mergePendingDeletes(previous, incoming) {
   return Object.keys(out).length ? out : null
 }
 
+export function buildBlobDelta(payload, deleted, syncHint) {
+  const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null
+  if (!changedKeys?.length) return null
+  const patch = {}
+  for (const key of changedKeys) {
+    const value = payload?.[key]
+    if (value === undefined) continue
+    const ids = Array.isArray(syncHint?.entityIds?.[key]) ? new Set(syncHint.entityIds[key].map(String)) : null
+    patch[key] = Array.isArray(value) && ids
+      ? value.filter(item => item?.id != null && ids.has(String(item.id)))
+      : value
+  }
+  // Los tombstones persistentes son pequeños y protegen a dispositivos que
+  // vuelven después de varios días sin conexión.
+  if (payload?._deleted) patch._deleted = payload._deleted
+  return { patch, deleted:deleted || {} }
+}
+
+async function _tryDeltaUpsert(payload, deleted, syncHint) {
+  if (USE_COLD_ROW || _deltaRpcAvailable === false) return false
+  const delta = buildBlobDelta(payload, deleted, syncHint)
+  if (!delta) return false
+  const nowIso = new Date().toISOString()
+  const { error } = await supabase.rpc('apply_app_data_delta', {
+    p_patch:delta.patch,
+    p_deleted:delta.deleted,
+    p_updated_at:nowIso,
+  })
+  if (error) {
+    const unavailable = error.code === 'PGRST202' || error.code === '42883' || /apply_app_data_delta|schema cache/i.test(error.message || '')
+    if (unavailable) {
+      _deltaRpcAvailable = false
+      console.info('[sync] RPC delta no desplegada; se mantiene el blob completo como compatibilidad')
+      return false
+    }
+    throw error
+  }
+  _deltaRpcAvailable = true
+  _noteServerTs(new Date(nowIso).getTime())
+  return true
+}
+
+async function _writeMergedOrDelta(payload, deleted, syncHint) {
+  if (await _tryDeltaUpsert(payload, deleted, syncHint)) return payload
+  const merged = await _mergeWithServer(payload, deleted)
+  await _upsertHotCold(merged)
+  return merged
+}
+
 // Tombstones compartidos en app_data: una eliminación confirmada debe vencer
 // también a dispositivos que llevaban días sin abrir y aún conservan el item.
 export function mergePersistentDeletes(...groups) {
@@ -495,7 +545,15 @@ export function mergeSyncHints(previous, incoming) {
   if (previous?.full || incoming?.full) return { full: true }
   const changedKeys = [...new Set([...(previous?.changedKeys || []), ...(incoming?.changedKeys || [])])]
   const recordIds = [...new Set([...(previous?.recordIds || []), ...(incoming?.recordIds || [])])]
-  return changedKeys.length || recordIds.length ? { changedKeys, recordIds } : null
+  const entityIds = {}
+  for (const source of [previous?.entityIds, incoming?.entityIds]) {
+    for (const [collection, ids] of Object.entries(source || {})) {
+      entityIds[collection] = [...new Set([...(entityIds[collection] || []), ...(Array.isArray(ids) ? ids : [])])]
+    }
+  }
+  return changedKeys.length || recordIds.length || Object.keys(entityIds).length
+    ? { changedKeys, recordIds, entityIds }
+    : null
 }
 
 function _fallbackPendingGet() {
@@ -655,8 +713,7 @@ async function _runBgSyncFallback() {
     // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard
     // interpretara "ya sincronizado" cuando en realidad solo habían llegado datos del admin.
     // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
-    const merged = await _mergeWithServer(data, deleted)
-    await _upsertHotCold(merged)
+    const merged = await _writeMergedOrDelta(data, deleted, syncHint)
     if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted, syncHint)
     merged._ts = Date.now()
     saveLocal(merged)
@@ -732,9 +789,8 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
   // subir nunca en esos dispositivos — ni la app en primer plano lo
   // reintentaba (todo pasaba a depender de Background Sync, que iOS no
   // soporta) hasta que el usuario cerraba y reabría la app.
-  _mergeWithServer(payload, effectiveDeleted)
+  _writeMergedOrDelta(payload, effectiveDeleted, effectiveSyncHint)
     .then(async merged => {
-      await _upsertHotCold(merged)
       if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted, effectiveSyncHint)
       return merged
     })

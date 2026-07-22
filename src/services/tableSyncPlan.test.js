@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
+import { buildSyncHint, buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -126,5 +126,48 @@ describe('plan de sincronización offline V2', () => {
 
     expect(plan.upserts.find(op => op.table === 'records').rows.map(row => row.id)).toEqual(['changed'])
     expect(plan.upserts.filter(op => op.table !== 'records').every(op => op.rows.length === 0)).toBe(true)
+  })
+  it('detecta solo las filas realmente modificadas aunque saveDB devuelva el db completo', () => {
+    const before = {
+      records: [{ id:'r1', _upd:'old' }, { id:'r2', _upd:'same' }],
+      audit: [{ id:'a1', action:'inicio' }],
+      config: { wdMin:480 },
+    }
+    const partial = {
+      ...before,
+      records: [{ id:'r1', _upd:'new' }, before.records[1]],
+      audit: [...before.audit, { id:'a2', action:'fin' }],
+    }
+    expect(buildSyncHint(before, partial)).toEqual({
+      changedKeys:['records','audit'],
+      entityIds:{ records:['r1'], audit:['a2'] },
+      recordIds:['r1'],
+    })
+  })
+
+  it('sube solo la nueva auditoría y no las filas históricas', () => {
+    const db = {
+      audit: [
+        { id:'a1', action:'antigua', _upd:'2026-07-01T00:00:00Z' },
+        { id:'a2', action:'nueva', _upd:'2026-07-13T12:00:00Z' },
+      ],
+    }
+    const plan = buildTableSyncPlan(db, null, now, {
+      changedKeys:['audit'], entityIds:{ audit:['a2'] }, recordIds:[],
+    })
+    expect(plan.upserts.find(op => op.table === 'app_entities').rows.map(row => row.id)).toEqual(['audit:a2'])
+  })
+
+  it('valida un fichaje contra todos los empleados aunque cambie otro perfil a la vez', () => {
+    const plan = buildTableSyncPlan({
+      employees:[{ id:'e1', name:'Ana' }, { id:'e2', name:'Luis' }],
+      records:[{ id:'r2', empId:'e2', inicio:'2026-07-13T08:00:00Z', _upd:'2026-07-13T12:00:00Z' }],
+    }, null, now, {
+      changedKeys:['employees','records'],
+      entityIds:{ employees:['e1'], records:['r2'] },
+      recordIds:['r2'],
+    })
+    expect(plan.upserts.find(op => op.table === 'employees').rows.map(row => row.id)).toEqual(['e1'])
+    expect(plan.upserts.find(op => op.table === 'records').rows.map(row => row.id)).toEqual(['r2'])
   })
 })

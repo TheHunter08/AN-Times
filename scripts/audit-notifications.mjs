@@ -31,7 +31,11 @@ const [blobRows, entityRows] = await Promise.all([
   rows('app_entities?select=id,entity_id,data,deleted,updated_at&collection=eq.notis'),
 ])
 const blobItems = blobRows[0]?.data?.notis || []
-const activeBlob = blobItems.filter(item => !item?.deleted)
+const tombstonedIds = new Set(entityRows
+  .filter(item => item.deleted || item.data?.deleted)
+  .map(item => String(item.entity_id || item.data?.id || ''))
+  .filter(Boolean))
+const activeBlob = blobItems.filter(item => !item?.deleted && !tombstonedIds.has(String(item?.id || '')))
 const activeEntities = entityRows.filter(item => !item.deleted && !item.data?.deleted).map(item => ({
   ...(item.data || {}),
   id:item.entity_id || item.data?.id,
@@ -44,6 +48,7 @@ const retainedIds = new Set(combined.map(item => item.id))
 console.log(JSON.stringify({
   blobNotifications:blobItems.length,
   blobSoftDeleted:blobItems.length - activeBlob.length,
+  blobItemsOverriddenByTombstone:blobItems.filter(item => tombstonedIds.has(String(item?.id || ''))).length,
   tableNotifications:entityRows.length,
   tableSoftDeleted:entityRows.filter(item => item.deleted || item.data?.deleted).length,
   uniqueActiveNotifications:combined.length,

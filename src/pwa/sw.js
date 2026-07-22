@@ -502,28 +502,22 @@ async function _bgSync() {
     const syncHint = isNewFmt ? stored.syncHint : undefined
     const revision = isNewFmt ? stored.revision : undefined
     if (!pending) return false
-    const server = await _fetchServerData()
-    const data = _mergeForPushSW(server, pending, deleted)
-    const { hot, cold } = _splitHotCold(data)
-    const nowIso = new Date().toISOString()
-    // POST + upsert (no PATCH): la fila fría (id=3) puede no existir todavía la
-    // primera vez — un PATCH sobre una fila inexistente no crea nada ni da error,
-    // así que el dato se perdería en silencio. upsert la crea si hace falta.
-    const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
-    const hotRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: _USE_COLD_ROW ? hot : data, updated_at: nowIso }) })
-    const coldRes = _USE_COLD_ROW
-      ? await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) })
-      : { ok: true, status: 200 }
-    if (!hotRes.ok) {
-      throw new Error(`bgSync failed: hot=${hotRes.status}`)
-    }
-    // Si solo falla la fila fría (RLS, fila aún no creada, etc.) no bloqueamos
-    // todo el sync — igual que en dataService.js, reintentamos metiendo el
-    // payload completo en la fila caliente para no perder la jornada/fichaje.
-    if (!coldRes.ok) {
-      const fbRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
-      if (!fbRes.ok) {
-        throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
+    let data = pending
+    const deltaWritten = await _tryDeltaSyncSW(pending, deleted, syncHint)
+    if (!deltaWritten) {
+      const server = await _fetchServerData()
+      data = _mergeForPushSW(server, pending, deleted)
+      const { hot, cold } = _splitHotCold(data)
+      const nowIso = new Date().toISOString()
+      const upsertHeaders = { apikey: _SB_ANON, Authorization: `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }
+      const hotRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data: _USE_COLD_ROW ? hot : data, updated_at: nowIso }) })
+      const coldRes = _USE_COLD_ROW
+        ? await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 3, data: cold, updated_at: nowIso }) })
+        : { ok: true, status: 200 }
+      if (!hotRes.ok) throw new Error(`bgSync failed: hot=${hotRes.status}`)
+      if (!coldRes.ok) {
+        const fbRes = await _sbFetch(`${_SB_URL}/rest/v1/app_data`, { method: 'POST', headers: upsertHeaders, body: JSON.stringify({ id: 1, data, updated_at: nowIso }) })
+        if (!fbRes.ok) throw new Error(`bgSync failed: hot=${hotRes.status} cold=${coldRes.status} fallback=${fbRes.status}`)
       }
     }
     // El blob y las tablas V2 forman una sola confirmación offline. Si una
@@ -592,6 +586,38 @@ async function _markEmptyQueueChecked() {
       }
     )
   } catch {}
+}
+
+let _deltaRpcAvailableSW = null
+
+function _buildBlobDeltaSW(payload, deleted, syncHint) {
+  const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null
+  if (!changedKeys?.length) return null
+  const patch = {}
+  for (const key of changedKeys) {
+    const value = payload?.[key]
+    if (value === undefined) continue
+    const ids = Array.isArray(syncHint?.entityIds?.[key]) ? new Set(syncHint.entityIds[key].map(String)) : null
+    patch[key] = Array.isArray(value) && ids
+      ? value.filter(item => item?.id != null && ids.has(String(item.id)))
+      : value
+  }
+  if (payload?._deleted) patch._deleted = payload._deleted
+  return { p_patch:patch, p_deleted:deleted || {}, p_updated_at:new Date().toISOString() }
+}
+
+async function _tryDeltaSyncSW(payload, deleted, syncHint) {
+  if (_USE_COLD_ROW || _deltaRpcAvailableSW === false) return false
+  const body = _buildBlobDeltaSW(payload, deleted, syncHint)
+  if (!body) return false
+  const response = await _sbFetch(`${_SB_URL}/rest/v1/rpc/apply_app_data_delta`, {
+    method:'POST',
+    headers:{ apikey:_SB_ANON, Authorization:`Bearer ${_SB_ANON}`, 'Content-Type':'application/json' },
+    body:JSON.stringify(body),
+  })
+  if (response.ok) { _deltaRpcAvailableSW = true; return true }
+  if (response.status === 404 || response.status === 400) { _deltaRpcAvailableSW = false; return false }
+  throw new Error(`bgSync delta failed: ${response.status}`)
 }
 
 async function _handleSyncPing() {

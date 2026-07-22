@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { auditLog, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints } from './dataService.js'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -83,10 +83,31 @@ describe('cola offline', () => {
 
   it('acumula el alcance de varios cambios y conserva compatibilidad con colas antiguas', () => {
     expect(mergeSyncHints(
-      { changedKeys: ['records'], recordIds: ['r1'] },
-      { changedKeys: ['vacaciones', 'records'], recordIds: ['r2'] },
-    )).toEqual({ changedKeys: ['records', 'vacaciones'], recordIds: ['r1', 'r2'] })
+      { changedKeys: ['records'], recordIds: ['r1'], entityIds:{ records:['r1'] } },
+      { changedKeys: ['vacaciones', 'records'], recordIds: ['r2'], entityIds:{ records:['r2'], vacaciones:['v1'] } },
+    )).toEqual({ changedKeys: ['records', 'vacaciones'], recordIds: ['r1', 'r2'], entityIds:{ records:['r1','r2'], vacaciones:['v1'] } })
     expect(mergeSyncHints({ full: true }, { changedKeys: ['records'], recordIds: ['r3'] })).toEqual({ full: true })
+  })
+
+  it('construye un delta mínimo del blob y conserva eliminaciones', () => {
+    const delta = buildBlobDelta({
+      records:[{ id:'r1', value:'viejo' }, { id:'r2', value:'nuevo' }],
+      audit:[{ id:'a1' }, { id:'a2' }],
+      config:{ wdMin:480 },
+      _deleted:{ notis:['n1'] },
+    }, { records:['r0'] }, {
+      changedKeys:['records','audit','config'],
+      entityIds:{ records:['r2'], audit:['a2'] },
+    })
+    expect(delta).toEqual({
+      patch:{
+        records:[{ id:'r2', value:'nuevo' }],
+        audit:[{ id:'a2' }],
+        config:{ wdMin:480 },
+        _deleted:{ notis:['n1'] },
+      },
+      deleted:{ records:['r0'] },
+    })
   })
 
   it('conserva tombstones remotos para proteger otros dispositivos desactualizados', () => {
