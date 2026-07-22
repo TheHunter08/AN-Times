@@ -40,8 +40,8 @@ export function Timesheets({ rows, search, onSearchChange, onModify, onDelete }:
   const startEdit = (row: TimesheetRow) => { setEditingId(row.id); setEditEntry(row.entrada); setEditExit(row.salida); setEditReason('') }
   const saveEdit = async (row: TimesheetRow) => {
     if (!onModify) return
-    setSavingId(row.id)
     if (!editReason.trim()) return
+    setSavingId(row.id)
     const ok = await onModify(row.id, editEntry, editExit, editReason.trim())
     setSavingId(null)
     if (ok !== false) setEditingId(null)

@@ -122,6 +122,12 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false, vacacionesExtra: 0 }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
   const isEdit = !!initial
+  // Sin este guard, un doble clic antes de que se cierre el modal ejecuta
+  // handleSave dos veces con el mismo form.id (generado una sola vez al
+  // montar) — la segunda llamada añade un SEGUNDO empleado con id idéntico
+  // en vez de fallar, ya que la comprobación de duplicados de
+  // validateEmployeeProfile se excluye a sí misma por id.
+  const [sending, setSending] = useState(false)
 
   const setF = (k: keyof EmpForm, v: any) => setForm(f => ({ ...f, [k]: v }))
   const toggleObra = (id: string) =>
@@ -130,8 +136,10 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       : [...form.obrasAsignadas, id])
 
   const handleSave = () => {
+    if (sending) return
     const validation: any = validateEmployeeProfile(form, db.employees || [], isEdit)
     if (!validation.ok) { toast(validation.error, 4500, 'warn'); return }
+    setSending(true)
     const nowIso = new Date().toISOString()
     saveDB((fresh: any) => {
       const emps: any[] = fresh.employees || []
@@ -276,7 +284,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             </span>
           </div>
         )}
-        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+        <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
           {isEdit ? 'Guardar cambios' : 'Crear empleado'}
         </button>
       </div>
@@ -737,19 +745,27 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
     const times = recordTimesFromClock(rec, entry, exit)
     if (!times) { toast('Introduce horas válidas', 3000, 'warn'); return false }
     const { inicio, fin } = times
-    const breaks = clipBreaksToWindow(rec.breaks || [], inicio, fin)
-    const calculated = calcSecs({ ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
     const device = currentDeviceLabel()
-    const updated = { ...rec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(rec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:reason, oldInicio:rec.inicio, oldFin:rec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado', device }] }
+    // Relee el fichaje justo antes de persistir (no el capturado al abrir el
+    // modal, que puede llevar segundos abierto): si otro dispositivo lo tocó
+    // mientras tanto (el propio empleado corrigiendo, u otro admin), mezclar
+    // sobre esa versión más fresca evita pisar sus cambios — p. ej. perder una
+    // corrección que ese otro dispositivo acababa de añadir — con datos viejos.
+    const freshDbNow = useAppStore.getState().db
+    const freshRec = (freshDbNow.records || []).find((r: any) => r.id === id) || rec
+    if (isRecordMonthLocked(freshDbNow.cierres || [], freshRec.empId, freshRec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn'); return false }
+    const breaks = clipBreaksToWindow(freshRec.breaks || [], inicio, fin)
+    const calculated = calcSecs({ ...freshRec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks })
+    const updated = { ...freshRec, inicio: inicio.toISOString(), fin: fin.toISOString(), breaks, workSecs: calculated.work, breakSecs: calculated.brk, aceptada:true, validado:true, rechazado:false, modificado:true, _upd:nowIso, validadoAt:nowIso, validadoBy:session?.user?.name || 'Encargado', correcciones:[...(freshRec.correcciones || []), { id:gid(), ts:nowIso, tipo:'admin', motivo:reason, oldInicio:freshRec.inicio, oldFin:freshRec.fin, newInicio:inicio.toISOString(), newFin:fin.toISOString(), by:session?.user?.name || 'Encargado', device }] }
     try {
       await persistRecordRow(updated)
       saveDB((fresh:any) => {
         const records = (fresh.records || []).map((r:any) => r.id === id ? updated : r)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, updated.inicio], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empName || rec.empId}: ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado', {
-          category:'jornada', entityType:'record', entityId:rec.id, reason, device,
-          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs },
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, updated.inicio], nowIso)
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${freshRec.empName || freshRec.empId}: ${fmtTime(freshRec.inicio)}–${fmtTime(freshRec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:freshRec.id, reason, device,
+          before:{ inicio:freshRec.inicio, fin:freshRec.fin, workSecs:freshRec.workSecs, breakSecs:freshRec.breakSecs },
           after:{ inicio:updated.inicio, fin:updated.fin, workSecs:updated.workSecs, breakSecs:updated.breakSecs },
         })
         return { records, cierres, audit:withAudit.audit }
@@ -939,6 +955,10 @@ function ValidateHoursPage() {
   const handleApprove = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
+      toast('Mes firmado y bloqueado. Reabre el cierre antes de validar este fichaje.', 5000, 'warn')
+      return
+    }
     const nowIso = new Date().toISOString()
     const updated = { ...rec, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try { await persistRecordRow(updated) } catch (error: any) {
@@ -955,6 +975,10 @@ function ValidateHoursPage() {
   const handleReject = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
+      toast('Mes firmado y bloqueado. Reabre el cierre antes de rechazar este fichaje.', 5000, 'warn')
+      return
+    }
     const nowIso = new Date().toISOString()
     const updated = { ...rec, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try { await persistRecordRow(updated) } catch (error: any) {
@@ -981,27 +1005,35 @@ function ValidateHoursPage() {
       return
     }
     const { inicio: newInicio, fin: newFin } = times
-    const breaks = clipBreaksToWindow(rec.breaks || [], newInicio, newFin)
-    const recalculated = calcSecs({ ...rec, inicio: newInicio.toISOString(), fin: newFin.toISOString(), breaks })
     const nowIso = new Date().toISOString()
     const inicioIso = newInicio.toISOString()
     const finIso = newFin.toISOString()
+    // Mismo criterio que TimesheetsPage.modify: relee el fichaje justo antes
+    // de persistir para no pisar un cambio concurrente con datos obsoletos.
+    const freshDbNow = useAppStore.getState().db
+    const freshRec = (freshDbNow.records || []).find((r: any) => r.id === id) || rec
+    if (isRecordMonthLocked(freshDbNow.cierres || [], freshRec.empId, freshRec.inicio)) {
+      toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn')
+      return
+    }
+    const breaks = clipBreaksToWindow(freshRec.breaks || [], newInicio, newFin)
+    const recalculated = calcSecs({ ...freshRec, inicio: inicioIso, fin: finIso, breaks })
     const correction = {
       id: gid(), ts: nowIso, tipo: 'admin', motivo: 'Corrección de horario desde Validar horas',
-      oldInicio: rec.inicio, oldFin: rec.fin, newInicio: inicioIso, newFin: finIso,
+      oldInicio: freshRec.inicio, oldFin: freshRec.fin, newInicio: inicioIso, newFin: finIso,
       by: session?.user?.name || 'Admin',
       device: currentDeviceLabel(),
     }
-    const correcciones = [...(rec.correcciones || []), correction]
-    const updatedRec = { ...rec, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
+    const correcciones = [...(freshRec.correcciones || []), correction]
+    const updatedRec = { ...freshRec, inicio: inicioIso, fin: finIso, breaks, workSecs: recalculated.work, breakSecs: recalculated.brk, aceptada: true, validado: true, rechazado: false, modificado: true, correcciones, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try {
       await persistRecordRow(updatedRec)
       saveDB((fresh: any) => {
         const records = (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio, inicioIso], nowIso)
-        const withAudit = auditLog(fresh, 'Fichaje modificado', `${rec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado', {
-          category:'jornada', entityType:'record', entityId:rec.id, reason:correction.motivo, device:correction.device,
-          before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs },
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, inicioIso], nowIso)
+        const withAudit = auditLog(fresh, 'Fichaje modificado', `${freshRec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado', {
+          category:'jornada', entityType:'record', entityId:freshRec.id, reason:correction.motivo, device:correction.device,
+          before:{ inicio:freshRec.inicio, fin:freshRec.fin, workSecs:freshRec.workSecs, breakSecs:freshRec.breakSecs },
           after:{ inicio:updatedRec.inicio, fin:updatedRec.fin, workSecs:updatedRec.workSecs, breakSecs:updatedRec.breakSecs },
         })
         return {
@@ -1047,7 +1079,11 @@ function ValidateHoursPage() {
     const idSet = new Set(ids)
     const nowIso = new Date().toISOString()
     const actor = session?.user?.name || 'Admin'
-    const candidates = (db.records || []).filter((record: any) => idSet.has(record.id))
+    const allCandidates = (db.records || []).filter((record: any) => idSet.has(record.id))
+    const lockedCount = allCandidates.filter((record: any) => isRecordMonthLocked(db.cierres || [], record.empId, record.inicio)).length
+    const candidates = allCandidates.filter((record: any) => !isRecordMonthLocked(db.cierres || [], record.empId, record.inicio))
+    if (lockedCount) toast(`${lockedCount} fichaje${lockedCount !== 1 ? 's' : ''} de un mes ya firmado se omitieron`, 4000, 'warn')
+    if (!candidates.length) return
     const updates = candidates.map((record: any) => ({
       ...record,
       aceptada: decision === 'approved',
@@ -2231,6 +2267,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
   const [locating, setLocating] = useState(false)
+  const [sending, setSending] = useState(false)
   const dialogRef = useDialogA11y(true, onClose)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
@@ -2266,9 +2303,11 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const normalizedCoordsPreview = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
 
   const handleSave = () => {
+    if (sending) return
     if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
     const normalizedCoords = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
     if (hasAnyCoord && !normalizedCoords) { toast('Revisa la latitud y la longitud: deben ser números dentro de rango (-90..90 / -180..180)', 4000, 'warn'); return }
+    setSending(true)
     const nowIso = new Date().toISOString()
     const obra = {
       ...(initial || {}),
@@ -2364,7 +2403,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
             Los empleados asignados a esta obra quedarán visibles para los encargados/jefes de obra de este centro, aunque no tengan la obra marcada directamente.
           </div>
         </div>
-        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+        <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
           {isEdit ? 'Guardar cambios' : 'Crear obra'}
         </button>
       </div>
