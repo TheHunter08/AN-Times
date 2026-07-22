@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { isValidAccountEmail } from '../src/utils/authRegistration.js'
 
 function loadEnvFile(path) {
   try {
@@ -65,8 +66,8 @@ const checks = {
   duplicatedEndpoints: [...endpointCounts.values()].filter(count => count > 1).length,
   workersWithSignature: signed.length,
   missingSignatures: workers.length - signed.length,
-  employeesWithEmail: activeEmployees.filter(item => String(item.email || '').includes('@')).length,
-  employeesMissingEmail: activeEmployees.filter(item => !String(item.email || '').includes('@')).length,
+  employeesWithEmail: activeEmployees.filter(item => isValidAccountEmail(item.email)).length,
+  employeesMissingEmail: activeEmployees.filter(item => !isValidAccountEmail(item.email)).length,
   employeesMissingAuth: activeEmployees.filter(item => !item.auth_id).length,
   duplicatedAuthIdentities: [...authCounts.values()].filter(count => count > 1).length,
   normalizedRecords: activeRecords.length,

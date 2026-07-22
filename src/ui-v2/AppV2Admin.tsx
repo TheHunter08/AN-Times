@@ -38,6 +38,9 @@ import { isRecordPendingValidation, recordValidationState, selectValidationRecor
 import { monthlyTargetMinutes } from '../utils/workTargets.js'
 import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 import { createNotification } from '../utils/notifications.js'
+import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
+import { getLaunchBlockers } from '../utils/launchRequirements.js'
+import { isValidAccountEmail } from '../utils/authRegistration.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -126,7 +129,9 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       : [...form.obrasAsignadas, id])
 
   const handleSave = () => {
-    if (!form.name.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    const validation: any = validateEmployeeProfile(form, db.employees || [], isEdit)
+    if (!validation.ok) { toast(validation.error, 4500, 'warn'); return }
+    const nowIso = new Date().toISOString()
     saveDB((fresh: any) => {
       const emps: any[] = fresh.employees || []
       const existing = isEdit ? emps.find((e: any) => e.id === form.id) || {} : {}
@@ -134,7 +139,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       const pinLen = form.pin ? form.pin.length : (isEdit ? existing.pinLen || null : null)
       const emp = {
         ...existing,
-        id: form.id, name: form.name.trim(), email: form.email || null,
+        id: form.id, name: validation.name, email: validation.email,
         role: form.role, pin: pinHash, pinLen,
         centroTrabajo: form.centroTrabajo || null,
         telefono: form.telefono || null,
@@ -147,6 +152,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         isJO: form.role === 'jefe_obra',
         baja: false,
         vacacionesExtra: form.vacacionesExtra || 0,
+        _upd: nowIso,
       }
       const updated = isEdit
         ? emps.map((e: any) => e.id === form.id ? emp : e)
@@ -157,7 +163,6 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       const dates = Array.from({ length: 45 }, (_, i) => {
         const d = new Date(now); d.setDate(now.getDate() + i); return d
       }).filter(d => d.getDay() !== 0 && d.getDay() !== 6)
-      const nowIso = new Date().toISOString()
       const turnos = [...(fresh.turnos || [])]
       dates.forEach(d => {
         const fecha = localDateStr(d)
@@ -2486,17 +2491,22 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
   const employees = (db.employees || []).filter((employee: any) => !employee.baja)
   const workers = employees.filter((employee: any) => employee.role !== 'admin' && !employee.isAdmin)
   const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
-  const emailReady = employees.filter((employee: any) => String(employee.email || '').includes('@')).length
+  const emailReady = employees.filter((employee: any) => isValidAccountEmail(employee.email)).length
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
   const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
   const [pushReady, setPushReady] = useState<number | null>(null)
+  const [pushMissingIds, setPushMissingIds] = useState<string[]>([])
   const documentCount = (db.documentos || []).length
+  const launchBlockers = getLaunchBlockers(db, pushMissingIds)
 
   const workerIdsKey = workers.map((employee: any) => employee.id).sort().join('|')
   useEffect(() => {
     let active = true
     getPushCoverage(workerIdsKey ? workerIdsKey.split('|') : []).then(result => {
-      if (active) setPushReady(result.registered)
+      if (active) {
+        setPushReady(result.registered)
+        setPushMissingIds(result.missingIds || [])
+      }
     })
     return () => { active = false }
   }, [workerIdsKey])
@@ -2526,6 +2536,7 @@ function OperationsPage({ onNavigate }: { onNavigate: (page: string) => void }) 
     pushTotal={workers.length}
     pendingValidation={pendingValidation}
     documentCount={documentCount}
+    launchBlockers={launchBlockers}
     schedules={schedules}
     visibleWidgets={visibleWidgets}
     onSync={onSync}

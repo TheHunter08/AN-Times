@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRegistrationEligibility, normalizeAccountEmail, validateAccountPassword } from './authRegistration.js'
+import { getRegistrationEligibility, isValidAccountEmail, normalizeAccountEmail, validateAccountPassword } from './authRegistration.js'
 
 const employees = [
   { id: 'active', email: ' Persona@Empresa.com ', baja: false },
@@ -11,6 +11,11 @@ describe('registro seguro de cuentas', () => {
   it('normaliza el correo antes de compararlo', () => {
     expect(normalizeAccountEmail(' Persona@Empresa.com ')).toBe('persona@empresa.com')
     expect(getRegistrationEligibility(employees, 'persona@empresa.com')).toMatchObject({ ok: true, employee: { id: 'active' } })
+  })
+
+  it('distingue un correo utilizable de un valor incompleto', () => {
+    expect(isValidAccountEmail('persona@empresa.com')).toBe(true)
+    expect(isValidAccountEmail('persona@empresa')).toBe(false)
   })
 
   it('rechaza correos desconocidos, empleados de baja y cuentas ya vinculadas', () => {

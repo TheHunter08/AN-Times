@@ -2,9 +2,13 @@ export function normalizeAccountEmail(value) {
   return String(value || '').trim().toLowerCase()
 }
 
+export function isValidAccountEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeAccountEmail(value))
+}
+
 export function getRegistrationEligibility(employees, email) {
   const normalizedEmail = normalizeAccountEmail(email)
-  if (!normalizedEmail) return { ok: false, reason: 'missing_email' }
+  if (!isValidAccountEmail(normalizedEmail)) return { ok: false, reason: 'missing_email' }
 
   const employee = (employees || []).find((item) =>
     !item?.baja && normalizeAccountEmail(item?.email) === normalizedEmail

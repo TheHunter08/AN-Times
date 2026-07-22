@@ -17,6 +17,12 @@ export interface ReportSchedule {
   _upd: string
 }
 
+export interface LaunchBlocker {
+  employeeId: string
+  employeeName: string
+  issues: string[]
+}
+
 interface OperationsProps {
   syncStatus: string
   syncError?: string | null
@@ -32,6 +38,7 @@ interface OperationsProps {
   pushTotal: number
   pendingValidation: number
   documentCount: number
+  launchBlockers: LaunchBlocker[]
   schedules: ReportSchedule[]
   visibleWidgets: string[]
   onSync: () => Promise<void>
@@ -121,6 +128,26 @@ export function Operations(props: OperationsProps) {
           </Card>
         ))}
       </section>
+
+      <Card>
+        <div className="ti-operations__section-title">
+          <div><strong>Plan de lanzamiento por empleado</strong><span>Personas que todavía requieren una acción real</span></div>
+          <span className="ti-operations__pill">{props.launchBlockers.length ? `${props.launchBlockers.length} por completar` : 'Completo'}</span>
+        </div>
+        {props.launchBlockers.length === 0 ? (
+          <ProductState compact title="Equipo preparado para el lanzamiento" description="Todos los perfiles tienen acceso, firma y notificaciones configuradas." icon={<IconCheck />} />
+        ) : (
+          <div className="ti-operations__blockers">
+            {props.launchBlockers.map(blocker => (
+              <button key={blocker.employeeId} type="button" onClick={() => props.onNavigate('empleados')} aria-label={`Revisar ${blocker.employeeName}: ${blocker.issues.join(', ')}`}>
+                <strong>{blocker.employeeName}</strong>
+                <span>{blocker.issues.map(issue => <small key={issue}>{issue}</small>)}</span>
+                <b>Revisar perfil →</b>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <section className="ti-operations__grid">
         <Card>

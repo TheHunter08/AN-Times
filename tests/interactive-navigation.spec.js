@@ -52,7 +52,10 @@ test('los KPI y filas de anomalías filtran y abren fichajes', async ({ page }) 
 })
 
 test('el centro operativo abre los detalles relacionados', async ({ page }) => {
-  await loginAsAdmin(page, { employees:[{ ...employee, email:'empleado@times.test', authId:'auth-e1' }] })
+  await loginAsAdmin(page, { employees:[
+    { ...employee, email:'empleado@times.test', authId:'auth-e1' },
+    { id:'admin', name:'Administrador', email:'admin@times.test', authId:'auth-admin', role:'admin', isAdmin:true, baja:false },
+  ] })
   await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
     status:200, contentType:'application/json', body:JSON.stringify([{ user_id:employee.id }]),
   }))
@@ -63,6 +66,7 @@ test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await expect(page.getByRole('button', { name:/Firmas obligatorias: 1\/1 registradas/i })).toBeVisible()
   await expect(page.getByRole('button', { name:/Dispositivos: 1\/1 registrados/i })).toBeVisible()
   await expect(page.getByRole('button', { name:/Validaciones reales: Ninguna pendiente/i })).toBeVisible()
+  await expect(page.getByText('Equipo preparado para el lanzamiento')).toBeVisible()
 
   await page.getByRole('button', { name:/Acceso seguro: \d+\/\d+ vinculados.*Revisar empleados/i }).click()
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
@@ -70,6 +74,21 @@ test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await openAdminPage(page, 'Sistema', 'Centro operativo')
   await page.getByRole('button', { name:'Abrir cumplimiento', exact:true }).click()
   await expect(page.getByRole('heading', { name:'Centro de cumplimiento', exact:true })).toBeVisible()
+})
+
+test('el centro operativo identifica cada perfil incompleto', async ({ page }) => {
+  await loginAsAdmin(page, { firmas:{}, employees:[{ ...employee, email:'', authId:null }] })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200, contentType:'application/json', body:'[]',
+  }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  const blocker = page.getByRole('button', { name:/Revisar Empleado Prueba.*Falta email.*Falta crear acceso.*Falta firma.*Falta activar notificaciones/i })
+  await expect(blocker).toBeVisible()
+  await blocker.click()
+  await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
 })
 
 test('solicitudes, gastos y documentos abren su contexto', async ({ page }) => {
