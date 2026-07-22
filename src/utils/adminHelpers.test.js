@@ -79,14 +79,19 @@ describe('isRecordMonthLocked', () => {
   const inicio = '2026-07-13T08:00:00.000Z'
 
   it('bloquea el mes cuando existe una firma del empleado o administrador', () => {
-    expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-07', firmaEmp:true }], 'e1', inicio)).toBe(true)
-    expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-07', firmaAdmin:true }], 'e1', inicio)).toBe(true)
+    const inicioFinalizado = '2026-06-13T08:00:00.000Z'
+    expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-06', firmaEmp:true }], 'e1', inicioFinalizado)).toBe(true)
+    expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-06', firmaAdmin:true }], 'e1', inicioFinalizado)).toBe(true)
   })
 
   it('no bloquea otro empleado, otro mes ni un cierre pendiente', () => {
     expect(isRecordMonthLocked([{ empId:'e2', mes:'2026-07', firmaEmp:true }], 'e1', inicio)).toBe(false)
     expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-06', firmaEmp:true }], 'e1', inicio)).toBe(false)
     expect(isRecordMonthLocked([{ empId:'e1', mes:'2026-07', estado:'pendiente' }], 'e1', inicio)).toBe(false)
+  })
+
+  it('un cierre prematuro heredado nunca bloquea el mes en curso', () => {
+    expect(isRecordMonthLocked([{ empId:'e1', mes:'2999-07', firmaEmp:true, estado:'firmado' }], 'e1', '2999-07-13T08:00:00.000Z')).toBe(false)
   })
 })
 

@@ -88,6 +88,7 @@ export const isRecordMonthLocked = (cierresList, empId, inicio) => {
   if (!mes || !empId) return false
   return (cierresList || []).some(c =>
     c.empId === empId && c.mes === mes &&
+    canCloseMonth(c.mes) &&
     !!(c.firmaAdmin || c.firmaEmp || c.firma || c.estado === 'firmado') &&
     !c.desactualizado
   )

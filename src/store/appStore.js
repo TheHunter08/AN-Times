@@ -5,7 +5,7 @@ import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
 import { normalizeToastOptions } from '../utils/toastOptions.js'
 import { pruneDbRetention } from '../utils/dbRetention.js'
-import { buildSyncHint } from '../services/tableSyncPlan.js'
+import { buildSyncHint, withForcedSyncIds } from '../services/tableSyncPlan.js'
 
 const storedSes = (() => {
   try {
@@ -66,7 +66,7 @@ export const useAppStore = create((set, get) => ({
     return newDB
   },
 
-  saveDB: (partialOrFn) => {
+  saveDB: (partialOrFn, options = {}) => {
     // Usar updater de Zustand para leer siempre el estado más reciente,
     // evitando sobrescrituras cuando dos saves se encadenan rápido o llega un sync de realtime
     let merged
@@ -76,12 +76,16 @@ export const useAppStore = create((set, get) => ({
     let skipNetwork = false
     set(state => {
       const partial = typeof partialOrFn === 'function' ? partialOrFn(state.db) : partialOrFn
-      syncHint = buildSyncHint(state.db, partial)
+      syncHint = withForcedSyncIds(buildSyncHint(state.db, partial), options.forceSyncIds)
+      // Una escritura crítica puede haber llegado por Realtime antes de que
+      // este updater se ejecute. En ese caso `before` y `partial` ya parecen
+      // iguales y el diff automático no incluiría el registro en el blob.
+      // Los ids forzados mantienen tabla y blob coherentes aun en esa carrera.
       if (Array.isArray(partial?.records)) {
         const changedRecordIds = new Set(syncHint.recordIds)
         priorityRecords = partial.records.filter(record => record?.id && changedRecordIds.has(String(record.id)))
       }
-      deleted = _diffDeleted(state.db, partial)
+      deleted = mergePendingDeletes(_diffDeleted(state.db, partial), options.deleted)
       merged = { ...state.db, ...(partial || {}), _ts: Date.now() }
       const retained = pruneDbRetention(merged)
       merged = retained.db
@@ -109,7 +113,9 @@ export const useAppStore = create((set, get) => ({
     // Realtime lo publique sin esperar a la reconciliación del blob completo.
     // No se espera esta promesa: la UI y el guardado local ya son inmediatos y
     // cloudPush mantiene la cola offline como respaldo si la red falla.
-    for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
+    if (!options.skipPriorityPersist) {
+      for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
+    }
     cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer
       // en dataService.js) y devuelve ese resultado reconciliado — lo incorporamos

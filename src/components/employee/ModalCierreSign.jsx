@@ -25,7 +25,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && canCloseMonth(c.mes) && !(c.firmaAdmin || c.firmaEmp || c.firma))
+  const pendingCierres = (db.cierres || []).filter(c => c.empId === u?.id && c.estado === 'pendiente' && !c.desactualizado && canCloseMonth(c.mes) && !(c.firmaAdmin || c.firmaEmp || c.firma))
   const selCierre = pendingCierres[selIdx] || null
   const liveRecords = selCierre
     ? (db.records || []).filter(record => record.empId === u?.id && record.inicio && record.fin && localMonthKey(record.inicio) === selCierre.mes)

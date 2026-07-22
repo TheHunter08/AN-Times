@@ -39,6 +39,22 @@ export function buildSyncHint(before, partial) {
   return { changedKeys, entityIds, recordIds: entityIds.records || [] }
 }
 
+export function withForcedSyncIds(syncHint, forceSyncIds = {}) {
+  const next = {
+    changedKeys:[...(syncHint?.changedKeys || [])],
+    entityIds:Object.fromEntries(Object.entries(syncHint?.entityIds || {}).map(([key, ids]) => [key, [...ids]])),
+    recordIds:[...(syncHint?.recordIds || [])],
+  }
+  for (const [key, rawIds] of Object.entries(forceSyncIds || {})) {
+    const ids = [...new Set((Array.isArray(rawIds) ? rawIds : []).filter(id => id != null).map(String))]
+    if (!ids.length) continue
+    next.changedKeys = [...new Set([...next.changedKeys, key])]
+    next.entityIds[key] = [...new Set([...(next.entityIds[key] || []).map(String), ...ids])]
+  }
+  next.recordIds = next.entityIds.records || []
+  return next
+}
+
 export function entityRowId(collection, entityId) {
   return `${collection}:${entityId}`
 }

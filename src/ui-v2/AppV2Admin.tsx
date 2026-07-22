@@ -431,7 +431,7 @@ function useRequestsActions() {
         after:updatedRecord ? { inicio:updatedRecord.inicio, fin:updatedRecord.fin, workSecs:updatedRecord.workSecs, breakSecs:updatedRecord.breakSecs } : { estado:'rechazada' },
       })
       return { correccionesFichaje, records, cierres, notis:[...(fresh.notis || []), noti], audit:withAudit.audit }
-    })
+    }, updatedRecord ? { forceSyncIds:{ records:[updatedRecord.id] }, skipPriorityPersist:true } : undefined)
     queuePush(corr.empId, estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', `Tu solicitud de corrección ha sido ${estado}.`, 'correccion', '/?tab=jornada', `correccion:${corr.id}:${estado}`)
     toast(estado === 'aprobada' ? 'Corrección aplicada y sincronizada' : 'Corrección rechazada', 3000, estado === 'aprobada' ? 'ok' : 'warn')
   }
@@ -752,7 +752,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
           after:{ inicio:updated.inicio, fin:updated.fin, workSecs:updated.workSecs, breakSecs:updated.breakSecs },
         })
         return { records, cierres, audit:withAudit.audit }
-      })
+      }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
       toast('Fichaje modificado y sincronizado', 3000, 'ok')
       return true
     } catch (error:any) { toast(`No se pudo modificar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
@@ -773,7 +773,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
           before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
         })
         return { records, cierres, audit:withAudit.audit }
-      })
+      }, { forceSyncIds:{ records:[id] }, deleted:{ records:[id] }, skipPriorityPersist:true })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
       return true
     } catch (error:any) { toast(`No se pudo eliminar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
@@ -947,7 +947,7 @@ function ValidateHoursPage() {
     saveDB((fresh: any) => {
       const withAudit = auditLog(fresh, 'Jornada validada', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Admin', { category:'jornada', entityType:'record', entityId:rec.id, before:{ validado:!!rec.validado }, after:{ validado:true } })
       return { records: (fresh.records || []).map((r: any) => r.id === id ? updated : r), audit:withAudit.audit }
-    })
+    }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
     toast('Jornada validada', 2500, 'ok')
   }
 
@@ -963,7 +963,7 @@ function ValidateHoursPage() {
     saveDB((fresh: any) => {
       const withAudit = auditLog(fresh, 'Jornada rechazada', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Admin', { category:'jornada', entityType:'record', entityId:rec.id, before:{ rechazado:!!rec.rechazado }, after:{ rechazado:true } })
       return { records: (fresh.records || []).map((r: any) => r.id === id ? updated : r), audit:withAudit.audit }
-    })
+    }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
     toast('Jornada rechazada', 2500, 'warn')
   }
 
@@ -1008,7 +1008,7 @@ function ValidateHoursPage() {
           cierres,
           audit: withAudit.audit,
         }
-      })
+      }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
       toast('Horario modificado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] modify failed:', error)
@@ -1034,7 +1034,7 @@ function ValidateHoursPage() {
           before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
         })
         return { records, cierres, audit: withAudit.audit }
-      })
+      }, { forceSyncIds:{ records:[id] }, deleted:{ records:[id] }, skipPriorityPersist:true })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] delete failed:', error)
@@ -1064,7 +1064,7 @@ function ValidateHoursPage() {
       const nextRecords = (fresh.records || []).map((record: any) => successfulMap.get(record.id) || record)
       const withAudit = auditLog(fresh, decision === 'approved' ? 'Jornadas validadas en lote' : 'Jornadas rechazadas en lote', `${successful.length} registros`, actor, { category:'jornada', entityType:'record_batch', entityId:successful.map((record: any) => record.id).join(','), before:{ count:successful.length }, after:{ decision } })
       return { records:nextRecords, audit:withAudit.audit }
-    })
+    }, { forceSyncIds:{ records:successful.map((record: any) => record.id) }, skipPriorityPersist:true })
     toast(`${successful.length} jornadas ${decision === 'approved' ? 'validadas' : 'rechazadas'}`, 2800, successful.length === updates.length ? 'ok' : 'warn')
   }
 
@@ -1686,6 +1686,7 @@ function MonthlyClosePage() {
     }
 
     return [...(db.cierres || [])]
+      .filter((c: any) => !c.desactualizado)
       .sort((a: any, b: any) => String(b.mes || '').localeCompare(String(a.mes || '')))
       .map((c: any) => {
         const emp = employeesById.get(c.empId) as any
@@ -2334,7 +2335,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     saveDB((fresh: any) => {
       const next = { ...fresh, records: (fresh.records || []).map((record: any) => record.id === closed.id ? closed : record) }
       return auditLog(next, 'Jornada finalizada manualmente', `${row.name} · salida ${fmtTime(nowIso)} · ${reason}`, actor)
-    })
+    }, { forceSyncIds:{ records:[closed.id] }, skipPriorityPersist:true })
 
     queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada${workedMinutes ? ` (${mhm(workedMinutes)})` : ''}.`, 'jornada', '/?tab=jornada')
     toast(`Jornada de ${row.name} finalizada`, 3000, 'ok')
@@ -2354,7 +2355,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     saveDB((fresh: any) => {
       const next = { ...fresh, records: (fresh.records || []).map((record: any) => record.id === restored.id ? restored : record) }
       return auditLog(next, 'Cierre manual deshecho', `${recentClose.name} · ${recentClose.reason}`, actor)
-    })
+    }, { forceSyncIds:{ records:[restored.id] }, skipPriorityPersist:true })
     toast(`Cierre de ${recentClose.name} deshecho`, 3000, 'ok')
     setRecentClose(null)
   }
@@ -2399,7 +2400,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
       const records = (fresh.records || []).map((record:any) => closedById.get(record.id) || record)
       const next = { ...fresh, records }
       return auditLog(next, 'Jornadas finalizadas en lote', `${successfulRecords.length} empleados · ${reason}`, actor)
-    })
+    }, { forceSyncIds:{ records:successfulRecords.map((record: any) => record.id) }, skipPriorityPersist:true })
     const successfulIds = new Set(successfulRecords.map((r: any) => r.id))
     selectedRows.filter(row => successfulIds.has(row.id)).forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
     if (successfulRecords.length < closedRecords.length) {

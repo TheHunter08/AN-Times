@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSyncHint, buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow } from './tableSyncPlan.js'
+import { buildSyncHint, buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow, withForcedSyncIds } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -142,6 +142,17 @@ describe('plan de sincronización offline V2', () => {
       changedKeys:['records','audit'],
       entityIds:{ records:['r1'], audit:['a2'] },
       recordIds:['r1'],
+    })
+  })
+
+  it('fuerza el registro crítico aunque Realtime ya haya adelantado el estado local', () => {
+    const record = { id:'r-race', validado:true, _upd:'2026-07-22T12:00:00Z' }
+    const automatic = buildSyncHint({ records:[record] }, { records:[record] })
+    expect(automatic.recordIds).toEqual([])
+    expect(withForcedSyncIds(automatic, { records:[record.id] })).toEqual({
+      changedKeys:['records'],
+      entityIds:{ records:['r-race'] },
+      recordIds:['r-race'],
     })
   })
 
