@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/appStore.js'
+import { getScopedEmployees, isScopedSupervisor } from '../../utils/supervisorScope.js'
 import type { RequestRow } from '../pages/Requests.js'
 
 interface DbVac {
@@ -30,10 +31,17 @@ export function useRequestsData(
   onApprove: (id: string) => void,
   onReject:  (id: string) => void
 ): RequestRow[] {
-  const db = useAppStore(s => s.db) as { vacaciones?: DbVac[] }
-  const vacs = [...(db.vacaciones || [])].sort((a, b) =>
-    String(b.ts || '').localeCompare(String(a.ts || ''))
-  )
+  const db = useAppStore(s => s.db) as { vacaciones?: DbVac[]; employees?: any[]; obras?: unknown[] }
+  const session = useAppStore(s => s.session) as any
+  const isScopedRole = isScopedSupervisor(session)
+  const scopedEmpIds = isScopedRole
+    ? new Set(getScopedEmployees({ employees: (db.employees || []) as any, obras: (db.obras || []) as any, supervisor: session?.user, unrestricted: false }).map((e: any) => e.id))
+    : null
+  const vacs = [...(db.vacaciones || [])]
+    .filter(v => scopedEmpIds === null || scopedEmpIds.has(v.empId))
+    .sort((a, b) =>
+      String(b.ts || '').localeCompare(String(a.ts || ''))
+    )
 
   return vacs.map((v): RequestRow => {
     const statusMap = { pendiente: 'pending', aprobada: 'approved', rechazada: 'rejected' } as const

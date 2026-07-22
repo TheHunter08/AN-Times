@@ -33,7 +33,8 @@ import { PDF_PAGE, pdfColors, drawTableHeaderRow, drawTableDataRow, drawStatRow,
 import { downloadHoursReportXlsx } from '../utils/hoursReportXlsx.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
-import { getScopedOnlineRecords, getScopedEmployees } from '../utils/supervisorScope.js'
+import { getScopedOnlineRecords, getScopedEmployees, isScopedSupervisor } from '../utils/supervisorScope.js'
+import { verifyPin } from '../utils/pinSecurity.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
 import { monthlyTargetMinutes } from '../utils/workTargets.js'
@@ -135,10 +136,20 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       ? form.obrasAsignadas.filter((x: string) => x !== id)
       : [...form.obrasAsignadas, id])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (sending) return
     const validation: any = validateEmployeeProfile(form, db.employees || [], isEdit)
     if (!validation.ok) { toast(validation.error, 4500, 'warn'); return }
+    if (form.pin) {
+      // Un PIN duplicado permitiría a un empleado iniciar sesión "como" otro
+      // en el selector de empleado del login — comprueba contra el PIN
+      // (en texto plano o ya hasheado en el primer login) de cada activo.
+      const candidates = (db.employees || []).filter((e: any) => e.id !== form.id && !e.baja && e.pin)
+      for (const candidate of candidates) {
+        const matches = await verifyPin(form.pin, candidate.pin, candidate.id)
+        if (matches) { toast(`Ese PIN ya lo usa ${candidate.name || 'otro empleado'}. Elige uno distinto.`, 5000, 'warn'); return }
+      }
+    }
     setSending(true)
     const nowIso = new Date().toISOString()
     saveDB((fresh: any) => {
@@ -367,10 +378,19 @@ function useRequestsActions() {
   const saveDB  = useAppStore(s => s.saveDB)
   const session = useAppStore(s => s.session)
   const toast   = useAppStore(s => s.toast)
+  // Defense in depth: mismo criterio que TimesheetsPage/ValidateHoursPage —
+  // un encargado/JO solo puede aprobar/rechazar solicitudes y correcciones
+  // de su propio equipo, aunque las políticas de Supabase sean abiertas.
+  const isScopedRole = isScopedSupervisor(session)
+  const scopedEmpIds = isScopedRole
+    ? new Set(getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false }).map((e: any) => e.id))
+    : null
+  const outOfScope = (empId: string) => scopedEmpIds !== null && !scopedEmpIds.has(empId)
 
   const approve = (id: string) => {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
+    if (outOfScope(vac.empId)) { toast('No tienes acceso a esta solicitud', 4000, 'warn'); return }
     saveDB((freshDb: any) => {
       const nowIso = new Date().toISOString()
       const updated = (freshDb.vacaciones || []).map((v: any) =>
@@ -387,6 +407,7 @@ function useRequestsActions() {
   const reject = (id: string) => {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
+    if (outOfScope(vac.empId)) { toast('No tienes acceso a esta solicitud', 4000, 'warn'); return }
     saveDB((freshDb: any) => {
       const nowIso = new Date().toISOString()
       const updated = (freshDb.vacaciones || []).map((v: any) =>
@@ -403,6 +424,7 @@ function useRequestsActions() {
   const resolveCorrection = async (id: string, estado: 'aprobada' | 'rechazada') => {
     const corr = (db.correccionesFichaje || []).find((c: any) => c.id === id)
     if (!corr) return
+    if (outOfScope(corr.empId)) { toast('No tienes acceso a esta corrección', 4000, 'warn'); return }
     const who = session?.user?.name || 'Admin'
     const nowIso = new Date().toISOString()
     const rec = (db.records || []).find((r: any) => r.id === corr.recId)
@@ -446,7 +468,7 @@ function useRequestsActions() {
   }
 
   const vacationRows = useRequestsData(approve, reject)
-  const correctionRows = (db.correccionesFichaje || []).map((c: any) => ({
+  const correctionRows = (db.correccionesFichaje || []).filter((c: any) => !outOfScope(c.empId)).map((c: any) => ({
     id:c.id,
     type:'Corrección de fichaje',
     employeeName:c.empName || '—',
@@ -737,10 +759,21 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
   const toast = useAppStore(s => s.toast)
   const rows = useTimesheetsData(search)
   const handleSearch = (s: string) => { setSearch(s); onSearchChange?.(s) }
+  // Defense in depth: las políticas de Supabase para `records` son
+  // abiertas (anon_all), así que el filtrado de useTimesheetsData es la
+  // única barrera de ámbito — se repite aquí para que modify/remove nunca
+  // acepten un id fuera del equipo del encargado aunque llegue por otra vía.
+  const isScopedRole = isScopedSupervisor(session)
+  const scopedEmpIds = useMemo(() => isScopedRole
+    ? new Set(getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false }).map((e: any) => e.id))
+    : null,
+  [isScopedRole, db.employees, db.obras, session])
+  const outOfScope = (empId: string) => scopedEmpIds !== null && !scopedEmpIds.has(empId)
 
   const modify = async (id: string, entry: string, exit: string, reason: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return false
+    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return false }
     if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn'); return false }
     const times = recordTimesFromClock(rec, entry, exit)
     if (!times) { toast('Introduce horas válidas', 3000, 'warn'); return false }
@@ -777,6 +810,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
 
   const remove = async (id: string, reason: string) => {
     const rec = (db.records || []).find((r:any) => r.id === id)
+    if (rec && outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return false }
     if (rec && isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) { toast('Mes firmado y bloqueado. Reabre el cierre antes de eliminarlo.', 5000, 'warn'); return false }
     if (!rec || !window.confirm('¿Eliminar este fichaje? Esta acción no se puede deshacer.')) return false
     try {
@@ -801,7 +835,9 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
 
 function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
+  const session = useAppStore(s => s.session)
   const [weekOffset, setWeekOffset] = useState(0)
+  const isScopedRole = isScopedSupervisor(session)
 
   const { weekLabel, days, employees } = useMemo(() => {
     // Build Mon-Sun for current week + offset
@@ -819,7 +855,9 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     const days = weekDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
     const weekLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+    const emps = isScopedRole
+      ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
+      : (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const records = db.records || []
 
     const employees = emps.map((e: any) => ({
@@ -848,7 +886,7 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     }))
 
     return { weekLabel, days, employees }
-  }, [db, weekOffset])
+  }, [db, weekOffset, session, isScopedRole])
 
   return (
     <Planning
@@ -865,7 +903,9 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
 
 function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
+  const session = useAppStore(s => s.session)
   const [weekOffset, setWeekOffset] = useState(0)
+  const isScopedRole = isScopedSupervisor(session)
 
   const { weekLabel, employees } = useMemo(() => {
     const now = new Date()
@@ -882,7 +922,9 @@ function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) =
     const days = weekDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
     const weekLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+    const emps = isScopedRole
+      ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
+      : (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const turnos = db.turnos || []
 
     const employees = emps.map((e: any) => ({
@@ -904,7 +946,7 @@ function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) =
     }))
 
     return { weekLabel, days, employees }
-  }, [db, weekOffset])
+  }, [db, weekOffset, session, isScopedRole])
 
   return (
     <Shifts
@@ -923,9 +965,20 @@ function ValidateHoursPage() {
   const session = useAppStore(s => s.session)
   const saveDB  = useAppStore(s => s.saveDB)
   const toast   = useAppStore(s => s.toast)
+  // Defense in depth: las políticas de Supabase para `records` son
+  // abiertas, así que el ámbito del encargado/JO se aplica aquí en el
+  // cliente tanto para lo que se ve (rows) como para lo que se puede
+  // aprobar/rechazar/editar/borrar (handlers de abajo).
+  const isScopedRole = isScopedSupervisor(session)
+  const scopedEmpIds = useMemo(() => isScopedRole
+    ? new Set(getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false }).map((e: any) => e.id))
+    : null,
+  [isScopedRole, db.employees, db.obras, session])
+  const outOfScope = (empId: string) => scopedEmpIds !== null && !scopedEmpIds.has(empId)
 
   const rows = useMemo(() => {
-    const records: any[] = selectValidationRecords(db.records || [])
+    const scopedRecords = (db.records || []).filter((r: any) => !outOfScope(r.empId))
+    const records: any[] = selectValidationRecords(scopedRecords)
 
     return records.map((r: any) => {
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
@@ -950,11 +1003,12 @@ function ValidateHoursPage() {
         status: recordValidationState(r),
       } as any
     })
-  }, [db.records, db.employees, db.config?.wdMin])
+  }, [db.records, db.employees, db.config?.wdMin, scopedEmpIds])
 
   const handleApprove = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de validar este fichaje.', 5000, 'warn')
       return
@@ -975,6 +1029,7 @@ function ValidateHoursPage() {
   const handleReject = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de rechazar este fichaje.', 5000, 'warn')
       return
@@ -995,6 +1050,7 @@ function ValidateHoursPage() {
   const handleModify = async (id: string, entry: string, exit: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
     if (!rec) return
+    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn')
       return
@@ -1051,6 +1107,7 @@ function ValidateHoursPage() {
 
   const handleDelete = async (id: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
+    if (rec && outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     if (rec && isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de eliminarlo.', 5000, 'warn')
       return
@@ -1079,9 +1136,11 @@ function ValidateHoursPage() {
     const idSet = new Set(ids)
     const nowIso = new Date().toISOString()
     const actor = session?.user?.name || 'Admin'
-    const allCandidates = (db.records || []).filter((record: any) => idSet.has(record.id))
-    const lockedCount = allCandidates.filter((record: any) => isRecordMonthLocked(db.cierres || [], record.empId, record.inicio)).length
-    const candidates = allCandidates.filter((record: any) => !isRecordMonthLocked(db.cierres || [], record.empId, record.inicio))
+    const scopedCandidates = (db.records || []).filter((record: any) => idSet.has(record.id) && !outOfScope(record.empId))
+    const outOfScopeCount = idSet.size - scopedCandidates.length
+    if (outOfScopeCount) toast(`${outOfScopeCount} fichaje${outOfScopeCount !== 1 ? 's' : ''} fuera de tu equipo se omitieron`, 4000, 'warn')
+    const lockedCount = scopedCandidates.filter((record: any) => isRecordMonthLocked(db.cierres || [], record.empId, record.inicio)).length
+    const candidates = scopedCandidates.filter((record: any) => !isRecordMonthLocked(db.cierres || [], record.empId, record.inicio))
     if (lockedCount) toast(`${lockedCount} fichaje${lockedCount !== 1 ? 's' : ''} de un mes ya firmado se omitieron`, 4000, 'warn')
     if (!candidates.length) return
     const updates = candidates.map((record: any) => ({
@@ -2654,7 +2713,10 @@ function MessagesPage() {
   const adminId = 'admin'
   const adminName = session?.user?.name || 'Admin'
   const chats: any[] = db.chats || []
-  const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
+  const isScopedRole = isScopedSupervisor(session)
+  const emps = isScopedRole
+    ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
+    : (db.employees || []).filter((e: any) => !e.isAdmin)
 
   const conversations = useMemo(() => {
     return emps.map((e: any) => {

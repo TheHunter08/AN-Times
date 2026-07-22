@@ -2,6 +2,11 @@ function normalize(value) {
   return String(value || '').trim().toLocaleLowerCase('es')
 }
 
+export function isScopedSupervisor(session) {
+  const user = session?.user || {}
+  return Boolean(session?.isEnc || session?.isJO || user.role === 'encargado' || user.role === 'jefe_obra')
+}
+
 function assignedWorks(employee) {
   return new Set((employee?.obrasAsignadas || []).map(normalize).filter(Boolean))
 }

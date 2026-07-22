@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getScopedEmployees, getScopedOnlineRecords } from './supervisorScope.js'
+import { getScopedEmployees, getScopedOnlineRecords, isScopedSupervisor } from './supervisorScope.js'
 
 const supervisor = { id: 'boss', centroTrabajo: 'Centro Norte', obrasAsignadas: ['obra-a'] }
 const obras = [{ id: 'obra-a', nombre: 'Reforma A' }, { id: 'obra-b', nombre: 'Reforma B' }]
@@ -46,6 +46,21 @@ describe('getScopedOnlineRecords', () => {
       supervisor:{}, unrestricted:true,
     })
     expect(result).toHaveLength(3)
+  })
+})
+
+describe('isScopedSupervisor', () => {
+  it('reconoce encargado y jefe de obra por session.isEnc/isJO o por el rol del empleado', () => {
+    expect(isScopedSupervisor({ isEnc: true, user: {} })).toBe(true)
+    expect(isScopedSupervisor({ isJO: true, user: {} })).toBe(true)
+    expect(isScopedSupervisor({ user: { role: 'encargado' } })).toBe(true)
+    expect(isScopedSupervisor({ user: { role: 'jefe_obra' } })).toBe(true)
+  })
+
+  it('no restringe a admin ni a empleado normal', () => {
+    expect(isScopedSupervisor({ user: { role: 'admin' } })).toBe(false)
+    expect(isScopedSupervisor({ user: { role: 'empleado' } })).toBe(false)
+    expect(isScopedSupervisor(null)).toBe(false)
   })
 })
 

@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { ftime, fds, recWorkSecs, mhm } from '../../utils/time.js'
+import { getScopedEmployees, isScopedSupervisor } from '../../utils/supervisorScope.js'
 import type { TimesheetRow } from '../pages/Timesheets.js'
 
 interface DbRecord {
@@ -21,18 +22,23 @@ interface DbRecord {
 interface Db {
   records?: DbRecord[]
   employees?: { id: string; name: string; centroTrabajo?: string }[]
+  obras?: unknown[]
   config?: { wdMin?: number }
 }
 
 export function useTimesheetsData(search: string): TimesheetRow[] {
   const db = useAppStore(s => s.db) as Db
+  const session = useAppStore(s => s.session) as any
   const wdMin = db.config?.wdMin || 480
+  const isScopedRole = isScopedSupervisor(session)
 
   return useMemo(() => {
-    const employees = db.employees || []
+    const employees = isScopedRole
+      ? getScopedEmployees({ employees: (db.employees || []) as any, obras: (db.obras || []) as any, supervisor: session?.user, unrestricted: false })
+      : (db.employees || [])
     const employeesById = new Map(employees.map(employee => [employee.id, employee]))
     const recs = (db.records || [])
-      .filter(r => r.fin)
+      .filter(r => r.fin && (!isScopedRole || employeesById.has(r.empId)))
       .sort((a, b) => String(b.inicio || '').localeCompare(String(a.inicio || '')))
     const q = search.trim().toLowerCase()
     return recs
@@ -59,5 +65,5 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
         }
       })
       .filter(r => !q || r.name.toLowerCase().includes(q) || r.centro.toLowerCase().includes(q))
-  }, [db.records, db.employees, search, wdMin])
+  }, [db.records, db.employees, db.obras, session, isScopedRole, search, wdMin])
 }
