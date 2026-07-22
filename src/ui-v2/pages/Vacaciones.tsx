@@ -144,10 +144,13 @@ function AssignModal({ emp, onClose, onSave }: { emp: VacEmpRow; onClose: () => 
   const [inicio, setInicio] = useState('')
   const [fin, setFin] = useState('')
   const [motivo, setMotivo] = useState('Vacaciones')
+  // Sin este guard, un doble clic asigna dos periodos idénticos ya
+  // aprobados — vacData() descontaría los días dos veces del saldo real.
+  const [sending, setSending] = useState(false)
   const ref = useDialogA11y(true, onClose)
 
   const dias = inicio && fin && fin >= inicio ? daysBetween(inicio, fin) : 0
-  const canSave = inicio && fin && fin >= inicio
+  const canSave = inicio && fin && fin >= inicio && !sending
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -190,7 +193,7 @@ function AssignModal({ emp, onClose, onSave }: { emp: VacEmpRow; onClose: () => 
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => { if (canSave) { onSave(inicio, fin, motivo || 'Vacaciones'); onClose() } }}
+          <button onClick={() => { if (canSave) { setSending(true); onSave(inicio, fin, motivo || 'Vacaciones'); onClose() } }}
             disabled={!canSave}
             style={{ flex: 1, padding: '11px', borderRadius: radius.md, border: 'none', background: canSave ? colors.primary.base : colors.bg[500], color: canSave ? '#fff' : colors.text[500], fontSize: 14, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
             Asignar aprobadas
@@ -434,7 +437,7 @@ export function Vacaciones({ employees, requests, onAdjust, onAssign, onApprove,
                           </button>
                         </>
                       )}
-                      <button onClick={() => onDelete(req.id)} aria-label="Eliminar"
+                      <button onClick={() => { if (window.confirm('¿Eliminar esta solicitud de vacaciones? Esta acción no se puede deshacer.')) onDelete(req.id) }} aria-label="Eliminar"
                         style={{ width: 34, height: 34, borderRadius: radius.sm, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[500], cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         title="Eliminar solicitud">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

@@ -3,6 +3,7 @@ import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { vacData } from '../../utils/time.js'
+import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -30,8 +31,19 @@ export function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
   if (!visible) return null
 
   const save = () => {
+    const trimmedName = nombre.trim()
+    if (!trimmedName) { toast('El nombre es obligatorio', 3000, 'warn'); return }
+    const normalizedEmail = normalizeAccountEmail(email)
+    if (!isValidAccountEmail(normalizedEmail)) { toast('Introduce un email válido', 3000, 'warn'); return }
+    const duplicate = (db.employees || []).find(e => e.id !== u.id && normalizeAccountEmail(e.email) === normalizedEmail)
+    if (duplicate) { toast('Ese email ya pertenece a otro empleado', 4000, 'warn'); return }
+    const linked = Boolean(emp.authId || emp.auth_id)
+    if (linked && normalizeAccountEmail(emp.email) !== normalizedEmail) {
+      toast('No se puede cambiar el email de una cuenta ya vinculada', 4500, 'warn')
+      return
+    }
     saveDB(fresh => ({
-      employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, name: nombre, email, tel } : e),
+      employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, name: trimmedName, email: normalizedEmail, tel } : e),
     }))
     toast('Datos actualizados')
     onClose()

@@ -21,19 +21,25 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
   const [fi, setFi] = useState('')
   const [ff, setFf] = useState('')
   const [motivo, setMotivo] = useState('')
-  useEffect(() => { if (!visible) { setFi(''); setFf(''); setMotivo('') } }, [visible])
+  const [sending, setSending] = useState(false)
+  useEffect(() => { if (!visible) { setFi(''); setFf(''); setMotivo(''); setSending(false) } }, [visible])
   useModalBack(visible, onClose)
   const { dragHandlers, modalStyle } = useSwipeDismiss(onClose)
   const dialogRef = useDialogA11y(visible, onClose)
   if (!visible) return null
 
   const submit = () => {
+    // Sin este guard, un doble toque antes de que se cierre el modal envía
+    // dos solicitudes idénticas — si ambas quedaran aprobadas, vacData()
+    // descontaría los días dos veces del saldo real del empleado.
+    if (sending) return
     if (!fi || !ff) { toast('Selecciona fechas'); return }
     const s = new Date(fi + 'T00:00:00'), e = new Date(ff + 'T00:00:00')
     if (s > e) { toast('Fecha fin debe ser posterior'); return }
     const days = Math.round((e - s) / 86400000) + 1
     const availDays = vacData(u.id, db).available
     if (days > availDays) { toast(`Solo tienes ${availDays} día${availDays !== 1 ? 's' : ''} disponibles`, 4000, 'warn'); return }
+    setSending(true)
     const nowIso = new Date().toISOString()
     const vac = { id: gid(), empId: u.id, empName: u.name, fechaInicio: fi, fechaFin: ff, dias: days, motivo: motivo || 'Vacaciones', estado: 'pendiente', ts: nowIso, _upd: nowIso }
     const noti = createNotification({ empId:'__admin__', action:'Nueva solicitud de vacaciones', detail:`${u.name}: ${fds(fi)} → ${fds(ff)}`, dedupeKey:`vac:${vac.id}:solicitud`, ts:nowIso })
@@ -70,7 +76,7 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
         </div>
         <div style={BTN_ROW}>
           <button style={btnSecondary} onClick={onClose}>Cancelar</button>
-          <button style={btnPrimary} onClick={submit}>Solicitar</button>
+          <button style={{ ...btnPrimary, opacity: sending ? 0.7 : 1, cursor: sending ? 'not-allowed' : 'pointer' }} onClick={submit} disabled={sending}>{sending ? 'Enviando…' : 'Solicitar'}</button>
         </div>
       </div>
     </div>
