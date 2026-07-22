@@ -28,7 +28,8 @@ import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLa
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
-import { downloadSimplePdf, downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
+import { downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
+import { PDF_PAGE, pdfColors, drawTableHeaderRow, drawTableDataRow, drawStatRow, drawSectionTitle, drawDocumentFooters, addReportPage } from '../utils/pdfReport.js'
 import { downloadHoursReportXlsx } from '../utils/hoursReportXlsx.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
@@ -1353,34 +1354,83 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const recs = (db.records || []).filter((r: any) => localMonthKey(r.inicio) === mes && r.fin)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
 
-    const pdfLines: string[] = []
-    emps.forEach((e: any) => {
+    const empRows = emps.map((e: any) => {
       const empRecs = recs.filter((r: any) => r.empId === e.id)
-      const mins = empRecs.reduce((s: number, r: any) =>
-        s + recWorkSecs(r) / 60, 0)
+      const mins = empRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0)
       // localDateStr(new Date(r.inicio)) (no r.inicio.slice(0,10)): inicio se
       // guarda en UTC — un fichaje nocturno se contaba en el día siguiente.
       const days = new Set(empRecs.map((r: any) => localDateStr(new Date(r.inicio)))).size
-      const h = Math.floor(mins / 60), m = Math.floor(mins % 60)
-      pdfLines.push(`${e.name} | ${e.centroTrabajo || e.dept || '-'} | ${days} dias | ${h}h ${m}m`)
+      return { name: e.name, centro: e.centroTrabajo || e.dept || '—', days, mins, records: empRecs.length }
+    }).filter((row: any) => row.records > 0)
+
+    const totalMins = recs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0)
+    const corrections = recs.flatMap((r: any) => (r.correcciones || []).map((c: any) => ({ record: r, correction: c })))
+
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+    const pdfCols = pdfColors(rgb)
+    const pdfDoc = await PDFDocument.create()
+    const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+    const { W: PW, H: PH } = PDF_PAGE
+    const ML = 35, MR = 35, CW = PW - ML - MR
+    const EMP_COLS = [{ label: 'Empleado', w: 195 }, { label: 'Centro / Obra', w: 165 }, { label: 'Días', w: 55 }, { label: 'Horas', w: 110 }]
+    const CORR_COLS = [{ label: 'Empleado', w: 130 }, { label: 'Por', w: 90 }, { label: 'Motivo', w: 140 }, { label: 'Dispositivo', w: 100 }, { label: 'Cambio', w: 65 }]
+
+    let page: any, y = 0, pageNum = 0
+    const newPage = (title = 'INFORME MENSUAL DE FICHAJES') => {
+      pageNum++
+      ;({ page, y } = addReportPage(pdfDoc, {
+        ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors: pdfCols, fontR, fontB,
+        empresa: 'TIMES INC', title, subtitle: `${label.charAt(0).toUpperCase() + label.slice(1)}  ·  ${emps.length} empleados  ·  ${recs.length} fichajes`,
+      }))
+    }
+    newPage()
+
+    y = drawStatRow(page, {
+      ml: ML, cw: CW, y, colors: pdfCols, fontR, fontB,
+      items: [
+        { label: 'TOTAL HORAS', val: mhm(totalMins) },
+        { label: 'EMPLEADOS ACTIVOS', val: String(empRows.length) },
+        { label: 'FICHAJES', val: String(recs.length) },
+        { label: 'MODIFICACIONES', val: String(corrections.length), color: corrections.length ? pdfCols.orange : pdfCols.green },
+      ],
+    })
+    y -= 20
+
+    y = drawSectionTitle(page, { ml: ML, y, text: 'HORAS POR EMPLEADO', colors: pdfCols, fontB })
+    y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: EMP_COLS, colors: pdfCols, fontB })
+    empRows.forEach((row: any, i: number) => {
+      if (y - 15 < 60) { newPage(); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: EMP_COLS, colors: pdfCols, fontB }) }
+      y = drawTableDataRow(page, {
+        ml: ML, cw: CW, y, cols: EMP_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB, highlightIdx: 3,
+        vals: [row.name, row.centro, `${row.days} día${row.days !== 1 ? 's' : ''}`, mhm(row.mins)],
+      })
     })
 
-    const totalMins = recs.reduce((s: number, r: any) =>
-      s + recWorkSecs(r) / 60, 0)
-
-    pdfLines.unshift(`Generado: ${new Date().toLocaleDateString('es-ES')}`)
-    pdfLines.push(`TOTAL: ${Math.floor(totalMins / 60)}h ${Math.floor(totalMins % 60)}m | ${recs.length} fichajes`)
-    const corrections = recs.flatMap((r: any) => (r.correcciones || []).map((c: any) => ({ record:r, correction:c })))
     if (corrections.length) {
-      pdfLines.push('', `TRAZABILIDAD DE MODIFICACIONES (${corrections.length})`)
-      corrections.forEach(({ record, correction: c }: any) => {
+      y -= 16
+      if (y - 40 < 60) { newPage() }
+      y = drawSectionTitle(page, { ml: ML, y, text: `TRAZABILIDAD DE MODIFICACIONES (${corrections.length})`, colors: pdfCols, fontB })
+      y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: CORR_COLS, colors: pdfCols, fontB })
+      corrections.forEach(({ record, correction: c }: any, i: number) => {
+        if (y - 15 < 60) { newPage(); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: CORR_COLS, colors: pdfCols, fontB }) }
         const emp = emps.find((e: any) => e.id === record.empId)
-        const oldRange = `${c.oldInicio ? new Date(c.oldInicio).toLocaleString('es-ES') : '—'}–${c.oldFin ? new Date(c.oldFin).toLocaleString('es-ES') : '—'}`
-        const newRange = `${c.newInicio ? new Date(c.newInicio).toLocaleString('es-ES') : '—'}–${c.newFin ? new Date(c.newFin).toLocaleString('es-ES') : '—'}`
-        pdfLines.push(`${emp?.name || record.empName || record.empId} | ${c.by || '—'} | ${c.motivo || 'Sin motivo'} | ${c.device || 'Dispositivo no registrado'} | ${oldRange} -> ${newRange}`)
+        const oldRange = `${c.oldInicio ? new Date(c.oldInicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '—'}–${c.oldFin ? new Date(c.oldFin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '—'}`
+        const newRange = `${c.newInicio ? new Date(c.newInicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '—'}–${c.newFin ? new Date(c.newFin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '—'}`
+        y = drawTableDataRow(page, {
+          ml: ML, cw: CW, y, cols: CORR_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB,
+          vals: [emp?.name || record.empName || record.empId, c.by || '—', c.motivo || 'Sin motivo', c.device || 'No registrado', `${oldRange} → ${newRange}`],
+        })
       })
     }
-    await downloadSimplePdf(`Informe mensual - ${label}`, pdfLines, `informe-${mes}.pdf`)
+
+    drawDocumentFooters(pdfDoc, { ml: ML, cw: CW, colors: pdfCols, fontR })
+    const bytes = await pdfDoc.save()
+    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+    const blobUrl = URL.createObjectURL(blob)
+    downloadDataUrl(blobUrl, `informe-${mes}.pdf`)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+    toast('Informe mensual descargado', 3000, 'ok')
   }
 
   const handleExportAudit = () => {
@@ -1407,29 +1457,100 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const retained = (db.records || [])
       .filter((record: any) => record.inicio && new Date(record.inicio).getTime() >= cutoff)
       .sort((a: any, b: any) => String(a.inicio).localeCompare(String(b.inicio)))
-    const lines = [
-      `Generado: ${new Date().toLocaleString('es-ES')}`,
-      'Base legal: articulo 34.9 del Estatuto de los Trabajadores',
-      `Indice documental: ${compliance.score}%`,
-      `Registros conservados: ${compliance.retainedRecords}`,
-      `Jornadas completas: ${compliance.completionPct}%`,
-      `Trazabilidad de cambios: ${compliance.traceabilityPct}%`,
-      `Registros validados: ${compliance.validationPct}%`,
-      `Cierres firmados: ${compliance.closurePct}%`,
-      '', 'DETALLE DE REGISTROS',
-      ...retained.map((record: any) => {
-        const employee = employeesById.get(record.empId) as any
-        const workedMinutes = record.fin ? Math.round(recWorkSecs(record) / 60) : 0
-        return `${localDateStr(new Date(record.inicio))} | ${employee?.name || record.empName || record.empId || '—'} | ${new Date(record.inicio).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}-${record.fin ? new Date(record.fin).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : 'ABIERTA'} | ${Math.floor(workedMinutes / 60)}h ${workedMinutes % 60}m | ${record.centro || employee?.centroTrabajo || '—'} | ${record.validado || record.aceptada ? 'VALIDADA' : 'PENDIENTE'} | ${(record.correcciones || []).length} cambios`
-      }),
-      '', 'RIESGOS DETECTADOS',
-      ...compliance.risks.map((risk: any) => `${risk.label}: ${risk.count}`),
-      '', 'INTEGRIDAD DE CIERRES FIRMADOS (SHA-256)',
-      ...(db.cierres || [])
-        .filter((cierre: any) => cierre.integrityHash)
-        .map((cierre: any) => `${cierre.mes} · ${cierre.empName || employeesById.get(cierre.empId)?.name || cierre.empId}: ${cierre.integrityHash}`),
-    ]
-    await downloadSimplePdf('TIMES INC - Paquete de inspeccion', lines, `inspeccion-registro-horario-${today()}.pdf`)
+    const signedCierres = (db.cierres || []).filter((cierre: any) => cierre.integrityHash)
+
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+    const pdfCols = pdfColors(rgb)
+    const pdfDoc = await PDFDocument.create()
+    const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+    const { W: PW, H: PH } = PDF_PAGE
+    const ML = 35, MR = 35, CW = PW - ML - MR
+    const REC_COLS = [{ label: 'Fecha', w: 62 }, { label: 'Empleado', w: 118 }, { label: 'Horario', w: 88 }, { label: 'Horas', w: 55 }, { label: 'Centro / Obra', w: 108 }, { label: 'Estado', w: 55 }, { label: 'Cambios', w: 39 }]
+    const RISK_COLS = [{ label: 'Riesgo detectado', w: CW - 80 }, { label: 'Casos', w: 80 }]
+    const HASH_COLS = [{ label: 'Mes', w: 50 }, { label: 'Empleado', w: 140 }, { label: 'Hash SHA-256', w: CW - 50 - 140 }]
+
+    let page: any, y = 0, pageNum = 0
+    const newPage = (subtitle: string) => {
+      pageNum++
+      ;({ page, y } = addReportPage(pdfDoc, {
+        ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors: pdfCols, fontR, fontB,
+        empresa: 'TIMES INC', title: 'PAQUETE DE INSPECCIÓN — REGISTRO HORARIO', subtitle,
+      }))
+    }
+    newPage('Base legal: artículo 34.9 del Estatuto de los Trabajadores · RDL 8/2019')
+
+    y = drawStatRow(page, {
+      ml: ML, cw: CW, y, colors: pdfCols, fontR, fontB,
+      items: [
+        { label: 'ÍNDICE DOCUMENTAL', val: `${compliance.score}%`, color: compliance.score >= 90 ? pdfCols.green : compliance.score >= 70 ? pdfCols.orange : pdfCols.red },
+        { label: 'REGISTROS CONSERVADOS', val: String(compliance.retainedRecords) },
+        { label: 'JORNADAS COMPLETAS', val: `${compliance.completionPct}%` },
+        { label: 'TRAZABILIDAD', val: `${compliance.traceabilityPct}%` },
+      ],
+    })
+    y -= 8
+    y = drawStatRow(page, {
+      ml: ML, cw: CW, y, height: 50, colors: pdfCols, fontR, fontB,
+      items: [
+        { label: 'REGISTROS VALIDADOS', val: `${compliance.validationPct}%` },
+        { label: 'CIERRES FIRMADOS', val: `${compliance.closurePct}%` },
+      ],
+    })
+    y -= 20
+
+    y = drawSectionTitle(page, { ml: ML, y, text: `DETALLE DE REGISTROS (${retained.length})`, colors: pdfCols, fontB })
+    y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: REC_COLS, colors: pdfCols, fontB })
+    retained.forEach((record: any, i: number) => {
+      if (y - 15 < 60) { newPage('Detalle de registros (continuación)'); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: REC_COLS, colors: pdfCols, fontB }) }
+      const employee = employeesById.get(record.empId) as any
+      const workedMinutes = record.fin ? Math.round(recWorkSecs(record) / 60) : 0
+      const validated = record.validado || record.aceptada
+      y = drawTableDataRow(page, {
+        ml: ML, cw: CW, y, cols: REC_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB,
+        vals: [
+          localDateStr(new Date(record.inicio)),
+          employee?.name || record.empName || record.empId || '—',
+          `${new Date(record.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}-${record.fin ? new Date(record.fin).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : 'ABIERTA'}`,
+          mhm(workedMinutes),
+          record.centro || employee?.centroTrabajo || '—',
+          validated ? 'Validada' : 'Pendiente',
+          String((record.correcciones || []).length),
+        ],
+      })
+    })
+
+    if (compliance.risks?.length) {
+      y -= 16
+      if (y - 40 < 60) newPage('Riesgos detectados (continuación)')
+      y = drawSectionTitle(page, { ml: ML, y, text: 'RIESGOS DETECTADOS', colors: pdfCols, fontB })
+      y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: RISK_COLS, colors: pdfCols, fontB })
+      compliance.risks.forEach((risk: any, i: number) => {
+        if (y - 15 < 60) { newPage('Riesgos detectados (continuación)'); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: RISK_COLS, colors: pdfCols, fontB }) }
+        y = drawTableDataRow(page, { ml: ML, cw: CW, y, cols: RISK_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB, highlightIdx: 1, vals: [risk.label, String(risk.count)] })
+      })
+    }
+
+    if (signedCierres.length) {
+      y -= 16
+      if (y - 40 < 60) newPage('Integridad de cierres firmados (continuación)')
+      y = drawSectionTitle(page, { ml: ML, y, text: `INTEGRIDAD DE CIERRES FIRMADOS · SHA-256 (${signedCierres.length})`, colors: pdfCols, fontB })
+      y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: HASH_COLS, colors: pdfCols, fontB })
+      signedCierres.forEach((cierre: any, i: number) => {
+        if (y - 15 < 60) { newPage('Integridad de cierres firmados (continuación)'); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: HASH_COLS, colors: pdfCols, fontB }) }
+        y = drawTableDataRow(page, {
+          ml: ML, cw: CW, y, cols: HASH_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB,
+          vals: [cierre.mes, cierre.empName || employeesById.get(cierre.empId)?.name || cierre.empId, cierre.integrityHash],
+        })
+      })
+    }
+
+    drawDocumentFooters(pdfDoc, { ml: ML, cw: CW, colors: pdfCols, fontR })
+    const bytes = await pdfDoc.save()
+    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+    const blobUrl = URL.createObjectURL(blob)
+    downloadDataUrl(blobUrl, `inspeccion-registro-horario-${today()}.pdf`)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
     toast('Paquete de inspección generado', 3000, 'ok')
   }
 

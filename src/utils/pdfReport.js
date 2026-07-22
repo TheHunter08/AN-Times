@@ -39,7 +39,7 @@ export function drawTableHeaderRow(page, { ml, y, cw, cols, colors, fontB, headH
 }
 
 // Dibuja una fila de datos con franjas alternas y separadores verticales.
-export function drawTableDataRow(page, { ml, cw, y, vals, cols, striped, colors, fontR, fontB, highlightIdx, rowH = 15 }) {
+export function drawTableDataRow(page, { ml, cw, y, vals, cols, striped, colors, fontR, fontB, highlightIdx = -1, rowH = 15 }) {
   page.drawRectangle({ x: ml, y: y - rowH, width: cw, height: rowH, color: striped ? colors.ltGray : colors.white })
   page.drawLine({ start: { x: ml, y: y - rowH }, end: { x: ml + cw, y: y - rowH }, thickness: 0.3, color: colors.border })
   let xc = ml
@@ -100,6 +100,31 @@ export function drawFooterLegal(page, { ml, cw, colors, fontR, y = 24 }) {
     'Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.',
     { x: ml, y, size: 5.5, font: fontR, color: colors.gray, maxWidth: cw }
   )
+}
+
+// Dibuja una fila de tarjetas de estadística (etiqueta arriba, valor grande
+// centrado abajo) dentro de una caja con fondo de marca — reutilizable en
+// cualquier informe (paquete de inspección, informe mensual, etc.).
+export function drawStatRow(page, { ml, cw, y, height = 60, items, colors, fontR, fontB }) {
+  page.drawRectangle({ x: ml, y: y - height, width: cw, height, color: colors.priLt, borderColor: colors.pri, borderWidth: 0.6 })
+  const colW = cw / items.length
+  items.forEach((item, i) => {
+    const cx = ml + i * colW
+    const center = cx + colW / 2
+    const labelW = fontR.widthOfTextAtSize(item.label, 7.5)
+    const valueW = fontB.widthOfTextAtSize(item.val, 13)
+    page.drawText(pdfSafe(item.label), { x: center - Math.min(labelW, colW - 8) / 2, y: y - 20, size: 7.5, font: fontR, color: colors.gray, maxWidth: colW - 8 })
+    page.drawText(pdfSafe(item.val), { x: center - Math.min(valueW, colW - 8) / 2, y: y - 42, size: 13, font: fontB, color: item.color || colors.pri, maxWidth: colW - 8 })
+  })
+  return y - height
+}
+
+// Dibuja un título de sección discreto (barra de color a la izquierda + texto
+// en mayúsculas) para separar bloques dentro de un informe largo.
+export function drawSectionTitle(page, { ml, y, text, colors, fontB, size = 8.5 }) {
+  page.drawRectangle({ x: ml, y: y - size + 1, width: 3, height: size, color: colors.pri })
+  page.drawText(pdfSafe(text), { x: ml + 8, y, size, font: fontB, color: colors.pri })
+  return y - size - 8
 }
 
 // Añade el pie legal y la numeración a todas las páginas del documento.
