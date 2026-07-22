@@ -27,3 +27,33 @@ test('activa automáticamente una versión PWA que ya está esperando', async ({
     .toEqual({ type: 'SKIP_WAITING' })
   await expect(page.getByRole('button', { name: /Actualizar ahora/i })).toHaveCount(0)
 })
+
+test('activa la versión aunque updatefound no llegue al reanudar la PWA', async ({ page }) => {
+  await page.addInitScript(() => {
+    const waitingWorker = new EventTarget()
+    waitingWorker.state = 'installed'
+    waitingWorker.postMessage = message => { window.__pwaUpdateMessage = message }
+
+    const registration = new EventTarget()
+    registration.waiting = null
+    registration.installing = null
+    registration.update = async () => {
+      // Reproduce WebView/iOS: update() termina con el worker preparado, pero el
+      // evento updatefound no se entrega a la página que acaba de recuperar foco.
+      registration.waiting = waitingWorker
+    }
+
+    const serviceWorker = new EventTarget()
+    serviceWorker.controller = {}
+    serviceWorker.ready = Promise.resolve(registration)
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: serviceWorker,
+    })
+  })
+  await seedLogin(page)
+  await page.goto('/')
+
+  await expect.poll(() => page.evaluate(() => window.__pwaUpdateMessage), { timeout: 1500 })
+    .toEqual({ type: 'SKIP_WAITING' })
+})

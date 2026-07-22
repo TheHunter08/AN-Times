@@ -114,6 +114,7 @@ function UpdateBanner() {
     if (!('serviceWorker' in navigator)) return
     let updateInterval = null
     let registration = null
+    let updateFlight = null
     const onControllerChange = () => {
       if (reloading.current) return
       reloading.current = true
@@ -121,8 +122,17 @@ function UpdateBanner() {
     }
     const checkNow = () => {
       if (document.visibilityState !== 'visible') return
-      if (registration) registration.update().catch(() => {})
       if (registration?.waiting) _setSW(registration.waiting)
+      if (!registration || updateFlight) return
+      // Esperar a que update() termine y volver a mirar registration.waiting.
+      // En algunos WebView/iOS el evento updatefound llega tarde o se pierde al
+      // reanudar la PWA, aunque el worker nuevo ya haya terminado de instalarse.
+      updateFlight = registration.update()
+        .then(() => {
+          if (registration?.waiting) _setSW(registration.waiting)
+        })
+        .catch(() => {})
+        .finally(() => { updateFlight = null })
     }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
     navigator.serviceWorker.ready.then(reg => {
@@ -150,16 +160,20 @@ function UpdateBanner() {
 
       // Comprobación inmediata, periódica y al volver a abrir/recuperar conexión.
       checkNow()
-      // Los assets llevan hash y la comprobación también se ejecuta al volver
-      // a la app o recuperar red. Cinco minutos evita una petición por minuto
-      // en cada uno de los dispositivos sin retrasar una actualización crítica.
-      updateInterval = setInterval(checkNow, 5 * 60 * 1000)
+      // sw.js pesa poco, no consulta Supabase y se sirve con no-cache. Una
+      // comprobación cada 30 s evita que una versión crítica tarde hasta cinco
+      // minutos en aparecer mientras la PWA permanece abierta.
+      updateInterval = setInterval(checkNow, 30 * 1000)
     }).catch(() => {})
     window.addEventListener('online', checkNow)
+    window.addEventListener('focus', checkNow)
+    window.addEventListener('pageshow', checkNow)
     document.addEventListener('visibilitychange', checkNow)
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
       window.removeEventListener('online', checkNow)
+      window.removeEventListener('focus', checkNow)
+      window.removeEventListener('pageshow', checkNow)
       document.removeEventListener('visibilitychange', checkNow)
       if (updateInterval) clearInterval(updateInterval)
     }
@@ -169,7 +183,9 @@ function UpdateBanner() {
   useEffect(() => {
     if (!waitingSW) return
     const initial = setTimeout(applySafely, 500)
-    const retry = setInterval(applySafely, 10 * 1000)
+    // Una sincronización normal dura pocos segundos. Reintentar pronto permite
+    // activar la versión en cuanto termina, sin esperar otros diez segundos.
+    const retry = setInterval(applySafely, 2 * 1000)
     const onOnline = () => applySafely()
     window.addEventListener('online', onOnline)
     return () => {
