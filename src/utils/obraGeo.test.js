@@ -17,6 +17,16 @@ describe('coordenadas de obra', () => {
     expect(normalizeObraCoords(null)).toBeNull()
   })
 
+  it('acepta coma decimal (formato es-ES) en vez de solo punto', () => {
+    expect(normalizeObraCoords('18,4861,-69,9312')).toEqual({ lat:18.4861, lng:-69.9312 })
+    expect(normalizeObraCoords('-18,4861,-69,9312')).toEqual({ lat:-18.4861, lng:-69.9312 })
+  })
+
+  it('acepta espacio o punto y coma como separador entre lat y lng', () => {
+    expect(normalizeObraCoords('18.4861 -69.9312')).toEqual({ lat:18.4861, lng:-69.9312 })
+    expect(normalizeObraCoords('18.4861;-69.9312')).toEqual({ lat:18.4861, lng:-69.9312 })
+  })
+
   it('genera una etiqueta GPS consistente', () => {
     expect(formatObraCoords({ lat:18.4861, lng:-69.9312 })).toBe('18.48610, -69.93120')
   })

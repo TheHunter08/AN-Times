@@ -2223,8 +2223,10 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const saveDB = useAppStore(s => s.saveDB)
   const toast  = useAppStore(s => s.toast)
   const isEdit = !!initial
+  const initialCoords = normalizeObraCoords(initial?.coords ?? null)
   const [nombre, setNombre] = useState(initial?.nombre || '')
-  const [coords, setCoords] = useState(initial?.coords ? formatObraCoords(initial.coords) : '')
+  const [lat, setLat] = useState(initialCoords ? String(initialCoords.lat) : '')
+  const [lng, setLng] = useState(initialCoords ? String(initialCoords.lng) : '')
   const [radio, setRadio] = useState(String(initial?.radio || 200))
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
@@ -2232,15 +2234,21 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const dialogRef = useDialogA11y(true, onClose)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
+  // Latitud y longitud en dos campos separados (no un único texto "lat,lng")
+  // a propósito: alguien escribiendo a mano en es-ES usa la coma como
+  // separador decimal ("18,4861"), no como separador de campo — con un solo
+  // input de texto libre, esa entrada partía en 4 trozos y la validación la
+  // rechazaba una y otra vez sin ninguna pista de qué formato hacía falta.
+  // Con dos inputs numéricos esa ambigüedad desaparece: cada campo es un
+  // único número, decida el navegador el separador decimal que decida.
   const useMyLocation = () => {
     if (!navigator.geolocation) { toast('Este dispositivo no permite geolocalización', 3000, 'warn'); return }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       pos => {
         setLocating(false)
-        const lat = +pos.coords.latitude.toFixed(5)
-        const lng = +pos.coords.longitude.toFixed(5)
-        setCoords(`${lat},${lng}`)
+        setLat(String(+pos.coords.latitude.toFixed(5)))
+        setLng(String(+pos.coords.longitude.toFixed(5)))
         toast('Ubicación detectada — revisa el mapa antes de guardar', 3000, 'ok')
       },
       error => {
@@ -2254,10 +2262,13 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
     )
   }
 
+  const hasAnyCoord = lat.trim() !== '' || lng.trim() !== ''
+  const normalizedCoordsPreview = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
+
   const handleSave = () => {
     if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
-    const normalizedCoords = coords.trim() ? normalizeObraCoords(coords) : null
-    if (coords.trim() && !normalizedCoords) { toast('Usa coordenadas válidas: latitud, longitud', 3500, 'warn'); return }
+    const normalizedCoords = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
+    if (hasAnyCoord && !normalizedCoords) { toast('Revisa la latitud y la longitud: deben ser números dentro de rango (-90..90 / -180..180)', 4000, 'warn'); return }
     const nowIso = new Date().toISOString()
     const obra = {
       ...(initial || {}),
@@ -2293,23 +2304,35 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
           <input value={nombre} onChange={e => setNombre(e.target.value)} aria-label="Nombre de la obra" placeholder="Ej: Gecama" style={fieldStyle} />
         </div>
         <div>
-          <div style={labelStyle}>Coordenadas GPS (opcional)</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={coords} onChange={e => setCoords(e.target.value)} aria-label="Coordenadas GPS" placeholder="Ej: 18.4861,-69.9312" style={{ ...fieldStyle, flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+            <div style={{ ...labelStyle, marginBottom: 0 }}>Ubicación GPS (opcional)</div>
             <button
               type="button"
               onClick={useMyLocation}
               disabled={locating}
               aria-label="Usar mi ubicación actual"
               title="Usar mi ubicación actual"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, padding: '9px 10px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: locating ? colors.bg[600] : colors.primary.dim, color: colors.primary.light, cursor: locating ? 'wait' : 'pointer', flexShrink: 0 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 7, border: 'none', background: locating ? colors.bg[600] : colors.primary.dim, color: colors.primary.light, cursor: locating ? 'wait' : 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
             >
-              <IconMapPin width={16} height={16} />
+              <IconMapPin width={13} height={13} /> {locating ? 'Detectando…' : 'Usar mi ubicación'}
             </button>
           </div>
-          {normalizeObraCoords(coords) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <input type="number" step="any" inputMode="decimal" value={lat} onChange={e => setLat(e.target.value)} aria-label="Latitud" placeholder="Latitud, ej: 18.4861" style={fieldStyle} />
+            </div>
+            <div>
+              <input type="number" step="any" inputMode="decimal" value={lng} onChange={e => setLng(e.target.value)} aria-label="Longitud" placeholder="Longitud, ej: -69.9312" style={fieldStyle} />
+            </div>
+          </div>
+          {hasAnyCoord && !normalizedCoordsPreview && (
+            <div style={{ fontSize: 11, color: colors.semantic.orange, marginTop: 6 }}>
+              Latitud entre -90 y 90, longitud entre -180 y 180.
+            </div>
+          )}
+          {normalizedCoordsPreview && (
             <a
-              href={`https://www.google.com/maps?q=${normalizeObraCoords(coords)!.lat},${normalizeObraCoords(coords)!.lng}`}
+              href={`https://www.google.com/maps?q=${normalizedCoordsPreview.lat},${normalizedCoordsPreview.lng}`}
               target="_blank" rel="noreferrer"
               style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: colors.primary.light, textDecoration: 'underline' }}
             >
