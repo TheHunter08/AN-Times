@@ -37,6 +37,19 @@ const COLD_ROW_ID = 3
 // El esquema desplegado restringe app_data a la fila 1. Mantener la fila 3
 // activa provocaba un 23514 y una segunda escritura de fallback en cada save.
 // Se conserva el código de partición para una futura migración explícita.
+// Distingue un fallo de RED real (sin señal, timeout de _timeoutFetch) de un
+// error que SÍ llegó al servidor y volvió con una respuesta (RLS, esquema,
+// payload inválido, 500...). Antes cualquier error del guardado se anunciaba
+// como "poca cobertura" — con buena señal pero un error real de Supabase,
+// el aviso era simplemente falso y no ayudaba a diagnosticar el problema real.
+function _isConnectivityError(e) {
+  if (!e) return true
+  if (e.name === 'AbortError') return true          // nuestro propio timeout de _timeoutFetch
+  if (e instanceof TypeError) return true            // fetch no llegó a completar la petición
+  if (e.code || e.status || e.details) return false  // PostgREST/Postgres respondió con un error real
+  return true
+}
+
 const USE_COLD_ROW = false
 const COLD_KEYS = ['gastos', 'denuncias', 'wellbeing', 'anomalias_vistas']
 
@@ -737,7 +750,8 @@ async function _runBgSyncFallback() {
       setTimeout(_bgSyncFallback, _bgSyncRetries * 5000)
     } else {
       _bgSyncRetries = 0
-      window.dispatchEvent(new CustomEvent('times-save-failed'))
+      if (_isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
+      else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
     }
     return { ok: false, pending: true, error: e }
   }
@@ -824,20 +838,22 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
       _storeForBgSync(payload, effectiveDeleted, effectiveSyncHint)
-      // Solo 2 reintentos en primer plano (antes 5): el dato YA está a salvo en
-      // IDB desde la línea de arriba, así que insistir aquí solo añade tiempo de
-      // espera en pantalla sin más seguridad — en señal débil es mejor rendirse
-      // rápido y dejar que la cola de fondo (background sync / listener 'online')
-      // termine el trabajo sin bloquear al usuario.
-      if (_saveRetry < 2) {
+      // Solo 3 reintentos en primer plano (antes 5, luego 2): el dato YA está a
+      // salvo en IDB desde la línea de arriba, así que insistir aquí solo añade
+      // tiempo de espera en pantalla sin más seguridad — pero con solo 2 daba
+      // demasiados falsos "poca cobertura" ante un simple pico de latencia
+      // puntual con señal real. Un reintento extra (4s) absorbe esos picos sin
+      // alargar mucho la espera cuando sí es una desconexión real.
+      if (_saveRetry < 3) {
         _saveRetry++
         _pushQueue.unshift({ db: null, deleted: effectiveDeleted, syncHint: effectiveSyncHint, onSuccess, onError })
-        // Backoff: 1s, 2s
+        // Backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, _saveRetry - 1), 30000)
         setTimeout(() => _drainQueue(), delay)
       } else {
         _saveRetry = 0
-        window.dispatchEvent(new CustomEvent('times-save-failed'))
+        if (_isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
+        else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
       }
     })
 }

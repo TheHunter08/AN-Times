@@ -532,6 +532,13 @@ export default function App() {
     // había perdido cuando en realidad estaba a salvo.
     const onSaveFailed = () => useAppStore.getState().toast('Poca cobertura: tus datos están guardados en el dispositivo y se sincronizarán solos en cuanto mejore la señal.', 6000, 'warn')
     window.addEventListener('times-save-failed', onSaveFailed)
+    // A diferencia de times-save-failed (timeout/sin red), este error SÍ llegó
+    // al servidor y volvió con una respuesta de error — no es un problema de
+    // señal, así que no tiene sentido decirle al empleado que "mejore la
+    // señal" cuando el problema real está en el guardado. El dato sigue a
+    // salvo en el dispositivo igualmente (mismo _storeForBgSync de antes).
+    const onSaveError = (e) => useAppStore.getState().toast(`No se pudo guardar en el servidor (${e.detail?.message || 'error desconocido'}). Tus datos siguen a salvo en este dispositivo y se reintentará solo.`, 8000, 'warn')
+    window.addEventListener('times-save-error', onSaveError)
     // Cuando vuelva internet: sincronizar inmediatamente
     const onOnline = () => {
       useAppStore.setState(s => s.offlinePending ? { syncStatus: 'syncing' } : {})
@@ -589,6 +596,7 @@ export default function App() {
       window.removeEventListener('push-deeplink', onDeepLink)
       window.removeEventListener('times-synced', onSynced)
       window.removeEventListener('times-save-failed', onSaveFailed)
+      window.removeEventListener('times-save-error', onSaveError)
       window.removeEventListener('online', onOnline)
       clearInterval(pollInterval)
       clearInterval(pendingRetryInterval)
