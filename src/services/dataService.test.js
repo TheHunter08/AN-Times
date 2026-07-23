@@ -1,7 +1,46 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints } from './dataService.js'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
+
+describe('isConnectivityError', () => {
+  it('trata timeouts y fallos de fetch como problema de conectividad', () => {
+    expect(isConnectivityError({ name: 'AbortError' })).toBe(true)
+    expect(isConnectivityError(new TypeError('Failed to fetch'))).toBe(true)
+    expect(isConnectivityError(null)).toBe(true)
+  })
+
+  it('trata un error que sí respondió el servidor (RLS, FK, dato inválido) como error real', () => {
+    expect(isConnectivityError({ code: '23505', message: 'duplicate key' })).toBe(false)
+    expect(isConnectivityError({ status: 500, message: 'internal error' })).toBe(false)
+  })
+})
+
+describe('withConnectivityRetry', () => {
+  it('reintenta un fallo de conectividad hasta que tiene éxito', async () => {
+    let attempts = 0
+    const fn = vi.fn(async () => {
+      attempts++
+      if (attempts < 3) throw { name: 'AbortError' }
+      return 'ok'
+    })
+    const result = await withConnectivityRetry(fn, { attempts: 3, delaysMs: [0, 0] })
+    expect(result).toBe('ok')
+    expect(fn).toHaveBeenCalledTimes(3)
+  })
+
+  it('relanza un error real del servidor sin reintentar', async () => {
+    const fn = vi.fn(async () => { throw { code: '23505', message: 'duplicate key' } })
+    await expect(withConnectivityRetry(fn, { attempts: 3, delaysMs: [0, 0] })).rejects.toMatchObject({ code: '23505' })
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('relanza el último error de conectividad tras agotar los reintentos', async () => {
+    const fn = vi.fn(async () => { throw { name: 'AbortError' } })
+    await expect(withConnectivityRetry(fn, { attempts: 3, delaysMs: [0, 0] })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fn).toHaveBeenCalledTimes(3)
+  })
+})
 
 // Regresión: un empleado/encargado borraba una jornada y, si un fetchDB
 // (sondeo, realtime, o simplemente reabrir la app) llegaba antes de que el

@@ -47,12 +47,28 @@ const COLD_ROW_ID = 3
 // payload inválido, 500...). Antes cualquier error del guardado se anunciaba
 // como "poca cobertura" — con buena señal pero un error real de Supabase,
 // el aviso era simplemente falso y no ayudaba a diagnosticar el problema real.
-function _isConnectivityError(e) {
+export function isConnectivityError(e) {
   if (!e) return true
   if (e.name === 'AbortError') return true          // nuestro propio timeout de _timeoutFetch
   if (e instanceof TypeError) return true            // fetch no llegó a completar la petición
   if (e.code || e.status || e.details) return false  // PostgREST/Postgres respondió con un error real
   return true
+}
+
+// Reintenta una operación de red solo cuando el fallo es de conectividad real
+// (ver isConnectivityError) — un error real del servidor (RLS, FK, dato
+// inválido) se relanza al primer intento, sin gastar tiempo reintentando algo
+// que va a fallar igual las tres veces.
+export async function withConnectivityRetry(fn, { attempts = 3, delaysMs = [1000, 2000] } = {}) {
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn() } catch (e) {
+      lastErr = e
+      if (i >= attempts - 1 || !isConnectivityError(e)) throw e
+      await new Promise(resolve => setTimeout(resolve, delaysMs[i] ?? delaysMs[delaysMs.length - 1]))
+    }
+  }
+  throw lastErr
 }
 
 const USE_COLD_ROW = false
@@ -755,7 +771,7 @@ async function _runBgSyncFallback() {
       setTimeout(_bgSyncFallback, _bgSyncRetries * 5000)
     } else {
       _bgSyncRetries = 0
-      if (_isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
+      if (isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
       else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
     }
     return { ok: false, pending: true, error: e }
@@ -857,7 +873,7 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
         setTimeout(() => _drainQueue(), delay)
       } else {
         _saveRetry = 0
-        if (_isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
+        if (isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
         else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
       }
     })

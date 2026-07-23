@@ -48,6 +48,7 @@ import {
   cloudFetchTs as _v1FetchTs,
   cloudPush  as _v1Push,
   setPostBlobSyncHandler,
+  withConnectivityRetry,
 } from './dataService.js'
 import {
   COMPANY_ID,
@@ -133,20 +134,29 @@ function fromObra(o) {
 // de la tabla antes de mostrar éxito. El push general al blob sigue ejecutándose
 // después mediante saveDB, pero realtime ya no puede devolver una fila antigua
 // durante esa ventana.
+// withConnectivityRetry: antes, un solo blip de red (timeout, sin señal un
+// instante) hacía fallar de golpe todo el aprobar/editar/borrar — a
+// diferencia del guardado normal (saveDB/cloudPush), que sí reintenta y
+// encola offline. Un fallo real del servidor (RLS, FK, dato inválido) se
+// relanza al primer intento, sin reintentos inútiles.
 export async function persistRecordRow(record) {
   if (!supabase) return false
-  const { error } = await supabase.from('records').upsert(toRecord(record), { onConflict: 'id' })
-  if (error) throw error
+  await withConnectivityRetry(async () => {
+    const { error } = await supabase.from('records').upsert(toRecord(record), { onConflict: 'id' })
+    if (error) throw error
+  })
   return true
 }
 
 export async function deleteRecordRow(id) {
   if (!supabase) return false
   const nowIso = new Date().toISOString()
-  const { error } = await supabase.from('records')
-    .update({ deleted: true, deleted_at: nowIso, updated_at: nowIso })
-    .eq('id', id).eq('company_id', COMPANY_ID)
-  if (error) throw error
+  await withConnectivityRetry(async () => {
+    const { error } = await supabase.from('records')
+      .update({ deleted: true, deleted_at: nowIso, updated_at: nowIso })
+      .eq('id', id).eq('company_id', COMPANY_ID)
+    if (error) throw error
+  })
   return true
 }
 

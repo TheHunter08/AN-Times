@@ -21,7 +21,7 @@ import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 import { useEmployeesData } from './hooks/useEmployeesData.js'
 import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
-import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny } from '../services/dataService.js'
+import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs, vacData as vacDataUtil } from '../utils/time.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
@@ -370,6 +370,15 @@ function fmtTime(ts?: string) {
   if (!ts) return ''
   try { return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
+// persistRecordRow/deleteRecordRow ya reintentan solos ante un blip de red
+// (withConnectivityRetry) — si aun así llega aquí un error, distingue si de
+// verdad no hay forma de llegar al servidor (mensaje honesto sobre la señal,
+// no "está guardado" porque esta acción concreta SÍ requiere confirmación
+// del servidor) de un error real (RLS, dato inválido...) con su detalle.
+function syncErrorMessage(action: string, error: any): string {
+  if (isConnectivityError(error)) return `${action}: no se pudo contactar con el servidor. Comprueba tu conexión e inténtalo de nuevo.`
+  return `${action}: ${error?.message || 'error de sincronización'}`
+}
 
 // ─── Page wrappers ─────────────────────────────────────────────────────────────
 
@@ -440,7 +449,7 @@ function useRequestsActions() {
       const calculated = calcSecs(base)
       updatedRecord = { ...base, workSecs:calculated.work, breakSecs:calculated.brk }
       try { await persistRecordRow(updatedRecord) } catch (error: any) {
-        toast(`No se pudo aplicar la corrección: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+        toast(syncErrorMessage('No se pudo aplicar la corrección', error), 5000, 'warn')
         return
       }
     }
@@ -805,7 +814,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
       toast('Fichaje modificado y sincronizado', 3000, 'ok')
       return true
-    } catch (error:any) { toast(`No se pudo modificar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
+    } catch (error:any) { toast(syncErrorMessage('No se pudo modificar', error), 5000, 'warn'); return false }
   }
 
   const remove = async (id: string, reason: string) => {
@@ -827,7 +836,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       }, { forceSyncIds:{ records:[id] }, deleted:{ records:[id] }, skipPriorityPersist:true })
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
       return true
-    } catch (error:any) { toast(`No se pudo eliminar: ${error?.message || 'error de sincronización'}`, 5000, 'warn'); return false }
+    } catch (error:any) { toast(syncErrorMessage('No se pudo eliminar', error), 5000, 'warn'); return false }
   }
 
   return <Timesheets rows={rows} search={search} onSearchChange={handleSearch} onModify={modify} onDelete={remove} />
@@ -1023,7 +1032,7 @@ function ValidateHoursPage() {
     const nowIso = new Date().toISOString()
     const updated = { ...rec, aceptada: true, validado: true, rechazado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try { await persistRecordRow(updated) } catch (error: any) {
-      toast(`No se pudo validar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo validar', error), 5000, 'warn')
       return
     }
     saveDB((fresh: any) => {
@@ -1044,7 +1053,7 @@ function ValidateHoursPage() {
     const nowIso = new Date().toISOString()
     const updated = { ...rec, aceptada: false, rechazado: true, validado: false, validadoBy: session?.user?.name || 'Admin', validadoAt: nowIso, _upd: nowIso }
     try { await persistRecordRow(updated) } catch (error: any) {
-      toast(`No se pudo rechazar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo rechazar', error), 5000, 'warn')
       return
     }
     saveDB((fresh: any) => {
@@ -1108,7 +1117,7 @@ function ValidateHoursPage() {
       toast('Horario modificado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] modify failed:', error)
-      toast(`No se pudo guardar el horario: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo guardar el horario', error), 5000, 'warn')
     }
   }
 
@@ -1135,7 +1144,7 @@ function ValidateHoursPage() {
       toast('Fichaje eliminado y sincronizado', 3000, 'ok')
     } catch (error: any) {
       console.error('[records] delete failed:', error)
-      toast(`No se pudo eliminar: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo eliminar', error), 5000, 'warn')
     }
   }
 
@@ -2629,7 +2638,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     const workedMinutes = Math.floor(totals.work / 60)
 
     try { await persistRecordRow(closed) } catch (error: any) {
-      toast(`No se pudo finalizar la jornada: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo finalizar la jornada', error), 5000, 'warn')
       return
     }
 
@@ -2650,7 +2659,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     const restored = { ...recentClose.record, _upd: nowIso }
 
     try { await persistRecordRow(restored) } catch (error: any) {
-      toast(`No se pudo deshacer el cierre: ${error?.message || 'error de sincronización'}`, 5000, 'warn')
+      toast(syncErrorMessage('No se pudo deshacer el cierre', error), 5000, 'warn')
       return
     }
 
