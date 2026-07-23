@@ -974,10 +974,15 @@ export default function EmployeePage() {
       const todayQR = today()
       const empVac = (db.vacaciones || []).find(v => v.empId === emp.id && v.estado === 'aprobada' && v.fechaInicio <= todayQR && v.fechaFin >= todayQR)
       if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
-      const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
-      saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
-      queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
-      toast(`Jornada iniciada para ${emp.name}`, 3000, 'ok')
+      // Mismo criterio que finalizar (arriba): sin confirmación, un QR mal
+      // escaneado (badge equivocado, prueba) creaba un fichaje real al
+      // instante para un empleado que no había iniciado nada.
+      showConfirm(`¿Iniciar la jornada de ${emp.name}?`, () => {
+        const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
+        saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
+        queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
+        toast(`Jornada iniciada para ${emp.name}`, 3000, 'ok')
+      })
       return
     }
 
