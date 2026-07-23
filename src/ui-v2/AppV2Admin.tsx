@@ -2722,6 +2722,31 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     setRecentClose(null)
   }
 
+  const toggleBreak = async (row: any) => {
+    const current = (db.records || []).find((record: any) => record.id === row.id)
+    if (!current || current.fin) return
+    const nowIso = new Date().toISOString()
+    const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
+    let updated: any
+    if (current.enDescanso) {
+      const breaks = [...(current.breaks || []), { start: current.bStartTs, end: nowIso }]
+      updated = { ...current, breaks, breakSecs: calcSecs({ ...current, breaks }).brk, enDescanso: false, bStartTs: null, _upd: nowIso, _rev: (current._rev || 0) + 1 }
+    } else {
+      updated = { ...current, enDescanso: true, bStartTs: nowIso, _upd: nowIso, _rev: (current._rev || 0) + 1 }
+    }
+    try { await persistRecordRow(updated) } catch (error: any) {
+      toast(syncErrorMessage('No se pudo actualizar el descanso', error), 5000, 'warn')
+      return
+    }
+    saveDB((fresh: any) => ({
+      ...fresh,
+      records: (fresh.records || []).map((record: any) => record.id === updated.id ? updated : record),
+    }), { forceSyncIds: { records: [updated.id] }, skipPriorityPersist: true })
+    const wasBreak = current.enDescanso
+    queuePush(row.employeeId, wasBreak ? '▶ Descanso finalizado' : '⏸ Descanso iniciado', wasBreak ? `${actor} ha reanudado tu jornada.` : `${actor} ha pausado tu jornada.`, 'jornada', '/?tab=inicio')
+    toast(wasBreak ? `▶ ${row.name}: jornada reanudada` : `⏸ ${row.name}: descanso iniciado`, 3000, 'ok')
+  }
+
   const remindMissing = () => {
     missingTeam.forEach((employee:any) => queuePush(employee.id, 'Recordatorio de fichaje', `${user.name || 'Tu responsable'} te recuerda que todavía no has iniciado la jornada.`, 'jornada', '/?tab=inicio'))
     toast(`Recordatorio enviado a ${missingTeam.length} empleado${missingTeam.length === 1 ? '' : 's'}`, 3000, 'ok')
@@ -2772,7 +2797,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     }
   }
 
-  return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} onOpenEmployee={row => onOpenEmployee(row.employeeId)} />
+  return <OnlineTeam rows={rows} hasScope={hasScope} onFinishShift={finishShift} onToggleBreak={toggleBreak} recentClose={recentClose} onUndoClose={undoClose} missingCount={missingTeam.length} onRemindMissing={remindMissing} onFinishMany={finishMany} onOpenEmployee={row => onOpenEmployee(row.employeeId)} />
 }
 
 function MessagesPage() {

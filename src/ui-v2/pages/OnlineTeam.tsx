@@ -24,7 +24,7 @@ function elapsed(startedAt: string, now: number) {
   return `${hours}h ${String(minutes).padStart(2, '0')}m`
 }
 
-export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoClose, missingCount = 0, onRemindMissing, onFinishMany, onOpenEmployee }: { rows: OnlineTeamRow[]; hasScope: boolean; onFinishShift?: (row: OnlineTeamRow) => void; recentClose?: { name: string; reason: string } | null; onUndoClose?: () => void; missingCount?: number; onRemindMissing?: () => void; onFinishMany?: (rows: OnlineTeamRow[]) => void; onOpenEmployee?: (row: OnlineTeamRow) => void }) {
+export function OnlineTeam({ rows, hasScope, onFinishShift, onToggleBreak, recentClose, onUndoClose, missingCount = 0, onRemindMissing, onFinishMany, onOpenEmployee }: { rows: OnlineTeamRow[]; hasScope: boolean; onFinishShift?: (row: OnlineTeamRow) => void; onToggleBreak?: (row: OnlineTeamRow) => void; recentClose?: { name: string; reason: string } | null; onUndoClose?: () => void; missingCount?: number; onRemindMissing?: () => void; onFinishMany?: (rows: OnlineTeamRow[]) => void; onOpenEmployee?: (row: OnlineTeamRow) => void }) {
   const [now, setNow] = useState(Date.now())
   const [search, setSearch] = useState('')
   const [location, setLocation] = useState('all')
@@ -109,15 +109,26 @@ export function OnlineTeam({ rows, hasScope, onFinishShift, recentClose, onUndoC
                   <span style={{ color: colors.text[500] }}>Entrada <strong style={{ color: colors.text[700] }}>{new Date(row.startedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</strong></span>
                   <strong style={{ color: colors.text[700] }}>{elapsed(row.startedAt, now)}</strong>
                 </div>
-                {onFinishShift && (
-                  <button
-                    type="button"
-                    onClick={event => { event.stopPropagation(); onFinishShift(row) }}
-                    style={{ border: '1px solid rgba(239,68,68,.32)', background: 'rgba(239,68,68,.10)', color: colors.semantic.red, borderRadius: radius.md, padding: '7px 10px', fontSize: 11, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    Finalizar jornada
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {onToggleBreak && (
+                    <button
+                      type="button"
+                      onClick={event => { event.stopPropagation(); onToggleBreak(row) }}
+                      style={{ border: `1px solid ${row.onBreak ? 'rgba(16,185,129,.32)' : 'rgba(245,158,11,.32)'}`, background: row.onBreak ? 'rgba(16,185,129,.10)' : 'rgba(245,158,11,.10)', color: row.onBreak ? colors.semantic.green : colors.semantic.orange, borderRadius: radius.md, padding: '7px 10px', fontSize: 11, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {row.onBreak ? '▶ Reanudar' : '⏸ Pausa'}
+                    </button>
+                  )}
+                  {onFinishShift && (
+                    <button
+                      type="button"
+                      onClick={event => { event.stopPropagation(); onFinishShift(row) }}
+                      style={{ border: '1px solid rgba(239,68,68,.32)', background: 'rgba(239,68,68,.10)', color: colors.semantic.red, borderRadius: radius.md, padding: '7px 10px', fontSize: 11, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      Finalizar
+                    </button>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
