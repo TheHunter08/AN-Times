@@ -57,18 +57,28 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     }
     const notiAction = 'Documento firmado'
     const notiDetail = `${u.name} firmó "${doc.titulo}"`
-    saveDB(fresh => {
-      const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
-        ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
-      } : d)
-      const noti = createNotification({ empId:'__admin__', action:notiAction, detail:notiDetail, dedupeKey:`documento:${doc.id}:firma:${u.id}`, ts:firmadoAt })
-      const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
-      return { documentos: updated, notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
-    })
-    queuePush('__admin__', notiAction, notiDetail, 'times-doc', '/?go=admin:documentos', `documento:${doc.id}:firma:${u.id}`)
-    setStamping(false)
-    toast('Documento firmado correctamente', 3000, 'ok')
-    setSigning(null)
+    // try/finally: antes, si saveDB/createNotification/auditLog lanzaban un
+    // error inesperado, setStamping(false) nunca se ejecutaba y los botones
+    // "Cancelar"/"Confirmar y firmar" quedaban bloqueados para siempre, sin
+    // ningún aviso — solo se podía escapar cerrando el modal entero.
+    try {
+      saveDB(fresh => {
+        const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
+          ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
+        } : d)
+        const noti = createNotification({ empId:'__admin__', action:notiAction, detail:notiDetail, dedupeKey:`documento:${doc.id}:firma:${u.id}`, ts:firmadoAt })
+        const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
+        return { documentos: updated, notis: [...(fresh.notis || []), noti], audit: withAudit.audit }
+      })
+      queuePush('__admin__', notiAction, notiDetail, 'times-doc', '/?go=admin:documentos', `documento:${doc.id}:firma:${u.id}`)
+      toast('Documento firmado correctamente', 3000, 'ok')
+      setSigning(null)
+    } catch (e) {
+      console.error('[FIRMA] No se pudo guardar la firma:', e)
+      toast('⚠️ No se pudo guardar la firma. Inténtalo de nuevo.', 5000, 'warn')
+    } finally {
+      setStamping(false)
+    }
   }
 
   const DocCard = ({ d }) => (

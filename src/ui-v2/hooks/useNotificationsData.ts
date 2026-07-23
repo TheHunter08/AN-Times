@@ -50,6 +50,7 @@ function classifyAction(action?: string): NotificationItem['type'] {
 
 export function useNotificationsData(): {
   items: NotificationItem[]
+  unreadCount: number
   markRead: (id: string) => void
   markAllRead: () => void
   dismiss: (id: string) => void
@@ -62,9 +63,14 @@ export function useNotificationsData(): {
   // también los recordatorios personales de cada empleado (fichaje,
   // vacaciones, cierre pendiente…), pareciendo notis "duplicadas" cuando en
   // realidad eran avisos de distintos empleados con el mismo texto genérico.
-  const items: NotificationItem[] = dedupeNotifications(db.notis || [])
+  const adminNotis = dedupeNotifications(db.notis || [])
     .filter(n => !n.deleted && n.empId === '__admin__')
     .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')))
+  // La insignia de la campana cuenta sobre TODAS, no solo las 50 que se
+  // listan — si no, con más de 50 sin leer el número se quedaba corto sin
+  // ningún aviso de que había más pendientes.
+  const unreadCount = adminNotis.filter(n => !n.leido).length
+  const items: NotificationItem[] = adminNotis
     .slice(0, 50)
     .map((n): NotificationItem => ({
       id: n.id,
@@ -97,5 +103,5 @@ export function useNotificationsData(): {
     }))
   }
 
-  return { items, markRead, markAllRead, dismiss }
+  return { items, unreadCount, markRead, markAllRead, dismiss }
 }

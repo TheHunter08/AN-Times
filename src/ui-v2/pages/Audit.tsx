@@ -23,6 +23,7 @@ export interface AuditEntry {
 
 export interface AuditProps {
   entries: AuditEntry[]
+  totalCount?: number
   onExport?: () => void
   onOpenEntry?: (entry: AuditEntry) => void
 }
@@ -47,10 +48,11 @@ const catStyle: Record<AuditEntry['category'], { bg: string; color: string }> = 
   seguridad: { bg: 'rgba(239,68,68,.14)',   color: colors.semantic.red },
 }
 
-export function Audit({ entries, onExport, onOpenEntry }: AuditProps) {
+export function Audit({ entries, totalCount, onExport, onOpenEntry }: AuditProps) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<AuditEntry['category'] | 'all'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const isTruncated = typeof totalCount === 'number' && totalCount > entries.length
 
   const filtered = entries
     .filter(e => catFilter === 'all' || e.category === catFilter)
@@ -68,8 +70,13 @@ export function Audit({ entries, onExport, onOpenEntry }: AuditProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <PageTitle>Auditoría</PageTitle>
           <span style={{ fontSize: 11.5, color: colors.text[500], padding: '3px 10px', borderRadius: radius.pill, background: colors.bg[500], border: `1px solid ${colors.border.subtle}` }}>
-            {entries.length} registros
+            {isTruncated ? `${entries.length} de ${totalCount} registros` : `${entries.length} registros`}
           </span>
+          {isTruncated && (
+            <span style={{ fontSize: 11, color: colors.semantic.orange }} title="La búsqueda y los filtros solo cubren los registros más recientes mostrados aquí. Usa «Exportar» para el histórico completo.">
+              Mostrando solo lo más reciente
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <Search placeholder="Buscar acción, usuario…" value={search} onChange={e => setSearch(e.target.value)} />

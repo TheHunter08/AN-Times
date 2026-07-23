@@ -32,6 +32,10 @@ export function TabMensajes({ db, u, toast, saveDB }) {
     try {
       saveDB(freshDb => ({ chats: [...(freshDb.chats || []), msg] }))
       queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')
+      // El estado nunca se actualizaba tras guardar: el ⏳ se quedaba fijo
+      // para siempre en cada mensaje enviado, aunque ya estuviera guardado
+      // y sincronizado — el empleado podía pensar que nunca llegaba.
+      saveDB(freshDb => ({ chats: (freshDb.chats || []).map(m => m.id === msg.id ? { ...m, estado: 'enviado' } : m) }))
       setTimeout(() => { setSending(false) }, 300)
     } catch {
       setSending(false)

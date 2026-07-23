@@ -34,7 +34,7 @@ import { downloadHoursReportXlsx } from '../utils/hoursReportXlsx.js'
 import { buildCierreConsolidadoPDF } from '../utils/cierrePdf.js'
 import { useDialogA11y } from '../hooks/useDialogA11y.js'
 import { getScopedOnlineRecords, getScopedEmployees, isScopedSupervisor } from '../utils/supervisorScope.js'
-import { verifyPin } from '../utils/pinSecurity.js'
+import { verifyPin, hashPin } from '../utils/pinSecurity.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
 import { monthlyTargetMinutes } from '../utils/workTargets.js'
@@ -152,11 +152,18 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
     }
     setSending(true)
     const nowIso = new Date().toISOString()
+    // Hashear ANTES de saveDB: el updater de saveDB es síncrono y no puede
+    // esperar a WebCrypto. Sin esto, el PIN viajaba y se guardaba en texto
+    // plano hasta el primer login del empleado (que sí lo hasheaba) — con
+    // las políticas de Supabase abiertas, quedaba legible por cualquiera con
+    // la anon key mientras tanto.
+    const newPinHash = form.pin ? await hashPin(form.pin, form.id) : null
+    const newPinLen = form.pin ? form.pin.length : null
     saveDB((fresh: any) => {
       const emps: any[] = fresh.employees || []
       const existing = isEdit ? emps.find((e: any) => e.id === form.id) || {} : {}
-      const pinHash = form.pin ? form.pin : (isEdit ? existing.pin || null : null)
-      const pinLen = form.pin ? form.pin.length : (isEdit ? existing.pinLen || null : null)
+      const pinHash = newPinHash ?? (isEdit ? existing.pin || null : null)
+      const pinLen = newPinLen ?? (isEdit ? existing.pinLen || null : null)
       const emp = {
         ...existing,
         id: form.id, name: validation.name, email: validation.email,
@@ -1667,7 +1674,12 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   }
 
   const handleExportPayroll = () => {
-    const month = months[0] || localMonthKey(new Date())
+    // months[0] solía ser el mes en curso en cuanto hubiera un solo fichaje
+    // hoy — la nómina salía con horas incompletas sin ningún aviso. Se
+    // excluye el mes actual (todavía no ha terminado de ficharse) y se usa
+    // el último mes ya cerrado como mes por defecto.
+    const currentMonth = localMonthKey(new Date())
+    const month = months.find((m: string) => m !== currentMonth) || months[0] || currentMonth
     const employees = (db.employees || []).filter((employee: any) => !employee.isAdmin && !employee.baja)
     const monthRecords = (db.records || []).filter((record: any) => record.inicio && record.fin && localMonthKey(record.inicio) === month)
     const payrollRows = employees.map((employee: any) => {
@@ -1865,15 +1877,19 @@ function MonthlyClosePage() {
   const isLastDayOfMonth = canCloseMonth(currentCloseMonth, nowForClose)
 
   // El cierre, manual o automático, solo puede generarse cuando el mes terminó.
+  // toCreate se recalcula DENTRO de saveDB contra fresh.cierres (no contra el
+  // `db` de render, que puede llevar ya un rato desactualizado): sin esto,
+  // este efecto automático y un clic manual en "Generar cierre" casi
+  // simultáneos podían generar dos cierres para el mismo empleado/mes.
   useEffect(() => {
     if (autoGenRef.current || !isLastDayOfMonth) return
     autoGenRef.current = true
     const mesPasado = currentCloseMonth
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
-    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
-    const toCreate = emps.filter((e: any) => !existing.has(e.id))
-    if (!toCreate.length) return
     saveDB((fresh: any) => {
+      const emps = (fresh.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+      const existing = new Set((fresh.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
+      const toCreate = emps.filter((e: any) => !existing.has(e.id))
+      if (!toCreate.length) return null
       const recs = fresh.records || []
       const nuevos = toCreate.flatMap((e: any) => {
         const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
@@ -1986,19 +2002,26 @@ function MonthlyClosePage() {
       })
   }, [db.cierres, db.employees, db.records])
 
-  // Generate closures for the previous (completed) month only
+  // Generate closures for the previous (completed) month only.
+  // toCreate se recalcula dentro de saveDB contra fresh.cierres — mismo
+  // criterio que el efecto de auto-generación de arriba, para que un doble
+  // clic (o el auto-generado disparándose casi a la vez) no produzca dos
+  // cierres para el mismo empleado/mes. sending además desactiva el botón.
+  const [generatingClosures, setGeneratingClosures] = useState(false)
   const handleGenerateAll = () => {
+    if (generatingClosures) return
     if (!isLastDayOfMonth) {
       toast('El cierre mensual solo puede generarse cuando el mes haya terminado', 4500, 'warn')
       return
     }
     const mesPasado = currentCloseMonth
-    const emps = (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
-    const existing = new Set((db.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
-    const toCreate = emps.filter((e: any) => !existing.has(e.id))
-    if (!toCreate.length) { toast(`Todos los empleados ya tienen cierre de ${mesPasado}`, 3000, 'ok'); return }
-
+    setGeneratingClosures(true)
+    let outcome = 'up_to_date' as 'created' | 'up_to_date' | 'no_records'
     saveDB((fresh: any) => {
+      const emps = (fresh.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
+      const existing = new Set((fresh.cierres || []).filter((c: any) => c.mes === mesPasado && !c.desactualizado).map((c: any) => c.empId))
+      const toCreate = emps.filter((e: any) => !existing.has(e.id))
+      if (!toCreate.length) return null
       const recs = fresh.records || []
       const nuevos = toCreate.flatMap((e: any) => {
         const eRecs = recs.filter((r: any) => r.empId === e.id && r.fin && localMonthKey(r.inicio) === mesPasado)
@@ -2009,13 +2032,17 @@ function MonthlyClosePage() {
         const targetMin = monthlyTargetMinutes(e, mesPasado)
         return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
-      if (!nuevos.length) { toast(`Sin registros de ${mesPasado}`, 3000, 'warn'); return null }
+      if (!nuevos.length) { outcome = 'no_records'; return null }
+      outcome = 'created'
       const withAudit = auditLog(fresh, `Cierre mensual generado (${mesPasado})`, `${nuevos.length} empleados`, session?.user?.name || 'Admin')
       const reemplazados = new Set(nuevos.map((c: any) => c.empId))
       const cierres = (fresh.cierres || []).filter((c: any) => !(c.mes === mesPasado && c.desactualizado && reemplazados.has(c.empId)))
       return { cierres: [...cierres, ...nuevos], audit: withAudit.audit }
     })
-    toast(`Generando cierres de ${mesPasado}…`, 2500, 'ok')
+    if (outcome === 'created') toast(`Generando cierres de ${mesPasado}…`, 2500, 'ok')
+    else if (outcome === 'no_records') toast(`Sin registros de ${mesPasado}`, 3000, 'warn')
+    else toast(`Todos los empleados ya tienen cierre de ${mesPasado}`, 3000, 'ok')
+    setGeneratingClosures(false)
   }
 
   const handleSignAdmin = (id: string) => {
@@ -2194,7 +2221,7 @@ function MonthlyClosePage() {
     toast(`${affected.length} cierre${affected.length !== 1 ? 's' : ''} de ${mes} eliminado${affected.length !== 1 ? 's' : ''}`, 3500, 'ok')
   }
 
-  return <MonthlyClose items={items} onDownload={handleDownloadPdf} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth} generationHint={isLastDayOfMonth ? `Generar cierre de ${currentCloseMonth}` : 'El mes todavía no ha terminado'} />
+  return <MonthlyClose items={items} onDownload={handleDownloadPdf} onSignAdmin={handleSignAdmin} onSignMany={handleSignMany} onGenerateAll={handleGenerateAll} onDelete={handleDeleteClosure} onDeleteMonth={handleDeleteMonth} onReopen={handleReopenClosure} onReopenMonth={handleReopenMonth} onDownloadConsolidated={handleDownloadConsolidated} canGenerate={isLastDayOfMonth && !generatingClosures} generationHint={!isLastDayOfMonth ? 'El mes todavía no ha terminado' : generatingClosures ? 'Generando…' : `Generar cierre de ${currentCloseMonth}`} />
 }
 
 function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -2231,12 +2258,19 @@ function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     })), [db.audit])
 
   const handleExport = () => {
-    const rows = entries.map((e: any) => [
-      e.ts ? new Date(e.ts).toLocaleString('es-ES') : '',
-      e.action, e.user, e.detail, e.entityId || '', e.reason || '', e.device || '',
-    ])
+    // Exporta TODO db.audit, no solo los 200 más recientes que se muestran
+    // en pantalla — antes exportaba lo mismo que se veía, así que un motivo
+    // de más de 200 acciones atrás no aparecía ni en pantalla ni en el CSV.
+    const rows = (db.audit || [])
+      .slice()
+      .sort((a: any, b: any) => String(a.ts || '').localeCompare(String(b.ts || '')))
+      .map((e: any) => [
+        e.ts ? new Date(e.ts).toLocaleString('es-ES') : '',
+        e.action || '', e.user || e.who || '', e.detail || e.target || '',
+        e.entityId || '', e.reason || '', e.device || '',
+      ])
     downloadCsv(['Fecha', 'Acción', 'Usuario', 'Detalle', 'Registro', 'Motivo', 'Dispositivo'], rows, `auditoria-${today()}.csv`)
-    toast('Auditoría exportada', 2000, 'ok')
+    toast(`Auditoría exportada · ${rows.length} registros`, 2500, 'ok')
   }
 
   const handleOpenEntry = (entry: any) => {
@@ -2248,7 +2282,7 @@ function AuditPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     if (target) onNavigate(target)
   }
 
-  return <Audit entries={entries} onExport={handleExport} onOpenEntry={handleOpenEntry} />
+  return <Audit entries={entries} totalCount={(db.audit || []).length} onExport={handleExport} onOpenEntry={handleOpenEntry} />
 }
 
 function AnomaliesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => void }) {
@@ -2904,7 +2938,7 @@ export default function AppV2Admin() {
   const name = session?.user?.name || 'Admin'
   const aiUser = session?.user || { id:'__admin__', name, role:'admin', isAdmin:true }
   const notis = useNotificationsData()
-  const unreadCount = useMemo(() => notis.items.filter(n => !n.read).length, [notis.items])
+  const unreadCount = notis.unreadCount
 
   // Detectar si es encargado/jefe_obra en lugar de admin
   const isEnc = !session?.isAdmin && (session?.isEnc || session?.isJO)

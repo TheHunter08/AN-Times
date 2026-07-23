@@ -185,13 +185,13 @@ export function EmployeeDenuncia({ toast, onBack }: EmployeeDenunciaProps) {
       <div style={{ background: colors.bg[600], borderRadius: 14, padding: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: '.95rem', color: colors.text[900], fontWeight: 700 }}>Consultar estado</h3>
         <p style={{ margin: '0 0 12px', color: colors.text[500], fontSize: '.82rem' }}>
-          Introduce el código de 6 caracteres que recibiste al enviar tu denuncia.
+          Introduce el código de 8 caracteres que recibiste al enviar tu denuncia.
         </p>
 
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: '1rem', letterSpacing: '.1em', textTransform: 'uppercase' }}
-            type="text" placeholder="XXXXXX" maxLength={6} value={trackCode}
+            type="text" placeholder="XXXXXXXX" maxLength={8} value={trackCode}
             onChange={e => { setTrackCode(e.target.value.toUpperCase()); setTrackResult(null); setTrackError('') }}
           />
           <button onClick={handleTrack} disabled={tracking} style={{ background: colors.primary.base, border: 'none', borderRadius: 10, color: '#fff', fontWeight: 600, fontSize: '.9rem', padding: '10px 18px', cursor: tracking ? 'not-allowed' : 'pointer', opacity: tracking ? .7 : 1, flexShrink: 0, fontFamily: 'inherit' }}>
