@@ -734,8 +734,19 @@ export default function EmployeePage() {
       toast(`🌴 Estás de vacaciones hasta el ${fds(activeVac.fechaFin)}. No puedes fichar hasta que terminen.`, 5000, 'warn')
       return false
     }
+    // Turno asignado por el administrador (Inicio del turno, en el perfil del
+    // empleado): no dejar fichar antes de esa hora. Comparación lexicográfica
+    // de "HH:MM" es válida porque ambos lados están siempre a 2 dígitos.
+    if (u?.turnoInicio) {
+      const now = new Date()
+      const nowHM = `${p2(now.getHours())}:${p2(now.getMinutes())}`
+      if (nowHM < u.turnoInicio) {
+        toast(`Tu turno empieza a las ${u.turnoInicio}. Todavía no puedes iniciar la jornada.`, 5000, 'warn')
+        return false
+      }
+    }
     return true
-  }, [timer.state, db.vacaciones, u?.id, toast, launchRequirements])
+  }, [timer.state, db.vacaciones, u?.id, u?.turnoInicio, toast, launchRequirements])
 
   const doStart = () => {
     if (!checkFichajePreconditions()) return
