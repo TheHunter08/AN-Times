@@ -41,6 +41,7 @@ import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { getLaunchBlockers } from '../utils/launchRequirements.js'
 import { isValidAccountEmail } from '../utils/authRegistration.js'
+import { hashPin } from '../utils/pinSecurity.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -128,14 +129,22 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
       ? form.obrasAsignadas.filter((x: string) => x !== id)
       : [...form.obrasAsignadas, id])
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
     const validation: any = validateEmployeeProfile(form, db.employees || [], isEdit)
     if (!validation.ok) { toast(validation.error, 4500, 'warn'); return }
+    setSaving(true)
+    // El PIN nunca se guarda en texto plano: se hashea aquí con el mismo
+    // formato PBKDF2 (pinSecurity.js) que usa el login. Sin esto, el PIN que
+    // pone el admin viajaba en claro al blob local y a Supabase hasta que el
+    // empleado hacía su primer login (momento en que LoginV2 lo migraba).
+    const newPinHash = form.pin ? await hashPin(form.pin, form.id) : null
     const nowIso = new Date().toISOString()
     saveDB((fresh: any) => {
       const emps: any[] = fresh.employees || []
       const existing = isEdit ? emps.find((e: any) => e.id === form.id) || {} : {}
-      const pinHash = form.pin ? form.pin : (isEdit ? existing.pin || null : null)
+      const pinHash = newPinHash || (isEdit ? existing.pin || null : null)
       const pinLen = form.pin ? form.pin.length : (isEdit ? existing.pinLen || null : null)
       const emp = {
         ...existing,
@@ -275,8 +284,8 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             </span>
           </div>
         )}
-        <button onClick={handleSave} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
-          {isEdit ? 'Guardar cambios' : 'Crear empleado'}
+        <button onClick={handleSave} disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear empleado'}
         </button>
       </div>
     </div>
