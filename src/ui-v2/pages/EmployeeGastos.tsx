@@ -6,6 +6,8 @@ import { gid, today } from '../../utils/time.js'
 import { resizeImageToDataUrl } from '../../utils/imageResize.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { supabase } from '../../services/dataServiceV2.js'
+import { queuePush } from '../../services/dataService.js'
+import { createNotification } from '../../utils/notifications.js'
 import { GASTOS_BUCKET } from '../../config/constants.js'
 
 const CATEGORIAS = ['dieta', 'transporte', 'material', 'otro']
@@ -69,15 +71,20 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
     let cancelled = false
     const ids = pendingFotoIds.split(',')
     ;(async () => {
-      const entries = await Promise.all(ids.map(async (id: string) => {
+      // No se cachea `null` en caso de fallo (a diferencia de un éxito): un
+      // error puntual de red dejaba la miniatura sin cargar para siempre,
+      // porque pendingFotoIds excluye cualquier id ya presente en
+      // signedUrls aunque su valor fuera null — así, sin caché de fallo, se
+      // reintenta en el siguiente render en vez de solo tras recargar la página.
+      const entries = (await Promise.all(ids.map(async (id: string) => {
         const g = misGastos.find((x: any) => x.id === id)
-        if (!g) return [id, null]
+        if (!g) return null
         try {
           const { data, error } = await supabase.storage.from(GASTOS_BUCKET).createSignedUrl(g.fotoPath, 3600)
-          return [id, error ? null : (data?.signedUrl || null)]
-        } catch { return [id, null] }
-      }))
-      if (!cancelled) setSignedUrls(prev => ({ ...prev, ...Object.fromEntries(entries) }))
+          return error || !data?.signedUrl ? null : [id, data.signedUrl]
+        } catch { return null }
+      }))).filter(Boolean) as [string, string][]
+      if (!cancelled && entries.length) setSignedUrls(prev => ({ ...prev, ...Object.fromEntries(entries) }))
     })()
     return () => { cancelled = true }
   }, [pendingFotoIds])
@@ -135,7 +142,12 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
       } else if (foto) {
         nuevo.foto = foto
       }
-      await saveDB((freshDb: any) => ({ gastos: [...(freshDb.gastos || []), nuevo] }))
+      // A diferencia de vacaciones/cierre/documentos, enviar un gasto no
+      // avisaba al admin de ninguna forma — solo se enteraba si entraba
+      // manualmente a la pantalla de gastos, retrasando el reembolso.
+      const noti = createNotification({ empId: '__admin__', action: 'Nuevo gasto pendiente', detail: `${u.name}: ${concepto.trim()} · ${fmt(+importe)} €`, dedupeKey: `gasto:${nuevo.id}:pendiente`, ts: nowIso })
+      await saveDB((freshDb: any) => ({ gastos: [...(freshDb.gastos || []), nuevo], notis: [...(freshDb.notis || []), noti] }))
+      queuePush('__admin__', noti.action, noti.detail, 'times-gasto', '/?go=admin:gastos', `gasto:${nuevo.id}:pendiente`)
       toast?.('Gasto enviado correctamente', 3000, 'ok')
       resetForm()
       setOpen(false)
@@ -185,7 +197,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
             </div>
             <div>
               <label style={labelStyle}>Fecha</label>
-              <input style={inputStyle} type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+              <input style={inputStyle} type="date" value={fecha} max={today()} onChange={e => setFecha(e.target.value)} />
             </div>
           </div>
           <div>

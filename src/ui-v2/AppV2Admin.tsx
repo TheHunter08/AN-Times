@@ -2376,6 +2376,11 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const [radio, setRadio] = useState(String(initial?.radio || 200))
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
+  // Sin este campo, ninguna obra podía marcarse como completada/inactiva
+  // desde la UI: handleSave escribía siempre activa:true, así que el filtro
+  // "Completada" de Obras.tsx era inalcanzable y una obra creada por error o
+  // ya terminada se quedaba para siempre seleccionable al asignar empleados.
+  const [activa, setActiva] = useState(initial?.activa ?? true)
   const [locating, setLocating] = useState(false)
   const [sending, setSending] = useState(false)
   const dialogRef = useDialogA11y(true, onClose)
@@ -2424,7 +2429,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
       id: initial?.id || gid(), nombre: nombre.trim(),
       coords: normalizedCoords,
       radio: Number(radio) > 0 ? Number(radio) : 200,
-      activa: initial?.activa ?? true,
+      activa,
       fechaInicio: fechaInicio || null,
       centroTrabajo: centroTrabajo || null,
       _upd: nowIso,
@@ -2513,6 +2518,17 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
             Los empleados asignados a esta obra quedarán visibles para los encargados/jefes de obra de este centro, aunque no tengan la obra marcada directamente.
           </div>
         </div>
+        {isEdit && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px', borderRadius: 10, border: `1px solid ${colors.border.default}`, background: activa ? 'rgba(var(--uiv2-overlay-rgb),.04)' : colors.primary.dim, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!activa} onChange={e => setActiva(!e.target.checked)} style={{ marginTop: 2, accentColor: colors.primary.base }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900] }}>Marcar como completada</div>
+              <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2 }}>
+                Deja de aparecer como obra activa al asignar empleados. No borra ningún dato histórico.
+              </div>
+            </div>
+          </label>
+        )}
         <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
           {isEdit ? 'Guardar cambios' : 'Crear obra'}
         </button>

@@ -396,6 +396,33 @@ export default function App() {
     return () => window.removeEventListener('times-conflict', handler)
   }, [toast])
 
+  // El bloqueo por PIN (pinLockouts) vive en el store de cada pestaña, que
+  // solo se sincroniza entre pestañas vía un ciclo completo con el
+  // servidor — con dos pestañas de login abiertas en el mismo dispositivo,
+  // cada una llevaba su propio contador de intentos fallidos, multiplicando
+  // por pestañas el número de intentos antes de bloquear de verdad. El
+  // evento 'storage' del navegador SÍ es instantáneo entre pestañas del
+  // mismo origen (solo se dispara en las OTRAS, nunca en la que escribió),
+  // así que basta con fusionar pinLockouts en cuanto cambie.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== 'an_times_v1' || !e.newValue) return
+      try {
+        const incoming = JSON.parse(e.newValue)?.pinLockouts
+        if (!incoming) return
+        // Solo actualiza el estado en memoria de ESTA pestaña — la otra
+        // pestaña ya se encargó de persistirlo al servidor con su propio
+        // saveDB; repetir el push aquí solo añadiría tráfico redundante.
+        const { db } = useAppStore.getState()
+        const merged = { ...(db.pinLockouts || {}), ...incoming }
+        if (JSON.stringify(merged) === JSON.stringify(db.pinLockouts || {})) return
+        useAppStore.setState({ db: { ...db, pinLockouts: merged } })
+      } catch {}
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   useEffect(() => {
     fetchDB()
     initRealtime()
