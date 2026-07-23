@@ -11,7 +11,12 @@ import { dedupeNotifications } from '../utils/notifications.js'
 // timeout propio, esas sí podían quedarse colgadas indefinidamente. Con esto,
 // cualquier petición individual falla rápido y entra en el mismo camino de
 // reintento/cola offline que ya existe, en vez de bloquear la UI.
-const _FETCH_TIMEOUT_MS = 6000
+// 6s abortaba peticiones que con 4G real pero débil (2 barras, alta latencia
+// en la ruta hasta Supabase) habrían terminado bien un par de segundos
+// después — cada guardado encadena varias peticiones (delta, timestamp,
+// datos, upsert final), así que abortar una sola ya bastaba para que todo el
+// intento se etiquetara como "poca cobertura" con cobertura real de sobra.
+const _FETCH_TIMEOUT_MS = 9000
 function _timeoutFetch(url, options = {}) {
   if (options.signal) return fetch(url, options)
   const controller = new AbortController()

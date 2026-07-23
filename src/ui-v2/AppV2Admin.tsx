@@ -2575,14 +2575,23 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   // podía desaparecer de "sin fichar" en cuanto cerraba su jornada.
   const missingTeam = useMemo(() => {
     const liveIds = new Set((db.records || []).filter((record:any) => !record.fin).map((record:any) => record.empId))
+    // De vacaciones aprobadas hoy: no ha fichado, pero no es que se le olvidara
+    // — sin este filtro, el botón "recordar fichaje" le mandaba un push de
+    // "aún no has iniciado la jornada" a alguien que está de vacaciones.
+    const todayStr = today()
+    const onLeaveTodayIds = new Set(
+      (db.vacaciones || [])
+        .filter((v: any) => v.estado === 'aprobada' && v.empId && v.fechaInicio && v.fechaFin && v.fechaInicio <= todayStr && todayStr <= v.fechaFin)
+        .map((v: any) => v.empId)
+    )
     const scoped = getScopedEmployees({
       employees: db.employees || [],
       obras: db.obras || [],
       supervisor: user,
       unrestricted: !isScopedRole,
     })
-    return scoped.filter((employee:any) => employee.id !== user.id && !liveIds.has(employee.id))
-  }, [db.records, db.employees, db.obras, user, isScopedRole])
+    return scoped.filter((employee:any) => employee.id !== user.id && !liveIds.has(employee.id) && !onLeaveTodayIds.has(employee.id))
+  }, [db.records, db.employees, db.obras, db.vacaciones, user, isScopedRole])
 
   // persistRecordRow primero (igual que Fichajes/Validar horas): la
   // mutación de un record solo se confirma en local si el guardado

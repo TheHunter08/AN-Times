@@ -21,9 +21,16 @@ interface DbEmployee {
   baja?: boolean
   isAdmin?: boolean
 }
+interface DbVac {
+  empId?: string
+  estado?: string
+  fechaInicio?: string
+  fechaFin?: string
+}
 interface Db {
   employees?: DbEmployee[]
   records?: DbRecord[]
+  vacaciones?: DbVac[]
   audit?: { action: string; detail?: string; user?: string; ts?: string }[]
   config?: { wdMin?: number }
 }
@@ -86,11 +93,21 @@ export function useDashboardData(): DashboardData {
       return result
     }
 
+    // Un empleado de vacaciones aprobadas hoy no fichó, pero tampoco está
+    // "ausente" (sin justificar) — sin este filtro, "Ausentes hoy" contaba
+    // igual a alguien de vacaciones que a alguien que simplemente no fichó.
+    const onLeaveTodayIds = new Set(
+      (db.vacaciones || [])
+        .filter(v => v.estado === 'aprobada' && v.empId && v.fechaInicio && v.fechaFin && v.fechaInicio <= todayStr && todayStr <= v.fechaFin)
+        .map(v => v.empId as string)
+    )
+    const absentCount = emps.filter(e => !presentTodayIds.has(e.id) && !onLeaveTodayIds.has(e.id)).length
+
     const kpis: KPI[] = [
       { label:'Empleados activos', value:String(emps.length), tone:'primary' },
       { label:'Trabajando ahora', value:String(workingCount), tone:'cyan' },
       { label:'En descanso', value:String(breakCount), tone:'amber' },
-      { label:'Ausentes hoy', value:String(Math.max(0, emps.length - presentTodayIds.size)), tone:'accent' },
+      { label:'Ausentes hoy', value:String(absentCount), tone:'accent' },
       { label:'Horas trabajadas hoy', value:mhm(dayMinutes.get(todayStr) || 0), tone:'primary' },
     ]
     const activity: ActivityItem[] = (db.audit || []).slice(-10).reverse().map((entry, index) => ({
@@ -100,7 +117,7 @@ export function useDashboardData(): DashboardData {
       tone:activityTone(entry.action),
     }))
     return { kpis, activity, trend:buildTrend(0), compareTrend:buildTrend(1) }
-  }, [db.employees, db.records, db.audit, db.config?.wdMin])
+  }, [db.employees, db.records, db.vacaciones, db.audit, db.config?.wdMin])
 
   const name = session?.user?.name?.split(' ')?.[0] ?? ''
   return {
