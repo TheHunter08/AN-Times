@@ -790,6 +790,21 @@ export default function EmployeePage() {
         return
       }
     }
+    // Relee el estado más fresco (no el `db` capturado al abrir el modal, que
+    // puede llevar rato abierto mientras se espera el GPS) justo antes de
+    // crear el fichaje: timer.state solo se actualiza una vez por segundo
+    // desde db.records, así que si este dispositivo aún no había recibido un
+    // fichaje abierto en otro sitio (offline, encargado por QR, otro
+    // dispositivo…), timer.state seguía en 'idle' y dejaba iniciar una
+    // SEGUNDA jornada simultánea — dos fichajes abiertos a la vez para el
+    // mismo empleado, algo que nunca debería ser posible.
+    const freshRecords = useAppStore.getState().db.records || []
+    const alreadyOpen = freshRecords.find(r => r.empId === u.id && !r.fin)
+    if (alreadyOpen) {
+      toast(`Ya tienes una jornada activa iniciada a las ${ftime(alreadyOpen.inicio)}. Ciérrala antes de iniciar otra.`, 6000, 'warn')
+      startingRef.current = false
+      return
+    }
     geoAbortRef.current = true
     setGpsStatus('idle')
     closeModal()
@@ -978,6 +993,11 @@ export default function EmployeePage() {
       // escaneado (badge equivocado, prueba) creaba un fichaje real al
       // instante para un empleado que no había iniciado nada.
       showConfirm(`¿Iniciar la jornada de ${emp.name}?`, () => {
+        // Relee justo antes de crear: pudo abrirse otro fichaje para este
+        // empleado (desde su propio móvil, otro encargado…) mientras el
+        // diálogo de confirmación estaba abierto.
+        const freshOpen = (useAppStore.getState().db.records || []).find(r => r.empId === emp.id && !r.fin)
+        if (freshOpen) { toast(`${emp.name} ya tiene una jornada activa iniciada a las ${ftime(freshOpen.inicio)}.`, 5000, 'warn'); return }
         const newRec = { id: gid(), operationId: globalThis.crypto?.randomUUID?.() ?? null, _rev: 1, empId: emp.id, empName: emp.name, inicio: new Date().toISOString(), fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, creadoPor: u.name, _upd: new Date().toISOString() }
         saveDB(freshDb => ({ records: [...(freshDb.records || []), newRec] }))
         queuePush(emp.id, '▶ Jornada iniciada', `${u.name} ha iniciado tu jornada laboral.`, 'jornada', '/?tab=inicio')
