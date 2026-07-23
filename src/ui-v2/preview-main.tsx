@@ -115,6 +115,11 @@ function AdminPreview() {
               ],
               extra:12,activeCount:12,pauseCount:2,total:18,onClick:()=>setActive('empleados'),
             }}
+            vacationsToday={[
+              { id:'v1',name:'Franklin Melo',until:'25 jul' },
+              { id:'v2',name:'Rosa Ventura',until:'28 jul' },
+            ]}
+            onOpenVacations={()=>setActive('solicitudes')}
             quickLinks={[
               { id:'pendientes',label:'Centro de pendientes',value:'12',onClick:()=>setActive('pendientes') },
               { id:'validar',label:'Horas por validar',value:'7',onClick:()=>setActive('validar') },

@@ -47,6 +47,12 @@ export interface TeamSlot {
   onClick?: () => void
 }
 
+export interface VacationPerson {
+  id: string
+  name: string
+  until?: string
+}
+
 export interface DashboardProps {
   greeting: string
   greetingSub?: string
@@ -59,6 +65,8 @@ export interface DashboardProps {
   fichaje?: { statusLabel: string; time: string; tone: 'green' | 'primary' | 'orange'; onClick?: () => void }
   quickLinks?: QuickLink[]
   teamSlot?: TeamSlot
+  vacationsToday?: VacationPerson[]
+  onOpenVacations?: () => void
   onExport?: () => void
   onTrendClick?: () => void
 }
@@ -146,6 +154,8 @@ export function Dashboard({
   fichaje,
   quickLinks,
   teamSlot,
+  vacationsToday,
+  onOpenVacations,
   onExport,
   onTrendClick,
 }: DashboardProps) {
@@ -161,7 +171,7 @@ export function Dashboard({
   const workingPct = (workingCount / total) * 100
   const pausePct = ((teamSlot?.pauseCount ?? 0) / total) * 100
   const awayPct = (awayCount / total) * 100
-  const hasThirdRow = Boolean(nextEvent || fichaje || (teamSlot && teamSlot.total > 0) || quickLinks?.length)
+  const hasThirdRow = Boolean(nextEvent || fichaje || (teamSlot && teamSlot.total > 0) || quickLinks?.length || vacationsToday?.length)
 
   return (
     <div className="ti-dashboard">
@@ -354,6 +364,26 @@ export function Dashboard({
                 <span><i className="ti-legend-dot ti-legend-dot--working" />Trabajando <strong>{workingCount}</strong></span>
                 <span><i className="ti-legend-dot ti-legend-dot--pause" />Descanso <strong>{teamSlot.pauseCount}</strong></span>
                 <span><i className="ti-legend-dot ti-legend-dot--away" />Fuera <strong>{awayCount}</strong></span>
+              </div>
+            </article>
+          )}
+
+          {vacationsToday && vacationsToday.length > 0 && (
+            <article className="ti-panel ti-vacations-card ti-pressable" role="button" tabIndex={0} onClick={onOpenVacations} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && onOpenVacations) { e.preventDefault(); onOpenVacations() } }} aria-label="Abrir vacaciones">
+              <PanelTitle detail={<strong className="ti-distribution-card__total">{vacationsToday.length}</strong>}>
+                De vacaciones hoy
+              </PanelTitle>
+              <div className="ti-vacations-list">
+                {vacationsToday.slice(0, 4).map(person => (
+                  <div className="ti-vacations-row" key={person.id}>
+                    <span className="ti-vacations-row__dot" aria-hidden="true" />
+                    <span className="ti-vacations-row__name" title={person.name}>{person.name}</span>
+                    {person.until && <span className="ti-vacations-row__until">hasta {person.until}</span>}
+                  </div>
+                ))}
+                {vacationsToday.length > 4 && (
+                  <div className="ti-vacations-row ti-vacations-row--more">+{vacationsToday.length - 4} más</div>
+                )}
               </div>
             </article>
           )}
@@ -637,6 +667,13 @@ export function Dashboard({
         .ti-legend-dot--working { background: ${colors.semantic.green}; }
         .ti-legend-dot--pause { background: ${colors.semantic.orange}; }
         .ti-legend-dot--away { background: ${colors.text[300]}; }
+        .ti-vacations-list { display: flex; flex-direction: column; gap: 2px; }
+        .ti-vacations-row { min-height: 30px; display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 0 2px; border-bottom: 1px solid ${colors.border.subtle}; }
+        .ti-vacations-row:last-child { border-bottom: 0; }
+        .ti-vacations-row__dot { width: 7px; height: 7px; border-radius: 999px; background: ${colors.accent.base}; }
+        .ti-vacations-row__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: ${colors.text[900]}; font-size: 12px; font-weight: 550; }
+        .ti-vacations-row__until { color: ${colors.text[500]}; font-size: 10px; white-space: nowrap; }
+        .ti-vacations-row--more { grid-template-columns: 1fr; color: ${colors.text[500]}; font-size: 10.5px; font-weight: 600; padding-top: 3px; border-bottom: 0; }
         .ti-management-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
         .ti-management-link { min-width: 0; min-height: 51px; padding: 7px 9px; display: flex; align-items: center; gap: 8px; border: 1px solid ${colors.border.subtle}; border-radius: 12px; background: rgba(var(--uiv2-overlay-rgb), .018); color: ${colors.text[500]}; cursor: pointer; font-family: inherit; text-align: left; transition: background 140ms cubic-bezier(.2,0,0,1), border-color 140ms cubic-bezier(.2,0,0,1), transform 140ms cubic-bezier(.2,0,0,1); }
         .ti-management-link:hover { background: ${colors.bg[500]}; border-color: ${colors.border.default}; transform: translateY(-1px); }

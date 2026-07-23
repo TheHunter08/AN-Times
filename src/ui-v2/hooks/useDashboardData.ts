@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { today, calcMin, mhm, localDateStr } from '../../utils/time.js'
-import type { KPI, ActivityItem } from '../pages/Dashboard.js'
+import type { KPI, ActivityItem, VacationPerson } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 
 interface DbRecord {
@@ -23,6 +23,7 @@ interface DbEmployee {
 }
 interface DbVac {
   empId?: string
+  empName?: string
   estado?: string
   fechaInicio?: string
   fechaFin?: string
@@ -41,6 +42,7 @@ export interface DashboardData {
   activity: ActivityItem[]
   trend: AreaChartPoint[]
   compareTrend: AreaChartPoint[]
+  vacationsToday: VacationPerson[]
 }
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
@@ -96,12 +98,16 @@ export function useDashboardData(): DashboardData {
     // Un empleado de vacaciones aprobadas hoy no fichó, pero tampoco está
     // "ausente" (sin justificar) — sin este filtro, "Ausentes hoy" contaba
     // igual a alguien de vacaciones que a alguien que simplemente no fichó.
-    const onLeaveTodayIds = new Set(
-      (db.vacaciones || [])
-        .filter(v => v.estado === 'aprobada' && v.empId && v.fechaInicio && v.fechaFin && v.fechaInicio <= todayStr && todayStr <= v.fechaFin)
-        .map(v => v.empId as string)
-    )
+    const leavesToday = (db.vacaciones || [])
+      .filter(v => v.estado === 'aprobada' && v.empId && v.fechaInicio && v.fechaFin && v.fechaInicio <= todayStr && todayStr <= v.fechaFin)
+    const onLeaveTodayIds = new Set(leavesToday.map(v => v.empId as string))
     const absentCount = emps.filter(e => !presentTodayIds.has(e.id) && !onLeaveTodayIds.has(e.id)).length
+    const empNameById = new Map(emps.map(e => [e.id, e.name]))
+    const vacationsToday: VacationPerson[] = leavesToday.map(v => ({
+      id: v.empId as string,
+      name: empNameById.get(v.empId as string) || v.empName || 'Empleado',
+      until: v.fechaFin ? new Date(`${v.fechaFin}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : undefined,
+    }))
 
     const kpis: KPI[] = [
       { label:'Empleados activos', value:String(emps.length), tone:'primary' },
@@ -116,7 +122,7 @@ export function useDashboardData(): DashboardData {
       time:entry.ts ? new Date(entry.ts).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '',
       tone:activityTone(entry.action),
     }))
-    return { kpis, activity, trend:buildTrend(0), compareTrend:buildTrend(1) }
+    return { kpis, activity, trend:buildTrend(0), compareTrend:buildTrend(1), vacationsToday }
   }, [db.employees, db.records, db.vacaciones, db.audit, db.config?.wdMin])
 
   const name = session?.user?.name?.split(' ')?.[0] ?? ''

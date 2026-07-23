@@ -693,6 +693,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       nextEvent={nextVacRequest ? { ...nextVacRequest, onClick: () => onNavigate('solicitudes') } : undefined}
       fichaje={ownShiftStatus ? { ...ownShiftStatus, onClick: () => setScreen('emp') } : undefined}
       teamSlot={{ ...teamAvatars, onClick: () => onNavigate('en_linea') }}
+      onOpenVacations={() => onNavigate('vacaciones')}
       onTrendClick={() => onNavigate('estadisticas')}
       onExport={handleExport}
       quickActions={canClockOwnShift ? (
