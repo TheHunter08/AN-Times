@@ -11,7 +11,7 @@ import { getRegistrationEligibility, normalizeAccountEmail, validateAccountPassw
 import { sortedEmps } from '../utils/time.js'
 import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
-  clearLockout, hashPin,
+  clearLockout, hashPin, needsRehash,
 } from '../utils/pinSecurity.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
 import { useConnectivity } from '../hooks/useConnectivity.js'
@@ -194,9 +194,12 @@ export default function LoginV2() {
 
     if (ok) {
       saveDB((fresh: any) => ({ pinLockouts: clearLockout(emp.id, fresh) }))
-      // Migrar PIN plano → hash automáticamente
-      if (!isPinHashed(emp.pin) || !emp.pinLen) {
-        const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
+      // Migrar PIN plano o hash legacy (SHA-256 sin sal, débil) → PBKDF2.
+      // isPinHashed() da true también para el hash legacy, así que no sirve
+      // aquí para decidir si hace falta migrar — needsRehash() sí distingue
+      // "ya está en el mejor formato" de "hay que rehashear".
+      if (needsRehash(emp.pin) || !emp.pinLen) {
+        const hashed = await hashPin(newPin, emp.id)
         useAppStore.getState().saveDB((fresh: any) => ({
           employees: (fresh.employees || []).map((e: any) =>
             e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e

@@ -20,12 +20,48 @@ const storedSes = (() => {
 })()
 const initialDb = loadLocal()
 
+// isAdmin/isEnc/isJO NUNCA deben venir de lo que ya traía el objeto de sesión
+// (persistido en localStorage, editable desde devtools, o simplemente una
+// copia en memoria desactualizada) — se recalculan siempre a partir del rol
+// real del empleado en la BD, la única fuente de verdad de permisos. Sin
+// esto, un empleado normal podía poner isAdmin:true en su propia sesión
+// guardada y entrar directo al panel de administración completo.
+function _roleFlagsFromProfile(profile) {
+  // Mismo criterio que doLogin en LoginV2.tsx: un jefe de obra cuenta como
+  // isAdmin también (decisión de negocio existente, no algo nuevo de este
+  // fix) — omitirlo aquí habría revertido a un JO a la pantalla de empleado
+  // en el siguiente fetch/realtime tras iniciar sesión.
+  const role = profile?.role
+  return {
+    isAdmin: role === 'admin' || role === 'jefe_obra' || !!profile?.isAdmin,
+    isEnc: role === 'encargado' || !!profile?.isEnc,
+    isJO: role === 'jefe_obra' || !!profile?.isJO,
+  }
+}
+
 function _runtimeSession(session, db) {
   const safe = sanitizeSession(session)
   if (!safe.user?.id) return safe
   const profile = (db?.employees || []).find(employee => employee.id === safe.user.id && !employee.baja)
-  return profile ? { ...safe, user: profile } : safe
+  return profile ? { ...safe, user: profile, ..._roleFlagsFromProfile(profile) } : safe
 }
+
+// Calculado una sola vez al arrancar y reutilizado tanto por `session` como
+// por `currentScreen` — antes cada uno repetía su propia versión de "¿es
+// admin?" leyendo storedSes.isAdmin directamente, sin pasar por
+// _runtimeSession, así que currentScreen podía mandar a la pantalla de
+// admin a una sesión cuyo rol real ya no lo era.
+const initialSession = (() => {
+  if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false }
+  if (storedSes.user) {
+    const stillActive = (initialDb.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
+    if (!stillActive) {
+      try { localStorage.removeItem('an_times_ses') } catch {}
+      return { user: null, isAdmin: false, isEnc: false, isJO: false }
+    }
+  }
+  return _runtimeSession(storedSes, initialDb)
+})()
 
 // Detecta qué ids (o valores, en arrays de strings) desaparecieron respecto al
 // estado anterior — son eliminaciones intencionadas del usuario (borrar un
@@ -197,7 +233,10 @@ export const useAppStore = create((set, get) => ({
         if (!freshEmp || freshEmp.baja) {
           get().logout()
         } else {
-          const persistedSes = sanitizeSession({ ...ses, user: freshEmp })
+          // isAdmin/isEnc/isJO recalculados desde freshEmp.role (no desde `ses`,
+          // que puede llevar el rol con el que se inició sesión) — si un admin
+          // cambia el rol de este empleado, el cambio aplica en cuanto sincroniza.
+          const persistedSes = sanitizeSession({ ...ses, user: freshEmp, ..._roleFlagsFromProfile(freshEmp) })
           set({ session: { ...persistedSes, user: freshEmp } })
           try { localStorage.setItem('an_times_ses', JSON.stringify(persistedSes)) } catch {}
         }
@@ -255,7 +294,7 @@ export const useAppStore = create((set, get) => ({
           const freshEmp = (merged.employees || []).find(e => e.id === ses.user.id)
           if (!freshEmp || freshEmp.baja) get().logout()
           else {
-            const persistedSes = sanitizeSession({ ...ses, user: freshEmp })
+            const persistedSes = sanitizeSession({ ...ses, user: freshEmp, ..._roleFlagsFromProfile(freshEmp) })
             set({ session: { ...persistedSes, user: freshEmp } })
             try { localStorage.setItem('an_times_ses', JSON.stringify(persistedSes)) } catch {}
           }
@@ -279,23 +318,18 @@ export const useAppStore = create((set, get) => ({
   stopPresence,
 
   // ── Session ─────────────────────────────────────────────────────────
-  session: (() => {
-    if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false }
-    const localDB = loadLocal()
-    if (storedSes.user) {
-      const stillActive = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
-      if (!stillActive) {
-        try { localStorage.removeItem('an_times_ses') } catch {}
-        return { user: null, isAdmin: false, isEnc: false, isJO: false }
-      }
-    }
-    return _runtimeSession(storedSes, localDB)
-  })(),
+  session: initialSession,
 
   setSession: ses => {
     const safe = sanitizeSession(ses)
-    set({ session: ses?.user ? { ...safe, user: ses.user } : safe })
-    try { localStorage.setItem('an_times_ses', JSON.stringify(safe)) } catch {}
+    // Igual que _runtimeSession: el rol se recalcula desde el empleado real,
+    // nunca desde lo que trajera `ses` (aunque en el login normal ya venga
+    // bien formado, esto cierra cualquier ruta futura que llame setSession
+    // con un objeto construido a mano).
+    const roleFlags = ses?.user?.id ? _roleFlagsFromProfile(ses.user) : {}
+    const withRole = { ...safe, ...roleFlags }
+    set({ session: ses?.user ? { ...withRole, user: ses.user } : withRole })
+    try { localStorage.setItem('an_times_ses', JSON.stringify(withRole)) } catch {}
   },
 
   logout: () => {
@@ -338,15 +372,13 @@ export const useAppStore = create((set, get) => ({
   // ── Navigation ───────────────────────────────────────────────────────
   currentScreen: (() => {
     if (!storedSes) return 'login'
-    if (storedSes.isAdmin && !storedSes.user) return 'admin'
-    if (storedSes.user) {
-      const localDB = loadLocal()
-      const ok = (localDB.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
-      if (!ok) return 'login'
-      if (storedSes.isAdmin) return 'admin'
-      return 'emp'
-    }
-    return 'login'
+    // initialSession ya viene con isAdmin recalculado desde el perfil real
+    // (_roleFlagsFromProfile) — nunca desde storedSes.isAdmin directamente.
+    // Mismo criterio que doLogin en LoginV2.tsx: solo isAdmin (que ya
+    // incluye jefe_obra) manda directo a 'admin'; un encargado (isEnc) o un
+    // empleado normal arrancan siempre en 'emp', igual que al iniciar sesión
+    // — pueden pasar a 'admin' voluntariamente con el botón del panel.
+    return initialSession.isAdmin ? 'admin' : (initialSession.user ? 'emp' : 'login')
   })(),
   currentEmpTab: 'inicio',
   currentAdminPage: 'dashboard',

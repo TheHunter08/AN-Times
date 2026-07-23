@@ -288,11 +288,21 @@ function applyDeepLink(url) {
   try {
     const parsed = parseNavigationTarget(url)
     if (!parsed) return
-    const { setScreen, setAdminPage, setEmpTab, openModal } = useAppStore.getState()
-    if (parsed.role === 'admin') {
+    const { setScreen, setAdminPage, setEmpTab, openModal, session } = useAppStore.getState()
+    // Sin esta comprobación, un empleado normal que visitara una URL con
+    // ?go=admin:... (o recibiera el enlace de otra forma) entraba directo al
+    // panel de administración completo — setScreen no comprobaba ningún rol.
+    // isAdmin/isEnc/isJO ya vienen recalculados desde el perfil real
+    // (_roleFlagsFromProfile en appStore.js), no desde algo manipulable.
+    const hasAdminAccess = !!(session?.isAdmin || session?.isEnc || session?.isJO)
+    if (parsed.role === 'admin' && hasAdminAccess) {
       setScreen('admin', true)
       if (parsed.target) setAdminPage(parsed.target)
       if (parsed.subtab) window.dispatchEvent(new CustomEvent('admin-panel-subtab', { detail: { panel: parsed.target, tab: parsed.subtab } }))
+    } else if (parsed.role === 'admin') {
+      // Enlace de admin pero sin permiso (empleado normal): quedarse en su
+      // propia pantalla en vez de no hacer nada silenciosamente.
+      setScreen('emp', true)
     } else if (parsed.role === 'emp' || EMP_TABS.includes(parsed.target)) {
       const destination = resolveEmployeeNotificationDestination({ url })
       setScreen('emp', true)
@@ -660,7 +670,10 @@ export default function App() {
       {currentScreen === 'login' && <LoginV2 />}
       <Suspense fallback={<ScreenLoader />}>
         {currentScreen === 'emp'   && <EmployeePage />}
-        {currentScreen === 'admin' && <AppV2Admin />}
+        {/* Segunda barrera además de applyDeepLink: currentScreen==='admin' solo
+            renderiza el panel si la sesión de verdad tiene rol elevado — session
+            ya viene con isAdmin/isEnc/isJO recalculados desde el perfil real. */}
+        {currentScreen === 'admin' && (session?.isAdmin || session?.isEnc || session?.isJO) && <AppV2Admin />}
       </Suspense>
       <ToastContainer />
       <GlobalConfirm />
