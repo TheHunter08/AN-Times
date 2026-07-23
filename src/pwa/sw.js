@@ -427,6 +427,10 @@ function _mergeRecordsSW(base, incoming) {
   for (const item of i) {
     const cur = map.get(item.id)
     if (!cur) { map.set(item.id, item); continue }
+    // Igual que _mergeRecords en dataService.js: una jornada cerrada nunca
+    // pierde contra una copia abierta del mismo id (no existe "reabrir").
+    if (cur.fin && !item.fin) continue
+    if (!cur.fin && item.fin) { map.set(item.id, item); continue }
     const curTs  = cur._upd  ? Date.parse(cur._upd)  : 0
     const itemTs = item._upd ? Date.parse(item._upd) : 0
     if (itemTs >= curTs) map.set(item.id, item)

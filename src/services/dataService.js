@@ -177,6 +177,12 @@ function _mergeRecords(base, incoming, tKey) {
   for (const item of i) {
     const cur = map.get(item.id)
     if (!cur) { map.set(item.id, item); continue }
+    // Una jornada cerrada nunca pierde contra una copia abierta del mismo id:
+    // la app no tiene "reabrir jornada", así que una copia sin `fin` con _upd
+    // más nuevo solo puede ser el tick periódico de un dispositivo que aún no
+    // había descargado el cierre — aplicarla "resucitaría" la jornada.
+    if (cur.fin && !item.fin) continue
+    if (!cur.fin && item.fin) { map.set(item.id, item); continue }
     const curTs  = cur._upd  ? Date.parse(cur._upd)  : 0
     const itemTs = item._upd ? Date.parse(item._upd) : 0
     if (itemTs >= curTs) map.set(item.id, item)
@@ -1149,7 +1155,7 @@ export async function getPushCoverage(employeeIds = []) {
   }
 }
 
-// Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 5 min.
+// Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 30 s.
 // Evita que la misma smart-noti se reenvíe en checks consecutivos del bucle 60s.
 function _pushDedupHit(to, tag, title, body) {
   try {

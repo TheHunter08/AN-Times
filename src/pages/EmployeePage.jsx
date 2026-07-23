@@ -308,10 +308,13 @@ export default function EmployeePage() {
   // ── Geofencing: aviso al entrar (iniciar jornada) y al salir (fichar salida) ──
   useEffect(() => {
     if (!u?.id || !navigator.geolocation) return
-    const obras = (dbRef.current?.obras || [])
+    // Leer las obras en cada posición (no una sola vez al montar): en el primer
+    // inicio de sesión db.obras aún puede estar vacío hasta que termine el
+    // primer fetchDB, y si el admin añade/edita una obra la lista cambia sin
+    // que este efecto se vuelva a ejecutar.
+    const getObras = () => (dbRef.current?.obras || [])
       .map(o => ({ ...o, coords:normalizeObraCoords(o.coords) }))
       .filter(o => o.coords && o.radio)
-    if (!obras.length) return
     const distTo = (lat, lng, o) => {
       const R = 6371e3
       const φ1 = lat * Math.PI/180, φ2 = o.coords.lat * Math.PI/180
@@ -320,6 +323,8 @@ export default function EmployeePage() {
       return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
     }
     const checkPos = (pos) => {
+      const obras = getObras()
+      if (!obras.length) return
       const lat = pos.coords.latitude, lng = pos.coords.longitude
       const openRec = (dbRef.current?.records || []).find(r => r.empId === u.id && !r.fin)
 
@@ -991,13 +996,17 @@ export default function EmployeePage() {
     })
   }
 
-  if (!u) return null
+  // Reglas de hooks: `u` puede ser null un instante (p.ej. si la sesión se
+  // invalida antes de cambiar de pantalla). Todos los hooks deben ejecutarse
+  // igualmente en ese render, así que operan sobre un perfil vacío y el
+  // `return null` se hace DESPUÉS del último hook.
+  const uh = u || { id: '', name: '' }
 
   const initials = useMemo(
-    () => u.initials || u.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?',
-    [u.initials, u.name]
+    () => uh.initials || uh.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?',
+    [uh.initials, uh.name]
   )
-  const vac = useMemo(() => vacData(u.id, db), [u.id, db.employees, db.vacaciones])
+  const vac = useMemo(() => vacData(uh.id, db), [uh.id, db.employees, db.vacaciones])
   const unread = useMemo(() => (db.notis || []).filter(n => n.empId === u?.id && !n.leido && !n.deleted).length, [db.notis, u?.id])
   const chatUnread = useMemo(() => (db.chats || []).filter(m => m.from === 'admin' && m.to === u?.id && !m.leido).length, [db.chats, u?.id])
 
@@ -1007,20 +1016,20 @@ export default function EmployeePage() {
     return () => clearInterval(id)
   }, [])
   const greeting = useMemo(() => {
-    const firstName = u.name.split(' ')[0]
+    const firstName = uh.name.split(' ')[0]
     if (greetHour >= 6 && greetHour < 14) return `Buenos días, ${firstName}`
     if (greetHour >= 14 && greetHour < 21) return `Buenas tardes, ${firstName}`
     return `Buenas noches, ${firstName}`
-  }, [u.name, greetHour])
+  }, [uh.name, greetHour])
 
   const homeData = useMemo(() => {
     const now = new Date()
     const todayD = localDateStr(now)
-    const empWKmin = (u.horasSemanales || WK / 60) * 60
+    const empWKmin = (uh.horasSemanales || WK / 60) * 60
     const dayMin = Math.round(empWKmin / 5)
 
     // Hoy: registros cerrados + timer vivo
-    const todayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD && r.fin)
+    const todayRecs = (db.records || []).filter(r => r.empId === uh.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD && r.fin)
     const closedMin = todayRecs.reduce((s, r) => s + calcMin(r), 0)
     const liveMin = timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0
     const totMin = closedMin + liveMin
@@ -1038,7 +1047,7 @@ export default function EmployeePage() {
       d.setDate(ws.getDate() + i)
       const ds = localDateStr(d)
       const isToday = ds === todayD
-      const dayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin)
+      const dayRecs = (db.records || []).filter(r => r.empId === uh.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin)
       let dm = dayRecs.reduce((s, r) => s + calcMin(r), 0)
       if (isToday && timer.state !== 'idle') dm += Math.floor(timer.ws / 60)
       weekMin += dm
@@ -1051,7 +1060,7 @@ export default function EmployeePage() {
     })
 
     // Últimas acciones de hoy
-    const allTodayRecs = (db.records || []).filter(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD)
+    const allTodayRecs = (db.records || []).filter(r => r.empId === uh.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD)
     const recent = []
     allTodayRecs.forEach(r => {
       if (r.inicio) recent.push({ id: r.id + '-e', label: 'Entrada', time: ftime(r.inicio), tone: 'green', type: 'entrada' })
@@ -1063,9 +1072,9 @@ export default function EmployeePage() {
     })
     recent.sort((a, b) => a.time.localeCompare(b.time))
 
-    const streak = calcStreak(db.records, u.id, todayD)
-    const currentRec = (db.records || []).find(r => r.empId === u.id && !r.fin)
-    const siteLabel = currentRec?.centro || u.centroTrabajo || undefined
+    const streak = calcStreak(db.records, uh.id, todayD)
+    const currentRec = (db.records || []).find(r => r.empId === uh.id && !r.fin)
+    const siteLabel = currentRec?.centro || uh.centroTrabajo || undefined
     const dateLabel = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
     const extraMin = Math.max(0, weekMin - WK)
     const overtimeLabel = extraMin > 0 ? `+${Math.floor(extraMin / 60)}h ${p2(extraMin % 60)}m extra esta semana` : undefined
@@ -1094,11 +1103,11 @@ export default function EmployeePage() {
             : 'Guardado en este dispositivo',
       syncTone: syncStatus === 'error' ? 'error' : syncStatus === 'syncing' ? 'pending' : 'ok',
     }
-  }, [db.records, timer.state, timer.ws, u.id, u.horasSemanales, u.centroTrabajo, greeting, syncStatus, realtimeStatus])
+  }, [db.records, timer.state, timer.ws, uh.id, uh.horasSemanales, uh.centroTrabajo, greeting, syncStatus, realtimeStatus])
 
-  const jornadaStats = useJornadaData(db, u, timer)
-  const jornadaPdf = useJornadaPdfExport(db, u, toast)
-  const vacacionesData = useVacacionesData(db, u, vac, toast, saveDB, showConfirm)
+  const jornadaStats = useJornadaData(db, uh, timer)
+  const jornadaPdf = useJornadaPdfExport(db, uh, toast)
+  const vacacionesData = useVacacionesData(db, uh, vac, toast, saveDB, showConfirm)
 
   const handleWellbeingSubmit = ({ mood, nota }) => {
     if (!mood || !wellbeingRecId) return
@@ -1108,8 +1117,8 @@ export default function EmployeePage() {
 
   // Cierres pendientes de firma del empleado actual
   const pendingCierresEmp = useMemo(
-    () => (db.cierres || []).filter(c => c.empId === u.id && canCloseMonth(c.mes) && !c.firma && !c.firmaEmp && c.estado !== 'rechazado'),
-    [db.cierres, u.id]
+    () => (db.cierres || []).filter(c => c.empId === uh.id && canCloseMonth(c.mes) && !c.firma && !c.firmaEmp && c.estado !== 'rechazado'),
+    [db.cierres, uh.id]
   )
 
   const handleNotificationNavigate = useCallback((item) => {
@@ -1122,11 +1131,11 @@ export default function EmployeePage() {
   // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)
   const teamCierresPendientes = useMemo(() => {
     if (!isSuper) return []
-    const centro = u.centroTrabajo || ''
+    const centro = uh.centroTrabajo || ''
     const empMap = new Map((db.employees || []).map(e => [e.id, e]))
     const teamIds = new Set(
       (db.employees || [])
-        .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== u.id)
+        .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== uh.id)
         .map(e => e.id)
     )
     // Fallback: también excluir IDs guardados en config para cuando firmaSupervisor
@@ -1135,7 +1144,10 @@ export default function EmployeePage() {
     return (db.cierres || [])
       .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor && !firmadosSet.has(c.id))
       .map(c => ({ id: c.id, empName: c.empName || empMap.get(c.empId)?.name || c.empId, mes: c.mes || '' }))
-  }, [db.cierres, db.employees, db.config, isSuper, u.centroTrabajo, u.id])
+  }, [db.cierres, db.employees, db.config, isSuper, uh.centroTrabajo, uh.id])
+
+  // Guard DESPUÉS de todos los hooks (ver comentario junto a `uh` más arriba).
+  if (!u) return null
 
   const handleSignSupervisor = (cierreId) => {
     const cierre = (db.cierres || []).find(c => c.id === cierreId)

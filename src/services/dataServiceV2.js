@@ -186,6 +186,11 @@ export async function cloudFetchTs() {
 export function mergeRecordVersions(tableRecord, blobRecord) {
   if (!blobRecord) return tableRecord
   if (!tableRecord) return blobRecord
+  // La versión cerrada gana siempre sobre la abierta del mismo id: no existe
+  // "reabrir jornada", así que la copia abierta con _upd más nuevo solo puede
+  // ser un tick de horas en vivo que aún no conocía el cierre.
+  if (tableRecord.fin && !blobRecord.fin) return { ...blobRecord, ...tableRecord }
+  if (blobRecord.fin && !tableRecord.fin) return { ...tableRecord, ...blobRecord }
   const blobTs = Date.parse(blobRecord._upd || '') || 0
   const tableTs = Date.parse(tableRecord._upd || '') || 0
   return blobTs > tableTs

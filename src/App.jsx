@@ -235,6 +235,15 @@ function SyncBanner() {
   const currentScreen  = useAppStore(s => s.currentScreen)
   const [retrying, setRetrying] = useState(false)
 
+  // Re-render cada 30 s mientras el banner está visible para que el texto
+  // "hace X min" no se quede congelado si nada más provoca un render.
+  const [, setSinceTick] = useState(0)
+  useEffect(() => {
+    if (syncStatus !== 'error') return
+    const id = setInterval(() => setSinceTick(t => t + 1), 30 * 1000)
+    return () => clearInterval(id)
+  }, [syncStatus])
+
   const handleRetry = useCallback(async () => {
     setRetrying(true)
     try {

@@ -10,3 +10,4 @@ dist/
 test-results/
 .codex/
 graphify-out/
+outputs/

@@ -11,7 +11,7 @@ import { getRegistrationEligibility, normalizeAccountEmail, validateAccountPassw
 import { sortedEmps } from '../utils/time.js'
 import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
-  clearLockout, hashPin,
+  clearLockout, hashPin, needsRehash,
 } from '../utils/pinSecurity.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
 import { useConnectivity } from '../hooks/useConnectivity.js'
@@ -194,9 +194,9 @@ export default function LoginV2() {
 
     if (ok) {
       saveDB((fresh: any) => ({ pinLockouts: clearLockout(emp.id, fresh) }))
-      // Migrar PIN plano → hash automáticamente
-      if (!isPinHashed(emp.pin) || !emp.pinLen) {
-        const hashed = isPinHashed(emp.pin) ? emp.pin : await hashPin(newPin, emp.id)
+      // Migrar PIN plano / hash legacy (SHA-256 o PBKDF2 100k) → PBKDF2 actual
+      if (needsRehash(emp.pin) || !emp.pinLen) {
+        const hashed = needsRehash(emp.pin) ? await hashPin(newPin, emp.id) : emp.pin
         useAppStore.getState().saveDB((fresh: any) => ({
           employees: (fresh.employees || []).map((e: any) =>
             e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
@@ -209,7 +209,14 @@ export default function LoginV2() {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
     } else {
       const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db) as any
-      if (lockoutData) saveDB((fresh: any) => ({ pinLockouts: recordFailedAttempt(emp.id, fresh).lockoutData }))
+      // recordFailedAttempt devuelve lockoutData null si el estado fresco ya
+      // está bloqueado (p.ej. el bloqueo llegó por realtime entre ambas
+      // llamadas) — en ese caso no hay nada que guardar; escribir null aquí
+      // borraría el mapa entero de bloqueos de todos los empleados.
+      if (lockoutData) saveDB((fresh: any) => {
+        const next = recordFailedAttempt(emp.id, fresh).lockoutData
+        return next ? { pinLockouts: next } : {}
+      })
       setPinShaking(true)
       if (lk.locked) {
         const secs = lk.remainingSecs || 0

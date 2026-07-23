@@ -25,8 +25,12 @@ export function useTimer() {
       const secs  = calcSecs(openRec)
       updateTimer({ state, ws: secs.work, bs: secs.brk })
 
-      // Persist workSecs/breakSecs every ~30 s so server always has fresh data
-      if ((++tickRef.current) % 30 === 0) {
+      // Persistir workSecs/breakSecs cada ~5 min para que el servidor tenga
+      // horas razonablemente frescas. Antes era cada 30 s, pero cada tick
+      // dispara un cloudPush completo (+ broadcast a todos los clientes) por
+      // empleado con jornada abierta — 5 min reduce ese tráfico 10× y las
+      // horas exactas se recalculan siempre desde inicio/breaks al cerrar.
+      if ((++tickRef.current) % 300 === 0) {
         clearTimeout(saveTickRef.current)
         const recId   = openRec.id
         const work    = secs.work
@@ -42,7 +46,12 @@ export function useTimer() {
           const records = fresh.records.map(r =>
             r.id === recId ? { ...r, workSecs: work, breakSecs: brk, _upd: new Date().toISOString() } : r
           )
-          sd({ records })
+          // skipPriorityPersist: el tick de horas en vivo no debe hacer el
+          // upsert directo (incondicional) a la tabla records — si otro
+          // dispositivo acabara de cerrar esta jornada, ese upsert pisaría la
+          // fila cerrada con esta copia abierta. El push normal del blob sí se
+          // ejecuta y pasa por el merge con el servidor, donde el cierre gana.
+          sd({ records }, { skipPriorityPersist: true })
         }, 5000)
       }
     }, 1000)

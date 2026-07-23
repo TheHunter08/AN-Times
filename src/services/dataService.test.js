@@ -130,3 +130,38 @@ describe('trazabilidad de modificaciones', () => {
     expect(second.audit[1]._upd).toBeTruthy()
   })
 })
+
+// Regresión: el tick periódico de useTimer sube una copia ABIERTA del registro
+// con _upd nuevo. Si otro dispositivo acababa de cerrar esa jornada, la regla
+// "el _upd más nuevo gana" la reabría. Como no existe "reabrir jornada" en la
+// app, una copia cerrada nunca debe perder contra una abierta del mismo id.
+describe('una jornada cerrada nunca pierde contra una copia abierta (tick en vivo)', () => {
+  beforeEach(() => { localStorage.clear() })
+  const closedRec = {
+    id: 'rc1', empId: 'e1', inicio: '2026-07-24T08:00:00.000Z',
+    fin: '2026-07-24T16:00:00.000Z', workSecs: 28800, _upd: '2026-07-24T16:00:00.000Z',
+  }
+  const staleOpenTick = {
+    id: 'rc1', empId: 'e1', inicio: '2026-07-24T08:00:00.000Z',
+    fin: null, workSecs: 29100, _upd: '2026-07-24T16:05:00.000Z', // _upd MÁS nuevo
+  }
+
+  it('la copia abierta con _upd más nuevo no pisa el cierre local (fetch/realtime)', () => {
+    const merged = mergeDB({ ...BASE, records: [closedRec] }, { records: [staleOpenTick] })
+    const rec = merged.records.find(r => r.id === 'rc1')
+    expect(rec.fin).toBe('2026-07-24T16:00:00.000Z')
+  })
+
+  it('el cierre remoto sí sustituye a la copia abierta local aunque sea más antiguo', () => {
+    const olderClose = { ...closedRec, _upd: '2026-07-24T15:59:00.000Z' }
+    const merged = mergeDB({ ...BASE, records: [staleOpenTick] }, { records: [olderClose] })
+    const rec = merged.records.find(r => r.id === 'rc1')
+    expect(rec.fin).toBe('2026-07-24T16:00:00.000Z')
+  })
+
+  it('entre dos copias cerradas sigue ganando la más reciente', () => {
+    const newerClose = { ...closedRec, fin: '2026-07-24T16:30:00.000Z', _upd: '2026-07-24T16:30:00.000Z' }
+    const merged = mergeDB({ ...BASE, records: [closedRec] }, { records: [newerClose] })
+    expect(merged.records.find(r => r.id === 'rc1').fin).toBe('2026-07-24T16:30:00.000Z')
+  })
+})
