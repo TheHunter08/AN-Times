@@ -15,11 +15,31 @@ const SB_H    = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 
 const HASH_RE = /^[a-f0-9]{64}$/i
 
+// Sin autenticación por diseño (ver comentario de arriba) — pero sin límite
+// alguno, un script podía golpear /rest/v1/cierres en Supabase sin ningún
+// coste, agotando cuota/causando throttling que afecta al resto de la app
+// (comparte la misma instancia). Mismo patrón in-memory por IP que sendpush.js.
+const _rl = new Map()
+function rateLimit(ip) {
+  const now = Date.now()
+  const window = 60_000
+  const max = 20
+  const entry = _rl.get(ip) || { count: 0, reset: now + window }
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + window }
+  entry.count++
+  _rl.set(ip, entry)
+  if (_rl.size > 2000) { for (const [k, v] of _rl) { if (now > v.reset) _rl.delete(k) } }
+  return entry.count > max
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
+  if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' })
 
   const hash = String(req.query.hash || '').trim()
   if (!HASH_RE.test(hash)) {

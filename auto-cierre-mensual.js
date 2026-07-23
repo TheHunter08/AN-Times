@@ -7,8 +7,13 @@ import { monthlyTargetMinutes } from './src/utils/workTargets.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
-const SB_URL   = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON  = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const SB_URL   = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON  = cleanEnv(process.env.VITE_SB_ANON)
+// Fail-closed (igual que el resto de api/*.js): si el secret de GitHub
+// Actions se queda vacío por error, antes el script seguía funcionando en
+// silencio contra un proyecto/clave fijados en el código fuente, en vez de
+// fallar de forma visible.
+if (!SB_URL || !SB_ANON) { console.error('[auto-cierre] VITE_SB_URL / VITE_SB_ANON not set'); process.exit(1) }
 const PUSH_URL = cleanEnv(process.env.PUSH_URL) || 'https://times-inc.vercel.app/api/sendpush'
 const PUSH_SECRET = cleanEnv(process.env.PUSH_SECRET)
 

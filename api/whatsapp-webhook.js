@@ -217,11 +217,14 @@ export default async function handler(req, res) {
     const msg = value?.messages?.[0]
 
     if (!msg) return res.status(200).json({ ok: true, skipped: 'no message' })
+    // El dedupe va ANTES de comprobar el tipo: si Meta reintenta el webhook
+    // de un mensaje no-textual (no recibió 200 a tiempo), el chequeo de tipo
+    // reenviaba la respuesta "solo puedo leer texto" en cada reintento.
+    if (isDuplicateMsg(msg.id)) return res.status(200).json({ ok: true, deduped: true })
     if (msg.type !== 'text') {
       await sendWhatsAppReply(msg.from, 'Solo puedo leer mensajes de texto: *entrada*, *salida*, *pausa*, *reanudar* o *estado*.')
       return res.status(200).json({ ok: true, skipped: 'non-text' })
     }
-    if (isDuplicateMsg(msg.id)) return res.status(200).json({ ok: true, deduped: true })
 
     if (!SB_URL || !SB_ANON) return res.status(200).json({ ok: false, error: 'Supabase no configurado' })
 

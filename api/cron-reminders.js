@@ -1,5 +1,8 @@
 // ── Cron de recordatorios ─────────────────────────────────────────────────────
-// Ejecutado por Vercel Cron cada hora (ver vercel.json: "0 * * * *").
+// Ejecutado por Vercel Cron una vez al día (ver vercel.json) y, con más
+// frecuencia en horario laboral (05:00-12:00 UTC, L-V), por
+// .github/workflows/fichar-reminder.yml — este endpoint es idempotente por
+// diseño (dedup vía db.notisSent) así que puede recibir ambos disparos.
 // Cubre TODOS los recordatorios críticos para cuando la app está cerrada:
 //   1. Recordatorio de fichaje (no ha registrado entrada hoy)
 //   2. Jornada larga (> 7h45m sin fichar salida)
@@ -12,8 +15,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
-import { toClosureRow } from '../src/services/tableSyncPlan.js'
-import { monthlyTargetMinutes } from '../src/utils/workTargets.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -81,29 +82,6 @@ function nowInSpain() {
 function todayInSpain() {
   const d = nowInSpain()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-
-function madridDateKey(value) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone:'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit',
-  }).format(new Date(value))
-}
-
-async function mergeClosuresIntoBlob(nuevos) {
-  const latest = await getAppData()
-  if (!latest) throw new Error('no app_data while merging closures')
-  const incomingIds = new Set(nuevos.map(c => c.id))
-  const updatedDb = {
-    ...latest,
-    cierres:[...(latest.cierres || []).filter(c => !incomingIds.has(c.id)), ...nuevos],
-    _ts:Date.now(),
-  }
-  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
-    method:'PATCH',
-    headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'return=minimal' },
-    body:JSON.stringify({ data:updatedDb, updated_at:new Date().toISOString() }),
-  })
-  if (!response.ok) throw new Error(`auto-cierre blob patch ${response.status}`)
 }
 
 function p2(n) { return String(n).padStart(2, '0') }
@@ -445,99 +423,56 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── AUTO-CIERRE MENSUAL (solo el día 1 de cada mes) ──────────────────────
-    // Genera cierres del mes anterior para todos los empleados activos que
-    // aún no tengan uno — sin que el admin tenga que hacerlo manualmente.
-    if (today.endsWith('-01')) {
-      try {
-        const [y, m] = today.split('-').map(Number)
-        const prevM = m === 1 ? 12 : m - 1
-        const prevY = m === 1 ? y - 1 : y
-        const mes = `${prevY}-${String(prevM).padStart(2, '0')}`
-        const mesLabel = new Date(`${mes}-15`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-        const empActivos = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-        const existenCierres = (db.cierres || []).filter(c => c.mes === mes)
-        const nuevos = []
-        for (const emp of empActivos) {
-          if (existenCierres.find(c => c.empId === emp.id)) continue
-          const eRecs = (db.records || []).filter(r =>
-            r.empId === emp.id && r.fin && r.inicio && madridDateKey(r.inicio).startsWith(mes)
-          )
-          if (!eRecs.length) continue
-          const totalMin = Math.floor(eRecs.reduce((s, r) => {
-            const ini = new Date(r.inicio).getTime()
-            const fin = new Date(r.fin).getTime()
-            return s + Math.max(0, (fin - ini) / 60000 - Math.floor((r.breakSecs || 0) / 60))
-          }, 0))
-          const targetMin = monthlyTargetMinutes(emp, mes)
-          // Id determinista: si una escritura parcial falla, el siguiente cron
-          // reintenta el mismo cierre en vez de crear un duplicado lógico.
-          const id = `cierre_${mes}_${emp.id}`
-          const updatedAt = new Date().toISOString()
-          nuevos.push({
-            id, empId: emp.id, empName: emp.name, mes,
-            generadoPor: 'Sistema', generadoPorId: null,
-            generadoAt: updatedAt, _upd: updatedAt,
-            totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias: new Set(eRecs.map(r => madridDateKey(r.inicio))).size, estado: 'pendiente', firma: null,
-            records_snapshot: eRecs.map(r => ({ inicio: r.inicio, fin: r.fin, centro: r.centro, workSecs: r.workSecs || 0 }))
-          })
-        }
-        if (nuevos.length > 0) {
-          // Tabla primero y blob después. Con ids deterministas, cualquier fallo
-          // intermedio se puede reintentar sin duplicar cierres.
-          const cierresRows = nuevos.map(c => toClosureRow(c, c._upd))
-          const tableResponse = await fetch(`${SB_URL}/rest/v1/cierres?on_conflict=id`, {
-            method: 'POST',
-            headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-            body: JSON.stringify(cierresRows)
-          })
-          if (!tableResponse.ok) throw new Error(`auto-cierre table insert ${tableResponse.status}: ${(await tableResponse.text()).slice(0, 160)}`)
-          await mergeClosuresIntoBlob(nuevos)
-          // Notificar a cada empleado
-          for (const c of nuevos) {
-            const sub = subMap.get(c.empId)
-            if (sub?.endpoint) {
-              toSend.push({
-                emp: { id: c.empId, name: c.empName }, sub,
-                payload: mkPayload('📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar.`, 'cierre', '/?go=emp:perfil'),
-                key: `auto_cierre_${c.empId}_${mes}`, keyVal: today
-              })
-            }
-          }
-          console.log(`[cron] auto-cierre ${mes}: ${nuevos.length} generados`)
-        }
-      } catch (e) {
-        console.error('[cron] auto-cierre error:', e.message)
-      }
-    }
+    // La generación del cierre mensual del día 1 vive solo en
+    // auto-cierre-mensual.js (workflow dedicado cierre-mensual.yml, 08:00
+    // UTC). Antes este cron también generaba el mismo cierre con OTRA
+    // fórmula de cálculo de horas (no usaba workSecs precalculado) — cuál de
+    // los dos ganara la carrera decidía las horas del documento legal
+    // firmado, y un fallo de lock optimista en el otro script podía dejar a
+    // empleados sin la notificación de "cierre pendiente" aunque el cierre
+    // ya existiera. Un solo generador elimina la carrera de raíz.
 
     // Solo se marca como "enviado" (notisSent) lo que realmente se entregó — ver
     // comentario junto a schedule() más arriba. successKeys se rellena aquí,
     // DESPUÉS de intentar el envío real, no antes.
-    const successKeys = {}
+    //
+    // Antes ambos bucles eran secuenciales (await uno a uno) y notisSent solo
+    // se guardaba UNA VEZ al final de todo — con una plantilla grande y el
+    // timeout por defecto de Vercel, un corte a mitad de bucle perdía el
+    // registro de lo que sí se había entregado, y el siguiente cron reenviaba
+    // duplicados a quien ya lo había recibido. Se paraleliza con
+    // allSettled (mismo patrón que send-push-all.js/sync-ping.js) y se
+    // persiste notisSent tras cada tanda, no solo al final.
+    let successKeys = {}
 
+    const pushResults = await Promise.allSettled(toSend.map(({ emp, sub, payload, key, keyVal }) =>
+      sendPush(sub, payload, emp.name).then(
+        () => ({ ok: true, key, keyVal }),
+        err => ({ ok: false, key, err, emp })
+      )
+    ))
     let sent = 0, failed = 0
-    for (const { emp, sub, payload, key, keyVal } of toSend) {
-      try {
-        await sendPush(sub, payload, emp.name)
-        sent++
-        successKeys[key] = keyVal
-      } catch (err) {
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await deleteSub(emp.id)
-        } else {
-          console.warn(`[cron] push error for ${emp.name}:`, err.statusCode, err.body || err.message)
-        }
-        failed++
-      }
+    const expiredSubs = []
+    for (const result of pushResults) {
+      const value = result.status === 'fulfilled' ? result.value : null
+      if (value?.ok) { sent++; successKeys[value.key] = value.keyVal; continue }
+      failed++
+      const err = value?.err
+      if (err?.statusCode === 410 || err?.statusCode === 404) expiredSubs.push(value.emp.id)
+      else if (value) console.warn(`[cron] push error for ${value.emp.name}:`, err?.statusCode, err?.body || err?.message)
     }
+    if (Object.keys(successKeys).length > 0) await markNotisSent(db, successKeys)
+    if (expiredSubs.length) await Promise.allSettled(expiredSubs.map(id => deleteSub(id)))
 
+    successKeys = {}
+    const waResults = await Promise.allSettled(waToSend.map(({ emp, message, key, keyVal }) =>
+      sendWhatsApp(emp.telefono, message, emp.name).then(ok => ({ ok, key, keyVal }))
+    ))
     let waSent = 0
-    for (const { emp, message, key, keyVal } of waToSend) {
-      const ok = await sendWhatsApp(emp.telefono, message, emp.name)
-      if (ok) { waSent++; successKeys[key] = keyVal }
+    for (const result of waResults) {
+      const value = result.status === 'fulfilled' ? result.value : null
+      if (value?.ok) { waSent++; successKeys[value.key] = value.keyVal }
     }
-
     if (Object.keys(successKeys).length > 0) await markNotisSent(db, successKeys)
 
     const result = {
