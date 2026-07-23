@@ -859,6 +859,12 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
       ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
       : (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
     const records = db.records || []
+    // Vacaciones/ausencias aprobadas: sin esto, un empleado de vacaciones
+    // aparecía como "Ausente" (en rojo) en vez de "Vacaciones" — Planning.tsx
+    // ya soporta el estado 'vac', solo faltaba comprobar aquí.
+    const approvedLeaves = (db.vacaciones || []).filter((v: any) => v.estado === 'aprobada' && v.fechaInicio && v.fechaFin)
+    const isOnLeave = (empId: string, dateStr: string) => approvedLeaves.some((v: any) =>
+      v.empId === empId && v.fechaInicio <= dateStr && dateStr <= v.fechaFin)
 
     const employees = emps.map((e: any) => ({
       id: e.id,
@@ -869,6 +875,7 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
         const dateStr = localDateStr(d)
         const dayRecs = records.filter((r: any) => r.empId === e.id && r.inicio && localDateStr(new Date(r.inicio)) === dateStr)
         const isWeekend = d.getDay() === 0 || d.getDay() === 6
+        if (!dayRecs.length && isOnLeave(e.id, dateStr)) return { status: 'vac' as const }
         if (!dayRecs.length && isWeekend) return { status: 'weekend' as const }
         if (!dayRecs.length && isFuture)  return { status: 'future' as const }
         if (!dayRecs.length) return { status: 'absent' as const }

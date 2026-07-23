@@ -595,31 +595,31 @@ export default function EmployeePage() {
         }
       }
 
-      // 7. Auto-cierre de jornada olvidada (> 12h sin fichar salida)
-      // 7a. Aviso preventivo a las 11h50m (10 min antes del auto-cierre)
+      // 7. Auto-cierre de jornada olvidada (> 10h sin fichar salida)
+      // 7a. Aviso preventivo a las 9h50m (10 min antes del auto-cierre)
       const staleRecs = (db.records || []).filter(r => r.empId === u.id && !r.fin)
       staleRecs.forEach(stale => {
         const elapsedStale = (Date.now() - new Date(stale.inicio).getTime()) / 60000
-        if (elapsedStale >= 710 && elapsedStale < 720) {
+        if (elapsedStale >= 590 && elapsedStale < 600) {
           const warnKey = 'an_autoclose_warn_' + stale.id
           if (!hasSent(warnKey)) {
             markSent(warnKey)
-            sendPush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio', warnKey)
-            addBell(warnKey, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 11h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
+            sendPush(u.id, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 9h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.', 'jornada', '/?tab=inicio', warnKey)
+            addBell(warnKey, '⚠️ Cierre automático en 10 minutos', 'Llevas más de 9h 50m sin fichar salida. Tu jornada se cerrará automáticamente en 10 min.')
             toast('Tu jornada se cerrará automáticamente en ~10 minutos', 8000, 'warn')
           }
         }
-        if (elapsedStale > 720) {
+        if (elapsedStale > 600) {
           const acKey = 'an_autoclose_' + stale.id
           if (!hasSent(acKey)) {
             // Re-read from current db snapshot to avoid double-close race
             const freshRec = dbRef.current.records.find(r => r.id === stale.id)
             if (!freshRec || freshRec.fin) return
             markSent(acKey)
-            // El cierre se fija exactamente a las 12 h, aunque el navegador se
+            // El cierre se fija exactamente a las 10 h, aunque el navegador se
             // despierte más tarde. finalizeRecord también incorpora un descanso
             // que siguiera activo y evita contabilizarlo como trabajo.
-            const closeTime = new Date(new Date(freshRec.inicio).getTime() + 12 * 60 * 60 * 1000).toISOString()
+            const closeTime = new Date(new Date(freshRec.inicio).getTime() + 10 * 60 * 60 * 1000).toISOString()
             const closed2 = { ...finalizeRecord(freshRec, { now: closeTime }), autoClosedAt: new Date().toISOString() }
             const t2 = { work: closed2.workSecs, brk: closed2.breakSecs }
             // localDateStr(new Date(inicio)) (no inicio.slice(0,10)): inicio se guarda en

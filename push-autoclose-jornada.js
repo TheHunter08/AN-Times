@@ -1,7 +1,7 @@
 /**
- * TIMES INC – Auto-cierre de jornadas abiertas > 12h
- * Corre vía GitHub Actions cada 2 horas (ver .github/workflows/autoclose-jornada.yml).
- * Cierra registros sin fin que lleven más de 12h abiertos y notifica al empleado.
+ * TIMES INC – Auto-cierre de jornadas abiertas > 10h
+ * Corre vía GitHub Actions cada 4 horas (ver .github/workflows/autoclose-jornada.yml).
+ * Cierra registros sin fin que lleven más de 10h abiertos y notifica al empleado.
  */
 
 import webpush from 'web-push'
@@ -85,7 +85,7 @@ async function sendPush(sub, title, body, url = '/') {
   }
 }
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000
+const TEN_HOURS_MS = 10 * 60 * 60 * 1000
 const p2 = n => String(n).padStart(2, '0')
 const mhm = min => {
   const h = Math.floor(min / 60), m = min % 60
@@ -100,14 +100,14 @@ async function run() {
   const db = row.data
   const openRecs = (db.records || []).filter(r => !r.fin)
 
-  const toClose = openRecs.filter(r => (now - new Date(r.inicio).getTime()) > TWELVE_HOURS_MS)
+  const toClose = openRecs.filter(r => (now - new Date(r.inicio).getTime()) > TEN_HOURS_MS)
 
   if (!toClose.length) {
-    console.log(`Sin jornadas abiertas >12h. Open total: ${openRecs.length}`)
+    console.log(`Sin jornadas abiertas >10h. Open total: ${openRecs.length}`)
     return
   }
 
-  console.log(`Cerrando ${toClose.length} jornada(s) con >12h sin fichar salida`)
+  console.log(`Cerrando ${toClose.length} jornada(s) con >10h sin fichar salida`)
 
   const pushSubs = await readPushSubs()
   const subsMap  = Object.fromEntries(pushSubs.map(s => [s.user_id, s]))
@@ -115,7 +115,7 @@ async function run() {
   const closedRecords = []
   const updatedRecords = db.records.map(r => {
     if (!toClose.find(c => c.id === r.id)) return r
-    const closeTime = new Date(new Date(r.inicio).getTime() + TWELVE_HOURS_MS).toISOString()
+    const closeTime = new Date(new Date(r.inicio).getTime() + TEN_HOURS_MS).toISOString()
     const closed = { ...finalizeRecord(r, { now: closeTime }), autoClosedAt: new Date().toISOString() }
     closedRecords.push(closed)
     return closed
@@ -134,7 +134,7 @@ async function run() {
     const sent = await sendPush(
       sub,
       '⏱️ Jornada cerrada automáticamente',
-      `Tu jornada del ${rec.inicio.slice(0, 10)} se cerró tras ${mhm(workMin)} (más de 12h sin fichar salida).`,
+      `Tu jornada del ${rec.inicio.slice(0, 10)} se cerró tras ${mhm(workMin)} (más de 10h sin fichar salida).`,
       '/?tab=jornada'
     )
     console.log(`  ${sent ? '✓' : '!'} Push a ${rec.empId} (${rec.empName || ''})`)

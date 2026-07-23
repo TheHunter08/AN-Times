@@ -1,4 +1,4 @@
-name: Auto-cierre jornadas >12h
+name: Auto-cierre jornadas >10h
 
 on:
   schedule:
