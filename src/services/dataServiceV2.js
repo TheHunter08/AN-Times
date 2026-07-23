@@ -54,6 +54,7 @@ import {
   buildTableSyncPlan,
   ENTITY_COLLECTIONS,
   SINGLETON_COLLECTIONS,
+  softDeletePayload,
   toEmployeeRow as toEmployee,
   toRecordRow as toRecord,
 } from './tableSyncPlan.js'
@@ -531,7 +532,7 @@ async function _syncToTables(db, deleted, syncHint) {
     op.mode === 'deactivate'
       ? supabase.from(op.table).update({ baja: true }).in('id', op.ids)
       : op.mode === 'soft_delete'
-        ? supabase.from(op.table).update({ deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in('id', op.ids)
+        ? supabase.from(op.table).update(softDeletePayload(op.table)).in('id', op.ids)
       : supabase.from(op.table).delete().in('id', op.ids)
   )
 

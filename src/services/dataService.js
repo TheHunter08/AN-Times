@@ -702,6 +702,19 @@ function _bgSyncFallback() {
 }
 
 async function _runBgSyncFallback() {
+  // _pushFlight es el mutex que ya usan cloudPush()/_doCloudPush() para
+  // encolar guardados interactivos en vez de lanzarlos en paralelo. Antes
+  // solo _doCloudPush lo marcaba — un guardado normal (fichar, iniciar/parar
+  // descanso, el tick periódico de horas en vivo…) podía disparar una
+  // petición nueva justo mientras esta función ya tenía otra en vuelo hacia
+  // el mismo servidor. En señal débil, dos peticiones compitiendo por el
+  // mismo ancho de banda hace mucho más probable que AMBAS caigan en el
+  // timeout de 6s — la cola offline nunca llegaba a vaciarse y el aviso de
+  // "poca cobertura" volvía una y otra vez aunque la red mejorase lo
+  // suficiente para una sola petición. Marcarlo aquí también hace que
+  // cloudPush() encole cualquier guardado que llegue mientras esta subida
+  // sigue en curso, en vez de competir con ella.
+  _pushFlight = true
   try {
     const stored = await _readPending()
     if (!stored || !supabase) { _bgSyncRetries = 0; return { ok: true, pending: false } }
@@ -746,6 +759,13 @@ async function _runBgSyncFallback() {
       window.dispatchEvent(new CustomEvent('times-save-failed'))
     }
     return { ok: false, pending: true, error: e }
+  } finally {
+    // Liberar el mutex sea cual sea la salida (éxito, error, o cualquier otra
+    // excepción no contemplada arriba). Sin este finally, _pushFlight se
+    // queda en true para siempre tras la primera pasada: cloudPush() encola
+    // todo indefinidamente y nada vuelve a subir nunca, aunque la red esté
+    // perfectamente disponible — el mutex debe liberarse pase lo que pase.
+    _pushFlight = false
   }
 }
 

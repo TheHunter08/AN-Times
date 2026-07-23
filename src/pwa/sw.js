@@ -2,7 +2,7 @@ import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
-import { buildTableSyncPlan } from '../services/tableSyncPlan.js'
+import { buildTableSyncPlan, softDeletePayload } from '../services/tableSyncPlan.js'
 import { pickNewestSyncItem } from './syncConflict.js'
 
 // ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ async function _syncTablesSW(data, deleted, syncHint) {
         ? await _sbFetch(url, {
             method: 'PATCH',
             headers: _restHeaders({ Prefer: 'return=minimal' }),
-            body: JSON.stringify({ deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+            body: JSON.stringify(softDeletePayload(operation.table)),
           })
         : await _sbFetch(url, { method: 'DELETE', headers: _restHeaders({ Prefer: 'return=minimal' }) })
     if (!response.ok) throw new Error(`table delete ${operation.table}: ${response.status}`)
