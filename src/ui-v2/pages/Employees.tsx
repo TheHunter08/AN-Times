@@ -26,6 +26,7 @@ export interface EmployeesProps {
   onEdit?: (id: string) => void
   onSelect?: (id: string) => void
   onViewTimesheets?: (id: string) => void
+  onDeactivate?: (id: string) => void
 }
 
 const statusCfg: Record<EmployeeRow['status'], { label: string; color: string; bg: string; dot: string }> = {
@@ -74,7 +75,7 @@ const FILTERS = [
   { key: 'off', label: 'Inactivo' },
 ] as const
 
-export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: EmployeesProps) {
+export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate }: EmployeesProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
@@ -275,6 +276,14 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets }: E
                 Cerrar
               </button>
             </div>
+            {onDeactivate && (
+              <button
+                onClick={() => { onDeactivate(profileEmp.id); setProfileEmp(null) }}
+                style={{ padding: '10px', borderRadius: radius.md, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: colors.semantic.red, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Dar de baja
+              </button>
+            )}
           </div>
         </div>
       )}
