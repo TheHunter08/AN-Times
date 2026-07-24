@@ -3,3 +3,11 @@ dist/
 .codex/
 graphify-out/
 .claude/worktrees/
+
+# Vercel trata CUALQUIER .js suelto bajo api/ como una función serverless.
+# Los tests colocados junto a pin-login.js (api/pin-login.test.js,
+# api/pin-login-flow.test.js) no exportan un handler válido — Vercel
+# fallaba al desplegar ("Deploying outputs" → Error) intentando bundlearlos
+# como rutas. vitest.config.js ya los recoge vía api/**/*.test.js para
+# correrlos en local/CI; esto solo los excluye del despliegue a Vercel.
+api/*.test.js
