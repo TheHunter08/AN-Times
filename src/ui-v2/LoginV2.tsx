@@ -13,6 +13,8 @@ import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
   clearLockout, hashPin, needsRehash,
 } from '../utils/pinSecurity.js'
+import { requestPinToken } from '../utils/pinAuthToken.js'
+import { supabase } from '../services/dataServiceV2.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
 import { useConnectivity } from '../hooks/useConnectivity.js'
 import type { LoginMode } from './pages/Login.js'
@@ -205,6 +207,13 @@ export default function LoginV2() {
       }
       doLogin(emp)
       setPin('')
+      // Sesión real de Supabase (auth.uid()) para este login por PIN — ver
+      // api/pin-login.js. No bloquea el login: si falla (offline, endpoint
+      // aún no desplegado…) todo sigue funcionando igual que hasta ahora con
+      // la clave anon, esto es puramente aditivo para cuando se active RLS.
+      requestPinToken(emp.id, newPin).then(token => {
+        if (token) supabase?.realtime.setAuth(token)
+      }).catch(() => {})
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
     } else {

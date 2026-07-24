@@ -6,6 +6,7 @@ import { sanitizeSession } from '../utils/sessionSecurity.js'
 import { normalizeToastOptions } from '../utils/toastOptions.js'
 import { pruneDbRetention } from '../utils/dbRetention.js'
 import { buildSyncHint, withForcedSyncIds } from '../services/tableSyncPlan.js'
+import { clearPinToken } from '../utils/pinAuthToken.js'
 
 const storedSes = (() => {
   try {
@@ -302,6 +303,10 @@ export const useAppStore = create((set, get) => ({
     const userId = get().session?.user?.id
     if (userId) detachPushUser(userId).catch(() => {})
     authSignOut().catch(() => {})
+    // Sesión de Supabase asociada a un login por PIN (ver api/pin-login.js) —
+    // un dispositivo compartido no debe conservar la identidad del empleado
+    // que acaba de cerrar sesión para las peticiones del siguiente.
+    clearPinToken()
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}

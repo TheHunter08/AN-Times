@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints } from './dataService.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, withPinAuthHeader } from './dataService.js'
+import { storePinToken, clearPinToken } from '../utils/pinAuthToken.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -164,4 +165,38 @@ describe('una jornada cerrada nunca pierde contra una copia abierta (tick en viv
     const merged = mergeDB({ ...BASE, records: [closedRec] }, { records: [newerClose] })
     expect(merged.records.find(r => r.id === 'rc1').fin).toBe('2026-07-24T16:30:00.000Z')
   })
+})
+
+describe('withPinAuthHeader: sustituye Authorization solo si hay sesión de PIN vigente', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('sin token guardado, devuelve las opciones sin tocar', () => {
+    const opts = { headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
+    expect(withPinAuthHeader(opts)).toBe(opts)
+  })
+
+  it('con un token vigente, sustituye Authorization y conserva el resto de headers', () => {
+    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
+    const opts = { method: 'GET', headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
+    const result = withPinAuthHeader(opts)
+    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
+    expect(result.headers.apikey).toBe('anon-key')
+    expect(result.method).toBe('GET')
+  })
+
+  it('con un token caducado, no lo aplica (vuelve a usar la clave anon)', () => {
+    storePinToken({ token: 'expired.jwt', expiresAt: Date.now() - 1000, empId: 'e1' })
+    const opts = { headers: { Authorization: 'Bearer anon-key' } }
+    expect(withPinAuthHeader(opts).headers.Authorization).toBe('Bearer anon-key')
+  })
+
+  it('funciona igual si headers llega como instancia de Headers (no objeto plano)', () => {
+    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
+    const opts = { headers: new Headers({ apikey: 'anon-key' }) }
+    const result = withPinAuthHeader(opts)
+    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
+    expect(result.headers.apikey).toBe('anon-key')
+  })
+
+  afterEach(() => clearPinToken())
 })

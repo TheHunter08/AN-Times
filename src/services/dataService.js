@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 import { dedupeNotifications } from '../utils/notifications.js'
+import { getStoredPinToken } from '../utils/pinAuthToken.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -12,11 +13,29 @@ import { dedupeNotifications } from '../utils/notifications.js'
 // cualquier petición individual falla rápido y entra en el mismo camino de
 // reintento/cola offline que ya existe, en vez de bloquear la UI.
 const _FETCH_TIMEOUT_MS = 6000
+
+// El cliente Supabase se crea UNA vez con la clave anon (ver createClient más
+// abajo). Un login por PIN (ver api/pin-login.js) obtiene, además, un JWT con
+// auth.uid() real — para que esa identidad se use en las peticiones REST sin
+// recrear el cliente (perdiendo el estado de Realtime), se sustituye aquí el
+// header Authorization por el del empleado activo cuando existe uno vigente.
+// Sin token válido (nadie ha iniciado sesión por PIN, o expiró), se manda tal
+// cual con la clave anon — comportamiento idéntico al de antes de esto.
+export function withPinAuthHeader(options) {
+  const stored = getStoredPinToken()
+  if (!stored) return options
+  const headers = options.headers instanceof Headers
+    ? Object.fromEntries(options.headers.entries())
+    : { ...(options.headers || {}) }
+  headers.Authorization = `Bearer ${stored.token}`
+  return { ...options, headers }
+}
 function _timeoutFetch(url, options = {}) {
-  if (options.signal) return fetch(url, options)
+  const opts = withPinAuthHeader(options)
+  if (opts.signal) return fetch(url, opts)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), _FETCH_TIMEOUT_MS)
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
