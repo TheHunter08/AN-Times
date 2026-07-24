@@ -13,6 +13,8 @@ import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
   clearLockout, hashPin, needsRehash,
 } from '../utils/pinSecurity.js'
+import { requestPinToken } from '../utils/pinAuthToken.js'
+import { supabase } from '../services/dataServiceV2.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
 import { useConnectivity } from '../hooks/useConnectivity.js'
 import type { LoginMode } from './pages/Login.js'
@@ -194,12 +196,14 @@ export default function LoginV2() {
 
     if (ok) {
       saveDB((fresh: any) => ({ pinLockouts: clearLockout(emp.id, fresh) }))
-      // Migrar PIN plano o hash legacy (SHA-256 sin sal, débil) → PBKDF2.
-      // isPinHashed() da true también para el hash legacy, así que no sirve
-      // aquí para decidir si hace falta migrar — needsRehash() sí distingue
-      // "ya está en el mejor formato" de "hay que rehashear".
+      // Migrar PIN plano o hash legacy (SHA-256 sin sal, débil, o PBKDF2 100k)
+      // → PBKDF2 600k actual. isPinHashed() da true también para cualquier
+      // hash legacy, así que no sirve aquí para decidir si hace falta migrar
+      // — needsRehash() sí distingue "ya está en el mejor formato" de "hay
+      // que rehashear". Si solo falta pinLen pero el hash ya es el actual,
+      // se reutiliza tal cual en vez de recalcularlo sin necesidad.
       if (needsRehash(emp.pin) || !emp.pinLen) {
-        const hashed = await hashPin(newPin, emp.id)
+        const hashed = needsRehash(emp.pin) ? await hashPin(newPin, emp.id) : emp.pin
         useAppStore.getState().saveDB((fresh: any) => ({
           employees: (fresh.employees || []).map((e: any) =>
             e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
@@ -208,11 +212,25 @@ export default function LoginV2() {
       }
       doLogin(emp)
       setPin('')
+      // Sesión real de Supabase (auth.uid()) para este login por PIN — ver
+      // api/pin-login.js. No bloquea el login: si falla (offline, endpoint
+      // aún no desplegado…) todo sigue funcionando igual que hasta ahora con
+      // la clave anon, esto es puramente aditivo para cuando se active RLS.
+      requestPinToken(emp.id, newPin).then(token => {
+        if (token) supabase?.realtime.setAuth(token)
+      }).catch(() => {})
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
     } else {
       const { state: lk, lockoutData } = recordFailedAttempt(emp.id, db) as any
-      if (lockoutData) saveDB((fresh: any) => ({ pinLockouts: recordFailedAttempt(emp.id, fresh).lockoutData }))
+      // recordFailedAttempt devuelve lockoutData null si el estado fresco ya
+      // está bloqueado (p.ej. el bloqueo llegó por realtime entre ambas
+      // llamadas) — en ese caso no hay nada que guardar; escribir null aquí
+      // borraría el mapa entero de bloqueos de todos los empleados.
+      if (lockoutData) saveDB((fresh: any) => {
+        const next = recordFailedAttempt(emp.id, fresh).lockoutData
+        return next ? { pinLockouts: next } : {}
+      })
       setPinShaking(true)
       if (lk.locked) {
         const secs = lk.remainingSecs || 0

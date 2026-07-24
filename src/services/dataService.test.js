@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry } from './dataService.js'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPinAuthHeader } from './dataService.js'
+import { storePinToken, clearPinToken } from '../utils/pinAuthToken.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -168,4 +169,73 @@ describe('trazabilidad de modificaciones', () => {
     expect(second.audit[1].previousId).toBe(first.audit[0].id)
     expect(second.audit[1]._upd).toBeTruthy()
   })
+})
+
+// Regresión: el tick periódico de useTimer sube una copia ABIERTA del registro
+// con _upd nuevo. Si otro dispositivo acababa de cerrar esa jornada, la regla
+// "el _upd más nuevo gana" la reabría. Como no existe "reabrir jornada" en la
+// app, una copia cerrada nunca debe perder contra una abierta del mismo id.
+describe('una jornada cerrada nunca pierde contra una copia abierta (tick en vivo)', () => {
+  beforeEach(() => { localStorage.clear() })
+  const closedRec = {
+    id: 'rc1', empId: 'e1', inicio: '2026-07-24T08:00:00.000Z',
+    fin: '2026-07-24T16:00:00.000Z', workSecs: 28800, _upd: '2026-07-24T16:00:00.000Z',
+  }
+  const staleOpenTick = {
+    id: 'rc1', empId: 'e1', inicio: '2026-07-24T08:00:00.000Z',
+    fin: null, workSecs: 29100, _upd: '2026-07-24T16:05:00.000Z', // _upd MÁS nuevo
+  }
+
+  it('la copia abierta con _upd más nuevo no pisa el cierre local (fetch/realtime)', () => {
+    const merged = mergeDB({ ...BASE, records: [closedRec] }, { records: [staleOpenTick] })
+    const rec = merged.records.find(r => r.id === 'rc1')
+    expect(rec.fin).toBe('2026-07-24T16:00:00.000Z')
+  })
+
+  it('el cierre remoto sí sustituye a la copia abierta local aunque sea más antiguo', () => {
+    const olderClose = { ...closedRec, _upd: '2026-07-24T15:59:00.000Z' }
+    const merged = mergeDB({ ...BASE, records: [staleOpenTick] }, { records: [olderClose] })
+    const rec = merged.records.find(r => r.id === 'rc1')
+    expect(rec.fin).toBe('2026-07-24T16:00:00.000Z')
+  })
+
+  it('entre dos copias cerradas sigue ganando la más reciente', () => {
+    const newerClose = { ...closedRec, fin: '2026-07-24T16:30:00.000Z', _upd: '2026-07-24T16:30:00.000Z' }
+    const merged = mergeDB({ ...BASE, records: [closedRec] }, { records: [newerClose] })
+    expect(merged.records.find(r => r.id === 'rc1').fin).toBe('2026-07-24T16:30:00.000Z')
+  })
+})
+
+describe('withPinAuthHeader: sustituye Authorization solo si hay sesión de PIN vigente', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('sin token guardado, devuelve las opciones sin tocar', () => {
+    const opts = { headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
+    expect(withPinAuthHeader(opts)).toBe(opts)
+  })
+
+  it('con un token vigente, sustituye Authorization y conserva el resto de headers', () => {
+    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
+    const opts = { method: 'GET', headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
+    const result = withPinAuthHeader(opts)
+    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
+    expect(result.headers.apikey).toBe('anon-key')
+    expect(result.method).toBe('GET')
+  })
+
+  it('con un token caducado, no lo aplica (vuelve a usar la clave anon)', () => {
+    storePinToken({ token: 'expired.jwt', expiresAt: Date.now() - 1000, empId: 'e1' })
+    const opts = { headers: { Authorization: 'Bearer anon-key' } }
+    expect(withPinAuthHeader(opts).headers.Authorization).toBe('Bearer anon-key')
+  })
+
+  it('funciona igual si headers llega como instancia de Headers (no objeto plano)', () => {
+    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
+    const opts = { headers: new Headers({ apikey: 'anon-key' }) }
+    const result = withPinAuthHeader(opts)
+    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
+    expect(result.headers.apikey).toBe('anon-key')
+  })
+
+  afterEach(() => clearPinToken())
 })

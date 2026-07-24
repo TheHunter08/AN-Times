@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 import { dedupeNotifications } from '../utils/notifications.js'
+import { getStoredPinToken } from '../utils/pinAuthToken.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -17,11 +18,29 @@ import { dedupeNotifications } from '../utils/notifications.js'
 // datos, upsert final), así que abortar una sola ya bastaba para que todo el
 // intento se etiquetara como "poca cobertura" con cobertura real de sobra.
 const _FETCH_TIMEOUT_MS = 9000
+
+// El cliente Supabase se crea UNA vez con la clave anon (ver createClient más
+// abajo). Un login por PIN (ver api/pin-login.js) obtiene, además, un JWT con
+// auth.uid() real — para que esa identidad se use en las peticiones REST sin
+// recrear el cliente (perdiendo el estado de Realtime), se sustituye aquí el
+// header Authorization por el del empleado activo cuando existe uno vigente.
+// Sin token válido (nadie ha iniciado sesión por PIN, o expiró), se manda tal
+// cual con la clave anon — comportamiento idéntico al de antes de esto.
+export function withPinAuthHeader(options) {
+  const stored = getStoredPinToken()
+  if (!stored) return options
+  const headers = options.headers instanceof Headers
+    ? Object.fromEntries(options.headers.entries())
+    : { ...(options.headers || {}) }
+  headers.Authorization = `Bearer ${stored.token}`
+  return { ...options, headers }
+}
 function _timeoutFetch(url, options = {}) {
-  if (options.signal) return fetch(url, options)
+  const opts = withPinAuthHeader(options)
+  if (opts.signal) return fetch(url, opts)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), _FETCH_TIMEOUT_MS)
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
@@ -211,6 +230,12 @@ function _mergeRecords(base, incoming, tKey) {
   for (const item of i) {
     const cur = map.get(item.id)
     if (!cur) { map.set(item.id, item); continue }
+    // Una jornada cerrada nunca pierde contra una copia abierta del mismo id:
+    // la app no tiene "reabrir jornada", así que una copia sin `fin` con _upd
+    // más nuevo solo puede ser el tick periódico de un dispositivo que aún no
+    // había descargado el cierre — aplicarla "resucitaría" la jornada.
+    if (cur.fin && !item.fin) continue
+    if (!cur.fin && item.fin) { map.set(item.id, item); continue }
     const curTs  = cur._upd  ? Date.parse(cur._upd)  : 0
     const itemTs = item._upd ? Date.parse(item._upd) : 0
     if (itemTs >= curTs) map.set(item.id, item)
@@ -730,6 +755,19 @@ function _bgSyncFallback() {
 }
 
 async function _runBgSyncFallback() {
+  // _pushFlight es el mutex que ya usan cloudPush()/_doCloudPush() para
+  // encolar guardados interactivos en vez de lanzarlos en paralelo. Antes
+  // solo _doCloudPush lo marcaba — un guardado normal (fichar, iniciar/parar
+  // descanso, el tick periódico de horas en vivo…) podía disparar una
+  // petición nueva justo mientras esta función ya tenía otra en vuelo hacia
+  // el mismo servidor. En señal débil, dos peticiones compitiendo por el
+  // mismo ancho de banda hace mucho más probable que AMBAS caigan en el
+  // timeout de 6s — la cola offline nunca llegaba a vaciarse y el aviso de
+  // "poca cobertura" volvía una y otra vez aunque la red mejorase lo
+  // suficiente para una sola petición. Marcarlo aquí también hace que
+  // cloudPush() encole cualquier guardado que llegue mientras esta subida
+  // sigue en curso, en vez de competir con ella.
+  _pushFlight = true
   try {
     const stored = await _readPending()
     if (!stored || !supabase) { _bgSyncRetries = 0; return { ok: true, pending: false } }
@@ -775,6 +813,13 @@ async function _runBgSyncFallback() {
       else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
     }
     return { ok: false, pending: true, error: e }
+  } finally {
+    // Liberar el mutex sea cual sea la salida (éxito, error, o cualquier otra
+    // excepción no contemplada arriba). Sin este finally, _pushFlight se
+    // queda en true para siempre tras la primera pasada: cloudPush() encola
+    // todo indefinidamente y nada vuelve a subir nunca, aunque la red esté
+    // perfectamente disponible — el mutex debe liberarse pase lo que pase.
+    _pushFlight = false
   }
 }
 
@@ -1186,7 +1231,7 @@ export async function getPushCoverage(employeeIds = []) {
   }
 }
 
-// Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 5 min.
+// Dedupe persistente per-device: bloquea el mismo (to|tag|title|body) durante 30 s.
 // Evita que la misma smart-noti se reenvíe en checks consecutivos del bucle 60s.
 function _pushDedupHit(to, tag, title, body) {
   try {

@@ -55,6 +55,7 @@ import {
   buildTableSyncPlan,
   ENTITY_COLLECTIONS,
   SINGLETON_COLLECTIONS,
+  softDeletePayload,
   toEmployeeRow as toEmployee,
   toRecordRow as toRecord,
 } from './tableSyncPlan.js'
@@ -196,6 +197,11 @@ export async function cloudFetchTs() {
 export function mergeRecordVersions(tableRecord, blobRecord) {
   if (!blobRecord) return tableRecord
   if (!tableRecord) return blobRecord
+  // La versión cerrada gana siempre sobre la abierta del mismo id: no existe
+  // "reabrir jornada", así que la copia abierta con _upd más nuevo solo puede
+  // ser un tick de horas en vivo que aún no conocía el cierre.
+  if (tableRecord.fin && !blobRecord.fin) return { ...blobRecord, ...tableRecord }
+  if (blobRecord.fin && !tableRecord.fin) return { ...tableRecord, ...blobRecord }
   const blobTs = Date.parse(blobRecord._upd || '') || 0
   const tableTs = Date.parse(tableRecord._upd || '') || 0
   return blobTs > tableTs
@@ -536,7 +542,7 @@ async function _syncToTables(db, deleted, syncHint) {
     op.mode === 'deactivate'
       ? supabase.from(op.table).update({ baja: true }).in('id', op.ids)
       : op.mode === 'soft_delete'
-        ? supabase.from(op.table).update({ deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in('id', op.ids)
+        ? supabase.from(op.table).update(softDeletePayload(op.table)).in('id', op.ids)
       : supabase.from(op.table).delete().in('id', op.ids)
   )
 

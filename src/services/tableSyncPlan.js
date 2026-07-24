@@ -149,6 +149,23 @@ export function toWorksiteRow(o, nowIso = new Date().toISOString()) {
   }
 }
 
+// records/vacaciones/cierres/obras tienen columna deleted_at (migraciones
+// 2026-07-14 phase1/phase2); app_entities SOLO tiene `deleted boolean` — nunca
+// se le añadió deleted_at. Incluirla en el UPDATE hace que PostgREST rechace
+// la petición entera con "columna inexistente" (42703) de forma PERMANENTE,
+// sin importar cuántas veces se reintente ni la calidad de la conexión — la
+// cola offline quedaba atascada para siempre creyendo que era un problema de
+// cobertura. Centralizado aquí (en vez de duplicado en dataServiceV2.js y
+// sw.js) para que ambas copias no puedan volver a desincronizarse del
+// esquema real de cada tabla.
+const TABLES_WITHOUT_DELETED_AT = new Set(['app_entities'])
+
+export function softDeletePayload(table, nowIso = new Date().toISOString()) {
+  return TABLES_WITHOUT_DELETED_AT.has(table)
+    ? { deleted: true, updated_at: nowIso }
+    : { deleted: true, deleted_at: nowIso, updated_at: nowIso }
+}
+
 function hasValue(value) {
   return typeof value === 'string' && value.trim().length > 0
 }

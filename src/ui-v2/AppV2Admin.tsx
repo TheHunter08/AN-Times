@@ -302,8 +302,8 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             </span>
           </div>
         )}
-        <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
-          {isEdit ? 'Guardar cambios' : 'Crear empleado'}
+        <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'wait' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
+          {sending ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear empleado'}
         </button>
       </div>
     </div>
@@ -731,9 +731,36 @@ function NotificationsPage({ onNavigate }: { onNavigate: (page: string) => void 
 }
 
 function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed }: { onViewTimesheets?: (id: string) => void; initialEditId?: string | null; onInitialEditConsumed?: () => void }) {
-  const rows   = useEmployeesData()
-  const db     = useAppStore(s => s.db) as any
+  const rows    = useEmployeesData()
+  const db      = useAppStore(s => s.db) as any
+  const saveDB  = useAppStore(s => s.saveDB)
+  const session = useAppStore(s => s.session)
+  const toast   = useAppStore(s => s.toast)
   const [modal, setModal] = useState<{ mode: 'create' } | { mode: 'edit'; emp: EmpForm } | null>(null)
+
+  // Baja lógica: el empleado deja de ser visible (listas y login ya filtran
+  // !e.baja), pero se conserva en el array de employees — nunca se elimina
+  // por completo, para no romper las referencias por id que ya tienen sus
+  // fichajes, cierres, vacaciones, etc. Se sincroniza como una fila normal
+  // (toEmployeeRow incluye baja), sin pasar por el mecanismo de tombstones.
+  const handleDeactivate = (id: string) => {
+    const emp = (db.employees || []).find((e: any) => e.id === id)
+    if (!emp) return
+    if (!window.confirm(`¿Dar de baja a ${emp.name}? No podrá volver a iniciar sesión y desaparecerá de los listados activos. Sus fichajes e historial se conservan.`)) return
+    const nowIso = new Date().toISOString()
+    const actor = session?.user?.name || 'Admin'
+    saveDB((fresh: any) => {
+      const withAudit = auditLog(fresh, 'Empleado dado de baja', emp.name, actor, {
+        category: 'empleado', entityType: 'employee', entityId: id,
+        before: { baja: false }, after: { baja: true },
+      })
+      return {
+        employees: (fresh.employees || []).map((e: any) => e.id === id ? { ...e, baja: true, _upd: nowIso } : e),
+        audit: withAudit.audit,
+      }
+    })
+    toast(`${emp.name} dado de baja`, 3000, 'warn')
+  }
 
   const openEdit = (id: string) => {
     const emp = (db.employees || []).find((e: any) => e.id === id)
@@ -760,7 +787,7 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed 
 
   return (
     <>
-      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} />
+      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} onDeactivate={handleDeactivate} />
       {modal && (
         <EmployeeModal initial={modal.mode === 'edit' ? modal.emp : undefined} onClose={() => setModal(null)} />
       )}

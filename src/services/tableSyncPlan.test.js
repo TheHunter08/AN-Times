@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSyncHint, buildTableSyncPlan, entityRowId, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow, withForcedSyncIds } from './tableSyncPlan.js'
+import { buildSyncHint, buildTableSyncPlan, entityRowId, softDeletePayload, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow, withForcedSyncIds } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -180,5 +180,30 @@ describe('plan de sincronización offline V2', () => {
     })
     expect(plan.upserts.find(op => op.table === 'employees').rows.map(row => row.id)).toEqual(['e1'])
     expect(plan.upserts.find(op => op.table === 'records').rows.map(row => row.id)).toEqual(['r2'])
+  })
+})
+
+// Regresión: app_entities (medicos/ausencias/mensajes/notis/documentos/audit/
+// correccionesFichaje/chats/gastos/wellbeing/turnos/partesTrabajo) solo tiene
+// columna `deleted boolean` en el esquema real — nunca se le añadió
+// `deleted_at` (a diferencia de records/vacaciones/cierres/obras). Enviar esa
+// columna en el UPDATE hacía que PostgREST rechazara la petición entera con
+// "columna inexistente" de forma permanente: ningún reintento, con cualquier
+// calidad de conexión, podía arreglarlo — la cola offline quedaba atascada
+// para siempre pareciendo un problema de cobertura.
+describe('softDeletePayload: solo las tablas con deleted_at real lo reciben', () => {
+  it('app_entities nunca lleva deleted_at', () => {
+    const payload = softDeletePayload('app_entities', '2026-07-24T00:00:00.000Z')
+    expect(payload).toEqual({ deleted: true, updated_at: '2026-07-24T00:00:00.000Z' })
+    expect(payload).not.toHaveProperty('deleted_at')
+  })
+
+  it.each(['records', 'vacaciones', 'cierres', 'obras'])('%s sí lleva deleted_at', (table) => {
+    const payload = softDeletePayload(table, '2026-07-24T00:00:00.000Z')
+    expect(payload).toEqual({
+      deleted: true,
+      deleted_at: '2026-07-24T00:00:00.000Z',
+      updated_at: '2026-07-24T00:00:00.000Z',
+    })
   })
 })
