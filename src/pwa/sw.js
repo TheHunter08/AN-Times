@@ -296,17 +296,29 @@ function _sbFetch(url, options) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
-const _restHeaders = (extra = {}) => ({
-  apikey: _SB_ANON,
-  Authorization: `Bearer ${_SB_ANON}`,
-  'Content-Type': 'application/json',
-  ...extra,
-})
+// Ver api/pin-login.js y src/utils/pinAuthToken.js: un login por PIN obtiene,
+// además de la sesión local, un JWT con auth.uid() real — mirror-ado aquí en
+// IDB (localStorage no es accesible desde un Service Worker) para que la
+// sincronización en segundo plano también lo use. Sin esto, cuando
+// policies_auth.sql se active, cualquier fichaje guardado offline y subido
+// por el SW mientras la app está cerrada fallaría por RLS (la petición
+// llegaría solo con la clave anon, sin auth.uid()). Hoy, con RLS aún
+// permisivo, este header extra no cambia ningún comportamiento.
+async function _restHeaders(extra = {}) {
+  const stored = await _idbGet('pin_auth_token').catch(() => null)
+  const valid = stored?.token && stored?.expiresAt && Date.now() < stored.expiresAt - 60_000
+  return {
+    apikey: _SB_ANON,
+    Authorization: valid ? `Bearer ${stored.token}` : `Bearer ${_SB_ANON}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  }
+}
 
 async function _restUpsertResilient(table, rows) {
   if (!rows.length) return
   const url = `${_SB_URL}/rest/v1/${table}`
-  const headers = _restHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' })
+  const headers = await _restHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' })
   const batch = await _sbFetch(url, { method: 'POST', headers, body: JSON.stringify(rows) })
   if (batch.ok) return
   // Una FK inválida no debe impedir que el resto de fichajes se sincronice.
@@ -334,14 +346,14 @@ async function _syncTablesSW(data, deleted, syncHint) {
     const idFilter = operation.ids.map(id => encodeURIComponent(id)).join(',')
     const url = `${_SB_URL}/rest/v1/${operation.table}?id=in.(${idFilter})`
     const response = operation.mode === 'deactivate'
-      ? await _sbFetch(url, { method: 'PATCH', headers: _restHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ baja: true }) })
+      ? await _sbFetch(url, { method: 'PATCH', headers: await _restHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ baja: true }) })
       : operation.mode === 'soft_delete'
         ? await _sbFetch(url, {
             method: 'PATCH',
-            headers: _restHeaders({ Prefer: 'return=minimal' }),
+            headers: await _restHeaders({ Prefer: 'return=minimal' }),
             body: JSON.stringify(softDeletePayload(operation.table)),
           })
-        : await _sbFetch(url, { method: 'DELETE', headers: _restHeaders({ Prefer: 'return=minimal' }) })
+        : await _sbFetch(url, { method: 'DELETE', headers: await _restHeaders({ Prefer: 'return=minimal' }) })
     if (!response.ok) throw new Error(`table delete ${operation.table}: ${response.status}`)
   }
 }
@@ -585,7 +597,7 @@ async function _markEmptyQueueChecked() {
       `${_SB_URL}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
       {
         method: 'PATCH',
-        headers: { ..._restHeaders(), Prefer: 'return=minimal' },
+        headers: await _restHeaders({ Prefer: 'return=minimal' }),
         body: JSON.stringify({ last_sync: new Date().toISOString() }),
       }
     )
