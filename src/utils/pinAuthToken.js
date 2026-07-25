@@ -102,6 +102,10 @@ export async function requestPinToken(empId, pin) {
     }
     const data = await res.json().catch(() => null)
     if (!data?.token || !data?.expiresAt) return null
+    // Nunca guardar (ni devolver) algo que no tenga forma de JWT — ver el
+    // mismo chequeo en getStoredPinToken(): guardar aquí un valor inválido
+    // es lo que dejaba a un dispositivo fallando para siempre más adelante.
+    if (typeof data.token !== 'string' || data.token.split('.').length !== 3) return null
     storePinToken({ token: data.token, expiresAt: data.expiresAt, empId })
     return data.token
   } catch (e) {

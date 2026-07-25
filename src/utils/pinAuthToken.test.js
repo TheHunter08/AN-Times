@@ -53,6 +53,12 @@ describe('requestPinToken: falla en silencio, nunca bloquea el login', () => {
     expect(getStoredPinToken()?.token).toBe('a.b.c')
   })
 
+  it('si el servidor devuelve un token con forma inválida, no lo guarda ni lo devuelve', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, token: 'esto-no-es-un-jwt', expiresAt: Date.now() + 3_600_000 }) })
+    expect(await requestPinToken('e1', '1234')).toBeNull()
+    expect(getStoredPinToken()).toBeNull()
+  })
+
   it('con respuesta no-ok, devuelve null y no guarda nada', async () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 401 })
     expect(await requestPinToken('e1', '0000')).toBeNull()

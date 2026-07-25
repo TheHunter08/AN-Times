@@ -217,7 +217,10 @@ export default function LoginV2() {
       // aún no desplegado…) todo sigue funcionando igual que hasta ahora con
       // la clave anon, esto es puramente aditivo para cuando se active RLS.
       requestPinToken(emp.id, newPin).then(token => {
-        if (token) supabase?.realtime.setAuth(token)
+        // requestPinToken ya valida que tenga forma de JWT, pero
+        // realtime.setAuth() decodifica el token internamente y puede lanzar
+        // — no debe poder romper el login por un fallo puramente de Realtime.
+        if (token) { try { supabase?.realtime.setAuth(token) } catch {} }
       }).catch(() => {})
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin error

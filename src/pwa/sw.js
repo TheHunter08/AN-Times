@@ -306,7 +306,14 @@ function _sbFetch(url, options) {
 // permisivo, este header extra no cambia ningún comportamiento.
 async function _restHeaders(extra = {}) {
   const stored = await _idbGet('pin_auth_token').catch(() => null)
-  const valid = stored?.token && stored?.expiresAt && Date.now() < stored.expiresAt - 60_000
+  // Mismo chequeo de forma que getStoredPinToken() en pinAuthToken.js: un
+  // token guardado que no sea un JWT real (3 partes) hacía que TODA petición
+  // en segundo plano fallara para siempre con "Expected 3 parts in JWT",
+  // incluso tras limpiar el lado de localStorage — el SW lee IndexedDB por
+  // su cuenta y nunca se enteraba de esa limpieza.
+  const validShape = typeof stored?.token === 'string' && stored.token.split('.').length === 3
+  const valid = validShape && stored?.expiresAt && Date.now() < stored.expiresAt - 60_000
+  if (stored && !validShape) _idbDel('pin_auth_token').catch(() => {})
   return {
     apikey: _SB_ANON,
     Authorization: valid ? `Bearer ${stored.token}` : `Bearer ${_SB_ANON}`,
