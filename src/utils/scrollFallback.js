@@ -102,11 +102,15 @@ function onTouchEnd() { touchState = null }
 
 let installed = false
 export function installScrollFallback() {
-  if (installed || typeof document === 'undefined') return
+  if (installed || typeof window === 'undefined') return
   installed = true
-  document.addEventListener('wheel', onWheel, { passive: false })
-  document.addEventListener('touchstart', onTouchStart, { passive: true })
-  document.addEventListener('touchmove', onTouchMove, { passive: false })
-  document.addEventListener('touchend', onTouchEnd, { passive: true })
-  document.addEventListener('touchcancel', onTouchEnd, { passive: true })
+  // Fase de CAPTURA sobre window: es lo primero que ve el evento en todo el
+  // árbol — ningún stopPropagation() intermedio (propio o de terceros) puede
+  // impedir que el fallback actúe, cosa que sí podía pasar escuchando en
+  // burbuja sobre document.
+  window.addEventListener('wheel', onWheel, { passive: false, capture: true })
+  window.addEventListener('touchstart', onTouchStart, { passive: true, capture: true })
+  window.addEventListener('touchmove', onTouchMove, { passive: false, capture: true })
+  window.addEventListener('touchend', onTouchEnd, { passive: true, capture: true })
+  window.addEventListener('touchcancel', onTouchEnd, { passive: true, capture: true })
 }

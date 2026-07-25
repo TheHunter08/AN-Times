@@ -3254,7 +3254,7 @@ export default function AppV2Admin() {
             <Avatar name={name} size={32} status="online" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-              <div style={{ fontSize: 10.5, color: colors.text[500] }}>{roleLabel}</div>
+              <div style={{ fontSize: 10.5, color: colors.text[500] }}>{roleLabel} · v{__APP_VERSION__}</div>
             </div>
             <button onClick={safeLogout} title="Cerrar sesión" aria-label="Cerrar sesión" style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[400], display: 'flex', padding: 6, borderRadius: 8 }}>
               <IconLogout width={15} height={15} />

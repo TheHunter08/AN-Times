@@ -121,7 +121,7 @@ export function Login({
           <div style={{ fontSize: 26, fontWeight: 650, color: colors.text[900], letterSpacing: '-1px' }}>
             TIMES <span style={{ color: colors.primary.light }}>INC</span>
           </div>
-          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Control horario y gestión de equipos</div>
+          <div style={{ fontSize: 12.5, color: colors.text[500], marginTop: 4 }}>Control horario y gestión de equipos · v{__APP_VERSION__}</div>
         </div>
 
         {/* Toggle PIN / Email */}
