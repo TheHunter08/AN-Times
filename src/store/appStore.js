@@ -343,6 +343,7 @@ export const useAppStore = create((set, get) => ({
     clearPinToken()
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}
+    try { sessionStorage.removeItem('an_times_admin_page') } catch {}
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
     set({
       session: { user: null, isAdmin: false, isEnc: false, isJO: false },
@@ -386,7 +387,12 @@ export const useAppStore = create((set, get) => ({
     return initialSession.isAdmin ? 'admin' : (initialSession.user ? 'emp' : 'login')
   })(),
   currentEmpTab: 'inicio',
-  currentAdminPage: 'dashboard',
+  // Sobrevive a un refresco de página (F5) dentro de la misma pestaña, pero
+  // no persiste entre sesiones de login distintas — evita que refrescar
+  // "reinicie" al admin al Dashboard perdiendo dónde estaba trabajando.
+  currentAdminPage: (() => {
+    try { return sessionStorage.getItem('an_times_admin_page') || 'dashboard' } catch { return 'dashboard' }
+  })(),
   navHistory: [],
 
   setScreen: (screen, noHistory) => {
@@ -405,7 +411,10 @@ export const useAppStore = create((set, get) => ({
   },
 
   setEmpTab: tab => set({ currentEmpTab: tab }),
-  setAdminPage: page => set({ currentAdminPage: page }),
+  setAdminPage: page => {
+    try { sessionStorage.setItem('an_times_admin_page', page) } catch {}
+    set({ currentAdminPage: page })
+  },
 
   // ── UI State ─────────────────────────────────────────────────────────
   isLoading: true,
