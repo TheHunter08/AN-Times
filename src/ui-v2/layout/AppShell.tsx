@@ -22,63 +22,6 @@ export interface AppShellProps {
 const DRAWER_W = 240
 const MOBILE_QUERY = '(max-width: 1023px)'
 
-// Diagnóstico temporal (quitar tras resolver el bug de scroll con rueda de
-// mouse reportado en producción): visible siempre por ahora — la app borra
-// los query params al cargar, así que ?debug=scroll no sobrevive — muestra
-// en pantalla si llegan eventos wheel/scroll reales, sin necesitar DevTools.
-function ScrollDebugBadge() {
-  const [info, setInfo] = useState<{ wheel: number; scroll: number; lastDeltaY: number | null; lastTarget: string }>({
-    wheel: 0, scroll: 0, lastDeltaY: null, lastTarget: '',
-  })
-  const [css, setCss] = useState('')
-  const enabled = true
-
-  useEffect(() => {
-    if (!enabled) return
-    const onWheel = (e: WheelEvent) => {
-      setInfo(prev => ({ ...prev, wheel: prev.wheel + 1, lastDeltaY: e.deltaY, lastTarget: (e.target as HTMLElement)?.className?.toString().slice(0, 40) || String((e.target as any)?.tagName || '') }))
-    }
-    const onScroll = () => setInfo(prev => ({ ...prev, scroll: prev.scroll + 1 }))
-    document.addEventListener('wheel', onWheel, { capture: true, passive: true })
-    document.querySelector('.uiv2-page-container')?.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      document.removeEventListener('wheel', onWheel, { capture: true } as any)
-      document.querySelector('.uiv2-page-container')?.removeEventListener('scroll', onScroll)
-    }
-  }, [enabled])
-
-  const readCss = () => {
-    const c = document.querySelector('.uiv2-page-container') as HTMLElement | null
-    if (!c) { setCss('no encontrado'); return }
-    const s = getComputedStyle(c)
-    setCss(`overflowY:${s.overflowY} scrollH:${c.scrollHeight} clientH:${c.clientHeight} scrollTop:${c.scrollTop}`)
-  }
-
-  const forceScroll = () => {
-    const c = document.querySelector('.uiv2-page-container') as HTMLElement | null
-    if (!c) return
-    c.scrollTop = c.scrollTop + 300
-    readCss()
-  }
-
-  if (!enabled) return null
-
-  return (
-    <div style={{
-      position: 'fixed', bottom: 12, right: 12, zIndex: 999999,
-      background: 'rgba(0,0,0,.85)', color: '#0f0', font: '12px/1.5 monospace',
-      padding: '10px 14px', borderRadius: 8, whiteSpace: 'pre', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 320,
-    }}>
-      <div>{`wheel events: ${info.wheel}\nscroll events: ${info.scroll}\nlast deltaY: ${info.lastDeltaY}\nlast target: ${info.lastTarget}`}</div>
-      <div style={{ wordBreak: 'break-all' }}>{css}</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={readCss} style={{ background: '#222', color: '#0f0', border: '1px solid #0f0', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', font: 'inherit' }}>Leer estado</button>
-        <button type="button" onClick={forceScroll} style={{ background: '#222', color: '#0f0', border: '1px solid #0f0', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', font: 'inherit' }}>Forzar scroll +300</button>
-      </div>
-    </div>
-  )
-}
-
 export function AppShell({
   navItems,
   activeNav,
@@ -347,7 +290,6 @@ export function AppShell({
             <div key={activeNav} className="uiv2-page-enter">{children}</div>
           </div>
         </main>
-        <ScrollDebugBadge />
       </div>
 
       <style>{`
