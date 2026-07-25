@@ -30,6 +30,7 @@ function ScrollDebugBadge() {
   const [info, setInfo] = useState<{ wheel: number; scroll: number; lastDeltaY: number | null; lastTarget: string }>({
     wheel: 0, scroll: 0, lastDeltaY: null, lastTarget: '',
   })
+  const [css, setCss] = useState('')
   const enabled = true
 
   useEffect(() => {
@@ -46,15 +47,34 @@ function ScrollDebugBadge() {
     }
   }, [enabled])
 
+  const readCss = () => {
+    const c = document.querySelector('.uiv2-page-container') as HTMLElement | null
+    if (!c) { setCss('no encontrado'); return }
+    const s = getComputedStyle(c)
+    setCss(`overflowY:${s.overflowY} scrollH:${c.scrollHeight} clientH:${c.clientHeight} scrollTop:${c.scrollTop}`)
+  }
+
+  const forceScroll = () => {
+    const c = document.querySelector('.uiv2-page-container') as HTMLElement | null
+    if (!c) return
+    c.scrollTop = c.scrollTop + 300
+    readCss()
+  }
+
   if (!enabled) return null
 
   return (
     <div style={{
       position: 'fixed', bottom: 12, right: 12, zIndex: 999999,
       background: 'rgba(0,0,0,.85)', color: '#0f0', font: '12px/1.5 monospace',
-      padding: '10px 14px', borderRadius: 8, pointerEvents: 'none', whiteSpace: 'pre',
+      padding: '10px 14px', borderRadius: 8, whiteSpace: 'pre', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 320,
     }}>
-      {`wheel events: ${info.wheel}\nscroll events: ${info.scroll}\nlast deltaY: ${info.lastDeltaY}\nlast target: ${info.lastTarget}`}
+      <div>{`wheel events: ${info.wheel}\nscroll events: ${info.scroll}\nlast deltaY: ${info.lastDeltaY}\nlast target: ${info.lastTarget}`}</div>
+      <div style={{ wordBreak: 'break-all' }}>{css}</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={readCss} style={{ background: '#222', color: '#0f0', border: '1px solid #0f0', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', font: 'inherit' }}>Leer estado</button>
+        <button type="button" onClick={forceScroll} style={{ background: '#222', color: '#0f0', border: '1px solid #0f0', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', font: 'inherit' }}>Forzar scroll +300</button>
+      </div>
     </div>
   )
 }
