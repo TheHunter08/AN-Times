@@ -8,6 +8,13 @@ import './ui-v2/design-system/theme.css'
 import './styles/premium.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { installScrollFallback } from './utils/scrollFallback.js'
+
+// Scroll de rueda/touch resuelto en el hilo principal — ver scrollFallback.js:
+// en varios equipos el scroll compositado de Chrome no responde a la rueda
+// aunque los eventos llegan; teclado y JS siempre funcionan, así que la app
+// hace el desplazamiento por su cuenta.
+installScrollFallback()
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   // La telemetría no debe retrasar el login ni el fichaje. Solo se descarga

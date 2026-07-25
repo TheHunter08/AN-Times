@@ -89,8 +89,11 @@ export function AreaChart({ data, height = 180, color = colors.primary.base, com
       </svg>
       {!compact && (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-          {data.map(d => (
-            <span key={d.label} style={{ fontSize: 11, fontWeight: 600, color: colors.text[500] }}>{d.label}</span>
+          {data.map((d, i) => (
+            // Clave por índice, no por label: las etiquetas pueden repetirse
+            // (p. ej. dos días "lun" en rangos largos, o dos empleados "Jose")
+            // y React avisaba de claves duplicadas.
+            <span key={i} style={{ fontSize: 11, fontWeight: 600, color: colors.text[500] }}>{d.label}</span>
           ))}
         </div>
       )}
