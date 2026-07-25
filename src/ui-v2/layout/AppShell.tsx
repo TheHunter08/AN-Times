@@ -317,7 +317,6 @@ export function AppShell({
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
           scrollbar-color: ${colors.border.default} transparent;
-          touch-action: pan-y;
         }
         .uiv2-page-frame { width: 100%; max-width: 1600px; margin: 0 auto; }
         .uiv2-page-enter { width: 100%; position: relative; animation: uiv2PageEnter 220ms cubic-bezier(.16,1,.3,1); }
