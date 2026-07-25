@@ -68,8 +68,14 @@ function shouldIgnoreTarget(target) {
 // consola cada decisión del fallback, sin ningún elemento visible en
 // pantalla — activar pegando `localStorage.setItem('an_times_scroll_debug','1')`
 // en la consola del navegador y recargando.
-function debugLog(...args) {
-  try { if (localStorage.getItem('an_times_scroll_debug') === '1') console.log('[scrollFallback]', ...args) } catch {}
+function debugLog(msg, data) {
+  try {
+    if (localStorage.getItem('an_times_scroll_debug') !== '1') return
+    // Un objeto como segundo argumento de console.log a veces se captura como
+    // "Object" sin desplegar (herramientas de lectura remota de consola) —
+    // se serializa aquí mismo para que el texto sea legible siempre.
+    console.log('[scrollFallback]', msg, data !== undefined ? JSON.stringify(data) : '')
+  } catch {}
 }
 
 function onWheel(e) {
@@ -103,19 +109,23 @@ function onTouchStart(e) {
 }
 
 function onTouchMove(e) {
-  if (!touchState || !e.cancelable || e.touches.length !== 1) return
+  if (!touchState) { debugLog('touchmove -> ignorado (sin touchState — el touchstart no lo activó)'); return }
+  if (!e.cancelable) { debugLog('touchmove -> ignorado (no cancelable)'); return }
+  if (e.touches.length !== 1) { debugLog('touchmove -> ignorado (multitouch)', { touches: e.touches.length }); return }
   const dx = touchState.x - e.touches[0].clientX
   const dy = touchState.y - e.touches[0].clientY
   const hit = findScrollTarget(touchState.target, dx, dy)
-  if (!hit) return
+  if (!hit) { debugLog('touchmove -> sin objetivo de scroll', { dx, dy }); return }
   e.preventDefault()
+  const before = hit.el.scrollTop
   if (hit.axis === 'y') hit.el.scrollTop += dy
   else hit.el.scrollLeft += dx
+  debugLog('touchmove -> aplicado', { axis: hit.axis, dx, dy, before, after: hit.el.scrollTop })
   touchState.x = e.touches[0].clientX
   touchState.y = e.touches[0].clientY
 }
 
-function onTouchEnd() { touchState = null }
+function onTouchEnd() { debugLog('touchend'); touchState = null }
 
 let installed = false
 export function installScrollFallback() {
