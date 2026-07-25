@@ -103,6 +103,20 @@ export function AppShell({
   const axisLockedRef = useRef<'h' | 'v' | null>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const pageContainerRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    // Un listener 'wheel' no-pasivo obliga a Chrome a resolver el scroll por
+    // el hilo principal en vez de por el compositor/GPU: en equipos donde el
+    // scroll compositado se queda "pegado" visualmente (el scrollTop avanza
+    // pero la pantalla no se repinta hasta el siguiente evento que fuerce un
+    // repintado), esta ruta más lenta pero síncrona evita el cuelgue visual.
+    const el = pageContainerRef.current
+    if (!el) return
+    const noop = () => {}
+    el.addEventListener('wheel', noop, { passive: false })
+    return () => el.removeEventListener('wheel', noop)
+  }, [])
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_QUERY)
@@ -328,7 +342,7 @@ export function AppShell({
           }
         />
 
-        <main className="uiv2-page-container">
+        <main className="uiv2-page-container" ref={pageContainerRef}>
           <div className="uiv2-page-frame">
             <div key={activeNav} className="uiv2-page-enter">{children}</div>
           </div>
