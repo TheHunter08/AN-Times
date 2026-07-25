@@ -15,12 +15,11 @@ import { auditLog, pushSubscribe, queuePush } from '../services/dataService.js'
 import { PWAInstall } from '../components/PWAInstall.jsx'
 import { shouldIgnoreAppGesture } from '../utils/gesture.js'
 import { useWindowWidth } from '../hooks/useWindowWidth.js'
-import { haversine } from '../utils/geo.js'
 import { getCfg, toggleTheme } from '../utils/userConfig.js'
 import { resolveEmployeeNotificationDestination } from '../utils/notificationNavigation.js'
 import { getNotificationPermissionGuide, notificationGuideText } from '../utils/notificationPermission.js'
 import { employeeObraOptions } from '../utils/obraAttribution.js'
-import { normalizeObraCoords } from '../utils/obraGeo.js'
+import { evaluateGeofence, normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
@@ -806,6 +805,15 @@ export default function EmployeePage() {
         return
       }
     }
+    // Geovalla: si la obra la marca como estricta (geofenceStrict), bloquea
+    // el fichaje fuera del radio permitido en vez de solo advertir — ver
+    // evaluateGeofence en utils/obraGeo.js.
+    const geofence = evaluateGeofence({ gps: effectiveGPS, obra: obraReq })
+    if (geofence.blocked) {
+      toast(`🚫 Estás a ${geofence.dist}m de "${centro}" (radio permitido: ${geofence.radio}m). Acércate a la obra para poder fichar.`, 7000, 'err')
+      startingRef.current = false
+      return
+    }
     // Relee el estado más fresco (no el `db` capturado al abrir el modal, que
     // puede llevar rato abierto mientras se espera el GPS) justo antes de
     // crear el fichaje: timer.state solo se actualiza una vez por segundo
@@ -831,18 +839,11 @@ export default function EmployeePage() {
       _upd: new Date().toISOString()
     }
     if (effectiveGPS) rec.locInicio = effectiveGPS
-    // Geofencing: warn if employee is outside the obra's defined radius
-    if (effectiveGPS) {
-      const obraGeo = (db.obras || []).find(o => o.nombre === centro)
-      const obraCoords = normalizeObraCoords(obraGeo?.coords)
-      if (obraCoords) {
-        const dist = haversine(effectiveGPS.lat, effectiveGPS.lng, obraCoords.lat, obraCoords.lng)
-        const radio = obraGeo.radio != null ? obraGeo.radio : 200
-        if (dist > radio) {
-          rec.geoAlert = { dist, radio, ts: new Date().toISOString() }
-          setTimeout(() => toast(`⚠️ Estás a ${dist}m de la obra (radio ${radio}m)`, 6000, 'warn'), 600)
-        }
-      }
+    // Fuera de radio pero sin geofenceStrict: se deja fichar, solo se marca
+    // para que el admin lo revise (comportamiento previo, no destructivo).
+    if (geofence.checked && geofence.outside) {
+      rec.geoAlert = { dist: geofence.dist, radio: geofence.radio, ts: new Date().toISOString() }
+      setTimeout(() => toast(`⚠️ Estás a ${geofence.dist}m de la obra (radio ${geofence.radio}m)`, 6000, 'warn'), 600)
     }
     saveDB(freshDb => ({
       records: [...freshDb.records, rec],

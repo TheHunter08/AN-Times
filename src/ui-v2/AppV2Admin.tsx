@@ -2507,6 +2507,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const [lat, setLat] = useState(initialCoords ? String(initialCoords.lat) : '')
   const [lng, setLng] = useState(initialCoords ? String(initialCoords.lng) : '')
   const [radio, setRadio] = useState(String(initial?.radio || 200))
+  const [geofenceStrict, setGeofenceStrict] = useState(initial?.geofenceStrict ?? false)
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
   // Sin este campo, ninguna obra podía marcarse como completada/inactiva
@@ -2562,6 +2563,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
       id: initial?.id || gid(), nombre: nombre.trim(),
       coords: normalizedCoords,
       radio: Number(radio) > 0 ? Number(radio) : 200,
+      geofenceStrict,
       activa,
       fechaInicio: fechaInicio || null,
       centroTrabajo: centroTrabajo || null,
@@ -2637,6 +2639,12 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
             <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} aria-label="Fecha de inicio de la obra" style={fieldStyle} />
           </div>
         </div>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', padding: '2px 2px 0' }}>
+          <input type="checkbox" checked={geofenceStrict} onChange={e => setGeofenceStrict(e.target.checked)} style={{ width: 17, height: 17, marginTop: 1, flexShrink: 0, accentColor: colors.primary.base, cursor: 'pointer' }} />
+          <span style={{ fontSize: 12.5, color: colors.text[700], lineHeight: 1.5 }}>
+            <strong style={{ color: colors.text[900] }}>Bloquear fichaje fuera del radio.</strong> Si está desactivado, fichar fuera del radio solo genera un aviso para revisión, no lo impide.
+          </span>
+        </label>
         <div>
           <div style={labelStyle}>Centro de trabajo</div>
           {centros.length > 0 ? (

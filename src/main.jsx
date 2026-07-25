@@ -19,6 +19,9 @@ if (import.meta.env.VITE_SENTRY_DSN) {
       tracesSampleRate: 0.2,
       integrations: [Sentry.browserTracingIntegration()],
     })
+    // ErrorBoundary.jsx reporta excepciones vía window.__sentryHub — sin esta
+    // asignación esa integración quedaba muerta incluso con el DSN activo.
+    window.__sentryHub = Sentry
   }).catch(() => {})
 }
 
