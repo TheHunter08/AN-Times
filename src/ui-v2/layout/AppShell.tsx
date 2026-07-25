@@ -357,8 +357,12 @@ export function AppShell({
           height: 100vh;
           height: 100dvh;
           min-height: 0;
-          position: fixed;
-          inset: 0;
+          /* html/body ya son position:fixed;inset:0 (index.html / globals.css)
+             para el shell de la PWA — evitamos un segundo nivel de fixed
+             anidado aquí, que es redundante (el body ya inmoviliza la página)
+             y puede confundir la resolución de scroll por rueda de mouse en
+             algunos navegadores/GPUs. */
+          position: relative;
           display: flex;
           overflow: hidden;
           background: ${colors.bg[900]};
