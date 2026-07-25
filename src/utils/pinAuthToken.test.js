@@ -30,6 +30,16 @@ describe('pinAuthToken: almacenamiento y caducidad', () => {
     localStorage.setItem('an_times_pin_jwt', '{not json')
     expect(getStoredPinToken()).toBeNull()
   })
+
+  it('un token con una forma distinta a un JWT (no 3 partes) se descarta y se limpia solo', () => {
+    // Regresión: un token guardado en un formato inválido (de una versión
+    // anterior, o corrupto) hacía fallar TODAS las peticiones para siempre
+    // con "Expected 3 parts in JWT" — nada volvía a limpiarlo.
+    storePinToken({ token: 'esto-no-es-un-jwt', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
+    expect(getStoredPinToken()).toBeNull()
+    // clearPinToken() ya se ejecutó como efecto secundario: no queda nada guardado.
+    expect(localStorage.getItem('an_times_pin_jwt')).toBeNull()
+  })
 })
 
 describe('requestPinToken: falla en silencio, nunca bloquea el login', () => {

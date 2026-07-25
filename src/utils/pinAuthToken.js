@@ -54,6 +54,16 @@ export function getStoredPinToken() {
     // Margen de 60s: evita usar un token que caduca a mitad de una petición
     // en vuelo por una pequeña diferencia de reloj entre cliente y servidor.
     if (Date.now() >= parsed.expiresAt - 60_000) return null
+    // Un JWT válido tiene siempre 3 partes (header.payload.firma). Un token
+    // guardado con otra forma (ej. de una versión anterior del endpoint, o
+    // corrupto) hacía que TODAS las peticiones fallaran con "Expected 3
+    // parts in JWT" indefinidamente, incluso después de desactivar RLS —
+    // nada volvía a limpiar solo ese valor guardado. Se descarta aquí mismo
+    // en vez de esperar a que el servidor lo rechace.
+    if (typeof parsed.token !== 'string' || parsed.token.split('.').length !== 3) {
+      clearPinToken()
+      return null
+    }
     return parsed
   } catch { return null }
 }
