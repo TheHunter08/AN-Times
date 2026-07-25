@@ -55,7 +55,7 @@ export function buildResumenMatrix({ employees = [], records = [], vacaciones = 
   const sameMonth = days.length > 0 && days.every(d => d.slice(0, 7) === days[0].slice(0, 7))
 
   const scoped = (employees || [])
-    .filter(e => e && !e.baja && (!employeeId || e.id === employeeId))
+    .filter(e => e && !e.baja && !e.isAdmin && e.role !== 'admin' && (!employeeId || e.id === employeeId))
     .map(e => ({ ...e, _role: resolveRole(e) }))
     .sort((a, b) =>
       (ROLE_ORDER[a._role] ?? 9) - (ROLE_ORDER[b._role] ?? 9) ||
@@ -79,11 +79,18 @@ export function buildResumenMatrix({ employees = [], records = [], vacaciones = 
     }
   }
 
+  const todayStr = localDateStr(new Date())
   const rows = scoped.map(employee => {
     const cells = days.map(d => {
       const key = `${employee.id}|${d}`
       const minutes = minutesByKey.get(key) || 0
-      return { date: d, minutes, hours: minutes / 60, isVacation: vacKeys.has(key) }
+      const isVacation = vacKeys.has(key)
+      const dow = new Date(d + 'T00:00:00').getDay()
+      const isWeekend = dow === 0 || dow === 6
+      // Sábado y domingo son descanso, no ausencia; los días futuros tampoco
+      // cuentan como ausencia porque el empleado aún no ha podido fichar.
+      const isAbsent = minutes === 0 && !isVacation && !isWeekend && d <= todayStr
+      return { date: d, minutes, hours: minutes / 60, isVacation, isWeekend, isAbsent }
     })
     const totalMinutes = cells.reduce((sum, c) => sum + c.minutes, 0)
     return {

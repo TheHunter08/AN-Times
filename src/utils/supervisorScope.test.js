@@ -50,16 +50,16 @@ describe('getScopedOnlineRecords', () => {
 })
 
 describe('isScopedSupervisor', () => {
-  it('reconoce encargado y jefe de obra por session.isEnc/isJO o por el rol del empleado', () => {
+  it('reconoce al encargado por session.isEnc o por el rol del empleado', () => {
     expect(isScopedSupervisor({ isEnc: true, user: {} })).toBe(true)
-    expect(isScopedSupervisor({ isJO: true, user: {} })).toBe(true)
     expect(isScopedSupervisor({ user: { role: 'encargado' } })).toBe(true)
-    expect(isScopedSupervisor({ user: { role: 'jefe_obra' } })).toBe(true)
   })
 
-  it('no restringe a admin ni a empleado normal', () => {
+  it('no restringe a admin, empleado normal, ni jefe de obra (ya tiene acceso completo de administrador)', () => {
     expect(isScopedSupervisor({ user: { role: 'admin' } })).toBe(false)
     expect(isScopedSupervisor({ user: { role: 'empleado' } })).toBe(false)
+    expect(isScopedSupervisor({ isJO: true, user: {} })).toBe(false)
+    expect(isScopedSupervisor({ user: { role: 'jefe_obra' } })).toBe(false)
     expect(isScopedSupervisor(null)).toBe(false)
   })
 })

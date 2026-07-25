@@ -1858,7 +1858,7 @@ function ResumenPage() {
   const [exportingExcel, setExportingExcel] = useState(false)
 
   const employees = useMemo(
-    () => (db.employees || []).filter((e: any) => !e.baja).map((e: any) => ({ id: e.id, name: e.name || e.id })),
+    () => (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin && e.role !== 'admin').map((e: any) => ({ id: e.id, name: e.name || e.id })),
     [db.employees],
   )
 
@@ -1908,7 +1908,7 @@ function ResumenPage() {
       const rows = matrix.rows.map((row: any) => [
         row.employee.name || row.employee.id,
         row.roleLabel,
-        ...row.cells.map((cell: any) => cell.minutes > 0 ? Math.round(cell.hours * 100) / 100 : (cell.isVacation ? 'Vac' : '')),
+        ...row.cells.map((cell: any) => cell.minutes > 0 ? Math.round(cell.hours * 100) / 100 : cell.isVacation ? 'Vac' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : ''),
         Math.round(row.totalHours * 100) / 100,
       ])
       await downloadXlsx(headers, rows, `resumen-${monthValue || dateValue || rangeFrom}.xlsx`, 'Resumen')

@@ -2,9 +2,15 @@ function normalize(value) {
   return String(value || '').trim().toLocaleLowerCase('es')
 }
 
+// El jefe de obra ya recibe acceso completo de administrador al iniciar
+// sesión (session.isAdmin=true en LoginV2, todas las PAGES visibles en
+// AppV2Admin) — solo el encargado queda restringido a su centro/obra. Antes
+// isJO se trataba igual que isEnc aquí, así que un jefe de obra con acceso
+// de página completo solo veía a un subconjunto de sus empleados en
+// Planning, Fichajes, Solicitudes, etc.
 export function isScopedSupervisor(session) {
   const user = session?.user || {}
-  return Boolean(session?.isEnc || session?.isJO || user.role === 'encargado' || user.role === 'jefe_obra')
+  return Boolean(session?.isEnc || user.role === 'encargado')
 }
 
 function assignedWorks(employee) {

@@ -74,9 +74,10 @@ export async function buildResumenPdfBlob({ title, subtitle, days, sameMonth, ro
     row.cells.forEach((cell, i) => {
       const x = ML + NAME_W + ROLE_W + i * dayColW
       if (cell.isVacation) page.drawRectangle({ x, y: rowY - ROW_H, width: dayColW, height: ROW_H, color: vacBg })
-      const label = cell.minutes > 0 ? fmtHours(cell.hours) : (cell.isVacation ? 'Vac' : '-')
-      const textColor = cell.minutes > 0 ? ink : gray
-      page.drawText(label, { x: x + dayColW / 2 - label.length * fontSize * 0.28, y: rowY - ROW_H + 6, size: fontSize, font: fontR, color: textColor })
+      const label = cell.minutes > 0 ? fmtHours(cell.hours) : cell.isVacation ? 'Vac' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : '-'
+      const cellSize = cell.isAbsent || cell.isWeekend ? Math.max(5.5, fontSize - 1.5) : fontSize
+      const textColor = cell.minutes > 0 ? ink : cell.isAbsent ? rgb(0.75, 0.16, 0.16) : gray
+      page.drawText(label, { x: x + dayColW / 2 - label.length * cellSize * 0.28, y: rowY - ROW_H + 6, size: cellSize, font: fontR, color: textColor })
     })
     page.drawLine({ start: { x: ML, y: rowY - ROW_H }, end: { x: ML + NAME_W + ROLE_W + days.length * dayColW, y: rowY - ROW_H }, thickness: 0.3, color: border })
     y -= ROW_H

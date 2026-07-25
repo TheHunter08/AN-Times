@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { buildResumenMatrix, resolvePeriodDays, dayColumnLabel, resolveRole } from './resumenMatrix.js'
 
 describe('resolveRole', () => {
@@ -79,6 +79,12 @@ describe('buildResumenMatrix', () => {
     expect(rows.some(r => r.employee.id === 'baja1')).toBe(false)
   })
 
+  it('excluye al administrador — no es un empleado', () => {
+    const withAdmin = [...employees, { id: 'admin1', name: 'Admin Root', role: 'admin' }, { id: 'admin2', name: 'Admin Legacy', isAdmin: true }]
+    const { rows } = buildResumenMatrix({ employees: withAdmin, records, vacaciones, period: { mode: 'date', value: '2026-07-05' } })
+    expect(rows.some(r => r.employee.id === 'admin1' || r.employee.id === 'admin2')).toBe(false)
+  })
+
   it('filtra por un empleado concreto cuando se pasa employeeId', () => {
     const { rows } = buildResumenMatrix({ employees, records, vacaciones, period: { mode: 'date', value: '2026-07-05' }, employeeId: 'e1' })
     expect(rows).toHaveLength(1)
@@ -105,6 +111,47 @@ describe('buildResumenMatrix', () => {
     expect(e3.cells[days.indexOf('2026-07-10')].isVacation).toBe(false)
     // Pendiente (no aprobada) no debe marcarse
     expect(e4.cells[days.indexOf('2026-07-05')].isVacation).toBe(false)
+  })
+
+  describe('ausencia vs. descanso (fin de semana) vs. día futuro', () => {
+    beforeEach(() => vi.useFakeTimers().setSystemTime(new Date('2026-07-25T12:00:00')))
+    afterEach(() => vi.useRealTimers())
+
+    it('sábado y domingo sin fichaje son descanso (isWeekend), nunca ausencia', () => {
+      const { rows, days } = buildResumenMatrix({ employees, records, period: { mode: 'month', value: '2026-07' } })
+      const e1 = rows.find(r => r.employee.id === 'e1')
+      const saturdayIdx = days.indexOf('2026-07-04') // sábado, sin fichaje
+      expect(e1.cells[saturdayIdx].isWeekend).toBe(true)
+      expect(e1.cells[saturdayIdx].isAbsent).toBe(false)
+    })
+
+    it('un día laborable pasado sin fichaje es ausencia', () => {
+      const { rows, days } = buildResumenMatrix({ employees, records, period: { mode: 'month', value: '2026-07' } })
+      const e1 = rows.find(r => r.employee.id === 'e1')
+      const pastWeekdayIdx = days.indexOf('2026-07-01') // miércoles, sin fichaje, ya pasó
+      expect(e1.cells[pastWeekdayIdx].isWeekend).toBe(false)
+      expect(e1.cells[pastWeekdayIdx].isAbsent).toBe(true)
+    })
+
+    it('un día laborable futuro sin fichaje no es ausencia todavía', () => {
+      const { rows, days } = buildResumenMatrix({ employees, records, period: { mode: 'month', value: '2026-07' } })
+      const e1 = rows.find(r => r.employee.id === 'e1')
+      const futureWeekdayIdx = days.indexOf('2026-07-30') // jueves, futuro respecto al 25 de julio
+      expect(e1.cells[futureWeekdayIdx].isAbsent).toBe(false)
+    })
+
+    it('un día con fichaje no cuenta como ausencia', () => {
+      const { rows, days } = buildResumenMatrix({ employees, records, period: { mode: 'month', value: '2026-07' } })
+      const e1 = rows.find(r => r.employee.id === 'e1')
+      expect(e1.cells[days.indexOf('2026-07-05')].isAbsent).toBe(false)
+    })
+
+    it('un día de vacaciones aprobadas no cuenta como ausencia', () => {
+      const { rows, days } = buildResumenMatrix({ employees, records, vacaciones, period: { mode: 'month', value: '2026-07' } })
+      const e3 = rows.find(r => r.employee.id === 'e3')
+      expect(e3.cells[days.indexOf('2026-07-06')].isVacation).toBe(true)
+      expect(e3.cells[days.indexOf('2026-07-06')].isAbsent).toBe(false)
+    })
   })
 
   it('sameMonth es true dentro de un mes y false en un rango que cruza meses', () => {

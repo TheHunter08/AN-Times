@@ -12,6 +12,8 @@ export interface ResumenCell {
   minutes: number
   hours: number
   isVacation: boolean
+  isWeekend: boolean
+  isAbsent: boolean
 }
 
 export interface ResumenRow {
@@ -166,10 +168,11 @@ export function Resumen(props: ResumenProps) {
                     <td key={cell.date} style={{
                       textAlign: 'center', padding: '8px 4px', borderBottom: `1px solid ${colors.border.subtle}`,
                       background: cell.isVacation ? colors.primary.dim : undefined,
-                      color: cell.minutes > 0 ? colors.text[900] : colors.text[300],
-                      fontWeight: cell.minutes > 0 ? 600 : 400,
+                      color: cell.minutes > 0 ? colors.text[900] : cell.isAbsent ? colors.semantic.red : colors.text[300],
+                      fontWeight: cell.minutes > 0 || cell.isAbsent ? 600 : 400,
+                      fontSize: cell.isAbsent || cell.isWeekend ? 10 : undefined,
                     }}>
-                      {cell.minutes > 0 ? fmtHours(cell.hours) : (cell.isVacation ? 'Vac' : '-')}
+                      {cell.minutes > 0 ? fmtHours(cell.hours) : cell.isVacation ? 'Vac' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : '-'}
                     </td>
                   ))}
                   <td style={{ textAlign: 'right', padding: '8px 12px', color: colors.text[900], fontWeight: 800, borderBottom: `1px solid ${colors.border.subtle}` }}>{fmtHours(row.totalHours) || '0h'}</td>
