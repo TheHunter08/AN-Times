@@ -43,6 +43,9 @@ import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { getLaunchBlockers } from '../utils/launchRequirements.js'
 import { isValidAccountEmail } from '../utils/authRegistration.js'
+import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
+import { downloadResumenPdf } from '../utils/resumenPdf.js'
+import type { ResumenPeriodMode } from './pages/Resumen.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
 const Employees = lazy(() => import('./pages/Employees.js').then(module => ({ default: module.Employees })))
@@ -54,6 +57,7 @@ const ValidateHours = lazy(() => import('./pages/ValidateHours.js').then(module 
 const Expenses = lazy(() => import('./pages/Expenses.js').then(module => ({ default: module.Expenses })))
 const Documents = lazy(() => import('./pages/Documents.js').then(module => ({ default: module.Documents })))
 const Reports = lazy(() => import('./pages/Reports.js').then(module => ({ default: module.Reports })))
+const Resumen = lazy(() => import('./pages/Resumen.js').then(module => ({ default: module.Resumen })))
 const Stats = lazy(() => import('./pages/Stats.js').then(module => ({ default: module.Stats })))
 const MonthlyClose = lazy(() => import('./pages/MonthlyClose.js').then(module => ({ default: module.MonthlyClose })))
 const Audit = lazy(() => import('./pages/Audit.js').then(module => ({ default: module.Audit })))
@@ -88,6 +92,7 @@ const PAGES = [
   { id: 'obras',          label: 'Obras',             group: 'Gestión', icon: <IconBuilding /> },
   { id: 'centros',        label: 'Centros de trabajo',group: 'Gestión', icon: <IconMapPin /> },
   { id: 'documentos',     label: 'Documentos',        group: 'Gestión', icon: <IconFolder /> },
+  { id: 'resumen',        label: 'Resumen',           group: 'Análisis', icon: <IconGrid /> },
   { id: 'estadisticas',   label: 'Estadísticas',      group: 'Análisis', icon: <IconChart /> },
   { id: 'informes',       label: 'Cumplimiento',      group: 'Análisis', icon: <IconFileText /> },
   { id: 'cierre',         label: 'Cierre mensual',    group: 'Análisis', icon: <IconSeal /> },
@@ -1839,6 +1844,107 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   )
 }
 
+function ResumenPage() {
+  const db    = useAppStore(s => s.db) as any
+  const toast = useAppStore(s => s.toast)
+
+  const [employeeId, setEmployeeId] = useState<string | null>(null)
+  const [mode, setMode] = useState<ResumenPeriodMode>('month')
+  const [monthValue, setMonthValue] = useState(() => today().slice(0, 7))
+  const [dateValue, setDateValue] = useState(() => today())
+  const [rangeFrom, setRangeFrom] = useState(() => today().slice(0, 7) + '-01')
+  const [rangeTo, setRangeTo] = useState(() => today())
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+
+  const employees = useMemo(
+    () => (db.employees || []).filter((e: any) => !e.baja).map((e: any) => ({ id: e.id, name: e.name || e.id })),
+    [db.employees],
+  )
+
+  const period = useMemo(() => {
+    if (mode === 'month') return { mode: 'month' as const, value: monthValue }
+    if (mode === 'date') return { mode: 'date' as const, value: dateValue }
+    return { mode: 'range' as const, from: rangeFrom, to: rangeTo }
+  }, [mode, monthValue, dateValue, rangeFrom, rangeTo])
+
+  const matrix = useMemo(
+    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId }),
+    [db.employees, db.records, db.vacaciones, period, employeeId],
+  )
+
+  const dayLabel = (date: string) => dayColumnLabel(date, matrix.sameMonth)
+
+  const periodLabel = mode === 'month'
+    ? new Date(`${monthValue}-01T00:00:00`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    : mode === 'date'
+      ? new Date(`${dateValue}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+      : `${rangeFrom} — ${rangeTo}`
+
+  const handleExportPdf = async () => {
+    if (exportingPdf || !matrix.days.length) return
+    setExportingPdf(true)
+    try {
+      await downloadResumenPdf({
+        title: 'Resumen de horas',
+        subtitle: periodLabel,
+        days: matrix.days,
+        sameMonth: matrix.sameMonth,
+        rows: matrix.rows,
+        dayLabel,
+      }, `resumen-${monthValue || dateValue || rangeFrom}.pdf`)
+    } catch (error: any) {
+      toast(`No se pudo generar el PDF: ${error?.message || 'error desconocido'}`, 5000, 'err')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  const handleExportExcel = async () => {
+    if (exportingExcel || !matrix.days.length) return
+    setExportingExcel(true)
+    try {
+      const headers = ['Empleado', 'Rol', ...matrix.days.map(d => dayLabel(d)), 'Total']
+      const rows = matrix.rows.map((row: any) => [
+        row.employee.name || row.employee.id,
+        row.roleLabel,
+        ...row.cells.map((cell: any) => cell.minutes > 0 ? Math.round(cell.hours * 100) / 100 : (cell.isVacation ? 'Vac' : '')),
+        Math.round(row.totalHours * 100) / 100,
+      ])
+      await downloadXlsx(headers, rows, `resumen-${monthValue || dateValue || rangeFrom}.xlsx`, 'Resumen')
+    } catch (error: any) {
+      toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 5000, 'err')
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
+  return (
+    <Resumen
+      employees={employees}
+      employeeId={employeeId}
+      onChangeEmployee={setEmployeeId}
+      mode={mode}
+      onChangeMode={setMode}
+      monthValue={monthValue}
+      onChangeMonth={setMonthValue}
+      dateValue={dateValue}
+      onChangeDate={setDateValue}
+      rangeFrom={rangeFrom}
+      rangeTo={rangeTo}
+      onChangeRangeFrom={setRangeFrom}
+      onChangeRangeTo={setRangeTo}
+      days={matrix.days}
+      dayLabel={dayLabel}
+      rows={matrix.rows}
+      onExportPdf={handleExportPdf}
+      onExportExcel={handleExportExcel}
+      exportingPdf={exportingPdf}
+      exportingExcel={exportingExcel}
+    />
+  )
+}
+
 function PendingCenterPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const offlinePending = useAppStore(s => s.offlinePending)
@@ -3103,6 +3209,7 @@ export default function AppV2Admin() {
     if (page === 'vacaciones')     return <VacacionesAdminPage />
     if (page === 'gastos')         return <ExpensesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
     if (page === 'documentos')     return <DocumentsPage />
+    if (page === 'resumen')        return <ResumenPage />
     if (page === 'estadisticas')   return <StatsPage onNavigate={setAdminPage} />
     if (page === 'informes')       return <ReportsPage onNavigate={setAdminPage} />
     if (page === 'cierre')         return <MonthlyClosePage />
