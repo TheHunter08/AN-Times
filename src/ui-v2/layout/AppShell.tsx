@@ -22,6 +22,43 @@ export interface AppShellProps {
 const DRAWER_W = 240
 const MOBILE_QUERY = '(max-width: 1023px)'
 
+// Diagnóstico temporal (quitar tras resolver el bug de scroll con rueda de
+// mouse reportado en producción): visible siempre por ahora — la app borra
+// los query params al cargar, así que ?debug=scroll no sobrevive — muestra
+// en pantalla si llegan eventos wheel/scroll reales, sin necesitar DevTools.
+function ScrollDebugBadge() {
+  const [info, setInfo] = useState<{ wheel: number; scroll: number; lastDeltaY: number | null; lastTarget: string }>({
+    wheel: 0, scroll: 0, lastDeltaY: null, lastTarget: '',
+  })
+  const enabled = true
+
+  useEffect(() => {
+    if (!enabled) return
+    const onWheel = (e: WheelEvent) => {
+      setInfo(prev => ({ ...prev, wheel: prev.wheel + 1, lastDeltaY: e.deltaY, lastTarget: (e.target as HTMLElement)?.className?.toString().slice(0, 40) || String((e.target as any)?.tagName || '') }))
+    }
+    const onScroll = () => setInfo(prev => ({ ...prev, scroll: prev.scroll + 1 }))
+    document.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    document.querySelector('.uiv2-page-container')?.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      document.removeEventListener('wheel', onWheel, { capture: true } as any)
+      document.querySelector('.uiv2-page-container')?.removeEventListener('scroll', onScroll)
+    }
+  }, [enabled])
+
+  if (!enabled) return null
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 12, right: 12, zIndex: 999999,
+      background: 'rgba(0,0,0,.85)', color: '#0f0', font: '12px/1.5 monospace',
+      padding: '10px 14px', borderRadius: 8, pointerEvents: 'none', whiteSpace: 'pre',
+    }}>
+      {`wheel events: ${info.wheel}\nscroll events: ${info.scroll}\nlast deltaY: ${info.lastDeltaY}\nlast target: ${info.lastTarget}`}
+    </div>
+  )
+}
+
 export function AppShell({
   navItems,
   activeNav,
@@ -276,6 +313,7 @@ export function AppShell({
             <div key={activeNav} className="uiv2-page-enter">{children}</div>
           </div>
         </main>
+        <ScrollDebugBadge />
       </div>
 
       <style>{`
