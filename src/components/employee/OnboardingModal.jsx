@@ -62,7 +62,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-dialog-title" tabIndex={-1} style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-dialog-title" tabIndex={-1} style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, maxHeight:'90dvh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
           <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
