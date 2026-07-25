@@ -64,24 +64,41 @@ function shouldIgnoreTarget(target) {
   return false
 }
 
+// Diagnóstico temporal (quitar cuando se confirme la causa): registra en
+// consola cada decisión del fallback, sin ningún elemento visible en
+// pantalla — activar pegando `localStorage.setItem('an_times_scroll_debug','1')`
+// en la consola del navegador y recargando.
+function debugLog(...args) {
+  try { if (localStorage.getItem('an_times_scroll_debug') === '1') console.log('[scrollFallback]', ...args) } catch {}
+}
+
 function onWheel(e) {
-  if (e.ctrlKey || e.defaultPrevented || !e.cancelable) return
-  if (shouldIgnoreTarget(e.target)) return
+  debugLog('wheel', {
+    target: e.target?.tagName + '.' + (e.target?.className || ''),
+    deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode,
+    cancelable: e.cancelable, defaultPrevented: e.defaultPrevented,
+    ctrlKey: e.ctrlKey, isTrusted: e.isTrusted,
+  })
+  if (e.ctrlKey || e.defaultPrevented || !e.cancelable) { debugLog('  -> ignorado (ctrl/defaultPrevented/no cancelable)'); return }
+  if (shouldIgnoreTarget(e.target)) { debugLog('  -> ignorado (shouldIgnoreTarget)'); return }
   const { dx, dy } = normalizedDeltas(e)
-  if (!dx && !dy) return
+  if (!dx && !dy) { debugLog('  -> ignorado (delta 0 tras normalizar)'); return }
   const hit = findScrollTarget(e.target, dx, dy)
-  if (!hit) return
+  if (!hit) { debugLog('  -> sin objetivo de scroll (findScrollTarget null)', { dx, dy }); return }
   e.preventDefault()
+  const before = hit.el.scrollTop
   if (hit.axis === 'y') hit.el.scrollTop += dy
   else hit.el.scrollLeft += dx || dy
+  debugLog('  -> aplicado', { axis: hit.axis, el: hit.el.tagName + '.' + hit.el.className, before, after: hit.el.scrollTop })
 }
 
 // ── Touch en escritorio ──────────────────────────────────────────────────────
 let touchState = null
 
 function onTouchStart(e) {
-  if (window.innerWidth < 1024 || e.touches.length !== 1) { touchState = null; return }
-  if (shouldIgnoreTarget(e.target)) { touchState = null; return }
+  debugLog('touchstart', { innerWidth: window.innerWidth, touches: e.touches.length, target: e.target?.tagName + '.' + (e.target?.className || '') })
+  if (window.innerWidth < 1024 || e.touches.length !== 1) { debugLog('  -> ignorado (viewport <1024 o multitouch)'); touchState = null; return }
+  if (shouldIgnoreTarget(e.target)) { debugLog('  -> ignorado (shouldIgnoreTarget)'); touchState = null; return }
   touchState = { x: e.touches[0].clientX, y: e.touches[0].clientY, target: e.target }
 }
 
