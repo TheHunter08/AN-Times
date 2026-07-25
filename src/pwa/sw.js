@@ -305,18 +305,16 @@ function _sbFetch(url, options) {
 // llegaría solo con la clave anon, sin auth.uid()). Hoy, con RLS aún
 // permisivo, este header extra no cambia ningún comportamiento.
 async function _restHeaders(extra = {}) {
-  const stored = await _idbGet('pin_auth_token').catch(() => null)
-  // Mismo chequeo de forma que getStoredPinToken() en pinAuthToken.js: un
-  // token guardado que no sea un JWT real (3 partes) hacía que TODA petición
-  // en segundo plano fallara para siempre con "Expected 3 parts in JWT",
-  // incluso tras limpiar el lado de localStorage — el SW lee IndexedDB por
-  // su cuenta y nunca se enteraba de esa limpieza.
-  const validShape = typeof stored?.token === 'string' && stored.token.split('.').length === 3
-  const valid = validShape && stored?.expiresAt && Date.now() < stored.expiresAt - 60_000
-  if (stored && !validShape) _idbDel('pin_auth_token').catch(() => {})
+  // DESACTIVADO (2026-07-25): el token PIN dejó de inyectarse en las
+  // peticiones (ver withPinAuthHeader en dataService.js — causó el fallo
+  // "Expected 3 parts in JWT" en producción). Con RLS revertido a anon_all
+  // no aporta nada; el SW usa siempre la clave anon, igual que antes de la
+  // Fase 2. El mirror en IDB se limpia aquí de paso para que ningún token
+  // viejo quede rondando en dispositivos ya afectados.
+  _idbDel('pin_auth_token').catch(() => {})
   return {
     apikey: _SB_ANON,
-    Authorization: valid ? `Bearer ${stored.token}` : `Bearer ${_SB_ANON}`,
+    Authorization: `Bearer ${_SB_ANON}`,
     'Content-Type': 'application/json',
     ...extra,
   }

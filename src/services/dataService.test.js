@@ -206,36 +206,37 @@ describe('una jornada cerrada nunca pierde contra una copia abierta (tick en viv
   })
 })
 
-describe('withPinAuthHeader: sustituye Authorization solo si hay sesión de PIN vigente', () => {
+describe('withPinAuthHeader: DESACTIVADO — nunca toca las opciones', () => {
+  // Regresión del incidente 2026-07-25: inyectar el token PIN en el header
+  // Authorization producía cabeceras duplicadas ('authorization' minúscula de
+  // supabase-js + 'Authorization' añadida aquí) que fetch combina en una sola
+  // ("Bearer <anon>, Bearer <pin>") y el servidor rechazaba TODAS las
+  // escrituras con "Expected 3 parts in JWT; got 5". Mientras RLS siga en
+  // anon_all, esta función debe ser un no-op puro.
   beforeEach(() => { localStorage.clear() })
+  afterEach(() => clearPinToken())
 
   it('sin token guardado, devuelve las opciones sin tocar', () => {
     const opts = { headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
     expect(withPinAuthHeader(opts)).toBe(opts)
   })
 
-  it('con un token vigente, sustituye Authorization y conserva el resto de headers', () => {
+  it('incluso con un token vigente guardado, NO sustituye Authorization', () => {
     storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
     const opts = { method: 'GET', headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
     const result = withPinAuthHeader(opts)
-    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
-    expect(result.headers.apikey).toBe('anon-key')
-    expect(result.method).toBe('GET')
+    expect(result).toBe(opts)
+    expect(result.headers.Authorization).toBe('Bearer anon-key')
   })
 
-  it('con un token caducado, no lo aplica (vuelve a usar la clave anon)', () => {
-    storePinToken({ token: 'expired.jwt', expiresAt: Date.now() - 1000, empId: 'e1' })
-    const opts = { headers: { Authorization: 'Bearer anon-key' } }
-    expect(withPinAuthHeader(opts).headers.Authorization).toBe('Bearer anon-key')
-  })
-
-  it('funciona igual si headers llega como instancia de Headers (no objeto plano)', () => {
+  it('nunca produce una cabecera Authorization duplicada por diferencia de mayúsculas', () => {
     storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
-    const opts = { headers: new Headers({ apikey: 'anon-key' }) }
+    // 'authorization' en minúscula, como la emiten partes de supabase-js — el
+    // detonante real del incidente.
+    const opts = { headers: { apikey: 'anon-key', authorization: 'Bearer anon-key' } }
     const result = withPinAuthHeader(opts)
-    expect(result.headers.Authorization).toBe('Bearer emp.jwt.token')
-    expect(result.headers.apikey).toBe('anon-key')
+    const authKeys = Object.keys(result.headers).filter(k => k.toLowerCase() === 'authorization')
+    expect(authKeys).toHaveLength(1)
+    expect(result.headers[authKeys[0]]).toBe('Bearer anon-key')
   })
-
-  afterEach(() => clearPinToken())
 })

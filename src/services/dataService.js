@@ -19,21 +19,21 @@ import { getStoredPinToken } from '../utils/pinAuthToken.js'
 // intento se etiquetara como "poca cobertura" con cobertura real de sobra.
 const _FETCH_TIMEOUT_MS = 9000
 
-// El cliente Supabase se crea UNA vez con la clave anon (ver createClient más
-// abajo). Un login por PIN (ver api/pin-login.js) obtiene, además, un JWT con
-// auth.uid() real — para que esa identidad se use en las peticiones REST sin
-// recrear el cliente (perdiendo el estado de Realtime), se sustituye aquí el
-// header Authorization por el del empleado activo cuando existe uno vigente.
-// Sin token válido (nadie ha iniciado sesión por PIN, o expiró), se manda tal
-// cual con la clave anon — comportamiento idéntico al de antes de esto.
+// DESACTIVADO (2026-07-25): la inyección del token PIN en el header
+// Authorization causó el fallo "Expected 3 parts in JWT; got 5" en
+// producción — si las opciones llegaban con la clave 'authorization' en
+// minúscula (como hacen partes de supabase-js), aquí se añadía
+// 'Authorization' con mayúscula SIN quitar la otra, y fetch combina ambas
+// en una sola cabecera ("Bearer <anon>, Bearer <pin>" → 5 segmentos al
+// partir por puntos), rompiendo TODAS las escrituras del dispositivo.
+// Con RLS revertido a anon_all, este header no aporta absolutamente nada
+// hoy — se desactiva entero en vez de arreglar el caso de mayúsculas para
+// eliminar la clase de fallo completa. Cuando RLS se retome (con sesiones
+// emitidas por la Admin API de Supabase, no JWT firmados a mano), esta
+// función debe reescribirse normalizando TODAS las variantes de mayúsculas
+// del header antes de asignar el propio.
 export function withPinAuthHeader(options) {
-  const stored = getStoredPinToken()
-  if (!stored) return options
-  const headers = options.headers instanceof Headers
-    ? Object.fromEntries(options.headers.entries())
-    : { ...(options.headers || {}) }
-  headers.Authorization = `Bearer ${stored.token}`
-  return { ...options, headers }
+  return options
 }
 function _timeoutFetch(url, options = {}) {
   const opts = withPinAuthHeader(options)
