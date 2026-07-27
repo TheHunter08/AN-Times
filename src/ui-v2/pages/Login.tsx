@@ -337,9 +337,9 @@ export function Login({
                 background: colors.bg[600], color: colors.text[400],
                 fontSize: 11.5, lineHeight: 1.55,
               }}>
-                <li><strong style={{ color: colors.text[800] }}>Correo:</strong> usa el que la empresa guardó en tu ficha.</li>
-                <li><strong style={{ color: colors.text[800] }}>PIN:</strong> introduce tu PIN habitual de fichaje; no es un código nuevo.</li>
-                <li><strong style={{ color: colors.text[800] }}>Confirmación:</strong> abre el enlace del email y vuelve. En esa primera entrada puede pedirte el PIN otra vez para guardar la vinculación.</li>
+                <li><strong style={{ color: colors.text[900] }}>Correo:</strong> usa el que la empresa guardó en tu ficha.</li>
+                <li><strong style={{ color: colors.text[900] }}>PIN:</strong> introduce tu PIN habitual de fichaje; no es un código nuevo.</li>
+                <li><strong style={{ color: colors.text[900] }}>Confirmación:</strong> abre el enlace del email y vuelve. En esa primera entrada puede pedirte el PIN otra vez para guardar la vinculación.</li>
               </ol>
             )}
 
@@ -347,7 +347,7 @@ export function Login({
               <div role="status" aria-live="polite" style={{
                 marginBottom: 14, padding: 14, borderRadius: radius.md,
                 border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)',
-                color: colors.text[800], fontSize: 12, lineHeight: 1.55,
+                color: colors.text[900], fontSize: 12, lineHeight: 1.55,
               }}>
                 <div style={{ color: colors.semantic.green, fontWeight: 800, marginBottom: 4 }}>Cuenta creada: falta confirmar el correo</div>
                 <div>{registrationNotice}</div>
