@@ -46,6 +46,12 @@ test.describe('Panel de administración', () => {
   }
 
   test('cierra la sesión y vuelve al acceso', async ({ page }) => {
+    let remoteLogoutRequests = 0
+    await page.route(/supabase\.co\/auth\/v1\/logout/i, route => {
+      remoteLogoutRequests += 1
+      expect(route.request().headers().authorization).toBe('Bearer sesion-persistida')
+      return route.fulfill({ status:204, body:'' })
+    })
     await page.evaluate(() => {
       localStorage.setItem('sb-eyyhlcvpyiorpdnvqsll-auth-token', JSON.stringify({
         access_token:'sesion-persistida',
@@ -59,6 +65,7 @@ test.describe('Panel de administración', () => {
     await expect.poll(() => page.evaluate(
       () => localStorage.getItem('sb-eyyhlcvpyiorpdnvqsll-auth-token'),
     )).toBeNull()
+    await expect.poll(() => remoteLogoutRequests).toBe(1)
   })
 })
 

@@ -39,15 +39,18 @@ describe('aislamiento de clientes Supabase durante Fase 1', () => {
   it('elimina la sesión persistida aunque falle la revocación remota', async () => {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ access_token:'token-prueba' }))
     localStorage.setItem(`${AUTH_STORAGE_KEY}-code-verifier`, 'verificador')
-    const remoteSignOut = vi.spyOn(authSupabase.auth, 'signOut').mockResolvedValue({
-      error:new Error('Network request failed'),
-    })
+    let finishRemoteSignOut
+    const remoteSignOut = vi.spyOn(authSupabase.auth.admin, 'signOut').mockReturnValue(
+      new Promise(resolve => { finishRemoteSignOut = resolve }),
+    )
 
-    await signOut()
+    const pendingSignOut = signOut()
 
-    expect(remoteSignOut).toHaveBeenCalledOnce()
+    expect(remoteSignOut).toHaveBeenCalledWith('token-prueba', 'global')
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
     expect(localStorage.getItem(`${AUTH_STORAGE_KEY}-code-verifier`)).toBeNull()
+    finishRemoteSignOut({ error:new Error('Network request failed') })
+    await pendingSignOut
     remoteSignOut.mockRestore()
   })
 })

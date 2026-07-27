@@ -106,14 +106,36 @@ export function clearAuthSessionStorage() {
   } catch {}
 }
 
-export async function signOut() {
+function readPersistedAccessToken() {
   try {
-    const { error } = await supabase?.auth.signOut() || {}
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')?.access_token || null
+  } catch {
+    return null
+  }
+}
+
+export async function signOut() {
+  const accessToken = readPersistedAccessToken()
+  let remoteSignOut = null
+  try {
+    // Capturar el JWT antes de limpiar el almacenamiento. appStore no espera
+    // esta promesa; si usáramos auth.signOut() y borrásemos la clave justo
+    // después, el cliente podría no llegar a leer el token y omitir la
+    // revocación global de los refresh tokens.
+    remoteSignOut = accessToken && supabase
+      ? supabase.auth.admin.signOut(accessToken, 'global')
+      : supabase?.auth.signOut({ scope:'local' })
+  } catch {}
+
+  // La salida local debe ser inmediata incluso si la red está caída.
+  clearAuthSessionStorage()
+
+  try {
+    const { error } = await remoteSignOut || {}
     if (error) throw error
   } catch {
-    // Sin red, Supabase no elimina por sí mismo la sesión persistida. Si se
-    // conserva, INITIAL_SESSION puede volver a iniciar sesión justo después
-    // de que la aplicación haya mostrado la pantalla de acceso.
+    // La revocación remota se reintentará cuando el token expire; la sesión de
+    // este dispositivo ya se ha eliminado localmente.
   } finally {
     clearAuthSessionStorage()
   }
