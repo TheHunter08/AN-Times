@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch, detachPushUser } from '../services/dataServiceV2.js'
-import { signOut as authSignOut } from '../services/authService.js'
+import { clearAuthSessionStorage, signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
 import { normalizeToastOptions } from '../utils/toastOptions.js'
@@ -341,7 +341,11 @@ export const useAppStore = create((set, get) => ({
       try { localStorage.removeItem(`an_push_ready_${userId}`) } catch {}
       detachPushUser(userId).catch(() => {})
     }
+    // Lanzar primero la revocación remota y limpiar inmediatamente la copia
+    // local. No esperamos a Supabase: offline, su signOut puede tardar hasta
+    // el timeout y LoginV2 restauraría entretanto INITIAL_SESSION.
     authSignOut().catch(() => {})
+    clearAuthSessionStorage()
     // Limpia restos del JWT personalizado que pudieron guardar versiones
     // anteriores. El flujo PIN actual no crea sesiones de Supabase.
     clearPinToken()

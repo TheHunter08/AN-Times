@@ -46,10 +46,19 @@ test.describe('Panel de administración', () => {
   }
 
   test('cierra la sesión y vuelve al acceso', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('sb-eyyhlcvpyiorpdnvqsll-auth-token', JSON.stringify({
+        access_token:'sesion-persistida',
+        refresh_token:'refresh-persistido',
+      }))
+    })
     const menu = page.getByRole('button', { name:/Abrir menú/i })
     if (await menu.isVisible()) await menu.click()
     await page.getByRole('button', { name:'Cerrar sesión', exact:true }).click()
     await expect(page.getByRole('button', { name: 'PIN', exact: true })).toBeVisible({ timeout: 8000 })
+    await expect.poll(() => page.evaluate(
+      () => localStorage.getItem('sb-eyyhlcvpyiorpdnvqsll-auth-token'),
+    )).toBeNull()
   })
 })
 

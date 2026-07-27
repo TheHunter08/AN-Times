@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AUTH_STORAGE_KEY, authSupabase, updatePassword } from './authService.js'
+import { AUTH_STORAGE_KEY, authSupabase, signOut, updatePassword } from './authService.js'
 import { supabase as dataSupabase } from './dataService.js'
 
 describe('aislamiento de clientes Supabase durante Fase 1', () => {
@@ -34,5 +34,20 @@ describe('aislamiento de clientes Supabase durante Fase 1', () => {
     expect(updateUser).toHaveBeenCalledOnce()
     expect(updateUser).toHaveBeenCalledWith({ password:'nueva-clave-segura' })
     updateUser.mockRestore()
+  })
+
+  it('elimina la sesión persistida aunque falle la revocación remota', async () => {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ access_token:'token-prueba' }))
+    localStorage.setItem(`${AUTH_STORAGE_KEY}-code-verifier`, 'verificador')
+    const remoteSignOut = vi.spyOn(authSupabase.auth, 'signOut').mockResolvedValue({
+      error:new Error('Network request failed'),
+    })
+
+    await signOut()
+
+    expect(remoteSignOut).toHaveBeenCalledOnce()
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem(`${AUTH_STORAGE_KEY}-code-verifier`)).toBeNull()
+    remoteSignOut.mockRestore()
   })
 })

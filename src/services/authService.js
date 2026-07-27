@@ -99,8 +99,24 @@ export async function updatePassword(newPassword) {
   if (error) throw { code: error.message, message: mapError(error) }
 }
 
+export function clearAuthSessionStorage() {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    localStorage.removeItem(`${AUTH_STORAGE_KEY}-code-verifier`)
+  } catch {}
+}
+
 export async function signOut() {
-  try { await supabase?.auth.signOut() } catch {}
+  try {
+    const { error } = await supabase?.auth.signOut() || {}
+    if (error) throw error
+  } catch {
+    // Sin red, Supabase no elimina por sí mismo la sesión persistida. Si se
+    // conserva, INITIAL_SESSION puede volver a iniciar sesión justo después
+    // de que la aplicación haya mostrado la pantalla de acceso.
+  } finally {
+    clearAuthSessionStorage()
+  }
 }
 
 export function isAuthReady() {
