@@ -262,6 +262,87 @@ test.describe('Acceso con PIN y email', () => {
     })).toBeNull()
   })
 
+  test('recrea con PIN una cuenta cuyo usuario Auth anterior fue eliminado', async ({ page }) => {
+    const authUser = {
+      id:'auth-recreada',
+      aud:'authenticated',
+      role:'authenticated',
+      email:'empleado@empresa.com',
+      email_confirmed_at:new Date().toISOString(),
+      app_metadata:{ provider:'email', providers:['email'] },
+      user_metadata:{},
+      identities:[{ identity_id:'identidad-nueva', provider:'email' }],
+      created_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    }
+    await seedLogin(page, {
+      employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111', authId:'auth-eliminada' }],
+    })
+    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({
+        access_token:'token-recreado',
+        refresh_token:'refresh-recreado',
+        token_type:'bearer',
+        expires_in:3600,
+        expires_at:Math.floor(Date.now() / 1000) + 3600,
+        user:authUser,
+      }),
+    }))
+    await page.goto('/')
+    await page.getByRole('button', { name:'Email', exact:true }).click()
+    await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
+    await page.getByLabel('Email', { exact:true }).fill('empleado@empresa.com')
+    await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
+    await page.getByLabel('Tu PIN habitual de fichaje').fill('1111')
+    await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
+
+    await expect.poll(() => page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
+      return db.employees?.find(item => item.id === 'e1')?.authId
+    })).toBe('auth-recreada')
+    await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible()
+  })
+
+  test('conserva el vínculo si la cuenta Auth anterior todavía existe', async ({ page }) => {
+    await seedLogin(page, {
+      employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111', authId:'auth-existente' }],
+    })
+    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({
+        user:{
+          id:'auth-respuesta-ofuscada',
+          aud:'authenticated',
+          role:'authenticated',
+          email:'empleado@empresa.com',
+          email_confirmed_at:null,
+          app_metadata:{ provider:'email', providers:['email'] },
+          user_metadata:{},
+          identities:[],
+          created_at:new Date().toISOString(),
+          updated_at:new Date().toISOString(),
+        },
+        session:null,
+      }),
+    }))
+    await page.goto('/')
+    await page.getByRole('button', { name:'Email', exact:true }).click()
+    await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
+    await page.getByLabel('Email', { exact:true }).fill('empleado@empresa.com')
+    await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
+    await page.getByLabel('Tu PIN habitual de fichaje').fill('1111')
+    await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
+
+    await expect(page.getByText(/cuenta anterior todavía existe/i)).toBeVisible()
+    await expect.poll(() => page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
+      return db.employees?.find(item => item.id === 'e1')?.authId
+    })).toBe('auth-existente')
+  })
+
   test('muestra y valida la contraseña nueva al volver desde recuperación', async ({ page }) => {
     await page.goto('/?reset=1')
     await expect(page.getByText('Crea una contraseña nueva')).toBeVisible()

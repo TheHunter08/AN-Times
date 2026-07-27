@@ -16,7 +16,7 @@ export function getActiveEmployeesByEmail(employees, email) {
   )
 }
 
-export function getRegistrationEligibility(employees, email) {
+export function getRegistrationEligibility(employees, email, options = {}) {
   const normalizedEmail = normalizeAccountEmail(email)
   if (!isValidAccountEmail(normalizedEmail)) return { ok: false, reason: 'missing_email' }
 
@@ -24,7 +24,11 @@ export function getRegistrationEligibility(employees, email) {
   if (matches.length > 1) return { ok:false, reason:'duplicate_email', employees:matches }
   const employee = matches[0]
   if (!employee) return { ok: false, reason: 'not_registered' }
-  if (employee.authId || employee.auth_id) {
+  const existingAuthId = employee.authId || employee.auth_id
+  if (existingAuthId && options.allowLinkedRecovery) {
+    return { ok:true, employee, recovery:true, existingAuthId }
+  }
+  if (existingAuthId) {
     return { ok: false, reason: 'already_linked', employee }
   }
   return { ok: true, employee }

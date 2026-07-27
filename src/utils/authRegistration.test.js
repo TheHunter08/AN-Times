@@ -24,6 +24,19 @@ describe('registro seguro de cuentas', () => {
     expect(getRegistrationEligibility(employees, 'linked@empresa.com').reason).toBe('already_linked')
   })
 
+  it('permite recuperar con PIN una vinculación cuyo usuario Auth fue eliminado', () => {
+    expect(getRegistrationEligibility(
+      employees,
+      'linked@empresa.com',
+      { allowLinkedRecovery:true },
+    )).toMatchObject({
+      ok:true,
+      recovery:true,
+      existingAuthId:'auth-1',
+      employee:{ id:'linked' },
+    })
+  })
+
   it('rechaza una identidad ambigua cuando dos empleados comparten correo', () => {
     const duplicated = [
       ...employees,

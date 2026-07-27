@@ -468,7 +468,14 @@ export default function LoginV2() {
     if (!online) { setEmailError('Crear la cuenta requiere conexión. Puedes seguir entrando con PIN.'); return }
     if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
 
-    const eligibility: any = getRegistrationEligibility(db.employees, email)
+    // Una identidad guardada puede apuntar a un usuario de Supabase Auth que
+    // ya fue eliminado. Tras acreditar el PIN permitimos intentar recrearlo:
+    // Supabase seguirá rechazando el alta si la cuenta anterior aún existe.
+    const eligibility: any = getRegistrationEligibility(
+      db.employees,
+      email,
+      { allowLinkedRecovery:true },
+    )
     if (!eligibility.ok) {
       setEmailError(
         eligibility.reason === 'already_linked'
@@ -510,7 +517,9 @@ export default function LoginV2() {
     try {
       const result = await signUpEmail(normalizeAccountEmail(email), password)
       if (result.session && result.user?.id) {
-        const identityLinkResult: any = linkAuthIdIfMissing(eligibility.employee, result.user.id)
+        const identityLinkResult: any = eligibility.recovery && eligibility.existingAuthId !== result.user.id
+          ? { ok:relinkAuthIdAfterProof(eligibility.employee, eligibility.existingAuthId, result.user.id) }
+          : linkAuthIdIfMissing(eligibility.employee, result.user.id)
         if (!identityLinkResult.ok) {
           await authSignOut()
           setEmailError(identityLinkResult.reason === 'identity_in_use'
@@ -519,7 +528,15 @@ export default function LoginV2() {
           return
         }
         doLogin(eligibility.employee, 'email')
-        toast('Cuenta creada y vinculada correctamente', 5000, 'ok')
+        toast(
+          eligibility.recovery
+            ? 'Cuenta recuperada y vinculada correctamente'
+            : 'Cuenta creada y vinculada correctamente',
+          5000,
+          'ok',
+        )
+      } else if (eligibility.recovery && result.user?.identities?.length === 0) {
+        setEmailError('La cuenta anterior todavía existe. Entra con tu contraseña o utiliza «¿La olvidaste?».')
       } else {
         setRegistrationNotice('Abre el enlace enviado a tu correo (revisa también spam). Después vuelve aquí y entra con ese correo y la contraseña que acabas de crear. Si aparece el campo PIN, introduce tu PIN de fichaje una última vez para completar la vinculación.')
         toast('Cuenta creada. Revisa tu correo y confirma el enlace antes de entrar.', 7000, 'ok')
