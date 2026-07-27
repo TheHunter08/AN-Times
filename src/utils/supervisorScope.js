@@ -45,12 +45,18 @@ export function getScopedEmployees({ employees = [], obras = [], supervisor, unr
 
   const centersByWork = obraCenterMap(obras)
 
+  // Centros a los que pertenecen las obras asignadas al supervisor.
+  // Si el supervisor tiene obra X y la obra X tiene centroTrabajo C,
+  // los empleados con centroTrabajo C también son de su ámbito aunque
+  // no tengan esa obra en obrasAsignadas.
+  const supervisorObraCenters = [...supervisorWorks].map(w => centersByWork.get(w)).filter(Boolean)
+
   return active.filter(employee => {
     const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
     const employeeWorks = assignedWorks(employee)
     const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
-    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter)
-    const workMatches = supervisorWorks.size === 0 || [...supervisorWorks].some(work => employeeWorks.has(work))
+    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter) || supervisorObraCenters.includes(employeeCenter)
+    const workMatches = supervisorWorks.size === 0 || [...supervisorWorks].some(work => employeeWorks.has(work)) || supervisorObraCenters.includes(employeeCenter)
     return centerMatches && workMatches
   })
 }
@@ -93,9 +99,16 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
         employeeWorkCenters.includes(supervisorCenter) ||
         recordWorkCenter === supervisorCenter
 
+      // supervisorWorks puede contener nombres o IDs; recordWorkId es siempre
+      // el ID (convertido por workNames). Se comprueba también recordCenter
+      // (el nombre en bruto) por si obrasAsignadas guarda nombres.
+      const supervisorObraCenters = [...supervisorWorks].map(wId => centersByWork.get(wId)).filter(Boolean)
       const workMatches = supervisorWorks.size === 0 ||
         [...supervisorWorks].some(workId => employeeWorks.has(workId)) ||
-        supervisorWorks.has(recordWorkId)
+        supervisorWorks.has(recordWorkId) ||
+        supervisorWorks.has(recordCenter) ||
+        supervisorObraCenters.includes(employeeCenter) ||
+        supervisorObraCenters.includes(recordCenter)
 
       // Sin ninguna asignación no se abre accidentalmente el acceso a todo.
       if (!supervisorCenter && supervisorWorks.size === 0) return false
