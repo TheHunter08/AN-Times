@@ -39,6 +39,9 @@ test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ 
   }
 
   await scan()
+  await expect(page.getByText('¿Iniciar la jornada de Trabajador QR?')).toBeVisible()
+  await page.getByRole('button', { name:'Confirmar', exact:true }).click()
+  await expect(page.getByText(/Jornada iniciada para Trabajador QR/)).toBeVisible()
   await expect.poll(() => page.evaluate(() => {
     const db = JSON.parse(localStorage.getItem('an_times_v1'))
     return db.records.some(record => record.empId === 'e2' && !record.fin)

@@ -6,6 +6,7 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Icons.js'
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
+import { evaluateRlsTransition } from '../../config/securityReadiness.js'
 
 export interface ReportSchedule {
   id: string
@@ -32,6 +33,8 @@ interface OperationsProps {
   authReady: number
   authTotal: number
   emailReady: number
+  duplicatedEmails: number
+  duplicatedAuthIds: number
   signatureReady: number
   signatureTotal: number
   pushReady: number | null
@@ -88,6 +91,15 @@ export function Operations(props: OperationsProps) {
   }
 
   const authPct = props.authTotal ? Math.round((props.authReady / props.authTotal) * 100) : 0
+  const rlsTransition = evaluateRlsTransition({
+    authTotal:props.authTotal,
+    authReady:props.authReady,
+    emailReady:props.emailReady,
+    duplicatedEmails:props.duplicatedEmails,
+    duplicatedAuthIds:props.duplicatedAuthIds,
+  })
+  const { ready:rlsReady } = rlsTransition
+  const identitiesReady = rlsTransition.identityBlockers.length === 0
   const syncHealthy = props.syncStatus === 'synced' && !props.offlinePending
   const realtimeHealthy = props.realtimeStatus === 'SUBSCRIBED'
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
@@ -114,8 +126,8 @@ export function Operations(props: OperationsProps) {
         {[
           { label: 'Datos', value: syncHealthy ? 'Sincronizados' : props.offlinePending ? 'Cambios pendientes' : 'Revisar conexión', ok: syncHealthy, icon: <IconCheck />, page: 'auditoria', detail: 'Abrir auditoría' },
           { label: 'Tiempo real', value: realtimeHealthy ? 'Activo' : 'Reconectando', ok: realtimeHealthy, icon: <IconClock />, page: 'en_linea', detail: 'Ver equipo conectado' },
-          { label: 'Acceso seguro', value: `${props.authReady}/${props.authTotal} vinculados`, ok: authPct === 100, icon: <IconShield />, page: 'empleados', detail: 'Revisar empleados' },
-          { label: 'Correos de acceso', value: `${props.emailReady}/${props.authTotal} configurados`, ok: props.emailReady === props.authTotal, icon: <IconShield />, page: 'empleados', detail: 'Completar perfiles' },
+          { label: 'Acceso seguro', value: rlsReady ? 'Listo para prueba' : identitiesReady ? 'Ruta de datos pendiente' : `${props.authReady}/${props.authTotal} vinculados`, ok: rlsReady, icon: <IconShield />, page: identitiesReady ? 'auditoria' : 'empleados', detail: identitiesReady ? 'Ver diagnóstico' : 'Revisar empleados' },
+          { label: 'Correos de acceso', value: props.duplicatedEmails ? `${props.duplicatedEmails} duplicados` : `${props.emailReady}/${props.authTotal} configurados`, ok: props.emailReady === props.authTotal && props.duplicatedEmails === 0, icon: <IconShield />, page: 'empleados', detail: 'Completar perfiles' },
           { label: 'Firmas obligatorias', value: `${props.signatureReady}/${props.signatureTotal} registradas`, ok: props.signatureReady === props.signatureTotal, icon: <IconFileText />, page: 'empleados', detail: 'Revisar empleados' },
           { label: 'Dispositivos', value: props.pushReady == null ? 'Comprobando…' : `${props.pushReady}/${props.pushTotal} registrados`, ok: props.pushReady === props.pushTotal, icon: <IconCheck />, page: 'empleados', detail: 'Revisar cobertura' },
           { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, page: 'validar', detail: 'Abrir validación' },
@@ -161,9 +173,16 @@ export function Operations(props: OperationsProps) {
         </Card>
 
         <Card>
-          <div className="ti-operations__section-title"><div><strong>Preparación de acceso seguro</strong><span>Supabase Auth + políticas RLS</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('empleados')}>Revisar empleados</button></div>
+          <div className="ti-operations__section-title"><div><strong>Preparación de acceso seguro</strong><span>Supabase Auth + políticas RLS</span></div><span className="ti-operations__pill">{rlsReady ? 'Prueba controlada' : 'Bloqueado'}</span></div>
           <div className="ti-operations__progress"><span style={{ width: `${authPct}%` }} /></div>
-          <p className="ti-operations__hint">Las políticas seguras están preparadas, pero solo deben activarse cuando todos los usuarios tengan un auth_id vinculado.</p>
+          <p className="ti-operations__hint">
+            {rlsReady
+              ? 'Todos los perfiles tienen correo e identidad única. Ya puede prepararse una prueba controlada de RLS antes de activarla globalmente.'
+              : rlsTransition.identityBlockers.length
+                ? `No activar RLS todavía: ${rlsTransition.identityBlockers.join(', ')}.`
+                : `No activar RLS todavía: ${rlsTransition.runtimeBlockers.join(', ')}.`}
+          </p>
+          <button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('empleados')}>Revisar empleados</button>
         </Card>
 
         {!props.documentCount && (

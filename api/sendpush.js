@@ -177,7 +177,13 @@ export default async function handler(req, res) {
     const _tag = tag || 'times'
     const _body = body || ''
 
-    const payload = JSON.stringify({ title, body: _body, tag: _tag, url: safeUrl })
+    const payload = JSON.stringify({
+      title,
+      body: _body,
+      tag: _tag,
+      url: safeUrl,
+      ...(userId === '__all__' ? {} : { userId }),
+    })
 
     if (userId === '__all__') {
       if (isDuplicate(userId, _tag, title, _body)) {

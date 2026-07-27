@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import type { EmployeeRow } from '../pages/Employees.js'
 import { mhm, calcMin, today, localDateStr } from '../../utils/time.js'
+import { isValidAccountEmail } from '../../utils/authRegistration.js'
 
 interface DbEmployee {
   id: string
@@ -18,6 +19,9 @@ interface DbEmployee {
   obrasAsignadas?: string[]
   isEnc?: boolean
   isJO?: boolean
+  authId?: string
+  auth_id?: string
+  pin?: string
 }
 interface DbRecord {
   empId: string
@@ -74,6 +78,11 @@ export function useEmployeesData() {
     const obrasNames = (e.obrasAsignadas || [])
       .map((id: string) => obrasById.get(id)?.nombre || id)
       .filter(Boolean)
+    const accountStatus: EmployeeRow['accountStatus'] =
+      e.authId || e.auth_id ? 'linked' :
+      !isValidAccountEmail(e.email) ? 'missing-email' :
+      !e.pin ? 'missing-pin' :
+      'ready'
 
     return {
       id: e.id,
@@ -89,6 +98,7 @@ export function useEmployeesData() {
       phone: e.telefono || e.phone || undefined,
       obrasAsignadas: obrasNames.length ? obrasNames : undefined,
       centroTrabajo: e.centroTrabajo || undefined,
+      accountStatus,
     }
     })
   }, [db.employees, db.records, db.obras])

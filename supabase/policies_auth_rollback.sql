@@ -21,6 +21,8 @@ CREATE POLICY "anon_all" ON records FOR ALL TO anon USING (true) WITH CHECK (tru
 
 DROP POLICY IF EXISTS "emp_read_vacaciones" ON vacaciones;
 DROP POLICY IF EXISTS "company_insert_vacaciones" ON vacaciones;
+DROP POLICY IF EXISTS "company_update_vacaciones" ON vacaciones;
+DROP POLICY IF EXISTS "company_delete_vacaciones" ON vacaciones;
 DROP POLICY IF EXISTS "admin_manage_vacaciones" ON vacaciones;
 CREATE POLICY "anon_all" ON vacaciones FOR ALL TO anon USING (true) WITH CHECK (true);
 

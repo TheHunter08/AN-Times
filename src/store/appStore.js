@@ -335,11 +335,15 @@ export const useAppStore = create((set, get) => ({
 
   logout: () => {
     const userId = get().session?.user?.id
-    if (userId) detachPushUser(userId).catch(() => {})
+    if (userId) {
+      // No conservar un "dispositivo listo" después de desasociarlo: en el
+      // próximo acceso debe confirmarse de nuevo el upsert de push_subs.
+      try { localStorage.removeItem(`an_push_ready_${userId}`) } catch {}
+      detachPushUser(userId).catch(() => {})
+    }
     authSignOut().catch(() => {})
-    // Sesión de Supabase asociada a un login por PIN (ver api/pin-login.js) —
-    // un dispositivo compartido no debe conservar la identidad del empleado
-    // que acaba de cerrar sesión para las peticiones del siguiente.
+    // Limpia restos del JWT personalizado que pudieron guardar versiones
+    // anteriores. El flujo PIN actual no crea sesiones de Supabase.
     clearPinToken()
     try { localStorage.removeItem('an_times_ses') } catch {}
     try { sessionStorage.removeItem('an_times_timer') } catch {}

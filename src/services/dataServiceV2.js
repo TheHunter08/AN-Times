@@ -59,6 +59,9 @@ import {
   toEmployeeRow as toEmployee,
   toRecordRow as toRecord,
 } from './tableSyncPlan.js'
+import { isPermanentRowError } from './rowSyncErrors.js'
+
+export { isPermanentRowError } from './rowSyncErrors.js'
 
 // ── Mappers DB→App (snake_case → camelCase) ──────────────────────────────────
 
@@ -437,12 +440,18 @@ export function cloudPush(db, deleted, onSuccess, onError, syncHint) {
 // ruido en consola sin ningún efecto (la fila nunca se sincronizaba de
 // todos modos). Se guarda en localStorage, no en el blob, porque es un
 // detalle de transporte de este dispositivo, no un dato de negocio.
-// Se guarda "id → updated_at" (no solo el id) para que, si la fila cambia
-// de verdad más adelante (p.ej. un admin reabre y vuelve a firmar un cierre
-// después de fin de mes), deje de coincidir con lo ya intentado y se
-// reintente sola — la cuarentena no debe esconder para siempre una
-// corrección legítima posterior.
-const _QUARANTINE_KEY = 'an_v2_quarantine'
+// Se guarda "id → { updatedAt, quarantinedAt }" para que una edición invalide
+// la entrada y, aunque la fila no cambie, la cuarentena caduque por sí sola.
+const _QUARANTINE_KEY = 'an_v2_quarantine_v2'
+export const ROW_QUARANTINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+export function isActiveQuarantineEntry(entry, updatedAt, now = Date.now()) {
+  return !!entry
+    && typeof entry === 'object'
+    && entry.updatedAt === (updatedAt ?? null)
+    && Number.isFinite(entry.quarantinedAt)
+    && now - entry.quarantinedAt < ROW_QUARANTINE_TTL_MS
+}
 function _loadQuarantine() {
   try { return JSON.parse(localStorage.getItem(_QUARANTINE_KEY) || '{}') } catch { return {} }
 }
@@ -451,12 +460,18 @@ function _saveQuarantine(map) {
 }
 function _isQuarantined(table, row) {
   const map = _loadQuarantine()
-  return map[`${table}:${row.id}`] === (row.updated_at ?? null)
+  return isActiveQuarantineEntry(map[`${table}:${row.id}`], row.updated_at)
 }
 function _addQuarantined(table, rows) {
   if (!rows.length) return
   const map = _loadQuarantine()
-  rows.forEach(row => { map[`${table}:${row.id}`] = row.updated_at ?? null })
+  const quarantinedAt = Date.now()
+  rows.forEach(row => {
+    map[`${table}:${row.id}`] = {
+      updatedAt: row.updated_at ?? null,
+      quarantinedAt,
+    }
+  })
   _saveQuarantine(map)
 }
 
@@ -476,14 +491,10 @@ async function _upsertResilient(table, rows) {
   for (const row of pending) {
     const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
     if (rowErr) {
-      // Errores 22xxx/23xxx son datos legacy incompatibles (fecha inválida,
-      // NOT NULL, FK, UNIQUE...); 42xxx son de sintaxis/permisos (columna
-      // inexistente, RLS denegando la fila — p.ej. si algún día se activa
-      // policies_auth.sql y una fila no cumple la política). Ninguno de los
-      // tres se arregla reintentando, y mantener la cola PWA bloqueada
-      // impide subir incluso fichajes perfectamente válidos. El blob
-      // principal conserva la fila para no perder información.
-      if (/^(22|23|42)/.test(rowErr.code || '')) {
+      // Solo los errores de datos/integridad se aíslan con caducidad. Los
+      // fallos de permisos, RLS o esquema permanecen pendientes porque pueden
+      // resolverse con un despliegue sin cambiar el contenido de la fila.
+      if (isPermanentRowError(rowErr)) {
         quarantined.push(row)
         console.warn(`[v2] ${table} row ${row.id} quarantined:`, rowErr.message)
       } else {

@@ -3,6 +3,8 @@ import { registerRoute, NavigationRoute, setCatchHandler } from 'workbox-routing
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { buildTableSyncPlan, softDeletePayload } from '../services/tableSyncPlan.js'
+import { isPermanentRowError } from '../services/rowSyncErrors.js'
+import { shouldDisplayPush } from './pushAudience.js'
 import { pickNewestSyncItem } from './syncConflict.js'
 
 // ─── ACTIVACIÓN ────────────────────────────────────────────────────────────────
@@ -140,6 +142,17 @@ self.addEventListener('push', (event) => {
 
   // waitUntil SIEMPRE: incluso un duplicado debe completar su trabajo asíncrono.
   event.waitUntil((async () => {
+    // Una baja de sesión puede ocurrir sin cobertura: el DELETE remoto de
+    // push_subs quizá no llegue, pero la asociación local se elimina primero.
+    // No mostrar contenido privado si el payload pertenece a otro usuario o si
+    // este dispositivo ya no tiene ningún empleado activo.
+    let activePushUser = null
+    try { activePushUser = await _idbGet('push_user_id') } catch {}
+    if (!shouldDisplayPush(activePushUser, data.userId)) {
+      try { await _bgSync() } catch {}
+      return
+    }
+
     let duplicate = false
     // Dedupe persistente en IDB — sobrevive reinicios del SW.
     // El registro IDB decide si este evento ya se mostró en este dispositivo.
@@ -296,21 +309,10 @@ function _sbFetch(url, options) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
-// Ver api/pin-login.js y src/utils/pinAuthToken.js: un login por PIN obtiene,
-// además de la sesión local, un JWT con auth.uid() real — mirror-ado aquí en
-// IDB (localStorage no es accesible desde un Service Worker) para que la
-// sincronización en segundo plano también lo use. Sin esto, cuando
-// policies_auth.sql se active, cualquier fichaje guardado offline y subido
-// por el SW mientras la app está cerrada fallaría por RLS (la petición
-// llegaría solo con la clave anon, sin auth.uid()). Hoy, con RLS aún
-// permisivo, este header extra no cambia ningún comportamiento.
 async function _restHeaders(extra = {}) {
-  // DESACTIVADO (2026-07-25): el token PIN dejó de inyectarse en las
-  // peticiones (ver withPinAuthHeader en dataService.js — causó el fallo
-  // "Expected 3 parts in JWT" en producción). Con RLS revertido a anon_all
-  // no aporta nada; el SW usa siempre la clave anon, igual que antes de la
-  // Fase 2. El mirror en IDB se limpia aquí de paso para que ningún token
-  // viejo quede rondando en dispositivos ya afectados.
+  // El JWT personalizado por PIN está retirado. El SW usa exclusivamente la
+  // clave anon durante Fase 1 y elimina el mirror que pudieran dejar versiones
+  // antiguas, evitando que reaparezca una Authorization duplicada.
   _idbDel('pin_auth_token').catch(() => {})
   return {
     apikey: _SB_ANON,
@@ -330,8 +332,15 @@ async function _restUpsertResilient(table, rows) {
   let firstFailure = null
   for (const row of rows) {
     const response = await _sbFetch(url, { method: 'POST', headers, body: JSON.stringify(row) })
-    if (!response.ok && !firstFailure) {
-      firstFailure = new Error(`table sync ${table}/${row.id}: ${response.status}`)
+    if (!response.ok) {
+      const details = await response.json().catch(() => ({}))
+      if (isPermanentRowError(details)) {
+        console.warn(`[SW] ${table}/${row.id} omitida por error permanente ${details.code}`)
+        continue
+      }
+      if (!firstFailure) {
+        firstFailure = new Error(`table sync ${table}/${row.id}: ${response.status}${details.code ? ` (${details.code})` : ''}`)
+      }
     }
   }
   if (firstFailure) throw firstFailure

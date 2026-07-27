@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { fromEmployee, mergeRecordVersions, tableChangeToPatch } from './dataServiceV2.js'
+import {
+  ROW_QUARANTINE_TTL_MS,
+  fromEmployee,
+  isActiveQuarantineEntry,
+  isPermanentRowError,
+  mergeRecordVersions,
+  tableChangeToPatch,
+} from './dataServiceV2.js'
 
 describe('mapeo de empleados desde tablas V2', () => {
   it('expone la vinculación Auth necesaria para auditar la preparación RLS', () => {
@@ -62,5 +69,30 @@ describe('parches ligeros de Realtime', () => {
     })
 
     expect(patch.gastos[0]).toMatchObject({ id:'g1', total:25, _rev:3, _upd:'2026-07-21T10:00:00Z' })
+  })
+})
+
+describe('cuarentena de filas normalizadas', () => {
+  it('aísla datos inválidos, pero nunca errores temporales de permisos o esquema', () => {
+    expect(isPermanentRowError({ code:'22007' })).toBe(true)
+    expect(isPermanentRowError({ code:'23503' })).toBe(true)
+    expect(isPermanentRowError({ code:'42501' })).toBe(false)
+    expect(isPermanentRowError({ code:'42P01' })).toBe(false)
+    expect(isPermanentRowError({ code:'PGRST204' })).toBe(false)
+  })
+
+  it('caduca y deja de bloquear una fila aunque su updated_at no cambie', () => {
+    const now = Date.parse('2026-07-27T12:00:00Z')
+    const updatedAt = '2026-07-27T10:00:00Z'
+    expect(isActiveQuarantineEntry({ updatedAt, quarantinedAt:now - 1000 }, updatedAt, now)).toBe(true)
+    expect(isActiveQuarantineEntry({
+      updatedAt,
+      quarantinedAt:now - ROW_QUARANTINE_TTL_MS,
+    }, updatedAt, now)).toBe(false)
+  })
+
+  it('una edición de la fila invalida inmediatamente su cuarentena', () => {
+    const entry = { updatedAt:'2026-07-27T10:00:00Z', quarantinedAt:Date.now() }
+    expect(isActiveQuarantineEntry(entry, '2026-07-27T10:01:00Z')).toBe(false)
   })
 })

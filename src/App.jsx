@@ -6,6 +6,7 @@ import { useSwipeDismiss } from './hooks/useSwipeDismiss.js'
 import { parseNavigationTarget, resolveEmployeeNotificationDestination } from './utils/notificationNavigation.js'
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
 import { getAuthSession, onAuthStateChange } from './services/authService.js'
+import { isOfficialAuthMethod, isOfficialSessionAuthorized } from './utils/sessionAuthorization.js'
 // v2 UI — nuevas pantallas con datos reales
 import LoginV2 from './ui-v2/LoginV2.tsx'
 const AppV2Admin = lazy(() => import('./ui-v2/AppV2Admin.tsx'))
@@ -358,6 +359,8 @@ function LoadingBar() { return null }
 export default function App() {
   const currentScreen  = useAppStore(s => s.currentScreen)
   const session        = useAppStore(s => s.session)
+  const authEmployees  = useAppStore(s => s.db.employees)
+  const authAdminEmails = useAppStore(s => s.db.config?.adminEmails)
   const logout         = useAppStore(s => s.logout)
   const fetchDB        = useAppStore(s => s.fetchDB)
   const initRealtime       = useAppStore(s => s.initRealtime)
@@ -371,20 +374,50 @@ export default function App() {
   // sesión Auth válida. El PIN y la biometría mantienen su funcionamiento
   // offline y no pasan por este guard.
   useEffect(() => {
-    if (!['email', 'oauth'].includes(session?.authMethod)) return
+    if (!isOfficialAuthMethod(session?.authMethod)) return
     let active = true
-    getAuthSession().then(authSession => {
-      if (active && !authSession && navigator.onLine) logout()
-    }).catch(() => {})
-    const { data: { subscription } } = onAuthStateChange((event) => {
-      if (event !== 'SIGNED_OUT' || !active) return
-      setTimeout(() => {
-        const current = useAppStore.getState().session
-        if (['email', 'oauth'].includes(current?.authMethod)) useAppStore.getState().logout()
+    const pendingTimers = new Set()
+
+    const enforceAuthorization = (authSession, confirmedSignedOut = false) => {
+      if (!active) return
+      const currentState = useAppStore.getState()
+      const currentSession = currentState.session
+      if (!isOfficialAuthMethod(currentSession?.authMethod)) return
+      if (!authSession) {
+        if (confirmedSignedOut || navigator.onLine) currentState.logout()
+        return
+      }
+      if (!isOfficialSessionAuthorized(currentSession, authSession, currentState.db)) {
+        currentState.logout()
+      }
+    }
+
+    const deferAuthorization = (authSession, confirmedSignedOut = false) => {
+      const timer = setTimeout(() => {
+        pendingTimers.delete(timer)
+        enforceAuthorization(authSession, confirmedSignedOut)
       }, 0)
+      pendingTimers.add(timer)
+    }
+
+    getAuthSession().then(authSession => {
+      enforceAuthorization(authSession)
+    }).catch(() => {})
+    const { data: { subscription } } = onAuthStateChange((event, authSession) => {
+      if (!active) return
+      if (event === 'SIGNED_OUT') {
+        deferAuthorization(null, true)
+      } else if (['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+        deferAuthorization(authSession)
+      }
     })
-    return () => { active = false; subscription.unsubscribe() }
-  }, [session?.authMethod, logout])
+    return () => {
+      active = false
+      pendingTimers.forEach(timer => clearTimeout(timer))
+      pendingTimers.clear()
+      subscription.unsubscribe()
+    }
+  }, [session?.authMethod, session?.user?.id, authEmployees, authAdminEmails, logout])
 
   // La reconciliación es transparente para empleados: reciben los datos nuevos
   // sin un aviso técnico que parece un error. El administrador sí conserva una

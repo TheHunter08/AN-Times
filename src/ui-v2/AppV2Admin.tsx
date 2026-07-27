@@ -23,6 +23,7 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
+import { authSupabase } from '../services/authService.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, recWorkSecs, vacData as vacDataUtil } from '../utils/time.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
@@ -42,7 +43,7 @@ import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { getLaunchBlockers } from '../utils/launchRequirements.js'
-import { isValidAccountEmail } from '../utils/authRegistration.js'
+import { isValidAccountEmail, normalizeAccountEmail } from '../utils/authRegistration.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
@@ -1321,9 +1322,9 @@ function DocumentsPage() {
   // base64/URL guardado directamente en el registro (documentos antiguos,
   // o si Storage no estaba disponible al subirlo).
   const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
-    if (doc.storagePath && supabase) {
+    if (doc.storagePath && authSupabase) {
       try {
-        const { data, error } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600, filename ? { download: filename } : undefined)
+        const { data, error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600, filename ? { download: filename } : undefined)
         if (!error && data?.signedUrl) return data.signedUrl
       } catch { /* cae al respaldo de abajo */ }
     }
@@ -1397,10 +1398,10 @@ function DocumentsPage() {
     // 1 GB) sobre guardar el archivo en base64 dentro del JSONB (se come la
     // cuota de base de datos, 500 MB). Si falla o no hay bucket todavía, cae
     // al comportamiento anterior para no bloquear la subida.
-    if (supabase) {
+    if (authSupabase) {
       try {
         const path = `${meta.empId}/${docId}-${file.name}`
-        const { error } = await supabase.storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: true })
+        const { error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: true })
         if (!error) storagePath = path
         else console.warn('[documentos] No se pudo subir a Storage, se guarda localmente:', error.message)
       } catch (uploadErr: any) {
@@ -2233,9 +2234,9 @@ function MonthlyClosePage() {
     if (!closure) return
     const filename = `cierre-${closure.mes}-${(closure.empName || '').replace(/\s+/g, '_')}.pdf`
     if (closure.pdfData) { downloadDataUrl(closure.pdfData, filename); return }
-    if (closure.documentoId && supabase) {
+    if (closure.documentoId && authSupabase) {
       try {
-        const { data, error } = await supabase.storage.from(CIERRE_PDF_BUCKET).createSignedUrl(closure.documentoId, 3600, { download: filename })
+        const { data, error } = await authSupabase.storage.from(CIERRE_PDF_BUCKET).createSignedUrl(closure.documentoId, 3600, { download: filename })
         if (error || !data?.signedUrl) { toast('No se pudo generar el enlace de descarga del PDF firmado', 4000, 'warn'); return }
         const a = document.createElement('a')
         a.href = data.signedUrl
@@ -3030,6 +3031,19 @@ function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: s
   const workers = employees.filter((employee: any) => employee.role !== 'admin' && !employee.isAdmin)
   const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
   const emailReady = employees.filter((employee: any) => isValidAccountEmail(employee.email)).length
+  const emailIdentityCounts = new Map<string, number>()
+  employees.forEach((employee: any) => {
+    if (!isValidAccountEmail(employee.email)) return
+    const email = normalizeAccountEmail(employee.email)
+    emailIdentityCounts.set(email, (emailIdentityCounts.get(email) || 0) + 1)
+  })
+  const duplicatedEmails = [...emailIdentityCounts.values()].filter(count => count > 1).length
+  const authIdentityCounts = new Map<string, number>()
+  employees.forEach((employee: any) => {
+    const authId = employee.auth_id || employee.authId
+    if (authId) authIdentityCounts.set(String(authId), (authIdentityCounts.get(String(authId)) || 0) + 1)
+  })
+  const duplicatedAuthIds = [...authIdentityCounts.values()].filter(count => count > 1).length
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
   const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
   const [pushReady, setPushReady] = useState<number | null>(null)
@@ -3068,6 +3082,8 @@ function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: s
     authReady={authReady}
     authTotal={employees.length}
     emailReady={emailReady}
+    duplicatedEmails={duplicatedEmails}
+    duplicatedAuthIds={duplicatedAuthIds}
     signatureReady={signatureReady}
     signatureTotal={workers.length}
     pushReady={pushReady}

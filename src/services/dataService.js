@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 import { dedupeNotifications } from '../utils/notifications.js'
-import { getStoredPinToken } from '../utils/pinAuthToken.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -19,24 +18,35 @@ import { getStoredPinToken } from '../utils/pinAuthToken.js'
 // intento se etiquetara como "poca cobertura" con cobertura real de sobra.
 const _FETCH_TIMEOUT_MS = 9000
 
-// DESACTIVADO (2026-07-25): la inyección del token PIN en el header
-// Authorization causó el fallo "Expected 3 parts in JWT; got 5" en
-// producción — si las opciones llegaban con la clave 'authorization' en
-// minúscula (como hacen partes de supabase-js), aquí se añadía
-// 'Authorization' con mayúscula SIN quitar la otra, y fetch combina ambas
-// en una sola cabecera ("Bearer <anon>, Bearer <pin>" → 5 segmentos al
-// partir por puntos), rompiendo TODAS las escrituras del dispositivo.
-// Con RLS revertido a anon_all, este header no aporta absolutamente nada
-// hoy — se desactiva entero en vez de arreglar el caso de mayúsculas para
-// eliminar la clase de fallo completa. Cuando RLS se retome (con sesiones
-// emitidas por la Admin API de Supabase, no JWT firmados a mano), esta
-// función debe reescribirse normalizando TODAS las variantes de mayúsculas
-// del header antes de asignar el propio.
-export function withPinAuthHeader(options) {
-  return options
+// Mientras las políticas activas sean las de Fase 1 (`anon_all` y
+// `app_data_*_anon`), iniciar sesión con Supabase Auth no debe cambiar el rol
+// de las peticiones de datos. supabase-js comparte la sesión Auth con el mismo
+// cliente y, tras signInWithPassword(), sustituye Authorization por el JWT del
+// usuario (`authenticated`). Ese rol no tiene políticas en Fase 1: el login
+// era correcto, pero el fetchDB inmediatamente posterior quedaba sin acceso y
+// el usuario terminaba viendo "cuenta no registrada".
+//
+// Se fuerza la clave anon SOLO para PostgREST/RPC. Auth conserva su JWT y
+// Storage sigue usando la sesión autenticada (sus políticas sí la necesitan).
+// Al activar policies_auth.sql habrá que retirar este puente de Fase 1.
+export function withPhase1RestAuth(url, options = {}) {
+  let isProjectRestRequest = false
+  try {
+    const requestUrl = new URL(String(url))
+    const projectUrl = new URL(SB_URL)
+    isProjectRestRequest = requestUrl.origin === projectUrl.origin
+      && requestUrl.pathname.startsWith('/rest/v1/')
+  } catch {}
+  if (!isProjectRestRequest) return options
+
+  const headers = new Headers(options.headers || {})
+  headers.set('apikey', SB_ANON)
+  headers.set('Authorization', `Bearer ${SB_ANON}`)
+  return { ...options, headers }
 }
+
 function _timeoutFetch(url, options = {}) {
-  const opts = withPinAuthHeader(options)
+  const opts = withPhase1RestAuth(url, options)
   if (opts.signal) return fetch(url, opts)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), _FETCH_TIMEOUT_MS)
@@ -44,9 +54,21 @@ function _timeoutFetch(url, options = {}) {
 }
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
-const _SUPABASE_SINGLETON_KEY = '__times_inc_supabase__'
+const _SUPABASE_SINGLETON_KEY = '__times_inc_supabase_data_v2__'
 export const supabase = (SB_URL && SB_ANON)
-  ? (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, { global: { fetch: _timeoutFetch } }))
+  ? (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, {
+      global: { fetch: _timeoutFetch },
+      // Este cliente transporta exclusivamente los datos de Fase 1. No debe
+      // restaurar ni adoptar una sesión de Supabase Auth: si lo hiciera,
+      // PostgREST y Realtime cambiarían de `anon` a `authenticated` después
+      // del login y dejarían de cumplir las políticas activas `anon_all`.
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'times-inc-data-anon',
+      },
+    }))
   : null
 
 const TABLE      = 'app_data'
@@ -1198,7 +1220,11 @@ export async function pushSubscribe(userId, vapidPub) {
 // usuario que cerró sesión. Conservamos la suscripción del navegador para que
 // el siguiente usuario pueda asociarla sin volver a pedir permiso.
 export async function detachPushUser(userId) {
-  if (!userId || !supabase || !('serviceWorker' in navigator)) return
+  if (!userId) return
+  // Cerrar primero la puerta local: aunque no haya red para borrar la fila
+  // remota, el SW dejará de mostrar de inmediato avisos del usuario anterior.
+  await _idbDel('push_user_id')
+  if (!supabase || !('serviceWorker' in navigator)) return
   try {
     const reg = await navigator.serviceWorker.ready
     const sub = await reg.pushManager.getSubscription()
@@ -1208,7 +1234,6 @@ export async function detachPushUser(userId) {
         .eq('user_id', userId)
         .eq('endpoint', sub.endpoint)
     }
-    await _idbDel('push_user_id')
   } catch {}
 }
 

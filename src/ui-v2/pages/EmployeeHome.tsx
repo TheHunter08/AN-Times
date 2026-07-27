@@ -229,6 +229,23 @@ export function EmployeeHome({
     if (resetTimerRef.current !== null) clearTimeout(resetTimerRef.current)
   }, [clearFrame])
 
+  useEffect(() => {
+    // Al pasar de "sin jornada" a "trabajando" (o viceversa), React conserva
+    // la misma instancia del botón. Sin este reinicio podía seguir 450 ms en
+    // fase `confirmed` y rechazar una segunda pulsación válida, especialmente
+    // cuando el usuario confirmaba rápidamente el centro de trabajo.
+    clearFrame()
+    if (resetTimerRef.current !== null) {
+      clearTimeout(resetTimerRef.current)
+      resetTimerRef.current = null
+    }
+    holdActiveRef.current = false
+    holdCompletedRef.current = false
+    pointerStartRef.current.id = -1
+    setHoldProgress(0)
+    setHoldPhase('ready')
+  }, [state, clearFrame])
+
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     pointerStartRef.current = { id:event.pointerId, x:event.clientX, y:event.clientY }
@@ -325,7 +342,6 @@ export function EmployeeHome({
               onPointerUp={handlePointerEnd}
               onPointerCancel={cancelHold}
               onLostPointerCapture={cancelHold}
-              onPointerLeave={cancelHold}
               onKeyDown={handleKeyDown}
               onKeyUp={handleKeyUp}
               onBlur={cancelHold}

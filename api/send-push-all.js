@@ -123,7 +123,6 @@ export default async function handler(req, res) {
     }
 
     const safeUrl = (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) ? url : '/'
-    const payload = JSON.stringify({ title, body, tag: 'admin-broadcast', url: safeUrl })
 
     // Envío en paralelo con Promise.allSettled — evita timeout de Vercel por ejecución secuencial
     const toSend = recipients.filter(e => subMap.get(e.id)?.endpoint)
@@ -132,6 +131,7 @@ export default async function handler(req, res) {
     const results = await Promise.allSettled(
       toSend.map(async emp => {
         const sub = subMap.get(emp.id)
+        const payload = JSON.stringify({ title, body, tag: 'admin-broadcast', url: safeUrl, userId: emp.id })
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload

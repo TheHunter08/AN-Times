@@ -46,11 +46,11 @@ for (const group of byEndpoint.values()) {
 }
 
 console.log(JSON.stringify({ mode:apply ? 'apply' : 'dry-run', subscriptions:subscriptions.length, duplicatedEndpoints:[...byEndpoint.values()].filter(group => group.length > 1).length, associationsToRemove:removals.length }, null, 2))
-if (!apply) process.exit(0)
-
-for (const item of removals) {
-  await request(`push_subs?user_id=eq.${encodeURIComponent(item.user_id)}&endpoint=eq.${encodeURIComponent(item.endpoint)}`, {
-    method:'DELETE', headers:{ Prefer:'return=minimal' },
-  })
+if (apply) {
+  for (const item of removals) {
+    await request(`push_subs?user_id=eq.${encodeURIComponent(item.user_id)}&endpoint=eq.${encodeURIComponent(item.endpoint)}`, {
+      method:'DELETE', headers:{ Prefer:'return=minimal' },
+    })
+  }
+  console.log(JSON.stringify({ ok:true, removed:removals.length }, null, 2))
 }
-console.log(JSON.stringify({ ok:true, removed:removals.length }, null, 2))

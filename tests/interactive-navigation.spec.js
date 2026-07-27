@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { employee, loginAsAdmin, loginAsEmployee } from './helpers/session.js'
+import { localDateStr } from '../src/utils/time.js'
 
 async function openAdminPage(page, group, item) {
   const menu = page.getByRole('button', { name:/Abrir menú/i })
@@ -53,7 +54,7 @@ test('los KPI y filas de anomalías filtran y abren fichajes', async ({ page }) 
 
 test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await loginAsAdmin(page, { employees:[
-    { ...employee, email:'empleado@times.test', authId:'auth-e1' },
+    { ...employee, email:'empleado@times.test', authId:'auth-e1', pin:'pbkdf2:salt:hash:600000' },
     { id:'admin', name:'Administrador', email:'admin@times.test', authId:'auth-admin', role:'admin', isAdmin:true, baja:false },
   ] })
   await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
@@ -67,9 +68,11 @@ test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await expect(page.getByRole('button', { name:/Dispositivos: 1\/1 registrados/i })).toBeVisible()
   await expect(page.getByRole('button', { name:/Validaciones reales: Ninguna pendiente/i })).toBeVisible()
   await expect(page.getByText('Equipo preparado para el lanzamiento')).toBeVisible()
+  await expect(page.getByText('Bloqueado', { exact:true })).toBeVisible()
+  await expect(page.getByText(/cliente de datos todavía anónimo, el acceso PIN todavía no tiene una sesión oficial de Supabase Auth, auth_id todavía no se ha contrastado con auth.users, blob legado todavía activo/)).toBeVisible()
 
-  await page.getByRole('button', { name:/Acceso seguro: \d+\/\d+ vinculados.*Revisar empleados/i }).click()
-  await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
+  await page.getByRole('button', { name:/Acceso seguro: Ruta de datos pendiente.*Ver diagnóstico/i }).click()
+  await expect(page.getByRole('heading', { name:'Auditoría', exact:true })).toBeVisible()
 
   await openAdminPage(page, 'Sistema', 'Centro operativo')
   await page.getByRole('button', { name:'Abrir cumplimiento', exact:true }).click()
@@ -85,6 +88,7 @@ test('el centro operativo identifica cada perfil incompleto', async ({ page }) =
   await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
   await openAdminPage(page, 'Sistema', 'Centro operativo')
 
+  await expect(page.getByText(/No activar RLS todavía: 2 sin identidad vinculada, 2 sin correo válido/)).toBeVisible()
   const blocker = page.getByRole('button', { name:/Revisar Empleado Prueba.*Falta email.*Falta crear acceso.*Falta firma.*Falta activar notificaciones/i })
   await expect(blocker).toBeVisible()
   await blocker.click()
@@ -122,7 +126,7 @@ test('solicitudes, gastos y documentos abren su contexto', async ({ page }) => {
 
 test('planning y turnos abren los fichajes del empleado', async ({ page }) => {
   const now = new Date()
-  const date = now.toISOString().slice(0, 10)
+  const date = localDateStr(now)
   const dayLabel = now.toLocaleDateString('es-ES', { weekday:'short', day:'numeric' })
   const dayName = now.toLocaleDateString('es-ES', { weekday:'short' }).replace(/[.,]/g, '')
   await loginAsAdmin(page, {
@@ -217,7 +221,8 @@ test('una obra nueva conserva coordenadas válidas para geofencing', async ({ pa
 
   const dialog = page.getByRole('dialog', { name:'Nueva obra', exact:true })
   await dialog.getByRole('textbox', { name:'Nombre de la obra', exact:true }).fill('Obra Geovalla')
-  await dialog.getByRole('textbox', { name:'Coordenadas GPS', exact:true }).fill('18.4861, -69.9312')
+  await dialog.getByRole('spinbutton', { name:'Latitud', exact:true }).fill('18.4861')
+  await dialog.getByRole('spinbutton', { name:'Longitud', exact:true }).fill('-69.9312')
   await dialog.getByRole('button', { name:'Crear obra', exact:true }).click()
 
   await page.getByRole('button', { name:'Ver detalle de la obra Obra Geovalla', exact:true }).click()

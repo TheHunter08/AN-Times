@@ -159,8 +159,8 @@ export default async function handler(req, res) {
 
     const toSend = []
 
-    const mkPayload = (title, body, tag, url = '/') =>
-      JSON.stringify({ title, body, tag, url: (typeof url === 'string' && url.startsWith('/')) ? url : '/' })
+    const mkPayload = (userId, title, body, tag, url = '/') =>
+      JSON.stringify({ title, body, tag, url: (typeof url === 'string' && url.startsWith('/')) ? url : '/', userId })
 
     const waToSend = []
     // newKeys ya no se usa para marcar "enviado" — solo se marca de verdad tras
@@ -172,7 +172,7 @@ export default async function handler(req, res) {
     // simplemente no se programa nada para él y no se marca la clave.
     const schedule = (emp, sub, key, keyVal, title, body, tag, url) => {
       if (sub?.endpoint) {
-        toSend.push({ emp, sub, payload: mkPayload(title, body, tag, url), key, keyVal })
+        toSend.push({ emp, sub, payload: mkPayload(emp.id, title, body, tag, url), key, keyVal })
       } else if (emp.telefono) {
         // Sin push sub → intentar WhatsApp como canal alternativo
         waToSend.push({ emp, message: `*${title}*\n${body}`, key, keyVal })

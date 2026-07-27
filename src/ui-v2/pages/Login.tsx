@@ -24,13 +24,21 @@ export interface LoginProps {
   onBioLogin?: () => void
   bioLoading?: boolean
   // Email
-  onLogin?: (email: string, password: string) => void
-  onRegister?: (email: string, password: string) => void
+  onLogin?: (email: string, password: string, employeePin: string) => void
+  onRegister?: (email: string, password: string, employeePin: string) => void
   onForgotPassword?: (email: string) => void
+  onUpdatePassword?: (password: string, confirmation: string) => void
+  onResendConfirmation?: (email: string) => void
   resetLoading?: boolean
+  recoveryLoading?: boolean
+  recoveryMode?: boolean
+  confirmationLoading?: boolean
   emailLoading?: boolean
   registerLoading?: boolean
   emailError?: string
+  emailPinRequired?: boolean
+  registrationNotice?: string
+  onRegistrationNoticeDone?: () => void
   // Mode
   mode?: LoginMode
   onSetMode?: (m: LoginMode) => void
@@ -45,20 +53,23 @@ const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 export function Login({
   employees = [], pin = '', selectedEmpId = '', onSelectEmp, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
-  onLogin, onRegister, onForgotPassword, resetLoading, emailLoading, registerLoading, emailError,
+  onLogin, onRegister, onForgotPassword, onUpdatePassword, onResendConfirmation, resetLoading, recoveryLoading, recoveryMode, confirmationLoading, emailLoading, registerLoading, emailError, emailPinRequired, registrationNotice, onRegistrationNoticeDone,
   mode = 'pin', onSetMode,
   loading, error, online = true, lastSyncLabel,
 }: LoginProps) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirmation, setPasswordConfirmation] = useState('')
+  const [registrationPin, setRegistrationPin] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [creatingAccount, setCreatingAccount] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
-    if (creatingAccount) onRegister?.(email, password)
-    else onLogin?.(email, password)
+    if (recoveryMode) onUpdatePassword?.(password, passwordConfirmation)
+    else if (creatingAccount) onRegister?.(email, password, registrationPin)
+    else onLogin?.(email, password, registrationPin)
   }
 
   const selEmp = employees.find(e => e.id === selectedEmpId)
@@ -68,6 +79,12 @@ export function Login({
     ? employees.filter(e => e.id === selectedEmpId)
     : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(normalizedEmployeeSearch))
   const pinDotCount = Math.min(6, Math.max(4, selEmp?.pinLen || 4))
+  const submitBusy = !!(emailLoading || registerLoading || recoveryLoading || loading)
+  const submitMissing = !password
+    || (!recoveryMode && !email)
+    || (recoveryMode && !passwordConfirmation)
+    || (!recoveryMode && (creatingAccount || emailPinRequired) && !registrationPin)
+  const submitDisabled = submitBusy || submitMissing
 
   return (
     <div className="v7-login-shell" style={{
@@ -125,7 +142,7 @@ export function Login({
         </div>
 
         {/* Toggle PIN / Email */}
-        <div style={{
+        {!recoveryMode && <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 18,
           background: colors.bg[700], border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius.lg, padding: 4,
@@ -148,7 +165,7 @@ export function Login({
               {m === 'pin' ? <><IconShield width={13} height={13} /> PIN</> : <><IconMail width={13} height={13} /> Email</>}
             </button>
           ))}
-        </div>
+        </div>}
 
         {/* ── PIN MODE ───────────────────────────────────────────────── */}
         {mode === 'pin' && (
@@ -302,17 +319,59 @@ export function Login({
           }}>
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: colors.text[900], letterSpacing: '-.4px', marginBottom: 4 }}>
-                {creatingAccount ? 'Crea tu acceso seguro' : 'Accede a TIMES INC'}
+                {recoveryMode ? 'Crea una contraseña nueva' : creatingAccount ? 'Crea y vincula tu cuenta' : 'Accede a TIMES INC'}
               </div>
               <div style={{ fontSize: 12, color: colors.text[500] }}>
-                {creatingAccount
-                  ? 'Usa el mismo email que figura en tu perfil de empleado.'
+                {recoveryMode
+                  ? 'Elige una contraseña segura de al menos 8 caracteres.'
+                  : creatingAccount
+                  ? 'La cuenta se asociará a tu perfil de empleado existente.'
                   : 'Detectaremos automáticamente tu perfil y permisos.'}
               </div>
             </div>
 
-            <form onSubmit={submitEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
+            {creatingAccount && !registrationNotice && !recoveryMode && (
+              <ol aria-label="Cómo vincular tu cuenta" style={{
+                margin: '0 0 14px', padding: '12px 12px 12px 34px',
+                borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`,
+                background: colors.bg[600], color: colors.text[400],
+                fontSize: 11.5, lineHeight: 1.55,
+              }}>
+                <li><strong style={{ color: colors.text[800] }}>Correo:</strong> usa el que la empresa guardó en tu ficha.</li>
+                <li><strong style={{ color: colors.text[800] }}>PIN:</strong> introduce tu PIN habitual de fichaje; no es un código nuevo.</li>
+                <li><strong style={{ color: colors.text[800] }}>Confirmación:</strong> abre el enlace del email y vuelve. En esa primera entrada puede pedirte el PIN otra vez para guardar la vinculación.</li>
+              </ol>
+            )}
+
+            {registrationNotice && !recoveryMode && (
+              <div role="status" aria-live="polite" style={{
+                marginBottom: 14, padding: 14, borderRadius: radius.md,
+                border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)',
+                color: colors.text[800], fontSize: 12, lineHeight: 1.55,
+              }}>
+                <div style={{ color: colors.semantic.green, fontWeight: 800, marginBottom: 4 }}>Cuenta creada: falta confirmar el correo</div>
+                <div>{registrationNotice}</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingAccount(false)
+                    setPassword('')
+                    setRegistrationPin('')
+                    onRegistrationNoticeDone?.()
+                  }}
+                  style={{
+                    marginTop: 10, padding: 0, border: 'none', background: 'transparent',
+                    color: colors.primary.light, fontSize: 11.5, fontWeight: 800,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  Ya confirmé el correo · Iniciar sesión
+                </button>
+              </div>
+            )}
+
+            {(recoveryMode || !registrationNotice) && <form onSubmit={submitEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {!recoveryMode && <div>
                 <label htmlFor="login-email" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
                   Email
                 </label>
@@ -336,14 +395,14 @@ export function Login({
                     onBlur={e => e.target.style.borderColor = colors.border.default}
                   />
                 </div>
-              </div>
+              </div>}
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label htmlFor="login-password" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px' }}>
-                    Contraseña
+                    {recoveryMode ? 'Nueva contraseña' : 'Contraseña'}
                   </label>
-                  {!creatingAccount && <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
+                  {!creatingAccount && !recoveryMode && <button type="button" disabled={resetLoading || !email} onClick={() => onForgotPassword?.(email)} style={{ fontSize: 10.5, color: colors.primary.light, background: 'none', border: 'none', cursor:resetLoading||!email?'default':'pointer', opacity:!email ? .5 : 1, padding: 0 }}>
                     {resetLoading ? 'Enviando…' : '¿La olvidaste?'}
                   </button>}
                 </div>
@@ -354,7 +413,7 @@ export function Login({
                   <input
                     id="login-password"
                     type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••" required minLength={creatingAccount ? 8 : undefined} autoComplete={creatingAccount ? 'new-password' : 'current-password'}
+                    placeholder="••••••••" required minLength={creatingAccount || recoveryMode ? 8 : undefined} autoComplete={creatingAccount || recoveryMode ? 'new-password' : 'current-password'}
                     className="uiv2-login-input"
                     style={{
                       width: '100%', boxSizing: 'border-box',
@@ -375,40 +434,127 @@ export function Login({
                 </div>
               </div>
 
+              {recoveryMode && <div>
+                <label htmlFor="login-password-confirmation" style={{ display:'block', marginBottom:6, fontSize:10.5, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px' }}>
+                  Repite la nueva contraseña
+                </label>
+                <div style={{ position:'relative' }}>
+                  <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:colors.text[500], display:'flex' }}>
+                    <IconLock width={13} height={13} />
+                  </span>
+                  <input
+                    id="login-password-confirmation"
+                    type={showPass ? 'text' : 'password'}
+                    value={passwordConfirmation}
+                    onChange={event => setPasswordConfirmation(event.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    className="uiv2-login-input"
+                    style={{
+                      width:'100%', boxSizing:'border-box', padding:'10px 12px 10px 33px',
+                      borderRadius:radius.sm, border:`1px solid ${colors.border.default}`,
+                      background:colors.bg[600], color:colors.text[900], fontSize:13,
+                      fontFamily:'inherit', outline:'none',
+                    }}
+                    onFocus={event => event.target.style.borderColor = colors.primary.base}
+                    onBlur={event => event.target.style.borderColor = colors.border.default}
+                  />
+                </div>
+              </div>}
+
+              {!recoveryMode && (creatingAccount || emailPinRequired) && (
+                <div>
+                  <label htmlFor="registration-pin" style={{ display:'block', marginBottom:6, fontSize:10.5, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px' }}>
+                    {creatingAccount ? 'Tu PIN habitual de fichaje' : 'PIN para primera vinculación'}
+                  </label>
+                  <div style={{ position:'relative' }}>
+                    <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:colors.text[500], display:'flex' }}>
+                      <IconShield width={13} height={13} />
+                    </span>
+                    <input
+                      id="registration-pin"
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={registrationPin}
+                      onChange={event => setRegistrationPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="PIN de fichaje"
+                      required
+                      minLength={4}
+                      className="uiv2-login-input"
+                      style={{
+                        width:'100%', boxSizing:'border-box', padding:'10px 12px 10px 33px',
+                        borderRadius:radius.sm, border:`1px solid ${colors.border.default}`,
+                        background:colors.bg[600], color:colors.text[900], fontSize:13,
+                        fontFamily:'inherit', outline:'none',
+                      }}
+                      onFocus={event => event.target.style.borderColor = colors.primary.base}
+                      onBlur={event => event.target.style.borderColor = colors.border.default}
+                    />
+                  </div>
+                </div>
+              )}
+
               {(emailError || error) && <ErrorBanner>{emailError || error}</ErrorBanner>}
 
               <button
                 type="submit"
-                disabled={emailLoading || registerLoading || loading || !email || !password}
+                disabled={submitDisabled}
                 className="uiv2-login-submit"
                 style={{
                   marginTop: 4, padding: '12px', borderRadius: radius.md, border: 'none',
-                  background: emailLoading || registerLoading || loading || !email || !password
+                  background: submitDisabled
                     ? colors.bg[400]
                     : colors.gradients.brand,
-                  color: emailLoading || registerLoading || loading || !email || !password ? colors.text[500] : '#fff',
-                  fontSize: 13.5, fontWeight: 800, cursor: emailLoading || registerLoading || loading ? 'wait' : 'pointer',
+                  color: submitDisabled ? colors.text[500] : '#fff',
+                  fontSize: 13.5, fontWeight: 800, cursor: submitBusy ? 'wait' : 'pointer',
                   fontFamily: 'inherit',
-                  boxShadow: emailLoading || registerLoading || loading || !email || !password ? 'none' : '0 10px 28px var(--uiv2-primary-glow)',
+                  boxShadow: submitDisabled ? 'none' : '0 10px 28px var(--uiv2-primary-glow)',
                   transition: 'all .2s',
                 }}
               >
-                {creatingAccount
-                  ? (registerLoading ? 'Creando cuenta…' : 'Crear acceso seguro')
+                {recoveryMode
+                  ? (recoveryLoading ? 'Guardando contraseña…' : 'Guardar nueva contraseña')
+                  : creatingAccount
+                  ? (registerLoading ? 'Creando y vinculando…' : 'Crear y vincular cuenta')
                   : (emailLoading || loading ? 'Entrando…' : 'Continuar')}
               </button>
-              <button
+              {!recoveryMode && <button
                 type="button"
-                disabled={emailLoading || registerLoading || loading}
-                onClick={() => { setCreatingAccount(value => !value); setPassword('') }}
+                disabled={emailLoading || registerLoading || confirmationLoading || loading}
+                onClick={() => {
+                  setCreatingAccount(value => !value)
+                  setPassword('')
+                  setRegistrationPin('')
+                  onRegistrationNoticeDone?.()
+                }}
                 style={{ padding: 5, border: 'none', background: 'transparent', color: colors.primary.light, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
               >
-                {creatingAccount ? 'Ya tengo cuenta' : 'Primera vez: crear cuenta'}
-              </button>
-              {creatingAccount && <div role="note" style={{ color: colors.text[400], fontSize: 10.5, lineHeight: 1.45, textAlign: 'center' }}>
-                Te enviaremos un enlace de confirmación. Si tu email no está en tu ficha, pide al administrador que lo añada.
+                {creatingAccount ? 'Ya tengo una cuenta vinculada' : 'Primera vez: vincular mi cuenta'}
+              </button>}
+              {!creatingAccount && !recoveryMode && <button
+                type="button"
+                disabled={confirmationLoading || !email}
+                onClick={() => onResendConfirmation?.(email)}
+                style={{
+                  padding:3,
+                  border:'none',
+                  background:'transparent',
+                  color:colors.text[500],
+                  fontSize:10.5,
+                  cursor:confirmationLoading || !email ? 'default' : 'pointer',
+                  opacity:!email ? .5 : 1,
+                  fontFamily:'inherit',
+                }}
+              >
+                {confirmationLoading ? 'Reenviando confirmación…' : '¿No llegó la confirmación? Reenviar'}
+              </button>}
+              {creatingAccount && !recoveryMode && <div role="note" style={{ color: colors.text[400], fontSize: 10.5, lineHeight: 1.45, textAlign: 'center' }}>
+                El PIN solo acredita que eres el empleado correcto. Tu contraseña será la que usarás para entrar por email.
               </div>}
-            </form>
+            </form>}
           </div>
         )}
 

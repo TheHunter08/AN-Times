@@ -4,7 +4,8 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { calcSecs, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
-import { queuePush, supabase } from '../../services/dataService.js'
+import { queuePush } from '../../services/dataService.js'
+import { authSupabase } from '../../services/authService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
 import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
@@ -67,10 +68,10 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
       // y se come la cuota gratuita de base de datos en vez de la de Storage.
       // Si no hay conexión o falla la subida, se cae al comportamiento anterior
       // (guardar pdfData) para no bloquear la firma por un problema de red.
-      if (supabase) {
+      if (authSupabase) {
         try {
           const path = `${firmado.empId}/${firmado.mes}.pdf`
-          const { error } = await supabase.storage.from(CIERRE_PDF_BUCKET).upload(path, blob, { contentType: 'application/pdf', upsert: true })
+          const { error } = await authSupabase.storage.from(CIERRE_PDF_BUCKET).upload(path, blob, { contentType: 'application/pdf', upsert: true })
           if (!error) documentoId = path
           else console.warn('[cierre] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
         } catch (uploadErr) {

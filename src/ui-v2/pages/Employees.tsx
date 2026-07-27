@@ -2,7 +2,7 @@
 import { Avatar } from '../components/Avatar.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconX } from '../components/Icons.js'
+import { IconPlus, IconSearch, IconUsers, IconClock, IconMapPin, IconDots, IconX, IconShield } from '../components/Icons.js'
 import { ProductState } from '../components/ProductState.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
@@ -18,6 +18,27 @@ export interface EmployeeRow {
   phone?: string
   obrasAsignadas?: string[]
   centroTrabajo?: string
+  accountStatus?: 'linked' | 'ready' | 'missing-email' | 'missing-pin'
+}
+
+const accountCfg = {
+  linked: { label: 'Cuenta vinculada', color: colors.semantic.green, bg: 'rgba(16,185,129,.1)' },
+  ready: { label: 'Lista para vincular', color: colors.primary.light, bg: colors.primary.dim },
+  'missing-email': { label: 'Falta correo', color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)' },
+  'missing-pin': { label: 'Falta PIN', color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)' },
+} as const
+
+function AccountPill({ status = 'missing-email' }: { status?: EmployeeRow['accountStatus'] }) {
+  const cfg = accountCfg[status]
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, width: 'fit-content',
+      padding: '4px 9px', borderRadius: radius.pill, background: cfg.bg,
+      color: cfg.color, fontSize: 11, fontWeight: 700,
+    }}>
+      <IconShield width={11} height={11} /> {cfg.label}
+    </div>
+  )
 }
 
 export interface EmployeesProps {
@@ -91,6 +112,9 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
   const active  = rows.filter(r => r.status === 'active').length
   const onBreak = rows.filter(r => r.status === 'break').length
   const off     = rows.filter(r => r.status === 'off').length
+  const linkedAccounts = rows.filter(r => r.accountStatus === 'linked').length
+  const readyAccounts = rows.filter(r => r.accountStatus === 'ready').length
+  const blockedAccounts = rows.filter(r => r.accountStatus === 'missing-email' || r.accountStatus === 'missing-pin').length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
@@ -124,6 +148,21 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
         <StatChip label="En pausa" value={onBreak} color={colors.semantic.orange} />
         <StatChip label="Inactivos" value={off} color={colors.text[400]} />
       </div>
+
+      {linkedAccounts < total && (
+        <div role="note" style={{
+          padding: '13px 15px', borderRadius: radius.lg,
+          border: `1px solid ${blockedAccounts ? 'rgba(245,158,11,.28)' : colors.border.subtle}`,
+          background: blockedAccounts ? 'rgba(245,158,11,.07)' : colors.bg[700],
+          color: colors.text[500], fontSize: 12, lineHeight: 1.55,
+        }}>
+          <strong style={{ display: 'block', color: colors.text[900], marginBottom: 3 }}>Acceso por email</strong>
+          <span>{linkedAccounts} vinculadas · {readyAccounts} listas para vincular · {blockedAccounts} con requisitos pendientes.</span>
+          <span style={{ display: 'block', marginTop: 3 }}>
+            Para habilitar una cuenta, guarda un correo único y un PIN en el perfil. Después el empleado debe usar “Primera vez: vincular mi cuenta”.
+          </span>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -223,7 +262,10 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             </div>
 
             {/* Status */}
-            <StatusPill status={profileEmp.status} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <StatusPill status={profileEmp.status} />
+              <AccountPill status={profileEmp.accountStatus} />
+            </div>
 
             {/* Details grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -335,7 +377,10 @@ function EmployeeCard({ emp, onSelect, onEdit, onViewProfile, onViewTimesheets }
       </div>
 
       {/* Status pill */}
-      <StatusPill status={emp.status} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <StatusPill status={emp.status} />
+        <AccountPill status={emp.accountStatus} />
+      </div>
 
       {/* Info chips */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

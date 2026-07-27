@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPinAuthHeader } from './dataService.js'
-import { storePinToken, clearPinToken } from '../utils/pinAuthToken.js'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -206,37 +205,35 @@ describe('una jornada cerrada nunca pierde contra una copia abierta (tick en viv
   })
 })
 
-describe('withPinAuthHeader: DESACTIVADO — nunca toca las opciones', () => {
-  // Regresión del incidente 2026-07-25: inyectar el token PIN en el header
-  // Authorization producía cabeceras duplicadas ('authorization' minúscula de
-  // supabase-js + 'Authorization' añadida aquí) que fetch combina en una sola
-  // ("Bearer <anon>, Bearer <pin>") y el servidor rechazaba TODAS las
-  // escrituras con "Expected 3 parts in JWT; got 5". Mientras RLS siga en
-  // anon_all, esta función debe ser un no-op puro.
-  beforeEach(() => { localStorage.clear() })
-  afterEach(() => clearPinToken())
+describe('withPhase1RestAuth: mantiene PostgREST en el rol anon durante Fase 1', () => {
+  const projectRestUrl = 'https://fake.supabase.co/rest/v1/employees'
 
-  it('sin token guardado, devuelve las opciones sin tocar', () => {
-    const opts = { headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
-    expect(withPinAuthHeader(opts)).toBe(opts)
+  it('sustituye un JWT authenticated por la clave anon sin duplicar Authorization', () => {
+    const result = withPhase1RestAuth(projectRestUrl, {
+      method: 'GET',
+      headers: {
+        authorization: 'Bearer authenticated.user.jwt',
+        apikey: 'public-anon-key',
+        'x-client-info': 'supabase-js',
+      },
+    })
+
+    const authEntries = [...result.headers.entries()].filter(([key]) => key.toLowerCase() === 'authorization')
+    expect(authEntries).toHaveLength(1)
+    expect(authEntries[0][1]).not.toContain('authenticated.user.jwt')
+    expect(result.headers.get('apikey')).not.toBe('public-anon-key')
+    expect(result.headers.get('x-client-info')).toBe('supabase-js')
+    expect(result.method).toBe('GET')
   })
 
-  it('incluso con un token vigente guardado, NO sustituye Authorization', () => {
-    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
-    const opts = { method: 'GET', headers: { apikey: 'anon-key', Authorization: 'Bearer anon-key' } }
-    const result = withPinAuthHeader(opts)
-    expect(result).toBe(opts)
-    expect(result.headers.Authorization).toBe('Bearer anon-key')
+  it('no toca las peticiones de Auth ni Storage', () => {
+    const opts = { headers: { Authorization: 'Bearer authenticated.user.jwt' } }
+    expect(withPhase1RestAuth('https://fake.supabase.co/auth/v1/token', opts)).toBe(opts)
+    expect(withPhase1RestAuth('https://fake.supabase.co/storage/v1/object/file', opts)).toBe(opts)
   })
 
-  it('nunca produce una cabecera Authorization duplicada por diferencia de mayúsculas', () => {
-    storePinToken({ token: 'emp.jwt.token', expiresAt: Date.now() + 3_600_000, empId: 'e1' })
-    // 'authorization' en minúscula, como la emiten partes de supabase-js — el
-    // detonante real del incidente.
-    const opts = { headers: { apikey: 'anon-key', authorization: 'Bearer anon-key' } }
-    const result = withPinAuthHeader(opts)
-    const authKeys = Object.keys(result.headers).filter(k => k.toLowerCase() === 'authorization')
-    expect(authKeys).toHaveLength(1)
-    expect(result.headers[authKeys[0]]).toBe('Bearer anon-key')
+  it('no toca peticiones REST de otro origen', () => {
+    const opts = { headers: { Authorization: 'Bearer external.jwt' } }
+    expect(withPhase1RestAuth('https://example.com/rest/v1/employees', opts)).toBe(opts)
   })
 })

@@ -5,7 +5,7 @@ import type { CSSProperties, ChangeEvent, FormEvent } from 'react'
 import { gid, today } from '../../utils/time.js'
 import { resizeImageToDataUrl } from '../../utils/imageResize.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
-import { supabase } from '../../services/dataServiceV2.js'
+import { authSupabase } from '../../services/authService.js'
 import { queuePush } from '../../services/dataService.js'
 import { createNotification } from '../../utils/notifications.js'
 import { GASTOS_BUCKET } from '../../config/constants.js'
@@ -67,7 +67,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
   // y no necesitan esto.
   const pendingFotoIds = misGastos.filter((g: any) => g.fotoPath && !(g.id in signedUrls)).map((g: any) => g.id).join(',')
   useEffect(() => {
-    if (!pendingFotoIds || !supabase) return
+    if (!pendingFotoIds || !authSupabase) return
     let cancelled = false
     const ids = pendingFotoIds.split(',')
     ;(async () => {
@@ -80,7 +80,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
         const g = misGastos.find((x: any) => x.id === id)
         if (!g) return null
         try {
-          const { data, error } = await supabase.storage.from(GASTOS_BUCKET).createSignedUrl(g.fotoPath, 3600)
+          const { data, error } = await authSupabase.storage.from(GASTOS_BUCKET).createSignedUrl(g.fotoPath, 3600)
           return error || !data?.signedUrl ? null : [id, data.signedUrl]
         } catch { return null }
       }))).filter(Boolean) as [string, string][]
@@ -127,12 +127,12 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
       // datos, 500 MB) — mismo criterio que documentos y PDFs de cierre. Si
       // falla la subida (sin conexión, bucket no configurado todavía), cae
       // al comportamiento anterior en vez de bloquear el envío del gasto.
-      if (foto && supabase) {
+      if (foto && authSupabase) {
         try {
           const blob = dataUrlToBlob(foto)
           const ext = blob.type === 'image/png' ? 'png' : 'jpg'
           const path = `${u.id}/${nuevo.id}.${ext}`
-          const { error } = await supabase.storage.from(GASTOS_BUCKET).upload(path, blob, { contentType: blob.type, upsert: true })
+          const { error } = await authSupabase.storage.from(GASTOS_BUCKET).upload(path, blob, { contentType: blob.type, upsert: true })
           if (!error) nuevo.fotoPath = path
           else { console.warn('[gastos] No se pudo subir la foto a Storage, se guarda en base64:', error.message); nuevo.foto = foto }
         } catch (uploadErr: any) {

@@ -4,11 +4,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
-import { linkAuthIdentity } from '../utils/authIdentity.js'
+import { linkEmployeeAuthIdentity, relinkEmployeeAuthIdentity } from '../utils/authIdentity.js'
 import { useShallow } from 'zustand/react/shallow'
-import { signInEmail, signUpEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword } from '../services/authService.js'
-import { getRegistrationEligibility, normalizeAccountEmail, validateAccountPassword } from '../utils/authRegistration.js'
+import { signInEmail, signUpEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword, resendConfirmationEmail, updatePassword } from '../services/authService.js'
+import { getActiveEmployeesByEmail, getRegistrationEligibility, normalizeAccountEmail, validateAccountPassword, verifyRegistrationPin } from '../utils/authRegistration.js'
 import { sortedEmps } from '../utils/time.js'
+import { auditLog } from '../services/dataService.js'
 import {
   isPinHashed, verifyPin, getLockoutState, recordFailedAttempt,
   clearLockout, hashPin, needsRehash,
@@ -63,7 +64,10 @@ export default function LoginV2() {
   )
 
   // Mode
-  const [mode, setMode] = useState<LoginMode>('pin')
+  const [mode, setMode] = useState<LoginMode>(() => {
+    const url = new URL(window.location.href)
+    return url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery') ? 'email' : 'pin'
+  })
 
   // PIN state
   const [pin, setPin]               = useState('')
@@ -80,8 +84,16 @@ export default function LoginV2() {
   // Email state
   const [emailLoading, setEmailLoading] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
+  const [emailPinRequired, setEmailPinRequired] = useState(false)
   const [emailError, setEmailError]     = useState('')
+  const [registrationNotice, setRegistrationNotice] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
+  const [recoveryLoading, setRecoveryLoading] = useState(false)
+  const [recoveryMode, setRecoveryMode] = useState(() => {
+    const url = new URL(window.location.href)
+    return url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')
+  })
+  const [confirmationLoading, setConfirmationLoading] = useState(false)
   const { online } = useConnectivity()
 
   const verifyingRef = useRef(false)
@@ -146,13 +158,29 @@ export default function LoginV2() {
   // porque siempre habría 0 empleados "vinculados".
   const linkAuthIdIfMissing = useCallback((emp: any, authUserId?: string | null) => {
     if (!authUserId) return false
-    const linkedEmployee = linkAuthIdentity(emp, authUserId)
-    if (!linkedEmployee) return false
-    if ((emp.authId || emp.auth_id) === authUserId) return true
-    saveDB((fresh: any) => ({
-      employees: (fresh.employees || []).map((e: any) => e.id === emp.id ? linkedEmployee : e),
-    }))
-    return true
+    let linked = false
+    saveDB((fresh: any) => {
+      const result = linkEmployeeAuthIdentity(fresh.employees, emp.id, authUserId)
+      linked = result.ok
+      return result.changed ? { employees:result.employees } : null
+    })
+    return linked
+  }, [saveDB])
+
+  const relinkAuthIdAfterProof = useCallback((emp: any, expectedAuthId: string, nextAuthId?: string | null) => {
+    if (!nextAuthId) return false
+    let relinked = false
+    saveDB((fresh: any) => {
+      const result = relinkEmployeeAuthIdentity(fresh.employees, emp.id, expectedAuthId, nextAuthId)
+      relinked = result.ok
+      if (!result.changed) return null
+      const withAudit = auditLog(fresh, 'Cuenta de acceso recuperada', emp.name || emp.id, emp.name || 'Empleado', {
+        category:'seguridad', entityType:'employee', entityId:emp.id,
+        before:{ authId:expectedAuthId }, after:{ authId:nextAuthId },
+      })
+      return { employees:result.employees, audit:withAudit.audit }
+    })
+    return relinked
   }, [saveDB])
 
   const doAdminLogin = useCallback((authMethod = 'admin') => {
@@ -203,20 +231,21 @@ export default function LoginV2() {
       // se reutiliza tal cual en vez de recalcularlo sin necesidad.
       if (needsRehash(emp.pin) || !emp.pinLen) {
         const hashed = needsRehash(emp.pin) ? await hashPin(newPin, emp.id) : emp.pin
+        const nowIso = new Date().toISOString()
         useAppStore.getState().saveDB((fresh: any) => ({
           employees: (fresh.employees || []).map((e: any) =>
-            e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length } : e
+            e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length, _upd:nowIso } : e
           ),
         }))
       }
       doLogin(emp)
       setPin('')
-      // DESACTIVADO (2026-07-25): la sesión JWT por PIN (requestPinToken +
-      // realtime.setAuth) se retiró del flujo de login — la inyección de ese
-      // token en las peticiones rompió producción ("Expected 3 parts in
-      // JWT") y con RLS revertido a anon_all no aporta nada. Además se limpia
-      // cualquier token que quedara guardado de la ventana en que estuvo
-      // activo, para que los dispositivos afectados se recuperen solos.
+      // La sesión JWT personalizada por PIN está retirada definitivamente:
+      // dependía del Legacy JWT Secret y la inyección manual llegó a combinar
+      // dos cabeceras Authorization, rompiendo las escrituras. El PIN conserva
+      // la sesión local y limpia cualquier token guardado por versiones viejas.
+      // auth_id solo se vincula con una identidad real de Supabase Auth en los
+      // flujos de email/OAuth.
       clearPinToken()
     } else if (!knownLen && newPin.length < maxLen) {
       // Longitud desconocida (legacy) — esperar más dígitos sin error
@@ -272,7 +301,7 @@ export default function LoginV2() {
 
   // ── Email login ───────────────────────────────────────────────────────────
 
-  const handleEmailLogin = async (email: string, password: string) => {
+  const handleEmailLogin = async (email: string, password: string, employeePin: string) => {
     setEmailError('')
     const lk = getEmailLockout()
     if (lk.locked) {
@@ -282,27 +311,81 @@ export default function LoginV2() {
     if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
     setEmailLoading(true)
     interactiveEmailRef.current = true
+    let credentialsAccepted = false
     try {
       const result = await signInEmail(email.trim(), password)
+      credentialsAccepted = true
       const userEmail = result.user?.email
       clearEmailLockout()
       await useAppStore.getState().fetchDB()
       const freshDB = useAppStore.getState().db
-      const em = userEmail?.toLowerCase()
-      const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === em)
-      const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
-      const configuredAdmin = configuredEmails.includes(em || '')
-      const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
-      if (emp && !linkAuthIdIfMissing(emp, result.user?.id)) {
+      const em = normalizeAccountEmail(userEmail)
+      const matchingEmployees = getActiveEmployeesByEmail(freshDB.employees, em)
+      if (matchingEmployees.length > 1) {
         await authSignOut()
-        setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+        setEmailError('Ese correo aparece en varios empleados. El administrador debe corregir los perfiles antes de vincular la cuenta.')
         return
       }
+      const emp = matchingEmployees[0]
+      const authUserId = result.user?.id
+      const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => normalizeAccountEmail(x))
+      const configuredAdmin = configuredEmails.includes(em || '')
+      const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
+      const linkedAuthId = emp && (emp.authId || emp.auth_id)
+      const identityMismatch = Boolean(emp && linkedAuthId && authUserId && linkedAuthId !== authUserId)
+      if (emp && (!linkedAuthId || identityMismatch)) {
+        const pinLockout: any = getLockoutState(emp.id, freshDB)
+        if (pinLockout.locked) {
+          await authSignOut()
+          setEmailPinRequired(true)
+          setEmailError(`PIN bloqueado temporalmente. Inténtalo en ${pinLockout.remainingMin || 1} min.`)
+          return
+        }
+        const pinCheck: any = await verifyRegistrationPin(emp, employeePin)
+        if (!pinCheck.ok) {
+          await authSignOut()
+          setEmailPinRequired(true)
+          if (pinCheck.reason === 'employee_without_pin') {
+            setEmailError('Tu perfil todavía no tiene PIN. Pide al administrador que lo configure antes de vincular la cuenta.')
+            return
+          }
+          if (pinCheck.reason === 'missing_pin') {
+            setEmailError(identityMismatch
+              ? 'La vinculación anterior no coincide. Introduce tu PIN de fichaje para recuperar el acceso con esta cuenta.'
+              : 'Introduce tu PIN de fichaje para completar esta primera vinculación.')
+            return
+          }
+          let failedState: any = null
+          saveDB((fresh: any) => {
+            const failed: any = recordFailedAttempt(emp.id, fresh)
+            failedState = failed.state
+            return failed.lockoutData ? { pinLockouts:failed.lockoutData } : null
+          })
+          setEmailError(failedState?.locked
+            ? 'PIN incorrecto. El perfil ha quedado bloqueado temporalmente.'
+            : `PIN incorrecto${failedState?.remaining != null ? ` (${failedState.remaining} intentos)` : ''}.`)
+          return
+        }
+        saveDB((fresh: any) => ({ pinLockouts:clearLockout(emp.id, fresh) }))
+      }
+      const identityLinked = emp && identityMismatch
+        ? relinkAuthIdAfterProof(emp, linkedAuthId, authUserId)
+        : emp
+          ? linkAuthIdIfMissing(emp, authUserId)
+          : true
+      if (emp && !identityLinked) {
+        await authSignOut()
+        setEmailError('La vinculación cambió mientras verificábamos el acceso. Inténtalo de nuevo o contacta al administrador.')
+        return
+      }
+      if (identityMismatch) toast('Cuenta recuperada y vinculada correctamente', 5000, 'ok')
       if (emp && employeeAdmin) {
+        setEmailPinRequired(false)
         doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
         doAdminLogin('email')
       } else if (emp) {
+        setEmailPinRequired(false)
         doLogin(emp, 'email')
       } else {
         await authSignOut()
@@ -311,17 +394,18 @@ export default function LoginV2() {
       }
     } catch (ex: any) {
       await authSignOut()
-      const newLk: any = recordEmailFailed()
-      if (newLk.locked) {
+      const newLk: any = credentialsAccepted ? null : recordEmailFailed()
+      if (newLk?.locked) {
         const m = Math.floor((newLk.remainingSecs || 0) / 60), s = (newLk.remainingSecs || 0) % 60
         setEmailError(`Demasiados intentos. Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
       } else {
-        const remaining = newLk.remaining != null ? ` (${newLk.remaining} intentos)` : ''
+        const remaining = newLk?.remaining != null ? ` (${newLk.remaining} intentos)` : ''
         setEmailError((ex?.message || 'Email o contraseña incorrectos') + remaining)
       }
+    } finally {
+      interactiveEmailRef.current = false
+      setEmailLoading(false)
     }
-    interactiveEmailRef.current = false
-    setEmailLoading(false)
   }
 
   const handleForgotPassword = async (email: string) => {
@@ -338,20 +422,86 @@ export default function LoginV2() {
     }
   }
 
-  const handleRegister = async (email: string, password: string) => {
+  const handleUpdatePassword = async (password: string, confirmation: string) => {
     setEmailError('')
+    const passwordError = validateAccountPassword(password)
+    if (passwordError) { setEmailError(passwordError); return }
+    if (password !== confirmation) { setEmailError('Las contraseñas no coinciden.'); return }
+    if (!online) { setEmailError('Cambiar la contraseña requiere conexión.'); return }
+
+    setRecoveryLoading(true)
+    interactiveEmailRef.current = true
+    try {
+      await updatePassword(password)
+      await authSignOut()
+      setRecoveryMode(false)
+      window.history.replaceState({}, '', window.location.pathname)
+      toast('Contraseña actualizada. Ya puedes iniciar sesión.', 6000, 'ok')
+    } catch (error: any) {
+      setEmailError(error?.message || 'No se pudo actualizar la contraseña. Solicita un enlace nuevo.')
+    } finally {
+      interactiveEmailRef.current = false
+      setRecoveryLoading(false)
+    }
+  }
+
+  const handleResendConfirmation = async (email: string) => {
+    if (!email.trim()) { setEmailError('Introduce primero tu email.'); return }
+    if (!online) { setEmailError('Reenviar la confirmación requiere conexión.'); return }
+    setConfirmationLoading(true)
+    setEmailError('')
+    try {
+      await resendConfirmationEmail(normalizeAccountEmail(email))
+      toast('Si la cuenta está pendiente, recibirás un nuevo enlace. Revisa también spam.', 7000, 'ok')
+    } catch (error: any) {
+      setEmailError(error?.message || 'No se pudo reenviar la confirmación')
+    } finally {
+      setConfirmationLoading(false)
+    }
+  }
+
+  const handleRegister = async (email: string, password: string, employeePin: string) => {
+    setEmailError('')
+    setRegistrationNotice('')
     if (!online) { setEmailError('Crear la cuenta requiere conexión. Puedes seguir entrando con PIN.'); return }
     if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
 
     const eligibility: any = getRegistrationEligibility(db.employees, email)
     if (!eligibility.ok) {
-      setEmailError(eligibility.reason === 'already_linked'
-        ? 'Ya existe una cuenta para este empleado. Entra o recupera la contraseña.'
-        : 'Ese email no figura en ningún empleado activo. Pide al administrador que revise tu ficha.')
+      setEmailError(
+        eligibility.reason === 'already_linked'
+          ? 'Ya existe una cuenta para este empleado. Entra o recupera la contraseña.'
+          : eligibility.reason === 'duplicate_email'
+            ? 'Ese correo aparece en varios empleados. El administrador debe corregir los perfiles antes de crear la cuenta.'
+            : 'Ese email no figura en ningún empleado activo. Pide al administrador que revise tu ficha.',
+      )
       return
     }
     const passwordError = validateAccountPassword(password)
     if (passwordError) { setEmailError(passwordError); return }
+    const pinLockout: any = getLockoutState(eligibility.employee.id, db)
+    if (pinLockout.locked) {
+      setEmailError(`PIN bloqueado temporalmente. Inténtalo en ${pinLockout.remainingMin || 1} min.`)
+      return
+    }
+    const pinCheck: any = await verifyRegistrationPin(eligibility.employee, employeePin)
+    if (!pinCheck.ok) {
+      if (pinCheck.reason === 'employee_without_pin') {
+        setEmailError('Tu perfil todavía no tiene PIN. Pide al administrador que lo configure antes de crear la cuenta.')
+        return
+      }
+      let failedState: any = null
+      saveDB((fresh: any) => {
+        const failed: any = recordFailedAttempt(eligibility.employee.id, fresh)
+        failedState = failed.state
+        return failed.lockoutData ? { pinLockouts:failed.lockoutData } : null
+      })
+      setEmailError(failedState?.locked
+        ? 'PIN incorrecto. El perfil ha quedado bloqueado temporalmente.'
+        : `PIN incorrecto${failedState?.remaining != null ? ` (${failedState.remaining} intentos)` : ''}.`)
+      return
+    }
+    saveDB((fresh: any) => ({ pinLockouts:clearLockout(eligibility.employee.id, fresh) }))
 
     setRegisterLoading(true)
     interactiveEmailRef.current = true
@@ -366,6 +516,7 @@ export default function LoginV2() {
         doLogin(eligibility.employee, 'email')
         toast('Cuenta creada y vinculada correctamente', 5000, 'ok')
       } else {
+        setRegistrationNotice('Abre el enlace enviado a tu correo (revisa también spam). Después vuelve aquí y entra con ese correo y la contraseña que acabas de crear. Si aparece el campo PIN, introduce tu PIN de fichaje una última vez para completar la vinculación.')
         toast('Cuenta creada. Revisa tu correo y confirma el enlace antes de entrar.', 7000, 'ok')
       }
     } catch (error: any) {
@@ -379,37 +530,95 @@ export default function LoginV2() {
   // ── Auth state change (Google OAuth / password reset) ─────────────────────
 
   useEffect(() => {
-    const { data: { subscription } } = onAuthStateChange(async (event: string, session: any) => {
-      if (event === 'PASSWORD_RECOVERY') { setMode('email'); return }
-      if (event === 'SIGNED_IN' && session?.user?.email) {
+    let active = true
+    let lastScheduledSession = ''
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>()
+
+    const processExternalSession = async (session: any) => {
+      if (!active) return
+      const userEmail = normalizeAccountEmail(session.user.email)
+      await useAppStore.getState().fetchDB()
+      if (!active) return
+
+      const freshDB = useAppStore.getState().db
+      const matchingEmployees = getActiveEmployeesByEmail(freshDB.employees, userEmail)
+      if (matchingEmployees.length > 1) {
+        await authSignOut()
+        if (!active) return
+        setMode('email')
+        setEmailError('Ese correo aparece en varios empleados. El administrador debe corregir los perfiles antes de continuar.')
+        return
+      }
+      const emp = matchingEmployees[0]
+      if (emp) {
+        const linkedAuthId = emp.authId || emp.auth_id
+        if (!linkedAuthId) {
+          await authSignOut()
+          if (!active) return
+          setMode('email')
+          setEmailPinRequired(true)
+          setEmailError('Introduce correo, contraseña y tu PIN de fichaje para completar la primera vinculación.')
+        } else if (linkedAuthId === session.user.id) {
+          doLogin(emp, 'oauth')
+        } else {
+          await authSignOut()
+          if (!active) return
+          setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+        }
+      } else {
+        const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => normalizeAccountEmail(x))
+        if (configuredEmails.includes(userEmail)) doAdminLogin('oauth')
+        else {
+          await authSignOut()
+          if (!active) return
+          setEmailError('Cuenta no registrada. Contacta al administrador.')
+        }
+      }
+      if (active) window.history.replaceState({}, '', window.location.pathname)
+    }
+
+    const deferExternalSession = (session: any) => {
+      const sessionKey = `${session.user.id}:${session.access_token || ''}`
+      if (sessionKey === lastScheduledSession) return
+      lastScheduledSession = sessionKey
+
+      const timer = setTimeout(() => {
+        pendingTimers.delete(timer)
+        void processExternalSession(session).catch(() => {
+          if (!active) return
+          setMode('email')
+          setEmailError('No se pudo completar la sesión. Comprueba la conexión e inténtalo de nuevo.')
+        })
+      }, 0)
+      pendingTimers.add(timer)
+    }
+
+    // El callback debe permanecer síncrono: supabase-js puede bloquear el
+    // cliente si se espera otra llamada de Supabase dentro de este evento.
+    const { data: { subscription } } = onAuthStateChange((event: string, session: any) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('email')
+        setRecoveryMode(true)
+        setEmailError('')
+        setRegistrationNotice('')
+        return
+      }
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email) {
         // signInWithPassword ya completa este flujo en handleEmailLogin. El
         // listener queda reservado para OAuth/restauración y evita dos fetches
         // y dos transiciones de pantalla compitiendo por la misma sesión.
         if (interactiveEmailRef.current) return
         const url = new URL(window.location.href)
         if (url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')) return
-        const userEmail = session.user.email.toLowerCase()
-        await useAppStore.getState().fetchDB()
-        const freshDB = useAppStore.getState().db
-        const emp = (freshDB.employees || []).find((e: any) => e.email?.toLowerCase() === userEmail)
-        if (emp) {
-          if (linkAuthIdIfMissing(emp, session.user.id)) doLogin(emp, 'oauth')
-          else {
-            await authSignOut()
-            setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
-          }
-        } else {
-          const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => x.toLowerCase())
-          if (configuredEmails.includes(userEmail)) doAdminLogin('oauth')
-          else {
-            await authSignOut()
-            setEmailError('Cuenta no registrada. Contacta al administrador.')
-          }
-        }
-        window.history.replaceState({}, '', window.location.pathname)
+        deferExternalSession(session)
       }
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      pendingTimers.forEach((timer) => clearTimeout(timer))
+      pendingTimers.clear()
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (
@@ -432,10 +641,18 @@ export default function LoginV2() {
       onLogin={handleEmailLogin}
       onRegister={handleRegister}
       onForgotPassword={handleForgotPassword}
+      onUpdatePassword={handleUpdatePassword}
+      onResendConfirmation={handleResendConfirmation}
       resetLoading={resetLoading}
+      recoveryLoading={recoveryLoading}
+      recoveryMode={recoveryMode}
+      confirmationLoading={confirmationLoading}
       emailLoading={emailLoading}
       registerLoading={registerLoading}
+      emailPinRequired={emailPinRequired}
       emailError={emailError}
+      registrationNotice={registrationNotice}
+      onRegistrationNoticeDone={() => setRegistrationNotice('')}
       online={online}
       lastSyncLabel={lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : undefined}
     />

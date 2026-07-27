@@ -69,6 +69,24 @@ test('cumplimiento muestra riesgos reales y permite abrir la excepción', async 
   await expect(page.getByRole('heading', { name:'Anomalías' })).toBeVisible()
 })
 
+test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[
+      { id:'linked', name:'Cuenta Vinculada', email:'vinculada@empresa.com', pin:'hash', authId:'auth-1', role:'empleado', baja:false },
+      { id:'ready', name:'Cuenta Preparada', email:'preparada@empresa.com', pin:'hash', role:'empleado', baja:false },
+      { id:'missing', name:'Sin Correo', email:'', pin:'hash', role:'empleado', baja:false },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Empleados')
+
+  await expect(page.getByRole('note')).toContainText('1 vinculadas · 1 listas para vincular · 1 con requisitos pendientes')
+  await expect(page.getByText('Cuenta vinculada', { exact:true })).toBeVisible()
+  await expect(page.getByText('Lista para vincular', { exact:true })).toBeVisible()
+  await expect(page.getByText('Falta correo', { exact:true })).toBeVisible()
+})
+
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {
   await loginAsAdmin(page, {
     audit: [{
