@@ -14,6 +14,12 @@ export function linkEmployeeAuthIdentity(employees, employeeId, authUserId, nowI
   const index = list.findIndex(employee => employee?.id === employeeId)
   if (index < 0) return { ok:false, changed:false, employees:list, employee:null }
   const current = list[index]
+  const identityAlreadyUsed = list.some((employee, employeeIndex) =>
+    employeeIndex !== index && (employee?.authId || employee?.auth_id) === authUserId,
+  )
+  if (identityAlreadyUsed) {
+    return { ok:false, changed:false, employees:list, employee:current, reason:'identity_in_use' }
+  }
   const linked = linkAuthIdentity(current, authUserId, nowIso)
   if (!linked) return { ok:false, changed:false, employees:list, employee:current }
   if ((current.authId || current.auth_id) === authUserId) {

@@ -215,6 +215,53 @@ test.describe('Acceso con PIN y email', () => {
     })).toBe('auth-nueva')
   })
 
+  test('no reutiliza una identidad vinculada a otro perfil dado de baja', async ({ page }) => {
+    const authUser = {
+      id:'auth-compartida',
+      aud:'authenticated',
+      role:'authenticated',
+      email:'empleado@empresa.com',
+      email_confirmed_at:new Date().toISOString(),
+      app_metadata:{ provider:'email', providers:['email'] },
+      user_metadata:{},
+      created_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    }
+    await seedLogin(page, {
+      employees:[
+        { ...employee, id:'e-antiguo', email:'empleado@empresa.com', authId:'auth-compartida', baja:true },
+        { ...employee, id:'e-nuevo', email:'empleado@empresa.com', pin:'1111', baja:false },
+      ],
+    })
+    await page.route(/supabase\.co\/auth\/v1\/token/i, route => route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({
+        access_token:'token-prueba',
+        refresh_token:'refresh-prueba',
+        token_type:'bearer',
+        expires_in:3600,
+        expires_at:Math.floor(Date.now() / 1000) + 3600,
+        user:authUser,
+      }),
+    }))
+    await page.route(/supabase\.co\/auth\/v1\/logout/i, route => route.fulfill({ status:204, body:'' }))
+    await page.goto('/')
+    await page.getByRole('button', { name:'Email', exact:true }).click()
+    await page.getByLabel('Email', { exact:true }).fill('empleado@empresa.com')
+    await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
+    await page.getByRole('button', { name:'Continuar', exact:true }).click()
+    await expect(page.getByRole('alert')).toContainText('completar esta primera vinculación')
+    await page.getByLabel('PIN para primera vinculación').fill('1111')
+    await page.getByRole('button', { name:'Continuar', exact:true }).click()
+
+    await expect(page.getByText(/cuenta ya está vinculada a otro perfil/i)).toBeVisible()
+    await expect.poll(() => page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
+      return db.employees?.find(item => item.id === 'e-nuevo')?.authId || null
+    })).toBeNull()
+  })
+
   test('muestra y valida la contraseña nueva al volver desde recuperación', async ({ page }) => {
     await page.goto('/?reset=1')
     await expect(page.getByText('Crea una contraseña nueva')).toBeVisible()

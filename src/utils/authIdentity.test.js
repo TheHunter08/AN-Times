@@ -37,6 +37,19 @@ describe('vinculación segura de Supabase Auth', () => {
     expect(result).toMatchObject({ ok:false, changed:false, employees })
   })
 
+  it('impide vincular una identidad que ya pertenece a otro perfil', () => {
+    const employees = [
+      { id:'e1', authId:'auth-compartida', baja:true },
+      { id:'e2', email:'nuevo@empresa.com', baja:false },
+    ]
+    expect(linkEmployeeAuthIdentity(employees, 'e2', 'auth-compartida')).toMatchObject({
+      ok:false,
+      changed:false,
+      employees,
+      reason:'identity_in_use',
+    })
+  })
+
   it('recupera una vinculación obsoleta mediante comparación atómica', () => {
     const result = relinkEmployeeAuthIdentity(
       [{ id:'e1', authId:'auth-antigua', email:'empleado@empresa.com' }],

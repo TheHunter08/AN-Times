@@ -157,14 +157,14 @@ export default function LoginV2() {
   // políticas RLS por rol (policies_auth.sql) no se pueden activar nunca,
   // porque siempre habría 0 empleados "vinculados".
   const linkAuthIdIfMissing = useCallback((emp: any, authUserId?: string | null) => {
-    if (!authUserId) return false
-    let linked = false
+    if (!authUserId) return { ok:false, changed:false, reason:'missing_auth_user' }
+    let outcome: any = { ok:false, changed:false, reason:'employee_not_found' }
     saveDB((fresh: any) => {
       const result = linkEmployeeAuthIdentity(fresh.employees, emp.id, authUserId)
-      linked = result.ok
+      outcome = result
       return result.changed ? { employees:result.employees } : null
     })
-    return linked
+    return outcome
   }, [saveDB])
 
   const relinkAuthIdAfterProof = useCallback((emp: any, expectedAuthId: string, nextAuthId?: string | null) => {
@@ -368,14 +368,16 @@ export default function LoginV2() {
         }
         saveDB((fresh: any) => ({ pinLockouts:clearLockout(emp.id, fresh) }))
       }
-      const identityLinked = emp && identityMismatch
-        ? relinkAuthIdAfterProof(emp, linkedAuthId, authUserId)
+      const identityLinkResult: any = emp && identityMismatch
+        ? { ok:relinkAuthIdAfterProof(emp, linkedAuthId, authUserId) }
         : emp
           ? linkAuthIdIfMissing(emp, authUserId)
-          : true
-      if (emp && !identityLinked) {
+          : { ok:true }
+      if (emp && !identityLinkResult.ok) {
         await authSignOut()
-        setEmailError('La vinculación cambió mientras verificábamos el acceso. Inténtalo de nuevo o contacta al administrador.')
+        setEmailError(identityLinkResult.reason === 'identity_in_use'
+          ? 'Esta cuenta ya está vinculada a otro perfil. Pide al administrador que revise el vínculo anterior.'
+          : 'La vinculación cambió mientras verificábamos el acceso. Inténtalo de nuevo o contacta al administrador.')
         return
       }
       if (identityMismatch) toast('Cuenta recuperada y vinculada correctamente', 5000, 'ok')
@@ -508,9 +510,12 @@ export default function LoginV2() {
     try {
       const result = await signUpEmail(normalizeAccountEmail(email), password)
       if (result.session && result.user?.id) {
-        if (!linkAuthIdIfMissing(eligibility.employee, result.user.id)) {
+        const identityLinkResult: any = linkAuthIdIfMissing(eligibility.employee, result.user.id)
+        if (!identityLinkResult.ok) {
           await authSignOut()
-          setEmailError('Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
+          setEmailError(identityLinkResult.reason === 'identity_in_use'
+            ? 'Esta cuenta ya está vinculada a otro perfil. Pide al administrador que revise el vínculo anterior.'
+            : 'Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
           return
         }
         doLogin(eligibility.employee, 'email')
