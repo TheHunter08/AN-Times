@@ -2748,7 +2748,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   const toast = useAppStore(s => s.toast)
   const [recentClose, setRecentClose] = useState<any>(null)
   const user = session?.user || {}
-  const isScopedRole = session?.isEnc || session?.isJO || user.role === 'encargado' || user.role === 'jefe_obra'
+  const isScopedRole = isScopedSupervisor(session)
   const hasScope = !isScopedRole || Boolean(user.centroTrabajo || user.dept || user.obrasAsignadas?.length)
 
   const rows = useMemo(() => getScopedOnlineRecords({
