@@ -94,4 +94,19 @@ describe('vínculo obra→centro de trabajo', () => {
   it('el comportamiento original (mismo centro y obra exigidos a la vez) se mantiene si la obra no está adscrita a ningún centro', () => {
     expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id)).toEqual(['ok'])
   })
+
+  it('getScopedOnlineRecords: jefe de obra con obra asignada por nombre ve fichaje cuyo centro coincide con el nombre (sin conversión a ID)', () => {
+    const supervisorNombre = { id: 'jefe', obrasAsignadas: ['Reforma C'] }
+    const emp = { id: 'emp1', name: 'Elena', centroTrabajo: 'Centro Norte', obrasAsignadas: [] }
+    const recs = [{ id: 'rec1', empId: 'emp1', inicio: '2026-07-27T08:00:00Z', centro: 'Reforma C' }]
+    const result = getScopedOnlineRecords({ records: recs, employees: [emp], obras: linkedObras, supervisor: supervisorNombre })
+    expect(result).toHaveLength(1)
+  })
+
+  it('getScopedEmployees: jefe de obra con obra ligada a un centro ve empleados con solo centroTrabajo, sin obrasAsignadas', () => {
+    const supervisorNombre = { id: 'jefe', obrasAsignadas: ['obra-c'] }
+    const empSoloCentro = { id: 'emp2', name: 'Fran', centroTrabajo: 'Centro Norte', obrasAsignadas: [] }
+    const result = getScopedEmployees({ employees: [empSoloCentro], obras: linkedObras, supervisor: supervisorNombre })
+    expect(result.map(item => item.id)).toEqual(['emp2'])
+  })
 })
