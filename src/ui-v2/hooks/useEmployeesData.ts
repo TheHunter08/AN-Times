@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/appStore.js'
 import type { EmployeeRow } from '../pages/Employees.js'
 import { mhm, calcMin, today, localDateStr } from '../../utils/time.js'
 import { isValidAccountEmail } from '../../utils/authRegistration.js'
+import { needsRehash } from '../../utils/pinSecurity.js'
 
 interface DbEmployee {
   id: string
@@ -99,6 +100,7 @@ export function useEmployeesData() {
       obrasAsignadas: obrasNames.length ? obrasNames : undefined,
       centroTrabajo: e.centroTrabajo || undefined,
       accountStatus,
+      pinStatus: !e.pin ? 'missing' : needsRehash(e.pin) ? 'legacy' : 'modern',
     }
     })
   }, [db.employees, db.records, db.obras])

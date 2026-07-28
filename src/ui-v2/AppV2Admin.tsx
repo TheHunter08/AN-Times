@@ -3048,20 +3048,24 @@ function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: s
   const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
   const [pushReady, setPushReady] = useState<number | null>(null)
   const [pushMissingIds, setPushMissingIds] = useState<string[]>([])
+  const [pushCoverageState, setPushCoverageState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [pushCoverageRequest, setPushCoverageRequest] = useState(0)
   const documentCount = (db.documentos || []).length
   const launchBlockers = getLaunchBlockers(db, pushMissingIds)
 
   const workerIdsKey = workers.map((employee: any) => employee.id).sort().join('|')
   useEffect(() => {
     let active = true
+    setPushCoverageState('loading')
     getPushCoverage(workerIdsKey ? workerIdsKey.split('|') : []).then(result => {
       if (active) {
         setPushReady(result.registered)
         setPushMissingIds(result.missingIds || [])
+        setPushCoverageState(result.registered == null ? 'error' : 'ready')
       }
     })
     return () => { active = false }
-  }, [workerIdsKey])
+  }, [workerIdsKey, pushCoverageRequest])
 
   const updateConfig = (patch: any) => saveDB((fresh: any) => ({
     config: { ...(fresh.config || {}), ...patch, _upd: new Date().toISOString() },
@@ -3070,6 +3074,7 @@ function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: s
   const onSync = async () => {
     await uploadPendingIfAny()
     await fetchDB()
+    setPushCoverageRequest(value => value + 1)
     toast('Sincronización comprobada', 2200, 'ok')
   }
 
@@ -3088,12 +3093,14 @@ function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: s
     signatureTotal={workers.length}
     pushReady={pushReady}
     pushTotal={workers.length}
+    pushCoverageState={pushCoverageState}
     pendingValidation={pendingValidation}
     documentCount={documentCount}
     launchBlockers={launchBlockers}
     schedules={schedules}
     visibleWidgets={visibleWidgets}
     onSync={onSync}
+    onRetryPushCoverage={() => setPushCoverageRequest(value => value + 1)}
     onSaveSchedule={(schedule: any) => {
       updateConfig({ reportSchedules: [...schedules, schedule] })
       toast('Programación guardada', 2200, 'ok')

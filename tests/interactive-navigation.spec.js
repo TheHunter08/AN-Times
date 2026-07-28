@@ -97,6 +97,113 @@ test('el centro operativo identifica cada perfil incompleto', async ({ page }) =
   await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Empleado Prueba')
 })
 
+test('el centro operativo explica las acciones que solo puede completar el trabajador', async ({ page }) => {
+  await loginAsAdmin(page, {
+    firmas:{ [employee.id]:{ main:{ data:'data:image/png;base64,firma' } } },
+    employees:[{
+      ...employee,
+      email:'empleado@times.test',
+      authId:'auth-e1',
+      pin:'a'.repeat(64),
+    }],
+  })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200, contentType:'application/json', body:'[]',
+  }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  const instructions = page.getByRole('button', {
+    name:/Ver instrucciones para Empleado Prueba.*PIN heredado.*Falta activar notificaciones/i,
+  })
+  await expect(instructions).toBeVisible()
+  await instructions.click()
+  await expect(page.getByRole('note')).toContainText('No puede activarse desde Administración porque el permiso pertenece a ese dispositivo')
+  await expect(page.getByRole('note')).toContainText('cerrar sesión y entrar una vez con su PIN habitual')
+  await expect(page.getByText('Editar empleado', { exact:true })).toHaveCount(0)
+})
+
+test('el centro operativo guía la vinculación y firma sin abrir un editor inútil', async ({ page }) => {
+  await loginAsAdmin(page, {
+    firmas:{},
+    employees:[{
+      ...employee,
+      email:'empleado@times.test',
+      authId:null,
+      pin:'pbkdf2:salt:hash:600000',
+    }],
+  })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200, contentType:'application/json', body:JSON.stringify([{ user_id:employee.id }]),
+  }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  const instructions = page.getByRole('button', {
+    name:/Ver instrucciones para Empleado Prueba.*Falta crear acceso.*Falta firma/i,
+  })
+  await expect(instructions).toBeVisible()
+  await instructions.click()
+  const note = page.getByRole('note')
+  await expect(note).toContainText('Primera vez: vincular mi cuenta')
+  await expect(note).toContainText('En el paso “Tu firma” debe dibujarla y guardarla')
+  await expect(page.getByText('Editar empleado', { exact:true })).toHaveCount(0)
+})
+
+test('el centro operativo permite reintentar una comprobación de dispositivos fallida', async ({ page }) => {
+  let coverageRequests = 0
+  let coverageAvailable = false
+  await loginAsAdmin(page, { employees:[
+    { ...employee, email:'empleado@times.test', authId:'auth-e1', pin:'pbkdf2:salt:hash:600000' },
+    { id:'admin', name:'Administrador', email:'admin@times.test', authId:'auth-admin', role:'admin', isAdmin:true, baja:false },
+  ] })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => {
+    coverageRequests++
+    if (!coverageAvailable) {
+      return route.fulfill({ status:503, contentType:'application/json', body:JSON.stringify({ message:'temporal' }) })
+    }
+    return route.fulfill({
+      status:200, contentType:'application/json', body:JSON.stringify([{ user_id:employee.id }]),
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  const retry = page.getByRole('button', { name:/Dispositivos: No disponible.*Reintentar comprobación/i })
+  await expect(retry).toBeVisible({ timeout:12000 })
+  await expect(page.getByText('No se pudo comprobar la cobertura de dispositivos')).toBeVisible()
+  await expect(page.getByText('Cobertura sin comprobar')).toBeVisible()
+  await expect(page.getByText('Equipo preparado para el lanzamiento')).toHaveCount(0)
+  coverageAvailable = true
+  await page.getByRole('button', { name:'Reintentar comprobación', exact:true }).click()
+  await expect(page.getByRole('button', { name:/Dispositivos: 1\/1 registrados/i })).toBeVisible()
+  await expect(page.getByText('Equipo preparado para el lanzamiento')).toBeVisible()
+  expect(coverageRequests).toBeGreaterThanOrEqual(2)
+})
+
+test('sincronizar ahora actualiza también la cobertura de dispositivos', async ({ page }) => {
+  let deviceRegistered = false
+  await loginAsAdmin(page, { employees:[
+    { ...employee, email:'empleado@times.test', authId:'auth-e1', pin:'pbkdf2:salt:hash:600000' },
+  ] })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify(deviceRegistered ? [{ user_id:employee.id }] : []),
+  }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+  await expect(page.getByRole('button', { name:/Dispositivos: 0\/1 registrados/i })).toBeVisible()
+
+  deviceRegistered = true
+  await page.getByRole('button', { name:'Sincronizar ahora', exact:true }).last().click()
+  await expect(page.getByRole('button', { name:/Dispositivos: 1\/1 registrados/i })).toBeVisible()
+})
+
 test('solicitudes, gastos y documentos abren su contexto', async ({ page }) => {
   await loginAsAdmin(page, {
     vacaciones:[{ id:'v1', empId:employee.id, empName:employee.name, tipo:'vacaciones', estado:'pendiente', fechaInicio:'2026-07-20', fechaFin:'2026-07-21', ts:new Date().toISOString() }],

@@ -19,6 +19,7 @@ export interface EmployeeRow {
   obrasAsignadas?: string[]
   centroTrabajo?: string
   accountStatus?: 'linked' | 'ready' | 'missing-email' | 'missing-pin'
+  pinStatus?: 'modern' | 'legacy' | 'missing'
 }
 
 const accountCfg = {
@@ -37,6 +38,19 @@ function AccountPill({ status = 'missing-email' }: { status?: EmployeeRow['accou
       color: cfg.color, fontSize: 11, fontWeight: 700,
     }}>
       <IconShield width={11} height={11} /> {cfg.label}
+    </div>
+  )
+}
+
+function LegacyPinPill({ status }: { status?: EmployeeRow['pinStatus'] }) {
+  if (status !== 'legacy') return null
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, width: 'fit-content',
+      padding: '4px 9px', borderRadius: radius.pill, background: 'rgba(245,158,11,.1)',
+      color: colors.semantic.orange, fontSize: 11, fontWeight: 700,
+    }}>
+      <IconShield width={11} height={11} /> PIN pendiente de actualizar
     </div>
   )
 }
@@ -115,6 +129,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
   const linkedAccounts = rows.filter(r => r.accountStatus === 'linked').length
   const readyAccounts = rows.filter(r => r.accountStatus === 'ready').length
   const blockedAccounts = rows.filter(r => r.accountStatus === 'missing-email' || r.accountStatus === 'missing-pin').length
+  const legacyPins = rows.filter(r => r.pinStatus === 'legacy').length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
@@ -149,18 +164,25 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
         <StatChip label="Inactivos" value={off} color={colors.text[400]} />
       </div>
 
-      {linkedAccounts < total && (
+      {(linkedAccounts < total || legacyPins > 0) && (
         <div role="note" style={{
           padding: '13px 15px', borderRadius: radius.lg,
-          border: `1px solid ${blockedAccounts ? 'rgba(245,158,11,.28)' : colors.border.subtle}`,
-          background: blockedAccounts ? 'rgba(245,158,11,.07)' : colors.bg[700],
+          border: `1px solid ${blockedAccounts || legacyPins ? 'rgba(245,158,11,.28)' : colors.border.subtle}`,
+          background: blockedAccounts || legacyPins ? 'rgba(245,158,11,.07)' : colors.bg[700],
           color: colors.text[500], fontSize: 12, lineHeight: 1.55,
         }}>
           <strong style={{ display: 'block', color: colors.text[900], marginBottom: 3 }}>Acceso por email</strong>
           <span>{linkedAccounts} vinculadas · {readyAccounts} listas para vincular · {blockedAccounts} con requisitos pendientes.</span>
-          <span style={{ display: 'block', marginTop: 3 }}>
-            Para habilitar una cuenta, guarda un correo único y un PIN en el perfil. Después el empleado debe usar “Primera vez: vincular mi cuenta”.
-          </span>
+          {linkedAccounts < total && (
+            <span style={{ display: 'block', marginTop: 3 }}>
+              Para habilitar una cuenta, guarda un correo único y un PIN en el perfil. Después el empleado debe usar “Primera vez: vincular mi cuenta”.
+            </span>
+          )}
+          {legacyPins > 0 && (
+            <span style={{ display: 'block', marginTop: 3 }}>
+              {legacyPins} {legacyPins === 1 ? 'PIN heredado necesita' : 'PIN heredados necesitan'} una actualización segura. El empleado debe cerrar sesión y entrar una vez con su PIN habitual; no es necesario cambiarlo.
+            </span>
+          )}
         </div>
       )}
 
@@ -265,6 +287,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <StatusPill status={profileEmp.status} />
               <AccountPill status={profileEmp.accountStatus} />
+              <LegacyPinPill status={profileEmp.pinStatus} />
             </div>
 
             {/* Details grid */}
@@ -380,6 +403,7 @@ function EmployeeCard({ emp, onSelect, onEdit, onViewProfile, onViewTimesheets }
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <StatusPill status={emp.status} />
         <AccountPill status={emp.accountStatus} />
+        <LegacyPinPill status={emp.pinStatus} />
       </div>
 
       {/* Info chips */}

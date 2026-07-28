@@ -1242,8 +1242,10 @@ export async function detachPushUser(userId) {
 export async function getPushCoverage(employeeIds = []) {
   const wanted = new Set((employeeIds || []).filter(Boolean))
   if (!supabase || wanted.size === 0) return { registered:0, total:wanted.size, missingIds:[...wanted] }
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
   try {
-    const { data, error } = await supabase.from(PUSH_TABLE).select('user_id')
+    const { data, error } = await supabase.from(PUSH_TABLE).select('user_id').abortSignal(controller.signal)
     if (error) throw error
     const registeredIds = new Set((data || []).map(row => row.user_id).filter(id => wanted.has(id)))
     return {
@@ -1253,6 +1255,8 @@ export async function getPushCoverage(employeeIds = []) {
     }
   } catch {
     return { registered:null, total:wanted.size, missingIds:[] }
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 

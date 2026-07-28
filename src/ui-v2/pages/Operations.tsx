@@ -39,12 +39,14 @@ interface OperationsProps {
   signatureTotal: number
   pushReady: number | null
   pushTotal: number
+  pushCoverageState: 'loading' | 'ready' | 'error'
   pendingValidation: number
   documentCount: number
   launchBlockers: LaunchBlocker[]
   schedules: ReportSchedule[]
   visibleWidgets: string[]
   onSync: () => Promise<void>
+  onRetryPushCoverage: () => void
   onSaveSchedule: (schedule: ReportSchedule) => void
   onToggleSchedule: (id: string) => void
   onDeleteSchedule: (id: string) => void
@@ -69,6 +71,7 @@ const inputStyle = {
 
 export function Operations(props: OperationsProps) {
   const [syncing, setSyncing] = useState(false)
+  const [actionHelpId, setActionHelpId] = useState<string | null>(null)
   const [name, setName] = useState('Informe mensual de jornada')
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly')
   const [format, setFormat] = useState<'pdf' | 'excel'>('pdf')
@@ -102,6 +105,7 @@ export function Operations(props: OperationsProps) {
   const identitiesReady = rlsTransition.identityBlockers.length === 0
   const syncHealthy = props.syncStatus === 'synced' && !props.offlinePending
   const realtimeHealthy = props.realtimeStatus === 'SUBSCRIBED'
+  const pushCoverageReady = props.pushCoverageState === 'ready'
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
     const ai = props.visibleWidgets.indexOf(a.id), bi = props.visibleWidgets.indexOf(b.id)
     return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
@@ -124,16 +128,23 @@ export function Operations(props: OperationsProps) {
 
       <section className="ti-operations__health" aria-label="Salud del sistema">
         {[
-          { label: 'Datos', value: syncHealthy ? 'Sincronizados' : props.offlinePending ? 'Cambios pendientes' : 'Revisar conexión', ok: syncHealthy, icon: <IconCheck />, page: 'auditoria', detail: 'Abrir auditoría' },
-          { label: 'Tiempo real', value: realtimeHealthy ? 'Activo' : 'Reconectando', ok: realtimeHealthy, icon: <IconClock />, page: 'en_linea', detail: 'Ver equipo conectado' },
-          { label: 'Acceso seguro', value: rlsReady ? 'Listo para prueba' : identitiesReady ? 'Ruta de datos pendiente' : `${props.authReady}/${props.authTotal} vinculados`, ok: rlsReady, icon: <IconShield />, page: identitiesReady ? 'auditoria' : 'empleados', detail: identitiesReady ? 'Ver diagnóstico' : 'Revisar empleados' },
-          { label: 'Correos de acceso', value: props.duplicatedEmails ? `${props.duplicatedEmails} duplicados` : `${props.emailReady}/${props.authTotal} configurados`, ok: props.emailReady === props.authTotal && props.duplicatedEmails === 0, icon: <IconShield />, page: 'empleados', detail: 'Completar perfiles' },
-          { label: 'Firmas obligatorias', value: `${props.signatureReady}/${props.signatureTotal} registradas`, ok: props.signatureReady === props.signatureTotal, icon: <IconFileText />, page: 'empleados', detail: 'Revisar empleados' },
-          { label: 'Dispositivos', value: props.pushReady == null ? 'Comprobando…' : `${props.pushReady}/${props.pushTotal} registrados`, ok: props.pushReady === props.pushTotal, icon: <IconCheck />, page: 'empleados', detail: 'Revisar cobertura' },
-          { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, page: 'validar', detail: 'Abrir validación' },
-          { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, page: 'documentos', detail: 'Abrir documentos' },
+          { label: 'Datos', value: syncHealthy ? 'Sincronizados' : props.offlinePending ? 'Cambios pendientes' : 'Revisar conexión', ok: syncHealthy, icon: <IconCheck />, action: () => props.onNavigate('auditoria'), detail: 'Abrir auditoría' },
+          { label: 'Tiempo real', value: realtimeHealthy ? 'Activo' : 'Reconectando', ok: realtimeHealthy, icon: <IconClock />, action: () => props.onNavigate('en_linea'), detail: 'Ver equipo conectado' },
+          { label: 'Acceso seguro', value: rlsReady ? 'Listo para prueba' : identitiesReady ? 'Ruta de datos pendiente' : `${props.authReady}/${props.authTotal} vinculados`, ok: rlsReady, icon: <IconShield />, action: () => props.onNavigate(identitiesReady ? 'auditoria' : 'empleados'), detail: identitiesReady ? 'Ver diagnóstico' : 'Revisar empleados' },
+          { label: 'Correos de acceso', value: props.duplicatedEmails ? `${props.duplicatedEmails} duplicados` : `${props.emailReady}/${props.authTotal} configurados`, ok: props.emailReady === props.authTotal && props.duplicatedEmails === 0, icon: <IconShield />, action: () => props.onNavigate('empleados'), detail: 'Completar perfiles' },
+          { label: 'Firmas obligatorias', value: `${props.signatureReady}/${props.signatureTotal} registradas`, ok: props.signatureReady === props.signatureTotal, icon: <IconFileText />, action: () => props.onNavigate('empleados'), detail: 'Revisar empleados' },
+          {
+            label: 'Dispositivos',
+            value: props.pushCoverageState === 'loading' ? 'Comprobando…' : props.pushCoverageState === 'error' ? 'No disponible' : `${props.pushReady}/${props.pushTotal} registrados`,
+            ok: pushCoverageReady && props.pushReady === props.pushTotal,
+            icon: <IconCheck />,
+            action: props.pushCoverageState === 'error' ? props.onRetryPushCoverage : () => props.onNavigate('empleados'),
+            detail: props.pushCoverageState === 'error' ? 'Reintentar comprobación' : 'Revisar cobertura',
+          },
+          { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, action: () => props.onNavigate('validar'), detail: 'Abrir validación' },
+          { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, action: () => props.onNavigate('documentos'), detail: 'Abrir documentos' },
         ].map(item => (
-          <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={() => props.onNavigate(item.page)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onNavigate(item.page) } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>
+          <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={item.action} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); item.action() } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>
             <div className={`ti-operations__health-icon${item.ok ? ' is-ok' : ''}`}>{item.icon}</div>
             <span>{item.label}</span>
             <strong>{item.value}</strong>
@@ -145,19 +156,71 @@ export function Operations(props: OperationsProps) {
       <Card>
         <div className="ti-operations__section-title">
           <div><strong>Plan de lanzamiento por empleado</strong><span>Personas que todavía requieren una acción real</span></div>
-          <span className="ti-operations__pill">{props.launchBlockers.length ? `${props.launchBlockers.length} por completar` : 'Completo'}</span>
+          <span className="ti-operations__pill">
+            {props.pushCoverageState === 'loading'
+              ? 'Comprobando dispositivos'
+              : props.pushCoverageState === 'error'
+                ? 'Cobertura sin comprobar'
+                : props.launchBlockers.length
+                  ? `${props.launchBlockers.length} por completar`
+                  : 'Completo'}
+          </span>
         </div>
-        {props.launchBlockers.length === 0 ? (
+        {props.pushCoverageState !== 'ready' && (
+          <ProductState
+            compact
+            title={props.pushCoverageState === 'loading' ? 'Comprobando la cobertura de dispositivos' : 'No se pudo comprobar la cobertura de dispositivos'}
+            description={props.pushCoverageState === 'loading'
+              ? 'El plan se completará cuando termine la comprobación. Todavía no se considera que el equipo esté preparado.'
+              : 'La cobertura es desconocida, así que el equipo todavía no se considera preparado para el lanzamiento.'}
+            icon={<IconClock />}
+            actionLabel={props.pushCoverageState === 'error' ? 'Reintentar comprobación' : undefined}
+            onAction={props.pushCoverageState === 'error' ? props.onRetryPushCoverage : undefined}
+          />
+        )}
+        {props.pushCoverageState === 'ready' && props.launchBlockers.length === 0 ? (
           <ProductState compact title="Equipo preparado para el lanzamiento" description="Todos los perfiles tienen acceso, firma y notificaciones configuradas." icon={<IconCheck />} />
-        ) : (
+        ) : props.launchBlockers.length > 0 && (
           <div className="ti-operations__blockers">
-            {props.launchBlockers.map(blocker => (
-              <button key={blocker.employeeId} type="button" onClick={() => props.onReviewEmployee(blocker.employeeId)} aria-label={`Revisar ${blocker.employeeName}: ${blocker.issues.join(', ')}`}>
-                <strong>{blocker.employeeName}</strong>
-                <span>{blocker.issues.map(issue => <small key={issue}>{issue}</small>)}</span>
-                <b>Revisar perfil →</b>
-              </button>
-            ))}
+            {props.launchBlockers.map(blocker => {
+              const profileFixable = blocker.issues.some(issue =>
+                issue === 'Falta email' || issue === 'Falta PIN'
+              )
+              const employeeActionOnly = !profileFixable
+              const showActionHelp = employeeActionOnly && actionHelpId === blocker.employeeId
+              return [
+                <button
+                  key={blocker.employeeId}
+                  type="button"
+                  onClick={() => employeeActionOnly
+                    ? setActionHelpId(current => current === blocker.employeeId ? null : blocker.employeeId)
+                    : props.onReviewEmployee(blocker.employeeId)}
+                  aria-expanded={employeeActionOnly ? showActionHelp : undefined}
+                  aria-label={`${employeeActionOnly ? 'Ver instrucciones para' : 'Revisar'} ${blocker.employeeName}: ${blocker.issues.join(', ')}`}
+                >
+                  <strong>{blocker.employeeName}</strong>
+                  <span>{blocker.issues.map(issue => <small key={issue}>{issue}</small>)}</span>
+                  <b>{employeeActionOnly ? 'Ver instrucciones →' : 'Revisar perfil →'}</b>
+                </button>,
+                showActionHelp && (
+                  <div key={`${blocker.employeeId}-help`} className="ti-operations__device-help" role="note">
+                    <strong>Acción de {blocker.employeeName}</strong>
+                    {blocker.issues.includes('Falta crear acceso') && (
+                      <span>Debe abrir la pantalla de acceso, elegir “Acceso con email” y pulsar “Primera vez: vincular mi cuenta”. Usará el correo de su perfil, su PIN habitual y una contraseña nueva.</span>
+                    )}
+                    {blocker.issues.includes('Falta firma') && (
+                      <span>Al entrar como empleado se abrirá la configuración obligatoria. En el paso “Tu firma” debe dibujarla y guardarla; no puede registrarse desde Administración.</span>
+                    )}
+                    {blocker.issues.includes('Falta activar notificaciones') && (
+                      <span>Debe abrir Times INC en su móvil, iniciar sesión y completar el paso “Activar notificaciones”. No puede activarse desde Administración porque el permiso pertenece a ese dispositivo.</span>
+                    )}
+                    {blocker.issues.includes('PIN heredado: iniciar sesión') && (
+                      <span>Debe cerrar sesión y entrar una vez con su PIN habitual. La app actualizará la protección del PIN automáticamente, sin cambiarlo.</span>
+                    )}
+                  </div>
+                ),
+              ]
+            })}
           </div>
         )}
       </Card>

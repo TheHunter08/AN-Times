@@ -86,21 +86,25 @@ test('cumplimiento muestra riesgos reales y permite abrir la excepción', async 
 })
 
 test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) => {
+  const modernPin = 'pbkdf2:00112233445566778899aabbccddeeff:hash:600000'
   await loginAsAdmin(page, {
     employees:[
-      { id:'linked', name:'Cuenta Vinculada', email:'vinculada@empresa.com', pin:'hash', authId:'auth-1', role:'empleado', baja:false },
-      { id:'ready', name:'Cuenta Preparada', email:'preparada@empresa.com', pin:'hash', role:'empleado', baja:false },
-      { id:'missing', name:'Sin Correo', email:'', pin:'hash', role:'empleado', baja:false },
+      { id:'linked', name:'Cuenta Vinculada', email:'vinculada@empresa.com', pin:modernPin, authId:'auth-1', role:'empleado', baja:false },
+      { id:'ready', name:'Cuenta Preparada', email:'preparada@empresa.com', pin:modernPin, role:'empleado', baja:false },
+      { id:'missing', name:'Sin Correo', email:'', pin:modernPin, role:'empleado', baja:false },
+      { id:'legacy', name:'PIN Antiguo', email:'antiguo@empresa.com', pin:'a'.repeat(64), authId:'auth-legacy', role:'empleado', baja:false },
     ],
   })
   await page.goto('/')
   await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
   await openSection(page, 'Equipo', 'Empleados')
 
-  await expect(page.getByRole('note')).toContainText('1 vinculadas · 1 listas para vincular · 1 con requisitos pendientes')
-  await expect(page.getByText('Cuenta vinculada', { exact:true })).toBeVisible()
+  await expect(page.getByRole('note')).toContainText('2 vinculadas · 1 listas para vincular · 1 con requisitos pendientes')
+  await expect(page.getByRole('note')).toContainText('1 PIN heredado necesita una actualización segura')
+  await expect(page.getByText('Cuenta vinculada', { exact:true })).toHaveCount(2)
   await expect(page.getByText('Lista para vincular', { exact:true })).toBeVisible()
   await expect(page.getByText('Falta correo', { exact:true })).toBeVisible()
+  await expect(page.getByText('PIN pendiente de actualizar', { exact:true })).toBeVisible()
 })
 
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {
