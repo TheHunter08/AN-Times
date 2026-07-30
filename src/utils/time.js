@@ -1,4 +1,5 @@
-import { WK, WM } from '../config/workRules.js'
+import { WK } from '../config/workRules.js'
+import { workWeekStartsInMonth } from './workTargets.js'
 
 export const p2 = n => String(n).padStart(2, '0')
 
@@ -164,44 +165,65 @@ export const recWorkSecs = r => {
 export const sortedEmps = db =>
   (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => (a.name||'').localeCompare(b.name||'', 'es', { sensitivity: 'base' }))
 
-// ── Horas extra del mes (regla TIMES INC) ─────────────────────────────────────
-// • Vista semanal: cualquier minuto por encima de 40h cuenta como extra.
-// • Vista mensual: solo cuenta como extra lo trabajado por encima de 160h.
-// • Una jornada larga no es extra por sí sola: manda el acumulado del periodo.
+// ── Balance semanal del periodo (regla TIMES INC) ─────────────────────────────
+// • Cada semana laboral va de lunes a viernes y exige 40h.
+// • Cada semana se liquida por separado: >40h es extra; <40h es déficit.
+// • Una semana larga nunca compensa el déficit de otra semana.
+// • El periodo agrupa las semanas cuyo lunes pertenece al mes seleccionado.
+// • La semana en curso no genera déficit hasta que termina el viernes.
 //
-// Devuelve: { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
-//   workedMin       — total minutos trabajados ese mes
-//   weeklyExtraMin  — suma de minutos por encima de 40h en cada semana
-//   shortfallMin    — minutos que faltan para el objetivo mensual (0 si llega)
-//   netExtraMin     — minutos por encima del objetivo mensual (≥0)
-//   deficitMin      — minutos pendientes para alcanzar el objetivo mensual (≥0)
+// Se conserva el nombre monthlyExtras por compatibilidad con sus consumidores.
 export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
   const weeklyTarget = Math.max(1, opts.weeklyH ? opts.weeklyH * 60 : WK)
-  const monthlyTarget = Math.max(1, opts.monthlyH ? opts.monthlyH * 60 : WM)
+  const now = opts.now instanceof Date ? opts.now : new Date()
+  const todayKey = localDateStr(now)
+  const weekStarts = workWeekStartsInMonth(monthKey)
+  const byWeek = new Map(weekStarts.map(start => [start, 0]))
 
-  const localMonth = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
-  const recs = (records || []).filter(r =>
-    r && r.empId === empId && r.fin && typeof r.inicio === 'string' && localMonth(r.inicio) === monthKey
-  )
-
-  // Agrupar por semana ISO (lunes como inicio — wkStart ya gestiona domingos)
-  const byWeek = new Map()
-  for (const r of recs) {
-    const d = wkStart(r.inicio)
-    const ws = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    byWeek.set(ws, (byWeek.get(ws) || 0) + calcMin(r))
+  for (const record of records || []) {
+    if (!record || record.empId !== empId || !record.fin || !record.inicio) continue
+    const date = new Date(record.inicio)
+    if (Number.isNaN(date.getTime())) continue
+    const weekday = date.getDay()
+    if (weekday < 1 || weekday > 5) continue
+    const startKey = localDateStr(wkStart(date))
+    if (byWeek.has(startKey)) byWeek.set(startKey, byWeek.get(startKey) + calcMin(record))
   }
 
   let workedMin = 0
+  let targetMin = 0
   let weeklyExtraMin = 0
-  for (const wkMin of byWeek.values()) {
-    workedMin += wkMin
-    if (wkMin > weeklyTarget) weeklyExtraMin += wkMin - weeklyTarget
+  let deficitMin = 0
+  let completedWeeks = 0
+  const weekly = weekStarts.map(start => {
+    const monday = new Date(`${start}T00:00:00`)
+    const friday = new Date(monday)
+    friday.setDate(monday.getDate() + 4)
+    const fridayKey = localDateStr(friday)
+    const minutes = byWeek.get(start) || 0
+    const completed = fridayKey < todayKey
+    const extraMin = Math.max(0, minutes - weeklyTarget)
+    const weekDeficitMin = completed ? Math.max(0, weeklyTarget - minutes) : 0
+    workedMin += minutes
+    weeklyExtraMin += extraMin
+    deficitMin += weekDeficitMin
+    if (completed) {
+      completedWeeks++
+      targetMin += weeklyTarget
+    }
+    return { start, end:fridayKey, minutes, targetMin:weeklyTarget, extraMin, deficitMin:weekDeficitMin, completed }
+  })
+
+  return {
+    workedMin,
+    targetMin,
+    scheduledTargetMin:weekStarts.length * weeklyTarget,
+    completedWeeks,
+    weeklyExtraMin,
+    shortfallMin:deficitMin,
+    netExtraMin:weeklyExtraMin,
+    deficitMin,
+    balanceMin:weeklyExtraMin - deficitMin,
+    weekly,
   }
-
-  const shortfallMin = Math.max(0, monthlyTarget - workedMin)
-  const netExtraMin  = Math.max(0, workedMin - monthlyTarget)
-  const deficitMin   = shortfallMin
-
-  return { workedMin, weeklyExtraMin, shortfallMin, netExtraMin, deficitMin }
 }

@@ -28,7 +28,7 @@ const _isValidVapid = (s) => /^[A-Za-z0-9_-]{86,90}$/.test(s)
 const _candidate = _sanitizeVapid(import.meta.env.VITE_VAPID_PUB)
 export const VAPID_PUB = _isValidVapid(_candidate) ? _candidate : _VAPID_FALLBACK
 
-export { WK, WD, WM } from './workRules.js'
+export { WK, WD } from './workRules.js'
 export const VPM = 2.5      // vacation days per month
 
 // Bucket privado de Supabase Storage para los PDFs de cierre firmados.

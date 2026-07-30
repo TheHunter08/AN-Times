@@ -44,4 +44,21 @@ describe('requisitos obligatorios de lanzamiento', () => {
     })
     expect(blockers[0].issues).toContain('PIN heredado: iniciar sesión')
   })
+
+  it('identifica todos los perfiles implicados en correos e identidades duplicadas', () => {
+    const blockers = getLaunchBlockers({
+      employees:[
+        { id:'emp1', name:'Ana', email:'Equipo@empresa.com', authId:'auth-shared', role:'empleado', pin:'pbkdf2:salt:hash:600000' },
+        { id:'emp2', name:'Luis', email:'equipo@empresa.com', authId:'auth-shared', role:'empleado', pin:'pbkdf2:salt:hash:600000' },
+      ],
+      firmas:{
+        emp1:{ main:{ data:'data:image/png;base64,firma1' } },
+        emp2:{ main:{ data:'data:image/png;base64,firma2' } },
+      },
+    })
+    expect(blockers).toEqual([
+      { employeeId:'emp1', employeeName:'Ana', issues:['Correo compartido con otro perfil', 'Identidad de acceso duplicada'] },
+      { employeeId:'emp2', employeeName:'Luis', issues:['Correo compartido con otro perfil', 'Identidad de acceso duplicada'] },
+    ])
+  })
 })

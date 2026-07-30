@@ -112,78 +112,76 @@ describe('localDateStr', () => {
 })
 
 describe('monthlyExtras', () => {
-  const mk = (inicio, fin, empId = 'e1') => ({ empId, inicio, fin, fin: fin })
+  const historicalNow = new Date('2026-07-15T12:00:00')
+  const week = (monday, dailyHours, empId = 'e1') => Array.from({ length:5 }, (_, index) => {
+    const start = new Date(`${monday}T08:00:00`)
+    start.setDate(start.getDate() + index)
+    const end = new Date(start)
+    end.setMinutes(end.getMinutes() + dailyHours * 60)
+    return { empId, inicio:start.toISOString(), fin:end.toISOString() }
+  })
 
-  it('sin registros no hay extras ni déficit', () => {
-    const r = monthlyExtras([], 'e1', '2026-06')
-    expect(r).toEqual({ workedMin: 0, weeklyExtraMin: 0, shortfallMin: 160 * 60, netExtraMin: 0, deficitMin: 160 * 60 })
+  it('descuenta cada semana completa sin fichajes', () => {
+    const r = monthlyExtras([], 'e1', '2026-06', { now:historicalNow })
+    expect(r.completedWeeks).toBe(5)
+    expect(r.weeklyExtraMin).toBe(0)
+    expect(r.deficitMin).toBe(5 * 40 * 60)
+    expect(r.balanceMin).toBe(-5 * 40 * 60)
   })
 
   it('detecta extras cuando una semana supera las 40h', () => {
-    // Semana del 1-5 junio 2026 (lunes 1 a viernes 5): 9h/día = 45h esa semana
-    const records = Array.from({ length: 5 }, (_, i) => ({
-      empId: 'e1',
-      inicio: `2026-06-0${i + 1}T08:00:00`,
-      fin: `2026-06-0${i + 1}T17:00:00`, // 9h
-    }))
-    const r = monthlyExtras(records, 'e1', '2026-06', { weeklyH: 40, monthlyH: 160 })
-    expect(r.weeklyExtraMin).toBe(5 * 60) // 5h extra esa semana
-  })
-
-  it('40h exactas no son extra semanal y el primer minuto adicional sí', () => {
-    const records = Array.from({ length: 5 }, (_, i) => ({
-      empId: 'e1',
-      inicio: `2026-06-0${i + 1}T08:00:00`,
-      fin: `2026-06-0${i + 1}T16:00:00`,
-    }))
-    expect(monthlyExtras(records, 'e1', '2026-06').weeklyExtraMin).toBe(0)
-    records[4] = { ...records[4], fin: '2026-06-05T16:01:00' }
-    expect(monthlyExtras(records, 'e1', '2026-06').weeklyExtraMin).toBe(1)
-  })
-
-  it('no considera extra mensual mientras el total no supere 160h', () => {
-    // Una semana supera 40h, pero el acumulado mensual todavía está en 45h.
-    const records = Array.from({ length: 5 }, (_, i) => ({
-      empId: 'e1',
-      inicio: `2026-06-0${i + 1}T08:00:00`,
-      fin: `2026-06-0${i + 1}T17:00:00`, // 9h x5 = 45h
-    }))
-    const r = monthlyExtras(records, 'e1', '2026-06', { weeklyH: 40, monthlyH: 160 })
-    // La vista semanal muestra 5h extra; la mensual aún tiene 115h pendientes.
-    expect(r.workedMin).toBe(45 * 60)
+    const r = monthlyExtras(week('2026-06-01', 9), 'e1', '2026-06', { now:historicalNow })
     expect(r.weeklyExtraMin).toBe(5 * 60)
-    expect(r.netExtraMin).toBe(0)
-    expect(r.deficitMin).toBe(115 * 60)
   })
 
-  it('considera extra mensual únicamente el exceso sobre 160h', () => {
-    const baseRecords = Array.from({ length: 20 }, (_, i) => ({
-        empId: 'e1',
-        inicio: `2026-06-${String(i + 1).padStart(2, '0')}T08:00:00`,
-        fin: `2026-06-${String(i + 1).padStart(2, '0')}T16:00:00`,
-      }))
-    const exact = monthlyExtras(baseRecords, 'e1', '2026-06')
-    expect(exact.workedMin).toBe(160 * 60)
-    expect(exact.netExtraMin).toBe(0)
-
-    const records = [
-      ...baseRecords,
-      { empId: 'e1', inicio: '2026-06-21T08:00:00', fin: '2026-06-21T13:00:00' },
-    ]
-    const r = monthlyExtras(records, 'e1', '2026-06')
-    expect(r.workedMin).toBe(165 * 60)
-    expect(r.netExtraMin).toBe(5 * 60)
-    expect(r.shortfallMin).toBe(0)
-    expect(r.deficitMin).toBe(0)
+  it('40h exactas no son extra y el primer minuto adicional sí', () => {
+    const records = week('2026-06-01', 8)
+    expect(monthlyExtras(records, 'e1', '2026-06', { now:historicalNow }).weeklyExtraMin).toBe(0)
+    const lastEnd = new Date(records[4].fin)
+    lastEnd.setMinutes(lastEnd.getMinutes() + 1)
+    records[4] = { ...records[4], fin:lastEnd.toISOString() }
+    expect(monthlyExtras(records, 'e1', '2026-06', { now:historicalNow }).weeklyExtraMin).toBe(1)
   })
 
-  it('ignora registros de otro empleado o mes', () => {
+  it('no compensa una semana corta con otra semana larga', () => {
     const records = [
-      { empId: 'otro', inicio: '2026-06-01T08:00:00', fin: '2026-06-01T17:00:00' },
-      { empId: 'e1', inicio: '2026-05-01T08:00:00', fin: '2026-05-01T17:00:00' },
+      ...week('2026-06-01', 9),
+      ...week('2026-06-08', 7),
+      ...week('2026-06-15', 8),
+      ...week('2026-06-22', 8),
+      ...week('2026-06-29', 8),
     ]
-    const r = monthlyExtras(records, 'e1', '2026-06')
-    expect(r.workedMin).toBe(0)
+    const r = monthlyExtras(records, 'e1', '2026-06', { now:historicalNow })
+    expect(r.workedMin).toBe(200 * 60)
+    expect(r.weeklyExtraMin).toBe(5 * 60)
+    expect(r.deficitMin).toBe(5 * 60)
+    expect(r.balanceMin).toBe(0)
+  })
+
+  it('solo cuenta de lunes a viernes', () => {
+    const records = [
+      ...week('2026-06-01', 8),
+      { empId:'e1', inicio:'2026-06-06T08:00:00', fin:'2026-06-06T18:00:00' },
+    ]
+    const r = monthlyExtras(records, 'e1', '2026-06', { now:historicalNow })
+    expect(r.weekly[0].minutes).toBe(40 * 60)
+    expect(r.weeklyExtraMin).toBe(0)
+  })
+
+  it('asigna una semana cruzada al periodo donde cae el lunes', () => {
+    const records = week('2026-06-29', 8)
+    const now = new Date('2026-08-01T12:00:00')
+    expect(monthlyExtras(records, 'e1', '2026-06', { now }).workedMin).toBe(40 * 60)
+    expect(monthlyExtras(records, 'e1', '2026-07', { now }).workedMin).toBe(0)
+  })
+
+  it('no descuenta la semana en curso antes de terminar el viernes', () => {
+    const now = new Date('2026-07-30T12:00:00')
+    const r = monthlyExtras([], 'e1', '2026-07', { now })
+    expect(r.completedWeeks).toBe(3)
+    expect(r.deficitMin).toBe(3 * 40 * 60)
+    expect(r.weekly.at(-1).completed).toBe(false)
+    expect(r.weekly.at(-1).deficitMin).toBe(0)
   })
 })
 

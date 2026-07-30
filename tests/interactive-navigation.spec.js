@@ -152,6 +152,50 @@ test('el centro operativo guía la vinculación y firma sin abrir un editor inú
   await expect(page.getByText('Editar empleado', { exact:true })).toHaveCount(0)
 })
 
+test('el centro operativo identifica los perfiles que comparten una identidad de acceso', async ({ page }) => {
+  const secondEmployee = {
+    ...employee,
+    id:'e2',
+    name:'Segundo Empleado',
+    email:'segundo@times.test',
+    authId:'auth-repetido',
+    pin:'pbkdf2:salt:hash:600000',
+  }
+  const firstEmployee = {
+    ...employee,
+    email:'empleado@times.test',
+    authId:'auth-repetido',
+    pin:'pbkdf2:salt:hash:600000',
+  }
+  await loginAsAdmin(page, {
+    firmas:{
+      [firstEmployee.id]:{ main:{ data:'data:image/png;base64,firma1' } },
+      [secondEmployee.id]:{ main:{ data:'data:image/png;base64,firma2' } },
+    },
+    employees:[firstEmployee, secondEmployee],
+  })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify([{ user_id:firstEmployee.id }, { user_id:secondEmployee.id }]),
+  }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+
+  const firstConflict = page.getByRole('button', {
+    name:/Ver instrucciones para Empleado Prueba.*Identidad de acceso duplicada/i,
+  })
+  const secondConflict = page.getByRole('button', {
+    name:/Ver instrucciones para Segundo Empleado.*Identidad de acceso duplicada/i,
+  })
+  await expect(firstConflict).toBeVisible()
+  await expect(secondConflict).toBeVisible()
+  await firstConflict.click()
+  await expect(page.getByRole('note')).toContainText('debe revisarse qué perfil es el propietario correcto')
+  await expect(page.getByText('Editar empleado', { exact:true })).toHaveCount(0)
+})
+
 test('el centro operativo permite reintentar una comprobación de dispositivos fallida', async ({ page }) => {
   let coverageRequests = 0
   let coverageAvailable = false

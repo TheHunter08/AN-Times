@@ -1,5 +1,5 @@
 import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm, localDateStr } from './time.js'
-import { WD, WK, WM } from '../config/constants.js'
+import { WK } from '../config/constants.js'
 import { buildComplianceSummary } from './complianceSummary.js'
 import { employeeBelongsToObra, resolveRecordObraId } from './obraAttribution.js'
 import { getScopedEmployees } from './supervisorScope.js'
@@ -101,8 +101,9 @@ export function buildAIContext(db, u) {
     `Empleado: ${u.name}`,
     `Horas trabajadas esta semana: ${mhm(weekMin)} (objetivo ${mhm(WK)})`,
     `Horas trabajadas este mes: ${mhm(monthMin)}`,
-    `Horas extra este mes (exceso sobre 160h): ${mhm(mExt.netExtraMin || 0)}`,
-    mExt.deficitMin > 0 ? `Déficit este mes: ${mhm(mExt.deficitMin)}` : null,
+    `Horas extra de semanas >40h: ${mhm(mExt.weeklyExtraMin || 0)}`,
+    mExt.deficitMin > 0 ? `Déficit de semanas <40h: ${mhm(mExt.deficitMin)}` : null,
+    `Balance semanal acumulado: ${mExt.balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(mExt.balanceMin || 0))}`,
     `Vacaciones disponibles: ${vac.available} días (${vac.generated} generados, ${vac.used} usados)`,
     canSeeTeam
       ? (sinFichar.length ? `Empleados sin fichar hoy: ${sinFichar.join(', ')}` : 'Todo el equipo ha fichado hoy')
@@ -134,8 +135,8 @@ export function aiAnswer(q, db, u) {
   // "horas trabajadas este mes" y además desincronizaba monthMin de
   // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
   const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-  // Regla TIMES INC: >40h en semana; en el resumen mensual, >160h en el mes.
-  const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0 }
+  // Regla TIMES INC: cada lunes-viernes se liquida contra 40h, sin compensar semanas.
+  const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0, balanceMin: 0 }
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
   const canSeeTeam = canSeeTeamData(u)
 
@@ -179,14 +180,11 @@ export function aiAnswer(q, db, u) {
 
   // ¿Cuántas horas extra tengo?
   if (ql.includes('extra')) {
-    const { netExtraMin, deficitMin } = mExt
-    if (netExtraMin > 0) {
-      return `⚡ Tienes **${mhm(netExtraMin)}** de horas extra este mes. Llevas **${mhm(monthMin)}** trabajados; todo lo que supera 160h se considera extra.`
+    const { weeklyExtraMin, deficitMin, balanceMin } = mExt
+    if (weeklyExtraMin > 0 || deficitMin > 0) {
+      return `⚡ Balance de semanas completas (lunes a viernes): **${mhm(weeklyExtraMin)} extra** y **${mhm(deficitMin)} de déficit**. Saldo: **${balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(balanceMin))}**. Cada semana se compara por separado con 40h.`
     }
-    if (deficitMin > 0) {
-      return `⚠️ Este mes te faltan **${mhm(deficitMin)}** para llegar a 160h. Llevas **${mhm(monthMin)}** trabajados y todavía no hay horas extra mensuales.`
-    }
-    return `✅ Este mes llevas **${mhm(monthMin)}** trabajados. ${monthMin >= WM ? '¡Ya has cubierto las 160h objetivo!' : `Te faltan ${mhm(WM - monthMin)} para llegar a 160h.`} Sin horas extra acumuladas todavía.`
+    return `✅ No tienes extras ni déficit en las semanas completas de este periodo. La semana actual se cerrará el viernes al compararla con las 40h obligatorias.`
   }
 
   // ¿Quién olvidó fichar? (visión de equipo si eres admin/encargado)
@@ -211,7 +209,7 @@ export function aiAnswer(q, db, u) {
 
   // Horas / trabajado
   if (ql.includes('hora') || ql.includes('trabaj')) {
-    return `📊 Este mes llevas **${mhm(monthMin)}** trabajados (referencia: ${mhm(WD * 20)}). Esta semana: ${mhm(weekMin)}.`
+    return `📊 Este mes llevas **${mhm(monthMin)}** trabajados. Esta semana (lunes a viernes): ${mhm(weekMin)} de ${mhm(WK)} obligatorias.`
   }
 
   // Vacaciones / cuándo cobro

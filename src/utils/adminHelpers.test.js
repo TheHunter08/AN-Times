@@ -37,34 +37,37 @@ describe('recordTimesFromClock', () => {
 })
 
 describe('canCloseMonth', () => {
-  it('bloquea antes del último día natural del mes', () => {
+  it('bloquea mientras no haya terminado el viernes de la última semana asignada', () => {
     expect(canCloseMonth('2026-07', new Date(2026, 6, 30))).toBe(false)
     expect(canCloseMonth('2026-07', new Date(2026, 6, 1))).toBe(false)
   })
 
-  it('solo permite firmar cuando el mes ya ha terminado', () => {
+  it('permite firmar desde el sábado posterior al último viernes', () => {
     expect(canCloseMonth('2026-07', new Date(2026, 6, 31, 23, 59, 59))).toBe(false)
     expect(canCloseMonth('2026-07', new Date(2026, 7, 1))).toBe(true)
     expect(canCloseMonth('2026-07', new Date(2026, 7, 5))).toBe(true)
   })
 
-  it('respeta meses de 30, 29 y 28 días', () => {
+  it('respeta semanas que cruzan el límite entre meses', () => {
     expect(canCloseMonth('2026-04', new Date(2026, 3, 29))).toBe(false)
     expect(canCloseMonth('2026-04', new Date(2026, 3, 30))).toBe(false)
-    expect(canCloseMonth('2026-04', new Date(2026, 4, 1))).toBe(true)
+    expect(canCloseMonth('2026-04', new Date(2026, 4, 1))).toBe(false)
+    expect(canCloseMonth('2026-04', new Date(2026, 4, 2))).toBe(true)
     expect(canCloseMonth('2026-02', new Date(2026, 1, 27))).toBe(false)
-    expect(canCloseMonth('2026-02', new Date(2026, 1, 28))).toBe(false)
+    expect(canCloseMonth('2026-02', new Date(2026, 1, 28))).toBe(true)
     expect(canCloseMonth('2026-02', new Date(2026, 2, 1))).toBe(true)
-    // 2024 es bisiesto: 29 de febrero
+    // La última semana de febrero de 2024 termina el viernes 1 de marzo.
     expect(canCloseMonth('2024-02', new Date(2024, 1, 28))).toBe(false)
     expect(canCloseMonth('2024-02', new Date(2024, 1, 29))).toBe(false)
-    expect(canCloseMonth('2024-02', new Date(2024, 2, 1))).toBe(true)
+    expect(canCloseMonth('2024-02', new Date(2024, 2, 1))).toBe(false)
+    expect(canCloseMonth('2024-02', new Date(2024, 2, 2))).toBe(true)
   })
 
   it('resuelve el cambio de año en diciembre', () => {
     expect(canCloseMonth('2026-12', new Date(2026, 11, 30))).toBe(false)
     expect(canCloseMonth('2026-12', new Date(2026, 11, 31))).toBe(false)
-    expect(canCloseMonth('2026-12', new Date(2027, 0, 1))).toBe(true)
+    expect(canCloseMonth('2026-12', new Date(2027, 0, 1))).toBe(false)
+    expect(canCloseMonth('2026-12', new Date(2027, 0, 2))).toBe(true)
     expect(canCloseMonth('2026-12', new Date(2027, 0, 3))).toBe(true)
   })
 
@@ -102,6 +105,8 @@ describe('refreshUnsignedClosures', () => {
     const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z')
     expect(updated.totalMin).toBe(540)
     expect(updated.extraMin).toBe(0)
+    expect(updated.deficitMin).toBe(31 * 60)
+    expect(updated.balanceMin).toBe(-31 * 60)
     expect(updated.records_snapshot[0].workSecs).toBe(9 * 3600)
     expect(updated.pdfData).toBeNull()
     expect(updated.desactualizado).toBe(false)
@@ -122,5 +127,18 @@ describe('refreshUnsignedClosures', () => {
     const updated = refreshUnsignedClosures(cierres, records, 'e1', ['2026-06-30T06:00:00', records[0].inicio], '2026-07-15T12:00:00.000Z')
     expect(updated[0].totalMin).toBe(0)
     expect(updated[1].totalMin).toBe(480)
+  })
+
+  it('recalcula el periodo anterior cuando una semana cruza de mes', () => {
+    const cierres = [
+      { id:'apr', empId:'e1', mes:'2026-04', estado:'pendiente' },
+      { id:'may', empId:'e1', mes:'2026-05', estado:'pendiente' },
+    ]
+    const records = [
+      { id:'r1', empId:'e1', inicio:'2026-05-01T08:00:00', fin:'2026-05-01T17:00:00', breaks:[] },
+    ]
+    const updated = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-05-04T12:00:00.000Z')
+    expect(updated[0]).not.toBe(cierres[0])
+    expect(updated[1]).not.toBe(cierres[1])
   })
 })

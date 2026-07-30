@@ -1,25 +1,25 @@
 import { WK } from '../config/workRules.js'
 
-export function contractWeeklyMinutes(employee) {
-  const hours = Number(employee?.horasSemanales ?? employee?.weeklyHours)
-  return Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : WK
+export function contractWeeklyMinutes() {
+  return WK
 }
 
-export function workingDaysInMonth(monthKey) {
+export function workWeekStartsInMonth(monthKey) {
   const [year, month] = String(monthKey || '').split('-').map(Number)
-  if (!year || month < 1 || month > 12) return 0
+  if (!year || month < 1 || month > 12) return []
   const lastDay = new Date(year, month, 0).getDate()
-  let days = 0
+  const starts = []
   for (let day = 1; day <= lastDay; day++) {
-    const weekday = new Date(year, month - 1, day).getDay()
-    if (weekday >= 1 && weekday <= 5) days++
+    const date = new Date(year, month - 1, day)
+    if (date.getDay() === 1) {
+      starts.push(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+    }
   }
-  return days
+  return starts
 }
 
-// Objetivo contractual proporcional a los días laborables reales del mes.
-// Los festivos/convenios se podrán restar cuando exista un calendario laboral
-// de empresa; nunca vuelve a asumir 160 h para todas las personas y meses.
-export function monthlyTargetMinutes(employee, monthKey) {
-  return Math.round(contractWeeklyMinutes(employee) / 5 * workingDaysInMonth(monthKey))
+// Referencia acumulada de las semanas laborales que empiezan en el mes.
+// No decide las extras: cada lunes-viernes se evalúa por separado.
+export function monthlyTargetMinutes(_employee, monthKey) {
+  return workWeekStartsInMonth(monthKey).length * WK
 }

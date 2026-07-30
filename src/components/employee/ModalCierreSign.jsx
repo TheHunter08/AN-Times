@@ -3,13 +3,12 @@ import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useSignatureCanvas } from '../../hooks/useSignatureCanvas.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { calcSecs, localMonthKey, mhm, recWorkSecs } from '../../utils/time.js'
+import { calcSecs, localMonthKey, mhm, monthlyExtras, recWorkSecs } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { authSupabase } from '../../services/authService.js'
 import { buildCierreIndividualPDF } from '../../utils/cierrePdf.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
 import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
-import { monthlyTargetMinutes } from '../../utils/workTargets.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
@@ -37,7 +36,10 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     return { ...record, workSecs: totals.work, breakSecs: totals.brk }
   })
   const previewTotalMin = Math.floor(previewSnapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
-  const targetMin = selCierre ? (selCierre.targetMin || monthlyTargetMinutes(u, selCierre.mes)) : 0
+  const weeklyBalance = selCierre
+    ? monthlyExtras(db.records || [], u?.id, selCierre.mes)
+    : { targetMin:0, weeklyExtraMin:0, deficitMin:0, balanceMin:0, completedWeeks:0 }
+  const targetMin = weeklyBalance.targetMin
   const closable = selCierre ? canCloseMonth(selCierre.mes) : false
 
   useEffect(() => { if (visible && selCierre) initCanvas() }, [visible, selCierre])
@@ -56,7 +58,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const records_snapshot = previewSnapshot
     const totalMin = previewTotalMin
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
-    const firmado = { ...selCierre, records_snapshot, totalMin, targetMin, extraMin:Math.max(0, totalMin - targetMin), dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+    const firmado = { ...selCierre, records_snapshot, totalMin, targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     let documentoId = null
     let integrityHash = null
@@ -114,12 +116,8 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
         <div style={{ fontSize:12, color:colors.text[500], marginBottom:4 }}>
           Generado por {selCierre.generadoPor} · {new Set(previewSnapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size} días trabajados · {mhm(previewTotalMin)}
         </div>
-        <div style={{ fontSize:12, color: previewTotalMin > targetMin ? colors.primary.light : colors.text[500], marginBottom:14, fontWeight: previewTotalMin > targetMin ? 700 : 400 }}>
-          {previewTotalMin > targetMin
-            ? `${mhm(previewTotalMin - targetMin)} por encima de tu objetivo contractual (${mhm(targetMin)})`
-            : previewTotalMin < targetMin
-              ? `${mhm(targetMin - previewTotalMin)} por debajo de tu objetivo contractual (${mhm(targetMin)})`
-              : `Coincide exactamente con tu objetivo contractual (${mhm(targetMin)})`}
+        <div style={{ fontSize:12, color: weeklyBalance.balanceMin >= 0 ? colors.primary.light : colors.semantic.red, marginBottom:14, fontWeight:700 }}>
+          Regla de 40h por semana (lunes a viernes) · Extra +{mhm(weeklyBalance.weeklyExtraMin)} · Déficit -{mhm(weeklyBalance.deficitMin)} · Saldo {weeklyBalance.balanceMin >= 0 ? '+' : '-'}{mhm(Math.abs(weeklyBalance.balanceMin))}
         </div>
 
         {/* Records snapshot */}

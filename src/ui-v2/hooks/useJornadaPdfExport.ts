@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { today, calcMin, recWorkSecs, wkStart, p2, ftime, mhm, monthlyExtras, localDateStr } from '../../utils/time.js'
-import { WM } from '../../config/constants.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawDocumentFooters, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
 
 export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => void) {
@@ -143,8 +142,8 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const statItems = [
         { label: 'Jornadas', val: String(monthRecs.length) },
         { label: 'Total horas', val: mhm(totalMin2) },
-        { label: 'H. extra', val: exCover.netExtraMin > 0 ? `+${mhm(exCover.netExtraMin)}` : exCover.deficitMin > 0 ? `-${mhm(exCover.deficitMin)}` : '0h' },
-        { label: 'Objetivo 160h', val: totalMin2 >= WM ? 'OK (160h)' : `Falta ${mhm(WM - totalMin2)}` },
+        { label: 'Extra semanal', val: `+${mhm(exCover.weeklyExtraMin)}` },
+        { label: 'Déficit semanal', val: `-${mhm(exCover.deficitMin)}` },
       ]
       const statW = CW / statItems.length
       statItems.forEach((s, i) => {
@@ -166,16 +165,11 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       })
       if (y - 50 < 35 + SIG_AREA) { newPage() }
       const exPdf = monthlyExtras(db.records, u.id, mk2)
-      const targetMin2 = WM
-      const cDiff = exPdf.netExtraMin > 0 ? cGreen : exPdf.deficitMin > 0 ? rgb(0.87, 0.27, 0.27) : pdfCols.pri
+      const cDiff = exPdf.balanceMin > 0 ? cGreen : exPdf.balanceMin < 0 ? rgb(0.87, 0.27, 0.27) : pdfCols.pri
       page.drawRectangle({ x: ML, y: y - 50, width: CW, height: 50, color: pdfCols.priLt, borderColor: pdfCols.pri, borderWidth: 0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length !== 1 ? 's' : ''} registrada${monthRecs.length !== 1 ? 's' : ''}`, { x: ML + 8, y: y - 14, size: 8.5, font: fontB, color: pdfCols.pri })
-      page.drawText(`Objetivo mensual: 160h (${mhm(targetMin2)})`, { x: ML + 8, y: y - 28, size: 7.5, font: fontR, color: pdfCols.dark, maxWidth: CW - 16 })
-      const extraLine = exPdf.netExtraMin > 0
-        ? `H. extra del mes: +${mhm(exPdf.netExtraMin)} sobre las 160h`
-        : exPdf.deficitMin > 0
-          ? `Deficit: -${mhm(exPdf.deficitMin)} para completar las 160h obligatorias`
-          : totalMin2 >= targetMin2 ? 'Objetivo de 160h alcanzado' : `Pendiente: ${mhm(targetMin2 - totalMin2)} para las 160h`
+      page.drawText(`Regla obligatoria: 40h por semana, de lunes a viernes · ${exPdf.completedWeeks} semanas cerradas`, { x: ML + 8, y: y - 28, size: 7.5, font: fontR, color: pdfCols.dark, maxWidth: CW - 16 })
+      const extraLine = `Extra: +${mhm(exPdf.weeklyExtraMin)} · Déficit: -${mhm(exPdf.deficitMin)} · Saldo: ${exPdf.balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(exPdf.balanceMin))}`
       page.drawText(extraLine, { x: ML + 8, y: y - 42, size: 7.5, font: fontB, color: cDiff, maxWidth: CW - 16 })
       y -= 58
       if (y - SIG_AREA < 30) { newPage() }

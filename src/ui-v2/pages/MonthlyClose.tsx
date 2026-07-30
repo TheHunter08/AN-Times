@@ -21,6 +21,10 @@ export interface ClosureItem {
   totalMins: number
   extraHours: string
   extraMins: number
+  deficitHours: string
+  deficitMins: number
+  balanceHours: string
+  balanceMins: number
   workedDays: number
   signedBy: 'none' | 'emp' | 'supervisor' | 'all'
   firmaAdmin: boolean
@@ -62,7 +66,9 @@ async function generatePDF(item: ClosureItem) {
     `Mes: ${item.month}`,
     `Dias trabajados: ${item.workedDays}`,
     `Horas totales: ${item.totalHours}`,
-    `Horas extra: ${item.extraHours}`,
+    `Horas extra semanales: ${item.extraHours}`,
+    `Déficit semanal: ${item.deficitHours}`,
+    `Saldo semanal: ${item.balanceHours}`,
     '',
     'Fecha | Entrada | Salida | Horas',
     ...(item.records || []).map(r => `${r.date} | ${r.entry} | ${r.exit} | ${r.hours}`),
@@ -230,7 +236,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
       <div style={{ borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`, overflow: 'hidden' }}>
         <div style={{ background: colors.bg[700] }}>
           <div className="uiv2-close-table-head" style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px 90px 180px 130px', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${colors.border.subtle}` }}>
-            {['Empleado', 'Mes', 'Horas', 'Extra', 'Firmas', 'Acciones'].map((h, index) => (
+            {['Empleado', 'Mes', 'Horas', 'Saldo', 'Firmas', 'Acciones'].map((h, index) => (
               <div key={h} style={{ display:'flex', alignItems:'center', gap:8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: colors.text[500] }}>
                 {index === 0 && onSignMany && <input type="checkbox" aria-label="Seleccionar todos los cierres visibles sin firma admin" checked={allVisibleSelected} disabled={!selectable.length} onChange={toggleVisible} />}
                 {h}
@@ -254,7 +260,7 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
               </div>
               <div style={{ fontSize: 13, color: colors.text[700] }}>{item.month}</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], fontVariantNumeric: 'tabular-nums' }}>{item.totalHours}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: item.extraMins > 0 ? colors.semantic.orange : colors.text[700], fontVariantNumeric: 'tabular-nums' }}>{item.extraHours}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: item.balanceMins < 0 ? colors.semantic.red : item.balanceMins > 0 ? colors.semantic.green : colors.text[700], fontVariantNumeric: 'tabular-nums' }}>{item.balanceHours}</div>
 
               {/* Firma indicators */}
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -367,11 +373,12 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
             </div>
 
             {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {[
                 { label: 'Días trabajados', value: String(detail.workedDays) },
                 { label: 'Horas totales',   value: detail.totalHours },
-                { label: 'Horas extra',     value: detail.extraHours, warn: detail.extraMins > 0 },
+                { label: 'Extra semanal',   value: detail.extraHours, warn: detail.extraMins > 0 },
+                { label: 'Déficit semanal', value: detail.deficitHours, warn: detail.deficitMins > 0 },
               ].map(k => (
                 <div key={k.label} style={{ padding: '10px 14px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}` }}>
                   <div style={{ fontSize: 10, color: colors.text[400], textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>{k.label}</div>

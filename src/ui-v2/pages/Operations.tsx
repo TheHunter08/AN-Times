@@ -184,7 +184,7 @@ export function Operations(props: OperationsProps) {
           <div className="ti-operations__blockers">
             {props.launchBlockers.map(blocker => {
               const profileFixable = blocker.issues.some(issue =>
-                issue === 'Falta email' || issue === 'Falta PIN'
+                issue === 'Falta email' || issue === 'Falta PIN' || issue === 'Correo compartido con otro perfil'
               )
               const employeeActionOnly = !profileFixable
               const showActionHelp = employeeActionOnly && actionHelpId === blocker.employeeId
@@ -204,7 +204,10 @@ export function Operations(props: OperationsProps) {
                 </button>,
                 showActionHelp && (
                   <div key={`${blocker.employeeId}-help`} className="ti-operations__device-help" role="note">
-                    <strong>Acción de {blocker.employeeName}</strong>
+                    <strong>Siguiente paso para {blocker.employeeName}</strong>
+                    {blocker.issues.includes('Identidad de acceso duplicada') && (
+                      <span>Dos perfiles comparten la misma identidad de acceso. No actives RLS ni cambies correos para ocultar el conflicto: debe revisarse qué perfil es el propietario correcto antes de desvincular el otro.</span>
+                    )}
                     {blocker.issues.includes('Falta crear acceso') && (
                       <span>Debe abrir la pantalla de acceso, elegir “Acceso con email” y pulsar “Primera vez: vincular mi cuenta”. Usará el correo de su perfil, su PIN habitual y una contraseña nueva.</span>
                     )}

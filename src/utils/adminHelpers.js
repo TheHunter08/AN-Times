@@ -1,6 +1,6 @@
 import { queuePush } from '../services/dataService.js'
-import { calcSecs, localDateStr, localMonthKey, recWorkSecs } from './time.js'
-import { WM } from '../config/constants.js'
+import { calcSecs, localDateStr, localMonthKey, monthlyExtras, recWorkSecs, wkStart } from './time.js'
+import { workWeekStartsInMonth } from './workTargets.js'
 
 export const buildRecordSnapshot = record => {
   const totals = calcSecs(record)
@@ -36,7 +36,18 @@ export const currentDeviceLabel = () => {
 }
 
 export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) => {
-  const months = new Set((dates || []).map(date => localMonthKey(date)).filter(Boolean))
+  const months = new Set()
+  for (const value of dates || []) {
+    const calendarMonth = localMonthKey(value)
+    if (calendarMonth) months.add(calendarMonth)
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) continue
+    const weekday = date.getDay()
+    if (weekday >= 1 && weekday <= 5) {
+      const weeklyPeriod = localMonthKey(wkStart(date))
+      if (weeklyPeriod) months.add(weeklyPeriod)
+    }
+  }
   return (cierres || []).map(cierre => {
     if (cierre.empId !== empId || !months.has(cierre.mes)) return cierre
     if (cierre.firmaAdmin || cierre.firmaEmp || cierre.firma || cierre.estado === 'firmado') return cierre
@@ -45,11 +56,15 @@ export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) 
     )
     const records_snapshot = monthRecords.map(buildRecordSnapshot)
     const totalMin = Math.floor(records_snapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
+    const weeklyBalance = monthlyExtras(records, empId, cierre.mes, { now: new Date(nowIso) })
     return {
       ...cierre,
       records_snapshot,
       totalMin,
-      extraMin: Math.max(0, totalMin - WM),
+      targetMin: weeklyBalance.targetMin,
+      extraMin: weeklyBalance.weeklyExtraMin,
+      deficitMin: weeklyBalance.deficitMin,
+      balanceMin: weeklyBalance.balanceMin,
       dias: new Set(monthRecords.map(record => localDateStr(new Date(record.inicio)))).size,
       desactualizado: false,
       pdfData: null,
@@ -70,17 +85,17 @@ export const downloadDataUrl = (dataUrl, filename) => {
 }
 
 // Un cierre solo puede firmarse (y por tanto bloquear el mes) una vez que ese
-// mes ya ha terminado de verdad: el día de hoy debe ser el último día natural
-// de `mes` o posterior. Antes solo se validaba la fecha al GENERAR el cierre;
-// firmar (empleado o admin) no comprobaba nada, así que un cierre generado o
-// insertado antes de tiempo podía firmarse y bloquear un mes aún en curso.
+// El periodo agrupa las semanas cuyo lunes pertenece a `mes`. Solo se puede
+// cerrar cuando ha terminado el viernes de la última de esas semanas.
 export const canCloseMonth = (mes, now = new Date()) => {
-  if (!mes) return false
-  const [year, month] = mes.split('-').map(Number)
-  if (!year || month < 1 || month > 12) return false
+  const starts = workWeekStartsInMonth(mes)
+  if (!starts.length) return false
+  const lastMonday = new Date(`${starts.at(-1)}T00:00:00`)
+  const closeAt = new Date(lastMonday)
+  closeAt.setDate(lastMonday.getDate() + 5)
   // El cierre solo es definitivo cuando ya empezó el mes siguiente. El último
   // día todavía puede contener fichajes y no debe quedar bloqueado a medianoche.
-  return now >= new Date(year, month, 1)
+  return now >= closeAt
 }
 
 export const isRecordMonthLocked = (cierresList, empId, inicio) => {
