@@ -1,9 +1,13 @@
-// Cron: se ejecuta el 1ro de cada mes (ver .github/workflows/cierre-mensual.yml)
+// Cron: se ejecuta cada día (ver .github/workflows/cierre-mensual.yml) y genera
+// el periodo anterior en cuanto termina el viernes de su última semana.
 // Genera automáticamente los cierres del mes anterior para todos los empleados activos
 // y envía notificación push para que los firmen.
 
 import { toClosureRow } from './src/services/tableSyncPlan.js'
-import { monthlyTargetMinutes } from './src/utils/workTargets.js'
+import { canCloseMonth } from './src/utils/adminHelpers.js'
+import { monthlyExtras } from './src/utils/time.js'
+
+process.env.TZ = 'Europe/Madrid'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -92,6 +96,10 @@ async function main() {
   const mesLabel = prevMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
 
   console.log(`Generando cierres para ${mesLabel} (${mes})…`)
+  if (!canCloseMonth(mes, now)) {
+    console.log(`El periodo ${mes} sigue abierto: aún no terminó el viernes de su última semana.`)
+    return
+  }
 
   const result = await readDB()
   if (!result) throw new Error('No se pudo leer la BD')
@@ -112,7 +120,7 @@ async function main() {
       continue
     }
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const targetMin = monthlyTargetMinutes(e, mes)
+    const weeklyBalance = monthlyExtras(records, e.id, mes, { now })
     const generadoAt = new Date().toISOString()
     const cierre = {
       // Id estable para que un reintento tras fallo parcial sea idempotente.
@@ -124,8 +132,10 @@ async function main() {
       generadoAt,
       _upd: generadoAt,
       totalMin,
-      targetMin,
-      extraMin: Math.max(0, totalMin - targetMin),
+      targetMin: weeklyBalance.targetMin,
+      extraMin: weeklyBalance.weeklyExtraMin,
+      deficitMin: weeklyBalance.deficitMin,
+      balanceMin: weeklyBalance.balanceMin,
       dias: new Set(eRecs.map(r => madridDateStr(r.inicio))).size,
       estado: 'pendiente',
       firma: null,

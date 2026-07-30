@@ -2,8 +2,9 @@ name: Cierre mensual automático
 
 on:
   schedule:
-    # Día 1 de cada mes a las 08:00 UTC
-    - cron: '0 8 1 * *'
+    # Cada día a las 08:00 UTC. El script solo actúa cuando ya terminó el
+    # viernes de la última semana asignada al periodo anterior.
+    - cron: '0 8 * * *'
   workflow_dispatch:
     inputs:
       confirm:
@@ -30,6 +31,7 @@ jobs:
       - run: npm install pdf-lib --no-save
       - name: Generar cierres del mes anterior
         env:
+          TZ: Europe/Madrid
           VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
           VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
           PUSH_URL: ${{ secrets.PUSH_URL }}
