@@ -41,6 +41,7 @@ import { isRecordPendingValidation, recordValidationState, selectValidationRecor
 import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
+import { workBalanceOptions } from '../utils/workBalance.js'
 import { getLaunchBlockers } from '../utils/launchRequirements.js'
 import { isValidAccountEmail, normalizeAccountEmail } from '../utils/authRegistration.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
@@ -474,7 +475,7 @@ function useRequestsActions() {
         ? (fresh.records || []).map((r: any) => r.id === corr.recId ? updatedRecord : r)
         : (fresh.records || [])
       const cierres = updatedRecord
-        ? refreshUnsignedClosures(fresh.cierres || [], records, corr.empId, [rec.inicio, updatedRecord.inicio], nowIso)
+        ? refreshUnsignedClosures(fresh.cierres || [], records, corr.empId, [rec.inicio, updatedRecord.inicio], nowIso, fresh)
         : (fresh.cierres || [])
       const noti = createNotification({ empId:corr.empId, action:estado === 'aprobada' ? 'Corrección aprobada' : 'Corrección rechazada', detail:corr.motivo || '', dedupeKey:`correccion:${corr.id}:${estado}`, ts:nowIso })
       const withAudit = auditLog(fresh, estado === 'aprobada' ? 'correccion_aprobada' : 'correccion_rechazada', `${corr.empName}: ${corr.motivo || ''}`, who, {
@@ -844,7 +845,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       await persistRecordRow(updated)
       saveDB((fresh:any) => {
         const records = (fresh.records || []).map((r:any) => r.id === id ? updated : r)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, updated.inicio], nowIso)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, updated.inicio], nowIso, fresh)
         const withAudit = auditLog(fresh, 'Fichaje modificado', `${freshRec.empName || freshRec.empId}: ${fmtTime(freshRec.inicio)}–${fmtTime(freshRec.fin)} → ${entry}–${exit} · ${reason}`, session?.user?.name || 'Encargado', {
           category:'jornada', entityType:'record', entityId:freshRec.id, reason, device,
           before:{ inicio:freshRec.inicio, fin:freshRec.fin, workSecs:freshRec.workSecs, breakSecs:freshRec.breakSecs },
@@ -867,7 +868,7 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
       const nowIso = new Date().toISOString()
       saveDB((fresh:any) => {
         const records = (fresh.records || []).filter((r:any) => r.id !== id)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso, fresh)
         const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empName || rec.empId}: ${fmtDate(rec.inicio)} ${fmtTime(rec.inicio)}–${fmtTime(rec.fin)} · ${reason}`, session?.user?.name || 'Encargado', {
           category:'jornada', entityType:'record', entityId:rec.id, reason,
           before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
@@ -1142,7 +1143,7 @@ function ValidateHoursPage() {
       await persistRecordRow(updatedRec)
       saveDB((fresh: any) => {
         const records = (fresh.records || []).map((r: any) => r.id === id ? updatedRec : r)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, inicioIso], nowIso)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, freshRec.empId, [freshRec.inicio, inicioIso], nowIso, fresh)
         const withAudit = auditLog(fresh, 'Fichaje modificado', `${freshRec.empId}: ${entry}–${exit}`, session?.user?.name || 'Encargado', {
           category:'jornada', entityType:'record', entityId:freshRec.id, reason:correction.motivo, device:correction.device,
           before:{ inicio:freshRec.inicio, fin:freshRec.fin, workSecs:freshRec.workSecs, breakSecs:freshRec.breakSecs },
@@ -1174,7 +1175,7 @@ function ValidateHoursPage() {
       const nowIso = new Date().toISOString()
       saveDB((fresh: any) => {
         const records = (fresh.records || []).filter((r: any) => r.id !== id)
-        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso)
+        const cierres = refreshUnsignedClosures(fresh.cierres || [], records, rec.empId, [rec.inicio], nowIso, fresh)
         const withAudit = auditLog(fresh, 'Fichaje eliminado', `${rec.empId}: ${fmtDate(rec.inicio)}`, session?.user?.name || 'Encargado', {
           category:'jornada', entityType:'record', entityId:rec.id, reason:'Eliminación desde Validar horas',
           before:{ inicio:rec.inicio, fin:rec.fin, workSecs:rec.workSecs, breakSecs:rec.breakSecs }, after:null,
@@ -1477,7 +1478,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const monthRecs = recs.filter((r: any) => localMonthKey(r.inicio) === mes)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin && (!e.baja || monthRecs.some((record: any) => record.empId === e.id)))
     try {
-      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees:emps, records:recs, closures:db.cierres || [] }, `informe-horas-general-${mes}.xlsx`)
+      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees:emps, records:recs, closures:db.cierres || [], balanceDb:db }, `informe-horas-general-${mes}.xlsx`)
       toast(`Excel general completo descargado — ${label}`, 3000, 'ok')
     } catch (error: any) {
       toast(`No se pudo generar el Excel: ${error?.message || 'error desconocido'}`, 6000, 'err')
@@ -1493,7 +1494,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const recs = (db.records || []).filter((record: any) => record.inicio && record.fin && record.empId === employeeId)
     const safeName = String(employee.name || employee.id).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '')
     try {
-      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees, records:recs, closures:db.cierres || [], employeeId }, `informe-horas-${safeName}-${mes}.xlsx`)
+      await downloadHoursReportXlsx({ monthKey:mes, monthLabel:label, employees, records:recs, closures:db.cierres || [], employeeId, balanceDb:db }, `informe-horas-${safeName}-${mes}.xlsx`)
       toast(`Informe individual descargado — ${employee.name}`, 3000, 'ok')
     } catch (error: any) {
       toast(`No se pudo generar el informe individual: ${error?.message || 'error desconocido'}`, 6000, 'err')
@@ -1717,20 +1718,22 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const monthRecords = (db.records || []).filter((record: any) => record.inicio && record.fin && localMonthKey(record.inicio) === month)
     const payrollRows = employees.map((employee: any) => {
       const records = monthRecords.filter((record: any) => record.empId === employee.id)
-      const weeklyBalance = monthlyExtras(db.records || [], employee.id, month)
+      const weeklyBalance = monthlyExtras(db.records || [], employee.id, month, workBalanceOptions(db, employee))
       const regularMinutes = Math.max(0, weeklyBalance.workedMin - weeklyBalance.weeklyExtraMin)
       const overtimeMinutes = weeklyBalance.weeklyExtraMin
       const deficitMinutes = weeklyBalance.deficitMin
+      const justifiedMinutes = weeklyBalance.justifiedMin + weeklyBalance.nonContractMin
       return [
         employee.id, employee.name || '', employee.email || '', employee.centroTrabajo || employee.dept || '',
-        month, records.length, regularMinutes, overtimeMinutes, deficitMinutes, weeklyBalance.balanceMin,
+        month, records.length, regularMinutes, justifiedMinutes, overtimeMinutes, deficitMinutes, weeklyBalance.balanceMin,
         `${Math.floor(regularMinutes / 60)}:${String(regularMinutes % 60).padStart(2, '0')}`,
+        `${Math.floor(justifiedMinutes / 60)}:${String(justifiedMinutes % 60).padStart(2, '0')}`,
         `${Math.floor(overtimeMinutes / 60)}:${String(overtimeMinutes % 60).padStart(2, '0')}`,
         `${Math.floor(deficitMinutes / 60)}:${String(deficitMinutes % 60).padStart(2, '0')}`,
       ]
     })
     downloadCsv(
-      ['ID empleado', 'Empleado', 'Email', 'Centro', 'Mes', 'Jornadas', 'Minutos ordinarios', 'Minutos extra', 'Minutos déficit', 'Saldo semanal minutos', 'Horas ordinarias', 'Horas extra', 'Horas déficit'],
+      ['ID empleado', 'Empleado', 'Email', 'Centro', 'Mes', 'Jornadas', 'Minutos ordinarios', 'Minutos justificados/no exigibles', 'Minutos extra', 'Minutos déficit', 'Saldo semanal minutos', 'Horas ordinarias', 'Horas justificadas/no exigibles', 'Horas extra', 'Horas déficit'],
       payrollRows,
       `nomina-times-inc-${month}.csv`,
     )
@@ -1795,7 +1798,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const empCount = emps.length || 1
     const weeklyBalances = new Map(emps.map((employee: any) => [
       employee.id,
-      monthlyExtras(allRecs, employee.id, thisMonth),
+      monthlyExtras(allRecs, employee.id, thisMonth, workBalanceOptions(db, employee)),
     ]))
     const monthlyExtraMin = emps.reduce((sum: number, employee: any) =>
       sum + ((weeklyBalances.get(employee.id) as any)?.weeklyExtraMin || 0), 0)
@@ -1837,7 +1840,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     }
 
     return { kpis, bars, centrosBars, donut, rawSlices }
-  }, [db.records, db.employees])
+  }, [db.records, db.employees, db.vacaciones, db.medicos, db.ausencias, db.config])
 
   return (
     <Stats
@@ -2040,10 +2043,10 @@ function MonthlyClosePage() {
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
         const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
-        const weeklyBalance = monthlyExtras(recs, e.id, mesPasado)
+        const weeklyBalance = monthlyExtras(recs, e.id, mesPasado, workBalanceOptions(fresh, e))
         return [{
           id: gid(), empId: e.id, empName: e.name, mes: mesPasado,
-          totalMin, targetMin:weeklyBalance.targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
+          totalMin, targetMin:weeklyBalance.targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, justifiedMin:weeklyBalance.justifiedMin, nonContractMin:weeklyBalance.nonContractMin, weeklyBreakdown:weeklyBalance.weekly, dias: new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado: 'pendiente', records_snapshot,
           generadoPor: 'Sistema', generadoAt,
           firma: null, firmaEmp: null, firmaAdmin: null, _upd: generadoAt,
         }]
@@ -2098,12 +2101,18 @@ function MonthlyClosePage() {
         const totalMins = recs.reduce((s: number, r: any) =>
           s + recWorkSecs(r) / 60, 0
         )
-        const liveWeeklyBalance = monthlyExtras(db.records || [], c.empId, c.mes)
+        const liveWeeklyBalance = monthlyExtras(db.records || [], c.empId, c.mes, workBalanceOptions(db, emp))
         const extraMins = hasSignature ? (c.extraMin || 0) : liveWeeklyBalance.weeklyExtraMin
         const deficitMins = hasSignature ? (c.deficitMin || 0) : liveWeeklyBalance.deficitMin
         const balanceMins = hasSignature
           ? (c.balanceMin ?? extraMins - deficitMins)
           : liveWeeklyBalance.balanceMin
+        const justifiedMins = hasSignature
+          ? ((c.justifiedMin || 0) + (c.nonContractMin || 0))
+          : liveWeeklyBalance.justifiedMin + liveWeeklyBalance.nonContractMin
+        const weeklyBreakdown = hasSignature && Array.isArray(c.weeklyBreakdown)
+          ? c.weeklyBreakdown
+          : liveWeeklyBalance.weekly
 
         const dayRecs = recs.map((r: any) => ({
           date:  new Date(r.inicio).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
@@ -2134,6 +2143,9 @@ function MonthlyClosePage() {
           deficitMins,
           balanceHours: `${balanceMins >= 0 ? '+' : '-'}${Math.floor(Math.abs(balanceMins) / 60)}h${Math.floor(Math.abs(balanceMins) % 60)}m`,
           balanceMins,
+          justifiedHours: mhm(justifiedMins),
+          justifiedMins,
+          weeklyBreakdown,
           workedDays: new Set(recs.map((r: any) => localDateStr(new Date(r.inicio)))).size,
           signedBy: (c.firmaAdmin && (c.firmaEmp || c.firma)) ? 'all' : (c.firmaEmp || c.firma) ? 'emp' : 'none',
           firmaAdmin: !!c.firmaAdmin,
@@ -2152,7 +2164,7 @@ function MonthlyClosePage() {
           documentoId: c.documentoId || null,
         } as any
       })
-  }, [db.cierres, db.employees, db.records])
+  }, [db.cierres, db.employees, db.records, db.vacaciones, db.medicos, db.ausencias, db.config])
 
   // Generate closures for the previous (completed) month only.
   // toCreate se recalcula dentro de saveDB contra fresh.cierres — mismo
@@ -2181,8 +2193,8 @@ function MonthlyClosePage() {
         const totalMin = Math.floor(eRecs.reduce((s: number, r: any) => s + recWorkSecs(r) / 60, 0))
         const records_snapshot = eRecs.map(buildRecordSnapshot)
         const generadoAt = new Date().toISOString()
-        const weeklyBalance = monthlyExtras(recs, e.id, mesPasado)
-        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, targetMin:weeklyBalance.targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
+        const weeklyBalance = monthlyExtras(recs, e.id, mesPasado, workBalanceOptions(fresh, e))
+        return [{ id: gid(), empId: e.id, empName: e.name, mes: mesPasado, totalMin, targetMin:weeklyBalance.targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, justifiedMin:weeklyBalance.justifiedMin, nonContractMin:weeklyBalance.nonContractMin, weeklyBreakdown:weeklyBalance.weekly, dias:new Set(eRecs.map((r:any) => localDateStr(new Date(r.inicio)))).size, estado:'pendiente', records_snapshot, generadoPor:session?.user?.name || 'Admin', generadoAt, firma:null, firmaEmp:null, firmaAdmin:null, _upd:generadoAt }]
       })
       if (!nuevos.length) { outcome = 'no_records'; return null }
       outcome = 'created'
@@ -2274,10 +2286,19 @@ function MonthlyClosePage() {
         record.empId === cierre.empId && record.inicio && record.fin && localMonthKey(record.inicio) === mes
       )
       const records_snapshot = records.map(buildRecordSnapshot)
+      const employee = (db.employees || []).find((item: any) => item.id === cierre.empId)
+      const weeklyBalance = monthlyExtras(db.records || [], cierre.empId, mes, workBalanceOptions(db, employee))
       return {
         ...cierre,
         records_snapshot,
         totalMin: Math.floor(records_snapshot.reduce((sum: number, record: any) => sum + recWorkSecs(record), 0) / 60),
+        targetMin:weeklyBalance.targetMin,
+        extraMin:weeklyBalance.weeklyExtraMin,
+        deficitMin:weeklyBalance.deficitMin,
+        balanceMin:weeklyBalance.balanceMin,
+        justifiedMin:weeklyBalance.justifiedMin,
+        nonContractMin:weeklyBalance.nonContractMin,
+        weeklyBreakdown:weeklyBalance.weekly,
         dias: new Set(records.map((record: any) => localDateStr(new Date(record.inicio)))).size,
       }
     })

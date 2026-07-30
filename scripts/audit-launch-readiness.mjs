@@ -33,7 +33,7 @@ const [employees, subscriptions, records, closures, blobRows] = await Promise.al
   rows('employees?select=id,role,baja,email,auth_id,pin_hash,data'),
   rows('push_subs?select=user_id,endpoint'),
   rows('records?select=id,fin,aceptada,validado,rechazado,closed,deleted'),
-  rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,deleted'),
+  rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,target_min,deficit_min,balance_min,justified_min,non_contract_min,data,deleted'),
   rows('app_data?select=data,updated_at&id=eq.1'),
 ])
 
@@ -50,6 +50,21 @@ const signed = workers.filter(item => Boolean(signatures[item.id]?.main?.data))
 const nowMonth = new Date().toLocaleDateString('en-CA', { timeZone:'Europe/Madrid', year:'numeric', month:'2-digit' }).slice(0, 7)
 const invalidCurrentClosures = closures.filter(item => item.mes >= nowMonth && !item.firma_admin && !item.firma_emp && !item.deleted)
 const pendingEndedClosures = closures.filter(item => item.mes < nowMonth && item.estado !== 'firmado' && !item.deleted)
+const normalizedWeeklyClosures = closures.filter(item =>
+  ['target_min','deficit_min','balance_min','justified_min','non_contract_min']
+    .every(column => Number.isFinite(Number(item[column])))
+)
+const weeklyClosureDrift = closures.filter(item => {
+  const pairs = [
+    ['target_min','targetMin'],
+    ['deficit_min','deficitMin'],
+    ['balance_min','balanceMin'],
+    ['justified_min','justifiedMin'],
+    ['non_contract_min','nonContractMin'],
+  ]
+  return pairs.some(([column, key]) =>
+    item.data?.[key] != null && Number(item[column]) !== Number(item.data[key]))
+})
 const activeRecords = records.filter(item => !item.deleted)
 const deletedRecordIds = new Set(records.filter(item => item.deleted).map(item => item.id))
 const tableRecordIds = new Set(activeRecords.map(item => item.id))
@@ -113,6 +128,8 @@ const checks = {
   pendingExpensesMissingUpd: pendingBlobExpenses.filter(item => !validUpdatedAt(item._upd)).length,
   invalidCurrentClosures: invalidCurrentClosures.length,
   pendingEndedClosures: pendingEndedClosures.length,
+  normalizedWeeklyClosures: normalizedWeeklyClosures.length,
+  weeklyClosureDrift: weeklyClosureDrift.length,
 }
 const rlsTransition = evaluateRlsTransition({
   authTotal:activeEmployees.length,
@@ -131,5 +148,6 @@ const blockers = checks.missingDeviceSubscriptions + checks.missingSignatures + 
   checks.invalidCurrentClosures + checks.workersWithLegacyPin + checks.workersMissingPin +
   checks.workerDataWithPlaintextPin + checks.workerDataWithLegacyHash +
   checks.blobWorkersWithLegacyPin + checks.blobWorkersMissingPin + checks.openRecordsMissingUpd +
-  checks.pendingVacationsMissingUpd + checks.pendingExpensesMissingUpd + checks.rlsRuntimeBlockers.length
+  checks.pendingVacationsMissingUpd + checks.pendingExpensesMissingUpd + checks.rlsRuntimeBlockers.length +
+  checks.weeklyClosureDrift
 if (process.argv.includes('--strict') && blockers) process.exitCode = 1

@@ -5,6 +5,7 @@ import {
   isActiveQuarantineEntry,
   isPermanentRowError,
   mergeRecordVersions,
+  rowsForAvailableSchema,
   tableChangeToPatch,
 } from './dataServiceV2.js'
 
@@ -35,6 +36,20 @@ describe('reconciliación tabla/blob de jornadas', () => {
       { id:'r1', fin:'2026-07-21T16:10:00Z', _upd:'2026-07-21T16:10:00Z' },
     )
     expect(merged.fin).toBe('2026-07-21T16:10:00Z')
+  })
+})
+
+describe('compatibilidad del esquema semanal de cierres', () => {
+  it('mantiene las columnas nuevas cuando el esquema está migrado', () => {
+    const rows = [{ id:'c1', target_min:2400, deficit_min:60, data:{ targetMin:2400 } }]
+    expect(rowsForAvailableSchema('cierres', rows, false)).toEqual(rows)
+  })
+
+  it('conserva valores en data y omite columnas nuevas ante un esquema antiguo', () => {
+    const rows = [{ id:'c1', target_min:2400, deficit_min:60, data:{ targetMin:2400, deficitMin:60 } }]
+    expect(rowsForAvailableSchema('cierres', rows, true)).toEqual([
+      { id:'c1', data:{ targetMin:2400, deficitMin:60 } },
+    ])
   })
 })
 

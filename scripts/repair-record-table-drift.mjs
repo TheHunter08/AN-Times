@@ -1,6 +1,22 @@
 import { readFileSync } from 'node:fs'
 import { toRecordRow } from '../src/services/tableSyncPlan.js'
 
+function fromRecord(row) {
+  return {
+    ...(row.data ?? {}),
+    id:row.id, empId:row.emp_id, empName:row.emp_name,
+    inicio:row.inicio, fin:row.fin ?? null, centro:row.centro ?? null,
+    workSecs:row.work_secs ?? 0, breakSecs:row.break_secs ?? 0,
+    breaks:row.breaks ?? [], closed:!!row.closed, aceptada:!!row.aceptada,
+    correcciones:row.correcciones ?? [], _upd:row.updated_at,
+    _rev:row.revision ?? 1, operationId:row.operation_id ?? null,
+    validado:!!row.validado, rechazado:!!row.rechazado, modificado:!!row.modificado,
+    validadoBy:row.validado_by ?? null, validadoAt:row.validado_at ?? null,
+    cerradoPor:row.cerrado_por ?? null, cerradoPorId:row.cerrado_por_id ?? null,
+    cierreManual:!!row.cierre_manual, motivoCierre:row.motivo_cierre ?? null,
+  }
+}
+
 function loadEnvFile(path) {
   try {
     for (const raw of readFileSync(path, 'utf8').split(/\r?\n/)) {
@@ -48,7 +64,7 @@ async function pagedRows(path) {
 
 const [blobRows, tableRows, employeeRows] = await Promise.all([
   request('app_data?select=data,updated_at&id=eq.1'),
-  pagedRows('records?select=id,deleted'),
+  pagedRows('records?select=*'),
   pagedRows('employees?select=id,baja'),
 ])
 
@@ -67,12 +83,16 @@ const valid = absent.filter(record =>
 )
 const invalid = absent.filter(record => !valid.includes(record))
 const rowsToInsert = valid.map(record => toRecordRow(record))
+const blobIds = new Set(blobRecords.map(record => String(record?.id || '')).filter(Boolean))
+const rowsMissingFromBlob = tableRows.filter(row => !row.deleted && !blobIds.has(String(row.id)))
+const recordsToRestoreInBlob = rowsMissingFromBlob.map(fromRecord)
 
 console.log(JSON.stringify({
   mode:apply ? 'apply' : 'dry-run',
   blobRecords:blobRecords.length,
   tableRows:tableRows.length,
   absentFromTable:absent.length,
+  absentFromBlob:recordsToRestoreInBlob.length,
   insertable:rowsToInsert.length,
   invalidOrOrphaned:invalid.length,
   protectedTableTombstones:tombstonedInTable.length,
@@ -82,11 +102,18 @@ console.log(JSON.stringify({
     fin:record.fin || null,
     updatedAt:record._upd || null,
   })),
+  blobRestoreCandidates:recordsToRestoreInBlob.map(record => ({
+    id:record.id,
+    inicio:record.inicio,
+    fin:record.fin || null,
+    updatedAt:record._upd || null,
+  })),
 }, null, 2))
 
-if (!apply || !rowsToInsert.length) process.exit(0)
+if (!apply || (!rowsToInsert.length && !recordsToRestoreInBlob.length)) process.exit(0)
 
 async function insertIgnoringDuplicates(rows) {
+  if (!rows.length) return { inserted:0, failures:[] }
   const path = 'records?on_conflict=id'
   const options = {
     method:'POST',
@@ -111,5 +138,25 @@ async function insertIgnoringDuplicates(rows) {
 }
 
 const result = await insertIgnoringDuplicates(rowsToInsert)
-console.log(JSON.stringify({ ok:result.failures.length === 0, ...result }, null, 2))
-if (result.failures.length) process.exitCode = 1
+if (result.failures.length) {
+  console.log(JSON.stringify({ ok:false, ...result }, null, 2))
+  process.exitCode = 1
+} else if (recordsToRestoreInBlob.length) {
+  const nextData = {
+    ...(blobRow.data || {}),
+    records:[...blobRecords, ...recordsToRestoreInBlob],
+    _ts:Date.now(),
+  }
+  const updatedFilter = encodeURIComponent(blobRow.updated_at)
+  const patched = await request(`app_data?id=eq.1&updated_at=eq.${updatedFilter}`, {
+    method:'PATCH',
+    headers:{ Prefer:'return=representation' },
+    body:JSON.stringify({ data:nextData, updated_at:new Date().toISOString() }),
+  })
+  if (!patched?.length) throw new Error('app_data cambió durante la reparación; vuelve a ejecutar el comando')
+}
+console.log(JSON.stringify({
+  ok:result.failures.length === 0,
+  ...result,
+  restoredInBlob:recordsToRestoreInBlob.length,
+}, null, 2))

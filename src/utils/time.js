@@ -171,6 +171,8 @@ export const sortedEmps = db =>
 // • Una semana larga nunca compensa el déficit de otra semana.
 // • El periodo agrupa las semanas cuyo lunes pertenece al mes seleccionado.
 // • La semana en curso no genera déficit hasta que termina el viernes.
+// • Festivos, ausencias justificadas y días fuera del contrato reducen la
+//   obligación en 8h por día, pero nunca crean horas extra.
 //
 // Se conserva el nombre monthlyExtras por compatibilidad con sus consumidores.
 export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
@@ -179,6 +181,15 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
   const todayKey = localDateStr(now)
   const weekStarts = workWeekStartsInMonth(monthKey)
   const byWeek = new Map(weekStarts.map(start => [start, 0]))
+  const dailyTarget = weeklyTarget / 5
+  const employee = opts.employee || null
+  const contractStartValue = employee?.fechaInicioContrato || employee?.contractStart || employee?.startDate || employee?.fechaAlta || null
+  const contractEndValue = employee?.fechaFinContrato || employee?.contractEnd || employee?.fechaBaja || null
+  const contractStart = contractStartValue ? String(contractStartValue).slice(0, 10) : null
+  const contractEnd = contractEndValue ? String(contractEndValue).slice(0, 10) : null
+  const holidayKeys = new Set(Object.keys(opts.holidays || {}))
+  const absences = (opts.justifiedAbsences || []).filter(item =>
+    item?.empId === empId && item.start && item.end)
 
   for (const record of records || []) {
     if (!record || record.empId !== empId || !record.fin || !record.inicio) continue
@@ -192,9 +203,14 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
 
   let workedMin = 0
   let targetMin = 0
+  let justifiedMin = 0
+  let nonContractMin = 0
   let weeklyExtraMin = 0
   let deficitMin = 0
   let completedWeeks = 0
+  let scheduledTargetMin = 0
+  let scheduledJustifiedMin = 0
+  let scheduledNonContractMin = 0
   const weekly = weekStarts.map(start => {
     const monday = new Date(`${start}T00:00:00`)
     const friday = new Date(monday)
@@ -202,22 +218,67 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
     const fridayKey = localDateStr(friday)
     const minutes = byWeek.get(start) || 0
     const completed = fridayKey < todayKey
+    let weekJustifiedMin = 0
+    let weekNonContractMin = 0
+    const justifiedDays = []
+    const nonContractDays = []
+    for (let index = 0; index < 5; index++) {
+      const day = new Date(monday)
+      day.setDate(monday.getDate() + index)
+      const dayKey = localDateStr(day)
+      const outsideContract = (contractStart && dayKey < contractStart) || (contractEnd && dayKey > contractEnd)
+      if (outsideContract) {
+        weekNonContractMin += dailyTarget
+        nonContractDays.push(dayKey)
+        continue
+      }
+      const absence = absences.find(item => item.start <= dayKey && dayKey <= item.end)
+      if (holidayKeys.has(dayKey) || absence) {
+        weekJustifiedMin += dailyTarget
+        justifiedDays.push({ date:dayKey, reason:holidayKeys.has(dayKey) ? 'festivo' : absence.type })
+      }
+    }
+    const requiredMin = Math.max(0, weeklyTarget - weekJustifiedMin - weekNonContractMin)
     const extraMin = Math.max(0, minutes - weeklyTarget)
-    const weekDeficitMin = completed ? Math.max(0, weeklyTarget - minutes) : 0
+    const weekDeficitMin = completed ? Math.max(0, requiredMin - minutes) : 0
     workedMin += minutes
     weeklyExtraMin += extraMin
     deficitMin += weekDeficitMin
+    scheduledTargetMin += requiredMin
+    scheduledJustifiedMin += weekJustifiedMin
+    scheduledNonContractMin += weekNonContractMin
     if (completed) {
       completedWeeks++
-      targetMin += weeklyTarget
+      targetMin += requiredMin
+      justifiedMin += weekJustifiedMin
+      nonContractMin += weekNonContractMin
     }
-    return { start, end:fridayKey, minutes, targetMin:weeklyTarget, extraMin, deficitMin:weekDeficitMin, completed }
+    return {
+      start,
+      end:fridayKey,
+      minutes,
+      scheduledTargetMin:weeklyTarget,
+      targetMin:requiredMin,
+      justifiedMin:weekJustifiedMin,
+      nonContractMin:weekNonContractMin,
+      justifiedDays,
+      nonContractDays,
+      extraMin,
+      deficitMin:weekDeficitMin,
+      completed,
+    }
   })
 
   return {
     workedMin,
     targetMin,
-    scheduledTargetMin:weekStarts.length * weeklyTarget,
+    requiredMin:targetMin,
+    grossScheduledTargetMin:weekStarts.length * weeklyTarget,
+    scheduledTargetMin,
+    justifiedMin,
+    scheduledJustifiedMin,
+    nonContractMin,
+    scheduledNonContractMin,
     completedWeeks,
     weeklyExtraMin,
     shortfallMin:deficitMin,

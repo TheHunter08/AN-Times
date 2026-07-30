@@ -1,6 +1,7 @@
 import { queuePush } from '../services/dataService.js'
 import { calcSecs, localDateStr, localMonthKey, monthlyExtras, recWorkSecs, wkStart } from './time.js'
 import { workWeekStartsInMonth } from './workTargets.js'
+import { workBalanceOptions } from './workBalance.js'
 
 export const buildRecordSnapshot = record => {
   const totals = calcSecs(record)
@@ -35,7 +36,7 @@ export const currentDeviceLabel = () => {
   return `${os} · ${browser}`
 }
 
-export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) => {
+export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso, db = null) => {
   const months = new Set()
   for (const value of dates || []) {
     const calendarMonth = localMonthKey(value)
@@ -56,7 +57,8 @@ export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) 
     )
     const records_snapshot = monthRecords.map(buildRecordSnapshot)
     const totalMin = Math.floor(records_snapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
-    const weeklyBalance = monthlyExtras(records, empId, cierre.mes, { now: new Date(nowIso) })
+    const employee = (db?.employees || []).find(item => item.id === empId)
+    const weeklyBalance = monthlyExtras(records, empId, cierre.mes, workBalanceOptions(db, employee, { now:new Date(nowIso) }))
     return {
       ...cierre,
       records_snapshot,
@@ -65,6 +67,9 @@ export const refreshUnsignedClosures = (cierres, records, empId, dates, nowIso) 
       extraMin: weeklyBalance.weeklyExtraMin,
       deficitMin: weeklyBalance.deficitMin,
       balanceMin: weeklyBalance.balanceMin,
+      justifiedMin: weeklyBalance.justifiedMin,
+      nonContractMin: weeklyBalance.nonContractMin,
+      weeklyBreakdown: weeklyBalance.weekly,
       dias: new Set(monthRecords.map(record => localDateStr(new Date(record.inicio)))).size,
       desactualizado: false,
       pdfData: null,

@@ -123,9 +123,7 @@ export function toClosureRow(c, nowIso = new Date().toISOString()) {
     ? (typeof c.firmaAdmin === 'string' ? c.firmaAdmin : JSON.stringify(c.firmaAdmin))
     : null
   // emp_name, dias, generado_por y generado_at NO son columnas reales de
-  // `cierres` (solo existen id, company_id, emp_id, mes, total_min, extra_min,
-  // estado, firma_admin, firma_emp, desactualizado, data, deleted*, updated_at
-  // — ver supabase/schema.sql). Enviarlas como columnas sueltas hacía fallar
+  // `cierres`. Enviarlas como columnas sueltas hacía fallar
   // CADA upsert con "columna desconocida" (PGRST204, fuera del rango 22xxx/
   // 23xxx que el cliente sabe poner en cuarentena, así que se reintentaba sin
   // éxito en cada sincronización). Quedan preservadas igualmente dentro de
@@ -133,6 +131,11 @@ export function toClosureRow(c, nowIso = new Date().toISOString()) {
   return {
     id: c.id, company_id: COMPANY_ID, emp_id: c.empId,
     mes: c.mes, total_min: c.totalMin ?? 0, extra_min: c.extraMin ?? 0,
+    target_min: c.targetMin ?? 0,
+    deficit_min: c.deficitMin ?? 0,
+    balance_min: c.balanceMin ?? ((c.extraMin ?? 0) - (c.deficitMin ?? 0)),
+    justified_min: c.justifiedMin ?? 0,
+    non_contract_min: c.nonContractMin ?? 0,
     estado: c.estado ?? 'pendiente',
     firma_admin: firmaAdminVal,
     firma_emp: firmaVal ? JSON.stringify(firmaVal) : null,

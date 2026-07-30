@@ -71,6 +71,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   const extraMin = cierre.extraMin || 0
   const deficitMin = cierre.deficitMin || 0
   const balanceMin = cierre.balanceMin ?? extraMin - deficitMin
+  const justifiedMin = (cierre.justifiedMin || 0) + (cierre.nonContractMin || 0)
   recs.forEach((r, i) => {
     if (y - ROW_H < 140) newPage({ withTable: true })
     const d = new Date(r.inicio)
@@ -87,8 +88,39 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   if (y - 90 < 30) newPage({ section: 'Resumen mensual' })
   y -= 12
   page.drawRectangle({ x:ML, y:y-38, width:CW, height:38, color:colors.priLt, borderColor:colors.pri, borderWidth:0.6 })
-  page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  EXTRA: +${mhm(extraMin)}  ·  DÉFICIT: -${mhm(deficitMin)}  ·  SALDO: ${balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(balanceMin))}`), { x:ML+10, y:y-22, size:9, font:fontB, color:colors.pri, maxWidth:CW-20 })
+  page.drawText(pdfSafe(`TOTAL: ${mhm(totalMin)}  ·  JUSTIFICADAS: ${mhm(justifiedMin)}  ·  EXTRA: +${mhm(extraMin)}  ·  DÉFICIT: -${mhm(deficitMin)}  ·  SALDO: ${balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(balanceMin))}`), { x:ML+10, y:y-22, size:8.5, font:fontB, color:colors.pri, maxWidth:CW-20 })
   y -= 58
+
+  const weeklyBreakdown = Array.isArray(cierre.weeklyBreakdown) ? cierre.weeklyBreakdown : []
+  if (weeklyBreakdown.length) {
+    const WEEK_COLS = [
+      { label:'Semana', w:115 }, { label:'Trabajadas', w:80 },
+      { label:'Exigibles', w:75 }, { label:'Justificadas', w:85 },
+      { label:'Extra', w:75 }, { label:'Déficit', w:85 },
+    ]
+    const WEEK_ROW_H = 17
+    if (y - 34 < 100) newPage({ section: 'Auditoría semanal' })
+    page.drawText('AUDITORÍA DE 40 HORAS SEMANALES (LUNES A VIERNES)', { x:ML, y, size:8, font:fontB, color:colors.pri })
+    y -= 13
+    y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:WEEK_COLS, colors, fontB, headH:18 })
+    weeklyBreakdown.forEach((week, index) => {
+      if (y - WEEK_ROW_H < 100) {
+        newPage({ section: 'Auditoría semanal' })
+        y = drawTableHeaderRow(page, { ml:ML, y, cw:CW, cols:WEEK_COLS, colors, fontB, headH:18 })
+      }
+      const excused = (week.justifiedMin || 0) + (week.nonContractMin || 0)
+      const vals = [
+        `${week.start}–${week.end}`,
+        mhm(week.minutes || 0),
+        mhm(week.targetMin || 0),
+        mhm(excused),
+        `+${mhm(week.extraMin || 0)}`,
+        `-${mhm(week.deficitMin || 0)}`,
+      ]
+      y = drawTableDataRow(page, { ml:ML, cw:CW, y, vals, cols:WEEK_COLS, striped:index%2!==0, colors, fontR, fontB, rowH:WEEK_ROW_H })
+    })
+    y -= 18
+  }
 
   const corrections = recs.flatMap(record => (record.correcciones || []).map(correction => ({ record, correction })))
   if (corrections.length) {
@@ -128,6 +160,7 @@ export async function buildCierreIndividualPDF({ cierre, empresa }) {
   // coincide con el registro conservado por la aplicación.
   const hashInput = JSON.stringify({
     empId:cierre.empId, mes:cierre.mes, totalMin, generadoAt:cierre.generadoAt || '',
+    weeklyBreakdown,
     records:recs.map(r => ({ id:r.id, inicio:r.inicio, fin:r.fin, workSecs:r.workSecs, breakSecs:r.breakSecs, correcciones:r.correcciones || [] })),
   })
   const hash = await sha256Hex(hashInput)

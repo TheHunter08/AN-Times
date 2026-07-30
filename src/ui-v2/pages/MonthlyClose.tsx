@@ -8,6 +8,8 @@ import { downloadSimplePdf, downloadXlsx, downloadDataUrl } from '../../utils/ex
 import { ProductState } from '../components/ProductState.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { useAppStore } from '../../store/appStore.js'
+import { WeeklyBalanceBreakdown, type WeeklyBalanceRow } from '../components/WeeklyBalanceBreakdown.js'
+import { mhm } from '../../utils/time.js'
 
 export interface ClosureItem {
   id: string
@@ -25,6 +27,9 @@ export interface ClosureItem {
   deficitMins: number
   balanceHours: string
   balanceMins: number
+  justifiedHours: string
+  justifiedMins: number
+  weeklyBreakdown: WeeklyBalanceRow[]
   workedDays: number
   signedBy: 'none' | 'emp' | 'supervisor' | 'all'
   firmaAdmin: boolean
@@ -68,7 +73,15 @@ async function generatePDF(item: ClosureItem) {
     `Horas totales: ${item.totalHours}`,
     `Horas extra semanales: ${item.extraHours}`,
     `Déficit semanal: ${item.deficitHours}`,
+    `Horas justificadas/no exigibles: ${item.justifiedHours}`,
     `Saldo semanal: ${item.balanceHours}`,
+    '',
+    'Auditoría semanal (lunes a viernes)',
+    'Semana | Trabajadas | Exigibles | Justificadas | Extra | Déficit',
+    ...item.weeklyBreakdown.map(week => {
+      const excused = (week.justifiedMin || 0) + (week.nonContractMin || 0)
+      return `${week.start}–${week.end} | ${mhm(week.minutes)} | ${mhm(week.targetMin)} | ${mhm(excused)} | +${mhm(week.extraMin)} | -${mhm(week.deficitMin)}`
+    }),
     '',
     'Fecha | Entrada | Salida | Horas',
     ...(item.records || []).map(r => `${r.date} | ${r.entry} | ${r.exit} | ${r.hours}`),
@@ -373,12 +386,13 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
             </div>
 
             {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
               {[
                 { label: 'Días trabajados', value: String(detail.workedDays) },
                 { label: 'Horas totales',   value: detail.totalHours },
                 { label: 'Extra semanal',   value: detail.extraHours, warn: detail.extraMins > 0 },
                 { label: 'Déficit semanal', value: detail.deficitHours, warn: detail.deficitMins > 0 },
+                { label: 'Justificadas', value: detail.justifiedHours },
               ].map(k => (
                 <div key={k.label} style={{ padding: '10px 14px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}` }}>
                   <div style={{ fontSize: 10, color: colors.text[400], textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>{k.label}</div>
@@ -386,6 +400,8 @@ export function MonthlyClose({ items, onDownload, onSignAdmin, onSignMany, onGen
                 </div>
               ))}
             </div>
+
+            <WeeklyBalanceBreakdown weeks={detail.weeklyBreakdown} title="Auditoría de las 40 horas semanales" />
 
             {/* Firma status */}
             <div style={{ padding: '14px 16px', borderRadius: radius.md, background: colors.bg[700], border: `1px solid ${colors.border.subtle}` }}>

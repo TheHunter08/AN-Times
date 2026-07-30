@@ -175,6 +175,49 @@ describe('monthlyExtras', () => {
     expect(monthlyExtras(records, 'e1', '2026-07', { now }).workedMin).toBe(0)
   })
 
+  it('no descuenta un día de vacaciones aprobado', () => {
+    const records = week('2026-06-01', 8).slice(0, 4)
+    const r = monthlyExtras(records, 'e1', '2026-06', {
+      now:historicalNow,
+      justifiedAbsences:[{ empId:'e1', start:'2026-06-05', end:'2026-06-05', type:'vacaciones' }],
+    })
+    expect(r.weekly[0].minutes).toBe(32 * 60)
+    expect(r.weekly[0].justifiedMin).toBe(8 * 60)
+    expect(r.weekly[0].targetMin).toBe(32 * 60)
+    expect(r.weekly[0].deficitMin).toBe(0)
+  })
+
+  it('un festivo reduce la obligación sin crear horas extra', () => {
+    const records = week('2026-06-01', 8).filter((_, index) => index !== 2)
+    const r = monthlyExtras(records, 'e1', '2026-06', {
+      now:historicalNow,
+      holidays:{ '2026-06-03':'Festivo de prueba' },
+    })
+    expect(r.weekly[0].targetMin).toBe(32 * 60)
+    expect(r.weekly[0].deficitMin).toBe(0)
+    expect(r.weekly[0].extraMin).toBe(0)
+  })
+
+  it('solo exige desde la fecha de inicio del contrato', () => {
+    const records = week('2026-06-01', 8).slice(2)
+    const r = monthlyExtras(records, 'e1', '2026-06', {
+      now:historicalNow,
+      employee:{ id:'e1', fechaInicioContrato:'2026-06-03' },
+    })
+    expect(r.weekly[0].nonContractMin).toBe(16 * 60)
+    expect(r.weekly[0].targetMin).toBe(24 * 60)
+    expect(r.weekly[0].deficitMin).toBe(0)
+  })
+
+  it('las horas justificadas no se convierten en extra si ya trabajó 40h', () => {
+    const r = monthlyExtras(week('2026-06-01', 8), 'e1', '2026-06', {
+      now:historicalNow,
+      justifiedAbsences:[{ empId:'e1', start:'2026-06-05', end:'2026-06-05', type:'vacaciones' }],
+    })
+    expect(r.weekly[0].justifiedMin).toBe(8 * 60)
+    expect(r.weekly[0].extraMin).toBe(0)
+  })
+
   it('no descuenta la semana en curso antes de terminar el viernes', () => {
     const now = new Date('2026-07-30T12:00:00')
     const r = monthlyExtras([], 'e1', '2026-07', { now })

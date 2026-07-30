@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -268,26 +269,25 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── 6. Resumen semanal (viernes 17:00-17:59, hora España) ──────────────
-      // Informa al empleado de sus horas totales de la semana.
-      if (now.getDay() === 5 && nowH === 17) {
-        const monOffset = now.getDay() === 0 ? 6 : now.getDay() - 1
-        const mon = new Date(now); mon.setDate(now.getDate() - monOffset)
-        const weekStartStr = `${mon.getFullYear()}-${p2(mon.getMonth()+1)}-${p2(mon.getDate())}`
-        const weekRecs = empRecs.filter(r => r.fin && r.inicio >= weekStartStr + 'T00:00:00')
-        const weekTotalMin = Math.floor(weekRecs.reduce((s, r) => {
-          const elapsed = (new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000
-          return s + Math.max(0, elapsed - Math.floor((r.breakSecs || 0) / 60))
-        }, 0))
-        if (weekTotalMin > 0) {
-          const key = `an_resumen_sem_${emp.id}_${today}`
+      // El sábado la semana de lunes a viernes ya está cerrada y el déficit
+      // puede calcularse de forma definitiva, sin anticipar horas pendientes.
+      const weeklySummary = completedWeeklySummary(db, emp, now)
+      if (weeklySummary && !notisSent[weeklySummary.employeeKey]) {
+        schedule(emp, sub, weeklySummary.employeeKey, today,
+          '📊 Resumen semanal definitivo',
+          employeeWeeklySummaryBody(emp, weeklySummary),
+          'resumen-semanal', '/?tab=jornada')
+      }
+      if (weeklySummary?.deficitMin > 0) {
+        const recipients = (db.employees || []).filter(item =>
+          !item.baja && (item.isAdmin || item.role === 'jefe_obra'))
+        for (const admin of recipients) {
+          const key = `an_weekly_deficit_${admin.id}_${emp.id}_${weeklySummary.start}`
           if (!notisSent[key]) {
-            const hh = Math.floor(weekTotalMin / 60), mm = weekTotalMin % 60
-            const nota = weekTotalMin >= 2400 ? ' ✅' : weekTotalMin < 1920 ? ' · Por debajo del objetivo' : ''
-            schedule(emp, sub, key, today,
-              '📊 Tu semana en Times INC',
-              `Esta semana has trabajado ${hh}h ${p2(mm)}m.${nota}`,
-              'resumen-semanal', '/?tab=jornada')
+            schedule(admin, subMap.get(admin.id), key, today,
+              '⚠️ Déficit semanal cerrado',
+              adminWeeklyDeficitBody(emp, weeklySummary),
+              'deficit-semanal', '/?go=admin:horas')
           }
         }
       }

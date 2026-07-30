@@ -141,4 +141,22 @@ describe('refreshUnsignedClosures', () => {
     expect(updated[0]).not.toBe(cierres[0])
     expect(updated[1]).not.toBe(cierres[1])
   })
+
+  it('incorpora vacaciones aprobadas al recalcular un cierre pendiente', () => {
+    const cierres = [{ id:'jun', empId:'e1', mes:'2026-06', estado:'pendiente' }]
+    const records = Array.from({ length:4 }, (_, index) => ({
+      id:`r${index}`,
+      empId:'e1',
+      inicio:`2026-06-0${index + 1}T08:00:00`,
+      fin:`2026-06-0${index + 1}T16:00:00`,
+      breaks:[],
+    }))
+    const db = {
+      employees:[{ id:'e1' }],
+      vacaciones:[{ empId:'e1', estado:'aprobada', fechaInicio:'2026-06-05', fechaFin:'2026-06-05' }],
+    }
+    const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z', db)
+    expect(updated.justifiedMin).toBe(8 * 60)
+    expect(updated.deficitMin).toBe(4 * 40 * 60)
+  })
 })

@@ -6,6 +6,7 @@
 import { toClosureRow } from './src/services/tableSyncPlan.js'
 import { canCloseMonth } from './src/utils/adminHelpers.js'
 import { monthlyExtras } from './src/utils/time.js'
+import { workBalanceOptions } from './src/utils/workBalance.js'
 
 process.env.TZ = 'Europe/Madrid'
 
@@ -120,7 +121,7 @@ async function main() {
       continue
     }
     const totalMin = eRecs.reduce((s, r) => s + calcMin(r), 0)
-    const weeklyBalance = monthlyExtras(records, e.id, mes, { now })
+    const weeklyBalance = monthlyExtras(records, e.id, mes, workBalanceOptions(db, e, { now }))
     const generadoAt = new Date().toISOString()
     const cierre = {
       // Id estable para que un reintento tras fallo parcial sea idempotente.
@@ -136,6 +137,9 @@ async function main() {
       extraMin: weeklyBalance.weeklyExtraMin,
       deficitMin: weeklyBalance.deficitMin,
       balanceMin: weeklyBalance.balanceMin,
+      justifiedMin: weeklyBalance.justifiedMin,
+      nonContractMin: weeklyBalance.nonContractMin,
+      weeklyBreakdown: weeklyBalance.weekly,
       dias: new Set(eRecs.map(r => madridDateStr(r.inicio))).size,
       estado: 'pendiente',
       firma: null,

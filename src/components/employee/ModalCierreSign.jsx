@@ -12,6 +12,7 @@ import { CIERRE_PDF_BUCKET } from '../../config/constants.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
+import { workBalanceOptions } from '../../utils/workBalance.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxHeight:'92vh', overflowY:'auto' }
@@ -37,7 +38,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
   })
   const previewTotalMin = Math.floor(previewSnapshot.reduce((sum, record) => sum + recWorkSecs(record), 0) / 60)
   const weeklyBalance = selCierre
-    ? monthlyExtras(db.records || [], u?.id, selCierre.mes)
+    ? monthlyExtras(db.records || [], u?.id, selCierre.mes, workBalanceOptions(db, u))
     : { targetMin:0, weeklyExtraMin:0, deficitMin:0, balanceMin:0, completedWeeks:0 }
   const targetMin = weeklyBalance.targetMin
   const closable = selCierre ? canCloseMonth(selCierre.mes) : false
@@ -58,7 +59,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
     const records_snapshot = previewSnapshot
     const totalMin = previewTotalMin
     const dias = new Set(records_snapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size
-    const firmado = { ...selCierre, records_snapshot, totalMin, targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+    const firmado = { ...selCierre, records_snapshot, totalMin, targetMin, extraMin:weeklyBalance.weeklyExtraMin, deficitMin:weeklyBalance.deficitMin, balanceMin:weeklyBalance.balanceMin, justifiedMin:weeklyBalance.justifiedMin, nonContractMin:weeklyBalance.nonContractMin, weeklyBreakdown:weeklyBalance.weekly, dias, desactualizado:false, estado: selCierre.firmaAdmin ? 'firmado' : 'pendiente_firma_admin', firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
     let pdfData = null
     let documentoId = null
     let integrityHash = null
@@ -117,7 +118,7 @@ export function ModalCierreSign({ visible, db, u, onClose, toast, saveDB }) {
           Generado por {selCierre.generadoPor} · {new Set(previewSnapshot.map(record => new Date(record.inicio).toLocaleDateString('es-ES'))).size} días trabajados · {mhm(previewTotalMin)}
         </div>
         <div style={{ fontSize:12, color: weeklyBalance.balanceMin >= 0 ? colors.primary.light : colors.semantic.red, marginBottom:14, fontWeight:700 }}>
-          Regla de 40h por semana (lunes a viernes) · Extra +{mhm(weeklyBalance.weeklyExtraMin)} · Déficit -{mhm(weeklyBalance.deficitMin)} · Saldo {weeklyBalance.balanceMin >= 0 ? '+' : '-'}{mhm(Math.abs(weeklyBalance.balanceMin))}
+          Regla de 40h por semana (lunes a viernes) · Justificadas {mhm(weeklyBalance.justifiedMin + weeklyBalance.nonContractMin)} · Extra +{mhm(weeklyBalance.weeklyExtraMin)} · Déficit -{mhm(weeklyBalance.deficitMin)} · Saldo {weeklyBalance.balanceMin >= 0 ? '+' : '-'}{mhm(Math.abs(weeklyBalance.balanceMin))}
         </div>
 
         {/* Records snapshot */}

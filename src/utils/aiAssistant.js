@@ -3,6 +3,7 @@ import { WK } from '../config/constants.js'
 import { buildComplianceSummary } from './complianceSummary.js'
 import { employeeBelongsToObra, resolveRecordObraId } from './obraAttribution.js'
 import { getScopedEmployees } from './supervisorScope.js'
+import { workBalanceOptions } from './workBalance.js'
 
 const PERSONAL_CHIPS = [
   '¿Mis datos están sincronizados?',
@@ -85,7 +86,7 @@ export function buildAIContext(db, u) {
   // "horas trabajadas este mes" y además desincronizaba monthMin de
   // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
   const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
-  const mExt = monthlyExtras(db.records, u.id, mk)
+  const mExt = monthlyExtras(db.records, u.id, mk, workBalanceOptions(db, u))
   const vac = vacData(u.id, db)
   const todayStr = today()
   const teamEmployees = canSeeTeamData(u) ? scopedEmployees(db, u) : []
@@ -101,6 +102,7 @@ export function buildAIContext(db, u) {
     `Empleado: ${u.name}`,
     `Horas trabajadas esta semana: ${mhm(weekMin)} (objetivo ${mhm(WK)})`,
     `Horas trabajadas este mes: ${mhm(monthMin)}`,
+    `Horas justificadas o no exigibles: ${mhm((mExt.justifiedMin || 0) + (mExt.nonContractMin || 0))}`,
     `Horas extra de semanas >40h: ${mhm(mExt.weeklyExtraMin || 0)}`,
     mExt.deficitMin > 0 ? `Déficit de semanas <40h: ${mhm(mExt.deficitMin)}` : null,
     `Balance semanal acumulado: ${mExt.balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(mExt.balanceMin || 0))}`,
@@ -136,7 +138,7 @@ export function aiAnswer(q, db, u) {
   // mExt/monthlyExtras (que sí calcula el mes en hora local correctamente).
   const monthMin = fin.filter(r => r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk)).reduce((s, r) => s + calcMin(r), 0)
   // Regla TIMES INC: cada lunes-viernes se liquida contra 40h, sin compensar semanas.
-  const mExt = u ? monthlyExtras(db.records, u.id, mk) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0, balanceMin: 0 }
+  const mExt = u ? monthlyExtras(db.records, u.id, mk, workBalanceOptions(db, u)) : { netExtraMin: 0, deficitMin: 0, weeklyExtraMin: 0, shortfallMin: 0, workedMin: 0, balanceMin: 0 }
   const vac = u ? vacData(u.id, db) : { available: 0, generated: 0, used: 0 }
   const canSeeTeam = canSeeTeamData(u)
 

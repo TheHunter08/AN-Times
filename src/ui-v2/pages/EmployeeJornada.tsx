@@ -1,13 +1,15 @@
 // Página "Jornada" (estadísticas + exportación PDF) — versión ui-v2, puramente
 // presentacional. Los datos y la lógica de PDF vienen de useJornadaData /
 // useJornadaPdfExport (misma lógica que TabJornada.jsx legacy, relocalizada).
-import { today, mhm, ftime, s2t, recWorkSecs, p2 } from '../../utils/time.js'
+import { today, mhm, ftime, s2t, recWorkSecs, p2, monthlyExtras } from '../../utils/time.js'
+import { workBalanceOptions } from '../../utils/workBalance.js'
 import { WK } from '../../config/constants.js'
 import { PomodoroWidget } from '../../components/employee/PomodoroWidget.jsx'
 import { WeeklyBars } from '../../components/employee/WeeklyBars.jsx'
 import { HistorialReciente } from '../../components/employee/HistorialReciente.jsx'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
+import { WeeklyBalanceBreakdown } from '../components/WeeklyBalanceBreakdown.js'
 
 
 function PdfBtn({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
@@ -47,6 +49,7 @@ export interface EmployeeJornadaProps {
 export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: EmployeeJornadaProps) {
   const { o, totMin, brkMin, monthMin, weekMin, extraMin, normMin, wdEfectivo, tlItems, histWithRecs, pendingValidation } = stats
   const now = new Date()
+  const weeklyBalance = monthlyExtras(db.records || [], u.id, today().slice(0, 7), workBalanceOptions(db, u, { now }))
 
   if (!db.records) return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -223,6 +226,8 @@ export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: Employe
           )}
 
           {o && <PomodoroWidget />}
+
+          <WeeklyBalanceBreakdown weeks={weeklyBalance.weekly} title="Balance semanal · lunes a viernes" />
 
           <div style={{
             background: colors.bg[600], border: `1px solid ${colors.border.subtle}`,

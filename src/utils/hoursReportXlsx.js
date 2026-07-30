@@ -1,6 +1,7 @@
 import { calcSecs, localDateStr, localMonthKey, monthlyExtras } from './time.js'
 import { recordValidationState } from './recordValidation.js'
 import { downloadBlob } from './exportFiles.js'
+import { workBalanceOptions } from './workBalance.js'
 
 const COLORS = {
   primary:'#7C3AED', primaryDark:'#5B21B6', primarySoft:'#F3E8FF',
@@ -122,14 +123,14 @@ function recordMetrics(record) {
   }
 }
 
-function employeeSummary(employee, records, closures, monthKey) {
+function employeeSummary(employee, records, closures, monthKey, balanceDb) {
   const own = records.filter(record => record.empId === employee.id && localMonthKey(record.inicio) === monthKey)
   const metrics = own.map(recordMetrics)
   const netMinutes = Math.round(metrics.reduce((sum, item) => sum + item.netHours * 60, 0))
   const breakMinutes = Math.round(metrics.reduce((sum, item) => sum + item.breakHours * 60, 0))
   const states = own.map(statusLabel)
   const closure = closures.find(item => item.empId === employee.id && item.mes === monthKey && !item.desactualizado)
-  const weeklyBalance = monthlyExtras(records, employee.id, monthKey)
+  const weeklyBalance = monthlyExtras(records, employee.id, monthKey, workBalanceOptions(balanceDb, employee))
   return {
     employee,
     records:own,
@@ -140,6 +141,7 @@ function employeeSummary(employee, records, closures, monthKey) {
     regularHours:Math.max(0, weeklyBalance.workedMin - weeklyBalance.weeklyExtraMin) / 60,
     overtimeHours:weeklyBalance.weeklyExtraMin / 60,
     deficitHours:weeklyBalance.deficitMin / 60,
+    justifiedHours:(weeklyBalance.justifiedMin + weeklyBalance.nonContractMin) / 60,
     targetDiffHours:weeklyBalance.balanceMin / 60,
     pending:states.filter(state => state === 'PENDIENTE').length,
     approved:states.filter(state => state === 'VALIDADA').length,
@@ -201,12 +203,13 @@ function totalsRow(columnCount, firstDataRow, lastDataRow, hourColumns, countCol
 }
 
 function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
-  const columns = 15
+  const columns = 16
   const totalRecords = summaries.reduce((sum, item) => sum + item.records.length, 0)
   const totalHours = summaries.reduce((sum, item) => sum + item.netHours, 0)
   const totalBreak = summaries.reduce((sum, item) => sum + item.breakHours, 0)
   const totalExtra = summaries.reduce((sum, item) => sum + item.overtimeHours, 0)
   const totalDeficit = summaries.reduce((sum, item) => sum + item.deficitHours, 0)
+  const totalJustified = summaries.reduce((sum, item) => sum + item.justifiedHours, 0)
   const pending = summaries.reduce((sum, item) => sum + item.pending, 0)
   const decided = summaries.reduce((sum, item) => sum + item.approved + item.rejected, 0)
   const validationPct = totalRecords ? decided / totalRecords : 0
@@ -215,11 +218,12 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
     subtitleRow(`Periodo: ${monthLabel} (${monthKey}) · Generado: ${generatedAt.toLocaleString('es-ES')} · Regla: 40 h por semana, lunes a viernes`, columns),
     Array(columns).fill(null),
     sectionRow('RESUMEN EJECUTIVO', columns),
-    metricRow(['Empleados con actividad', 'Jornadas', 'Horas netas', 'Descanso', 'Horas extra', 'Déficit', 'Pendientes', 'Validación'], columns),
+    metricRow(['Empleados con actividad', 'Jornadas', 'Horas netas', 'Justificadas', 'Descanso', 'Horas extra', 'Déficit', 'Pendientes', 'Validación'], columns),
     metricRow([
       { value:summaries.filter(item => item.records.length).length, format:'0' },
       { value:totalRecords, format:'0' },
       { value:totalHours, format:HOURS_FORMAT },
+      { value:totalJustified, format:HOURS_FORMAT },
       { value:totalBreak, format:HOURS_FORMAT },
       { value:totalExtra, format:HOURS_FORMAT },
       { value:totalDeficit, format:HOURS_FORMAT },
@@ -227,7 +231,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
       { value:validationPct, format:'0%' },
     ], columns, true),
     Array(columns).fill(null),
-    headerRow(['Empleado', 'Centro / Obra', 'Días', 'Fichajes', 'Horas netas', 'Descanso', 'Referencia semanal', 'Extra', 'Déficit', 'Pendientes', 'Validadas', 'Rechazadas', 'Modificaciones', 'Cierre firmado', 'Saldo semanal']),
+    headerRow(['Empleado', 'Centro / Obra', 'Días', 'Fichajes', 'Horas netas', 'Descanso', 'Referencia semanal', 'Justificadas', 'Extra', 'Déficit', 'Pendientes', 'Validadas', 'Rechazadas', 'Modificaciones', 'Cierre firmado', 'Saldo semanal']),
   ]
   summaries.forEach((item, index) => {
     rows.push([
@@ -238,6 +242,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
       dataCell(item.netHours, index, { type:Number, format:HOURS_FORMAT, align:'right', fontWeight:'bold' }),
       dataCell(item.breakHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
       dataCell(item.targetHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
+      dataCell(item.justifiedHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
       dataCell(item.overtimeHours, index, { type:Number, format:HOURS_FORMAT, align:'right', textColor:item.overtimeHours ? COLORS.orange : COLORS.ink }),
       dataCell(item.deficitHours, index, { type:Number, format:HOURS_FORMAT, align:'right', textColor:item.deficitHours ? COLORS.red : COLORS.ink }),
       dataCell(item.pending, index, { type:Number, format:'0', align:'right', ...(item.pending ? statusStyle('PENDIENTE') : {}) }),
@@ -250,8 +255,8 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
   })
   const firstDataRow = 9
   const lastDataRow = firstDataRow + summaries.length - 1
-  const total = totalsRow(columns, firstDataRow, lastDataRow, [4, 5, 6, 7, 8, 14])
-  ;[2, 3, 9, 10, 11, 12].forEach(column => {
+  const total = totalsRow(columns, firstDataRow, lastDataRow, [4, 5, 6, 7, 8, 9, 15])
+  ;[2, 3, 10, 11, 12, 13].forEach(column => {
     const letter = String.fromCharCode(65 + column)
     total[column] = { ...total[column], value:summaries.length ? `SUM(${letter}${firstDataRow}:${letter}${lastDataRow})` : 0, type:summaries.length ? 'Formula' : Number, format:'0', align:'right' }
   })
@@ -259,7 +264,7 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
   return {
     data:rows,
     sheet:'Resumen general',
-    columns:[24, 24, 9, 10, 13, 12, 15, 11, 11, 11, 11, 11, 14, 15, 16].map(width => ({ width })),
+    columns:[24, 24, 9, 10, 13, 12, 15, 12, 11, 11, 11, 11, 11, 14, 15, 16].map(width => ({ width })),
     stickyRowsCount:8,
     stickyColumnsCount:2,
     showGridLines:false,
@@ -299,13 +304,14 @@ function buildEmployeeSheet(summary, sheetName, monthLabel, generatedAt) {
     subtitleRow(`Periodo: ${monthLabel} · Centro: ${summary.employee.centroTrabajo || summary.employee.dept || 'Sin asignar'} · Generado: ${generatedAt.toLocaleString('es-ES')}`, columns),
     Array(columns).fill(null),
     sectionRow('RESUMEN DEL EMPLEADO', columns),
-    metricRow(['Días', 'Jornadas', 'Horas netas', 'Descanso', 'Referencia semanal', 'Extra', 'Déficit'], columns),
+    metricRow(['Días', 'Jornadas', 'Horas netas', 'Descanso', 'Referencia semanal', 'Justificadas', 'Extra', 'Déficit'], columns),
     metricRow([
       { value:summary.days, format:'0' },
       { value:summary.records.length, format:'0' },
       { value:summary.netHours, format:HOURS_FORMAT },
       { value:summary.breakHours, format:HOURS_FORMAT },
       { value:summary.targetHours, format:HOURS_FORMAT },
+      { value:summary.justifiedHours, format:HOURS_FORMAT },
       { value:summary.overtimeHours, format:HOURS_FORMAT },
       { value:summary.deficitHours, format:HOURS_FORMAT },
     ], columns, true),
@@ -332,7 +338,7 @@ function buildEmployeeSheet(summary, sheetName, monthLabel, generatedAt) {
   }
 }
 
-export async function buildHoursReportXlsxBlob({ monthKey, monthLabel, employees = [], records = [], closures = [], employeeId = null, generatedAt = new Date() }) {
+export async function buildHoursReportXlsxBlob({ monthKey, monthLabel, employees = [], records = [], closures = [], employeeId = null, generatedAt = new Date(), balanceDb = {} }) {
   const writeXlsxFile = (await import('write-excel-file/browser')).default
   const closedRecords = records
     .filter(record => record?.inicio && record?.fin && (!employeeId || record.empId === employeeId))
@@ -352,7 +358,7 @@ export async function buildHoursReportXlsxBlob({ monthKey, monthLabel, employees
     knownIds.add(record.empId)
   })
   selectedEmployees.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
-  const summaries = selectedEmployees.map(employee => employeeSummary(employee, closedRecords, closures, monthKey))
+  const summaries = selectedEmployees.map(employee => employeeSummary(employee, closedRecords, closures, monthKey, balanceDb))
   const names = uniqueSheetNames(selectedEmployees, ['Resumen general', 'Detalle fichajes'])
   const sheets = [
     buildSummarySheet(summaries, monthKey, monthLabel, generatedAt),

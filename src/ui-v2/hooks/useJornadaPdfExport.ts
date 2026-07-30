@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { today, calcMin, recWorkSecs, wkStart, p2, ftime, mhm, monthlyExtras, localDateStr } from '../../utils/time.js'
 import { PDF_PAGE, pdfColors, pdfSafe, drawTableHeaderRow, drawTableDataRow, drawSignatureBlock, drawDocumentFooters, addReportPage, findResponsableFirma } from '../../utils/pdfReport.js'
+import { workBalanceOptions } from '../../utils/workBalance.js'
 
 export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => void) {
   const [informeUrl, setInformeUrl] = useState<string | null>(null)
@@ -138,7 +139,7 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       cover.drawLine({ start: { x: ML, y: ly(2) - 16 }, end: { x: PW - MR, y: ly(2) - 16 }, thickness: 0.4, color: pdfCols.border })
       const statsY = ly(3) - 10
       cover.drawRectangle({ x: ML, y: statsY - 80, width: CW, height: 80, color: pdfCols.priLt, borderColor: pdfCols.pri, borderWidth: 0.6 })
-      const exCover = monthlyExtras(db.records, u.id, mk2)
+      const exCover = monthlyExtras(db.records, u.id, mk2, workBalanceOptions(db, u))
       const statItems = [
         { label: 'Jornadas', val: String(monthRecs.length) },
         { label: 'Total horas', val: mhm(totalMin2) },
@@ -164,11 +165,11 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
         y = drawTableDataRow(page, { ml: ML, cw: CW, y, vals, cols: COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB, highlightIdx: 4, rowH: ROW_H })
       })
       if (y - 50 < 35 + SIG_AREA) { newPage() }
-      const exPdf = monthlyExtras(db.records, u.id, mk2)
+      const exPdf = monthlyExtras(db.records, u.id, mk2, workBalanceOptions(db, u))
       const cDiff = exPdf.balanceMin > 0 ? cGreen : exPdf.balanceMin < 0 ? rgb(0.87, 0.27, 0.27) : pdfCols.pri
       page.drawRectangle({ x: ML, y: y - 50, width: CW, height: 50, color: pdfCols.priLt, borderColor: pdfCols.pri, borderWidth: 0.6 })
       page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${monthRecs.length} jornada${monthRecs.length !== 1 ? 's' : ''} registrada${monthRecs.length !== 1 ? 's' : ''}`, { x: ML + 8, y: y - 14, size: 8.5, font: fontB, color: pdfCols.pri })
-      page.drawText(`Regla obligatoria: 40h por semana, de lunes a viernes · ${exPdf.completedWeeks} semanas cerradas`, { x: ML + 8, y: y - 28, size: 7.5, font: fontR, color: pdfCols.dark, maxWidth: CW - 16 })
+      page.drawText(`Regla: 40h semanales · Justificadas/no exigibles: ${mhm(exPdf.justifiedMin + exPdf.nonContractMin)} · ${exPdf.completedWeeks} semanas cerradas`, { x: ML + 8, y: y - 28, size: 7.5, font: fontR, color: pdfCols.dark, maxWidth: CW - 16 })
       const extraLine = `Extra: +${mhm(exPdf.weeklyExtraMin)} · Déficit: -${mhm(exPdf.deficitMin)} · Saldo: ${exPdf.balanceMin >= 0 ? '+' : '-'}${mhm(Math.abs(exPdf.balanceMin))}`
       page.drawText(extraLine, { x: ML + 8, y: y - 42, size: 7.5, font: fontB, color: cDiff, maxWidth: CW - 16 })
       y -= 58

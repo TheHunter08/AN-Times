@@ -53,71 +53,7 @@ export const DOCUMENTOS_BUCKET = 'documentos-empleado'
 // focos de crecimiento continuo de la cuota de base de datos.
 export const GASTOS_BUCKET = 'gastos-fotos'
 
-// Festivos Comunidad de Madrid — 2026 + 2027
-export const FESTIVOS_MADRID = {
-  // 2026
-  '2026-01-01': 'Año Nuevo',
-  '2026-01-06': 'Reyes Magos',
-  '2026-04-02': 'Jueves Santo',
-  '2026-04-03': 'Viernes Santo',
-  '2026-05-01': 'Día del Trabajo',
-  '2026-05-02': 'Comunidad de Madrid',
-  '2026-05-15': 'San Isidro',
-  '2026-08-15': 'Asunción de la Virgen',
-  '2026-10-12': 'Fiesta Nacional de España',
-  '2026-11-02': 'Todos los Santos',
-  '2026-11-09': 'La Almudena',
-  '2026-12-07': 'Día de la Constitución',
-  '2026-12-08': 'Inmaculada Concepción',
-  '2026-12-25': 'Navidad',
-  // 2027
-  '2027-01-01': 'Año Nuevo',
-  '2027-01-06': 'Reyes Magos',
-  '2027-03-25': 'Jueves Santo',
-  '2027-03-26': 'Viernes Santo',
-  '2027-05-01': 'Día del Trabajo',
-  '2027-05-03': 'Comunidad de Madrid',
-  '2027-05-14': 'San Isidro',
-  '2027-08-16': 'Asunción de la Virgen',
-  '2027-10-12': 'Fiesta Nacional de España',
-  '2027-11-01': 'Todos los Santos',
-  '2027-11-09': 'La Almudena',
-  '2027-12-06': 'Día de la Constitución',
-  '2027-12-08': 'Inmaculada Concepción',
-  '2027-12-25': 'Navidad',
-  // 2028
-  '2028-01-01': 'Año Nuevo',
-  '2028-01-06': 'Reyes Magos',
-  '2028-04-13': 'Jueves Santo',
-  '2028-04-14': 'Viernes Santo',
-  '2028-05-01': 'Día del Trabajo',
-  '2028-05-02': 'Comunidad de Madrid',
-  '2028-05-15': 'San Isidro',
-  '2028-08-15': 'Asunción de la Virgen',
-  '2028-10-12': 'Fiesta Nacional de España',
-  '2028-11-01': 'Todos los Santos',
-  '2028-11-09': 'La Almudena',
-  '2028-12-06': 'Día de la Constitución',
-  '2028-12-08': 'Inmaculada Concepción',
-  '2028-12-25': 'Navidad',
-  // 2029
-  '2029-01-01': 'Año Nuevo',
-  '2029-01-06': 'Reyes Magos',
-  '2029-03-29': 'Jueves Santo',
-  '2029-03-30': 'Viernes Santo',
-  '2029-05-01': 'Día del Trabajo',
-  '2029-05-02': 'Comunidad de Madrid',
-  '2029-05-15': 'San Isidro',
-  '2029-08-15': 'Asunción de la Virgen',
-  '2029-10-12': 'Fiesta Nacional de España',
-  '2029-11-01': 'Todos los Santos',
-  '2029-11-09': 'La Almudena',
-  '2029-12-06': 'Día de la Constitución',
-  '2029-12-08': 'Inmaculada Concepción',
-  '2029-12-25': 'Navidad',
-}
-// Alias para compatibilidad con importaciones existentes
-export const FESTIVOS_MADRID_2026 = FESTIVOS_MADRID
+export { FESTIVOS_MADRID, FESTIVOS_MADRID_2026 } from './holidays.js'
 
 export const INITIAL_DB = {
   empresas: [],

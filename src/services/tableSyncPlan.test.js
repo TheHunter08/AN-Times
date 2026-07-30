@@ -108,6 +108,17 @@ describe('plan de sincronización offline V2', () => {
     expect(row.data.integrityHash).toBe('abc123')
   })
 
+  it('normaliza el balance semanal del cierre', () => {
+    const row = toClosureRow({
+      id:'c1', empId:'e1', mes:'2026-06', extraMin:180, targetMin:9600,
+      deficitMin:60, balanceMin:120, justifiedMin:480, nonContractMin:480,
+    })
+    expect(row).toMatchObject({
+      target_min:9600, deficit_min:60, balance_min:120,
+      justified_min:480, non_contract_min:480,
+    })
+  })
+
   it('no convierte una firma administrativa falsa en el texto firmado "false"', () => {
     expect(toClosureRow({ id:'pending', empId:'e1', mes:'2026-07', firmaAdmin:false }).firma_admin).toBeNull()
     expect(toClosureRow({ id:'signed', empId:'e1', mes:'2026-06', firmaAdmin:true }).firma_admin).toBe('true')

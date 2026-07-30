@@ -1,162 +1,142 @@
 /**
- * TIMES INC – Resumen semanal de horas
- * Corre vía GitHub Actions los viernes ~17h Madrid.
- * Lee datos desde Supabase y envía push directamente a cada empleado.
+ * Resumen definitivo de la semana laboral (lunes a viernes).
+ * Corre el sábado y usa exactamente la misma regla que la app y los cierres.
  */
-
 import webpush from 'web-push'
+import {
+  adminWeeklyDeficitBody,
+  completedWeeklySummary,
+  employeeWeeklySummaryBody,
+} from './src/utils/weeklySummary.js'
 
-// Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
-const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
-const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-const isValidVapid = s => /^[A-Za-z0-9\-_]{40,}$/.test(s)
-const _vpub = toB64Url(process.env.VAPID_PUBLIC)
-const _vprv = toB64Url(process.env.VAPID_PRIVATE)
-const VAPID_PUBLIC  = isValidVapid(_vpub) ? _vpub : null
-const VAPID_PRIVATE = isValidVapid(_vprv) ? _vprv : null
-const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
-const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+process.env.TZ = 'Europe/Madrid'
 
-if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-  console.error('VAPID_PUBLIC/VAPID_PRIVATE no configuradas o inválidas — abortando sin enviar push')
+const cleanEnv = value => String(value || '').replace(/^\uFEFF/, '').trim()
+const toB64Url = value => cleanEnv(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const isValidVapid = value => /^[A-Za-z0-9_-]{40,}$/.test(value)
+const VAPID_PUBLIC = toB64Url(process.env.VAPID_PUBLIC)
+const VAPID_PRIVATE = toB64Url(process.env.VAPID_PRIVATE)
+const SB_URL = cleanEnv(process.env.VITE_SB_URL)
+const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
+
+if (!isValidVapid(VAPID_PUBLIC) || !isValidVapid(VAPID_PRIVATE) || !SB_URL || !SB_ANON) {
+  console.error('Faltan credenciales VAPID o Supabase válidas')
   process.exit(1)
 }
+
 webpush.setVapidDetails('mailto:admin@times.inc', VAPID_PUBLIC, VAPID_PRIVATE)
+const SB_HEADERS = { apikey:SB_ANON, Authorization:`Bearer ${SB_ANON}` }
 
-const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
-const p2  = n => String(n).padStart(2, '0')
-const mhm = m => `${Math.floor(m/60)}h ${p2(m%60)}m`
+async function readJson(path) {
+  const response = await fetch(`${SB_URL}/rest/v1/${path}`, { headers:SB_HEADERS })
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${path}`)
+  return response.json()
+}
 
-async function sbReadData() {
-  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_HEADERS })
-  const rows = await res.json()
+async function readAppData() {
+  const rows = await readJson('app_data?id=eq.1&select=data')
   return rows?.[0]?.data || null
 }
 
-async function sbReadPushSubs() {
-  const res = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_HEADERS })
-  return (await res.json()) || []
-}
-
-async function sbDeletePushSub(userId) {
+async function deletePushSub(userId) {
   await fetch(`${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
-    method: 'DELETE', headers: SB_HEADERS
+    method:'DELETE',
+    headers:SB_HEADERS,
   }).catch(() => {})
 }
 
-async function sbMarkSent(current, key, value) {
-  if (!current) return
-  const merged = { ...current, notisSent: { ...(current.notisSent || {}), [key]: value }, _ts: Date.now() }
-  await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
-    method: 'PATCH',
-    headers: { ...SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ data: merged, updated_at: new Date().toISOString() })
-  }).catch(e => console.warn('sbMarkSent error', e.message))
+async function markSent(keys) {
+  if (!Object.keys(keys).length) return
+  const latest = await readAppData()
+  const data = {
+    ...latest,
+    notisSent:{ ...(latest.notisSent || {}), ...keys },
+    _ts:Date.now(),
+  }
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method:'PATCH',
+    headers:{ ...SB_HEADERS, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body:JSON.stringify({ data, updated_at:new Date().toISOString() }),
+  })
+  if (!response.ok) throw new Error(`No se pudo guardar la deduplicación (${response.status})`)
+}
+
+async function deliver(recipient, subscription, title, body, tag, url) {
+  if (!subscription?.endpoint) return { ok:false, skipped:true }
+  try {
+    await webpush.sendNotification(
+      { endpoint:subscription.endpoint, keys:{ p256dh:subscription.p256dh, auth:subscription.auth } },
+      JSON.stringify({ title, body, tag, url, userId:recipient.id }),
+    )
+    return { ok:true }
+  } catch (error) {
+    if (error?.statusCode === 404 || error?.statusCode === 410) await deletePushSub(recipient.id)
+    return { ok:false, error }
+  }
 }
 
 async function run() {
-  const now         = new Date()
-  const madridFmt   = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit' })
-  const madridHFmt  = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', weekday:'long' })
-  const madridHHFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', hour:'numeric', hour12: false })
-  const madridMMFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', minute:'numeric' })
-  const todayStr    = madridFmt.format(now)
-  const weekday     = madridHFmt.format(now)
-  const hh          = parseInt(madridHHFmt.format(now))
-  const mm          = parseInt(madridMMFmt.format(now))
-  const slotMin     = mm < 30 ? 0 : 30 // el workflow corre a :00 y :30
-
-  console.log(`Madrid: ${now.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} | Día: ${weekday}`)
-
-  const db = await sbReadData()
-  if (!db) { console.log('No se pudo leer Supabase.'); return }
-
-  const semanalTimes = db.config?.reminders?.semanal?.length
-    ? db.config.reminders.semanal
-    : ['17:00']
-  // Coincide si la hora configurada cae en la misma franja de 30 min que se está ejecutando ahora
-  const matched = semanalTimes.find(t => {
-    const [th, tm] = t.split(':').map(Number)
-    return th === hh && (tm < 30 ? 0 : 30) === slotMin
-  })
-
-  if (!weekday.toLowerCase().includes('fri') || !matched) {
-    console.log(`No es viernes o no coincide franja (${hh}:${p2(slotMin)} vs [${semanalTimes}]) — nada que hacer.`)
+  const now = new Date()
+  if (now.getDay() !== 6) {
+    console.log('No es sábado en Europe/Madrid; no se genera un resumen provisional.')
     return
   }
 
-  const todayDate = new Date(todayStr + 'T00:00:00')
-  const dow       = todayDate.getDay()
-  const monday    = new Date(todayDate)
-  monday.setDate(todayDate.getDate() - (dow === 0 ? 6 : dow - 1))
-  const mondayStr = madridFmt.format(monday)
+  const [db, pushSubs] = await Promise.all([
+    readAppData(),
+    readJson('push_subs?select=user_id,endpoint,p256dh,auth'),
+  ])
+  if (!db) throw new Error('No se pudo leer app_data')
 
-  const dedupKey = `an_weekly_${mondayStr}_${matched.replace(':', '')}`
-  if (db.notisSent?.[dedupKey]) {
-    console.log(`Resumen ya enviado para esta franja (${matched}) — nada que hacer.`)
-    return
-  }
+  const employees = (db.employees || []).filter(item => !item.baja && !item.isAdmin)
+  const admins = (db.employees || []).filter(item => !item.baja && (item.isAdmin || item.role === 'jefe_obra'))
+  const subs = new Map(pushSubs.map(item => [item.user_id, item]))
+  const sentKeys = {}
+  let sent = 0
 
-  console.log(`Semana: ${mondayStr} → ${todayStr}`)
+  for (const employee of employees) {
+    const summary = completedWeeklySummary(db, employee, now)
+    if (!summary) continue
 
-  const pushSubs = await sbReadPushSubs()
-
-  const employees = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-  const records   = db.records || []
-  const subsMap   = Object.fromEntries(pushSubs.map(s => [s.user_id, s]))
-
-  let enviados = 0
-  for (const emp of employees) {
-    const sub = subsMap[emp.id]
-    if (!sub?.endpoint) continue
-
-    const eRecs = records.filter(r =>
-      r.empId === emp.id && r.fin &&
-      r.inicio.slice(0, 10) >= mondayStr &&
-      r.inicio.slice(0, 10) <= todayStr
-    )
-
-    const totalMin = eRecs.reduce((s, r) => {
-      const ws = r.workSecs > 0 ? Math.floor(r.workSecs / 60) : 0
-      if (ws > 0) return s + ws
-      if (r.fin) {
-        const diff = Math.floor((new Date(r.fin) - new Date(r.inicio)) / 60000)
-        return s + Math.max(0, diff - Math.floor((r.breakSecs || 0) / 60))
-      }
-      return s
-    }, 0)
-
-    const dias    = eRecs.length
-    const nombre  = emp.name.split(' ')[0]
-    const horas   = mhm(totalMin)
-    const weeklyH = emp.horasSemanales || 40
-    const diff    = totalMin - weeklyH * 60
-    const diffStr = diff >= 0 ? `+${mhm(diff)}` : `-${mhm(Math.abs(diff))}`
-
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify({
-          title: 'Resumen semanal',
-          body: `${nombre}, esta semana: ${horas} en ${dias} día${dias!==1?'s':''} (${diffStr} vs jornada)`,
-          tag: 'weekly-summary',
-          url: '/?tab=inicio'
-        })
+    if (!db.notisSent?.[summary.employeeKey]) {
+      const result = await deliver(
+        employee,
+        subs.get(employee.id),
+        '📊 Resumen semanal definitivo',
+        employeeWeeklySummaryBody(employee, summary),
+        'resumen-semanal',
+        '/?tab=jornada',
       )
-      console.log(`  ✓ ${emp.name}: ${horas}`)
-      enviados++
-    } catch (err) {
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        await sbDeletePushSub(emp.id)
-        console.log(`  ✗ Sub expirada eliminada: ${emp.name}`)
-      } else {
-        console.warn(`  ✗ Push fallido para ${emp.name}:`, err.statusCode || err.message)
+      if (result.ok) {
+        sent++
+        sentKeys[summary.employeeKey] = summary.end
+      }
+    }
+
+    if (summary.deficitMin <= 0) continue
+    for (const admin of admins) {
+      const key = `an_weekly_deficit_${admin.id}_${employee.id}_${summary.start}`
+      if (db.notisSent?.[key]) continue
+      const result = await deliver(
+        admin,
+        subs.get(admin.id),
+        '⚠️ Déficit semanal cerrado',
+        adminWeeklyDeficitBody(employee, summary),
+        'deficit-semanal',
+        '/?go=admin:horas',
+      )
+      if (result.ok) {
+        sent++
+        sentKeys[key] = summary.end
       }
     }
   }
 
-  await sbMarkSent(db, dedupKey, true)
-  console.log(`✓ Resumen semanal enviado a ${enviados}/${employees.length} empleados`)
+  await markSent(sentKeys)
+  console.log(`Resumen semanal definitivo: ${sent} notificaciones entregadas`)
 }
 
-run().catch(e => { console.error('Error:', e.message); process.exit(1) })
+run().catch(error => {
+  console.error('Error:', error?.message || error)
+  process.exit(1)
+})

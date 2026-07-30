@@ -120,6 +120,11 @@ function fromCierre(c) {
     ...(c.data ?? {}),
     id: c.id, empId: c.emp_id, mes: c.mes,
     totalMin: c.total_min ?? 0, extraMin: c.extra_min ?? 0,
+    targetMin: c.target_min ?? c.data?.targetMin ?? 0,
+    deficitMin: c.deficit_min ?? c.data?.deficitMin ?? 0,
+    balanceMin: c.balance_min ?? c.data?.balanceMin ?? ((c.extra_min ?? 0) - (c.data?.deficitMin ?? 0)),
+    justifiedMin: c.justified_min ?? c.data?.justifiedMin ?? 0,
+    nonContractMin: c.non_contract_min ?? c.data?.nonContractMin ?? 0,
     estado: c.estado ?? 'pendiente',
     firma: firmaObj,          // campo canónico que usa la app
     firmaEmp: firmaObj,       // alias usado en algunos filtros
@@ -480,16 +485,51 @@ function _addQuarantined(table, rows) {
 // constraint violada, etc. — hace fallar el INSERT...ON CONFLICT entero),
 // reintenta fila a fila para aislar el problema en vez de perder en
 // silencio los cambios de TODAS las demás filas del lote.
+const OPTIONAL_CLOSURE_COLUMNS = [
+  'target_min',
+  'deficit_min',
+  'balance_min',
+  'justified_min',
+  'non_contract_min',
+]
+let _legacyClosureSchema = false
+
+export function rowsForAvailableSchema(table, rows, legacyClosureSchema = _legacyClosureSchema) {
+  if (table !== 'cierres' || !legacyClosureSchema) return rows
+  return rows.map(row => Object.fromEntries(
+    Object.entries(row).filter(([key]) => !OPTIONAL_CLOSURE_COLUMNS.includes(key))
+  ))
+}
+
+function isOptionalClosureSchemaError(table, error) {
+  return table === 'cierres' && error?.code === 'PGRST204' &&
+    OPTIONAL_CLOSURE_COLUMNS.some(column => String(error?.message || '').includes(column))
+}
+
 async function _upsertResilient(table, rows) {
   const pending = rows.filter(row => !_isQuarantined(table, row))
   if (!pending.length) return
-  const { error } = await supabase.from(table).upsert(pending, { onConflict: 'id' })
+  const prepared = rowsForAvailableSchema(table, pending)
+  let { error } = await supabase.from(table).upsert(prepared, { onConflict: 'id' })
   if (!error) return
+  if (isOptionalClosureSchemaError(table, error)) {
+    _legacyClosureSchema = true
+    const fallback = await supabase.from(table).upsert(
+      rowsForAvailableSchema(table, pending),
+      { onConflict: 'id' },
+    )
+    if (!fallback.error) {
+      console.info('[v2] columnas semanales de cierres pendientes de migración; valores preservados en data')
+      return
+    }
+    error = fallback.error
+  }
   console.warn(`[v2] batch upsert failed for ${table}, retrying individually:`, error.message)
   const failures = []
   const quarantined = []
   for (const row of pending) {
-    const { error: rowErr } = await supabase.from(table).upsert(row, { onConflict: 'id' })
+    const [preparedRow] = rowsForAvailableSchema(table, [row])
+    const { error: rowErr } = await supabase.from(table).upsert(preparedRow, { onConflict: 'id' })
     if (rowErr) {
       // Solo los errores de datos/integridad se aíslan con caducidad. Los
       // fallos de permisos, RLS o esquema permanecen pendientes porque pueden
