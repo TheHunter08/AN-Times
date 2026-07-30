@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 import { isValidAccountEmail, normalizeAccountEmail } from '../src/utils/authRegistration.js'
 import { evaluateRlsTransition, RLS_RUNTIME_CAPABILITIES } from '../src/config/securityReadiness.js'
 import { isPinHashed, needsRehash } from '../src/utils/pinSecurity.js'
@@ -29,18 +30,47 @@ async function rows(path) {
   return response.json()
 }
 
-const [employees, subscriptions, records, closures, blobRows] = await Promise.all([
+function serviceToken() {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
+  const secret = process.env.SUPABASE_JWT_SECRET
+  if (!secret) return null
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const now = Math.floor(Date.now() / 1000)
+  const header = encode({ alg:'HS256', typ:'JWT' })
+  const payload = encode({ role:'service_role', iss:'supabase', iat:now, exp:now + 600 })
+  const signature = createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url')
+  return `${header}.${payload}.${signature}`
+}
+
+async function readAuthUsers() {
+  const token = serviceToken()
+  if (!token) return null
+  const users = []
+  for (let page = 1; ; page++) {
+    const response = await fetch(`${url}/auth/v1/admin/users?page=${page}&per_page=1000`, {
+      headers:{ apikey:key, Authorization:`Bearer ${token}` },
+    })
+    if (!response.ok) return null
+    const batch = (await response.json())?.users || []
+    users.push(...batch)
+    if (batch.length < 1000) return users
+  }
+}
+
+const [employees, subscriptions, records, closures, blobRows, authUsers] = await Promise.all([
   rows('employees?select=id,role,baja,email,auth_id,pin_hash,data'),
   rows('push_subs?select=user_id,endpoint'),
   rows('records?select=id,fin,aceptada,validado,rechazado,closed,deleted'),
   rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,target_min,deficit_min,balance_min,justified_min,non_contract_min,data,deleted'),
   rows('app_data?select=data,updated_at&id=eq.1'),
+  readAuthUsers(),
 ])
 
 const blob = blobRows[0]?.data || {}
 const workers = employees.filter(item => !item.baja && item.role !== 'admin' && !item.isAdmin)
 const blobWorkers = (blob.employees || []).filter(item => !item.baja && item.role !== 'admin' && !item.isAdmin)
 const activeEmployees = employees.filter(item => !item.baja)
+const authUserIds = new Set((authUsers || []).map(item => item.id))
 const workerIds = new Set(workers.map(item => item.id))
 const subscribed = new Set(subscriptions.map(item => item.user_id).filter(id => workerIds.has(id)))
 const endpointCounts = new Map()
@@ -116,6 +146,14 @@ const checks = {
   employeesMissingEmail: activeEmployees.filter(item => !isValidAccountEmail(item.email)).length,
   duplicatedEmployeeEmails: [...emailCounts.values()].filter(count => count > 1).length,
   employeesMissingAuth: activeEmployees.filter(item => !item.auth_id).length,
+  authUsersAudited: Array.isArray(authUsers),
+  authUsersTotal: Array.isArray(authUsers) ? authUsers.length : null,
+  employeesWithVerifiedAuth: Array.isArray(authUsers)
+    ? activeEmployees.filter(item => item.auth_id && authUserIds.has(item.auth_id)).length
+    : null,
+  orphanedAuthLinks: Array.isArray(authUsers)
+    ? activeEmployees.filter(item => item.auth_id && !authUserIds.has(item.auth_id)).length
+    : null,
   duplicatedAuthIdentities: [...authCounts.values()].filter(count => count > 1).length,
   normalizedRecords: activeRecords.length,
   blobRecords: blobRecordIds.size,
@@ -131,15 +169,20 @@ const checks = {
   normalizedWeeklyClosures: normalizedWeeklyClosures.length,
   weeklyClosureDrift: weeklyClosureDrift.length,
 }
+const auditedCapabilities = {
+  ...RLS_RUNTIME_CAPABILITIES,
+  authIdsVerifiedAgainstAuthUsers:checks.authUsersAudited && checks.orphanedAuthLinks === 0,
+}
 const rlsTransition = evaluateRlsTransition({
   authTotal:activeEmployees.length,
   authReady:activeEmployees.length - checks.employeesMissingAuth,
   emailReady:activeEmployees.length - checks.employeesMissingEmail,
   duplicatedAuthIds:checks.duplicatedAuthIdentities,
   duplicatedEmails:checks.duplicatedEmployeeEmails,
+  capabilities:auditedCapabilities,
 })
 checks.rlsTransitionState = rlsTransition.state
-checks.rlsRuntimeCapabilities = RLS_RUNTIME_CAPABILITIES
+checks.rlsRuntimeCapabilities = auditedCapabilities
 checks.rlsRuntimeBlockers = rlsTransition.runtimeBlockers
 
 console.log(JSON.stringify(checks, null, 2))
@@ -149,5 +192,5 @@ const blockers = checks.missingDeviceSubscriptions + checks.missingSignatures + 
   checks.workerDataWithPlaintextPin + checks.workerDataWithLegacyHash +
   checks.blobWorkersWithLegacyPin + checks.blobWorkersMissingPin + checks.openRecordsMissingUpd +
   checks.pendingVacationsMissingUpd + checks.pendingExpensesMissingUpd + checks.rlsRuntimeBlockers.length +
-  checks.weeklyClosureDrift
+  checks.weeklyClosureDrift + (checks.orphanedAuthLinks || 0)
 if (process.argv.includes('--strict') && blockers) process.exitCode = 1

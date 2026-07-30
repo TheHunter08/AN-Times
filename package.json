@@ -24,6 +24,8 @@
     "repair:record-table-drift": "node scripts/repair-record-table-drift.mjs --apply",
     "audit:plaintext-pins": "node scripts/repair-plaintext-pins.mjs",
     "repair:plaintext-pins": "node scripts/repair-plaintext-pins.mjs --apply",
+    "audit:auth-identities": "node scripts/reconcile-auth-identities.mjs",
+    "repair:auth-identities": "node scripts/reconcile-auth-identities.mjs --apply",
     "audit:blob-health": "node scripts/repair-blob-table-drift.mjs",
     "repair:blob-table-drift": "node scripts/repair-blob-table-drift.mjs --apply",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
