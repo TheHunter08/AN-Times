@@ -1,11 +1,9 @@
-import { localDateStr, mhm, monthlyExtras } from './time.js'
+import { localDateStr, mhm, monthlyExtras, wkStart } from './time.js'
 import { workBalanceOptions } from './workBalance.js'
 
 export function completedWeeklySummary(db, employee, now = new Date()) {
-  if (now.getDay() !== 6) return null
-  const monday = new Date(now)
-  monday.setHours(12, 0, 0, 0)
-  monday.setDate(now.getDate() - 5)
+  if (now.getDay() !== 6 && now.getDay() !== 0) return null
+  const monday = wkStart(now)
   const weekStart = localDateStr(monday)
   const balance = monthlyExtras(
     db.records || [],
@@ -38,8 +36,11 @@ export function employeeWeeklySummaryBody(employee, summary) {
 
 export function adminWeeklyDeficitBody(employee, summary) {
   const reasons = [...new Set((summary.justifiedDays || []).map(item => item.reason).filter(Boolean))]
-  const context = reasons.length
-    ? ` Justificaciones registradas: ${reasons.join(', ')} (${mhm(summary.justified)}).`
+  const details = []
+  if (reasons.length) details.push(`Justificaciones registradas: ${reasons.join(', ')} (${mhm(summary.justifiedMin || 0)}).`)
+  if (summary.nonContractMin > 0) details.push(`Tiempo no exigible fuera del contrato: ${mhm(summary.nonContractMin)}.`)
+  const context = details.length
+    ? ` ${details.join(' ')}`
     : ' Sin justificación registrada para el déficit.'
   return `${employee.name}: -${mhm(summary.deficitMin)} en la semana ${summary.start}–${summary.end}; trabajadas ${mhm(summary.minutes)} de ${mhm(summary.targetMin)} exigibles.${context}`
 }

@@ -13,6 +13,10 @@ describe('resumen semanal definitivo', () => {
     expect(completedWeeklySummary(db, employee, new Date('2026-07-10T18:00:00'))).toBeNull()
     const summary = completedWeeklySummary(db, employee, saturday)
     expect(summary).toMatchObject({ start:'2026-07-06', minutes:480, targetMin:2400, deficitMin:1920 })
+    expect(completedWeeklySummary(db, employee, new Date('2026-07-12T10:00:00'))).toMatchObject({
+      start:'2026-07-06',
+      deficitMin:1920,
+    })
     expect(employeeWeeklySummaryBody(employee, summary)).toContain('Déficit: -32h')
     expect(adminWeeklyDeficitBody(employee, summary)).toContain('Sin justificación')
   })
@@ -25,5 +29,17 @@ describe('resumen semanal definitivo', () => {
     const summary = completedWeeklySummary(db, employee, saturday)
     expect(summary).toMatchObject({ targetMin:0, justified:2400, deficitMin:0 })
     expect(employeeWeeklySummaryBody(employee, summary)).toContain('Justificadas/no exigibles: 40h')
+  })
+
+  it('explica el tiempo no exigible fuera del contrato sin llamarlo ausencia injustificada', () => {
+    const summary = completedWeeklySummary(
+      { records:[] },
+      { ...employee, fechaInicioContrato:'2026-07-08' },
+      saturday,
+    )
+    const body = adminWeeklyDeficitBody(employee, summary)
+    expect(summary).toMatchObject({ targetMin:1440, nonContractMin:960, deficitMin:1440 })
+    expect(body).toContain('Tiempo no exigible fuera del contrato: 16h')
+    expect(body).not.toContain('Sin justificación')
   })
 })

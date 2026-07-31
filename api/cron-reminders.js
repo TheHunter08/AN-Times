@@ -80,9 +80,21 @@ function nowInSpain() {
   return new Date(str)
 }
 
+function dateKeyInSpain(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone:'Europe/Madrid',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 function todayInSpain() {
-  const d = nowInSpain()
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  return dateKeyInSpain()
 }
 
 function p2(n) { return String(n).padStart(2, '0') }
@@ -185,7 +197,7 @@ export default async function handler(req, res) {
       const sub = subMap.get(emp.id)
       const empRecs = records.filter(r => r.empId === emp.id)
       const openRec = empRecs.find(r => !r.fin)
-      const todayRecs = empRecs.filter(r => typeof r.inicio === 'string' && r.inicio.startsWith(today))
+      const todayRecs = empRecs.filter(r => r.inicio && dateKeyInSpain(r.inicio) === today)
       const hasFichado = todayRecs.length > 0
 
       // ── 1. Recordatorio de fichaje (solo lunes a viernes) ──────────────────

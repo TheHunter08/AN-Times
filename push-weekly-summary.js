@@ -1,6 +1,7 @@
 /**
  * Resumen definitivo de la semana laboral (lunes a viernes).
- * Corre el sábado y usa exactamente la misma regla que la app y los cierres.
+ * Corre el fin de semana y usa exactamente la misma regla que la app y los
+ * cierres. El domingo actúa como reintento si el envío del sábado falló.
  */
 import webpush from 'web-push'
 import {
@@ -77,8 +78,8 @@ async function deliver(recipient, subscription, title, body, tag, url) {
 
 async function run() {
   const now = new Date()
-  if (now.getDay() !== 6) {
-    console.log('No es sábado en Europe/Madrid; no se genera un resumen provisional.')
+  if (now.getDay() !== 6 && now.getDay() !== 0) {
+    console.log('No es fin de semana en Europe/Madrid; no se genera un resumen provisional.')
     return
   }
 
