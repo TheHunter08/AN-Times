@@ -4,7 +4,7 @@
 // PanelDashboard.jsx en la app real, para no duplicar ni divergir cálculos.
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, calcMin, mhm, localDateStr } from '../../utils/time.js'
+import { today, calcMin, mhm, localDateStr, isWorkday, workWeekDates } from '../../utils/time.js'
 import type { KPI, ActivityItem, VacationPerson } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 
@@ -85,14 +85,12 @@ export function useDashboardData(): DashboardData {
     }
 
     const buildTrend = (offsetWeeks: number): AreaChartPoint[] => {
-      const result: AreaChartPoint[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i - offsetWeeks * 7)
+      const reference = new Date()
+      reference.setDate(reference.getDate() - offsetWeeks * 7)
+      return workWeekDates(reference).map(date => {
         const dayMin = dayMinutes.get(localDateStr(date)) || 0
-        result.push({ label:DOW[date.getDay()], value:Math.min(100, Math.round((dayMin / wdMin) * 100)) })
-      }
-      return result
+        return { label:DOW[date.getDay()], value:Math.min(100, Math.round((dayMin / wdMin) * 100)) }
+      })
     }
 
     // Un empleado de vacaciones aprobadas hoy no fichó, pero tampoco está
@@ -101,7 +99,9 @@ export function useDashboardData(): DashboardData {
     const leavesToday = (db.vacaciones || [])
       .filter(v => v.estado === 'aprobada' && v.empId && v.fechaInicio && v.fechaFin && v.fechaInicio <= todayStr && todayStr <= v.fechaFin)
     const onLeaveTodayIds = new Set(leavesToday.map(v => v.empId as string))
-    const absentCount = emps.filter(e => !presentTodayIds.has(e.id) && !onLeaveTodayIds.has(e.id)).length
+    const absentCount = isWorkday(new Date())
+      ? emps.filter(e => !presentTodayIds.has(e.id) && !onLeaveTodayIds.has(e.id)).length
+      : 0
     const empNameById = new Map(emps.map(e => [e.id, e.name]))
     const vacationsToday: VacationPerson[] = leavesToday.map(v => ({
       id: v.empId as string,

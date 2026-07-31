@@ -125,16 +125,30 @@ export const isWorkday = value => {
   return weekday >= 1 && weekday <= 5
 }
 
-export const workWeekRecords = (records, empId, reference = new Date()) => {
+export const workWeekDates = (reference = new Date()) => {
+  const referenceDate = reference instanceof Date ? reference : new Date(reference)
+  if (isNaN(referenceDate.getTime())) return []
+  const monday = wkStart(referenceDate)
+  return Array.from({ length:5 }, (_, index) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + index)
+    return date
+  })
+}
+
+export const recordsInWorkWeek = (records, reference = new Date()) => {
   const referenceDate = reference instanceof Date ? reference : new Date(reference)
   if (isNaN(referenceDate.getTime())) return []
   const weekStartKey = localDateStr(wkStart(referenceDate))
   return (records || []).filter(record => {
-    if (!record?.fin || !record?.inicio || record.empId !== empId) return false
+    if (!record?.fin || !record?.inicio) return false
     const startedAt = new Date(record.inicio)
     return isWorkday(startedAt) && localDateStr(wkStart(startedAt)) === weekStartKey
   })
 }
+
+export const workWeekRecords = (records, empId, reference = new Date()) =>
+  recordsInWorkWeek(records, reference).filter(record => record.empId === empId)
 
 export const workWeekMinutes = (records, empId, reference = new Date()) =>
   workWeekRecords(records, empId, reference).reduce((sum, record) => sum + calcMin(record), 0)

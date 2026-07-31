@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcSecs, calcMin, recWorkSecs, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey, isWorkday, workWeekRecords, workWeekMinutes } from './time.js'
+import { calcSecs, calcMin, recWorkSecs, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey, isWorkday, workWeekDates, recordsInWorkWeek, workWeekRecords, workWeekMinutes } from './time.js'
 
 describe('localMonthKey', () => {
   it('clasifica por el mes local y no por el mes UTC', () => {
@@ -106,6 +106,10 @@ describe('semana laboral', () => {
 
     expect(isWorkday('2026-07-31T08:00:00')).toBe(true)
     expect(isWorkday('2026-08-01T08:00:00')).toBe(false)
+    expect(workWeekDates(new Date('2026-08-01T12:00:00')).map(localDateStr))
+      .toEqual(['2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'])
+    expect(recordsInWorkWeek(records, new Date('2026-07-31T12:00:00')).map(item => item.id))
+      .toEqual(['lunes', 'viernes', 'otro-empleado'])
     expect(workWeekRecords(records, 'e1', new Date('2026-07-31T12:00:00')).map(item => item.id))
       .toEqual(['lunes', 'viernes'])
     expect(workWeekMinutes(records, 'e1', new Date('2026-07-31T12:00:00'))).toBe(16 * 60)

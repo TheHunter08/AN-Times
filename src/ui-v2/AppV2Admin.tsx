@@ -24,7 +24,7 @@ import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { authSupabase } from '../services/authService.js'
-import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, vacData as vacDataUtil } from '../utils/time.js'
+import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
@@ -629,13 +629,8 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
     const now = new Date()
     const dow = now.getDay()
     const monday = new Date(now); monday.setDate(now.getDate() - ((dow + 6) % 7)); monday.setHours(0,0,0,0)
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999)
     const emps = (db.employees || []).filter((e: any) => !e.isAdmin)
-    const weekRecs = (db.records || []).filter((r: any) => {
-      if (!r.fin || !r.inicio) return false
-      const d = new Date(r.inicio)
-      return d >= monday && d <= sunday
-    })
+    const weekRecs = recordsInWorkWeek(db.records || [], now)
     const rows = weekRecs.map((r: any) => {
       const emp = emps.find((e: any) => e.id === r.empId)
       const mins = Math.round(recWorkSecs(r) / 60)
