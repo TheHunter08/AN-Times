@@ -1,19 +1,17 @@
 // Datos derivados del tab "Jornada" — misma lógica que TabJornada.jsx (legacy),
 // solo relocalizada como hook reutilizable por la página ui-v2 equivalente.
 import { useMemo } from 'react'
-import { calcSecs, calcMin, recWorkSecs, wkStart, p2, localDateStr } from '../../utils/time.js'
+import { calcSecs, calcMin, recWorkSecs, p2, localDateStr, isWorkday, workWeekRecords } from '../../utils/time.js'
 import { WD, WK } from '../../config/constants.js'
 import { isRecordPendingValidation } from '../../utils/recordValidation.js'
 
 export function useJornadaData(db: any, u: any, timer: any) {
   return useMemo(() => {
     const now = new Date()
-    const ws = wkStart(now)
-    const wsStr = localDateStr(ws)
     const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`
     const todayStr = localDateStr(now)
 
-    const weekRecs = (db.records || []).filter((r: any) => r.empId === u.id && r.fin && new Date(r.inicio) >= new Date(wsStr + 'T00:00:00'))
+    const weekRecs = workWeekRecords(db.records || [], u.id, now)
     const monthMin = (db.records || [])
       .filter((r: any) => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)).startsWith(mk))
       .reduce((s: number, r: any) => s + calcMin(r), 0)
@@ -29,8 +27,10 @@ export function useJornadaData(db: any, u: any, timer: any) {
     const brkMin = recs.reduce((a: number, r: any) => a + Math.floor((r.breakSecs || 0) / 60), 0)
     const wdEfectivo = db.config?.wdMin || WD
 
-    const weekMin = weekRecs.reduce((s: number, r: any) => s + calcMin(r), 0) + (timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0)
-    const weekMinAntes = Math.max(0, weekMin - totMin)
+    const currentDayIsWorkday = isWorkday(now)
+    const liveWeekMin = currentDayIsWorkday && timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0
+    const weekMin = weekRecs.reduce((s: number, r: any) => s + calcMin(r), 0) + liveWeekMin
+    const weekMinAntes = Math.max(0, weekMin - (currentDayIsWorkday ? totMin : 0))
     const extraMin = Math.max(0, weekMin - WK) - Math.max(0, weekMinAntes - WK)
     const normMin = Math.max(0, totMin - extraMin)
 

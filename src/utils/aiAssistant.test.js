@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { aiAnswer, buildAIContext, buildWorksiteInsights, getAIChips } from './aiAssistant.js'
 
 const admin = { id:'admin', name:'Ana Admin', role:'admin', isAdmin:true }
@@ -71,5 +71,31 @@ describe('Times AI operativo', () => {
     }, { id:'e1', name:'Empleado Uno', role:'empleado' })
     expect(answer).toContain('cambios pendientes de subir')
     expect(answer).toContain('guardados en este dispositivo')
+  })
+
+  it('no suma el fin de semana al resumen laboral de 40 horas', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-01T12:00:00'))
+    try {
+      const record = (id, inicio) => ({
+        id,
+        empId:'e1',
+        inicio,
+        fin:new Date(new Date(inicio).getTime() + 8 * 3600000).toISOString(),
+      })
+      const answer = aiAnswer('Resumen semanal', {
+        employees:[{ id:'e1', name:'Empleado Uno', role:'empleado' }],
+        records:[
+          record('lunes', '2026-07-27T08:00:00'),
+          record('sabado', '2026-08-01T08:00:00'),
+        ],
+        vacaciones:[],
+      }, { id:'e1', name:'Empleado Uno', role:'empleado' })
+
+      expect(answer).toContain('Trabajado: 8h 00m')
+      expect(answer).toContain('Jornadas: 1 día(s)')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

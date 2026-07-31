@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcSecs, calcMin, recWorkSecs, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey } from './time.js'
+import { calcSecs, calcMin, recWorkSecs, mhm, wkStart, monthlyExtras, vacData, localDateStr, localMonthKey, isWorkday, workWeekRecords, workWeekMinutes } from './time.js'
 
 describe('localMonthKey', () => {
   it('clasifica por el mes local y no por el mes UTC', () => {
@@ -84,6 +84,31 @@ describe('wkStart', () => {
     const d = wkStart(new Date('2026-07-05T10:00:00')) // domingo
     expect(d.getDay()).toBe(1)
     expect(d.getDate()).toBe(29)
+  })
+})
+
+describe('semana laboral', () => {
+  const record = (id, inicio, hours = 8) => ({
+    id,
+    empId:'e1',
+    inicio,
+    fin:new Date(new Date(inicio).getTime() + hours * 3600000).toISOString(),
+  })
+
+  it('solo considera laborables de lunes a viernes', () => {
+    const records = [
+      record('lunes', '2026-07-27T08:00:00'),
+      record('viernes', '2026-07-31T08:00:00'),
+      record('sabado', '2026-08-01T08:00:00'),
+      record('otro-empleado', '2026-07-28T08:00:00'),
+    ]
+    records[3].empId = 'e2'
+
+    expect(isWorkday('2026-07-31T08:00:00')).toBe(true)
+    expect(isWorkday('2026-08-01T08:00:00')).toBe(false)
+    expect(workWeekRecords(records, 'e1', new Date('2026-07-31T12:00:00')).map(item => item.id))
+      .toEqual(['lunes', 'viernes'])
+    expect(workWeekMinutes(records, 'e1', new Date('2026-07-31T12:00:00'))).toBe(16 * 60)
   })
 })
 

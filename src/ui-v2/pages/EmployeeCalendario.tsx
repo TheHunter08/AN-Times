@@ -5,7 +5,7 @@
 import { useState, useMemo, useRef } from 'react'
 import type { CSSProperties, TouchEvent } from 'react'
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
-import { WK, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
+import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { buildEmployeeCalendarICS, downloadICS } from '../../utils/calendarExport.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
@@ -110,7 +110,7 @@ export function EmployeeCalendario({ db, u, calMonth, setCalMonth }: EmployeeCal
     if (medDays.has(ds)) return 'medical'
     if (absDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
-    const wdEfectivo = Math.round(((u.horasSemanales || WK / 60) * 60) / 5)
+    const wdEfectivo = WD
     if (mins >= wdEfectivo * 0.9) return 'complete'
     if (mins > 0) return 'pending'
     if (ds < todayStr) return 'missing'

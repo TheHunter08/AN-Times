@@ -1,4 +1,4 @@
-import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm, localDateStr } from './time.js'
+import { p2, wkStart, calcMin, monthlyExtras, vacData, today, mhm, localDateStr, workWeekRecords, workWeekMinutes } from './time.js'
 import { WK } from '../config/constants.js'
 import { buildComplianceSummary } from './complianceSummary.js'
 import { employeeBelongsToObra, resolveRecordObraId } from './obraAttribution.js'
@@ -79,8 +79,7 @@ export function buildAIContext(db, u) {
   const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`
   const mine = (db.records || []).filter(r => r.empId === u.id)
   const fin = mine.filter(r => r.fin)
-  const ws = wkStart(now)
-  const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
+  const weekMin = workWeekMinutes(fin, u.id, now)
   // localDateStr (no r.inicio?.startsWith(mk)): inicio se guarda en UTC, mk es
   // local — un fichaje de madrugada del día 1 del mes se quedaba fuera de
   // "horas trabajadas este mes" y además desincronizaba monthMin de
@@ -129,8 +128,9 @@ export function aiAnswer(q, db, u) {
   // Semana actual y anterior
   const ws = wkStart(now)
   const prevWs = new Date(ws); prevWs.setDate(prevWs.getDate() - 7)
-  const weekMin = fin.filter(r => new Date(r.inicio) >= ws).reduce((s, r) => s + calcMin(r), 0)
-  const prevWeekMin = fin.filter(r => { const d = new Date(r.inicio); return d >= prevWs && d < ws }).reduce((s, r) => s + calcMin(r), 0)
+  const currentWeekRecords = workWeekRecords(fin, u?.id, now)
+  const weekMin = currentWeekRecords.reduce((sum, record) => sum + calcMin(record), 0)
+  const prevWeekMin = workWeekMinutes(fin, u?.id, prevWs)
 
   // localDateStr (no r.inicio?.startsWith(mk)): inicio se guarda en UTC, mk es
   // local — un fichaje de madrugada del día 1 del mes se quedaba fuera de
@@ -204,7 +204,7 @@ export function aiAnswer(q, db, u) {
 
   // Resumen semanal
   if (ql.includes('resumen') || (ql.includes('semana') && (ql.includes('cómo') || ql.includes('como') || ql.includes('va')))) {
-    const dias = fin.filter(r => new Date(r.inicio) >= ws).length
+    const dias = new Set(currentWeekRecords.map(record => localDateStr(new Date(record.inicio)))).size
     const trend = prevWeekMin > 0 ? (weekMin >= prevWeekMin ? '↑' : '↓') : ''
     return `📋 **Resumen de tu semana**\n• Trabajado: ${mhm(weekMin)} ${trend}\n• Jornadas: ${dias} día(s)\n• Media diaria: ${dias ? mhm(Math.round(weekMin / dias)) : '0h'}\n• Objetivo semanal: ${mhm(WK)}`
   }

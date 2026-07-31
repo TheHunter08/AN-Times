@@ -3,7 +3,7 @@ import { useAppStore } from '../store/appStore.js'
 import { useShallow } from 'zustand/react/shallow'
 import { lazy, Suspense } from 'react'
 import { useTimer } from '../hooks/useTimer.js'
-import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, localDateStr } from '../utils/time.js'
+import { mhm, p2, calcSecs, calcMin, gid, vacData, wkStart, today, fds, ftime, localDateStr, isWorkday, workWeekMinutes } from '../utils/time.js'
 import { calcStreak } from '../utils/streaks.js'
 import { WK } from '../config/constants.js'
 import { EmployeeHome } from '../ui-v2/pages/EmployeeHome.tsx'
@@ -664,9 +664,13 @@ export default function EmployeePage() {
         const ws = wkStart(new Date())
         const wkKey = 'an_extra40h_' + localDateStr(ws)
         if (!hasSent(wkKey)) {
-          const weekMin = (db.records || [])
-            .filter(r => r.empId === u.id && r.fin && new Date(r.inicio) >= ws)
-            .reduce((s, r) => s + calcMin(r), 0) + (openR ? Math.floor(calcSecs(openR).work / 60) : 0)
+          const now = new Date()
+          const openStartedAt = openR?.inicio ? new Date(openR.inicio) : null
+          const openBelongsToWorkWeek = openStartedAt
+            && isWorkday(openStartedAt)
+            && localDateStr(wkStart(openStartedAt)) === localDateStr(ws)
+          const weekMin = workWeekMinutes(db.records || [], u.id, now)
+            + (openR && openBelongsToWorkWeek && isWorkday(now) ? Math.floor(calcSecs(openR).work / 60) : 0)
           if (weekMin > WK) {
             markSent(wkKey)
             const extraWeekMin = weekMin - WK
@@ -1062,8 +1066,7 @@ export default function EmployeePage() {
   const homeData = useMemo(() => {
     const now = new Date()
     const todayD = localDateStr(now)
-    const empWKmin = (uh.horasSemanales || WK / 60) * 60
-    const dayMin = Math.round(empWKmin / 5)
+    const dayMin = Math.round(WK / 5)
 
     // Hoy: registros cerrados + timer vivo
     const todayRecs = (db.records || []).filter(r => r.empId === uh.id && r.inicio && localDateStr(new Date(r.inicio)) === todayD && r.fin)
@@ -1075,9 +1078,9 @@ export default function EmployeePage() {
     const pct = Math.min(100, Math.round(totMin / (dayMin || 480) * 100))
     const remainMin = Math.max(0, dayMin - totMin)
 
-    // Semana L-D
+    // Semana laboral L-V: el fin de semana no altera el objetivo ni las extras.
     const ws = wkStart(now)
-    const weekDayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+    const weekDayLabels = ['L', 'M', 'X', 'J', 'V']
     let weekMin = 0
     const week = weekDayLabels.map((label, i) => {
       const d = new Date(ws)
@@ -1086,7 +1089,7 @@ export default function EmployeePage() {
       const isToday = ds === todayD
       const dayRecs = (db.records || []).filter(r => r.empId === uh.id && r.inicio && localDateStr(new Date(r.inicio)) === ds && r.fin)
       let dm = dayRecs.reduce((s, r) => s + calcMin(r), 0)
-      if (isToday && timer.state !== 'idle') dm += Math.floor(timer.ws / 60)
+      if (isToday && isWorkday(now) && timer.state !== 'idle') dm += Math.floor(timer.ws / 60)
       weekMin += dm
       return {
         label,
@@ -1140,7 +1143,7 @@ export default function EmployeePage() {
             : 'Guardado en este dispositivo',
       syncTone: syncStatus === 'error' ? 'error' : syncStatus === 'syncing' ? 'pending' : 'ok',
     }
-  }, [db.records, timer.state, timer.ws, uh.id, uh.horasSemanales, uh.centroTrabajo, greeting, syncStatus, realtimeStatus])
+  }, [db.records, timer.state, timer.ws, uh.id, uh.centroTrabajo, greeting, syncStatus, realtimeStatus])
 
   const jornadaStats = useJornadaData(db, uh, timer)
   const jornadaPdf = useJornadaPdfExport(db, uh, toast)

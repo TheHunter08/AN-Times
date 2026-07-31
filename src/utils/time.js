@@ -118,6 +118,27 @@ export const calcMin = r => {
   return r.workSecs > 0 ? Math.floor(r.workSecs / 60) : 0
 }
 
+export const isWorkday = value => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (isNaN(date.getTime())) return false
+  const weekday = date.getDay()
+  return weekday >= 1 && weekday <= 5
+}
+
+export const workWeekRecords = (records, empId, reference = new Date()) => {
+  const referenceDate = reference instanceof Date ? reference : new Date(reference)
+  if (isNaN(referenceDate.getTime())) return []
+  const weekStartKey = localDateStr(wkStart(referenceDate))
+  return (records || []).filter(record => {
+    if (!record?.fin || !record?.inicio || record.empId !== empId) return false
+    const startedAt = new Date(record.inicio)
+    return isWorkday(startedAt) && localDateStr(wkStart(startedAt)) === weekStartKey
+  })
+}
+
+export const workWeekMinutes = (records, empId, reference = new Date()) =>
+  workWeekRecords(records, empId, reference).reduce((sum, record) => sum + calcMin(record), 0)
+
 export const gid = () => {
   const arr = new Uint32Array(2)
   ;(typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto : { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = Math.random() * 0xFFFFFFFF | 0; return a } }).getRandomValues(arr)

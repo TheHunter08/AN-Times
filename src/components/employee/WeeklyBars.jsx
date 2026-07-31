@@ -3,7 +3,7 @@ import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
 export function WeeklyBars({ db, u, timer }) {
-  const DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+  const DAYS = ['Lun','Mar','Mié','Jue','Vie']
   const now = new Date()
   const dow = (now.getDay() + 6) % 7
   const ws = wkStart(now)
@@ -16,7 +16,7 @@ export function WeeklyBars({ db, u, timer }) {
     // aparecía vacía aunque el total semanal sí incluyera esas horas.
     let min = (db.records || []).filter(r => r.empId === u.id && r.fin && r.inicio && localDateStr(new Date(r.inicio)) === ds)
       .reduce((s, r) => s + calcMin(r), 0)
-    if (i === dow && timer.state !== 'idle') min += Math.floor(timer.ws / 60)
+    if (i === dow && now.getDay() >= 1 && now.getDay() <= 5 && timer.state !== 'idle') min += Math.floor(timer.ws / 60)
     return { label, min, isToday: i === dow }
   })
   const maxMin = Math.max(1, ...bars.map(b => b.min))
