@@ -217,9 +217,23 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const pdfCols = pdfColors(rgb)
       const now2 = new Date()
       const ws2 = wkStart(now2)
-      const weekRecs2 = (db.records || []).filter((r: any) => r.empId === u.id && r.fin && r.inicio && new Date(r.inicio) >= ws2).sort((a: any, b: any) => a.inicio.localeCompare(b.inicio))
-      const totalMin2 = weekRecs2.reduce((s: number, r: any) => s + calcMin(r), 0)
-      const weekLabel = `Semana del ${ws2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} al ${now2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`
+      const weekEnd2 = new Date(ws2)
+      weekEnd2.setDate(ws2.getDate() + 4)
+      const weekStartKey = localDateStr(ws2)
+      const weekBalance = monthlyExtras(
+        db.records || [],
+        u.id,
+        weekStartKey.slice(0, 7),
+        workBalanceOptions(db, u, { now:now2 }),
+      ).weekly.find((week: any) => week.start === weekStartKey)
+      const weekRecs2 = (db.records || []).filter((r: any) => {
+        if (r.empId !== u.id || !r.fin || !r.inicio) return false
+        const startedAt = new Date(r.inicio)
+        const weekday = startedAt.getDay()
+        return startedAt >= ws2 && weekday >= 1 && weekday <= 5
+      }).sort((a: any, b: any) => a.inicio.localeCompare(b.inicio))
+      const totalMin2 = weekBalance?.minutes || 0
+      const weekLabel = `Semana laboral del ${ws2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} al ${weekEnd2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`
       const pdfDoc = await PDFDocument.create()
       const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -252,13 +266,23 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
         y = drawTableDataRow(page, { ml: ML, cw: CW, y, vals, cols: COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB, highlightIdx: 4, rowH: ROW_H })
       })
       if (y - 40 < 35 + SIG_AREA) { newPage() }
-      const targetMin2 = weekRecs2.length * 480
-      const diffMin2 = totalMin2 - targetMin2
-      const diffSign = diffMin2 >= 0 ? '+' : ''
-      const cDiff = diffMin2 >= 0 ? pdfCols.green : pdfCols.red
+      const targetMin2 = weekBalance?.targetMin ?? 2400
+      const extraMin2 = weekBalance?.extraMin || 0
+      const deficitMin2 = weekBalance?.deficitMin || 0
+      const remainingMin2 = Math.max(0, targetMin2 - totalMin2)
+      const completedWeek = Boolean(weekBalance?.completed)
+      const balanceMin2 = extraMin2 - deficitMin2
+      const cDiff = completedWeek
+        ? (balanceMin2 >= 0 ? pdfCols.green : pdfCols.red)
+        : (remainingMin2 > 0 ? pdfCols.gray : pdfCols.green)
       page.drawRectangle({ x: ML, y: y - 40, width: CW, height: 40, color: pdfCols.priLt, borderColor: pdfCols.pri, borderWidth: 0.6 })
-      page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${weekRecs2.length} jornada${weekRecs2.length !== 1 ? 's' : ''} registrada${weekRecs2.length !== 1 ? 's' : ''}`, { x: ML + 8, y: y - 14, size: 8.5, font: fontB, color: pdfCols.pri })
-      page.drawText(`Objetivo: ${mhm(targetMin2)}   Desviación: ${diffSign}${mhm(Math.abs(diffMin2))}`, { x: ML + 8, y: y - 30, size: 7.5, font: fontR, color: cDiff, maxWidth: CW - 16 })
+      page.drawText(`TOTAL: ${mhm(totalMin2)}   ·   ${weekRecs2.length} registro${weekRecs2.length !== 1 ? 's' : ''}`, { x: ML + 8, y: y - 14, size: 8.5, font: fontB, color: pdfCols.pri })
+      page.drawText(
+        completedWeek
+          ? `Objetivo semanal: ${mhm(targetMin2)}   ·   Extra: +${mhm(extraMin2)}   ·   Déficit: -${mhm(deficitMin2)}`
+          : `Objetivo semanal: ${mhm(targetMin2)}   ·   Progreso: ${remainingMin2 > 0 ? `faltan ${mhm(remainingMin2)}` : `+${mhm(extraMin2)} extra`}   ·   Se cierra el viernes`,
+        { x: ML + 8, y: y - 30, size: 7.5, font: fontR, color: cDiff, maxWidth: CW - 16 },
+      )
       y -= 48
       if (y - SIG_AREA < 30) { newPage() }
       y -= 10
