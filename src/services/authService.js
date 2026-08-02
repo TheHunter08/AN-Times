@@ -163,6 +163,13 @@ export async function getAuthSession() {
   return data?.session || null
 }
 
+// Callback para el cliente de datos autenticado. Supabase admite un proveedor
+// de access token externo: así Auth conserva la única sesión persistida y el
+// cliente PostgREST/Realtime usa siempre el JWT vigente sin duplicarlo.
+export async function getAuthAccessToken() {
+  return (await getAuthSession())?.access_token || null
+}
+
 export function onAuthStateChange(cb) {
   if (!supabase) return { data: { subscription: { unsubscribe: () => {} } } }
   return supabase.auth.onAuthStateChange(cb)

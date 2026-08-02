@@ -11,7 +11,7 @@ import { timingSafeEqual } from 'crypto'
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON    = cleanEnv(process.env.VITE_SB_ANON)
-const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY)
+const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
 
 const KEY  = SB_SERVICE || SB_ANON
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   try {
     // 1. Leer blob
     const blobRes = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, {
-      headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+      headers:SB_H
     })
     const blobRows = await blobRes.json()
     const db = blobRows?.[0]?.data || {}

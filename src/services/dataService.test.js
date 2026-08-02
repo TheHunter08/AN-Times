@@ -236,4 +236,9 @@ describe('withPhase1RestAuth: mantiene PostgREST en el rol anon durante Fase 1',
     const opts = { headers: { Authorization: 'Bearer external.jwt' } }
     expect(withPhase1RestAuth('https://example.com/rest/v1/employees', opts)).toBe(opts)
   })
+
+  it('conserva el JWT oficial al activar explícitamente la ruta autenticada', () => {
+    const opts = { headers: { Authorization: 'Bearer authenticated.user.jwt' } }
+    expect(withPhase1RestAuth(projectRestUrl, opts, true)).toBe(opts)
+  })
 })

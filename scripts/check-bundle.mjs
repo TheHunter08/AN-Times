@@ -22,12 +22,13 @@ if (totalGzip > INITIAL_BUDGET) {
 const assetNames = await readdir(new URL('assets/', DIST))
 const precacheSource = await readFile(new URL('sw.js', DIST), 'utf8')
 const forbiddenPrecache = assetNames.filter(name =>
-  /^(localai-|localAI\.worker-)/i.test(name) && precacheSource.includes(name)
+  /^(localai-|localAI\.worker-|preview-)/i.test(name) && precacheSource.includes(name)
 )
+if (precacheSource.includes('uiv2-preview.html')) forbiddenPrecache.push('uiv2-preview.html')
 if (forbiddenPrecache.length) {
-  throw new Error(`La IA local pesada entró en el precache: ${forbiddenPrecache.join(', ')}`)
+  throw new Error(`Activos internos o pesados entraron en el precache: ${forbiddenPrecache.join(', ')}`)
 }
 
 console.log(`App shell inicial: ${(totalGzip / 1024).toFixed(1)} KiB gzip / 230 KiB`)
 console.log(`Activos iniciales: ${rows.map(row => row.file).join(', ')}`)
-console.log(`IA local excluida del precache: correcto`)
+console.log(`IA local y preview interno excluidos del precache: correcto`)

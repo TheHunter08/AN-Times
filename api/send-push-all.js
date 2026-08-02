@@ -20,12 +20,13 @@ if (!isValid(VAPID_PUBLIC) || !isValid(VAPID_PRIVATE)) {
 
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 if (!SB_URL || !SB_ANON) console.error('[send-push-all] VITE_SB_URL / VITE_SB_ANON not set')
 
 // Usar solo CRON_SECRET (sin prefijo VITE_) para que no quede expuesto en el bundle del cliente
 const CRON_SECRET = process.env.CRON_SECRET
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 
 // Este endpoint (broadcast a toda/parte de la plantilla) no tenía ningún
 // rate-limit — dado que la vía "browser" solo autentica por Origin (falsificable

@@ -62,7 +62,9 @@ const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : null
 const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 if (!SB_URL || !SB_ANON) console.error('[sendpush] VITE_SB_URL / VITE_SB_ANON not set')
+const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 const PUSH_SECRET   = process.env.PUSH_SECRET
 const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
@@ -82,7 +84,7 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 async function sbGet(userId) {
   if (!SB_URL || !SB_ANON) return null
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=user_id,endpoint,p256dh,auth&order=updated_at.desc&limit=1`
-  const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } })
+  const r = await fetch(url, { headers:SB_H })
   if (!r.ok) return null
   const rows = await r.json()
   return rows?.[0] || null
@@ -91,7 +93,7 @@ async function sbGet(userId) {
 async function sbGetAll() {
   if (!SB_URL || !SB_ANON) return []
   const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`
-  const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } })
+  const r = await fetch(url, { headers:SB_H })
   if (!r.ok) return []
   return await r.json()
 }
@@ -99,7 +101,7 @@ async function sbGetAll() {
 async function sbDelete(userId) {
   if (!SB_URL || !SB_ANON) return
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`
-  await fetch(url, { method: 'DELETE', headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }).catch(() => {})
+  await fetch(url, { method: 'DELETE', headers:SB_H }).catch(() => {})
 }
 
 async function claimPushDelivery(userId, dedupeKey, tag, title, body) {
@@ -112,7 +114,7 @@ async function claimPushDelivery(userId, dedupeKey, tag, title, body) {
   try {
     const response = await fetch(`${SB_URL}/rest/v1/app_entities?on_conflict=id`, {
       method:'POST',
-      headers:{ apikey:SB_ANON, Authorization:`Bearer ${SB_ANON}`, 'Content-Type':'application/json', Prefer:'resolution=ignore-duplicates,return=representation' },
+      headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'resolution=ignore-duplicates,return=representation' },
       body:JSON.stringify({
         id:`push_delivery:${digest}`, company_id:COMPANY_ID, collection:'push_delivery', entity_id:digest,
         data:{ userId, dedupeKey:dedupeKey || null, expiresAt:new Date(Date.now() + 30 * 86400000).toISOString() },
@@ -135,7 +137,7 @@ async function releasePushDelivery(id) {
   const url = `${SB_URL}/rest/v1/app_entities?id=eq.${encodeURIComponent(id)}`
   await fetch(url, {
     method: 'DELETE',
-    headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` },
+    headers:SB_H,
   }).catch(() => {})
 }
 

@@ -16,7 +16,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 const cleanEnv    = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL      = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON     = cleanEnv(process.env.VITE_SB_ANON)
-const SB_SERVICE  = cleanEnv(process.env.SB_SERVICE_KEY)
+const SB_SERVICE  = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
 
 const SB_H_ANON    = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
@@ -35,8 +35,8 @@ export default async function handler(req, res) {
 
   try {
     const [hotRes, coldRes] = await Promise.all([
-      fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_H_ANON }),
-      fetch(`${SB_URL}/rest/v1/app_data?id=eq.3&select=data,updated_at`, { headers: SB_H_ANON }),
+      fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_H_STORAGE }),
+      fetch(`${SB_URL}/rest/v1/app_data?id=eq.3&select=data,updated_at`, { headers: SB_H_STORAGE }),
     ])
 
     const hot  = hotRes.ok  ? (await hotRes.json())[0]  : null

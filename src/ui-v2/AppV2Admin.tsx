@@ -985,9 +985,11 @@ function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) =
       dept: e.dept || e.centroTrabajo || '',
       week: weekDays.map(d => {
         const isWeekend = d.getDay() === 0 || d.getDay() === 6
-        if (isWeekend) return { status: 'weekend' as const }
         const dateStr = localDateStr(d)
         const turno = turnos.find((t: any) => t.empId === e.id && t.fecha === dateStr)
+        // Un turno asignado en sábado o domingo es trabajo planificado, no
+        // descanso. Solo mostramos "fin de semana" cuando no existe turno.
+        if (!turno && isWeekend) return { status: 'weekend' as const }
         if (!turno) return {}
         return {
           type: (turno.tipo === 'guardia' || turno.tipo === 'vacaciones' || turno.tipo === 'libre' ? turno.tipo : 'normal') as 'normal' | 'guardia' | 'vacaciones' | 'libre',

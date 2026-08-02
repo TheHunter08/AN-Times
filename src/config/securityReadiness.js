@@ -1,8 +1,10 @@
+import { isAuthenticatedDataPathEnabled } from './dataAuthMode.js'
+
 // Estado real de la transición RLS. Estas capacidades solo deben cambiar a
 // true cuando el flujo correspondiente esté implementado y probado de extremo
 // a extremo. Tener todos los auth_id poblados es necesario, pero no suficiente.
 export const RLS_RUNTIME_CAPABILITIES = Object.freeze({
-  authenticatedDataPath:false,
+  authenticatedDataPath:isAuthenticatedDataPathEnabled(),
   pinSupabaseSessions:false,
   authIdsVerifiedAgainstAuthUsers:false,
   legacyBlobRetired:false,

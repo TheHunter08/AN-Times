@@ -13,15 +13,16 @@ Las programaciones se guardan en `db.config.reportSchedules`. No envían correos
 
 ## Activación de Supabase Auth/RLS
 
-1. Ejecutar `supabase/auth-readiness.sql` en un entorno de prueba.
-2. Completar el email de todos los empleados activos que todavía no lo tengan.
-3. Cada empleado crea su cuenta desde `Email` > `Primera vez: crear cuenta` y confirma el enlace recibido. El alta solo acepta emails que ya pertenezcan a un empleado activo.
-4. Al primer acceso confirmado, la app vincula de forma segura `employees.auth_id` con `auth.users.id` y rechaza identidades distintas para un empleado ya vinculado.
-5. Confirmar que el resultado de readiness es `LISTO_PARA_PRUEBA_CONTROLADA`.
-6. Hacer backup de `app_data` y las tablas V2.
-7. Aplicar `supabase/policies_auth.sql` primero en staging.
-8. Probar empleado, encargado, jefe de obra y administrador.
-9. Activar en producción solo dentro de una ventana de mantenimiento con rollback preparado.
+1. Ejecutar `npm run backup:production` y conservar el JSON junto a su checksum fuera del repositorio.
+2. Ejecutar `supabase/auth-readiness.sql` y `supabase/launch-security-preflight.sql` en un entorno de prueba.
+3. Completar el email de todos los empleados activos que todavía no lo tengan.
+4. Cada empleado crea su cuenta desde `Email` > `Primera vez: crear cuenta` y confirma el enlace recibido. El alta solo acepta emails que ya pertenezcan a un empleado activo.
+5. Al primer acceso confirmado, la app vincula de forma segura `employees.auth_id` con `auth.users.id` y rechaza identidades distintas para un empleado ya vinculado.
+6. Confirmar que `SB_SERVICE_KEY` existe en las funciones servidor y que `npm run verify:rls-readiness` no devuelve bloqueos.
+7. Desplegar primero con `VITE_DATA_AUTH_MODE=authenticated`, sin cambiar todavía las políticas, y probar sesiones email, Realtime y sincronización.
+8. Aplicar `supabase/policies_auth.sql` primero en staging. El script protege también `app_data`, `push_subs` y el RPC de delta.
+9. Probar empleado, encargado, jefe de obra y administrador: entrada, pausa, salida, vacaciones, gastos, chat, documentos, push y cierre.
+10. Activar en producción solo dentro de una ventana de mantenimiento. Ante cualquier fallo, ejecutar inmediatamente `supabase/policies_auth_rollback.sql` y volver a `VITE_DATA_AUTH_MODE=phase1-anon`.
 
 No se deben eliminar las políticas actuales antes de completar la vinculación de todos los usuarios activos.
 

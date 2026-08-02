@@ -20,6 +20,7 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const CRON_SECRET   = process.env.CRON_SECRET
 const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
@@ -36,7 +37,7 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
   }
 }
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 async function getSyncState() {
   if (!SB_URL || !SB_ANON) return { candidates: [], coverage: getDeviceCoverage() }
   const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`

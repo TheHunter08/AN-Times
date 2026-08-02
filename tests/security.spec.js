@@ -4,7 +4,7 @@ import { loginAsEmployee } from './helpers/session.js'
 test('migra una sesión antigua sin conservar PIN ni ficha personal duplicada', async ({ page }) => {
   await loginAsEmployee(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name:/Buenas/ })).toBeVisible({ timeout:15000 })
+  await expect(page.getByRole('heading', { name:/Buenos días|Buenas tardes|Buenas noches/ })).toBeVisible({ timeout:15000 })
 
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_ses') || 'null'))
   expect(persisted.user).toEqual({
@@ -15,4 +15,3 @@ test('migra una sesión antigua sin conservar PIN ni ficha personal duplicada', 
   expect(persisted.user).not.toHaveProperty('pin')
   expect(persisted.user).not.toHaveProperty('centroTrabajo')
 })
-

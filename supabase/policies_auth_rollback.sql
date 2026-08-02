@@ -48,6 +48,24 @@ DROP POLICY IF EXISTS "emp_read_obras" ON obras;
 DROP POLICY IF EXISTS "admin_manage_obras" ON obras;
 CREATE POLICY "anon_all" ON obras FOR ALL TO anon USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "linked_read_app_data" ON app_data;
+DROP POLICY IF EXISTS "linked_insert_app_data" ON app_data;
+DROP POLICY IF EXISTS "linked_update_app_data" ON app_data;
+DROP POLICY IF EXISTS "app_data_select_anon" ON app_data;
+DROP POLICY IF EXISTS "app_data_insert_anon" ON app_data;
+DROP POLICY IF EXISTS "app_data_update_anon" ON app_data;
+CREATE POLICY "app_data_select_anon" ON app_data FOR SELECT TO anon USING (true);
+CREATE POLICY "app_data_insert_anon" ON app_data FOR INSERT TO anon WITH CHECK (id IN (1, 2, 3));
+CREATE POLICY "app_data_update_anon" ON app_data FOR UPDATE TO anon USING (id IN (1, 2, 3)) WITH CHECK (id IN (1, 2, 3));
+GRANT EXECUTE ON FUNCTION public.apply_app_data_delta(jsonb, jsonb, timestamptz) TO anon, authenticated;
+
+DROP POLICY IF EXISTS "employee_read_own_push" ON push_subs;
+DROP POLICY IF EXISTS "employee_insert_own_push" ON push_subs;
+DROP POLICY IF EXISTS "employee_update_own_push" ON push_subs;
+DROP POLICY IF EXISTS "employee_delete_own_push" ON push_subs;
+DROP POLICY IF EXISTS "push_subs_all_anon" ON push_subs;
+CREATE POLICY "push_subs_all_anon" ON push_subs FOR ALL TO anon USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS "emp_read_entities" ON app_entities;
 DROP POLICY IF EXISTS "admin_manage_entities" ON app_entities;
 CREATE POLICY "app_entities_anon_phase1" ON app_entities FOR ALL TO anon USING (true) WITH CHECK (true);

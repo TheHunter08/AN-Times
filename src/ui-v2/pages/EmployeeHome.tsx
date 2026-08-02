@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import {
   IconArrowLeft,
@@ -140,6 +140,7 @@ export function EmployeeHome({
   const holdCompletedRef = useRef(false)
   const holdStartedAtRef = useRef(0)
   const frameRef = useRef<number | null>(null)
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintId = useId()
 
@@ -155,21 +156,29 @@ export function EmployeeHome({
       frameRef.current = null
     }
   }, [])
+  const clearCompletionTimer = useCallback(() => {
+    if (completionTimerRef.current !== null) {
+      clearTimeout(completionTimerRef.current)
+      completionTimerRef.current = null
+    }
+  }, [])
   const pointerStartRef = useRef({ id: -1, x: 0, y: 0 })
 
   const cancelHold = useCallback(() => {
     if (!holdActiveRef.current || holdCompletedRef.current) return
     holdActiveRef.current = false
     clearFrame()
+    clearCompletionTimer()
     setHoldProgress(0)
     setHoldPhase('ready')
-  }, [clearFrame])
+  }, [clearCompletionTimer, clearFrame])
 
   const completeHold = useCallback(() => {
     if (holdCompletedRef.current) return
     holdActiveRef.current = false
     holdCompletedRef.current = true
     clearFrame()
+    clearCompletionTimer()
     setHoldProgress(100)
     setHoldPhase('confirmed')
 
@@ -183,7 +192,7 @@ export function EmployeeHome({
       setHoldProgress(0)
       setHoldPhase('ready')
     }, 450)
-  }, [clearFrame])
+  }, [clearCompletionTimer, clearFrame])
 
   const beginHold = useCallback(() => {
     if (holdActiveRef.current || holdPhase !== 'ready') return
@@ -198,6 +207,11 @@ export function EmployeeHome({
     setHoldPhase('holding')
     const startedAt = performance.now()
     holdStartedAtRef.current = startedAt
+    // El temporizador es la fuente de verdad. requestAnimationFrame solo pinta
+    // el progreso y puede ser throttled en móviles lentos o bajo carga.
+    completionTimerRef.current = setTimeout(() => {
+      if (holdActiveRef.current) completeHold()
+    }, HOLD_DURATION)
 
     const update = (now: number) => {
       if (!holdActiveRef.current) return
@@ -226,15 +240,17 @@ export function EmployeeHome({
 
   useEffect(() => () => {
     clearFrame()
+    clearCompletionTimer()
     if (resetTimerRef.current !== null) clearTimeout(resetTimerRef.current)
-  }, [clearFrame])
+  }, [clearCompletionTimer, clearFrame])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Al pasar de "sin jornada" a "trabajando" (o viceversa), React conserva
     // la misma instancia del botón. Sin este reinicio podía seguir 450 ms en
-    // fase `confirmed` y rechazar una segunda pulsación válida, especialmente
-    // cuando el usuario confirmaba rápidamente el centro de trabajo.
+    // fase `confirmed` y rechazar una segunda pulsación válida. Layout effect
+    // lo reinicia antes de que el botón del nuevo estado pueda recibir eventos.
     clearFrame()
+    clearCompletionTimer()
     if (resetTimerRef.current !== null) {
       clearTimeout(resetTimerRef.current)
       resetTimerRef.current = null
@@ -244,7 +260,7 @@ export function EmployeeHome({
     pointerStartRef.current.id = -1
     setHoldProgress(0)
     setHoldPhase('ready')
-  }, [state, clearFrame])
+  }, [state, clearCompletionTimer, clearFrame])
 
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return

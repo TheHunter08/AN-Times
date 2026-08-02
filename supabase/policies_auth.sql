@@ -5,9 +5,10 @@
 -- Bloqueos de runtime confirmados:
 --   1. El acceso PIN no dispone todavía de una sesión oficial de Supabase
 --      Auth. El antiguo JWT HS256 personalizado está retirado.
---   2. dataService fuerza PostgREST al rol anon durante la Fase 1.
---   3. app_data conserva el blob completo y políticas anon propias; proteger
---      solo las tablas V2 no elimina esa vía de lectura/escritura.
+--   2. dataService mantiene PostgREST en anon salvo que el despliegue use
+--      VITE_DATA_AUTH_MODE=authenticated.
+--   3. app_data conserva el blob completo. Este script ya elimina sus políticas
+--      anon, pero no debe aplicarse hasta validar el cliente autenticado.
 --
 -- Este archivo describe el objetivo de políticas, no es por sí solo un
 -- procedimiento de activación. La fuente de verdad ejecutable es
@@ -47,8 +48,8 @@
 --        LEFT JOIN auth.users u ON u.id = e.auth_id
 --        WHERE NOT e.baja AND (e.auth_id IS NULL OR u.id IS NULL);
 --      Cualquier fila bloquea la activación: ese usuario perdería acceso.
---   2. Retirar/proteger app_data y validar clientes de datos + Realtime con
---      sesiones email y PIN reales.
+--   2. Validar cliente de datos + Realtime con sesiones reales y confirmar que
+--      todas las funciones servidor usan SB_SERVICE_KEY.
 --   3. Ejecutar este script completo. Las líneas DROP POLICY IF EXISTS
 --      "anon_all" ya están incluidas — no hace falta borrarlas a mano
 --      antes.
@@ -257,6 +258,52 @@ CREATE POLICY "admin_manage_obras" ON obras
   FOR ALL TO authenticated
   USING (auth_is_admin() AND auth_same_company(company_id))
   WITH CHECK (auth_is_admin() AND auth_same_company(company_id));
+
+-- ── app_data (blob legacy durante la retirada) ────────────────────────────
+-- Sigue siendo necesario para configuración, firmas y compatibilidad offline,
+-- pero deja de estar expuesto a cualquier poseedor de la anon key. Solo una
+-- identidad Auth enlazada puede leer/escribir las filas de transición.
+DROP POLICY IF EXISTS "app_data_select_anon" ON app_data;
+DROP POLICY IF EXISTS "app_data_insert_anon" ON app_data;
+DROP POLICY IF EXISTS "app_data_update_anon" ON app_data;
+
+CREATE POLICY "linked_read_app_data" ON app_data
+  FOR SELECT TO authenticated
+  USING (id IN (1, 2, 3) AND auth_company_id() IS NOT NULL);
+
+CREATE POLICY "linked_insert_app_data" ON app_data
+  FOR INSERT TO authenticated
+  WITH CHECK (id IN (1, 2, 3) AND auth_company_id() IS NOT NULL);
+
+CREATE POLICY "linked_update_app_data" ON app_data
+  FOR UPDATE TO authenticated
+  USING (id IN (1, 2, 3) AND auth_company_id() IS NOT NULL)
+  WITH CHECK (id IN (1, 2, 3) AND auth_company_id() IS NOT NULL);
+
+REVOKE EXECUTE ON FUNCTION public.apply_app_data_delta(jsonb, jsonb, timestamptz) FROM anon;
+GRANT EXECUTE ON FUNCTION public.apply_app_data_delta(jsonb, jsonb, timestamptz) TO authenticated;
+
+-- ── push_subs ──────────────────────────────────────────────────────────────
+-- Los endpoints push son credenciales del dispositivo. Cada empleado solo
+-- gestiona los suyos; las funciones servidor usan SB_SERVICE_KEY y omiten RLS.
+DROP POLICY IF EXISTS "push_subs_all_anon" ON push_subs;
+
+CREATE POLICY "employee_read_own_push" ON push_subs
+  FOR SELECT TO authenticated
+  USING (user_id = auth_emp_id() OR auth_is_admin());
+
+CREATE POLICY "employee_insert_own_push" ON push_subs
+  FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth_emp_id());
+
+CREATE POLICY "employee_update_own_push" ON push_subs
+  FOR UPDATE TO authenticated
+  USING (user_id = auth_emp_id())
+  WITH CHECK (user_id = auth_emp_id());
+
+CREATE POLICY "employee_delete_own_push" ON push_subs
+  FOR DELETE TO authenticated
+  USING (user_id = auth_emp_id() OR auth_is_admin());
 
 -- ── app_entities (fase de migración granular) ───────────────────────────────
 DROP POLICY IF EXISTS "app_entities_anon_phase1" ON app_entities;

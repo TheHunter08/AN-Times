@@ -52,12 +52,14 @@ test('completa una entrada y una salida y conserva el fichaje cerrado', async ({
   await page.goto('/')
 
   const hold = async (button) => {
-    const box = await button.boundingBox()
-    expect(box).not.toBeNull()
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(button).toBeVisible({ timeout:15000 })
+    // `hover` espera a que el elemento sea visible, accionable y tenga una
+    // posición estable. Un boundingBox tomado durante el primer reflow podía
+    // dejar el puntero en las coordenadas antiguas y simular una pulsación
+    // fuera del botón, especialmente con varios navegadores en paralelo.
+    await button.hover()
     await page.mouse.down()
-    // Margen sobre HOLD_DURATION: en emulación móvil requestAnimationFrame
-    // puede perder un frame cuando el estado acaba de cambiar.
+    // Margen sobre HOLD_DURATION para incluir la cola de eventos del navegador.
     await page.waitForTimeout(550)
     await page.mouse.up()
   }

@@ -23,7 +23,15 @@ export default defineConfig({
         // El chunk de la IA local (@mlc-ai/web-llm) pesa varios MB y solo se descarga
         // si el usuario activa explícitamente "IA avanzada offline" — no forma parte
         // del app shell, así que no debe precachearse con el resto de la PWA.
-        globIgnores: ['**/localai-*.js', '**/localAI.worker-*.js'],
+        globIgnores: [
+          '**/localai-*.js',
+          '**/localAI.worker-*.js',
+          // La página de preview es una herramienta interna de diseño. Se
+          // compila para desarrollo, pero no debe ocupar la caché offline de
+          // los empleados ni retrasar una actualización crítica del shell.
+          'uiv2-preview.html',
+          '**/preview-*.js',
+        ],
       },
       manifest: {
         id: '/',
@@ -80,15 +88,6 @@ export default defineConfig({
             description: 'Chat con el administrador',
             url: '/?tab=mensajes',
             icons: [{ src: '/icon.svg', sizes: 'any' }]
-          }
-        ],
-        screenshots: [
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            form_factor: 'narrow',
-            label: 'TIMES INC — Control de jornada'
           }
         ]
       }

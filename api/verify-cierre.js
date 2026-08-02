@@ -11,7 +11,8 @@
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
-const SB_H    = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+const SB_H    = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 
 const HASH_RE = /^[a-f0-9]{64}$/i
 

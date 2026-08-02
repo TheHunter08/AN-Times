@@ -21,11 +21,8 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Instalar Chromium para pruebas de interfaz
+        run: npx playwright install --with-deps chromium
 
-      - name: Tests unitarios
-        run: npm run test
-
-      - name: Build
-        run: npm run build
+      - name: Verificar release completo
+        run: npm run verify:release

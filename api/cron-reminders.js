@@ -25,6 +25,7 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 if (!SB_URL || !SB_ANON) console.error('[cron-reminders] VITE_SB_URL / VITE_SB_ANON not set')
 const CRON_SECRET   = process.env.CRON_SECRET
 
@@ -41,7 +42,7 @@ if (!VAPID_PRIVATE) {
   }
 }
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 
 async function getAppData() {
   const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_H })

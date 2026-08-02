@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
+import { isAuthenticatedDataPathEnabled } from '../config/dataAuthMode.js'
 import { dedupeNotifications } from '../utils/notifications.js'
+import { getAuthAccessToken } from './authService.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -29,7 +31,8 @@ const _FETCH_TIMEOUT_MS = 9000
 // Se fuerza la clave anon SOLO para PostgREST/RPC. Auth conserva su JWT y
 // Storage sigue usando la sesión autenticada (sus políticas sí la necesitan).
 // Al activar policies_auth.sql habrá que retirar este puente de Fase 1.
-export function withPhase1RestAuth(url, options = {}) {
+export function withPhase1RestAuth(url, options = {}, authenticatedDataPath = isAuthenticatedDataPathEnabled()) {
+  if (authenticatedDataPath) return options
   let isProjectRestRequest = false
   try {
     const requestUrl = new URL(String(url))
@@ -55,6 +58,7 @@ function _timeoutFetch(url, options = {}) {
 
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
 const _SUPABASE_SINGLETON_KEY = '__times_inc_supabase_data_v2__'
+const _authenticatedDataPath = isAuthenticatedDataPathEnabled()
 export const supabase = (SB_URL && SB_ANON)
   ? (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, {
       global: { fetch: _timeoutFetch },
@@ -62,12 +66,16 @@ export const supabase = (SB_URL && SB_ANON)
       // restaurar ni adoptar una sesión de Supabase Auth: si lo hiciera,
       // PostgREST y Realtime cambiarían de `anon` a `authenticated` después
       // del login y dejarían de cumplir las políticas activas `anon_all`.
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        storageKey: 'times-inc-data-anon',
-      },
+      ...(_authenticatedDataPath
+        ? { accessToken:getAuthAccessToken }
+        : {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false,
+              storageKey: 'times-inc-data-anon',
+            },
+          }),
     }))
   : null
 

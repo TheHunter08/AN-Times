@@ -33,12 +33,13 @@ import { timingSafeEqual } from 'crypto'
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL          = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON         = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE      = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const WA_TOKEN        = process.env.WHATSAPP_TOKEN
 const WA_PHONE_ID     = process.env.WHATSAPP_PHONE_ID
 const VERIFY_TOKEN    = process.env.WHATSAPP_VERIFY_TOKEN
 const WEBHOOK_SECRET  = process.env.WHATSAPP_WEBHOOK_SECRET
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 
 function isAuthorizedRequest(req) {
   if (!WEBHOOK_SECRET) return false
