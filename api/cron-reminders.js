@@ -100,18 +100,18 @@ function todayInSpain() {
 
 function p2(n) { return String(n).padStart(2, '0') }
 
-async function sendPush(sub, payload, empName) {
+async function sendPush(sub, payload, employeeId) {
   await webpush.sendNotification(
     { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
     payload
   )
-  console.log(`[cron] push sent → ${empName}`)
+  console.log(`[cron] push sent → employee:${employeeId}`)
 }
 
 const WA_TOKEN    = process.env.WHATSAPP_TOKEN
 const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID
 
-async function sendWhatsApp(phone, message, empName) {
+async function sendWhatsApp(phone, message, employeeId) {
   if (!WA_TOKEN || !WA_PHONE_ID) return false
   const clean = String(phone || '').replace(/\D/g, '')
   if (clean.length < 9) return false
@@ -121,11 +121,11 @@ async function sendWhatsApp(phone, message, empName) {
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', to: clean, type: 'text', text: { body: message } })
     })
-    if (r.ok) { console.log(`[cron] whatsapp sent → ${empName}`); return true }
-    console.warn(`[cron] whatsapp error → ${empName}:`, await r.text())
+    if (r.ok) { console.log(`[cron] whatsapp sent → employee:${employeeId}`); return true }
+    console.warn(`[cron] whatsapp error → employee:${employeeId}:`, await r.text())
     return false
   } catch (e) {
-    console.warn(`[cron] whatsapp fetch error → ${empName}:`, e.message)
+    console.warn(`[cron] whatsapp fetch error → employee:${employeeId}:`, e.message)
     return false
   }
 }
@@ -459,7 +459,7 @@ export default async function handler(req, res) {
     let successKeys = {}
 
     const pushResults = await Promise.allSettled(toSend.map(({ emp, sub, payload, key, keyVal }) =>
-      sendPush(sub, payload, emp.name).then(
+      sendPush(sub, payload, emp.id).then(
         () => ({ ok: true, key, keyVal }),
         err => ({ ok: false, key, err, emp })
       )
@@ -472,14 +472,14 @@ export default async function handler(req, res) {
       failed++
       const err = value?.err
       if (err?.statusCode === 410 || err?.statusCode === 404) expiredSubs.push(value.emp.id)
-      else if (value) console.warn(`[cron] push error for ${value.emp.name}:`, err?.statusCode, err?.body || err?.message)
+      else if (value) console.warn(`[cron] push error for employee:${value.emp.id}:`, err?.statusCode, err?.body || err?.message)
     }
     if (Object.keys(successKeys).length > 0) await markNotisSent(db, successKeys)
     if (expiredSubs.length) await Promise.allSettled(expiredSubs.map(id => deleteSub(id)))
 
     successKeys = {}
     const waResults = await Promise.allSettled(waToSend.map(({ emp, message, key, keyVal }) =>
-      sendWhatsApp(emp.telefono, message, emp.name).then(ok => ({ ok, key, keyVal }))
+      sendWhatsApp(emp.telefono, message, emp.id).then(ok => ({ ok, key, keyVal }))
     ))
     let waSent = 0
     for (const result of waResults) {

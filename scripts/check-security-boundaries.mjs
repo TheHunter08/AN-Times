@@ -36,6 +36,24 @@ for (const required of [
   if (!rollback.includes(required)) failures.push(`policies_auth_rollback.sql: falta ${required}`)
 }
 
+const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
+if (packageJson.engines?.node !== '24.x') failures.push('package.json: Node de producción no está fijado a 24.x')
+
+const ci = await readFile('.github/workflows/ci.yml', 'utf8')
+if (!/node-version:\s*24\b/.test(ci)) failures.push('ci.yml: CI no usa la misma versión mayor de Node que producción')
+
+const vercel = JSON.parse(await readFile('vercel.json', 'utf8'))
+const globalHeaderSet = new Map(
+  (vercel.headers || []).find(entry => entry.source === '/(.*)')?.headers?.map(header => [header.key, header.value]) || [],
+)
+for (const [key, expected] of [
+  ['Permissions-Policy', 'camera=(self), geolocation=(self), microphone=(), payment=(), usb=()'],
+  ['Cross-Origin-Resource-Policy', 'same-origin'],
+  ['X-Permitted-Cross-Domain-Policies', 'none'],
+]) {
+  if (globalHeaderSet.get(key) !== expected) failures.push(`vercel.json: falta cabecera ${key}`)
+}
+
 if (failures.length) {
   throw new Error(`Límites de seguridad incompletos:\n- ${failures.join('\n- ')}`)
 }

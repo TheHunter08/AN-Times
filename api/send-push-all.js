@@ -137,7 +137,7 @@ export default async function handler(req, res) {
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload
         )
-        console.log(`[push-all] sent → ${emp.name}`)
+        console.log(`[push-all] sent → employee:${emp.id}`)
       })
     )
 
@@ -150,7 +150,7 @@ export default async function handler(req, res) {
         if (err?.statusCode === 410 || err?.statusCode === 404) {
           deleteSub(toSend[i].id) // fire-and-forget, sub expirada
         }
-        console.warn(`[push-all] failed → ${toSend[i].name}: ${err?.statusCode || err?.message}`)
+        console.warn(`[push-all] failed → employee:${toSend[i].id}: ${err?.statusCode || err?.message}`)
         failed++
       }
     }
