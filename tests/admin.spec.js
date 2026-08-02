@@ -105,6 +105,12 @@ test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) 
   await expect(page.getByText('Lista para vincular', { exact:true })).toBeVisible()
   await expect(page.getByText('Falta correo', { exact:true })).toBeVisible()
   await expect(page.getByText('PIN pendiente de actualizar', { exact:true })).toBeVisible()
+
+  await page.getByRole('button', { name:'Pendientes de acceso (3)', exact:true }).click()
+  await expect(page.getByText('Cuenta Vinculada', { exact:true })).toHaveCount(0)
+  await expect(page.getByText('Cuenta Preparada', { exact:true })).toBeVisible()
+  await expect(page.getByText('Sin Correo', { exact:true })).toBeVisible()
+  await expect(page.getByText('PIN Antiguo', { exact:true })).toBeVisible()
 })
 
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {

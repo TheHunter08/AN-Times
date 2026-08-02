@@ -110,16 +110,24 @@ const FILTERS = [
   { key: 'off', label: 'Inactivo' },
 ] as const
 
+type AccessFilter = 'all' | 'pending' | 'ready' | 'linked'
+
 export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate }: EmployeesProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
   const profileDialogRef = useDialogA11y(Boolean(profileEmp), () => setProfileEmp(null))
 
   const filtered = rows.filter(r => {
     const matchSearch = (r.name + r.dept + (r.role ?? '') + (r.email ?? '')).toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' || r.status === filter
-    return matchSearch && matchFilter
+    const accessPending = r.accountStatus !== 'linked' || r.pinStatus === 'legacy'
+    const matchAccess = accessFilter === 'all'
+      || (accessFilter === 'pending' && accessPending)
+      || (accessFilter === 'ready' && r.accountStatus === 'ready')
+      || (accessFilter === 'linked' && r.accountStatus === 'linked')
+    return matchSearch && matchFilter && matchAccess
   })
 
   const total   = rows.length
@@ -130,6 +138,13 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
   const readyAccounts = rows.filter(r => r.accountStatus === 'ready').length
   const blockedAccounts = rows.filter(r => r.accountStatus === 'missing-email' || r.accountStatus === 'missing-pin').length
   const legacyPins = rows.filter(r => r.pinStatus === 'legacy').length
+  const pendingAccess = rows.filter(r => r.accountStatus !== 'linked' || r.pinStatus === 'legacy').length
+  const accessFilters: { key: AccessFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'Todos los accesos', count: total },
+    { key: 'pending', label: 'Pendientes de acceso', count: pendingAccess },
+    { key: 'ready', label: 'Listos para vincular', count: readyAccounts },
+    { key: 'linked', label: 'Vinculados', count: linkedAccounts },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
@@ -228,11 +243,32 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             </button>
           ))}
         </div>
+
+        <div aria-label="Filtrar por acceso" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {accessFilters.map(item => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={accessFilter === item.key}
+              onClick={() => setAccessFilter(item.key)}
+              style={{
+                padding: '7px 13px', borderRadius: radius.pill,
+                cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                background: accessFilter === item.key ? colors.primary.dim : colors.bg[700],
+                color: accessFilter === item.key ? colors.primary.light : colors.text[500],
+                border: `1px solid ${accessFilter === item.key ? colors.primary.base : colors.border.subtle}`,
+                transition: 'all .15s ease',
+              }}
+            >
+              {item.label} ({item.count})
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid de tarjetas */}
       {filtered.length === 0 ? (
-        <ProductState title="No encontramos empleados" description="Prueba con otro nombre o cambia el filtro." actionLabel={rows.length === 0 ? 'Añadir primer empleado' : undefined} onAction={rows.length === 0 ? onAdd : undefined} />
+        <ProductState title="No encontramos empleados" description="Prueba con otro nombre o cambia los filtros." actionLabel={rows.length === 0 ? 'Añadir primer empleado' : undefined} onAction={rows.length === 0 ? onAdd : undefined} />
       ) : (
         <div style={{
           display: 'grid',
