@@ -307,6 +307,8 @@ export default function EmployeePage() {
   // ── Geofencing: aviso al entrar (iniciar jornada) y al salir (fichar salida) ──
   useEffect(() => {
     if (!u?.id || !navigator.geolocation) return
+    let disposed = false
+    let permissionStatus = null
     // Leer las obras en cada posición (no una sola vez al montar): en el primer
     // inicio de sesión db.obras aún puede estar vacío hasta que termine el
     // primer fetchDB, y si el admin añade/edita una obra la lista cambia sin
@@ -361,9 +363,51 @@ export default function EmployeePage() {
       const inRange = obras.find(o => distTo(lat, lng, o) <= (o.radio != null ? o.radio : 200))
       setGeoPrompt(inRange ? { obraName: inRange.nombre } : null)
     }
-    geoWatchRef.current = navigator.geolocation.watchPosition(checkPos, (err) => { console.warn('[geo] watchPosition error:', err.code, err.message) }, { enableHighAccuracy: false, maximumAge: 60000 })
-    return () => { if (geoWatchRef.current != null) navigator.geolocation.clearWatch(geoWatchRef.current) }
-  }, [u?.id])
+    const stopWatch = () => {
+      if (geoWatchRef.current == null) return
+      navigator.geolocation.clearWatch(geoWatchRef.current)
+      geoWatchRef.current = null
+    }
+    const startWatch = () => {
+      if (disposed || geoWatchRef.current != null) return
+      geoWatchRef.current = navigator.geolocation.watchPosition(
+        checkPos,
+        (err) => {
+          // Denegar ubicación es una decisión normal del usuario, no un error
+          // operativo. Solo dejamos en consola fallos técnicos inesperados.
+          if (err.code !== 1) console.warn('[geo] watchPosition error:', err.code, err.message)
+        },
+        { enableHighAccuracy:false, maximumAge:60000 },
+      )
+    }
+    const syncPermission = () => {
+      if (permissionStatus?.state === 'granted') startWatch()
+      else if (timer.state === 'idle') {
+        stopWatch()
+        setGeoPrompt(null)
+      }
+    }
+
+    // Con una jornada abierta se conserva el aviso de salida. Fuera de jornada
+    // no provocamos un prompt de ubicación al cargar: el watcher de entrada solo
+    // se activa si el permiso ya estaba concedido. La pulsación de fichaje sigue
+    // solicitando la posición de forma explícita mediante getCurrentPosition.
+    if (timer.state !== 'idle') startWatch()
+    else if (navigator.permissions?.query) {
+      navigator.permissions.query({ name:'geolocation' }).then(status => {
+        if (disposed) return
+        permissionStatus = status
+        permissionStatus.addEventListener?.('change', syncPermission)
+        syncPermission()
+      }).catch(() => {})
+    }
+
+    return () => {
+      disposed = true
+      permissionStatus?.removeEventListener?.('change', syncPermission)
+      stopWatch()
+    }
+  }, [u?.id, timer.state])
 
   const empBodyRef = useRef(null)
   const prevTabRef = useRef(currentEmpTab)
@@ -1295,7 +1339,7 @@ export default function EmployeePage() {
         </div>
       </aside>
 
-      <div className="emp-dsk-main">
+      <main className="emp-dsk-main">
         <header className="emp-dsk-topbar">
           <div className="emp-dsk-greeting-block" aria-hidden="true" />
           <div className="emp-dsk-topbar-actions">
@@ -1398,7 +1442,7 @@ export default function EmployeePage() {
             {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
           </Suspense>
         </div>
-      </div>
+      </main>
 
       {employeeOverlays}
     </div>
@@ -1515,7 +1559,7 @@ export default function EmployeePage() {
       )}
 
       {/* Body */}
-      <div className="emp-body" ref={empBodyRef}>
+      <main className="emp-body" ref={empBodyRef}>
         {currentEmpTab === 'inicio' && (
           <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 116, boxSizing: 'border-box' }}>
             {pendingCierresEmp.length > 0 && (
@@ -1560,7 +1604,7 @@ export default function EmployeePage() {
           {currentEmpTab === 'turnos' && <EmployeeTurnos db={db} u={u} />}
           {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
         </Suspense>
-      </div>
+      </main>
 
       {/* Bottom nav */}
       <div className="emp-nav emp-nav-scroll">
