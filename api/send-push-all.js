@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -72,6 +73,7 @@ async function deleteSub(userId) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   if (req.method !== 'POST') return res.status(405).end()
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
@@ -84,9 +86,13 @@ export default async function handler(req, res) {
   if (!hasValidSecret) return res.status(401).json({ error: 'Unauthorized' })
 
   const { title, body, url = '/', target = 'all' } = req.body || {}
-  if (!title || !body) return res.status(400).json({ error: 'title y body son requeridos' })
+  if (typeof title !== 'string' || typeof body !== 'string' || !title.trim() || !body.trim()) return res.status(400).json({ error: 'title y body son requeridos' })
   if (title.length > 80)  return res.status(400).json({ error: 'title máx 80 caracteres' })
   if (body.length > 200)  return res.status(400).json({ error: 'body máx 200 caracteres' })
+  if (typeof url !== 'string' || url.length > 512) return res.status(400).json({ error: 'url inválida' })
+  if (target && typeof target === 'object' && Array.isArray(target.empIds) && (target.empIds.length > 500 || target.empIds.some(id => typeof id !== 'string' || id.length > 128))) {
+    return res.status(400).json({ error: 'target empIds inválido' })
+  }
 
   try {
     // Fetch en paralelo — independientes entre sí
@@ -111,6 +117,7 @@ export default async function handler(req, res) {
       )
       recipients = allEmps.filter(e => activeIds.has(e.id))
     } else if (target?.role) {
+      if (!['jefe_obra', 'encargado', 'empleado'].includes(target.role)) return res.status(400).json({ error: 'target role inválido' })
       recipients = allEmps.filter(e => e.role === target.role)
     } else if (Array.isArray(target?.empIds)) {
       const ids = new Set(target.empIds)
@@ -120,7 +127,7 @@ export default async function handler(req, res) {
       // terminaba enviando a TODA la plantilla en vez de fallar explícitamente
       // — con la autenticación débil de este endpoint (ver más abajo), eso
       // amplificaba el impacto de cualquier petición mal formada.
-      return res.status(400).json({ error: `target no reconocido: ${JSON.stringify(target)}` })
+      return res.status(400).json({ error: 'target no reconocido' })
     }
 
     const safeUrl = (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) ? url : '/'
@@ -160,7 +167,7 @@ export default async function handler(req, res) {
     return res.status(200).json(result)
 
   } catch (e) {
-    console.error('[send-push-all] fatal', e)
-    return res.status(500).json({ error: e.message })
+    console.error('[send-push-all] fatal', e?.message || 'unknown error')
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

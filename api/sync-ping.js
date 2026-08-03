@@ -10,6 +10,7 @@
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -75,6 +76,8 @@ async function deleteSub(userId) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
   // Vercel Cron y GitHub Actions comparten el CRON_SECRET ya configurado en
   // ambos servicios. Comparación constante para no filtrar información.
   const token = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
@@ -126,7 +129,7 @@ export default async function handler(req, res) {
           expired++; await deleteSub(sub.user_id)
         } else {
           errors++
-          console.warn('[sync-ping] push error:', sub.user_id, err.statusCode, err.body || err.message)
+          console.warn('[sync-ping] push error:', err.statusCode, err.body || err.message)
         }
       }
     }))
@@ -135,6 +138,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, ...coverageResult, candidates: candidates.length, sent, expired, errors })
   } catch (e) {
     console.error('[sync-ping] fatal:', e)
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

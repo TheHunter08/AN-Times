@@ -29,6 +29,8 @@
 //   5. Suscribirse al campo "messages"
 // ─────────────────────────────────────────────────────────────────────────────
 import { timingSafeEqual } from 'crypto'
+import { toRecordRow } from '../src/services/tableSyncPlan.js'
+import { hardenApiResponse } from './_response.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL          = cleanEnv(process.env.VITE_SB_URL)
@@ -71,26 +73,39 @@ async function getAppData() {
   return rows?.[0]?.data || null
 }
 
-async function saveAppData(data) {
-  const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
-    method: 'PATCH',
-    headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ data, updated_at: new Date().toISOString() })
-  })
-  // fetch() no lanza por un status de error HTTP, solo por fallo de red — sin
-  // comprobar r.ok, un PATCH rechazado por Supabase (400/500) se daba por
-  // guardado con éxito en silencio.
-  if (!r.ok) throw new Error(`saveAppData PATCH failed: ${r.status}`)
+async function saveRecord(record) {
+  const headers = { ...SB_H, 'Content-Type': 'application/json' }
+  const [blobResult, tableResult] = await Promise.allSettled([
+    fetch(`${SB_URL}/rest/v1/rpc/apply_app_data_delta`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ p_patch: { records: [record] }, p_deleted: {}, p_updated_at: record._upd }),
+    }).then(response => {
+      if (!response.ok) throw new Error(`blob delta ${response.status}`)
+    }),
+    fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(toRecordRow(record)),
+    }).then(response => {
+      if (!response.ok) throw new Error(`record upsert ${response.status}`)
+    }),
+  ])
+
+  const succeeded = [blobResult, tableResult].filter(result => result.status === 'fulfilled').length
+  if (!succeeded) throw new Error('record persistence failed')
+  if (succeeded < 2) console.warn('[whatsapp-webhook] partial persistence; reconciliation pending')
 }
 
 async function sendWhatsAppReply(to, message) {
   if (!WA_TOKEN || !WA_PHONE_ID) return
   try {
-    await fetch(`https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: message } })
     })
+    if (!response.ok) console.error('[whatsapp-webhook] reply rejected', response.status)
   } catch (e) {
     console.error('[whatsapp-webhook] reply error', e.message)
   }
@@ -148,9 +163,9 @@ export async function handleMessage(db, emp, text) {
 
   if (intent === 'entrada') {
     if (openRec) return { reply: `Ya tienes una jornada abierta desde las ${new Date(openRec.inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.`, changed: false }
-    const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: now, fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: 'WhatsApp' }
+    const newRec = { id: gid(), empId: emp.id, empName: emp.name, inicio: now, fin: null, centro: emp.centroTrabajo || '', breaks: [], workSecs: 0, breakSecs: 0, creadoPor: 'WhatsApp', _upd: now }
     db.records = [...records, newRec]
-    return { reply: `✅ Entrada registrada a las ${new Date(now).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ¡Buena jornada!`, changed: true }
+    return { reply: `✅ Entrada registrada a las ${new Date(now).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ¡Buena jornada!`, changed: true, record: newRec }
   }
 
   if (intent === 'salida') {
@@ -160,16 +175,17 @@ export async function handleMessage(db, emp, text) {
     const workMs = new Date(now).getTime() - new Date(openRec.inicio).getTime()
     const breakMs = breaks.reduce((s, b) => s + (new Date(b.end || now).getTime() - new Date(b.start).getTime()), 0)
     const workSecs = Math.max(0, Math.floor((workMs - breakMs) / 1000))
-    const closed = { ...openRec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, workSecs, breakSecs: Math.floor(breakMs / 1000) }
+    const closed = { ...openRec, fin: now, breaks, enDescanso: false, bStartTs: null, closed: true, workSecs, breakSecs: Math.floor(breakMs / 1000), _upd: now }
     db.records = records.map(r => r.id === openRec.id ? closed : r)
-    return { reply: `✅ Salida registrada. Jornada de hoy: ${mhm(Math.floor(workSecs / 60))}.`, changed: true }
+    return { reply: `✅ Salida registrada. Jornada de hoy: ${mhm(Math.floor(workSecs / 60))}.`, changed: true, record: closed }
   }
 
   if (intent === 'pausa') {
     if (!openRec) return { reply: 'No tienes ninguna jornada abierta para pausar.', changed: false }
     if (openRec.enDescanso) return { reply: 'Ya estás en pausa.', changed: false }
-    db.records = records.map(r => r.id === openRec.id ? { ...r, enDescanso: true, bStartTs: now } : r)
-    return { reply: '⏸ Pausa iniciada. Escribe *reanudar* cuando vuelvas.', changed: true }
+    const paused = { ...openRec, enDescanso: true, bStartTs: now, _upd: now }
+    db.records = records.map(r => r.id === openRec.id ? paused : r)
+    return { reply: '⏸ Pausa iniciada. Escribe *reanudar* cuando vuelvas.', changed: true, record: paused }
   }
 
   if (intent === 'reanudar') {
@@ -177,8 +193,9 @@ export async function handleMessage(db, emp, text) {
     if (!openRec.enDescanso) return { reply: 'No estás en pausa ahora mismo.', changed: false }
     const breaks = [...(openRec.breaks || []), { start: openRec.bStartTs, end: now }]
     const breakSecs = breaks.reduce((s, b) => s + Math.max(0, Math.floor((new Date(b.end || now).getTime() - new Date(b.start).getTime()) / 1000)), 0)
-    db.records = records.map(r => r.id === openRec.id ? { ...r, enDescanso: false, bStartTs: null, breaks, breakSecs } : r)
-    return { reply: '▶ Jornada reanudada.', changed: true }
+    const resumed = { ...openRec, enDescanso: false, bStartTs: null, breaks, breakSecs, _upd: now }
+    db.records = records.map(r => r.id === openRec.id ? resumed : r)
+    return { reply: '▶ Jornada reanudada.', changed: true, record: resumed }
   }
 
   if (intent === 'estado') {
@@ -191,6 +208,7 @@ export async function handleMessage(db, emp, text) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   // Sin WHATSAPP_WEBHOOK_SECRET configurado (o si no coincide), el endpoint
   // rechaza cualquier petición — incluida la verificación GET. Fallar cerrado:
   // mientras no se dé de alta en Meta, este endpoint no debe aceptar nada.
@@ -230,34 +248,44 @@ export default async function handler(req, res) {
     if (!SB_URL || !SB_ANON) return res.status(200).json({ ok: false, error: 'Supabase no configurado' })
 
     const fromPhone = normalizePhone(msg.from)
+    if (fromPhone.length < 9 || fromPhone.length > 15) {
+      return res.status(200).json({ ok: true, skipped: 'invalid sender' })
+    }
     const db = await getAppData()
     if (!db) return res.status(200).json({ ok: false, error: 'no app_data' })
 
-    const emp = (db.employees || []).find(e => !e.baja && normalizePhone(e.telefono) === fromPhone)
-    if (!emp) {
+    const matchingEmployees = (db.employees || []).filter(e => !e.baja && normalizePhone(e.telefono) === fromPhone)
+    if (matchingEmployees.length !== 1) {
       await sendWhatsAppReply(msg.from, 'No encuentro tu número asociado a ningún empleado de TIMES INC. Pide al administrador que revise tu teléfono en tu ficha.')
-      return res.status(200).json({ ok: true, skipped: 'unknown employee' })
+      return res.status(200).json({ ok: true, skipped: matchingEmployees.length ? 'ambiguous employee' : 'unknown employee' })
+    }
+    const emp = matchingEmployees[0]
+
+    const messageText = String(msg.text?.body || '')
+    if (messageText.length > 500) {
+      await sendWhatsAppReply(msg.from, 'El mensaje es demasiado largo. Responde solo con *entrada*, *salida*, *pausa*, *reanudar* o *estado*.')
+      return res.status(200).json({ ok: true, skipped: 'message too long' })
     }
 
-    const { reply, changed } = await handleMessage(db, emp, msg.text?.body || '')
+    const { reply, changed, record } = await handleMessage(db, emp, messageText)
     if (changed) {
       try {
-        await saveAppData(db)
+        await saveRecord(record)
       } catch (saveErr) {
         // Si el guardado falla, el empleado se quedaba sin fichaje Y sin ninguna
         // respuesta (creía haber fichado). Avisar del fallo en vez de silencio.
-        console.error('[whatsapp-webhook] saveAppData failed', saveErr.message)
+        console.error('[whatsapp-webhook] saveRecord failed', saveErr.message)
         await sendWhatsAppReply(msg.from, '⚠️ No se pudo registrar tu fichaje por un problema temporal. Vuelve a intentarlo en un momento.')
-        return res.status(200).json({ ok: false, error: 'save failed', emp: emp.name })
+        return res.status(200).json({ ok: false, error: 'save failed' })
       }
     }
     await sendWhatsAppReply(msg.from, reply)
 
-    return res.status(200).json({ ok: true, emp: emp.name, changed })
+    return res.status(200).json({ ok: true, changed })
   } catch (e) {
-    console.error('[whatsapp-webhook] fatal', e)
+    console.error('[whatsapp-webhook] fatal', e?.message || 'unknown error')
     // Devolver 200 igualmente: un 500 haría que Meta reintente y probablemente
     // vuelva a fallar igual, generando más ruido sin arreglar nada.
-    return res.status(200).json({ ok: false, error: e.message })
+    return res.status(200).json({ ok: false, error: 'internal error' })
   }
 }

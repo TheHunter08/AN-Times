@@ -8,6 +8,8 @@
 // así que exponer esta consulta sin autenticación no filtra datos que el
 // propio PDF no muestre ya en texto plano (nombre del empleado, mes,
 // fecha de firma).
+import { hardenApiResponse } from './_response.js'
+
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
@@ -34,6 +36,7 @@ function rateLimit(ip) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -72,6 +75,6 @@ export default async function handler(req, res) {
       message: 'La huella coincide con los datos de un cierre mensual firmado conservado en TIMES INC.',
     })
   } catch (e) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

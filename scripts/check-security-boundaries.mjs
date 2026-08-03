@@ -11,11 +11,24 @@ const serverFiles = [
   'api/verify-cierre.js',
   'api/whatsapp-webhook.js',
 ]
+const apiHandlerFiles = [...serverFiles, 'api/pin-login.js', 'api/send-whatsapp.js']
 
 const failures = []
 for (const file of serverFiles) {
   const source = await readFile(file, 'utf8')
   if (!source.includes('SB_SERVICE_KEY')) failures.push(`${file}: no contempla SB_SERVICE_KEY`)
+}
+
+for (const file of apiHandlerFiles) {
+  const source = await readFile(file, 'utf8')
+  if (!source.includes("from './_response.js'")) failures.push(`${file}: no importa el endurecimiento común de respuestas`)
+  if (!source.includes('hardenApiResponse(res)')) failures.push(`${file}: no desactiva caché ni indexación en respuestas API`)
+}
+
+const whatsappWebhook = await readFile('api/whatsapp-webhook.js', 'utf8')
+if ((whatsappWebhook.match(/_upd:\s*now/g) || []).length < 4) failures.push('whatsapp-webhook.js: alguna mutación de fichaje no refresca _upd')
+for (const forbidden of ['emp: emp.name', 'saveAppData(db)', 'error: e.message']) {
+  if (whatsappWebhook.includes(forbidden)) failures.push(`whatsapp-webhook.js: exposición o persistencia insegura detectada (${forbidden})`)
 }
 
 const authPolicies = await readFile('supabase/policies_auth.sql', 'utf8')

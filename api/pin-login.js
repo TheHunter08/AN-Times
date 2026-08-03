@@ -5,7 +5,10 @@
 // que no eran sesiones de Supabase Auth y podía mezclar dos valores distintos
 // en Authorization. Se conserva la ruta con respuesta 410 para que clientes
 // antiguos fallen de forma controlada y continúen usando el login PIN local.
+import { hardenApiResponse } from './_response.js'
+
 export default function handler(req, res) {
+  hardenApiResponse(res)
   if (req.method !== 'POST') return res.status(405).end()
   return res.status(410).json({
     error:'La sesión JWT personalizada por PIN está retirada',

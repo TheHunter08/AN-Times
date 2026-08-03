@@ -7,6 +7,7 @@
 // Prerequisito en Supabase SQL Editor:
 //   ALTER TABLE employees ADD COLUMN IF NOT EXISTS pin_len int;
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
@@ -18,6 +19,7 @@ const KEY  = SB_SERVICE || SB_ANON
 const SB_H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   if (req.method !== 'POST') return res.status(405).end()
 
   if (!CRON_SECRET) return res.status(500).json({ error: 'CRON_SECRET no configurado' })
@@ -74,6 +76,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, total: emps.length, patched: ok, errors: err, results })
   } catch (e) {
     console.error('[patch-pins] fatal:', e)
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

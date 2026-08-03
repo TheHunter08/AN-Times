@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
@@ -122,7 +123,7 @@ async function sendWhatsApp(phone, message, employeeId) {
       body: JSON.stringify({ messaging_product: 'whatsapp', to: clean, type: 'text', text: { body: message } })
     })
     if (r.ok) { console.log(`[cron] whatsapp sent → employee:${employeeId}`); return true }
-    console.warn(`[cron] whatsapp error → employee:${employeeId}:`, await r.text())
+    console.warn(`[cron] whatsapp error → employee:${employeeId}:`, r.status)
     return false
   } catch (e) {
     console.warn(`[cron] whatsapp fetch error → employee:${employeeId}:`, e.message)
@@ -131,6 +132,7 @@ async function sendWhatsApp(phone, message, employeeId) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   // Fail-closed: si CRON_SECRET no está configurado (p.ej. un despliegue con
   // la env var ausente), antes el endpoint quedaba abierto a cualquiera en vez
   // de rechazar — este cron dispara push/WhatsApp masivos y escribe en

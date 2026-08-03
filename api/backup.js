@@ -12,6 +12,7 @@
 // Retención recomendada: 4 años (RDL 8/2019 obliga a conservar registros de jornada).
 // Puedes configurar una política de expiración en el bucket para borrar backups > 4 años.
 import { createHash, timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 
 const cleanEnv    = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL      = cleanEnv(process.env.VITE_SB_URL)
@@ -25,6 +26,8 @@ const SB_H_STORAGE = SB_SERVICE
   : SB_H_ANON
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
   if (!CRON_SECRET) return res.status(500).json({ error: 'CRON_SECRET no configurado' })
   const token = (req.headers['authorization'] || '').replace('Bearer ', '')
   const valid = token.length === CRON_SECRET.length &&
@@ -61,12 +64,10 @@ export default async function handler(req, res) {
     })
 
     if (!uploadRes.ok) {
-      const errText = await uploadRes.text()
-      console.error('[backup] storage upload failed:', uploadRes.status, errText)
+      console.error('[backup] storage upload failed:', uploadRes.status)
       return res.status(500).json({
         error: 'Storage upload failed',
         hint:  'Crea el bucket "backups" (privado) en Supabase Dashboard → Storage → New bucket',
-        detail: errText.slice(0, 300),
       })
     }
 
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
     console.log(`[backup] ${filename} subido — ${sizeKB} KB`)
     return res.status(200).json({ ok: true, verified: true, filename, sizeKB, checksum, records: hot.data.records.length, employees: hot.data.employees.length })
   } catch (e) {
-    console.error('[backup] fatal:', e)
-    return res.status(500).json({ error: e.message })
+    console.error('[backup] fatal:', e?.message || 'unknown error')
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -3,6 +3,7 @@
 import webpush from 'web-push'
 import { createHash, timingSafeEqual } from 'crypto'
 import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
+import { hardenApiResponse } from './_response.js'
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
 const _rl = new Map()
@@ -149,6 +150,7 @@ async function sendOne(sub, payload) {
 }
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   try {
     res.setHeader('Access-Control-Allow-Origin', CANONICAL_APP_ORIGIN)
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -172,7 +174,15 @@ export default async function handler(req, res) {
     if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Missing Supabase config' })
 
     const { userId, title, body, tag, url, dedupeKey } = req.body || {}
-    if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' })
+    if (typeof userId !== 'string' || typeof title !== 'string' || !userId || !title.trim()) {
+      return res.status(400).json({ error: 'Missing userId or title' })
+    }
+    if ([body, tag, url, dedupeKey].some(value => value != null && typeof value !== 'string')) {
+      return res.status(400).json({ error: 'Invalid payload types' })
+    }
+    if (userId.length > 128 || title.length > 80 || (body || '').length > 240 || (tag || '').length > 80 || (url || '').length > 512 || (dedupeKey || '').length > 160) {
+      return res.status(400).json({ error: 'Payload too large' })
+    }
     if (userId === '__all__' && !hasValidToken) return res.status(403).json({ error: 'Broadcast requires server authorization' })
 
     const safeUrl = typeof url === 'string' && url.startsWith('/') ? url : '/'
@@ -218,11 +228,11 @@ export default async function handler(req, res) {
         await sbDelete(userId)
         return res.status(200).json({ ok: false, reason: 'expired' })
       }
-      console.error('[sendpush]', err.statusCode, err.body || err.message)
-      return res.status(500).json({ error: err.message, statusCode: err.statusCode })
+      console.error('[sendpush] delivery failed', err.statusCode || 'unknown')
+      return res.status(500).json({ error: 'Push delivery failed' })
     }
   } catch (fatal) {
-    console.error('[sendpush] uncaught:', fatal)
-    try { return res.status(500).json({ error: 'uncaught: ' + (fatal?.message || String(fatal)) }) } catch { return }
+    console.error('[sendpush] uncaught:', fatal?.message || 'unknown error')
+    try { return res.status(500).json({ error: 'Internal server error' }) } catch { return }
   }
 }

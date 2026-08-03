@@ -11,12 +11,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 
 const PHONE_ID = process.env.WHATSAPP_PHONE_ID
 const TOKEN    = process.env.WHATSAPP_TOKEN
 const CRON_SECRET = process.env.CRON_SECRET
 
 export default async function handler(req, res) {
+  hardenApiResponse(res)
   if (req.method !== 'POST') return res.status(405).end()
 
   // El header 'x-vercel-cron' NO es una firma verificada — cualquier cliente
@@ -36,10 +38,13 @@ export default async function handler(req, res) {
   }
 
   const { to, message } = req.body || {}
-  if (!to || !message) return res.status(400).json({ error: 'to y message son requeridos' })
+  if (typeof to !== 'string' || typeof message !== 'string' || !to || !message.trim()) {
+    return res.status(400).json({ error: 'to y message son requeridos' })
+  }
+  if (message.length > 4096) return res.status(400).json({ error: 'message máx 4096 caracteres' })
 
   const phone = String(to).replace(/\D/g, '')
-  if (phone.length < 9) return res.status(400).json({ error: 'Número inválido' })
+  if (phone.length < 9 || phone.length > 15) return res.status(400).json({ error: 'Número inválido' })
 
   try {
     const r = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {
@@ -54,13 +59,13 @@ export default async function handler(req, res) {
     })
     const data = await r.json()
     if (!r.ok) {
-      console.error('[send-whatsapp] Meta API error', data)
-      return res.status(502).json({ error: data?.error?.message || 'Meta API error', detail: data })
+      console.error('[send-whatsapp] Meta API error', r.status, data?.error?.code || 'unknown')
+      return res.status(502).json({ error: 'WhatsApp provider error' })
     }
-    console.log(`[send-whatsapp] sent to ${phone}`, data?.messages?.[0]?.id)
+    console.log('[send-whatsapp] sent', data?.messages?.[0]?.id || 'without-message-id')
     return res.status(200).json({ ok: true, messageId: data?.messages?.[0]?.id })
   } catch (e) {
     console.error('[send-whatsapp] fetch error', e.message)
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

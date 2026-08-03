@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import handler from './pin-login.js'
 
 function mockRes() {
-  const res = { statusCode:200 }
+  const res = { statusCode:200, headers:{} }
+  res.setHeader = (name, value) => { res.headers[name] = value; return res }
   res.status = code => { res.statusCode = code; return res }
   res.json = body => { res.body = body; return res }
   res.end = () => res
@@ -20,6 +21,8 @@ describe('api/pin-login retirado', () => {
     })
     expect(res.body).not.toHaveProperty('token')
     expect(res.body).not.toHaveProperty('authId')
+    expect(res.headers['Cache-Control']).toBe('private, no-store, max-age=0')
+    expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow')
   })
 
   it('mantiene el contrato 405 para otros métodos', () => {

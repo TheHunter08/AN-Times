@@ -15,6 +15,7 @@
 // Usa SB_SERVICE_KEY si está disponible (recomendado para saltar RLS durante la
 // migración); si no, usa el anon key (requiere que policies.sql esté aplicado).
 import { timingSafeEqual } from 'crypto'
+import { hardenApiResponse } from './_response.js'
 
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
@@ -62,7 +63,8 @@ async function countCompanyRows(table) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end()
+  hardenApiResponse(res)
+  if (req.method !== 'POST') return res.status(405).end()
 
   if (!CRON_SECRET) return res.status(500).json({ error: 'CRON_SECRET no configurado' })
   const token = (req.headers['authorization'] || '').replace('Bearer ', '')
@@ -212,6 +214,6 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     console.error('[migrate-to-tables] fatal:', e)
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }
