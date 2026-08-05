@@ -2,8 +2,9 @@
 // de Fichajes al store real reutilizando las utilidades puras existentes.
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { ftime, fds, recWorkSecs, mhm } from '../../utils/time.js'
+import { ftime, fds, recWorkSecs, mhm, localDateStr } from '../../utils/time.js'
 import { getScopedEmployees, isScopedSupervisor } from '../../utils/supervisorScope.js'
+import { effectiveDailyTargetMin } from '../../utils/laborCalendar.js'
 import type { TimesheetRow } from '../pages/Timesheets.js'
 
 interface DbRecord {
@@ -29,7 +30,6 @@ interface Db {
 export function useTimesheetsData(search: string): TimesheetRow[] {
   const db = useAppStore(s => s.db) as Db
   const session = useAppStore(s => s.session) as any
-  const wdMin = db.config?.wdMin || 480
   const isScopedRole = isScopedSupervisor(session)
 
   return useMemo(() => {
@@ -47,6 +47,7 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
         const employeeName = employee?.name || r.empName || '—'
         const centro = r.centro || employee?.centroTrabajo || 'Sin centro'
         const workedMin = Math.floor(recWorkSecs(r) / 60)
+        const dayTarget = effectiveDailyTargetMin(db.config?.wdMin, r.inicio ? localDateStr(new Date(r.inicio)) : '')
         return {
           id: r.id,
           name: employeeName,
@@ -55,7 +56,7 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
           entrada: ftime(r.inicio),
           salida: ftime(r.fin),
           worked: mhm(workedMin),
-          over: workedMin > wdMin,
+          over: workedMin > dayTarget,
           history: [
             r.creadoPor ? `Iniciada por ${r.creadoPor}` : 'Iniciada por el empleado',
             r.cerradoPor ? `Finalizada por ${r.cerradoPor}${r.motivoCierre ? `: ${r.motivoCierre}` : ''}` : 'Finalizada por el empleado',
@@ -65,5 +66,5 @@ export function useTimesheetsData(search: string): TimesheetRow[] {
         }
       })
       .filter(r => !q || r.name.toLowerCase().includes(q) || r.centro.toLowerCase().includes(q))
-  }, [db.records, db.employees, db.obras, session, isScopedRole, search, wdMin])
+  }, [db.records, db.employees, db.obras, session, isScopedRole, search, db.config?.wdMin])
 }

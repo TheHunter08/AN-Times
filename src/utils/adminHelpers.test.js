@@ -105,8 +105,9 @@ describe('refreshUnsignedClosures', () => {
     const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z')
     expect(updated.totalMin).toBe(540)
     expect(updated.extraMin).toBe(0)
-    expect(updated.deficitMin).toBe(31 * 60)
-    expect(updated.balanceMin).toBe(-31 * 60)
+    // Semana del 6-10 jul: jornada intensiva (33h reales por calendario), no 40h.
+    expect(updated.deficitMin).toBe(24 * 60)
+    expect(updated.balanceMin).toBe(-24 * 60)
     expect(updated.records_snapshot[0].workSecs).toBe(9 * 3600)
     expect(updated.pdfData).toBeNull()
     expect(updated.desactualizado).toBe(false)
@@ -157,6 +158,9 @@ describe('refreshUnsignedClosures', () => {
     }
     const [updated] = refreshUnsignedClosures(cierres, records, 'e1', [records[0].inicio], '2026-07-15T12:00:00.000Z', db)
     expect(updated.justifiedMin).toBe(8 * 60)
-    expect(updated.deficitMin).toBe(4 * 40 * 60)
+    // Semana 1 jun (con vacaciones) queda a 0 déficit; semanas 8, 15 y 22 jun
+    // son normales (40h cada una); la semana del 29 jun-3 jul ya cruza a
+    // jornada intensiva (37h reales, no 40h) — 3*40h + 37h = 157h.
+    expect(updated.deficitMin).toBe(3 * 40 * 60 + 37 * 60)
   })
 })

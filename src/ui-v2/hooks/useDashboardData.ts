@@ -5,6 +5,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { today, calcMin, mhm, localDateStr, isWorkday, workWeekDates } from '../../utils/time.js'
+import { effectiveDailyTargetMin } from '../../utils/laborCalendar.js'
 import type { KPI, ActivityItem, VacationPerson } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
 
@@ -63,7 +64,6 @@ export function useDashboardData(): DashboardData {
   const computed = useMemo(() => {
     const todayStr = today()
     const emps = (db.employees || []).filter(e => !e.baja && !e.isAdmin)
-    const wdMin = db.config?.wdMin || 480
     const dayMinutes = new Map<string, number>()
     const presentTodayIds = new Set<string>()
     let workingCount = 0
@@ -88,8 +88,11 @@ export function useDashboardData(): DashboardData {
       const reference = new Date()
       reference.setDate(reference.getDate() - offsetWeeks * 7)
       return workWeekDates(reference).map(date => {
-        const dayMin = dayMinutes.get(localDateStr(date)) || 0
-        return { label:DOW[date.getDay()], value:Math.min(100, Math.round((dayMin / wdMin) * 100)) }
+        const dateStr = localDateStr(date)
+        const dayMin = dayMinutes.get(dateStr) || 0
+        const target = effectiveDailyTargetMin(db.config?.wdMin, dateStr)
+        const pct = target > 0 ? Math.round((dayMin / target) * 100) : 0
+        return { label:DOW[date.getDay()], value:Math.min(100, pct) }
       })
     }
 

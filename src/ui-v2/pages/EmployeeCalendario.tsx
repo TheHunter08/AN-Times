@@ -6,6 +6,7 @@ import { useState, useMemo, useRef } from 'react'
 import type { CSSProperties, TouchEvent } from 'react'
 import { today, p2, calcMin, mhm, ftime } from '../../utils/time.js'
 import { WD, FESTIVOS_MADRID_2026 } from '../../config/constants.js'
+import { calendarDayHours } from '../../utils/laborCalendar.js'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { buildEmployeeCalendarICS, downloadICS } from '../../utils/calendarExport.js'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
@@ -110,8 +111,11 @@ export function EmployeeCalendario({ db, u, calMonth, setCalMonth }: EmployeeCal
     if (medDays.has(ds)) return 'medical'
     if (absDays.has(ds)) return 'absence'
     const mins = workedMap[ds] || 0
-    const wdEfectivo = WD
-    if (mins >= wdEfectivo * 0.9) return 'complete'
+    // Un jueves/viernes de jornada intensiva (jul-ago) solo exige 6-7h, no 8h
+    // — sin esto, cumplir la jornada real de ese día se marcaba "pendiente".
+    const calendarHours = calendarDayHours(ds)
+    const wdEfectivo = calendarHours !== null ? calendarHours * 60 : WD
+    if (wdEfectivo > 0 && mins >= wdEfectivo * 0.9) return 'complete'
     if (mins > 0) return 'pending'
     if (ds < todayStr) return 'missing'
     return 'future'

@@ -1,9 +1,10 @@
 // Datos derivados del tab "Jornada" — misma lógica que TabJornada.jsx (legacy),
 // solo relocalizada como hook reutilizable por la página ui-v2 equivalente.
 import { useMemo } from 'react'
-import { calcSecs, calcMin, recWorkSecs, p2, localDateStr, isWorkday, workWeekRecords } from '../../utils/time.js'
-import { WD, WK } from '../../config/constants.js'
+import { calcSecs, calcMin, recWorkSecs, p2, localDateStr, isWorkday, workWeekRecords, wkStart } from '../../utils/time.js'
+import { WK } from '../../config/constants.js'
 import { isRecordPendingValidation } from '../../utils/recordValidation.js'
+import { effectiveDailyTargetMin, calendarWeeklyHours } from '../../utils/laborCalendar.js'
 
 export function useJornadaData(db: any, u: any, timer: any) {
   return useMemo(() => {
@@ -25,13 +26,18 @@ export function useJornadaData(db: any, u: any, timer: any) {
     const totSecs = completedSecs + liveSecs
     const totMin = Math.floor(totSecs / 60)
     const brkMin = recs.reduce((a: number, r: any) => a + Math.floor((r.breakSecs || 0) / 60), 0)
-    const wdEfectivo = db.config?.wdMin || WD
+    const wdEfectivo = effectiveDailyTargetMin(db.config?.wdMin, todayStr)
 
     const currentDayIsWorkday = isWorkday(now)
     const liveWeekMin = currentDayIsWorkday && timer.state !== 'idle' ? Math.floor(timer.ws / 60) : 0
     const weekMin = weekRecs.reduce((s: number, r: any) => s + calcMin(r), 0) + liveWeekMin
     const weekMinAntes = Math.max(0, weekMin - (currentDayIsWorkday ? totMin : 0))
-    const extraMin = Math.max(0, weekMin - WK) - Math.max(0, weekMinAntes - WK)
+    // El calendario oficial manda sobre el objetivo semanal (p.ej. jornada
+    // intensiva jul-ago, ~33h en vez de 40h) salvo que no haya calendario
+    // cargado para esta semana, en cuyo caso se usa el fijo de 40h (WK).
+    const calendarWeekHours = calendarWeeklyHours(localDateStr(wkStart(now)))
+    const weekTarget = calendarWeekHours !== null ? calendarWeekHours * 60 : WK
+    const extraMin = Math.max(0, weekMin - weekTarget) - Math.max(0, weekMinAntes - weekTarget)
     const normMin = Math.max(0, totMin - extraMin)
 
     const tlItems = realRecs.map((r: any) => ({ r, isCurrent: !r.fin }))

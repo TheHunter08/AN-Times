@@ -1,5 +1,6 @@
 import { WK } from '../config/workRules.js'
 import { workWeekStartsInMonth } from './workTargets.js'
+import { calendarDayHours, calendarWeeklyHours } from './laborCalendar.js'
 
 export const p2 = n => String(n).padStart(2, '0')
 
@@ -201,17 +202,26 @@ export const sortedEmps = db =>
   (db.employees || []).filter(e => !e.isAdmin).sort((a, b) => (a.name||'').localeCompare(b.name||'', 'es', { sensitivity: 'base' }))
 
 // ── Balance semanal del periodo (regla TIMES INC) ─────────────────────────────
-// • Cada semana laboral va de lunes a viernes y exige 40h.
-// • Cada semana se liquida por separado: >40h es extra; <40h es déficit.
+// • Cada semana laboral va de lunes a viernes y exige 40h — salvo que el
+//   calendario laboral oficial (ver laborCalendar.js) estipule menos para esa
+//   semana concreta, como la jornada intensiva de julio-agosto (6-7h/día en
+//   vez de 8h). Sin calendario cargado para ese año se usa el fijo de 40h.
+// • Cada semana se liquida por separado: superar su objetivo (40h, o el que
+//   marque el calendario esa semana) es extra; no llegar es déficit.
 // • Una semana larga nunca compensa el déficit de otra semana.
 // • El periodo agrupa las semanas cuyo lunes pertenece al mes seleccionado.
 // • La semana en curso no genera déficit hasta que termina el viernes.
 // • Festivos, ausencias justificadas y días fuera del contrato reducen la
-//   obligación en 8h por día, pero nunca crean horas extra.
+//   obligación en las horas que el calendario asigne a ese día concreto (8h
+//   por defecto sin calendario cargado), pero nunca crean horas extra.
+// • opts.weeklyH es un objetivo contractual explícito (p.ej. jornada parcial)
+//   que siempre gana al calendario general — un empleado a tiempo parcial no
+//   sigue el calendario de jornada completa.
 //
 // Se conserva el nombre monthlyExtras por compatibilidad con sus consumidores.
 export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
-  const weeklyTarget = Math.max(1, opts.weeklyH ? opts.weeklyH * 60 : WK)
+  const hasContractOverride = !!opts.weeklyH
+  const weeklyTarget = Math.max(1, hasContractOverride ? opts.weeklyH * 60 : WK)
   const now = opts.now instanceof Date ? opts.now : new Date()
   const todayKey = localDateStr(now)
   const weekStarts = workWeekStartsInMonth(monthKey)
@@ -246,6 +256,7 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
   let scheduledTargetMin = 0
   let scheduledJustifiedMin = 0
   let scheduledNonContractMin = 0
+  let grossScheduledTargetMin = 0
   const weekly = weekStarts.map(start => {
     const monday = new Date(`${start}T00:00:00`)
     const friday = new Date(monday)
@@ -253,6 +264,12 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
     const fridayKey = localDateStr(friday)
     const minutes = byWeek.get(start) || 0
     const completed = fridayKey < todayKey
+    // El calendario oficial (si hay uno cargado para este año) manda sobre el
+    // objetivo semanal — p.ej. una semana de jornada intensiva en julio-agosto
+    // pesa ~33h, no 40h. hasContractOverride (jornada parcial pactada) gana
+    // siempre al calendario general.
+    const calendarWeekHours = hasContractOverride ? null : calendarWeeklyHours(start)
+    const weeklyTargetForWeek = calendarWeekHours !== null ? calendarWeekHours * 60 : weeklyTarget
     let weekJustifiedMin = 0
     let weekNonContractMin = 0
     const justifiedDays = []
@@ -261,20 +278,22 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
       const day = new Date(monday)
       day.setDate(monday.getDate() + index)
       const dayKey = localDateStr(day)
+      const calendarDayHoursValue = hasContractOverride ? null : calendarDayHours(dayKey)
+      const dailyTargetForDay = calendarDayHoursValue !== null ? calendarDayHoursValue * 60 : dailyTarget
       const outsideContract = (contractStart && dayKey < contractStart) || (contractEnd && dayKey > contractEnd)
       if (outsideContract) {
-        weekNonContractMin += dailyTarget
+        weekNonContractMin += dailyTargetForDay
         nonContractDays.push(dayKey)
         continue
       }
       const absence = absences.find(item => item.start <= dayKey && dayKey <= item.end)
       if (holidayKeys.has(dayKey) || absence) {
-        weekJustifiedMin += dailyTarget
+        weekJustifiedMin += dailyTargetForDay
         justifiedDays.push({ date:dayKey, reason:holidayKeys.has(dayKey) ? 'festivo' : absence.type })
       }
     }
-    const requiredMin = Math.max(0, weeklyTarget - weekJustifiedMin - weekNonContractMin)
-    const extraMin = Math.max(0, minutes - weeklyTarget)
+    const requiredMin = Math.max(0, weeklyTargetForWeek - weekJustifiedMin - weekNonContractMin)
+    const extraMin = Math.max(0, minutes - weeklyTargetForWeek)
     const weekDeficitMin = completed ? Math.max(0, requiredMin - minutes) : 0
     workedMin += minutes
     weeklyExtraMin += extraMin
@@ -282,6 +301,7 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
     scheduledTargetMin += requiredMin
     scheduledJustifiedMin += weekJustifiedMin
     scheduledNonContractMin += weekNonContractMin
+    grossScheduledTargetMin += weeklyTargetForWeek
     if (completed) {
       completedWeeks++
       targetMin += requiredMin
@@ -292,7 +312,7 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
       start,
       end:fridayKey,
       minutes,
-      scheduledTargetMin:weeklyTarget,
+      scheduledTargetMin:weeklyTargetForWeek,
       targetMin:requiredMin,
       justifiedMin:weekJustifiedMin,
       nonContractMin:weekNonContractMin,
@@ -308,7 +328,7 @@ export const monthlyExtras = (records, empId, monthKey, opts = {}) => {
     workedMin,
     targetMin,
     requiredMin:targetMin,
-    grossScheduledTargetMin:weekStarts.length * weeklyTarget,
+    grossScheduledTargetMin,
     scheduledTargetMin,
     justifiedMin,
     scheduledJustifiedMin,

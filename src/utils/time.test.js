@@ -154,8 +154,11 @@ describe('monthlyExtras', () => {
     const r = monthlyExtras([], 'e1', '2026-06', { now:historicalNow })
     expect(r.completedWeeks).toBe(5)
     expect(r.weeklyExtraMin).toBe(0)
-    expect(r.deficitMin).toBe(5 * 40 * 60)
-    expect(r.balanceMin).toBe(-5 * 40 * 60)
+    // 4 semanas normales de 40h + la semana del 29 jun-3 jul, que ya cae en
+    // jornada intensiva (lun 29 y mar 30 a 8h, mié-vie 1-3 jul a 7h): calendario
+    // laboral 2026 (LABOR_CALENDAR_2026) → 40*4 + 37 = 197h.
+    expect(r.deficitMin).toBe(197 * 60)
+    expect(r.balanceMin).toBe(-197 * 60)
   })
 
   it('detecta extras cuando una semana supera las 40h', () => {
@@ -182,9 +185,13 @@ describe('monthlyExtras', () => {
     ]
     const r = monthlyExtras(records, 'e1', '2026-06', { now:historicalNow })
     expect(r.workedMin).toBe(200 * 60)
-    expect(r.weeklyExtraMin).toBe(5 * 60)
+    // Semana 1 jun (9h/día): 45h sobre objetivo de 40h → 5h extra.
+    // Semana 29 jun-3 jul (8h/día pactadas en el test, pero esa semana ya cae
+    // en jornada intensiva: 1-3 jul solo exigen 7h/día por calendario) → 40h
+    // trabajadas sobre objetivo real de 37h → 3h extra más.
+    expect(r.weeklyExtraMin).toBe(8 * 60)
     expect(r.deficitMin).toBe(5 * 60)
-    expect(r.balanceMin).toBe(0)
+    expect(r.balanceMin).toBe(3 * 60)
   })
 
   it('solo cuenta de lunes a viernes', () => {
@@ -251,9 +258,49 @@ describe('monthlyExtras', () => {
     const now = new Date('2026-07-30T12:00:00')
     const r = monthlyExtras([], 'e1', '2026-07', { now })
     expect(r.completedWeeks).toBe(3)
-    expect(r.deficitMin).toBe(3 * 40 * 60)
+    // Julio es jornada intensiva completa (7h lun-mié, 6h jue-vie = 33h/semana
+    // por calendario), no 40h — las 3 semanas completadas (6, 13 y 20 jul)
+    // suman 33*3 = 99h.
+    expect(r.deficitMin).toBe(99 * 60)
     expect(r.weekly.at(-1).completed).toBe(false)
     expect(r.weekly.at(-1).deficitMin).toBe(0)
+  })
+
+  it('en jornada intensiva las horas extra empiezan a partir de las 33h reales de esa semana, no de 40h', () => {
+    // Semana del 6-10 jul: calendario 2026 exige 7h lun-mié + 6h jue-vie = 33h.
+    // Se construye día a día (no con el helper `week`, que usa horas iguales
+    // cada día) para reproducir exactamente ese patrón 7/7/7/6/6.
+    const preciseWeek = [7, 7, 7, 6, 6].map((hours, index) => {
+      const start = new Date('2026-07-06T08:00:00')
+      start.setDate(start.getDate() + index)
+      const end = new Date(start)
+      end.setMinutes(end.getMinutes() + hours * 60)
+      return { empId:'e1', inicio:start.toISOString(), fin:end.toISOString() }
+    })
+    const onSchedule = monthlyExtras(preciseWeek, 'e1', '2026-07', { now:historicalNow })
+    expect(onSchedule.weekly[0].minutes).toBe(33 * 60)
+    expect(onSchedule.weekly[0].extraMin).toBe(0)
+    expect(onSchedule.weekly[0].deficitMin).toBe(0)
+
+    // Un minuto por encima del horario real de esa semana ya es hora extra,
+    // aunque el total (33h01m) siga muy por debajo del umbral genérico de 40h.
+    const overtimeWeek = [...preciseWeek]
+    const lastEnd = new Date(overtimeWeek[4].fin)
+    lastEnd.setMinutes(lastEnd.getMinutes() + 1)
+    overtimeWeek[4] = { ...overtimeWeek[4], fin:lastEnd.toISOString() }
+    const overtime = monthlyExtras(overtimeWeek, 'e1', '2026-07', { now:historicalNow })
+    expect(overtime.weekly[0].minutes).toBe(33 * 60 + 1)
+    expect(overtime.weekly[0].extraMin).toBe(1)
+  })
+
+  it('un objetivo contractual explícito (jornada pactada) ignora el calendario general', () => {
+    // opts.weeklyH representa una jornada pactada distinta (p.ej. tiempo
+    // parcial) — debe primar siempre sobre el calendario de jornada completa,
+    // incluso en un mes de jornada intensiva.
+    const r = monthlyExtras(week('2026-07-06', 20 / 5), 'e1', '2026-07', { now:historicalNow, weeklyH:20 })
+    expect(r.weekly[0].scheduledTargetMin).toBe(20 * 60)
+    expect(r.weekly[0].extraMin).toBe(0)
+    expect(r.weekly[0].deficitMin).toBe(0)
   })
 })
 

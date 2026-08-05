@@ -25,6 +25,7 @@ import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny, isConnectivit
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { authSupabase } from '../services/authService.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
+import { effectiveDailyTargetMin } from '../utils/laborCalendar.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
@@ -1129,7 +1130,7 @@ function ValidateHoursPage() {
     return records.map((r: any) => {
       const emp = (db.employees || []).find((e: any) => e.id === r.empId)
       const worked = recWorkSecs(r) / 60
-      const expected = Number(db.config?.wdMin) || 480
+      const expected = effectiveDailyTargetMin(Number(db.config?.wdMin) || 0, r.inicio ? localDateStr(new Date(r.inicio)) : '')
       const diff = worked - expected
       const absDiffMin = Math.abs(diff)
       const diffH = Math.floor(absDiffMin / 60)

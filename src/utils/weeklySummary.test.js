@@ -10,14 +10,16 @@ describe('resumen semanal definitivo', () => {
       id:'r1', empId:'e1', inicio:'2026-07-06T08:00:00', fin:'2026-07-06T16:00:00',
       workSecs:8 * 3600,
     }] }
+    // Semana del 6-10 jul: jornada intensiva completa (7h lun-mié, 6h jue-vie
+    // por calendario) → objetivo real 33h (1980min), no 40h.
     expect(completedWeeklySummary(db, employee, new Date('2026-07-10T18:00:00'))).toBeNull()
     const summary = completedWeeklySummary(db, employee, saturday)
-    expect(summary).toMatchObject({ start:'2026-07-06', minutes:480, targetMin:2400, deficitMin:1920 })
+    expect(summary).toMatchObject({ start:'2026-07-06', minutes:480, targetMin:1980, deficitMin:1500 })
     expect(completedWeeklySummary(db, employee, new Date('2026-07-12T10:00:00'))).toMatchObject({
       start:'2026-07-06',
-      deficitMin:1920,
+      deficitMin:1500,
     })
-    expect(employeeWeeklySummaryBody(employee, summary)).toContain('Déficit: -32h')
+    expect(employeeWeeklySummaryBody(employee, summary)).toContain('Déficit: -25h')
     expect(adminWeeklyDeficitBody(employee, summary)).toContain('Sin justificación')
   })
 
@@ -27,8 +29,9 @@ describe('resumen semanal definitivo', () => {
       vacaciones:[{ id:'v1', empId:'e1', fechaInicio:'2026-07-06', fechaFin:'2026-07-10', estado:'aprobada' }],
     }
     const summary = completedWeeklySummary(db, employee, saturday)
-    expect(summary).toMatchObject({ targetMin:0, justified:2400, deficitMin:0 })
-    expect(employeeWeeklySummaryBody(employee, summary)).toContain('Justificadas/no exigibles: 40h')
+    // Semana completa de vacaciones en jornada intensiva (33h reales, no 40h).
+    expect(summary).toMatchObject({ targetMin:0, justified:1980, deficitMin:0 })
+    expect(employeeWeeklySummaryBody(employee, summary)).toContain('Justificadas/no exigibles: 33h')
   })
 
   it('explica el tiempo no exigible fuera del contrato sin llamarlo ausencia injustificada', () => {
@@ -38,8 +41,11 @@ describe('resumen semanal definitivo', () => {
       saturday,
     )
     const body = adminWeeklyDeficitBody(employee, summary)
-    expect(summary).toMatchObject({ targetMin:1440, nonContractMin:960, deficitMin:1440 })
-    expect(body).toContain('Tiempo no exigible fuera del contrato: 16h')
+    // Contrato empieza el miércoles 8: lunes y martes (7h/día por jornada
+    // intensiva) quedan fuera de contrato → 14h, no 16h. Objetivo real de la
+    // semana (33h) menos esas 14h no exigibles = 19h (1140min).
+    expect(summary).toMatchObject({ targetMin:1140, nonContractMin:840, deficitMin:1140 })
+    expect(body).toContain('Tiempo no exigible fuera del contrato: 14h')
     expect(body).not.toContain('Sin justificación')
   })
 })
