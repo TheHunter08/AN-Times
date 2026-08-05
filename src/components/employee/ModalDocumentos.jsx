@@ -34,7 +34,14 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const { dragHandlers, modalStyle } = useSwipeDismiss(closeDocumentModal)
   const dialogRef = useDialogA11y(visible, closeDocumentModal)
 
-  const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
+  // El admin guarda el nombre de archivo en `nombre` (ver uploadFile en
+  // AppV2Admin.tsx), no en `titulo` — sin este fallback, la tarjeta, la
+  // cabecera del modal, la confirmación de firma y la notificación al admin
+  // mostraban literalmente "undefined" para cualquier documento subido desde
+  // el panel de administración.
+  const myDocs = (db.documentos || [])
+    .filter(d => d.empId === u?.id)
+    .map(d => ({ ...d, titulo: d.titulo || d.nombre || d.name || 'Documento' }))
   const pendientes = myDocs.filter(d => !d.firma)
   const firmados = myDocs.filter(d => d.firma)
   const myFirma = db.firmas?.[u?.id]?.main
