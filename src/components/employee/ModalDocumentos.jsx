@@ -4,7 +4,7 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { auditLog, queuePush, supabase } from '../../services/dataService.js'
 import { DocPreview } from '../DocPreview.jsx'
-import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../../utils/pdfSign.js'
+import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage, blobToDataUrl } from '../../utils/pdfSign.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
@@ -72,10 +72,19 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     if (!myFirma) { toast('Necesitas guardar tu firma primero en Perfil → Firma digital'); return }
     setStamping(true)
     const firmadoAt = new Date().toISOString()
-    // El admin guarda el contenido en `data` (base64) o en `storagePath`.
-    // `fileData` era el nombre histórico — normalizamos los tres.
+    // El admin guarda el contenido en `data` (base64) o en `storagePath`
+    // (Storage). `fileData` era el nombre histórico — normalizamos los tres.
+    // Si el original vive solo en Storage, hay que descargarlo antes de poder
+    // estampar la firma (stampSignatureOnPdf/Image necesitan un data URL).
     let fileData = doc.fileData || doc.data || null
     try {
+      if (!fileData && doc.storagePath && supabase) {
+        const { data: signed, error: signErr } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 300)
+        if (signErr || !signed?.signedUrl) throw new Error(signErr?.message || 'No se pudo descargar el documento original')
+        const res = await fetch(signed.signedUrl)
+        if (!res.ok) throw new Error('No se pudo descargar el documento original')
+        fileData = await blobToDataUrl(await res.blob())
+      }
       const printable = await makePrintableSignature(myFirma.data)
       const label = `Firmado digitalmente por ${u.name} · ${new Date(firmadoAt).toLocaleString('es-ES')}`
       if (fileData?.startsWith('data:application/pdf')) {

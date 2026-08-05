@@ -1,3 +1,25 @@
+// Descarga desde Storage devuelve un Blob; el resto de este módulo trabaja
+// con data URLs (stampSignatureOnPdf/Image, <img>/<iframe src>). Estas dos
+// conversiones son las mismas que ya se repetían sueltas en DocPreview.jsx
+// y EmployeeGastos.tsx.
+export function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('read error'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+export function dataUrlToBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] || 'application/octet-stream'
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
+
 function arrayBufferToBase64(buf) {
   let binary = ''
   const bytes = new Uint8Array(buf)

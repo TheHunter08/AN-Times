@@ -1406,11 +1406,16 @@ function DocumentsPage() {
     certificado: 'certificado',
   }
 
-  // Resuelve una URL utilizable: si el documento vive en Storage (subida
-  // reciente), pide una URL firmada de corta duración; si no, usa el
-  // base64/URL guardado directamente en el registro (documentos antiguos,
-  // o si Storage no estaba disponible al subirlo).
+  // Resuelve una URL utilizable. `fileData` se comprueba primero porque es
+  // donde queda el contenido DEFINITIVO tras la firma del empleado (ver
+  // firmarDoc en ModalDocumentos.jsx): el original en Storage (`storagePath`)
+  // sigue existiendo pero ya no lleva la firma estampada, así que una vez
+  // firmado hay que ignorar Storage y servir siempre fileData. Si no está
+  // firmado, fileData no existe y se cae a Storage o al resto de campos
+  // heredados (documentos antiguos, o si Storage no estaba disponible al
+  // subirlo).
   const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
+    if (doc.fileData) return doc.fileData
     if (doc.storagePath && authSupabase) {
       try {
         const { data, error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600, filename ? { download: filename } : undefined)
