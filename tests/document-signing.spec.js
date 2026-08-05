@@ -1,10 +1,18 @@
 import { test, expect } from '@playwright/test'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { employee, loginAsAdmin, loginAsEmployee } from './helpers/session.js'
 
 // PDF válido mínimo (una página, sin texto) generado con pdf-lib para poder
 // probar el estampado real de la firma (stampSignatureOnPdf usa pdf-lib para
 // cargarlo, no aceptaría un placeholder inválido).
 const PDF_DATA_URL = 'data:application/pdf;base64,JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxMTIKPj4Kc3RyZWFtCnicHcoxCgJRDEXR/q0itSDmZ/Jf/oBYCDNY2AjZgMgoihaKuH5Hud3hPrFNqPx6XbDaTffP9L6ejsvQvnnTaL0USp5hLrlH+a9FXMWqSj6w9o4jh/AwlnCOpnRW09CwqKycfSN5Qy4wJA74AgrwGVYKZW5kc3RyZWFtCmVuZG9iagoKNyAwIG9iago8PAovRmlsdGVyIC9GbGF0ZURlY29kZQovVHlwZSAvT2JqU3RtCi9OIDUKL0ZpcnN0IDI2Ci9MZW5ndGggMzU5Cj4+CnN0cmVhbQp4nNVSTUvDQBC976+Yox5kJ5tvKYW2SRSkKK2gKB7SZCmRsivJVuq/dyZJLT2IZwmP3Zl5s/s28zxAUBAE4EOcQAChryCE2PNgMhHy8etDg3wot7oT8q6pO3glDsIK3oRc2L1x4InpVJy4i9KVO7sVQxN4TD4yHlpb7yvdwqTIiwIxRsQoIESIKqN1QUgJimKqqYT2hDgYQbnYR/RnVCsGRPHQw/WeG479Oa3EjZiTDdwgGeKfe/mufDhD/aUnnQq5tHVWOg0X2bVCFWGCIQYq9NOXS/odrS6d/b+P6/U31vz6wrM583h5yK1mD/RTlivd2X1b0diZV1iq8OZW7z61a6ryKsY0IZ1xkpLHRmPI5/vNu656Kof5wd2sHWsYEpxb6rop5/ZA7kP66OU9yIMzY6xjV/Z+NI7UcBSNHj2TzIKEXO83rg856Qk5LzvdSz3pJBGmsnVjtiCfGjMzXXNM8InfLcXF5wplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9TaXplIDkKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MAovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCA5IF0KPj4Kc3RyZWFtCnicFcSxEQAgDAOxt8MdLdOzE1MlWIWAbrMhKTlVWuKAeD9fGGGsA6oKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjY2MgolJUVPRg=='
+
+// PNG 1×1 real y decodificable (no el placeholder de texto sin sentido que
+// usa `firmas` en helpers/session.js) — necesario para probar el estampado
+// real de la firma: makePrintableSignature() carga `myFirma.data` como
+// `Image()` y con un data URL inválido esa carga falla en silencio (el propio
+// flujo de firmarDoc lo captura y guarda el documento sin estampar).
+const REAL_SIGNATURE_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 
 async function openAdminPage(page, group, item) {
   const menu = page.getByRole('button', { name: /Abrir menú/i })
@@ -55,6 +63,54 @@ async function mockStorageSigning(page, pdfDataUrl, onSignRequest) {
     return route.continue()
   })
 }
+
+test('la firma se estampa exactamente donde el PDF subido dice "Firma del trabajador"', async ({ page }) => {
+  // Genera un contrato de prueba con texto real y seleccionable "Firma del
+  // trabajador" en una posición conocida — a diferencia del resto de PDFs de
+  // este archivo (sin texto de firma), este cubre el caso que motivó la
+  // búsqueda con pdf.js en pdfSignatureAnchor.js: el admin sube un contrato
+  // arbitrario y la firma debe caer sobre esa línea, no en la esquina fija.
+  const contractDoc = await PDFDocument.create()
+  const contractPage = contractDoc.addPage([400, 600])
+  const contractFont = await contractDoc.embedFont(StandardFonts.Helvetica)
+  contractPage.drawText('CONTRATO DE TRABAJO', { x: 50, y: 550, size: 14, font: contractFont })
+  contractPage.drawText('Firma del trabajador', { x: 60, y: 100, size: 10, font: contractFont })
+  const contractBytes = await contractDoc.save()
+  const contractDataUrl = 'data:application/pdf;base64,' + Buffer.from(contractBytes).toString('base64')
+
+  await loginAsEmployee(page, {
+    documentos: [{
+      id: 'doc-anchor', empId: employee.id, empName: employee.name, tipo: 'contrato',
+      nombre: 'Contrato.pdf', data: contractDataUrl, mime: 'application/pdf', size: '2 KB',
+      createdAt: new Date().toISOString(),
+    }],
+    firmas: { [employee.id]: { main: { data: REAL_SIGNATURE_PNG, updatedAt: '2026-01-01T00:00:00.000Z', empName: employee.name } } },
+  })
+  await stubRestSuccess(page)
+  await page.goto('/')
+  await openEmployeeDocuments(page)
+
+  await page.getByRole('button', { name: 'Ver' }).click()
+  await expect(page.locator('iframe')).toBeVisible({ timeout: 10000 })
+  await page.getByRole('button', { name: 'Firmar', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirmar y firmar' }).click()
+  await expect(page.getByText('Documento firmado correctamente')).toBeVisible({ timeout: 8000 })
+  // Con una firma real (no el placeholder de texto de los demás tests), el
+  // estampado debe completarse sin caer al aviso de "no se pudo insertar".
+  await expect(page.getByText('No se pudo insertar la firma')).toHaveCount(0)
+
+  const signedDoc = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).documentos[0])
+  expect(signedDoc.fileData).toMatch(/^data:application\/pdf;base64,/)
+
+  // El PDF firmado debe seguir siendo válido y tener una página más de
+  // contenido (la firma incrustada) que el original — confirma que
+  // stampSignatureOnPdf completó el flujo con pdfjs-dist bajo el build de
+  // producción (no solo en el servidor de desarrollo).
+  const signedBytes = Buffer.from(signedDoc.fileData.split(',')[1], 'base64')
+  const reloaded = await PDFDocument.load(signedBytes)
+  expect(reloaded.getPageCount()).toBe(1)
+  expect(signedBytes.length).toBeGreaterThan(contractBytes.length)
+})
 
 test('empleado firma un documento subido en base64 y el admin lo ve firmado con su contenido', async ({ page }) => {
   await loginAsEmployee(page, {

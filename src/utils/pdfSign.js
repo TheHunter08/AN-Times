@@ -83,6 +83,7 @@ function dataUrlToBytes(dataUrl) {
 
 export async function stampSignatureOnPdf(pdfDataUrl, signaturePngDataUrl, label) {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+  const { findSignatureAnchor } = await import('./pdfSignatureAnchor.js')
   const pdfBytes = dataUrlToBytes(pdfDataUrl)
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
   const pngBytes = dataUrlToBytes(signaturePngDataUrl)
@@ -90,13 +91,31 @@ export async function stampSignatureOnPdf(pdfDataUrl, signaturePngDataUrl, label
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
 
   const pages = pdfDoc.getPages()
-  const page = pages[pages.length - 1]
+  // Documento subido por el admin (contrato, nómina...): su maquetación no la
+  // controla la app, así que se busca dónde imprime literalmente "Firma del
+  // trabajador" para estampar la firma justo ahí, en vez de una esquina fija
+  // que puede no coincidir con la línea real del documento. Si no se
+  // encuentra (PDF escaneado como imagen, plantilla con otra redacción...) se
+  // cae a la esquina inferior derecha de la última página, como antes.
+  const anchor = await findSignatureAnchor(pdfDataUrl)
+  const page = anchor ? pages[anchor.pageIndex] : pages[pages.length - 1]
   const { width } = page.getSize()
 
   const sigWidth = 140
   const sigHeight = sigWidth * (pngImage.height / pngImage.width)
-  const margin = 40
 
+  if (anchor) {
+    const x = Math.max(10, Math.min(anchor.x, width - sigWidth - 10))
+    // La etiqueta "Firma del trabajador" que encontramos ya está impresa en
+    // el documento justo debajo de donde va la firma — no se repite aquí un
+    // texto propio para no superponerse a ella; el pequeño margen (4pt) deja
+    // esa etiqueta original visible bajo la firma.
+    const y = anchor.y + 4
+    page.drawImage(pngImage, { x, y, width: sigWidth, height: sigHeight })
+    return 'data:application/pdf;base64,' + arrayBufferToBase64(await pdfDoc.save())
+  }
+
+  const margin = 40
   page.drawImage(pngImage, {
     x: width - sigWidth - margin,
     y: margin + 16,
