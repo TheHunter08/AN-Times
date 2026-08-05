@@ -881,10 +881,17 @@ function TimesheetsPage({ initialSearch = '', onSearchChange }: { initialSearch?
 function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
   const db = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session)
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
   const [weekOffset, setWeekOffset] = useState(0)
+  const [addModal, setAddModal] = useState<{ empId: string; empName: string; dateStr: string } | null>(null)
+  const [startTime, setStartTime] = useState('08:00')
+  const [endTime, setEndTime] = useState('16:00')
+  const [note, setNote] = useState('Se olvidó fichar')
+  const [saving, setSaving] = useState(false)
   const isScopedRole = isScopedSupervisor(session)
 
-  const { weekLabel, days, employees } = useMemo(() => {
+  const { weekLabel, days, employees, weekDaysIso } = useMemo(() => {
     // Build Mon-Sun for current week + offset
     const now = new Date()
     const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1 // 0=Mon
@@ -899,6 +906,7 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     })
     const days = weekDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
     const weekLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    const weekDaysIso = weekDays.map(d => localDateStr(d))
 
     const emps = isScopedRole
       ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
@@ -937,19 +945,105 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
       }),
     }))
 
-    return { weekLabel, days, employees }
+    return { weekLabel, days, employees, weekDaysIso }
   }, [db, weekOffset, session, isScopedRole])
 
+  const openAddModal = (empId: string, dayIndex: number) => {
+    const emp = (db.employees || []).find((e: any) => e.id === empId)
+    setAddModal({ empId, empName: emp?.name || empId, dateStr: weekDaysIso[dayIndex] })
+    setStartTime('08:00')
+    setEndTime('16:00')
+    setNote('Se olvidó fichar')
+  }
+
+  const saveRecord = async () => {
+    if (!addModal) return
+    const { empId, empName, dateStr } = addModal
+    const inicio = new Date(`${dateStr}T${startTime}:00`).toISOString()
+    const fin    = new Date(`${dateStr}T${endTime}:00`).toISOString()
+    if (new Date(fin) <= new Date(inicio)) {
+      toast('La hora de salida debe ser posterior a la de entrada', 3000, 'warn')
+      return
+    }
+    setSaving(true)
+    const nowIso = new Date().toISOString()
+    const emp = (db.employees || []).find((e: any) => e.id === empId)
+    const rec: any = {
+      id: gid(), empId, empName,
+      inicio, fin, breaks: [],
+      centro: emp?.centroTrabajo || emp?.dept || '',
+      nota: note.trim() || 'Añadido manualmente',
+      manual: true, device: 'Manual (planning)',
+      ts: nowIso, _upd: nowIso,
+      modificado: false, aceptada: false, validado: false, rechazado: false,
+    }
+    const calculated = calcSecs(rec)
+    rec.workSecs = calculated.work
+    rec.breakSecs = calculated.brk
+    try {
+      await persistRecordRow(rec)
+    } catch (error: any) {
+      toast(syncErrorMessage('No se pudo guardar la jornada', error), 5000, 'warn')
+      setSaving(false)
+      return
+    }
+    saveDB((fresh: any) => {
+      const records = [...(fresh.records || []), rec]
+      const cierres = refreshUnsignedClosures(fresh.cierres || [], records, empId, [inicio], nowIso)
+      const withAudit = auditLog(fresh, 'Jornada añadida manualmente', `${empName}: ${startTime}–${endTime} · ${note.trim()}`, session?.user?.name || 'Admin', {
+        category: 'jornada', entityType: 'record', entityId: rec.id,
+      } as any)
+      return { records, cierres, audit: withAudit.audit }
+    })
+    toast(`Jornada añadida para ${empName}`, 3000, 'ok')
+    setSaving(false)
+    setAddModal(null)
+  }
+
+  const inputStyle: React.CSSProperties = { minHeight: 42, padding: '0 12px', borderRadius: 10, background: colors.bg[600], color: colors.text[900], border: `1px solid ${colors.border.default}`, fontFamily: 'inherit', fontSize: 14, width: '100%', boxSizing: 'border-box' as const }
+  const labelStyle: React.CSSProperties = { display: 'grid', gap: 6, fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase' as const }
+
   return (
-    <Planning
-      weekLabel={weekLabel}
-      days={days}
-      employees={employees}
-      onPrev={() => setWeekOffset(o => o - 1)}
-      onNext={() => setWeekOffset(o => o + 1)}
-      onToday={() => setWeekOffset(0)}
-      onOpenEmployee={onOpenEmployee}
-    />
+    <>
+      <Planning
+        weekLabel={weekLabel}
+        days={days}
+        employees={employees}
+        onPrev={() => setWeekOffset(o => o - 1)}
+        onNext={() => setWeekOffset(o => o + 1)}
+        onToday={() => setWeekOffset(0)}
+        onOpenEmployee={onOpenEmployee}
+        onAddRecord={openAddModal}
+      />
+      {addModal && (
+        <div onClick={() => setAddModal(null)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.68)', backdropFilter:'blur(8px)' }}>
+          <div role="dialog" aria-modal="true" aria-label="Añadir jornada manual" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:420, padding:24, borderRadius:18, background:colors.bg[900], border:`1px solid ${colors.border.default}`, boxShadow:'0 24px 70px rgba(0,0,0,.5)', display:'grid', gap:16 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+              <div>
+                <div style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>Añadir jornada manual</div>
+                <div style={{ marginTop:3, fontSize:12, color:colors.text[500] }}>{addModal.empName} · {new Date(`${addModal.dateStr}T12:00:00`).toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' })}</div>
+              </div>
+              <button aria-label="Cerrar" onClick={() => setAddModal(null)} style={{ width:38, height:38, border:0, borderRadius:12, background:colors.bg[600], color:colors.text[700], cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><IconX width={17} height={17}/></button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <label style={labelStyle}>Hora entrada
+                <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>Hora salida
+                <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inputStyle} />
+              </label>
+            </div>
+            <label style={labelStyle}>Nota
+              <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Motivo (ej: se olvidó fichar)" maxLength={120} style={inputStyle} />
+            </label>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setAddModal(null)} style={{ flex:1, minHeight:44, borderRadius:10, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[700], fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={saveRecord} disabled={saving} style={{ flex:1, minHeight:44, borderRadius:10, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit', boxShadow:`0 4px 14px ${colors.primary.glow}` }}>{saving ? 'Guardando…' : 'Añadir jornada'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -1356,6 +1450,8 @@ function DocumentsPage() {
     size: d.size || d.peso || '—',
     uploadedOn: fmtDate(d.ts || d.fecha || d.createdAt),
     expiresOn: d.expiresOn || '',
+    signed: !!d.firma,
+    signedOn: d.firma?.firmadoAt ? new Date(d.firma.firmadoAt).toLocaleDateString('es-ES') : undefined,
     onDownload: handleDownload,
     onPreview: handlePreview,
   })), [db.documentos])

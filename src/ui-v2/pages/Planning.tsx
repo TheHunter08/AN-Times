@@ -24,6 +24,7 @@ export interface PlanningProps {
   onNext?: () => void
   onToday?: () => void
   onOpenEmployee?: (employeeId: string) => void
+  onAddRecord?: (employeeId: string, dayIndex: number) => void
 }
 
 type PlanStatus = PlanCell['status']
@@ -72,7 +73,7 @@ const LEGEND = [
   { status: 'future', label: 'Aún no llega' },
 ] as const
 
-export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, onOpenEmployee }: PlanningProps) {
+export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, onOpenEmployee, onAddRecord }: PlanningProps) {
   const safeDays = Array.isArray(days) ? days : []
   const safeEmployees = Array.isArray(employees) ? employees : []
 
@@ -135,13 +136,16 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                   const def = cellDef[safeCell.status]
                   return (
                     <td key={di} style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <button type="button" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. Abrir fichajes de ${emp.name}`} style={{
-                        width:'100%', border: `1px solid ${def.border}`, cursor:onOpenEmployee?'pointer':'default', fontFamily:'inherit',
-                        padding: '4px 2px', borderRadius: radius.sm, minHeight: 30,
-                        background: def.bg,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        position: 'relative',
-                      }}>
+                      <button type="button"
+                        onClick={() => safeCell.status === 'absent' && onAddRecord ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
+                        aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? 'Añadir jornada manual' : `Abrir fichajes de ${emp.name}`}`}
+                        style={{
+                          width:'100%', border: `1px solid ${def.border}`, cursor:(onOpenEmployee || (safeCell.status === 'absent' && onAddRecord))?'pointer':'default', fontFamily:'inherit',
+                          padding: '4px 2px', borderRadius: radius.sm, minHeight: 30,
+                          background: def.bg,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          position: 'relative',
+                        }}>
                         {safeCell.status === 'live' && (
                           <span style={{ position: 'absolute', top: 2, right: 3, width: 5, height: 5, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 0 2px rgba(52,211,153,.25)', animation: 'pulse 2s infinite' }} />
                         )}
@@ -149,7 +153,7 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                           <span style={{ fontSize: 9.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{safeCell.value}</span>
                         ) : (
                           <span style={{ fontSize: 9, color: def.color, fontWeight: 700 }}>
-                            {safeCell.status === 'absent' ? '—' : safeCell.status === 'vac' ? 'VAC' : safeCell.status === 'weekend' ? '·' : ''}
+                            {safeCell.status === 'absent' ? (onAddRecord ? '+' : '—') : safeCell.status === 'vac' ? 'VAC' : safeCell.status === 'weekend' ? '·' : ''}
                           </span>
                         )}
                       </button>
@@ -178,8 +182,11 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                 return (
                   <div key={di} className="uiv2-week-day">
                     <span className="uiv2-week-day-label">{safeDays[di] || ''}</span>
-                    <button type="button" onClick={() => onOpenEmployee?.(emp.id)} aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. Abrir fichajes de ${emp.name}`} style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
-                      {safeCell.value || (safeCell.status === 'absent' ? 'Ausente' : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
+                    <button type="button"
+                      onClick={() => safeCell.status === 'absent' && onAddRecord ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
+                      aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? 'Añadir jornada manual' : `Abrir fichajes de ${emp.name}`}`}
+                      style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
+                      {safeCell.value || (safeCell.status === 'absent' ? (onAddRecord ? '+ Añadir' : 'Ausente') : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
                     </button>
                   </div>
                 )

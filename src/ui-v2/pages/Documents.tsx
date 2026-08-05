@@ -16,6 +16,8 @@ export interface DocumentItem {
   size: string
   uploadedOn: string
   expiresOn?: string
+  signed?: boolean
+  signedOn?: string
   onDownload?: (id: string) => void
   onPreview?: (id: string) => void
 }
@@ -96,6 +98,7 @@ export function Documents({ items, onUpload }: DocumentsProps) {
               </div>
             </div>
             <div style={{ fontSize: 11.5, color: colors.text[500] }}>{doc.empName}</div>
+            {doc.signed && <div style={{ fontSize:11, fontWeight:650, color: colors.semantic.green }}>✓ Firmado{doc.signedOn ? ` el ${doc.signedOn}` : ''}</div>}
             {doc.expiresOn && <div style={{ fontSize:11, fontWeight:650, color:expiryColor }}>{expiryDays !== null && expiryDays < 0 ? 'Documento caducado' : expiryDays !== null && expiryDays <= 30 ? `Caduca en ${expiryDays} días` : `Caduca el ${new Date(`${doc.expiresOn}T12:00:00`).toLocaleDateString('es-ES')}`}</div>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, color: colors.text[300] }}>{doc.size} · {doc.uploadedOn}</span>

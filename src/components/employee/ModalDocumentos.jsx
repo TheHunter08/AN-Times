@@ -1,13 +1,14 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { auditLog, queuePush } from '../../services/dataService.js'
+import { auditLog, queuePush, supabase } from '../../services/dataService.js'
 import { DocPreview } from '../DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage } from '../../utils/pdfSign.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
+import { DOCUMENTOS_BUCKET } from '../../config/constants.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:560, maxHeight:'92vh', overflowY:'auto' }
@@ -24,6 +25,7 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null)
   const [stamping, setStamping] = useState(false)
   const [viewing, setViewing] = useState(null)
+  const [resolvedUrls, setResolvedUrls] = useState({})
   const closeDocumentModal = () => {
     if (viewing || signing) { setViewing(null); setSigning(null) }
     else onClose()
@@ -31,25 +33,55 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   useModalBack(visible, closeDocumentModal)
   const { dragHandlers, modalStyle } = useSwipeDismiss(closeDocumentModal)
   const dialogRef = useDialogA11y(visible, closeDocumentModal)
-  if (!visible) return null
 
   const myDocs = (db.documentos || []).filter(d => d.empId === u?.id)
   const pendientes = myDocs.filter(d => !d.firma)
   const firmados = myDocs.filter(d => d.firma)
   const myFirma = db.firmas?.[u?.id]?.main
 
+  // Obtiene URLs firmadas para documentos guardados en Storage
+  const pendingStorageIds = myDocs
+    .filter(d => d.storagePath && !d.fileData && !d.data && !(d.id in resolvedUrls))
+    .map(d => d.id).join(',')
+  useEffect(() => {
+    if (!pendingStorageIds || !supabase) return
+    let cancelled = false
+    pendingStorageIds.split(',').filter(Boolean).forEach(async id => {
+      const doc = myDocs.find(d => d.id === id)
+      if (!doc?.storagePath) return
+      try {
+        const { data, error } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600)
+        if (!cancelled && !error && data?.signedUrl) {
+          setResolvedUrls(prev => ({ ...prev, [id]: data.signedUrl }))
+        }
+      } catch {}
+    })
+    return () => { cancelled = true }
+  }, [pendingStorageIds])
+
+  // Normaliza el doc para DocPreview: unifica los distintos nombres de campo
+  const normalizeDoc = (doc) => ({
+    ...doc,
+    fileData: doc.fileData || doc.data || null,
+    url: doc.url || resolvedUrls[doc.id] || null,
+  })
+
+  if (!visible) return null
+
   const firmarDoc = async (doc) => {
     if (!myFirma) { toast('Necesitas guardar tu firma primero en Perfil → Firma digital'); return }
     setStamping(true)
     const firmadoAt = new Date().toISOString()
-    let fileData = doc.fileData
+    // El admin guarda el contenido en `data` (base64) o en `storagePath`.
+    // `fileData` era el nombre histórico — normalizamos los tres.
+    let fileData = doc.fileData || doc.data || null
     try {
       const printable = await makePrintableSignature(myFirma.data)
       const label = `Firmado digitalmente por ${u.name} · ${new Date(firmadoAt).toLocaleString('es-ES')}`
-      if (doc.fileData?.startsWith('data:application/pdf')) {
-        fileData = await stampSignatureOnPdf(doc.fileData, printable, label)
-      } else if (doc.fileData?.startsWith('data:image')) {
-        fileData = await stampSignatureOnImage(doc.fileData, printable, label)
+      if (fileData?.startsWith('data:application/pdf')) {
+        fileData = await stampSignatureOnPdf(fileData, printable, label)
+      } else if (fileData?.startsWith('data:image')) {
+        fileData = await stampSignatureOnImage(fileData, printable, label)
       }
     } catch (e) {
       console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
@@ -64,7 +96,10 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     try {
       saveDB(fresh => {
         const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
-          ...d, fileData, firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
+          ...d,
+          // fileData estampado (o el original si no se pudo estampar)
+          fileData: fileData || d.fileData || d.data || null,
+          firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
         } : d)
         const noti = createNotification({ empId:'__admin__', action:notiAction, detail:notiDetail, dedupeKey:`documento:${doc.id}:firma:${u.id}`, ts:firmadoAt })
         const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
@@ -122,7 +157,7 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
         {/* Read-only viewer */}
         {viewing && !signing && (
           <div style={{ marginBottom:16 }}>
-            <DocPreview d={viewing} db={db} empId={u.id} />
+            <DocPreview d={normalizeDoc(viewing)} db={db} empId={u.id} />
             <div style={{ display:'flex', gap:8, marginTop:12 }}>
               {!viewing.firma && <button style={btnPrimary} onClick={() => { setSigning(viewing); setViewing(null) }}>Firmar</button>}
             </div>
@@ -133,7 +168,7 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
         {signing && (
           <div style={{ background:colors.bg[600], border:`1px solid ${colors.border.subtle}`, borderRadius:radius.xl, padding:16, marginBottom:16 }}>
             <div style={{ fontSize:13, fontWeight:700, color:colors.text[900], marginBottom:8 }}>{signing.titulo}</div>
-            <div style={{ marginBottom:12 }}><DocPreview d={signing} db={db} empId={u.id} /></div>
+            <div style={{ marginBottom:12 }}><DocPreview d={normalizeDoc(signing)} db={db} empId={u.id} /></div>
             {myFirma ? (
               <>
                 <div style={{ fontSize:11, color:colors.text[500], marginBottom:6 }}>Tu firma guardada:</div>

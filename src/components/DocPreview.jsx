@@ -81,30 +81,34 @@ function PdfViewer({ blobUrl, title }) {
 }
 
 export function DocPreview({ d, db, empId }) {
-  const blobUrl = useBlobUrl(d.fileData)
+  // El admin guarda el contenido en `data` (base64 local) o en Storage
+  // (`storagePath`). El campo histórico en ModalDocumentos era `fileData`.
+  // Normalizamos para que ambos funcionen.
+  const fileData = d.fileData || d.data
+  const blobUrl = useBlobUrl(fileData)
 
-  if (d.fileData) {
-    const isPdf = d.fileData.startsWith('data:application/pdf')
+  if (fileData) {
+    const isPdf = fileData.startsWith('data:application/pdf')
     if (isPdf) {
       return blobUrl
         ? <PdfViewer blobUrl={blobUrl} title={d.titulo} />
         : <div style={{ width:'100%', height:'50vh', display:'flex', alignItems:'center', justifyContent:'center', background: colors.bg[600], borderRadius: radius.sm, border:`1px solid ${colors.border.default}`, color: colors.text[500], fontSize:13 }}>Cargando documento…</div>
     }
     // Imagen — mostrar previsualización + botón de descarga
-    const mime = d.fileData.split(';')[0].split(':')[1] || 'image/jpeg'
+    const mime = fileData.split(';')[0].split(':')[1] || 'image/jpeg'
     const ext = mime === 'image/png' ? '.png' : mime === 'image/gif' ? '.gif' : '.jpg'
     const imgName = ((d.fileName || d.titulo || 'imagen').replace(/\.[^.]+$/, '')) + ext
     const downloadImg = () => {
       const a = document.createElement('a')
-      a.href = d.fileData
+      a.href = fileData
       a.download = imgName
       a.click()
     }
     return (
       <div>
-        <img src={d.fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius: radius.sm, border:`1px solid ${colors.border.default}`, background:'#fff', display:'block' }} />
+        <img src={fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius: radius.sm, border:`1px solid ${colors.border.default}`, background:'#fff', display:'block' }} />
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
-          <button onClick={() => window.open(d.fileData, '_blank')}
+          <button onClick={() => window.open(fileData, '_blank')}
             style={{ flex:1, padding:'9px 12px', fontSize:12, fontWeight:700, background: colors.bg[400], color: colors.text[700], border:`1px solid ${colors.border.default}`, borderRadius: radius.md, cursor:'pointer', fontFamily:'inherit' }}>
             ↗ Abrir
           </button>
