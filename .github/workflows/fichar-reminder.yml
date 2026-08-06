@@ -1,10 +1,7 @@
 name: Recordatorio Fichar
 
 on:
-  schedule:
-    # Cada 30 min de 05:00 a 12:00 UTC (07:00–14:00 Madrid verano)
-    # La hora exacta de envío se configura en el panel de Ajustes → Recordatorios
-    - cron: '0,30 5-12 * * 1-5'
+  # Respaldo manual. El schedule unificado está en operational-crons.yml.
   workflow_dispatch:
 
 jobs:

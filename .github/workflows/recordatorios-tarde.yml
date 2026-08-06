@@ -5,11 +5,8 @@ name: Recordatorios tarde/noche
 # recordatorio configurado durante la tarde/noche de Madrid.
 
 on:
-  schedule:
-    # Cada 30 min, lejos del minuto 0 para reducir retrasos y fallos de runner.
-    # 13:17-22:47 UTC = 15:17-00:47 en verano / 14:17-23:47 en invierno.
-    # cron-reminders deduplica los avisos, así que los reintentos son seguros.
-    - cron: "17,47 13-22 * * *"
+  # Respaldo manual. Entrada, tarde y noche se programan conjuntamente en
+  # operational-crons.yml para evitar colas de runners duplicadas.
   workflow_dispatch:
 
 concurrency:

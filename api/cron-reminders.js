@@ -1,7 +1,7 @@
 // ── Cron de recordatorios ─────────────────────────────────────────────────────
 // Ejecutado por Vercel Cron una vez al día (ver vercel.json) y, con más
 // frecuencia en horario laboral (05:00-12:00 UTC, L-V), por
-// .github/workflows/fichar-reminder.yml — este endpoint es idempotente por
+// .github/workflows/operational-crons.yml — este endpoint es idempotente por
 // diseño (dedup vía db.notisSent) así que puede recibir ambos disparos.
 // Cubre TODOS los recordatorios críticos para cuando la app está cerrada:
 //   1. Recordatorio de fichaje (no ha registrado entrada hoy)
@@ -453,8 +453,8 @@ export default async function handler(req, res) {
     }
 
     // La generación del cierre mensual del día 1 vive solo en
-    // auto-cierre-mensual.js (workflow dedicado cierre-mensual.yml, 08:00
-    // UTC). Antes este cron también generaba el mismo cierre con OTRA
+    // auto-cierre-mensual.js, reutilizado por /api/cron-monthly-close en el
+    // cron diario de Vercel. Antes este cron también generaba el mismo cierre con OTRA
     // fórmula de cálculo de horas (no usaba workSecs precalculado) — cuál de
     // los dos ganara la carrera decidía las horas del documento legal
     // firmado, y un fallo de lock optimista en el otro script podía dejar a

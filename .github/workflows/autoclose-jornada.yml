@@ -1,12 +1,8 @@
 name: Auto-cierre jornadas >10h
 
 on:
-  schedule:
-    # Cada 30 min, fuera del minuto 0 (hora punta de runners de GitHub).
-    # El script es idempotente: una jornada ya cerrada deja de ser candidata.
-    # Dos intentos por hora reducen el impacto de un schedule perdido o de un
-    # fallo temporal al adquirir runner.
-    - cron: "17,47 * * * *"
+  # Respaldo manual. La programación vive en operational-crons.yml y llama al
+  # endpoint de Vercel para no instalar dependencias en cada ejecución.
   workflow_dispatch:
 
 concurrency:

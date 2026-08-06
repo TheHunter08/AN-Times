@@ -33,7 +33,9 @@ No se deben eliminar las políticas actuales ni `app_data` antes de completar la
 
 `/api/cron-migration-checkpoint` ejecuta cada día una comprobación no destructiva. Compara IDs y recencia de `employees`, `records`, `vacaciones`, `cierres`, `obras` y `app_entities`; permite filas adicionales en tablas, pero bloquea el checkpoint si falta una fila del blob o la copia tabular está obsoleta. Nunca reescribe las tablas ni activa RLS.
 
-El autocierre frecuente continúa en GitHub Actions. `/api/cron-autoclose` añade una ejecución diaria de respaldo en Vercel para que una saturación de runners de GitHub no deje jornadas abiertas indefinidamente. Ambos caminos usan la misma regla de 10 horas, son idempotentes y conservan `_upd`; la notificación push es secundaria y nunca impide cerrar o sincronizar el fichaje.
+El autocierre, los recordatorios y el despertar de sincronización comparten un único workflow semihorario (`operational-crons.yml`). Sustituye cuatro schedules que llegaban a crear 372 jobs diarios y saturaban la cola de runners. Cada paso llama a un endpoint idempotente de producción y se reintenta ante fallos transitorios. `/api/cron-autoclose` mantiene además una ejecución diaria de respaldo en Vercel para que una saturación de GitHub no deje jornadas abiertas indefinidamente.
+
+El cierre mensual usa el mismo generador tanto en el script manual como en `/api/cron-monthly-close`. La ejecución diaria principal está en Vercel, donde dispone de la credencial de servicio de Supabase; el workflow antiguo queda únicamente como respaldo manual. La generación sigue siendo idempotente, conserva el lock optimista del blob y hace upsert de las filas de `cierres` antes de notificar.
 
 ## Informes programados
 

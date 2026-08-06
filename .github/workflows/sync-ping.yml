@@ -1,12 +1,8 @@
 name: Despertar sincronización offline
 
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/sync-ping.yml']
-  schedule:
-    # Evita el minuto 0, donde GitHub advierte de más retrasos de carga.
-    - cron: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *'
+  # Respaldo manual. Antes lanzaba 12 jobs/hora; ahora comparte el runner
+  # semihorario definido en operational-crons.yml.
   workflow_dispatch:
 
 concurrency:

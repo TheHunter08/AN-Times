@@ -7,6 +7,8 @@ import { toClosureRow } from './src/services/tableSyncPlan.js'
 import { canCloseMonth } from './src/utils/adminHelpers.js'
 import { monthlyExtras } from './src/utils/time.js'
 import { workBalanceOptions } from './src/utils/workBalance.js'
+import { fileURLToPath } from 'url'
+import path from 'path'
 
 process.env.TZ = 'Europe/Madrid'
 
@@ -14,17 +16,18 @@ process.env.TZ = 'Europe/Madrid'
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL   = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON  = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 // Fail-closed (igual que el resto de api/*.js): si el secret de GitHub
 // Actions se queda vacío por error, antes el script seguía funcionando en
 // silencio contra un proyecto/clave fijados en el código fuente, en vez de
 // fallar de forma visible.
-if (!SB_URL || !SB_ANON) { console.error('[auto-cierre] VITE_SB_URL / VITE_SB_ANON not set'); process.exit(1) }
 const PUSH_URL = cleanEnv(process.env.PUSH_URL) || 'https://times-inc.vercel.app/api/sendpush'
 const PUSH_SECRET = cleanEnv(process.env.PUSH_SECRET)
+const SB_KEY = SB_SERVICE || SB_ANON
 
 const SB_HEADERS = {
-  apikey: SB_ANON,
-  Authorization: `Bearer ${SB_ANON}`,
+  apikey: SB_KEY,
+  Authorization: `Bearer ${SB_KEY}`,
   'Content-Type': 'application/json',
 }
 
@@ -89,8 +92,7 @@ function calcMin(r) {
   return Math.max(0, Math.floor((workMs - breakMs) / 60000))
 }
 
-async function main() {
-  const now = new Date()
+export async function runMonthlyClose(now = new Date()) {
   // Mes anterior
   const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const mes = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`
@@ -99,8 +101,10 @@ async function main() {
   console.log(`Generando cierres para ${mesLabel} (${mes})…`)
   if (!canCloseMonth(mes, now)) {
     console.log(`El periodo ${mes} sigue abierto: aún no terminó el viernes de su última semana.`)
-    return
+    return { ok:true, mes, processed:0, skipped:'period-open' }
   }
+
+  if (!SB_URL || !SB_KEY) throw new Error('VITE_SB_URL / credencial Supabase no configurados')
 
   const result = await readDB()
   if (!result) throw new Error('No se pudo leer la BD')
@@ -152,7 +156,7 @@ async function main() {
 
   if (!nuevos.length) {
     console.log('Nada que generar.')
-    return
+    return { ok:true, mes, processed:0, skipped:'nothing-to-generate' }
   }
 
   await upsertClosures(nuevos)
@@ -163,6 +167,9 @@ async function main() {
     await sendPush(c.empId, '📋 Cierre mensual pendiente', `Tu resumen de ${mesLabel} está listo para firmar en la app.`)
     console.log(`  Push enviado a ${c.empName}`)
   }
+
+  return { ok:true, mes, processed:nuevos.length }
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+if (isDirectRun) runMonthlyClose().catch(e => { console.error(e); process.exit(1) })

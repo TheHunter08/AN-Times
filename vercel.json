@@ -8,6 +8,7 @@
     { "path": "/api/cron-reports",   "schedule": "35 7 * * *" },
     { "path": "/api/cron-migration-checkpoint", "schedule": "5 4 * * *" },
     { "path": "/api/cron-autoclose",  "schedule": "10 22 * * *" },
+    { "path": "/api/cron-monthly-close", "schedule": "25 8 * * *" },
     { "path": "/api/backup",         "schedule": "0 3 * * *" },
     { "path": "/api/sync-ping",      "schedule": "17 12 * * *" }
   ],
@@ -16,6 +17,7 @@
     { "source": "/api/patch-pins", "destination": "/api/admin-tools?op=patch-pins" },
     { "source": "/api/send-push-all", "destination": "/api/admin-tools?op=send-push-all" },
     { "source": "/api/send-whatsapp", "destination": "/api/admin-tools?op=send-whatsapp" },
+    { "source": "/api/cron-monthly-close", "destination": "/api/admin-tools?op=monthly-close" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

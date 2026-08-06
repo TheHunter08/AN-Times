@@ -1,0 +1,53 @@
+name: Automatizaciones operativas
+
+on:
+  schedule:
+    # Un único runner cada 30 min sustituye cuatro schedules independientes.
+    # Los endpoints son idempotentes y deciden qué avisos corresponden ahora.
+    - cron: '12,42 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: times-inc-operational-crons
+  cancel-in-progress: true
+
+jobs:
+  run-operational-crons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+    steps:
+      - name: Validar configuración
+        shell: bash
+        run: test -n "${CRON_SECRET}"
+
+      - name: Recordatorios de entrada y salida
+        shell: bash
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 90 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-reminders"
+
+      - name: Autocierre de jornadas largas
+        if: always()
+        shell: bash
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 90 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-autoclose"
+
+      - name: Despertar sincronización offline
+        if: always()
+        shell: bash
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 90 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/sync-ping"

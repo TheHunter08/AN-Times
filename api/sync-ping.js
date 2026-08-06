@@ -1,4 +1,5 @@
-// GitHub Actions: cada 5 minutos (Vercel Hobby solo admite cron diario).
+// GitHub Actions: comparte un runner cada 30 minutos con recordatorios y
+// autocierre (Vercel Hobby solo admite cron diario).
 // Detecta dispositivos con datos offline pendientes (basándose en heartbeats)
 // y les envía un push SYNC_PING para despertar el Service Worker en iOS/Android.
 //
