@@ -2,9 +2,16 @@ name: Auto-cierre jornadas >10h
 
 on:
   schedule:
-    # Cada 4 horas entre las 06:00 y las 22:00 UTC (L-D)
-    - cron: '0 6,10,14,18,22 * * *'
+    # Cada 30 min, fuera del minuto 0 (hora punta de runners de GitHub).
+    # El script es idempotente: una jornada ya cerrada deja de ser candidata.
+    # Dos intentos por hora reducen el impacto de un schedule perdido o de un
+    # fallo temporal al adquirir runner.
+    - cron: "17,47 * * * *"
   workflow_dispatch:
+
+concurrency:
+  group: autoclose-jornada
+  cancel-in-progress: false
 
 jobs:
   autoclose:
@@ -14,13 +21,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "24"
+          cache: "npm"
       - run: npm install web-push --no-save
-      - name: Cerrar jornadas abiertas >12h
+      - name: Cerrar jornadas abiertas >10h
         run: node push-autoclose-jornada.js
         env:
-          VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-          VITE_SB_URL:   ${{ secrets.VITE_SB_URL }}
-          VITE_SB_ANON:  ${{ secrets.VITE_SB_ANON }}
+          VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
+          VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
+          SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}

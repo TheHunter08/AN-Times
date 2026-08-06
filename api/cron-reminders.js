@@ -17,6 +17,7 @@ import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
 import { hardenApiResponse } from './_response.js'
 import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
+import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -67,12 +68,12 @@ async function markNotisSent(current, keys) {
 
 async function getPushSubs() {
   const r = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_H })
-  if (!r.ok) return []
+  if (!r.ok) throw new Error(`push_subs read failed: ${r.status}`)
   return r.json()
 }
 
-async function deleteSub(userId) {
-  await fetch(`${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
+async function deleteSub(userId, endpoint) {
+  await fetch(`${SB_URL}/rest/v1/push_subs?${pushSubscriptionDeleteFilter(userId, endpoint)}`, {
     method: 'DELETE', headers: SB_H
   }).catch(() => {})
 }
@@ -171,7 +172,7 @@ export default async function handler(req, res) {
     const cfgSalidaTime = db.config?.salidaTime || '21:00'
 
     const subs   = await getPushSubs()
-    const subMap = new Map(subs.map(s => [s.user_id, s]))
+    const subMap = groupPushSubscriptions(subs)
 
     const toSend = []
 
@@ -186,9 +187,10 @@ export default async function handler(req, res) {
     // constaba como "enviada" y nunca se reintentaba, ni en el siguiente cron).
     // Tampoco se marcaba cuando el empleado no tenía push ni teléfono — ahora
     // simplemente no se programa nada para él y no se marca la clave.
-    const schedule = (emp, sub, key, keyVal, title, body, tag, url) => {
-      if (sub?.endpoint) {
-        toSend.push({ emp, sub, payload: mkPayload(emp.id, title, body, tag, url), key, keyVal })
+    const schedule = (emp, employeeSubs, key, keyVal, title, body, tag, url) => {
+      if (employeeSubs?.length) {
+        const payload = mkPayload(emp.id, title, body, tag, url)
+        for (const sub of employeeSubs) toSend.push({ emp, sub, payload, key, keyVal })
       } else if (emp.telefono) {
         // Sin push sub → intentar WhatsApp como canal alternativo
         waToSend.push({ emp, message: `*${title}*\n${body}`, key, keyVal })
@@ -197,7 +199,7 @@ export default async function handler(req, res) {
 
     for (const emp of employees) {
      try {
-      const sub = subMap.get(emp.id)
+      const sub = subMap.get(emp.id) || []
       const empRecs = records.filter(r => r.empId === emp.id)
       const openRec = empRecs.find(r => !r.fin)
       const todayRecs = empRecs.filter(r => r.inicio && dateKeyInSpain(r.inicio) === today)
@@ -463,7 +465,7 @@ export default async function handler(req, res) {
     const pushResults = await Promise.allSettled(toSend.map(({ emp, sub, payload, key, keyVal }) =>
       sendPush(sub, payload, emp.id).then(
         () => ({ ok: true, key, keyVal }),
-        err => ({ ok: false, key, err, emp })
+        err => ({ ok: false, key, err, emp, sub })
       )
     ))
     let sent = 0, failed = 0
@@ -473,11 +475,11 @@ export default async function handler(req, res) {
       if (value?.ok) { sent++; successKeys[value.key] = value.keyVal; continue }
       failed++
       const err = value?.err
-      if (err?.statusCode === 410 || err?.statusCode === 404) expiredSubs.push(value.emp.id)
+      if (err?.statusCode === 410 || err?.statusCode === 404) expiredSubs.push({ userId:value.emp.id, endpoint:value.sub.endpoint })
       else if (value) console.warn(`[cron] push error for employee:${value.emp.id}:`, err?.statusCode, err?.body || err?.message)
     }
     if (Object.keys(successKeys).length > 0) await markNotisSent(db, successKeys)
-    if (expiredSubs.length) await Promise.allSettled(expiredSubs.map(id => deleteSub(id)))
+    if (expiredSubs.length) await Promise.allSettled(expiredSubs.map(item => deleteSub(item.userId, item.endpoint)))
 
     successKeys = {}
     const waResults = await Promise.allSettled(waToSend.map(({ emp, message, key, keyVal }) =>
