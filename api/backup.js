@@ -12,6 +12,8 @@
 // Retención recomendada: 4 años (RDL 8/2019 obliga a conservar registros de jornada).
 // Puedes configurar una política de expiración en el bucket para borrar backups > 4 años.
 import { createHash, timingSafeEqual } from 'crypto'
+import { createAutomationRun } from '../src/server/automationHealth.js'
+import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 
 const cleanEnv    = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL      = cleanEnv(process.env.VITE_SB_URL)
@@ -33,6 +35,12 @@ export default async function handler(req, res) {
 
   if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
 
+  const startedAt = Date.now()
+  const recordRun = async details => {
+    try { await persistAutomationRun(createAutomationRun('backup', { startedAt, ...details })) }
+    catch (error) { console.error('[backup] automation health:', error.message) }
+  }
+
   try {
     const [hotRes, coldRes] = await Promise.all([
       fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_H_ANON }),
@@ -42,6 +50,7 @@ export default async function handler(req, res) {
     const hot  = hotRes.ok  ? (await hotRes.json())[0]  : null
     const cold = coldRes.ok ? (await coldRes.json())[0] : null
     if (!hot?.data || !Array.isArray(hot.data.records) || !Array.isArray(hot.data.employees)) {
+      await recordRun({ status:'error', error:'Backup source invalid' })
       return res.status(500).json({ error: 'Backup source invalid', detail: 'app_data principal no contiene records/employees válidos' })
     }
 
@@ -63,6 +72,7 @@ export default async function handler(req, res) {
     if (!uploadRes.ok) {
       const errText = await uploadRes.text()
       console.error('[backup] storage upload failed:', uploadRes.status, errText)
+      await recordRun({ status:'error', error:`Storage upload failed ${uploadRes.status}` })
       return res.status(500).json({
         error: 'Storage upload failed',
         hint:  'Crea el bucket "backups" (privado) en Supabase Dashboard → Storage → New bucket',
@@ -72,16 +82,24 @@ export default async function handler(req, res) {
 
     // Verificación real: descargar el objeto recién escrito y comparar hash.
     const verifyRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, { headers: SB_H_STORAGE })
-    if (!verifyRes.ok) return res.status(500).json({ error: 'Backup verification download failed', status: verifyRes.status })
+    if (!verifyRes.ok) {
+      await recordRun({ status:'error', error:`Backup verification download failed ${verifyRes.status}` })
+      return res.status(500).json({ error: 'Backup verification download failed', status: verifyRes.status })
+    }
     const verifiedBody = await verifyRes.text()
     const verifiedChecksum = createHash('sha256').update(verifiedBody).digest('hex')
-    if (verifiedChecksum !== checksum) return res.status(500).json({ error: 'Backup checksum mismatch' })
+    if (verifiedChecksum !== checksum) {
+      await recordRun({ status:'error', error:'Backup checksum mismatch' })
+      return res.status(500).json({ error: 'Backup checksum mismatch' })
+    }
 
     const sizeKB = Math.round(body.length / 1024)
     console.log(`[backup] ${filename} subido — ${sizeKB} KB`)
+    await recordRun({ checked:hot.data.records.length, processed:1, delivered:1 })
     return res.status(200).json({ ok: true, verified: true, filename, sizeKB, checksum, records: hot.data.records.length, employees: hot.data.employees.length })
   } catch (e) {
     console.error('[backup] fatal:', e)
+    await recordRun({ status:'error', error:e.message })
     return res.status(500).json({ error: e.message })
   }
 }

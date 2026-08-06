@@ -114,7 +114,8 @@ export function Operations(props: OperationsProps) {
   const pushCoverageReady = props.pushCoverageState === 'ready'
   const automationRuns = automationHealthList(props.automationHealth)
   const automationLabels: Record<string, string> = {
-    reminders:'Recordatorios', autoclose:'Autocierre', reports:'Informes', migration:'Paridad de migración',
+    reminders:'Recordatorios', autoclose:'Autocierre', sync:'Sincronización offline', reports:'Informes',
+    monthlyClose:'Cierre mensual', backup:'Backup verificado', migration:'Paridad de migración',
   }
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
     const ai = props.visibleWidgets.indexOf(a.id), bi = props.visibleWidgets.indexOf(b.id)

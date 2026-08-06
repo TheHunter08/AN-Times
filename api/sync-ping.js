@@ -11,6 +11,8 @@
 // muestra una notificación mínima que se cierra sola si no había nada que subir.
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { createAutomationRun } from '../src/server/automationHealth.js'
+import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -82,8 +84,20 @@ export default async function handler(req, res) {
     timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
   if (!authorized) return res.status(401).json({ error: 'Unauthorized' })
 
-  if (_vapidError) return res.status(500).json({ error: _vapidError })
-  if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
+  const startedAt = Date.now()
+  const recordRun = async details => {
+    try { await persistAutomationRun(createAutomationRun('sync', { startedAt, ...details })) }
+    catch (error) { console.error('[sync-ping] automation health:', error.message) }
+  }
+
+  if (_vapidError) {
+    await recordRun({ status:'error', error:_vapidError })
+    return res.status(500).json({ error: _vapidError })
+  }
+  if (!SB_URL || !SB_ANON) {
+    await recordRun({ status:'error', error:'Supabase config missing' })
+    return res.status(500).json({ error: 'Supabase config missing' })
+  }
 
   try {
     const { candidates, coverage } = await getSyncState()
@@ -98,6 +112,7 @@ export default async function handler(req, res) {
     }
     if (!candidates.length) {
       console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} signed=${coverageResult.signatureReadyDevices} ready=${coverageResult.fullyReadyDevices} missing=${coverageResult.missingDevices} candidates=0 sent=0`)
+      await recordRun({ checked:coverageResult.expectedDevices })
       return res.status(200).json({ ok: true, ...coverageResult, candidates: 0, sent: 0, reason: 'no candidates' })
     }
 
@@ -132,9 +147,11 @@ export default async function handler(req, res) {
     }))
 
     console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} signed=${coverageResult.signatureReadyDevices} ready=${coverageResult.fullyReadyDevices} missing=${coverageResult.missingDevices} candidates=${candidates.length} sent=${sent} expired=${expired} errors=${errors}`)
+    await recordRun({ checked:coverageResult.expectedDevices, processed:candidates.length, delivered:sent, status:errors ? 'error' : 'ok', error:errors ? `${errors} envíos fallidos` : null })
     return res.status(200).json({ ok: true, ...coverageResult, candidates: candidates.length, sent, expired, errors })
   } catch (e) {
     console.error('[sync-ping] fatal:', e)
+    await recordRun({ status:'error', error:e.message })
     return res.status(500).json({ error: e.message })
   }
 }

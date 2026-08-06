@@ -15,6 +15,6 @@ describe('automationHealth', () => {
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('healthy')
     expect(evaluateAutomationRun({ job:'reminders', status:'error', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('error')
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T08:00:00Z' }, { now }).state).toBe('stale')
-    expect(automationHealthList({})).toHaveLength(4)
+    expect(automationHealthList({})).toHaveLength(7)
   })
 })

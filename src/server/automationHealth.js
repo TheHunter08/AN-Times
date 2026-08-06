@@ -3,6 +3,9 @@ const DEFAULT_MAX_AGE_MS = Object.freeze({
   autoclose: 90 * 60 * 1000,
   reports: 26 * 60 * 60 * 1000,
   migration: 26 * 60 * 60 * 1000,
+  sync: 26 * 60 * 60 * 1000,
+  monthlyClose: 26 * 60 * 60 * 1000,
+  backup: 26 * 60 * 60 * 1000,
 })
 
 export function createAutomationRun(job, {
@@ -56,7 +59,7 @@ export function evaluateAutomationRun(run, {
 }
 
 export function automationHealthList(health, options) {
-  return ['reminders', 'autoclose', 'reports', 'migration'].map(job => {
+  return ['reminders', 'autoclose', 'sync', 'reports', 'monthlyClose', 'backup', 'migration'].map(job => {
     const run = health?.[job] || null
     return { job, run, ...evaluateAutomationRun(run, options) }
   })
