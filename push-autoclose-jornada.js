@@ -7,6 +7,7 @@
 import webpush from 'web-push'
 import { finalizeRecord } from './src/utils/recordLifecycle.js'
 import { toRecordRow } from './src/services/tableSyncPlan.js'
+import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from './src/server/pushSubscriptions.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
@@ -18,6 +19,7 @@ const VAPID_PUBLIC  = isValidVapid(_vpub) ? _vpub : null
 const VAPID_PRIVATE = isValidVapid(_vprv) ? _vprv : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
   console.error('VAPID_PUBLIC/VAPID_PRIVATE no configuradas o inválidas — abortando sin enviar push')
@@ -27,7 +29,7 @@ webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID
 
 const SB_HEADERS = {
   apikey: SB_ANON,
-  Authorization: `Bearer ${SB_ANON}`,
+  Authorization: `Bearer ${SB_SERVICE || SB_ANON}`,
   'Content-Type': 'application/json',
 }
 
@@ -51,23 +53,36 @@ async function writeDB(data, expectedTs) {
 }
 
 async function upsertRecordRows(records) {
-  if (!records.length) return
+  if (!records.length) return []
   const rows = records.map(record => toRecordRow(record, record._upd))
-  const res = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
-    method: 'POST',
-    headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(rows),
-  })
-  if (!res.ok) throw new Error(`records upsert failed: ${res.status} ${(await res.text()).slice(0, 180)}`)
+  const upsert = async batch => {
+    const res = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(batch),
+    })
+    return { res, detail: res.ok ? '' : (await res.text()).slice(0, 180) }
+  }
+
+  const batch = await upsert(rows)
+  if (batch.res.ok) return []
+
+  const failures = []
+  for (const row of rows) {
+    const attempt = await upsert([row])
+    if (!attempt.res.ok) failures.push(`${row.id}: ${attempt.res.status} ${attempt.detail}`)
+  }
+  return failures
 }
 
 async function readPushSubs() {
   const res = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_HEADERS })
+  if (!res.ok) throw new Error(`push_subs read failed: ${res.status}`)
   return (await res.json()) || []
 }
 
-async function deletePushSub(userId) {
-  await fetch(`${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
+async function deletePushSub(userId, endpoint) {
+  await fetch(`${SB_URL}/rest/v1/push_subs?${pushSubscriptionDeleteFilter(userId, endpoint)}`, {
     method: 'DELETE', headers: SB_HEADERS
   }).catch(() => {})
 }
@@ -80,9 +95,14 @@ async function sendPush(sub, title, body, url = '/') {
     )
     return true
   } catch (err) {
-    if (err.statusCode === 410) await deletePushSub(sub.user_id)
+    if (err.statusCode === 410 || err.statusCode === 404) await deletePushSub(sub.user_id, sub.endpoint)
     return false
   }
+}
+
+async function sendPushToAll(subs, title, body, url = '/') {
+  const results = await Promise.all(subs.map(sub => sendPush(sub, title, body, url)))
+  return results.some(Boolean)
 }
 
 const TEN_HOURS_MS = 10 * 60 * 60 * 1000
@@ -109,8 +129,15 @@ async function run() {
 
   console.log(`Cerrando ${toClose.length} jornada(s) con >10h sin fichar salida`)
 
-  const pushSubs = await readPushSubs()
-  const subsMap  = Object.fromEntries(pushSubs.map(s => [s.user_id, s]))
+  let pushSubs = []
+  try {
+    pushSubs = await readPushSubs()
+  } catch (error) {
+    // La notificación es secundaria: una caída de push_subs no debe impedir
+    // que la jornada se cierre y se conserve correctamente.
+    console.warn('No se pudieron leer las suscripciones push; el autocierre continuará sin aviso:', error.message)
+  }
+  const subsByUser = groupPushSubscriptions(pushSubs)
 
   const closedRecords = []
   const updatedRecords = db.records.map(r => {
@@ -122,17 +149,21 @@ async function run() {
   })
 
   const newDB = { ...db, records: updatedRecords, _ts: now }
-  await upsertRecordRows(closedRecords)
+  const recordSyncFailures = await upsertRecordRows(closedRecords)
   await writeDB(newDB, row.ts)
   console.log('BD actualizada.')
+  if (recordSyncFailures.length) {
+    console.warn(`No se pudieron reflejar ${recordSyncFailures.length} autocierres en la tabla records; app_data quedó actualizado para su resincronización.`)
+  }
 
   for (const rec of toClose) {
     const closed = closedRecords.find(item => item.id === rec.id)
     const workMin = Math.floor((closed?.workSecs || 0) / 60)
-    const sub = subsMap[rec.empId]
+    const employeeSubs = subsByUser.get(rec.empId) || []
+    const sub = employeeSubs[0]
     if (!sub?.endpoint) { console.log(`  ! Sin suscripción push: ${rec.empId}`); continue }
-    const sent = await sendPush(
-      sub,
+    const sent = await sendPushToAll(
+      employeeSubs,
       '⏱️ Jornada cerrada automáticamente',
       `Tu jornada del ${rec.inicio.slice(0, 10)} se cerró tras ${mhm(workMin)} (más de 10h sin fichar salida).`,
       '/?tab=jornada'

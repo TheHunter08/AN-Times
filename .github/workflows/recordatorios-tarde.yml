@@ -1,17 +1,20 @@
 name: Recordatorios tarde/noche
 
 # Cubre los huecos del cron de Vercel (solo 1/día en plan Hobby).
-# Llama al endpoint cron-reminders a las horas clave de la tarde:
-#   - 14:00 UTC = ~16h Madrid verano / ~15h invierno (jornada larga, salida olvidada)
-#   - 18:00 UTC = ~20h Madrid verano / ~19h invierno (recordatorio de fichaje tarde, salida olvidada)
-#   - 20:00 UTC = ~22h Madrid verano / ~21h invierno (último aviso salida olvidada)
+# Comprueba cada media hora la jornada larga, la salida olvidada y cualquier
+# recordatorio configurado durante la tarde/noche de Madrid.
 
 on:
   schedule:
-    - cron: '0 14 * * *'
-    - cron: '0 18 * * *'
-    - cron: '0 20 * * *'
+    # Cada 30 min, lejos del minuto 0 para reducir retrasos y fallos de runner.
+    # 13:17-22:47 UTC = 15:17-00:47 en verano / 14:17-23:47 en invierno.
+    # cron-reminders deduplica los avisos, así que los reintentos son seguros.
+    - cron: "17,47 13-22 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: recordatorios-tarde-noche
+  cancel-in-progress: false
 
 jobs:
   recordatorios:
@@ -24,6 +27,7 @@ jobs:
           APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           echo "Llamando a: $APP_URL/api/cron-reminders"
           STATUS=$(curl -s -o /tmp/cron_resp.txt -w "%{http_code}" \
+            --connect-timeout 15 --max-time 90 --retry 2 --retry-all-errors \
             -X GET "$APP_URL/api/cron-reminders" \
             -H "Authorization: Bearer $CRON_SECRET")
           echo "Status: $STATUS"
@@ -34,4 +38,4 @@ jobs:
           fi
         env:
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
-          CRON_SECRET:    ${{ secrets.CRON_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
