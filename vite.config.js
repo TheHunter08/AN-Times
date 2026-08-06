@@ -23,7 +23,10 @@ export default defineConfig({
         // El chunk de la IA local (@mlc-ai/web-llm) pesa varios MB y solo se descarga
         // si el usuario activa explícitamente "IA avanzada offline" — no forma parte
         // del app shell, así que no debe precachearse con el resto de la PWA.
-        globIgnores: ['**/localai-*.js', '**/localAI.worker-*.js'],
+        // Linux distingue mayúsculas: `localai-*` es el vendor pesado y
+        // `localAI-*` el adaptador. Declarar ambos evita que Vercel precargue
+        // cualquiera de ellos aunque Windows trate los patrones sin distinción.
+        globIgnores: ['**/localai-*.js', '**/localAI-*.js', '**/localAI.worker-*.js'],
       },
       manifest: {
         id: '/',
