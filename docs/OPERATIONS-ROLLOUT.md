@@ -8,7 +8,7 @@ La pantalla `Centro operativo` funciona sin infraestructura adicional para:
 - medir cuántos empleados tienen `auth_id`;
 - personalizar los KPI del dashboard;
 - guardar la configuración de informes programados;
-- comprobar la última ejecución confirmada de recordatorios, autocierre e informes;
+- comprobar la última ejecución confirmada de recordatorios, autocierre, informes y paridad de migración;
 - seguir la fase de migración y mantener visible la vía de reversión.
 
 Las programaciones se guardan en `db.config.reportSchedules`. `/api/cron-reports` procesa diariamente los periodos completos, crea de forma idempotente el bucket privado `scheduled-reports` si todavía no existe, genera PDF o Excel y registra el resultado en `db.config.reportRuns`. El periodo queda marcado con `lastRunKey`, por lo que un reintento no vuelve a enviarlo. La migración SQL conserva la misma configuración como infraestructura declarativa, pero el primer arranque no depende de una intervención manual.
@@ -30,6 +30,10 @@ Para el envío por correo deben configurarse `RESEND_API_KEY` y `REPORT_FROM_EMA
 11. Activar en producción solo dentro de una ventana de mantenimiento con rollback preparado.
 
 No se deben eliminar las políticas actuales ni `app_data` antes de completar la vinculación, la equivalencia sostenida y el piloto. Durante toda esta fase el modo permanece en `dual-write`; el rollback consiste en volver a lectura V1 conservando el blob.
+
+`/api/cron-migration-checkpoint` ejecuta cada día una comprobación no destructiva. Compara IDs y recencia de `employees`, `records`, `vacaciones`, `cierres`, `obras` y `app_entities`; permite filas adicionales en tablas, pero bloquea el checkpoint si falta una fila del blob o la copia tabular está obsoleta. Nunca reescribe las tablas ni activa RLS.
+
+El autocierre frecuente continúa en GitHub Actions. `/api/cron-autoclose` añade una ejecución diaria de respaldo en Vercel para que una saturación de runners de GitHub no deje jornadas abiertas indefinidamente. Ambos caminos usan la misma regla de 10 horas, son idempotentes y conservan `_upd`; la notificación push es secundaria y nunca impide cerrar o sincronizar el fichaje.
 
 ## Informes programados
 

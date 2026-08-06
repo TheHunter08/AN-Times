@@ -6,6 +6,8 @@
   "crons": [
     { "path": "/api/cron-reminders", "schedule": "15 7 * * *" },
     { "path": "/api/cron-reports",   "schedule": "35 7 * * *" },
+    { "path": "/api/cron-migration-checkpoint", "schedule": "5 4 * * *" },
+    { "path": "/api/cron-autoclose",  "schedule": "10 22 * * *" },
     { "path": "/api/backup",         "schedule": "0 3 * * *" },
     { "path": "/api/sync-ping",      "schedule": "17 12 * * *" }
   ],

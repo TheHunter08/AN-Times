@@ -27,6 +27,10 @@
     "audit:auth-identities": "node scripts/reconcile-auth-identities.mjs",
     "repair:auth-identities": "node scripts/reconcile-auth-identities.mjs --apply",
     "audit:blob-health": "node scripts/repair-blob-table-drift.mjs",
+    "audit:migration-parity": "node scripts/audit-migration-parity.mjs",
+    "record:migration-checkpoint": "node scripts/audit-migration-parity.mjs --strict --record",
+    "audit:closure-drift": "node scripts/repair-closure-table-drift.mjs",
+    "repair:closure-drift": "node scripts/repair-closure-table-drift.mjs --apply",
     "repair:blob-table-drift": "node scripts/repair-blob-table-drift.mjs --apply",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
     "typecheck": "tsc --noEmit"

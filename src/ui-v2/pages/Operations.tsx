@@ -112,7 +112,7 @@ export function Operations(props: OperationsProps) {
   const pushCoverageReady = props.pushCoverageState === 'ready'
   const automationRuns = automationHealthList(props.automationHealth)
   const automationLabels: Record<string, string> = {
-    reminders:'Recordatorios', autoclose:'Autocierre', reports:'Informes',
+    reminders:'Recordatorios', autoclose:'Autocierre', reports:'Informes', migration:'Paridad de migración',
   }
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
     const ai = props.visibleWidgets.indexOf(a.id), bi = props.visibleWidgets.indexOf(b.id)
@@ -164,7 +164,7 @@ export function Operations(props: OperationsProps) {
       <Card>
         <div className="ti-operations__section-title">
           <div><strong>Automatizaciones</strong><span>Última ejecución confirmada por cada proceso</span></div>
-          <span className="ti-operations__pill">{automationRuns.filter(item => item.healthy).length}/3 activas</span>
+          <span className="ti-operations__pill">{automationRuns.filter(item => item.healthy).length}/{automationRuns.length} activas</span>
         </div>
         <div className="ti-operations__automation-grid">
           {automationRuns.map(item => (
@@ -320,7 +320,7 @@ export function Operations(props: OperationsProps) {
       <Card>
         <div className="ti-operations__section-title"><div><strong>Informes programados</strong><span>Se generan automáticamente; el calendario es opcional</span></div><span className="ti-operations__pill">{props.schedules.length}</span></div>
         {!props.schedules.length ? <ProductState compact title="Aún no hay informes programados" description="Crea una programación semanal o mensual para dejarla preparada." icon={<IconFileText />} /> : (
-          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span><small>{(schedule as any).lastRunAt ? `Último: ${new Date((schedule as any).lastRunAt).toLocaleString('es-ES')}` : 'Pendiente de primera ejecución'}</small></div><div><button type="button" onClick={() => downloadICS(buildReportScheduleICS(schedule), `informe-${schedule.id}.ics`)}>Calendario</button><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
+          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span><small>{(schedule as any).lastRunAt ? `Último: ${new Date((schedule as any).lastRunAt).toLocaleString('es-ES')} · ${(schedule as any).lastRunStatus === 'sent' ? 'Enviado' : (schedule as any).lastRunStatus === 'generated' ? 'Generado, entrega pendiente' : (schedule as any).lastRunStatus || 'Completado'}` : 'Pendiente de primera ejecución'}</small></div><div><button type="button" onClick={() => downloadICS(buildReportScheduleICS(schedule), `informe-${schedule.id}.ics`)}>Calendario</button><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
         )}
       </Card>
     </div>

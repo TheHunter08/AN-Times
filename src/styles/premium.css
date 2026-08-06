@@ -237,7 +237,7 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__schedules button + button { margin-left:6px; }
 .ti-operations__schedules button.is-danger { color:var(--uiv2-red); border-color:rgba(239,68,68,.24); }
 .ti-operations__schedules small { color:var(--uiv2-text-400); font-size:10px; }
-.ti-operations__automation-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.ti-operations__automation-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .ti-operations__automation { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:10px; padding:14px; border:1px solid var(--premium-line); border-radius:12px; background:var(--uiv2-bg-600); }
 .ti-operations__automation-dot { width:9px; height:9px; margin-top:4px; border-radius:50%; background:var(--uiv2-orange); box-shadow:0 0 0 4px rgba(245,158,11,.1); }
 .ti-operations__automation.is-ok .ti-operations__automation-dot { background:var(--uiv2-green); box-shadow:0 0 0 4px rgba(16,185,129,.1); }

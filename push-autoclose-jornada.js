@@ -1,6 +1,6 @@
 /**
  * TIMES INC – Auto-cierre de jornadas abiertas > 10h
- * Corre vía GitHub Actions cada 4 horas (ver .github/workflows/autoclose-jornada.yml).
+ * Corre vía GitHub Actions cada 30 minutos (ver .github/workflows/autoclose-jornada.yml).
  * Cierra registros sin fin que lleven más de 10h abiertos y notifica al empleado.
  */
 

@@ -1,0 +1,123 @@
+import { timingSafeEqual } from 'crypto'
+import webpush from 'web-push'
+import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
+import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
+import { toRecordRow } from '../src/services/tableSyncPlan.js'
+import { finalizeRecord } from '../src/utils/recordLifecycle.js'
+
+const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
+const SB_URL = clean(process.env.VITE_SB_URL)
+const SB_ANON = clean(process.env.VITE_SB_ANON)
+const SB_SERVICE = clean(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+const CRON_SECRET = process.env.CRON_SECRET
+const headers = { apikey:SB_SERVICE || SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}`, 'Content-Type':'application/json' }
+const TEN_HOURS_MS = 10 * 60 * 60 * 1000
+
+async function readDB() {
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers })
+  if (!response.ok) throw new Error(`app_data read ${response.status}`)
+  return (await response.json())?.[0] || null
+}
+
+async function writeDB(data, expectedUpdatedAt) {
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`, {
+    method:'PATCH', headers:{ ...headers, Prefer:'return=representation' },
+    body:JSON.stringify({ data, updated_at:new Date().toISOString() }),
+  })
+  if (!response.ok) throw new Error(`app_data write ${response.status}`)
+  if (!(await response.json())?.length) throw new Error('app_data cambió durante el autocierre')
+}
+
+async function persistHealth(run) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const row = await readDB()
+    const next = { ...mergeAutomationHealth(row.data, run), _ts:Date.now() }
+    try { await writeDB(next, row.updated_at); return } catch (error) { if (attempt === 1) throw error }
+  }
+}
+
+async function upsertRecords(records) {
+  if (!records.length) return []
+  const rows = records.map(record => toRecordRow(record, record._upd))
+  const upsert = async batch => {
+    const response = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+      method:'POST', headers:{ ...headers, Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(batch),
+    })
+    return { ok:response.ok, status:response.status, detail:response.ok ? '' : (await response.text()).slice(0, 160) }
+  }
+  const batch = await upsert(rows)
+  if (batch.ok) return []
+  const failures = []
+  for (const row of rows) {
+    const result = await upsert([row])
+    if (!result.ok) failures.push(`${row.id}: ${result.status} ${result.detail}`)
+  }
+  return failures
+}
+
+async function notifyClosed(records) {
+  const publicKey = clean(process.env.VAPID_PUBLIC)
+  const privateKey = clean(process.env.VAPID_PRIVATE)
+  if (!publicKey || !privateKey) return { sent:0, skipped:records.length, reason:'VAPID no configurado' }
+  try { webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', publicKey, privateKey) } catch { return { sent:0, skipped:records.length, reason:'VAPID inválido' } }
+  const response = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers })
+  if (!response.ok) return { sent:0, skipped:records.length, reason:`push_subs ${response.status}` }
+  const grouped = groupPushSubscriptions(await response.json())
+  let sent = 0
+  for (const record of records) {
+    const subs = grouped.get(record.empId) || []
+    const payload = JSON.stringify({ title:'⏱️ Jornada cerrada automáticamente', body:`Tu jornada del ${record.inicio.slice(0, 10)} se cerró tras 10 horas sin fichar salida.`, tag:'autoclose', url:'/?tab=jornada', userId:record.empId })
+    const results = await Promise.allSettled(subs.map(async sub => {
+      try {
+        await webpush.sendNotification({ endpoint:sub.endpoint, keys:{ p256dh:sub.p256dh, auth:sub.auth } }, payload)
+        return true
+      } catch (error) {
+        if (error?.statusCode === 404 || error?.statusCode === 410) {
+          await fetch(`${SB_URL}/rest/v1/push_subs?${pushSubscriptionDeleteFilter(record.empId, sub.endpoint)}`, { method:'DELETE', headers }).catch(() => {})
+        }
+        return false
+      }
+    }))
+    sent += results.filter(result => result.status === 'fulfilled' && result.value).length
+  }
+  return { sent, skipped:Math.max(0, records.length - sent) }
+}
+
+export default async function handler(req, res) {
+  if (!CRON_SECRET) return res.status(500).json({ error:'CRON_SECRET no configurado' })
+  const token = String(req.headers.authorization || '').replace('Bearer ', '')
+  const valid = token.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
+  if (!valid) return res.status(401).json({ error:'Unauthorized' })
+  if (!SB_URL || !SB_ANON || !SB_SERVICE) return res.status(500).json({ error:'Supabase service config missing' })
+  const startedAt = Date.now()
+  try {
+    const row = await readDB()
+    if (!row?.data) throw new Error('app_data no disponible')
+    const records = row.data.records || []
+    const open = records.filter(record => !record.fin && !record.deleted)
+    const candidates = open.filter(record => startedAt - new Date(record.inicio).getTime() > TEN_HOURS_MS)
+    if (!candidates.length) {
+      await persistHealth(createAutomationRun('autoclose', { startedAt, checked:open.length }))
+      return res.status(200).json({ ok:true, checked:open.length, closed:0 })
+    }
+    const ids = new Set(candidates.map(record => record.id))
+    const closed = []
+    const updatedRecords = records.map(record => {
+      if (!ids.has(record.id)) return record
+      const closeTime = new Date(new Date(record.inicio).getTime() + TEN_HOURS_MS).toISOString()
+      const next = { ...finalizeRecord(record, { now:closeTime }), autoClosedAt:new Date().toISOString() }
+      closed.push(next)
+      return next
+    })
+    const tableFailures = await upsertRecords(closed)
+    const run = createAutomationRun('autoclose', { startedAt, checked:open.length, processed:closed.length, status:tableFailures.length ? 'error' : 'ok', error:tableFailures[0] || null })
+    const next = { ...mergeAutomationHealth(row.data, run), records:updatedRecords, _ts:Date.now() }
+    await writeDB(next, row.updated_at)
+    const delivery = await notifyClosed(closed)
+    return res.status(200).json({ ok:true, checked:open.length, closed:closed.length, tableFailures:tableFailures.length, pushSent:delivery.sent, pushSkipped:delivery.skipped })
+  } catch (error) {
+    console.error('[cron-autoclose]', error)
+    try { await persistHealth(createAutomationRun('autoclose', { status:'error', startedAt, error:error?.message || error })) } catch {}
+    return res.status(500).json({ error:'Autoclose failed' })
+  }
+}
