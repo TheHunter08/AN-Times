@@ -3202,6 +3202,8 @@ export default function AppV2Admin() {
     pendingExpenses: (db.gastos || []).filter((g: any) => g.estado === 'pendiente').length,
   }), [db.records, db.vacaciones, db.correccionesFichaje, db.gastos])
   const pendingVac = (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
+  const automationProblemCount = useMemo(() => automationHealthList(db.config?.automationHealth || {})
+    .filter(item => item.state === 'error' || item.state === 'stale').length, [db.config?.automationHealth])
   const navBadges: Record<string, number> = {
     pendientes: pendingHours + pendingRequests + pendingExpenses,
     validar: pendingHours,
@@ -3209,6 +3211,7 @@ export default function AppV2Admin() {
     vacaciones: pendingVac,
     gastos: pendingExpenses,
     notificaciones: unreadCount,
+    operaciones: automationProblemCount,
   }
   const navItems = visiblePages.map(p => ({
     id: p.id,
@@ -3216,6 +3219,10 @@ export default function AppV2Admin() {
     group: p.group,
     icon: <span>{p.icon}</span>,
     badge: navBadges[p.id] || undefined,
+    badgeLabel:p.id === 'operaciones' && automationProblemCount
+      ? `${automationProblemCount} automatización${automationProblemCount > 1 ? 'es' : ''} requiere${automationProblemCount > 1 ? 'n' : ''} atención`
+      : undefined,
+    badgeTone:p.id === 'operaciones' ? 'warning' as const : 'default' as const,
   }))
 
   // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'

@@ -106,6 +106,9 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
   background:rgba(124,58,237,.14); color:var(--premium-brand-soft); font-size:10px; font-weight:750;
   font-variant-numeric:tabular-nums;
 }
+#sAdmin .uiv2-sidebar-badge.is-warning {
+  border-color:rgba(245,158,11,.34); background:rgba(245,158,11,.14); color:#FBBF24;
+}
 #sAdmin .uiv2-sidebar-item.uiv2-active .uiv2-sidebar-badge { background:rgba(255,255,255,.13); color:#fff; }
 #sAdmin .uiv2-page-container { background:radial-gradient(circle at 88% 0,rgba(124,58,237,.055),transparent 26rem) !important; }
 #sAdmin .ti-kpi-card,

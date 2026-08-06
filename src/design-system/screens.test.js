@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Dashboard } from '../ui-v2/pages/Dashboard'
 import { EmployeeHome } from '../ui-v2/pages/EmployeeHome'
 import { ValidateHours } from '../ui-v2/pages/ValidateHours'
+import { Sidebar } from '../ui-v2/components/Sidebar'
 
 const dashboardProps = {
   greeting: 'Resumen general de la empresa',
@@ -81,6 +82,27 @@ describe('V7 administrator dashboard contract', () => {
     expect(html).toContain('2 automatizaciones requieren atención')
     expect(html).toContain('1 fallida · 1 atrasada')
     expect(html).toContain('Abrir Centro operativo')
+  })
+})
+
+describe('V7 administrator navigation contract', () => {
+  const items = [
+    { id:'dashboard', label:'Dashboard', group:'Principal', icon:createElement('span') },
+    { id:'operaciones', label:'Centro operativo', group:'Sistema', icon:createElement('span'), badge:2, badgeTone:'warning', badgeLabel:'2 automatizaciones requieren atención' },
+  ]
+
+  it('keeps critical automation problems visible while the system group is collapsed', () => {
+    const html = renderToStaticMarkup(createElement(Sidebar, { items, active:'dashboard', onSelect:vi.fn() }))
+
+    expect(html).toContain('class="uiv2-sidebar-group-alert"')
+    expect(html).toContain('aria-label="2 automatizaciones requieren atención"')
+  })
+
+  it('labels the automation badge when Centro operativo is open', () => {
+    const html = renderToStaticMarkup(createElement(Sidebar, { items, active:'operaciones', onSelect:vi.fn() }))
+
+    expect(html).toContain('class="uiv2-sidebar-badge is-warning"')
+    expect(html).toContain('aria-label="2 automatizaciones requieren atención"')
   })
 })
 

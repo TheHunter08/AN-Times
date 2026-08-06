@@ -8,6 +8,8 @@ export interface SidebarItem {
   icon: ReactNode
   group?: string
   badge?: string | number
+  badgeLabel?: string
+  badgeTone?: 'default' | 'warning'
 }
 
 export interface SidebarProps {
@@ -50,6 +52,14 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
           const isActive = item.id === active
           const startsGroup = Boolean(item.group && item.group !== items[index - 1]?.group)
           const isCollapsed = Boolean(item.group && collapsed.has(item.group))
+          const collapsedWarningItems = startsGroup && isCollapsed
+            ? items.filter(candidate => candidate.group === item.group && candidate.badgeTone === 'warning' && candidate.badge)
+            : []
+          const collapsedWarningCount = collapsedWarningItems
+            .reduce((total, candidate) => total + (typeof candidate.badge === 'number' ? candidate.badge : 1), 0)
+          const collapsedWarningLabel = collapsedWarningItems.length === 1 && collapsedWarningItems[0].badgeLabel
+            ? collapsedWarningItems[0].badgeLabel
+            : `${collapsedWarningCount} avisos críticos en ${item.group}`
 
           return (
             <div className="uiv2-sidebar-entry" key={item.id}>
@@ -61,7 +71,14 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
                   aria-expanded={!isCollapsed}
                 >
                   <span>{item.group}</span>
-                  <IconChevronDown width={12} height={12} className={`uiv2-sidebar-group-chevron${isCollapsed ? ' uiv2-collapsed' : ''}`} aria-hidden="true" />
+                  <span className="uiv2-sidebar-group-meta">
+                    {collapsedWarningCount > 0 && (
+                      <span className="uiv2-sidebar-group-alert" aria-label={collapsedWarningLabel}>
+                        {collapsedWarningCount}
+                      </span>
+                    )}
+                    <IconChevronDown width={12} height={12} className={`uiv2-sidebar-group-chevron${isCollapsed ? ' uiv2-collapsed' : ''}`} aria-hidden="true" />
+                  </span>
                 </button>
               )}
               {!isCollapsed && (
@@ -73,7 +90,14 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
                 >
                   <span className="uiv2-sidebar-icon" aria-hidden="true">{item.icon}</span>
                   <span className="uiv2-sidebar-label">{item.label}</span>
-                  {item.badge !== undefined && item.badge !== 0 && <span className="uiv2-sidebar-badge" aria-label={`${item.badge} pendientes`}>{item.badge}</span>}
+                  {item.badge !== undefined && item.badge !== 0 && (
+                    <span
+                      className={`uiv2-sidebar-badge${item.badgeTone === 'warning' ? ' is-warning' : ''}`}
+                      aria-label={item.badgeLabel || `${item.badge} pendientes`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
@@ -139,6 +163,12 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         .uiv2-sidebar-group:hover { color: ${colors.text[500]}; }
         .uiv2-sidebar-group:focus-visible { outline: 2px solid ${colors.primary.base}; outline-offset: 1px; }
         .uiv2-sidebar-entry:first-child .uiv2-sidebar-group { padding-top: 3px; }
+        .uiv2-sidebar-group-meta { display:inline-flex; align-items:center; gap:7px; }
+        .uiv2-sidebar-group-alert {
+          min-width:20px; height:20px; box-sizing:border-box; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
+          border:1px solid color-mix(in srgb, ${colors.semantic.orange} 34%, transparent); border-radius:999px;
+          background:rgba(245,158,11,.13); color:${colors.semantic.orange}; font-size:10px; font-weight:800; letter-spacing:0;
+        }
         .uiv2-sidebar-group-chevron { transition: transform 150ms cubic-bezier(.2,0,0,1); flex-shrink: 0; }
         .uiv2-sidebar-group-chevron.uiv2-collapsed { transform: rotate(-90deg); }
         .uiv2-sidebar-item {
