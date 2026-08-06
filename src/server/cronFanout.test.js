@@ -41,4 +41,15 @@ describe('runCronFanout', () => {
     expect(result.statusCode).toBe(500)
     expect(result.results[1]).toMatchObject({ name:'autoclose', statusCode:200 })
   })
+
+  it('preserves a shared authorization failure instead of masking it as server error', async () => {
+    const unauthorized = async (_req, res) => res.status(401).json({ error:'Unauthorized' })
+    const result = await runCronFanout({ headers:{} }, [
+      ['reminders', unauthorized],
+      ['autoclose', unauthorized],
+    ])
+
+    expect(result.ok).toBe(false)
+    expect(result.statusCode).toBe(401)
+  })
 })

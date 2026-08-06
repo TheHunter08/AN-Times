@@ -26,5 +26,7 @@ export async function runCronFanout(req, jobs) {
     }
   }
   const ok = results.every(result => result.statusCode >= 200 && result.statusCode < 300)
-  return { ok, statusCode:ok ? 200 : 500, results }
+  const statuses = new Set(results.map(result => result.statusCode))
+  const statusCode = ok ? 200 : statuses.size === 1 ? results[0].statusCode : 500
+  return { ok, statusCode, results }
 }
