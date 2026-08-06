@@ -60,6 +60,12 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
           const collapsedWarningLabel = collapsedWarningItems.length === 1 && collapsedWarningItems[0].badgeLabel
             ? collapsedWarningItems[0].badgeLabel
             : `${collapsedWarningCount} avisos críticos en ${item.group}`
+          const collapsedPendingItems = startsGroup && isCollapsed
+            ? items.filter(candidate => candidate.group === item.group && candidate.badgeTone !== 'warning' && candidate.badge)
+            : []
+          const collapsedPendingLabel = collapsedPendingItems.length
+            ? `Hay pendientes en ${collapsedPendingItems.map(candidate => candidate.label).join(', ')}`
+            : ''
 
           return (
             <div className="uiv2-sidebar-entry" key={item.id}>
@@ -72,8 +78,11 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
                 >
                   <span>{item.group}</span>
                   <span className="uiv2-sidebar-group-meta">
+                    {collapsedPendingItems.length > 0 && (
+                      <span className="uiv2-sidebar-group-pending" role="img" aria-label={collapsedPendingLabel} />
+                    )}
                     {collapsedWarningCount > 0 && (
-                      <span className="uiv2-sidebar-group-alert" aria-label={collapsedWarningLabel}>
+                      <span className="uiv2-sidebar-group-alert" role="img" aria-label={collapsedWarningLabel}>
                         {collapsedWarningCount}
                       </span>
                     )}
@@ -164,6 +173,10 @@ export function Sidebar({ items, active, onSelect, header, footer }: SidebarProp
         .uiv2-sidebar-group:focus-visible { outline: 2px solid ${colors.primary.base}; outline-offset: 1px; }
         .uiv2-sidebar-entry:first-child .uiv2-sidebar-group { padding-top: 3px; }
         .uiv2-sidebar-group-meta { display:inline-flex; align-items:center; gap:7px; }
+        .uiv2-sidebar-group-pending {
+          width:7px; height:7px; display:inline-block; border-radius:999px; background:${colors.primary.light};
+          box-shadow:0 0 0 3px color-mix(in srgb, ${colors.primary.base} 15%, transparent);
+        }
         .uiv2-sidebar-group-alert {
           min-width:20px; height:20px; box-sizing:border-box; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
           border:1px solid color-mix(in srgb, ${colors.semantic.orange} 34%, transparent); border-radius:999px;

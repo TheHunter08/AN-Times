@@ -88,6 +88,7 @@ describe('V7 administrator dashboard contract', () => {
 describe('V7 administrator navigation contract', () => {
   const items = [
     { id:'dashboard', label:'Dashboard', group:'Principal', icon:createElement('span') },
+    { id:'validar', label:'Validar horas', group:'Gestión', icon:createElement('span'), badge:3 },
     { id:'operaciones', label:'Centro operativo', group:'Sistema', icon:createElement('span'), badge:2, badgeTone:'warning', badgeLabel:'2 automatizaciones requieren atención' },
   ]
 
@@ -96,6 +97,14 @@ describe('V7 administrator navigation contract', () => {
 
     expect(html).toContain('class="uiv2-sidebar-group-alert"')
     expect(html).toContain('aria-label="2 automatizaciones requieren atención"')
+  })
+
+  it('signals regular pending work without presenting a duplicated total', () => {
+    const html = renderToStaticMarkup(createElement(Sidebar, { items, active:'dashboard', onSelect:vi.fn() }))
+
+    expect(html).toContain('class="uiv2-sidebar-group-pending"')
+    expect(html).toContain('aria-label="Hay pendientes en Validar horas"')
+    expect(html).not.toContain('aria-label="3 pendientes en Gestión"')
   })
 
   it('labels the automation badge when Centro operativo is open', () => {
