@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import handler from './pin-login.js'
+import handler from '../../api/pin-login.js'
 
 function mockRes() {
   const res = { statusCode:200 }
