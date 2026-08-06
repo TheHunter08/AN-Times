@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
   const db = { firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } } }
@@ -60,5 +60,18 @@ describe('requisitos obligatorios de lanzamiento', () => {
       { employeeId:'emp1', employeeName:'Ana', issues:['Correo compartido con otro perfil', 'Identidad de acceso duplicada'] },
       { employeeId:'emp2', employeeName:'Luis', issues:['Correo compartido con otro perfil', 'Identidad de acceso duplicada'] },
     ])
+  })
+
+  it('genera instrucciones compartibles sin revelar credenciales', () => {
+    const text = buildLaunchBlockerInstructions({
+      employeeName:'Ana',
+      issues:['Falta crear acceso', 'PIN heredado: iniciar sesión', 'Falta activar notificaciones'],
+    })
+
+    expect(text).toContain('Hola Ana')
+    expect(text).toContain('Primera vez: vincular mi cuenta')
+    expect(text).toContain('actualizará su protección automáticamente')
+    expect(text).toContain('no envíes tu contraseña ni tu PIN')
+    expect(text).not.toContain('pbkdf2')
   })
 })

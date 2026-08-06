@@ -48,3 +48,27 @@ export function getLaunchBlockers(db, missingPushIds = []) {
     })
     .filter(item => item.issues.length > 0)
 }
+
+const ISSUE_INSTRUCTIONS = {
+  'Falta email': 'Pide a Administración que añada un correo personal y único a tu perfil.',
+  'Correo compartido con otro perfil': 'Pide a Administración que sustituya el correo compartido por uno personal y único.',
+  'Falta crear acceso': 'En la pantalla de acceso, elige “Acceso con email” y después “Primera vez: vincular mi cuenta”. Usa el correo de tu perfil, crea una contraseña e introduce tu PIN habitual cuando se solicite.',
+  'Identidad de acceso duplicada': 'Contacta con Administración para revisar qué perfil debe conservar la identidad antes de volver a vincular la cuenta.',
+  'Falta PIN': 'Pide a Administración que configure un PIN de fichaje antes de intentar vincular la cuenta.',
+  'PIN heredado: iniciar sesión': 'Cierra sesión y entra una vez con tu PIN habitual. Times INC actualizará su protección automáticamente; no necesitas cambiarlo.',
+  'Falta firma': 'Entra en Times INC y completa el paso “Tu firma” de la configuración obligatoria.',
+  'Falta activar notificaciones': 'Abre Times INC en tu móvil, inicia sesión y pulsa “Activar notificaciones” cuando aparezca el paso correspondiente.',
+}
+
+export function buildLaunchBlockerInstructions(blocker) {
+  const name = blocker?.employeeName || 'Empleado'
+  const steps = (blocker?.issues || [])
+    .map(issue => ISSUE_INSTRUCTIONS[issue])
+    .filter(Boolean)
+
+  return [
+    `Hola ${name}, para terminar de preparar tu acceso a Times INC:`,
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
+    'Por seguridad, no envíes tu contraseña ni tu PIN a nadie.',
+  ].join('\n')
+}

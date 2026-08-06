@@ -8,6 +8,7 @@ import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Ic
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
 import { evaluateRlsTransition, evaluateSafeMigration } from '../../config/securityReadiness.js'
 import { automationHealthList } from '../../server/automationHealth.js'
+import { buildLaunchBlockerInstructions } from '../../utils/launchRequirements.js'
 
 export interface ReportSchedule {
   id: string
@@ -75,6 +76,7 @@ const inputStyle = {
 export function Operations(props: OperationsProps) {
   const [syncing, setSyncing] = useState(false)
   const [actionHelpId, setActionHelpId] = useState<string | null>(null)
+  const [copiedHelpId, setCopiedHelpId] = useState<string | null>(null)
   const [name, setName] = useState('Informe mensual de jornada')
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly')
   const [format, setFormat] = useState<'pdf' | 'excel'>('pdf')
@@ -125,6 +127,27 @@ export function Operations(props: OperationsProps) {
     if (index < 0 || target < 0 || target >= current.length) return
     ;[current[index], current[target]] = [current[target], current[index]]
     props.onChangeWidgets(current)
+  }
+
+  const copyEmployeeInstructions = async (blocker: LaunchBlocker) => {
+    const text = buildLaunchBlockerInstructions(blocker)
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text)
+      else {
+        const field = document.createElement('textarea')
+        field.value = text
+        field.style.position = 'fixed'
+        field.style.opacity = '0'
+        document.body.appendChild(field)
+        field.select()
+        document.execCommand('copy')
+        field.remove()
+      }
+      setCopiedHelpId(blocker.employeeId)
+      window.setTimeout(() => setCopiedHelpId(current => current === blocker.employeeId ? null : current), 2500)
+    } catch {
+      setCopiedHelpId(null)
+    }
   }
 
   return (
@@ -250,6 +273,9 @@ export function Operations(props: OperationsProps) {
                     {blocker.issues.includes('PIN heredado: iniciar sesión') && (
                       <span>Debe cerrar sesión y entrar una vez con su PIN habitual. La app actualizará la protección del PIN automáticamente, sin cambiarlo.</span>
                     )}
+                    <button type="button" className="ti-operations__secondary-action" onClick={() => copyEmployeeInstructions(blocker)}>
+                      {copiedHelpId === blocker.employeeId ? 'Instrucciones copiadas' : 'Copiar instrucciones'}
+                    </button>
                   </div>
                 ),
               ]
