@@ -35,6 +35,8 @@ No se deben eliminar las políticas actuales ni `app_data` antes de completar la
 
 El autocierre, los recordatorios y el despertar de sincronización comparten un único workflow semihorario (`operational-crons.yml`). Sustituye cuatro schedules que llegaban a crear 372 jobs diarios y saturaban la cola de runners. Cada paso llama a un endpoint idempotente de producción y se reintenta ante fallos transitorios. `/api/cron-autoclose` mantiene además una ejecución diaria de respaldo en Vercel para que una saturación de GitHub no deje jornadas abiertas indefinidamente.
 
+Los recordatorios tampoco dependen exclusivamente de GitHub: Vercel invoca la misma función idempotente mediante cuatro rutas diarias (mañana, mediodía, tarde y noche). Las rutas separadas respetan el mínimo de una ejecución diaria por cron del plan Hobby, reutilizan una sola función serverless y toleran la precisión horaria de ese plan porque la función envía únicamente avisos ya vencidos y conserva claves de deduplicación en `notisSent`.
+
 El cierre mensual usa el mismo generador tanto en el script manual como en `/api/cron-monthly-close`. La ejecución diaria principal está en Vercel, donde dispone de la credencial de servicio de Supabase; el workflow antiguo queda únicamente como respaldo manual. La generación sigue siendo idempotente, conserva el lock optimista del blob y hace upsert de las filas de `cierres` antes de notificar.
 
 ## Informes programados

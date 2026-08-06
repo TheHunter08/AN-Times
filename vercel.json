@@ -4,7 +4,10 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "crons": [
-    { "path": "/api/cron-reminders", "schedule": "15 7 * * *" },
+    { "path": "/api/cron-reminders", "schedule": "5 8 * * *" },
+    { "path": "/api/cron-reminders-midday", "schedule": "5 12 * * *" },
+    { "path": "/api/cron-reminders-evening", "schedule": "5 17 * * *" },
+    { "path": "/api/cron-reminders-night", "schedule": "5 20 * * *" },
     { "path": "/api/cron-reports",   "schedule": "35 7 * * *" },
     { "path": "/api/cron-migration-checkpoint", "schedule": "5 4 * * *" },
     { "path": "/api/cron-autoclose",  "schedule": "10 22 * * *" },
@@ -17,6 +20,9 @@
     { "source": "/api/patch-pins", "destination": "/api/admin-tools?op=patch-pins" },
     { "source": "/api/send-push-all", "destination": "/api/admin-tools?op=send-push-all" },
     { "source": "/api/send-whatsapp", "destination": "/api/admin-tools?op=send-whatsapp" },
+    { "source": "/api/cron-reminders-midday", "destination": "/api/cron-reminders" },
+    { "source": "/api/cron-reminders-evening", "destination": "/api/cron-reminders" },
+    { "source": "/api/cron-reminders-night", "destination": "/api/cron-reminders" },
     { "source": "/api/cron-monthly-close", "destination": "/api/admin-tools?op=monthly-close" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
