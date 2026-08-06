@@ -34,4 +34,12 @@ describe('deployment quality gate', () => {
     expect(githubWorkflow).not.toContain('run: npm run build')
     expect(githubWorkflow).not.toContain('run: npm run test\n')
   })
+
+  it('uses evening reminder slots to reinforce autoclose without extra crons', () => {
+    const rewrites = new Map(vercel.rewrites.map(item => [item.source, item.destination]))
+    expect(vercel.crons).toHaveLength(10)
+    expect(rewrites.get('/api/cron-reminders-midday')).toBe('/api/cron-reminders')
+    expect(rewrites.get('/api/cron-reminders-evening')).toBe('/api/cron-reminders-and-autoclose')
+    expect(rewrites.get('/api/cron-reminders-night')).toBe('/api/cron-reminders-and-autoclose')
+  })
 })
