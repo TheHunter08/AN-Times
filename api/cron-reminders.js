@@ -17,6 +17,7 @@ import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
 import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
+import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -63,6 +64,18 @@ async function markNotisSent(current, keys) {
     body: JSON.stringify({ data: merged, updated_at: new Date().toISOString() })
   })
   if (!response.ok) throw new Error(`markNotisSent patch ${response.status}`)
+}
+
+async function markAutomationRun(run) {
+  const latest = await getAppData()
+  if (!latest) throw new Error('no app_data while marking automation health')
+  const merged = { ...mergeAutomationHealth(latest, run), _ts:Date.now() }
+  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+    method:'PATCH',
+    headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body:JSON.stringify({ data:merged, updated_at:new Date().toISOString() }),
+  })
+  if (!response.ok) throw new Error(`automation health patch ${response.status}`)
 }
 
 async function getPushSubs() {
@@ -144,6 +157,7 @@ export default async function handler(req, res) {
 
   if (_cronVapidError) return res.status(500).json({ error: _cronVapidError })
 
+  const startedAt = Date.now()
   try {
     const db = await getAppData()
     if (!db) return res.status(500).json({ error: 'no app_data' })
@@ -494,11 +508,24 @@ export default async function handler(req, res) {
       ok: true, today, nowSpain: `${p2(nowH)}:${p2(nowM)}`,
       checked: employees.length, sent, failed, queued: toSend.length, waSent
     }
+    await markAutomationRun(createAutomationRun('reminders', {
+      startedAt,
+      checked:employees.length,
+      processed:toSend.length + waToSend.length,
+      delivered:sent + waSent,
+    }))
     console.log('[cron-reminders]', JSON.stringify(result))
     return res.status(200).json(result)
 
   } catch (e) {
     console.error('[cron-reminders] fatal', e)
+    try {
+      await markAutomationRun(createAutomationRun('reminders', {
+        status:'error', startedAt, error:e?.message || e,
+      }))
+    } catch (healthError) {
+      console.error('[cron-reminders] no se pudo registrar el fallo', healthError)
+    }
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

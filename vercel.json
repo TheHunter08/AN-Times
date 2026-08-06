@@ -5,6 +5,7 @@
   "framework": "vite",
   "crons": [
     { "path": "/api/cron-reminders", "schedule": "15 7 * * *" },
+    { "path": "/api/cron-reports",   "schedule": "35 7 * * *" },
     { "path": "/api/backup",         "schedule": "0 3 * * *" },
     { "path": "/api/sync-ping",      "schedule": "17 12 * * *" }
   ],

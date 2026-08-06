@@ -12,8 +12,9 @@ Esta fase es aditiva: `app_data` sigue siendo el respaldo y no se elimina ningun
    `POST /api/migrate-to-tables`
 
    Cabecera: `Authorization: Bearer <CRON_SECRET>`.
-5. Confirmar que `verification.consistent` sea `true` y que `mismatch` esté vacío.
-6. Usar la aplicación normalmente durante el periodo de verificación. Las escrituras seguirán llegando a `app_data` y, en segundo plano, a las tablas granulares.
+5. Confirmar que `verification.consistent` sea `true` y que `mismatch` esté vacío. El endpoint guarda un checkpoint en `config.migrationVerification`.
+6. Repetir la comprobación durante siete días distintos. Un control repetido el mismo día no suma otro checkpoint.
+7. Usar la aplicación normalmente durante el periodo de verificación. Las escrituras seguirán llegando a `app_data` y, en segundo plano, a las tablas granulares.
 
 ## Qué migra
 
@@ -28,4 +29,4 @@ No es necesario borrar datos. Si `app_entities` no está disponible, el cliente 
 
 ## Condición para la fase 2
 
-No activar las políticas de `policies_auth.sql` ni retirar el blob hasta completar un periodo de equivalencia sin diferencias y poblar `employees.auth_id` para todos los usuarios.
+No activar las políticas de `policies_auth.sql` ni retirar el blob hasta completar como mínimo siete días y siete controles consecutivos de equivalencia sin diferencias, contrastar cada `employees.auth_id` con `auth.users` y probar todos los roles en staging. La retirada del blob es una fase posterior independiente: nunca se hace a la vez que la activación inicial de RLS.

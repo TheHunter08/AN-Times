@@ -8,6 +8,7 @@ import webpush from 'web-push'
 import { finalizeRecord } from './src/utils/recordLifecycle.js'
 import { toRecordRow } from './src/services/tableSyncPlan.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from './src/server/pushSubscriptions.js'
+import { createAutomationRun, mergeAutomationHealth } from './src/server/automationHealth.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
@@ -50,6 +51,19 @@ async function writeDB(data, expectedTs) {
   if (!res.ok) throw new Error(`DB write failed: ${res.status}`)
   const count = parseInt(res.headers.get('Content-Range')?.split('/')[1] || '1', 10)
   if (count === 0) throw new Error('Escritura rechazada: la BD cambió mientras procesábamos.')
+}
+
+async function persistAutomationRun(run) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const latest = await readDB()
+    if (!latest) throw new Error('No se pudo guardar la salud del autocierre')
+    try {
+      await writeDB({ ...mergeAutomationHealth(latest.data, run), _ts:Date.now() }, latest.ts)
+      return
+    } catch (error) {
+      if (attempt === 1) throw error
+    }
+  }
 }
 
 async function upsertRecordRows(records) {
@@ -113,7 +127,8 @@ const mhm = min => {
 }
 
 async function run() {
-  const now = Date.now()
+  const startedAt = Date.now()
+  const now = startedAt
   const row = await readDB()
   if (!row) { console.log('No se pudo leer Supabase.'); return }
 
@@ -123,6 +138,9 @@ async function run() {
   const toClose = openRecs.filter(r => (now - new Date(r.inicio).getTime()) > TEN_HOURS_MS)
 
   if (!toClose.length) {
+    await persistAutomationRun(createAutomationRun('autoclose', {
+      startedAt, checked:openRecs.length, processed:0,
+    }))
     console.log(`Sin jornadas abiertas >10h. Open total: ${openRecs.length}`)
     return
   }
@@ -148,7 +166,10 @@ async function run() {
     return closed
   })
 
-  const newDB = { ...db, records: updatedRecords, _ts: now }
+  const healthRun = createAutomationRun('autoclose', {
+    startedAt, checked:openRecs.length, processed:closedRecords.length,
+  })
+  const newDB = { ...mergeAutomationHealth(db, healthRun), records: updatedRecords, _ts: now }
   const recordSyncFailures = await upsertRecordRows(closedRecords)
   await writeDB(newDB, row.ts)
   console.log('BD actualizada.')
@@ -172,4 +193,15 @@ async function run() {
   }
 }
 
-run().catch(err => { console.error(err); process.exit(1) })
+const processStartedAt = Date.now()
+run().catch(async err => {
+  console.error(err)
+  try {
+    await persistAutomationRun(createAutomationRun('autoclose', {
+      status:'error', startedAt:processStartedAt, error:err?.message || err,
+    }))
+  } catch (healthError) {
+    console.error('No se pudo registrar el fallo del autocierre:', healthError.message)
+  }
+  process.exit(1)
+})

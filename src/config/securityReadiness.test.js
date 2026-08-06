@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateRlsTransition, RLS_RUNTIME_CAPABILITIES } from './securityReadiness.js'
+import { evaluateRlsTransition, evaluateSafeMigration, RLS_RUNTIME_CAPABILITIES } from './securityReadiness.js'
 
 describe('preparación real de RLS', () => {
   it('no confunde identidades completas con una ruta de datos preparada', () => {
@@ -44,5 +44,13 @@ describe('preparación real de RLS', () => {
       },
     })
     expect(result).toMatchObject({ ready:true, state:'LISTO_PARA_PRUEBA_CONTROLADA' })
+  })
+
+  it('exige equivalencia sostenida antes del piloto controlado', () => {
+    const transition = { identityBlockers:[], runtimeBlockers:[] }
+    const now = Date.parse('2026-08-10T00:00:00Z')
+    expect(evaluateSafeMigration({ rlsTransition:transition, verification:{ consistent:false }, now }).stage).toBe('PARITY')
+    expect(evaluateSafeMigration({ rlsTransition:transition, verification:{ consistent:true, startedAt:'2026-08-06T00:00:00Z', consecutiveConsistentChecks:4 }, now }).stage).toBe('OBSERVATION')
+    expect(evaluateSafeMigration({ rlsTransition:transition, verification:{ consistent:true, startedAt:'2026-08-01T00:00:00Z', consecutiveConsistentChecks:8 }, now }).ready).toBe(true)
   })
 })

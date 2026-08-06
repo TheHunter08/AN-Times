@@ -21,7 +21,7 @@ import { useTimesheetsData } from './hooks/useTimesheetsData.js'
 import { useEmployeesData } from './hooks/useEmployeesData.js'
 import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
-import { auditLog, getPushCoverage, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
+import { auditLog, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { authSupabase } from '../services/authService.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
@@ -43,8 +43,6 @@ import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
 import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { workBalanceOptions } from '../utils/workBalance.js'
-import { getLaunchBlockers } from '../utils/launchRequirements.js'
-import { isValidAccountEmail, normalizeAccountEmail } from '../utils/authRegistration.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
@@ -67,7 +65,7 @@ const Anomalies = lazy(() => import('./pages/Anomalies.js').then(module => ({ de
 const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ default: module.Messages })))
 const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
 const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
-const Operations = lazy(() => import('./pages/Operations.js').then(module => ({ default: module.Operations })))
+const OperationsPage = lazy(() => import('./pages/OperationsContainer.js'))
 const VacacionesPage = lazy(() => import('./pages/Vacaciones.js').then(module => ({ default: module.Vacaciones })))
 const ModalAI = lazy(() => import('../components/employee/ModalAI.jsx').then(module => ({ default: module.ModalAI })))
 
@@ -3146,107 +3144,6 @@ function MessagesPage() {
   }
 
   return <Messages conversations={conversations} adminName={adminName} onSend={handleSend} onSelectConversation={handleMarkRead} />
-}
-
-function OperationsPage({ onNavigate, onReviewEmployee }: { onNavigate: (page: string) => void; onReviewEmployee: (employeeId: string) => void }) {
-  const db = useAppStore(s => s.db) as any
-  const saveDB = useAppStore(s => s.saveDB)
-  const toast = useAppStore(s => s.toast)
-  const syncStatus = useAppStore(s => s.syncStatus)
-  const syncError = useAppStore(s => s.syncError)
-  const offlinePending = useAppStore(s => s.offlinePending)
-  const realtimeStatus = useAppStore(s => s.realtimeStatus)
-  const lastSyncTime = useAppStore(s => s.lastSyncTime)
-  const fetchDB = useAppStore(s => s.fetchDB)
-  const schedules = db.config?.reportSchedules || []
-  const defaultWidgets = ['employees', 'working', 'break', 'absent', 'hoursToday']
-  const legacyWidgetIds: Record<string, string> = { validation: 'break', requests: 'absent', coverage: 'hoursToday' }
-  const visibleWidgets = (db.config?.adminDashboard?.visibleWidgets || defaultWidgets)
-    .map((id: string) => legacyWidgetIds[id] || id)
-  const employees = (db.employees || []).filter((employee: any) => !employee.baja)
-  const workers = employees.filter((employee: any) => employee.role !== 'admin' && !employee.isAdmin)
-  const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
-  const emailReady = employees.filter((employee: any) => isValidAccountEmail(employee.email)).length
-  const emailIdentityCounts = new Map<string, number>()
-  employees.forEach((employee: any) => {
-    if (!isValidAccountEmail(employee.email)) return
-    const email = normalizeAccountEmail(employee.email)
-    emailIdentityCounts.set(email, (emailIdentityCounts.get(email) || 0) + 1)
-  })
-  const duplicatedEmails = [...emailIdentityCounts.values()].filter(count => count > 1).length
-  const authIdentityCounts = new Map<string, number>()
-  employees.forEach((employee: any) => {
-    const authId = employee.auth_id || employee.authId
-    if (authId) authIdentityCounts.set(String(authId), (authIdentityCounts.get(String(authId)) || 0) + 1)
-  })
-  const duplicatedAuthIds = [...authIdentityCounts.values()].filter(count => count > 1).length
-  const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
-  const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
-  const [pushReady, setPushReady] = useState<number | null>(null)
-  const [pushMissingIds, setPushMissingIds] = useState<string[]>([])
-  const [pushCoverageState, setPushCoverageState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [pushCoverageRequest, setPushCoverageRequest] = useState(0)
-  const documentCount = (db.documentos || []).length
-  const launchBlockers = getLaunchBlockers(db, pushMissingIds)
-
-  const workerIdsKey = workers.map((employee: any) => employee.id).sort().join('|')
-  useEffect(() => {
-    let active = true
-    setPushCoverageState('loading')
-    getPushCoverage(workerIdsKey ? workerIdsKey.split('|') : []).then(result => {
-      if (active) {
-        setPushReady(result.registered)
-        setPushMissingIds(result.missingIds || [])
-        setPushCoverageState(result.registered == null ? 'error' : 'ready')
-      }
-    })
-    return () => { active = false }
-  }, [workerIdsKey, pushCoverageRequest])
-
-  const updateConfig = (patch: any) => saveDB((fresh: any) => ({
-    config: { ...(fresh.config || {}), ...patch, _upd: new Date().toISOString() },
-  }))
-
-  const onSync = async () => {
-    await uploadPendingIfAny()
-    await fetchDB()
-    setPushCoverageRequest(value => value + 1)
-    toast('Sincronización comprobada', 2200, 'ok')
-  }
-
-  return <Operations
-    syncStatus={syncStatus}
-    syncError={syncError}
-    offlinePending={offlinePending}
-    realtimeStatus={realtimeStatus}
-    lastSyncTime={lastSyncTime}
-    authReady={authReady}
-    authTotal={employees.length}
-    emailReady={emailReady}
-    duplicatedEmails={duplicatedEmails}
-    duplicatedAuthIds={duplicatedAuthIds}
-    signatureReady={signatureReady}
-    signatureTotal={workers.length}
-    pushReady={pushReady}
-    pushTotal={workers.length}
-    pushCoverageState={pushCoverageState}
-    pendingValidation={pendingValidation}
-    documentCount={documentCount}
-    launchBlockers={launchBlockers}
-    schedules={schedules}
-    visibleWidgets={visibleWidgets}
-    onSync={onSync}
-    onRetryPushCoverage={() => setPushCoverageRequest(value => value + 1)}
-    onSaveSchedule={(schedule: any) => {
-      updateConfig({ reportSchedules: [...schedules, schedule] })
-      toast('Programación guardada', 2200, 'ok')
-    }}
-    onToggleSchedule={(id: string) => updateConfig({ reportSchedules: schedules.map((schedule: any) => schedule.id === id ? { ...schedule, enabled: !schedule.enabled, _upd: new Date().toISOString() } : schedule) })}
-    onDeleteSchedule={(id: string) => updateConfig({ reportSchedules: schedules.filter((schedule: any) => schedule.id !== id) })}
-    onChangeWidgets={(ids: string[]) => updateConfig({ adminDashboard: { ...(db.config?.adminDashboard || {}), visibleWidgets: ids } })}
-    onNavigate={onNavigate}
-    onReviewEmployee={onReviewEmployee}
-  />
 }
 
 // ─── Main shell ────────────────────────────────────────────────────────────────

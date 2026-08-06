@@ -196,8 +196,8 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__section-title > div { display:flex; flex-direction:column; gap:3px; }
 .ti-operations__section-title strong { color:var(--uiv2-text-900); font-size:14px; }
 .ti-operations__section-title span { color:var(--uiv2-text-500); font-size:11px; }
-.ti-operations__section-title button,.ti-operations__form button { min-height:38px; padding:0 13px; border:0; border-radius:10px; background:var(--gradient-brand); color:#fff; font-weight:700; cursor:pointer; }
-.ti-operations__section-title .ti-operations__secondary-action { min-height:34px; border:1px solid var(--premium-line); background:var(--uiv2-bg-500); color:var(--uiv2-text-700); font-size:11px; }
+.ti-operations__section-title button,.ti-operations__form button { min-height:44px; padding:0 13px; border:0; border-radius:10px; background:var(--gradient-brand); color:#fff; font-weight:700; cursor:pointer; }
+.ti-operations__section-title .ti-operations__secondary-action { min-height:44px; border:1px solid var(--premium-line); background:var(--uiv2-bg-500); color:var(--uiv2-text-700); font-size:11px; }
 .ti-operations__section-title .ti-operations__secondary-action:hover,.ti-operations__section-title .ti-operations__secondary-action:focus-visible { border-color:rgba(124,58,237,.42); color:var(--premium-brand-soft); outline:none; }
 .ti-operations__section-title button:disabled,.ti-operations__form button:disabled { opacity:.55; cursor:wait; }
 .ti-operations__pill { padding:4px 9px; border:1px solid rgba(167,139,250,.22); border-radius:999px; background:rgba(124,58,237,.12); color:var(--premium-brand-soft) !important; font-weight:750; }
@@ -219,11 +219,11 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__device-help strong { color:var(--uiv2-text-900); font-size:12px; }
 .ti-operations__device-help span { color:var(--uiv2-text-500); font-size:11px; line-height:1.55; }
 .ti-operations__checks { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-.ti-operations__checks label { min-height:40px; display:flex; align-items:center; gap:8px; padding:0 11px; border:1px solid var(--premium-line); border-radius:10px; background:var(--uiv2-bg-600); color:var(--uiv2-text-700); font-size:12px; cursor:pointer; }
+.ti-operations__checks label { min-height:44px; display:flex; align-items:center; gap:8px; padding:0 11px; border:1px solid var(--premium-line); border-radius:10px; background:var(--uiv2-bg-600); color:var(--uiv2-text-700); font-size:12px; cursor:pointer; }
 .ti-operations__checks input { accent-color:var(--premium-brand); }
 .ti-operations__checks label > span:nth-child(2) { flex:1; }
 .ti-operations__order { display:flex; gap:3px; }
-.ti-operations__order button { width:27px; height:27px; border:1px solid var(--premium-line); border-radius:7px; background:var(--uiv2-bg-500); color:var(--uiv2-text-700); cursor:pointer; }
+.ti-operations__order button { width:44px; height:44px; border:1px solid var(--premium-line); border-radius:7px; background:var(--uiv2-bg-500); color:var(--uiv2-text-700); cursor:pointer; }
 .ti-operations__order button:disabled { opacity:.3; cursor:default; }
 .ti-operations__form { display:grid; gap:9px; }
 .ti-operations__form > div { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -233,9 +233,19 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__schedules > div > div:first-child { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .ti-operations__schedules strong { color:var(--uiv2-text-900); font-size:13px; }
 .ti-operations__schedules span { color:var(--uiv2-text-500); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.ti-operations__schedules button { min-height:34px; padding:0 10px; border:1px solid var(--premium-line); border-radius:9px; background:var(--uiv2-bg-500); color:var(--uiv2-text-700); font-size:11px; font-weight:700; cursor:pointer; }
+.ti-operations__schedules button { min-height:44px; padding:0 12px; border:1px solid var(--premium-line); border-radius:9px; background:var(--uiv2-bg-500); color:var(--uiv2-text-700); font-size:11px; font-weight:700; cursor:pointer; }
 .ti-operations__schedules button + button { margin-left:6px; }
 .ti-operations__schedules button.is-danger { color:var(--uiv2-red); border-color:rgba(239,68,68,.24); }
+.ti-operations__schedules small { color:var(--uiv2-text-400); font-size:10px; }
+.ti-operations__automation-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.ti-operations__automation { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:10px; padding:14px; border:1px solid var(--premium-line); border-radius:12px; background:var(--uiv2-bg-600); }
+.ti-operations__automation-dot { width:9px; height:9px; margin-top:4px; border-radius:50%; background:var(--uiv2-orange); box-shadow:0 0 0 4px rgba(245,158,11,.1); }
+.ti-operations__automation.is-ok .ti-operations__automation-dot { background:var(--uiv2-green); box-shadow:0 0 0 4px rgba(16,185,129,.1); }
+.ti-operations__automation > div { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.ti-operations__automation strong { color:var(--uiv2-text-900); font-size:12.5px; }
+.ti-operations__automation span,.ti-operations__automation small { color:var(--uiv2-text-500); font-size:10.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ti-operations__automation small.is-error { color:var(--uiv2-red); }
+.ti-operations__automation b { color:var(--uiv2-text-500); font-size:10px; white-space:nowrap; }
 .uiv2-expense-row:hover,.uiv2-expense-row:focus-visible,.uiv2-document-card:hover,.uiv2-document-card:focus-visible { border-color:rgba(124,58,237,.42) !important; transform:translateY(-1px); outline:none; box-shadow:0 10px 24px rgba(0,0,0,.12); }
 
 /* Preview aislada para comparar las tres superficies sin sesión. */
@@ -268,6 +278,12 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
   .ti-operations__blockers { grid-template-columns:1fr; }
   .ti-operations__blockers button { grid-template-columns:1fr; gap:7px; }
   .ti-operations__schedules > div { align-items:flex-start; flex-direction:column; }
+  .ti-operations__automation-grid { grid-template-columns:1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-operations__health-card,.ti-operations__blockers button,.ti-operations__progress span { transition:none; }
+  .ti-operations__health-card:hover,.ti-operations__health-card:focus-visible,.ti-operations__blockers button:hover,.ti-operations__blockers button:focus-visible { transform:none; }
 }
 
 @media (prefers-reduced-motion:reduce) {

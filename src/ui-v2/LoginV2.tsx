@@ -72,6 +72,7 @@ export default function LoginV2() {
   // PIN state
   const [pin, setPin]               = useState('')
   const [selectedEmpId, setSelectedEmpId] = useState('')
+  const [rememberedEmpId, setRememberedEmpId] = useState('')
   const [pinError, setPinError]     = useState('')
   const [pinShaking, setPinShaking] = useState(false)
   const [pinLocked, setPinLocked]   = useState(false)
@@ -106,7 +107,7 @@ export default function LoginV2() {
   useEffect(() => {
     try {
       const rem = JSON.parse(localStorage.getItem('an_times_rem') || 'null')
-      if (rem?.empId) setSelectedEmpId(rem.empId)
+      if (rem?.empId) setRememberedEmpId(rem.empId)
     } catch {}
     try {
       const qrEmpId = localStorage.getItem('an_qr_emp')
@@ -651,6 +652,10 @@ export default function LoginV2() {
       pin={pin}
       selectedEmpId={selectedEmpId}
       onSelectEmp={handleSelectEmp}
+      hasRememberedEmployee={!!rememberedEmpId && emps.some((employee: any) => employee.id === rememberedEmpId)}
+      onUseRememberedEmployee={() => {
+        if (rememberedEmpId && emps.some((employee: any) => employee.id === rememberedEmpId)) handleSelectEmp(rememberedEmpId)
+      }}
       onPinKey={handlePinKey}
       onPinDel={handlePinDel}
       pinError={pinError}

@@ -6,7 +6,8 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Icons.js'
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
-import { evaluateRlsTransition } from '../../config/securityReadiness.js'
+import { evaluateRlsTransition, evaluateSafeMigration } from '../../config/securityReadiness.js'
+import { automationHealthList } from '../../server/automationHealth.js'
 
 export interface ReportSchedule {
   id: string
@@ -44,6 +45,8 @@ interface OperationsProps {
   documentCount: number
   launchBlockers: LaunchBlocker[]
   schedules: ReportSchedule[]
+  automationHealth?: Record<string, any>
+  migrationVerification?: Record<string, any>
   visibleWidgets: string[]
   onSync: () => Promise<void>
   onRetryPushCoverage: () => void
@@ -102,10 +105,15 @@ export function Operations(props: OperationsProps) {
     duplicatedAuthIds:props.duplicatedAuthIds,
   })
   const { ready:rlsReady } = rlsTransition
+  const migration = evaluateSafeMigration({ rlsTransition, verification:props.migrationVerification })
   const identitiesReady = rlsTransition.identityBlockers.length === 0
   const syncHealthy = props.syncStatus === 'synced' && !props.offlinePending
   const realtimeHealthy = props.realtimeStatus === 'SUBSCRIBED'
   const pushCoverageReady = props.pushCoverageState === 'ready'
+  const automationRuns = automationHealthList(props.automationHealth)
+  const automationLabels: Record<string, string> = {
+    reminders:'Recordatorios', autoclose:'Autocierre', reports:'Informes',
+  }
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
     const ai = props.visibleWidgets.indexOf(a.id), bi = props.visibleWidgets.indexOf(b.id)
     return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
@@ -152,6 +160,28 @@ export function Operations(props: OperationsProps) {
           </Card>
         ))}
       </section>
+
+      <Card>
+        <div className="ti-operations__section-title">
+          <div><strong>Automatizaciones</strong><span>Última ejecución confirmada por cada proceso</span></div>
+          <span className="ti-operations__pill">{automationRuns.filter(item => item.healthy).length}/3 activas</span>
+        </div>
+        <div className="ti-operations__automation-grid">
+          {automationRuns.map(item => (
+            <div key={item.job} className={`ti-operations__automation${item.healthy ? ' is-ok' : ' is-warning'}`}>
+              <span className="ti-operations__automation-dot" aria-hidden="true" />
+              <div>
+                <strong>{automationLabels[item.job]}</strong>
+                <span>{item.label}</span>
+                <small>{item.run?.finishedAt ? new Date(item.run.finishedAt).toLocaleString('es-ES') : 'Se mostrará tras la primera ejecución'}</small>
+                {item.run?.error && <small className="is-error">{item.run.error}</small>}
+              </div>
+              <b>{item.run ? `${item.run.processed || 0} procesados` : 'Pendiente'}</b>
+            </div>
+          ))}
+        </div>
+        <p className="ti-operations__hint">Un estado atrasado significa que el proceso no ha confirmado una ejecución dentro de su intervalo esperado. La tarea sigue siendo idempotente y puede reintentarse sin duplicar resultados.</p>
+      </Card>
 
       <Card>
         <div className="ti-operations__section-title">
@@ -248,6 +278,11 @@ export function Operations(props: OperationsProps) {
                 ? `No activar RLS todavía: ${rlsTransition.identityBlockers.join(', ')}.`
                 : `No activar RLS todavía: ${rlsTransition.runtimeBlockers.join(', ')}.`}
           </p>
+          <dl className="ti-operations__details" style={{ marginTop:12 }}>
+            <div><dt>Fase segura</dt><dd>{migration.stage}</dd></div>
+            <div><dt>Comprobación</dt><dd>{migration.label}</dd></div>
+            <div><dt>Reversión</dt><dd>Blob conservado</dd></div>
+          </dl>
           <button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('empleados')}>Revisar empleados</button>
         </Card>
 
@@ -272,7 +307,7 @@ export function Operations(props: OperationsProps) {
         </Card>
 
         <Card>
-          <div className="ti-operations__section-title"><div><strong>Programar informe</strong><span>Crea un recordatorio recurrente compatible con tu calendario</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('informes')}>Abrir cumplimiento</button></div>
+          <div className="ti-operations__section-title"><div><strong>Programar informe</strong><span>Generación automática y aviso a los destinatarios</span></div><button type="button" className="ti-operations__secondary-action" onClick={() => props.onNavigate('informes')}>Abrir cumplimiento</button></div>
           <div className="ti-operations__form">
             <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} aria-label="Nombre del informe" placeholder="Nombre del informe" />
             <div><select style={inputStyle} value={frequency} onChange={e => setFrequency(e.target.value as 'weekly' | 'monthly')} aria-label="Frecuencia"><option value="weekly">Semanal</option><option value="monthly">Mensual</option></select><select style={inputStyle} value={format} onChange={e => setFormat(e.target.value as 'pdf' | 'excel')} aria-label="Formato"><option value="pdf">PDF</option><option value="excel">Excel</option></select></div>
@@ -283,9 +318,9 @@ export function Operations(props: OperationsProps) {
       </section>
 
       <Card>
-        <div className="ti-operations__section-title"><div><strong>Informes programados</strong><span>Añádelos a Google Calendar, Outlook o Apple Calendar</span></div><span className="ti-operations__pill">{props.schedules.length}</span></div>
+        <div className="ti-operations__section-title"><div><strong>Informes programados</strong><span>Se generan automáticamente; el calendario es opcional</span></div><span className="ti-operations__pill">{props.schedules.length}</span></div>
         {!props.schedules.length ? <ProductState compact title="Aún no hay informes programados" description="Crea una programación semanal o mensual para dejarla preparada." icon={<IconFileText />} /> : (
-          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span></div><div><button type="button" onClick={() => downloadICS(buildReportScheduleICS(schedule), `informe-${schedule.id}.ics`)}>Calendario</button><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
+          <div className="ti-operations__schedules">{props.schedules.map(schedule => <div key={schedule.id}><div><strong>{schedule.name}</strong><span>{schedule.frequency === 'weekly' ? 'Semanal' : 'Mensual'} · {schedule.format.toUpperCase()} · {schedule.recipients}</span><small>{(schedule as any).lastRunAt ? `Último: ${new Date((schedule as any).lastRunAt).toLocaleString('es-ES')}` : 'Pendiente de primera ejecución'}</small></div><div><button type="button" onClick={() => downloadICS(buildReportScheduleICS(schedule), `informe-${schedule.id}.ics`)}>Calendario</button><button type="button" onClick={() => props.onToggleSchedule(schedule.id)}>{schedule.enabled ? 'Pausar' : 'Activar'}</button><button type="button" className="is-danger" onClick={() => props.onDeleteSchedule(schedule.id)}>Eliminar</button></div></div>)}</div>
         )}
       </Card>
     </div>

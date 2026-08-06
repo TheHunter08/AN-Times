@@ -136,6 +136,7 @@ export function EmployeeHome({
 
   const [holdPhase, setHoldPhase] = useState<HoldPhase>('ready')
   const [holdProgress, setHoldProgress] = useState(0)
+  const [showTapConfirm, setShowTapConfirm] = useState(false)
   const holdActiveRef = useRef(false)
   const holdCompletedRef = useRef(false)
   const holdStartedAtRef = useRef(0)
@@ -244,6 +245,7 @@ export function EmployeeHome({
     pointerStartRef.current.id = -1
     setHoldProgress(0)
     setHoldPhase('ready')
+    setShowTapConfirm(false)
   }, [state, clearFrame])
 
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
@@ -401,6 +403,21 @@ export function EmployeeHome({
             <span aria-hidden="true"><IconClock /></span>
             Mantén pulsado hasta completar el círculo
           </p>
+          <button type="button" className="employee-home-v7__tap-alternative" onClick={() => setShowTapConfirm(true)}>
+            Confirmar con un toque
+          </button>
+          {showTapConfirm && (
+            <div className="employee-home-v7__tap-confirm" role="dialog" aria-modal="true" aria-labelledby={`${hintId}-confirm-title`}>
+              <div>
+                <strong id={`${hintId}-confirm-title`}>{cfg.action}</strong>
+                <span>Confirma la acción para evitar un fichaje accidental.</span>
+              </div>
+              <div>
+                <button type="button" onClick={() => setShowTapConfirm(false)}>Cancelar</button>
+                <button type="button" className="is-primary" autoFocus onClick={() => { setShowTapConfirm(false); completeHold() }}>Confirmar</button>
+              </div>
+            </div>
+          )}
 
           {(shiftStart || shiftEnd) && (
             <div className="employee-home-v7__shift">
@@ -939,6 +956,43 @@ const employeeHomeStyles = `
 
   .employee-home-v7__hold-hint svg { width: 13px; height: 13px; }
 
+  .employee-home-v7__tap-alternative {
+    min-height: 44px;
+    display: block;
+    margin: -12px auto var(--space-4);
+    padding: 0 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: var(--font-caption);
+    font-weight: var(--font-semibold);
+    cursor: pointer;
+  }
+
+  .employee-home-v7__tap-alternative:hover,
+  .employee-home-v7__tap-alternative:focus-visible { border-color: var(--primary-400); color: var(--primary-300); outline: none; }
+
+  .employee-home-v7__tap-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-4);
+    padding: 12px;
+    border: 1px solid var(--primary-500);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-md);
+  }
+  .employee-home-v7__tap-confirm > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+  .employee-home-v7__tap-confirm strong { color: var(--text-primary); font-size: var(--font-body-sm); }
+  .employee-home-v7__tap-confirm span { color: var(--text-tertiary); font-size: var(--font-micro); }
+  .employee-home-v7__tap-confirm > div:last-child { display: flex; gap: 7px; }
+  .employee-home-v7__tap-confirm button { min-height: 44px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-overlay); color: var(--text-secondary); font: inherit; font-size: var(--font-caption); font-weight: var(--font-semibold); cursor: pointer; }
+  .employee-home-v7__tap-confirm button.is-primary { border-color: var(--primary-500); background: var(--primary-500); color: #fff; }
+
   .employee-home-v7__shift {
     display: flex;
     align-items: center;
@@ -1208,6 +1262,8 @@ const employeeHomeStyles = `
     .employee-home-v7__quick-action { min-height: 54px; padding: 9px; gap: var(--space-2); }
     .employee-home-v7__quick-action > span:first-child { width: 32px; height: 32px; }
     .employee-home-v7__quick-action small { display: none; }
+    .employee-home-v7__tap-confirm { align-items: stretch; flex-direction: column; }
+    .employee-home-v7__tap-confirm > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -61,6 +61,38 @@ async function countCompanyRows(table) {
   return total && total !== '*' ? Number(total) : 0
 }
 
+async function persistMigrationVerification(consistent, mismatch) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers:SB_H })
+    if (!response.ok) throw new Error(`No se pudo leer el checkpoint de migración: ${response.status}`)
+    const row = (await response.json())?.[0]
+    if (!row?.data) throw new Error('No existe app_data para guardar el checkpoint')
+    const previous = row.data.config?.migrationVerification || {}
+    const nowIso = new Date().toISOString()
+    const today = nowIso.slice(0, 10)
+    const alreadyCheckedToday = String(previous.lastCheckAt || '').slice(0, 10) === today
+    const checkpoint = {
+      consistent,
+      mismatchCount:mismatch.length,
+      startedAt:consistent ? (previous.consistent && previous.startedAt ? previous.startedAt : nowIso) : null,
+      lastCheckAt:nowIso,
+      consecutiveConsistentChecks:consistent
+        ? (alreadyCheckedToday ? Math.max(1, Number(previous.consecutiveConsistentChecks) || 1) : (previous.consistent ? Number(previous.consecutiveConsistentChecks) || 0 : 0) + 1)
+        : 0,
+      rollbackReady:true,
+      blobMode:'dual-write',
+    }
+    const next = { ...row.data, config:{ ...(row.data.config || {}), migrationVerification:checkpoint }, _ts:Date.now() }
+    const update = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
+      method:'PATCH', headers:{ ...SB_H, Prefer:'return=representation' },
+      body:JSON.stringify({ data:next, updated_at:nowIso }),
+    })
+    if (!update.ok) throw new Error(`No se pudo guardar el checkpoint: ${update.status}`)
+    if ((await update.json())?.length) return checkpoint
+  }
+  throw new Error('app_data cambió durante el checkpoint; vuelve a ejecutar la comprobación')
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end()
 
@@ -197,12 +229,13 @@ export default async function handler(req, res) {
     }
     const actual = Object.fromEntries(await Promise.all(Object.keys(expected).map(async table => [table, await countCompanyRows(table)])))
     const mismatch = Object.entries(expected).filter(([key, value]) => actual[key] !== value)
+    const migrationVerification = await persistMigrationVerification(mismatch.length === 0, mismatch)
 
     console.log('[migrate-to-tables] completado:', JSON.stringify(stats))
     return res.status(200).json({
       ok: true,
       stats,
-      verification: { expected, actual, mismatch, consistent: mismatch.length === 0 },
+      verification: { expected, actual, mismatch, consistent: mismatch.length === 0, checkpoint:migrationVerification },
       next: [
         'En appStore.js cambia el import:',
         "  from '../services/dataService.js'",

@@ -43,3 +43,29 @@ export function evaluateRlsTransition({
 
   return { ready, state, authMissing, emailMissing, identityBlockers, runtimeBlockers }
 }
+
+/** @param {any} options */
+export function evaluateSafeMigration({
+  rlsTransition = null,
+  verification = null,
+  now = Date.now(),
+  minimumDays = 7,
+  minimumChecks = 7,
+} = {}) {
+  if (!rlsTransition || rlsTransition.identityBlockers?.length) {
+    return { stage:'IDENTITIES', ready:false, label:'Completar identidades de acceso' }
+  }
+  if (!verification?.consistent || Number(verification?.mismatchCount || 0) > 0) {
+    return { stage:'PARITY', ready:false, label:'Verificar equivalencia blob ↔ tablas' }
+  }
+  const startedAt = Date.parse(verification.startedAt || '')
+  const observedDays = Number.isFinite(startedAt) ? Math.max(0, Math.floor((now - startedAt) / 86400000)) : 0
+  const checks = Math.max(0, Number(verification.consecutiveConsistentChecks) || 0)
+  if (observedDays < minimumDays || checks < minimumChecks) {
+    return { stage:'OBSERVATION', ready:false, observedDays, checks, label:`Observación segura: ${observedDays}/${minimumDays} días · ${checks}/${minimumChecks} controles` }
+  }
+  if (rlsTransition.runtimeBlockers?.length) {
+    return { stage:'AUTH_RUNTIME', ready:false, observedDays, checks, label:'Preparar sesión Auth para todos los accesos' }
+  }
+  return { stage:'CONTROLLED_PILOT', ready:true, observedDays, checks, label:'Lista para piloto RLS controlado' }
+}

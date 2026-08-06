@@ -14,6 +14,8 @@ export interface LoginProps {
   pin?: string
   selectedEmpId?: string
   onSelectEmp?: (id: string) => void
+  hasRememberedEmployee?: boolean
+  onUseRememberedEmployee?: () => void
   onPinKey?: (k: string) => void
   onPinDel?: () => void
   pinError?: string
@@ -51,7 +53,7 @@ export interface LoginProps {
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 
 export function Login({
-  employees = [], pin = '', selectedEmpId = '', onSelectEmp, onPinKey, onPinDel,
+  employees = [], pin = '', selectedEmpId = '', onSelectEmp, hasRememberedEmployee, onUseRememberedEmployee, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
   onLogin, onRegister, onForgotPassword, onUpdatePassword, onResendConfirmation, resetLoading, recoveryLoading, recoveryMode, confirmationLoading, emailLoading, registerLoading, emailError, emailPinRequired, registrationNotice, onRegistrationNoticeDone,
   mode = 'pin', onSetMode,
@@ -73,9 +75,9 @@ export function Login({
   }
 
   const selEmp = employees.find(e => e.id === selectedEmpId)
-  const protectedDirectory = employees.length > 4
+  const protectedDirectory = employees.length > 0
   const normalizedEmployeeSearch = employeeSearch.trim().toLocaleLowerCase('es')
-  const visibleEmployees = protectedDirectory && normalizedEmployeeSearch.length < 2
+  const visibleEmployees = normalizedEmployeeSearch.length < 2
     ? employees.filter(e => e.id === selectedEmpId)
     : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(normalizedEmployeeSearch))
   const pinDotCount = Math.min(6, Math.max(4, selEmp?.pinLen || 4))
@@ -154,7 +156,7 @@ export function Login({
               onClick={() => onSetMode?.(m)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '9px 12px', borderRadius: radius.md, border: 'none',
+                minHeight:44, padding: '9px 12px', borderRadius: radius.md, border: 'none',
                 cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
                 transition: 'all .18s ease',
                 background: mode === m ? colors.primary.base : 'transparent',
@@ -191,8 +193,17 @@ export function Login({
                   placeholder="Escribe al menos 2 letras"
                   autoComplete="off"
                   aria-label="Buscar perfil de empleado"
-                  style={{ width:'100%', boxSizing:'border-box', minHeight:42, marginBottom:9, padding:'0 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13 }}
+                  style={{ width:'100%', boxSizing:'border-box', minHeight:44, marginBottom:9, padding:'0 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13 }}
                 />
+              )}
+              {!selectedEmpId && hasRememberedEmployee && (
+                <button
+                  type="button"
+                  onClick={onUseRememberedEmployee}
+                  style={{ width:'100%', minHeight:44, marginBottom:9, padding:'0 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[700], fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+                >
+                  Continuar con el último perfil usado
+                </button>
               )}
               {employees.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '14px', fontSize: 12.5, color: colors.text[400] }}>
@@ -208,7 +219,7 @@ export function Login({
                       aria-pressed={selectedEmpId === e.id}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '5px 12px 5px 5px', borderRadius: radius.pill, border: 'none',
+                        minHeight:44, padding: '5px 12px 5px 5px', borderRadius: radius.pill, border: 'none',
                         cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600,
                         transition: 'all .15s',
                         background: selectedEmpId === e.id ? colors.primary.dim : colors.bg[600],
