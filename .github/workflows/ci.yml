@@ -24,13 +24,7 @@ jobs:
           cache: npm
 
       - name: Instalar dependencias
-        run: npm ci
+        run: npm ci --include=dev
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Tests unitarios
-        run: npm run test
-
-      - name: Build
-        run: npm run build
+      - name: Verificar release completa
+        run: npm run verify:deploy

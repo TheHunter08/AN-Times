@@ -27,4 +27,11 @@ describe('deployment quality gate', () => {
     expect(localNodeVersion).toBe('24')
     expect(githubWorkflow).toContain('node-version: 24.x')
   })
+
+  it('keeps GitHub and Vercel on the same release gate', () => {
+    expect(githubWorkflow).toContain('run: npm ci --include=dev')
+    expect(githubWorkflow).toContain('run: npm run verify:deploy')
+    expect(githubWorkflow).not.toContain('run: npm run build')
+    expect(githubWorkflow).not.toContain('run: npm run test\n')
+  })
 })
