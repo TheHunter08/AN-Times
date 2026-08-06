@@ -23,8 +23,8 @@ describe('deployment quality gate', () => {
   })
 
   it('uses the same supported Node major locally, in CI and on Vercel', () => {
-    expect(pkg.engines.node).toBe('20.x')
-    expect(localNodeVersion).toBe('20')
-    expect(githubWorkflow).toContain('node-version: 20.x')
+    expect(pkg.engines.node).toBe('24.x')
+    expect(localNodeVersion).toBe('24')
+    expect(githubWorkflow).toContain('node-version: 24.x')
   })
 })
