@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm install --include=dev",
+  "buildCommand": "npm run verify:deploy",
+  "installCommand": "npm ci --include=dev",
   "outputDirectory": "dist",
   "framework": "vite",
   "crons": [

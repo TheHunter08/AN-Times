@@ -33,6 +33,7 @@
     "repair:closure-drift": "node scripts/repair-closure-table-drift.mjs --apply",
     "repair:blob-table-drift": "node scripts/repair-blob-table-drift.mjs --apply",
     "verify:release": "npm run build && npm run test && npm run test:bundle",
+    "verify:deploy": "npm run typecheck && npm run verify:release",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
