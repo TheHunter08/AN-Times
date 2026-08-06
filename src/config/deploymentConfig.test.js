@@ -7,6 +7,8 @@ const vercel = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'u
 const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.js'), 'utf8')
 const vercelIgnore = readFileSync(resolve(process.cwd(), '.vercelignore'), 'utf8')
 const vitestConfig = readFileSync(resolve(process.cwd(), 'vitest.config.js'), 'utf8')
+const githubWorkflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
+const localNodeVersion = readFileSync(resolve(process.cwd(), '.nvmrc'), 'utf8').trim()
 const apiTests = readdirSync(resolve(process.cwd(), 'api')).filter(name => name.endsWith('.test.js'))
 
 describe('deployment quality gate', () => {
@@ -18,5 +20,11 @@ describe('deployment quality gate', () => {
     expect(vercelIgnore).not.toContain('api/*.test.js')
     expect(vitestConfig).not.toContain('api/**/*.test.js')
     expect(apiTests).toEqual([])
+  })
+
+  it('uses the same supported Node major locally, in CI and on Vercel', () => {
+    expect(pkg.engines.node).toBe('20.x')
+    expect(localNodeVersion).toBe('20')
+    expect(githubWorkflow).toContain('node-version: 20.x')
   })
 })
