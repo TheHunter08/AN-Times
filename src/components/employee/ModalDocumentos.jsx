@@ -84,6 +84,8 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     // Si el original vive solo en Storage, hay que descargarlo antes de poder
     // estampar la firma (stampSignatureOnPdf/Image necesitan un data URL).
     let fileData = doc.fileData || doc.data || null
+    const hadOriginalContent = !!fileData
+    let downloadFailed = false
     try {
       if (!fileData && doc.storagePath && supabase) {
         const { data: signed, error: signErr } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 300)
@@ -100,9 +102,24 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
         fileData = await stampSignatureOnImage(fileData, printable, label)
       }
     } catch (e) {
-      console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
-      toast('⚠️ No se pudo insertar la firma en el archivo, se guardó solo el registro')
+      // Distingue dos fallos muy distintos: no poder ESTAMPAR visualmente la
+      // firma sobre un contenido que sí tenemos (degradado, pero el
+      // documento sigue teniendo contenido real que mostrar) frente a no
+      // haber podido obtener el contenido en absoluto (típicamente al
+      // descargarlo de Storage) — en ese segundo caso, seguir adelante
+      // guardaría un documento marcado como "firmado" pero sin nada que
+      // mostrar nunca, algo peor que no firmarlo: se corta aquí y se deja
+      // reintentar en vez de fingir un éxito.
+      if (!hadOriginalContent && !fileData) {
+        console.error('[FIRMA] No se pudo descargar el documento original, no se firma:', e)
+        toast('⚠️ No se pudo descargar el documento para firmarlo. Comprueba tu conexión e inténtalo de nuevo.', 6000, 'warn')
+        downloadFailed = true
+      } else {
+        console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
+        toast('⚠️ No se pudo insertar la firma en el archivo, se guardó solo el registro')
+      }
     }
+    if (downloadFailed) { setStamping(false); return }
     const notiAction = 'Documento firmado'
     const notiDetail = `${u.name} firmó "${doc.titulo}"`
     // try/finally: antes, si saveDB/createNotification/auditLog lanzaban un

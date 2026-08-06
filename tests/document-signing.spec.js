@@ -224,3 +224,54 @@ test('empleado firma un documento guardado solo en Storage (sin base64 local)', 
   await page.getByRole('button', { name: 'Ver' }).click()
   expect(signRequests).toBe(signRequestsBeforeAdmin)
 })
+
+test('si no se puede descargar el original de Storage (permisos/red), no se marca el documento como firmado', async ({ page }) => {
+  // Cubre el caso donde createSignedUrl funciona (el empleado puede VER el
+  // documento) pero la descarga real falla al firmar — p.ej. una política
+  // RLS más estricta para esa operación concreta, o un corte de red justo
+  // en ese momento. Antes, este fallo se trataba igual que un fallo de
+  // ESTAMPADO (solo un aviso) y el documento se guardaba de todas formas
+  // como "firmado" pero con fileData nulo — quedaba marcado en verde sin
+  // tener nunca nada que mostrar. Ahora debe cortar y dejar reintentar.
+  const storagePath = `${employee.id}/doc-storage.pdf`
+  await loginAsEmployee(page, {
+    documentos: [{
+      id: 'doc-storage-fail', empId: employee.id, empName: employee.name, tipo: 'nomina',
+      nombre: 'Nomina.pdf', storagePath, mime: 'application/pdf', size: '3 KB',
+      createdAt: new Date().toISOString(),
+    }],
+  })
+  await page.route(/supabase\.co\/storage\/v1\//i, async route => {
+    const req = route.request()
+    const url = new URL(req.url())
+    if (req.method() === 'POST' && url.pathname.includes('/object/sign/')) {
+      const afterSign = url.pathname.split('/object/sign/')[1]
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ signedURL: `/object/sign/${afterSign}?token=faketoken` }) })
+    }
+    if (req.method() === 'GET' && url.pathname.includes('/object/sign/') && url.search.includes('token=faketoken')) {
+      // La URL firmada existe (createSignedUrl funcionó) pero la descarga en
+      // sí es rechazada — simula una política RLS que sí bloquea esta lectura.
+      return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Forbidden' }) })
+    }
+    return route.continue()
+  })
+  await stubRestSuccess(page)
+
+  await page.goto('/')
+  await openEmployeeDocuments(page)
+  await expect(page.getByText('Nomina.pdf')).toBeVisible()
+  await page.getByRole('button', { name: 'Ver' }).click()
+  await page.getByRole('button', { name: 'Firmar', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirmar y firmar' }).click()
+
+  await expect(page.getByText('No se pudo descargar el documento para firmarlo')).toBeVisible({ timeout: 8000 })
+  await expect(page.getByText('Documento firmado correctamente')).toHaveCount(0)
+
+  const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).documentos[0])
+  expect(doc.firma).toBeFalsy()
+  expect(doc.fileData).toBeFalsy()
+
+  // El modal de confirmación sigue abierto (no se cerró como en un éxito),
+  // así que el empleado puede reintentar directamente.
+  await expect(page.getByRole('button', { name: 'Confirmar y firmar' })).toBeVisible()
+})

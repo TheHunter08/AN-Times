@@ -24,21 +24,44 @@ function dataUrlToUint8Array(dataUrl) {
   return bytes
 }
 
+// Un PDF real (varias páginas, fuentes incrustadas, escaneado con imágenes
+// pesadas...) puede tardar mucho más que mis PDFs de prueba en analizarse, y
+// si el worker de pdf.js falla en cargar/responder en producción (red lenta,
+// bloqueador de scripts, un fallo interno que deja la promesa colgada sin
+// rechazarla) esta búsqueda podía quedarse esperando para siempre — congelando
+// TODO el flujo de firma sin ningún error visible, porque firmarDoc() la
+// espera con `await` antes de poder seguir. Con este límite, si no responde a
+// tiempo se cae a la posición por defecto en vez de bloquear la firma.
+const ANCHOR_TIMEOUT_MS = 8000
+
+async function withTimeout(promise, ms) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Tiempo de espera agotado (${ms}ms)`)), ms)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /**
  * Busca "Firma del trabajador" (o variantes cercanas) en el texto real y
  * seleccionable del PDF. Devuelve `{ pageIndex, x, y }` (coordenadas PDF,
  * origen abajo-izquierda, mismo sistema que pdf-lib) del punto donde
  * empieza esa frase, o `null` si no aparece como texto -- lo mas habitual
  * cuando el PDF es una imagen escaneada sin capa de texto, o cuando la
- * plantilla usa una frase distinta. El llamador debe caer a una posicion
- * por defecto en ese caso.
+ * plantilla usa una frase distinta -- o si el análisis no responde a tiempo.
+ * El llamador debe caer a una posicion por defecto en ese caso.
  */
 export async function findSignatureAnchor(pdfDataUrl) {
+  let loadingTask = null
   try {
-    const bytes = dataUrlToUint8Array(pdfDataUrl)
-    const loadingTask = pdfjsLib.getDocument({ data: bytes })
-    const doc = await loadingTask.promise
-    try {
+    return await withTimeout((async () => {
+      const bytes = dataUrlToUint8Array(pdfDataUrl)
+      loadingTask = pdfjsLib.getDocument({ data: bytes })
+      const doc = await loadingTask.promise
       for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
         const page = await doc.getPage(pageNum)
         // Una pagina rotada desplaza el sistema de coordenadas del texto
@@ -52,11 +75,13 @@ export async function findSignatureAnchor(pdfDataUrl) {
         return { pageIndex: pageNum - 1, x: hit.x, y: hit.y }
       }
       return null
-    } finally {
-      loadingTask.destroy()
-    }
+    })(), ANCHOR_TIMEOUT_MS)
   } catch (e) {
     console.warn('[pdfSignatureAnchor] No se pudo analizar el PDF, se usara la posicion por defecto:', e)
     return null
+  } finally {
+    // destroy() es seguro de llamar aunque loadingTask.promise nunca haya
+    // resuelto (p.ej. si saltó el timeout) — libera el worker/red en vuelo.
+    try { loadingTask?.destroy() } catch {}
   }
 }
