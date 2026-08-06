@@ -12,6 +12,10 @@
     { "path": "/api/sync-ping",      "schedule": "17 12 * * *" }
   ],
   "rewrites": [
+    { "source": "/api/migrate-to-tables", "destination": "/api/admin-tools?op=migrate-to-tables" },
+    { "source": "/api/patch-pins", "destination": "/api/admin-tools?op=patch-pins" },
+    { "source": "/api/send-push-all", "destination": "/api/admin-tools?op=send-push-all" },
+    { "source": "/api/send-whatsapp", "destination": "/api/admin-tools?op=send-whatsapp" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
