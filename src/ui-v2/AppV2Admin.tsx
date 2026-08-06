@@ -45,6 +45,7 @@ import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { workBalanceOptions } from '../utils/workBalance.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
+import { automationHealthList } from '../server/automationHealth.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -688,6 +689,10 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
   const visibleKpis = visibleWidgets
     .map(id => kpisWithExtra[widgetIds.indexOf(id)])
     .filter(Boolean)
+  const automationProblems = automationHealthList(db.config?.automationHealth || {})
+    .filter(item => item.state === 'error' || item.state === 'stale')
+  const failedAutomations = automationProblems.filter(item => item.state === 'error').length
+  const staleAutomations = automationProblems.length - failedAutomations
 
   return (
     <Dashboard
@@ -703,6 +708,12 @@ function DashboardPage({ onNavigate }: { onNavigate: (id: string) => void }) {
       onOpenVacations={() => onNavigate('vacaciones')}
       onTrendClick={() => onNavigate('estadisticas')}
       onExport={handleExport}
+      automationAlert={automationProblems.length ? {
+        title: automationProblems.length === 1 ? 'Una automatización requiere atención' : `${automationProblems.length} automatizaciones requieren atención`,
+        detail: [failedAutomations ? `${failedAutomations} fallida${failedAutomations > 1 ? 's' : ''}` : '', staleAutomations ? `${staleAutomations} atrasada${staleAutomations > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · '),
+        count:automationProblems.length,
+        onClick:() => onNavigate('operaciones'),
+      } : undefined}
       quickActions={canClockOwnShift ? (
         <button className="ti-dashboard-button" type="button" onClick={() => setScreen('emp')}>
           <IconClock width={16} height={16} /> Mi jornada

@@ -4,6 +4,7 @@ import type { AreaChartPoint } from '../components/AreaChart.js'
 import { colors } from '../design-system/colors'
 import {
   IconArrowRight,
+  IconAlertCircle,
   IconCalendar,
   IconClock,
   IconDownload,
@@ -69,6 +70,7 @@ export interface DashboardProps {
   onOpenVacations?: () => void
   onExport?: () => void
   onTrendClick?: () => void
+  automationAlert?: { title: string; detail: string; count: number; onClick?: () => void }
 }
 
 const toneOrder: KpiTone[] = ['primary', 'accent', 'cyan', 'amber']
@@ -158,6 +160,7 @@ export function Dashboard({
   onOpenVacations,
   onExport,
   onTrendClick,
+  automationAlert,
 }: DashboardProps) {
   const todayLabel = new Intl.DateTimeFormat('es-ES', {
     weekday: 'short',
@@ -199,6 +202,18 @@ export function Dashboard({
           {quickActions}
         </div>
       </section>
+
+      {automationAlert && (
+        <button type="button" className="ti-automation-alert" onClick={automationAlert.onClick} aria-label={`${automationAlert.title}. ${automationAlert.detail}. Abrir Centro operativo`}>
+          <span className="ti-automation-alert__icon" aria-hidden="true"><IconAlertCircle width={18} height={18} /></span>
+          <span className="ti-automation-alert__copy">
+            <strong>{automationAlert.title}</strong>
+            <small>{automationAlert.detail}</small>
+          </span>
+          <b aria-label={`${automationAlert.count} procesos requieren atención`}>{automationAlert.count}</b>
+          <span className="ti-automation-alert__action">Revisar <IconArrowRight width={14} height={14} aria-hidden="true" /></span>
+        </button>
+      )}
 
       {quickLinks && quickLinks.length > 0 && (
         <section className="ti-priority-strip" aria-label="Prioridades de hoy">
@@ -451,6 +466,20 @@ export function Dashboard({
           line-height: 1.45;
         }
         .ti-dashboard-heading__separator { color: ${colors.text[300]}; }
+        .ti-automation-alert {
+          width:100%; min-height:62px; display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; align-items:center; gap:12px;
+          padding:11px 14px; border:1px solid color-mix(in srgb, ${colors.semantic.orange} 42%, ${colors.border.subtle}); border-radius:15px;
+          background:linear-gradient(100deg,rgba(245,158,11,.14),rgba(239,68,68,.055)),${colors.bg[600]}; color:${colors.text[900]};
+          font-family:inherit; text-align:left; cursor:pointer; box-shadow:0 10px 28px rgba(0,0,0,.12); transition:transform .15s,border-color .15s,background .15s;
+        }
+        .ti-automation-alert:hover { transform:translateY(-1px); border-color:${colors.semantic.orange}; background:linear-gradient(100deg,rgba(245,158,11,.18),rgba(239,68,68,.075)),${colors.bg[600]}; }
+        .ti-automation-alert:focus-visible { outline:2px solid ${colors.semantic.orange}; outline-offset:2px; }
+        .ti-automation-alert__icon { width:36px; height:36px; display:grid; place-items:center; border-radius:11px; background:rgba(245,158,11,.14); color:${colors.semantic.orange}; }
+        .ti-automation-alert__copy { min-width:0; display:grid; gap:3px; }
+        .ti-automation-alert__copy strong { font-size:12.5px; font-weight:700; }
+        .ti-automation-alert__copy small { overflow:hidden; color:${colors.text[500]}; font-size:10.5px; text-overflow:ellipsis; white-space:nowrap; }
+        .ti-automation-alert>b { min-width:27px; height:27px; display:grid; place-items:center; border-radius:99px; background:rgba(239,68,68,.13); color:${colors.semantic.red}; font-size:11px; }
+        .ti-automation-alert__action { display:inline-flex; align-items:center; gap:5px; color:${colors.primary.light}; font-size:10.5px; font-weight:750; }
         .ti-priority-strip {
           display:grid;
           grid-template-columns:minmax(200px,.75fr) minmax(0,1.8fr);
@@ -695,6 +724,8 @@ export function Dashboard({
           .ti-dashboard { gap: 14px; }
           .ti-priority-strip { grid-template-columns:1fr; gap:12px; }
           .ti-priority-strip__actions { grid-template-columns:1fr; }
+          .ti-automation-alert { grid-template-columns:auto minmax(0,1fr) auto; }
+          .ti-automation-alert__action { display:none; }
           .ti-dashboard-heading { min-height: 0; flex-direction: column; gap: 14px; }
           .ti-dashboard-toolbar { width: 100%; justify-content: flex-start; }
           .ti-date-chip { flex: 1; }
@@ -718,7 +749,8 @@ export function Dashboard({
           .ti-live-label__dot { animation: none; }
           .ti-kpi-card,
           .ti-dashboard-button,
-          .ti-management-link { transition: none; }
+          .ti-management-link,
+          .ti-automation-alert { transition: none; }
         }
       `}</style>
     </div>

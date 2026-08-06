@@ -70,6 +70,18 @@ describe('V7 administrator dashboard contract', () => {
     expect(html).not.toContain('Ver equipo')
     expect(html).not.toContain('undefined')
   })
+
+  it('surfaces an actionable automation warning without obscuring the dashboard', () => {
+    const html = renderToStaticMarkup(createElement(Dashboard, {
+      ...dashboardProps,
+      automationAlert:{ title:'2 automatizaciones requieren atención', detail:'1 fallida · 1 atrasada', count:2, onClick:vi.fn() },
+    }))
+
+    expect(html).toContain('class="ti-automation-alert"')
+    expect(html).toContain('2 automatizaciones requieren atención')
+    expect(html).toContain('1 fallida · 1 atrasada')
+    expect(html).toContain('Abrir Centro operativo')
+  })
 })
 
 describe('V7 employee home contract', () => {
