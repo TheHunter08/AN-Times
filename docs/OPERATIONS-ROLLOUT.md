@@ -11,7 +11,7 @@ La pantalla `Centro operativo` funciona sin infraestructura adicional para:
 - comprobar la última ejecución confirmada de recordatorios, autocierre e informes;
 - seguir la fase de migración y mantener visible la vía de reversión.
 
-Las programaciones se guardan en `db.config.reportSchedules`. `/api/cron-reports` procesa diariamente los periodos completos, genera PDF o Excel, guarda el archivo en el bucket privado `scheduled-reports` y registra el resultado en `db.config.reportRuns`. El periodo queda marcado con `lastRunKey`, por lo que un reintento no vuelve a enviarlo.
+Las programaciones se guardan en `db.config.reportSchedules`. `/api/cron-reports` procesa diariamente los periodos completos, crea de forma idempotente el bucket privado `scheduled-reports` si todavía no existe, genera PDF o Excel y registra el resultado en `db.config.reportRuns`. El periodo queda marcado con `lastRunKey`, por lo que un reintento no vuelve a enviarlo. La migración SQL conserva la misma configuración como infraestructura declarativa, pero el primer arranque no depende de una intervención manual.
 
 Para el envío por correo deben configurarse `RESEND_API_KEY` y `REPORT_FROM_EMAIL`. Sin esas variables el archivo se genera y queda auditado como `generated`, pero no se afirma que haya sido enviado. Los enlaces firmados caducan a los siete días.
 

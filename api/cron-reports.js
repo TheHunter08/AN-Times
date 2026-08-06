@@ -14,6 +14,29 @@ const REPORT_FROM_EMAIL = clean(process.env.REPORT_FROM_EMAIL)
 const headers = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 const storageHeaders = SB_SERVICE ? { apikey:SB_SERVICE, Authorization:`Bearer ${SB_SERVICE}` } : headers
 
+async function ensureReportBucket() {
+  const existing = await fetch(`${SB_URL}/storage/v1/bucket/scheduled-reports`, { headers:storageHeaders })
+  if (existing.ok) return
+  if (existing.status !== 404) throw new Error(`storage bucket check ${existing.status}`)
+  const created = await fetch(`${SB_URL}/storage/v1/bucket`, {
+    method:'POST',
+    headers:{ ...storageHeaders, 'Content-Type':'application/json' },
+    body:JSON.stringify({
+      id:'scheduled-reports',
+      name:'scheduled-reports',
+      public:false,
+      file_size_limit:20 * 1024 * 1024,
+      allowed_mime_types:['application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    }),
+  })
+  // Dos invocaciones simultáneas pueden comprobar el 404 a la vez. Si la
+  // segunda recibe conflicto, confirmar que la primera ya creó el bucket.
+  if (!created.ok) {
+    const retry = await fetch(`${SB_URL}/storage/v1/bucket/scheduled-reports`, { headers:storageHeaders })
+    if (!retry.ok) throw new Error(`storage bucket create ${created.status}: ${(await created.text()).slice(0, 140)}`)
+  }
+}
+
 async function readDB() {
   const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers })
   if (!response.ok) throw new Error(`app_data read ${response.status}`)
@@ -142,6 +165,7 @@ export default async function handler(req, res) {
   const startedAt = Date.now()
   const now = new Date()
   try {
+    await ensureReportBucket()
     const source = await readDB()
     if (!source?.data) throw new Error('app_data no disponible')
     const schedules = source.data.config?.reportSchedules || []
