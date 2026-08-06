@@ -4,7 +4,7 @@
 // y envía notificación push para que los firmen.
 
 import { toClosureRow } from './src/services/tableSyncPlan.js'
-import { canCloseMonth } from './src/utils/adminHelpers.js'
+import { canCloseMonth } from './src/utils/monthClose.js'
 import { monthlyExtras } from './src/utils/time.js'
 import { workBalanceOptions } from './src/utils/workBalance.js'
 import { fileURLToPath } from 'url'

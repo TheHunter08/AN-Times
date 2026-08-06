@@ -1,7 +1,9 @@
 import { queuePush } from '../services/dataService.js'
 import { calcSecs, localDateStr, localMonthKey, monthlyExtras, recWorkSecs, wkStart } from './time.js'
-import { workWeekStartsInMonth } from './workTargets.js'
 import { workBalanceOptions } from './workBalance.js'
+import { canCloseMonth } from './monthClose.js'
+
+export { canCloseMonth }
 
 export const buildRecordSnapshot = record => {
   const totals = calcSecs(record)
@@ -87,20 +89,6 @@ export const downloadDataUrl = (dataUrl, filename) => {
   const a = document.createElement('a')
   a.href = dataUrl; a.download = filename
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
-}
-
-// Un cierre solo puede firmarse (y por tanto bloquear el mes) una vez que ese
-// El periodo agrupa las semanas cuyo lunes pertenece a `mes`. Solo se puede
-// cerrar cuando ha terminado el viernes de la última de esas semanas.
-export const canCloseMonth = (mes, now = new Date()) => {
-  const starts = workWeekStartsInMonth(mes)
-  if (!starts.length) return false
-  const lastMonday = new Date(`${starts.at(-1)}T00:00:00`)
-  const closeAt = new Date(lastMonday)
-  closeAt.setDate(lastMonday.getDate() + 5)
-  // El cierre solo es definitivo cuando ya empezó el mes siguiente. El último
-  // día todavía puede contener fichajes y no debe quedar bloqueado a medianoche.
-  return now >= closeAt
 }
 
 export const isRecordMonthLocked = (cierresList, empId, inicio) => {
