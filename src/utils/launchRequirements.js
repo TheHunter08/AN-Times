@@ -49,6 +49,20 @@ export function getLaunchBlockers(db, missingPushIds = []) {
     .filter(item => item.issues.length > 0)
 }
 
+const PROFILE_FIXABLE_ISSUES = new Set([
+  'Falta email',
+  'Falta PIN',
+  'Correo compartido con otro perfil',
+])
+
+export function getLaunchBlockerActions(issues = []) {
+  const profileFixable = issues.some(issue => PROFILE_FIXABLE_ISSUES.has(issue))
+  return {
+    profileFixable,
+    employeeActionRequired:issues.some(issue => !PROFILE_FIXABLE_ISSUES.has(issue)),
+  }
+}
+
 const ISSUE_INSTRUCTIONS = {
   'Falta email': 'Pide a Administración que añada un correo personal y único a tu perfil.',
   'Correo compartido con otro perfil': 'Pide a Administración que sustituya el correo compartido por uno personal y único.',

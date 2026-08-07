@@ -221,6 +221,8 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__device-help { grid-column:1/-1; display:flex; flex-direction:column; gap:5px; padding:12px 14px; border:1px solid rgba(59,130,246,.24); border-radius:11px; background:rgba(59,130,246,.08); }
 .ti-operations__device-help strong { color:var(--uiv2-text-900); font-size:12px; }
 .ti-operations__device-help span { color:var(--uiv2-text-500); font-size:11px; line-height:1.55; }
+.ti-operations__device-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:5px; }
+.ti-operations__device-help .ti-operations__secondary-action { display:inline-flex; width:auto; min-height:36px; grid-template-columns:none; justify-content:center; padding:0 12px; }
 .ti-operations__checks { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .ti-operations__checks label { min-height:44px; display:flex; align-items:center; gap:8px; padding:0 11px; border:1px solid var(--premium-line); border-radius:10px; background:var(--uiv2-bg-600); color:var(--uiv2-text-700); font-size:12px; cursor:pointer; }
 .ti-operations__checks input { accent-color:var(--premium-brand); }

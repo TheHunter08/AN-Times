@@ -8,7 +8,7 @@ import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Ic
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
 import { evaluateRlsTransition, evaluateSafeMigration } from '../../config/securityReadiness.js'
 import { automationHealthList } from '../../server/automationHealth.js'
-import { buildLaunchBlockerInstructions } from '../../utils/launchRequirements.js'
+import { buildLaunchBlockerInstructions, getLaunchBlockerActions } from '../../utils/launchRequirements.js'
 
 export interface ReportSchedule {
   id: string
@@ -237,24 +237,21 @@ export function Operations(props: OperationsProps) {
         ) : props.launchBlockers.length > 0 && (
           <div className="ti-operations__blockers">
             {props.launchBlockers.map(blocker => {
-              const profileFixable = blocker.issues.some(issue =>
-                issue === 'Falta email' || issue === 'Falta PIN' || issue === 'Correo compartido con otro perfil'
-              )
-              const employeeActionOnly = !profileFixable
-              const showActionHelp = employeeActionOnly && actionHelpId === blocker.employeeId
+              const { profileFixable, employeeActionRequired } = getLaunchBlockerActions(blocker.issues)
+              const showActionHelp = employeeActionRequired && actionHelpId === blocker.employeeId
               return [
                 <button
                   key={blocker.employeeId}
                   type="button"
-                  onClick={() => employeeActionOnly
+                  onClick={() => employeeActionRequired
                     ? setActionHelpId(current => current === blocker.employeeId ? null : blocker.employeeId)
                     : props.onReviewEmployee(blocker.employeeId)}
-                  aria-expanded={employeeActionOnly ? showActionHelp : undefined}
-                  aria-label={`${employeeActionOnly ? 'Ver instrucciones para' : 'Revisar'} ${blocker.employeeName}: ${blocker.issues.join(', ')}`}
+                  aria-expanded={employeeActionRequired ? showActionHelp : undefined}
+                  aria-label={`${employeeActionRequired ? 'Ver pasos para' : 'Revisar'} ${blocker.employeeName}: ${blocker.issues.join(', ')}`}
                 >
                   <strong>{blocker.employeeName}</strong>
                   <span>{blocker.issues.map(issue => <small key={issue}>{issue}</small>)}</span>
-                  <b>{employeeActionOnly ? 'Ver instrucciones →' : 'Revisar perfil →'}</b>
+                  <b>{employeeActionRequired ? 'Ver pasos →' : 'Revisar perfil →'}</b>
                 </button>,
                 showActionHelp && (
                   <div key={`${blocker.employeeId}-help`} className="ti-operations__device-help" role="note">
@@ -274,9 +271,16 @@ export function Operations(props: OperationsProps) {
                     {blocker.issues.includes('PIN heredado: iniciar sesión') && (
                       <span>Debe cerrar sesión y entrar una vez con su PIN habitual. La app actualizará la protección del PIN automáticamente, sin cambiarlo.</span>
                     )}
-                    <button type="button" className="ti-operations__secondary-action" onClick={() => copyEmployeeInstructions(blocker)}>
-                      {copiedHelpId === blocker.employeeId ? 'Instrucciones copiadas' : 'Copiar instrucciones'}
-                    </button>
+                    <div className="ti-operations__device-actions">
+                      {profileFixable && (
+                        <button type="button" className="ti-operations__secondary-action" onClick={() => props.onReviewEmployee(blocker.employeeId)}>
+                          Revisar perfil
+                        </button>
+                      )}
+                      <button type="button" className="ti-operations__secondary-action" onClick={() => copyEmployeeInstructions(blocker)}>
+                        {copiedHelpId === blocker.employeeId ? 'Instrucciones copiadas' : 'Copiar instrucciones'}
+                      </button>
+                    </div>
                   </div>
                 ),
               ]

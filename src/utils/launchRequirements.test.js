@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaunchBlockerInstructions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
   const db = { firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } } }
@@ -73,5 +73,14 @@ describe('requisitos obligatorios de lanzamiento', () => {
     expect(text).toContain('actualizará su protección automáticamente')
     expect(text).toContain('no envíes tu contraseña ni tu PIN')
     expect(text).not.toContain('pbkdf2')
+  })
+
+  it('conserva acciones de perfil y del empleado en bloqueos mixtos', () => {
+    expect(getLaunchBlockerActions(['Falta email', 'Falta activar notificaciones'])).toEqual({
+      profileFixable:true,
+      employeeActionRequired:true,
+    })
+    expect(getLaunchBlockerActions(['Falta PIN'])).toEqual({ profileFixable:true, employeeActionRequired:false })
+    expect(getLaunchBlockerActions(['Falta firma'])).toEqual({ profileFixable:false, employeeActionRequired:true })
   })
 })
