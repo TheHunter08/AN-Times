@@ -9,12 +9,16 @@ export function isRecordPendingValidation(record) {
   return recordValidationState(record) === 'pending'
 }
 
+export function pendingValidationRecords(records) {
+  return (records || []).filter(record => !record?.deleted && isRecordPendingValidation(record))
+}
+
 export function selectValidationRecords(records, now = Date.now(), reviewedDays = 14, reviewedLimit = 60) {
   const completed = (records || [])
     .filter(record => record?.fin && record?.inicio && Number.isFinite(new Date(record.inicio).getTime()))
     .sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)))
 
-  const pending = completed.filter(isRecordPendingValidation)
+  const pending = completed.filter(record => !record?.deleted && isRecordPendingValidation(record))
   const reviewed = completed
     .filter(record => !isRecordPendingValidation(record))
     .filter(record => {

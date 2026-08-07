@@ -4,6 +4,7 @@ import { getPushCoverage, uploadPendingIfAny } from '../../services/dataService.
 import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
 import { getLaunchBlockers } from '../../utils/launchRequirements.js'
 import { buildComplianceSummary } from '../../utils/complianceSummary.js'
+import { pendingValidationRecords } from '../../utils/recordValidation.js'
 import { Operations } from './Operations.js'
 
 export default function OperationsContainer({ onNavigate, onReviewEmployee }: { onNavigate: (page: string) => void; onReviewEmployee: (employeeId: string) => void }) {
@@ -37,7 +38,7 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
   const duplicatedEmails = [...emailCounts.values()].filter(count => count > 1).length
   const duplicatedAuthIds = [...authCounts.values()].filter(count => count > 1).length
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
-  const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
+  const pendingValidation = pendingValidationRecords(db.records).length
   const compliance = buildComplianceSummary(db)
   const [pushReady, setPushReady] = useState<number | null>(null)
   const [pushMissingIds, setPushMissingIds] = useState<string[]>([])

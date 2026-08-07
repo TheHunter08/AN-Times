@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from './recordValidation.js'
+import { isRecordPendingValidation, pendingValidationRecords, recordValidationState, selectValidationRecords } from './recordValidation.js'
 
 describe('estado de validación de jornadas', () => {
   it('unifica los campos legacy aceptada y validado', () => {
@@ -14,6 +14,11 @@ describe('estado de validación de jornadas', () => {
     expect(isRecordPendingValidation({ fin:'2026-07-20' })).toBe(true)
     expect(isRecordPendingValidation({ fin:'2026-07-20', validado:true })).toBe(false)
     expect(isRecordPendingValidation({ fin:null })).toBe(false)
+    expect(pendingValidationRecords([
+      { id:'pending', fin:'2026-07-20' },
+      { id:'deleted', fin:'2026-07-20', deleted:true },
+      { id:'approved', fin:'2026-07-20', validado:true },
+    ]).map(record => record.id)).toEqual(['pending'])
   })
 
   it('mantiene visibles todos los pendientes antiguos y limita solo el historial resuelto', () => {
