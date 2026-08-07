@@ -10,6 +10,7 @@
 //   4. Documentos pendientes de firma (≥9h)
 //   5. Cierre mensual pendiente (≥9h)
 //   6. Jornadas pendientes de validación administrativa (≥9h)
+//   7. Resumen administrativo de firmas de cierre pendientes (≥9h)
 //
 // Las claves de dedup se marcan en db.notisSent (Supabase) para evitar
 // duplicados entre el cron y el cliente (cuando la app está en background).
@@ -20,6 +21,7 @@ import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBo
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 import { pendingValidationRecords } from '../src/utils/recordValidation.js'
+import { closureSignatureBacklog } from '../src/utils/closureSignatures.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -347,7 +349,29 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── 7. Alerta a admin/JO: jornada abierta > umbral configurable ───────────
+    // ── 7. Firmas de cierre pendientes para administración (≥9h, diario) ────
+    // El empleado ya recibe su aviso individual más arriba. Este resumen permite
+    // que administración firme lo que le corresponde y haga seguimiento de lo
+    // que todavía depende del trabajador, sin completar firmas automáticamente.
+    if (nowH >= 9) {
+      const backlog = closureSignatureBacklog(cierres, now)
+      if (backlog.pending.length > 0) {
+        const recipients = (db.employees || []).filter(e => !e.baja && (e.isAdmin || e.role === 'jefe_obra'))
+        for (const admin of recipients) {
+          const key = `an_pending_closure_signatures_${admin.id}`
+          if (notisSent[key] !== today) {
+            const adminCount = backlog.admin.length
+            const employeeCount = backlog.employee.length
+            schedule(admin, subMap.get(admin.id), key, today,
+              '📋 Cierres pendientes de firma',
+              `${backlog.pending.length} cierre${backlog.pending.length > 1 ? 's' : ''} sin completar: ${adminCount} requiere${adminCount === 1 ? '' : 'n'} firma administrativa · ${employeeCount} espera${employeeCount === 1 ? '' : 'n'} al trabajador.`,
+              'cierre', '/?go=admin:cierre')
+          }
+        }
+      }
+    }
+
+    // ── 8. Alerta a admin/JO: jornada abierta > umbral configurable ───────────
     {
       const ALERT_MIN = Math.round((db.config?.reminders?.alertHoras ?? 10) * 60)
       const allEmps = db.employees || []
@@ -378,7 +402,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── 8. Alertas de convenio colectivo (a admins / jefes de obra) ───────────
+    // ── 9. Alertas de convenio colectivo (a admins / jefes de obra) ───────────
     // ET art. 34.3: máximo 9h ordinarias/día, 12h de descanso entre jornadas.
     // Se notifica al admin una vez por infracción (clave por empId + fecha/jornada).
     {
@@ -441,7 +465,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── 9. Aniversarios de contratación (a las 09:00, al admin) ─────────────
+    // ── 10. Aniversarios de contratación (a las 09:00, al admin) ────────────
     // Usa el campo startDate (fecha de alta) de cada empleado. Si el MM-DD
     // de hoy coincide con el MM-DD del startDate y han pasado ≥ 1 año,
     // se envía una notificación a los administradores.
