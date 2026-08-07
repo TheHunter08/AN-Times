@@ -86,3 +86,26 @@ export function buildLaunchBlockerInstructions(blocker) {
     'Por seguridad, no envíes tu contraseña ni tu PIN a nadie.',
   ].join('\n')
 }
+
+export function buildLaunchPlanSummary(blockers = []) {
+  const validBlockers = blockers.filter(blocker => blocker?.employeeName && blocker?.issues?.length)
+  const issueCounts = new Map()
+  validBlockers.forEach(blocker => blocker.issues.forEach(issue => {
+    issueCounts.set(issue, (issueCounts.get(issue) || 0) + 1)
+  }))
+
+  return [
+    'Plan de preparación de Times INC',
+    `Personas pendientes: ${validBlockers.length}`,
+    '',
+    'Resumen de incidencias:',
+    ...[...issueCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))
+      .map(([issue, count]) => `- ${issue}: ${count}`),
+    '',
+    'Detalle por persona:',
+    ...validBlockers.map(blocker => `- ${blocker.employeeName}: ${blocker.issues.join('; ')}`),
+    '',
+    'Las credenciales son personales: no recopilar ni compartir contraseñas o PIN.',
+  ].join('\n')
+}

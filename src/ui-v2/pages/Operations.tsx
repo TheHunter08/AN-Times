@@ -8,7 +8,7 @@ import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Ic
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
 import { evaluateRlsTransition, evaluateSafeMigration } from '../../config/securityReadiness.js'
 import { automationHealthList } from '../../server/automationHealth.js'
-import { buildLaunchBlockerInstructions, getLaunchBlockerActions } from '../../utils/launchRequirements.js'
+import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions } from '../../utils/launchRequirements.js'
 
 export interface ReportSchedule {
   id: string
@@ -79,6 +79,7 @@ export function Operations(props: OperationsProps) {
   const [syncing, setSyncing] = useState(false)
   const [actionHelpId, setActionHelpId] = useState<string | null>(null)
   const [copiedHelpId, setCopiedHelpId] = useState<string | null>(null)
+  const [planCopied, setPlanCopied] = useState(false)
   const [name, setName] = useState('Informe mensual de jornada')
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly')
   const [format, setFormat] = useState<'pdf' | 'excel'>('pdf')
@@ -132,8 +133,7 @@ export function Operations(props: OperationsProps) {
     props.onChangeWidgets(current)
   }
 
-  const copyEmployeeInstructions = async (blocker: LaunchBlocker) => {
-    const text = buildLaunchBlockerInstructions(blocker)
+  const copyText = async (text: string) => {
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text)
       else {
@@ -146,11 +146,23 @@ export function Operations(props: OperationsProps) {
         document.execCommand('copy')
         field.remove()
       }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const copyEmployeeInstructions = async (blocker: LaunchBlocker) => {
+    if (await copyText(buildLaunchBlockerInstructions(blocker))) {
       setCopiedHelpId(blocker.employeeId)
       window.setTimeout(() => setCopiedHelpId(current => current === blocker.employeeId ? null : current), 2500)
-    } catch {
-      setCopiedHelpId(null)
-    }
+    } else setCopiedHelpId(null)
+  }
+
+  const copyLaunchPlan = async () => {
+    if (!(await copyText(buildLaunchPlanSummary(props.launchBlockers)))) return
+    setPlanCopied(true)
+    window.setTimeout(() => setPlanCopied(false), 2500)
   }
 
   return (
@@ -214,15 +226,22 @@ export function Operations(props: OperationsProps) {
       <Card>
         <div className="ti-operations__section-title">
           <div><strong>Plan de lanzamiento por empleado</strong><span>Personas que todavía requieren una acción real</span></div>
-          <span className="ti-operations__pill">
-            {props.pushCoverageState === 'loading'
-              ? 'Comprobando dispositivos'
-              : props.pushCoverageState === 'error'
-                ? 'Cobertura sin comprobar'
-                : props.launchBlockers.length
-                  ? `${props.launchBlockers.length} por completar`
-                  : 'Completo'}
-          </span>
+          <div className="ti-operations__section-actions">
+            {props.launchBlockers.length > 0 && (
+              <button type="button" className="ti-operations__secondary-action" onClick={copyLaunchPlan}>
+                {planCopied ? 'Plan copiado' : 'Copiar plan completo'}
+              </button>
+            )}
+            <span className="ti-operations__pill">
+              {props.pushCoverageState === 'loading'
+                ? 'Comprobando dispositivos'
+                : props.pushCoverageState === 'error'
+                  ? 'Cobertura sin comprobar'
+                  : props.launchBlockers.length
+                    ? `${props.launchBlockers.length} por completar`
+                    : 'Completo'}
+            </span>
+          </div>
         </div>
         {props.pushCoverageState !== 'ready' && (
           <ProductState

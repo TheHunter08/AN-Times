@@ -195,8 +195,9 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
 .ti-operations__health-card:hover,.ti-operations__health-card:focus-visible { transform:translateY(-2px); border-color:rgba(124,58,237,.42) !important; box-shadow:0 14px 30px rgba(0,0,0,.16); outline:none; }
 .ti-operations__health-card small { margin-top:10px; color:var(--premium-brand-soft); font-size:10.5px; font-weight:700; }
 .ti-operations__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.ti-operations__section-title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; color:var(--uiv2-text-700); }
+.ti-operations__section-title { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:18px; color:var(--uiv2-text-700); }
 .ti-operations__section-title > div { display:flex; flex-direction:column; gap:3px; }
+.ti-operations__section-title > .ti-operations__section-actions { flex-direction:row; align-items:center; flex-wrap:wrap; gap:8px; }
 .ti-operations__section-title strong { color:var(--uiv2-text-900); font-size:14px; }
 .ti-operations__section-title span { color:var(--uiv2-text-500); font-size:11px; }
 .ti-operations__section-title button,.ti-operations__form button { min-height:44px; padding:0 13px; border:0; border-radius:10px; background:var(--gradient-brand); color:#fff; font-weight:700; cursor:pointer; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaunchBlockerInstructions, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
   const db = { firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } } }
@@ -82,5 +82,18 @@ describe('requisitos obligatorios de lanzamiento', () => {
     })
     expect(getLaunchBlockerActions(['Falta PIN'])).toEqual({ profileFixable:true, employeeActionRequired:false })
     expect(getLaunchBlockerActions(['Falta firma'])).toEqual({ profileFixable:false, employeeActionRequired:true })
+  })
+
+  it('genera un plan consolidado ordenado y sin credenciales', () => {
+    const summary = buildLaunchPlanSummary([
+      { employeeName:'Luis', issues:['Falta crear acceso', 'Falta email'] },
+      { employeeName:'Ana', issues:['Falta crear acceso'] },
+    ])
+
+    expect(summary).toContain('Personas pendientes: 2')
+    expect(summary).toContain('- Falta crear acceso: 2')
+    expect(summary).toContain('- Falta email: 1')
+    expect(summary).toContain('- Luis: Falta crear acceso; Falta email')
+    expect(summary).toContain('no recopilar ni compartir contraseñas o PIN')
   })
 })
