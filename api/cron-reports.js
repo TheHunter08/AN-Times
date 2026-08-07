@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import writeXlsxFile from 'write-excel-file/node'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 import { buildScheduledReportRows, isScheduleDue, parseReportRecipients, reportPeriod } from '../src/server/scheduledReports.js'
+import { isMissingStorageBucketResponse } from '../src/server/storageBuckets.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -17,7 +18,10 @@ const storageHeaders = SB_SERVICE ? { apikey:SB_SERVICE, Authorization:`Bearer $
 async function ensureReportBucket() {
   const existing = await fetch(`${SB_URL}/storage/v1/bucket/scheduled-reports`, { headers:storageHeaders })
   if (existing.ok) return
-  if (existing.status !== 404) throw new Error(`storage bucket check ${existing.status}`)
+  const existingBody = await existing.text()
+  if (!isMissingStorageBucketResponse(existing.status, existingBody)) {
+    throw new Error(`storage bucket check ${existing.status}: ${existingBody.slice(0, 140)}`)
+  }
   const created = await fetch(`${SB_URL}/storage/v1/bucket`, {
     method:'POST',
     headers:{ ...storageHeaders, 'Content-Type':'application/json' },
@@ -165,11 +169,14 @@ export default async function handler(req, res) {
   const startedAt = Date.now()
   const now = new Date()
   try {
-    await ensureReportBucket()
     const source = await readDB()
     if (!source?.data) throw new Error('app_data no disponible')
     const schedules = source.data.config?.reportSchedules || []
     const due = schedules.filter(schedule => isScheduleDue(schedule, now))
+    // No tocar Storage cuando no hay trabajo. Además de ahorrar una llamada,
+    // permite registrar una comprobación saludable aunque todavía no exista el
+    // bucket porque la empresa no ha configurado ningún informe.
+    if (due.length) await ensureReportBucket()
     const runs = []
     for (const schedule of due) {
       const period = reportPeriod(schedule.frequency, now)
