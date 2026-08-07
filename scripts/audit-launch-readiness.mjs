@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createHmac } from 'node:crypto'
 import { isValidAccountEmail, normalizeAccountEmail } from '../src/utils/authRegistration.js'
 import { evaluateRlsTransition, RLS_RUNTIME_CAPABILITIES } from '../src/config/securityReadiness.js'
+import { summarizeAutomationHealth } from '../src/server/automationHealth.js'
 import { isPinHashed, needsRehash } from '../src/utils/pinSecurity.js'
 
 function loadEnvFile(path) {
@@ -168,6 +169,7 @@ const checks = {
   pendingEndedClosures: pendingEndedClosures.length,
   normalizedWeeklyClosures: normalizedWeeklyClosures.length,
   weeklyClosureDrift: weeklyClosureDrift.length,
+  automationHealth:summarizeAutomationHealth(blob.config?.automationHealth),
 }
 const auditedCapabilities = {
   ...RLS_RUNTIME_CAPABILITIES,
@@ -192,5 +194,5 @@ const blockers = checks.missingDeviceSubscriptions + checks.missingSignatures + 
   checks.workerDataWithPlaintextPin + checks.workerDataWithLegacyHash +
   checks.blobWorkersWithLegacyPin + checks.blobWorkersMissingPin + checks.openRecordsMissingUpd +
   checks.pendingVacationsMissingUpd + checks.pendingExpensesMissingUpd + checks.rlsRuntimeBlockers.length +
-  checks.weeklyClosureDrift + (checks.orphanedAuthLinks || 0)
+  checks.weeklyClosureDrift + checks.automationHealth.unhealthy + (checks.orphanedAuthLinks || 0)
 if (process.argv.includes('--strict') && blockers) process.exitCode = 1

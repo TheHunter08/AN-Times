@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { automationHealthList, createAutomationRun, evaluateAutomationRun, mergeAutomationHealth } from './automationHealth.js'
+import { automationHealthList, createAutomationRun, evaluateAutomationRun, mergeAutomationHealth, summarizeAutomationHealth } from './automationHealth.js'
 
 describe('automationHealth', () => {
   it('crea una traza estable y la mezcla sin perder configuración', () => {
@@ -16,5 +16,19 @@ describe('automationHealth', () => {
     expect(evaluateAutomationRun({ job:'reminders', status:'error', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('error')
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T08:00:00Z' }, { now }).state).toBe('stale')
     expect(automationHealthList({})).toHaveLength(7)
+  })
+
+  it('resume procesos sanos, fallidos y pendientes para la auditorÃ­a operativa', () => {
+    const now = Date.parse('2026-08-07T01:30:00Z')
+    const summary = summarizeAutomationHealth({
+      reminders:createAutomationRun('reminders', { startedAt:now - 1000, finishedAt:now }),
+      autoclose:createAutomationRun('autoclose', { status:'error', startedAt:now - 1000, finishedAt:now, error:'write failed' }),
+    }, { now })
+
+    expect(summary.healthy).toBe(1)
+    expect(summary.unhealthy).toBe(6)
+    expect(summary.jobs.find(job => job.job === 'reminders')).toMatchObject({ state:'healthy', status:'ok' })
+    expect(summary.jobs.find(job => job.job === 'autoclose')).toMatchObject({ state:'error', error:'write failed' })
+    expect(summary.jobs.find(job => job.job === 'backup')).toMatchObject({ state:'unknown', finishedAt:null })
   })
 })

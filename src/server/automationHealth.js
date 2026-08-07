@@ -64,3 +64,18 @@ export function automationHealthList(health, options) {
     return { job, run, ...evaluateAutomationRun(run, options) }
   })
 }
+
+export function summarizeAutomationHealth(health, options) {
+  const jobs = automationHealthList(health, options).map(item => ({
+    job:item.job,
+    state:item.state,
+    status:item.run?.status || null,
+    finishedAt:item.run?.finishedAt || null,
+    error:item.run?.error || null,
+  }))
+  return {
+    healthy:jobs.filter(job => job.state === 'healthy').length,
+    unhealthy:jobs.filter(job => job.state !== 'healthy').length,
+    jobs,
+  }
+}
