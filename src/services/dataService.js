@@ -637,6 +637,24 @@ export function mergeSyncHints(previous, incoming) {
     : null
 }
 
+// Combina dos versiones de la cola conservando siempre la foto local más
+// reciente, pero sin perder tombstones ni el alcance de sincronización de una
+// operación anterior. Es importante cuando IndexedDB ya contiene un guardado
+// fallido y el usuario realiza otro cambio antes de que uploadPendingIfAny()
+// consiga vaciarlo.
+export function mergePendingSyncEntries(previous, incoming, now = Date.now()) {
+  const previousRevision = Number(previous?.revision) || 0
+  const incomingRevision = Number(incoming?.revision) || 0
+  const revision = Math.max(now, previousRevision + 1, incomingRevision)
+  const previousHint = previous && !('syncHint' in previous) ? { full: true } : previous?.syncHint
+  return {
+    payload: incoming?.payload ?? previous?.payload,
+    deleted: mergePendingDeletes(previous?.deleted, incoming?.deleted),
+    syncHint: mergeSyncHints(previousHint, incoming?.syncHint),
+    revision,
+  }
+}
+
 function _fallbackPendingGet() {
   try { return JSON.parse(localStorage.getItem(_PENDING_FALLBACK_KEY) || 'null') } catch { return null }
 }
@@ -652,12 +670,17 @@ async function _readPending() {
 async function _writePending(value) {
   try {
     await _idbSet('pending', value)
-    try { localStorage.removeItem(_PENDING_FALLBACK_KEY) } catch {}
   } catch {
     // Safari privado y algunos WebViews pueden bloquear IndexedDB aunque
     // localStorage sí funcione. Mantener una segunda copia evita perder la cola.
     try { localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(value)) } catch {}
+    return
   }
+  // Mantener también el espejo síncrono mientras la operación siga pendiente.
+  // Si se borrase aquí, un guardado nuevo podría arrancar antes de leer IDB y
+  // reemplazar la cola perdiendo tombstones anteriores. _clearBgSync elimina
+  // ambas copias juntas solo después de confirmar blob y tablas.
+  try { localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(value)) } catch {}
 }
 
 async function _storeForBgSync(data, deleted, syncHint) {
@@ -667,14 +690,11 @@ async function _storeForBgSync(data, deleted, syncHint) {
     // aplicar la eliminación real en vez de que la unión con el servidor la resucite.
     await (_pendingWriteFlight = _pendingWriteFlight.catch(() => {}).then(async () => {
       const previous = await _readPending()
-      const previousRevision = Number(previous?.revision) || 0
-      const revision = Math.max(Date.now(), previousRevision + 1)
-      await _writePending({
+      await _writePending(mergePendingSyncEntries(previous, {
         payload: data,
-        deleted: mergePendingDeletes(previous?.deleted, deleted),
-        syncHint: mergeSyncHints(previous && !('syncHint' in previous) ? { full: true } : previous?.syncHint, syncHint),
-        revision,
-      })
+        deleted,
+        syncHint,
+      }))
     }))
     // Badge rojo en el icono de la app: avisa al usuario de que hay datos pendientes.
     // Se borra en _bgSyncFallback y en _bgSync del SW cuando la subida tiene éxito.
@@ -866,11 +886,10 @@ function _drainQueue() {
 
 function _markPendingFallback(payload, deleted, syncHint) {
   const previous = _fallbackPendingGet()
-  const revision = Math.max(Date.now(), (Number(previous?.revision) || 0) + 1)
-  const effectiveDeleted = mergePendingDeletes(previous?.deleted, deleted)
-  const effectiveSyncHint = mergeSyncHints(previous && !('syncHint' in previous) ? { full: true } : previous?.syncHint, syncHint)
+  const pending = mergePendingSyncEntries(previous, { payload, deleted, syncHint })
+  const { revision, deleted: effectiveDeleted, syncHint: effectiveSyncHint } = pending
   try {
-    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify({ payload, deleted: effectiveDeleted, syncHint: effectiveSyncHint, revision }))
+    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(pending))
   } catch {}
   return { revision, effectiveDeleted, effectiveSyncHint }
 }

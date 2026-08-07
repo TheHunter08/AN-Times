@@ -26,7 +26,18 @@ export default defineConfig({
         // Linux distingue mayúsculas: `localai-*` es el vendor pesado y
         // `localAI-*` el adaptador. Declarar ambos evita que Vercel precargue
         // cualquiera de ellos aunque Windows trate los patrones sin distinción.
-        globIgnores: ['**/localai-*.js', '**/localAI-*.js', '**/localAI.worker-*.js'],
+        // Los motores PDF y su worker también son funcionalidades bajo demanda.
+        // Excluirlos reduce drásticamente la instalación inicial; el SW los
+        // conserva en runtime después del primer uso para seguir disponibles
+        // sin conexión en visitas posteriores.
+        globIgnores: [
+          '**/localai-*.js',
+          '**/localAI-*.js',
+          '**/localAI.worker-*.js',
+          '**/pdf-*.js',
+          '**/pdfSignatureAnchor-*.js',
+          '**/pdf.worker.min-*.mjs',
+        ],
       },
       manifest: {
         id: '/',

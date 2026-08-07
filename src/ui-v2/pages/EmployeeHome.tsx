@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -143,6 +144,7 @@ export function EmployeeHome({
   const frameRef = useRef<number | null>(null)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintId = useId()
+  const tapConfirmRef = useDialogA11y(showTapConfirm, () => setShowTapConfirm(false))
 
   const safeProgress = Number.isFinite(progressPct)
     ? Math.max(0, Math.min(100, progressPct))
@@ -407,10 +409,10 @@ export function EmployeeHome({
             Confirmar con un toque
           </button>
           {showTapConfirm && (
-            <div className="employee-home-v7__tap-confirm" role="dialog" aria-modal="true" aria-labelledby={`${hintId}-confirm-title`}>
+            <div ref={tapConfirmRef} className="employee-home-v7__tap-confirm" role="dialog" aria-modal="true" aria-labelledby={`${hintId}-confirm-title`} aria-describedby={`${hintId}-confirm-description`} tabIndex={-1}>
               <div>
                 <strong id={`${hintId}-confirm-title`}>{cfg.action}</strong>
-                <span>Confirma la acción para evitar un fichaje accidental.</span>
+                <span id={`${hintId}-confirm-description`}>Confirma la acción para evitar un fichaje accidental.</span>
               </div>
               <div>
                 <button type="button" onClick={() => setShowTapConfirm(false)}>Cancelar</button>

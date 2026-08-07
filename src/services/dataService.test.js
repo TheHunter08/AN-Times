@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
+import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -126,6 +126,41 @@ describe('cola offline', () => {
       { changedKeys: ['vacaciones', 'records'], recordIds: ['r2'], entityIds:{ records:['r2'], vacaciones:['v1'] } },
     )).toEqual({ changedKeys: ['records', 'vacaciones'], recordIds: ['r1', 'r2'], entityIds:{ records:['r1','r2'], vacaciones:['v1'] } })
     expect(mergeSyncHints({ full: true }, { changedKeys: ['records'], recordIds: ['r3'] })).toEqual({ full: true })
+  })
+
+  it('un guardado nuevo conserva los tombstones y alcance de una cola anterior', () => {
+    const merged = mergePendingSyncEntries({
+      payload:{ records:[] },
+      deleted:{ records:['r-old'] },
+      syncHint:{ changedKeys:['records'], recordIds:['r-old'] },
+      revision:10,
+    }, {
+      payload:{ records:[], vacaciones:[{ id:'v-new' }] },
+      deleted:{ vacaciones:['v-old'] },
+      syncHint:{ changedKeys:['vacaciones'], entityIds:{ vacaciones:['v-new'] } },
+    }, 20)
+
+    expect(merged).toEqual({
+      payload:{ records:[], vacaciones:[{ id:'v-new' }] },
+      deleted:{ records:['r-old'], vacaciones:['v-old'] },
+      syncHint:{
+        changedKeys:['records','vacaciones'],
+        recordIds:['r-old'],
+        entityIds:{ vacaciones:['v-new'] },
+      },
+      revision:20,
+    })
+  })
+
+  it('una cola legacy obliga a sincronización completa al recibir otro cambio', () => {
+    expect(mergePendingSyncEntries({ payload:{ records:[] }, revision:4 }, {
+      payload:{ records:[{ id:'r1' }] },
+      syncHint:{ changedKeys:['records'], recordIds:['r1'] },
+    }, 5)).toMatchObject({
+      payload:{ records:[{ id:'r1' }] },
+      syncHint:{ full:true },
+      revision:5,
+    })
   })
 
   it('construye un delta mínimo del blob y conserva eliminaciones', () => {

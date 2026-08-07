@@ -1,6 +1,9 @@
 const DEFAULT_MAX_AGE_MS = Object.freeze({
-  reminders: 90 * 60 * 1000,
-  autoclose: 90 * 60 * 1000,
+  // Recordatorios: la mayor separación real es de 12 h (20:05 → 08:05 UTC).
+  // Autocierre: se ejecuta una vez al día. El margen adicional evita alertas
+  // falsas por colas del proveedor sin ocultar una ejecución diaria perdida.
+  reminders: 14 * 60 * 60 * 1000,
+  autoclose: 26 * 60 * 60 * 1000,
   reports: 26 * 60 * 60 * 1000,
   migration: 26 * 60 * 60 * 1000,
   sync: 26 * 60 * 60 * 1000,

@@ -21,13 +21,27 @@ if (totalGzip > INITIAL_BUDGET) {
 
 const assetNames = await readdir(new URL('assets/', DIST))
 const precacheSource = await readFile(new URL('sw.js', DIST), 'utf8')
+const onDemandAssetPattern = /^(?:localai-|localAI\.worker-|pdf-|pdfSignatureAnchor-|pdf\.worker\.min-)/i
 const forbiddenPrecache = assetNames.filter(name =>
-  /^(localai-|localAI\.worker-)/i.test(name) && precacheSource.includes(name)
+  onDemandAssetPattern.test(name) && precacheSource.includes(name)
 )
 if (forbiddenPrecache.length) {
-  throw new Error(`La IA local pesada entró en el precache: ${forbiddenPrecache.join(', ')}`)
+  throw new Error(`Un activo pesado bajo demanda entró en el precache: ${forbiddenPrecache.join(', ')}`)
+}
+
+const precachedAssets = assetNames.filter(name => precacheSource.includes(name))
+const precacheRawBytes = (await Promise.all(
+  precachedAssets.map(async name => (await readFile(new URL(`assets/${name}`, DIST))).length)
+)).reduce((sum, size) => sum + size, 0)
+// Presupuesto del conjunto offline completo (no solo del shell inicial). El
+// valor deja un margen pequeño sobre los ~1,84 MiB actuales y evita que una
+// dependencia pesada vuelva a colarse silenciosamente en cada instalación.
+const PRECACHE_RAW_BUDGET = 1900 * 1024
+if (precacheRawBytes > PRECACHE_RAW_BUDGET) {
+  throw new Error(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB; presupuesto: 1900 KiB`)
 }
 
 console.log(`App shell inicial: ${(totalGzip / 1024).toFixed(1)} KiB gzip / 230 KiB`)
 console.log(`Activos iniciales: ${rows.map(row => row.file).join(', ')}`)
-console.log(`IA local excluida del precache: correcto`)
+console.log(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB / 1900 KiB`)
+console.log(`IA local y motores PDF excluidos del precache: correcto`)

@@ -16,7 +16,16 @@ describe('deployment quality gate', () => {
     expect(vercel.installCommand).toBe('npm ci --include=dev')
     expect(vercel.buildCommand).toBe('npm run verify:deploy')
     expect(pkg.scripts['verify:deploy']).toBe('npm run typecheck && npm run verify:release')
-    expect(viteConfig).toContain("'**/localai-*.js', '**/localAI-*.js', '**/localAI.worker-*.js'")
+    for (const ignoredAsset of [
+      '**/localai-*.js',
+      '**/localAI-*.js',
+      '**/localAI.worker-*.js',
+      '**/pdf-*.js',
+      '**/pdfSignatureAnchor-*.js',
+      '**/pdf.worker.min-*.mjs',
+    ]) {
+      expect(viteConfig).toContain(`'${ignoredAsset}'`)
+    }
     expect(vercelIgnore).not.toContain('api/*.test.js')
     expect(vitestConfig).not.toContain('api/**/*.test.js')
     expect(apiTests).toEqual([])

@@ -10,11 +10,12 @@ import { HistorialReciente } from '../../components/employee/HistorialReciente.j
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { WeeklyBalanceBreakdown } from '../components/WeeklyBalanceBreakdown.js'
+import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 
 
 function PdfBtn({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
   return (
-    <button type="button" onClick={onClick} disabled={loading} style={{
+    <button type="button" onClick={onClick} disabled={loading} aria-busy={loading} style={{
       flex: 1, minHeight: 44, padding: '10px', borderRadius: radius.md,
       border: `1px solid ${colors.border.default}`, background: colors.bg[500],
       color: colors.text[700], fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
@@ -47,6 +48,7 @@ export interface EmployeeJornadaProps {
 }
 
 export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: EmployeeJornadaProps) {
+  const pdfDialogRef = useDialogA11y(Boolean(pdf.informeUrl), pdf.closeInforme)
   const { o, totMin, brkMin, monthMin, weekMin, extraMin, normMin, wdEfectivo, tlItems, histWithRecs, pendingValidation } = stats
   const now = new Date()
   const weeklyBalance = monthlyExtras(db.records || [], u.id, today().slice(0, 7), workBalanceOptions(db, u, { now }))
@@ -342,7 +344,7 @@ export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: Employe
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
         const dlName = `jornada-${today().slice(0, 7)}.pdf`
         return (
-          <div role="dialog" aria-modal="true" aria-label="Vista previa del registro de jornada" style={{ position: 'fixed', inset: 0, zIndex: 300, minHeight: '100dvh', background: colors.bg[800], display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div ref={pdfDialogRef} role="dialog" aria-modal="true" aria-label="Vista previa del registro de jornada" tabIndex={-1} style={{ position: 'fixed', inset: 0, zIndex: 300, minHeight: '100dvh', background: colors.bg[800], display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
               background: colors.bg[700], borderBottom: `1px solid ${colors.border.subtle}`, flexShrink: 0,

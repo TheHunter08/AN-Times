@@ -14,8 +14,15 @@ describe('automationHealth', () => {
     const now = Date.parse('2026-08-06T12:00:00Z')
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('healthy')
     expect(evaluateAutomationRun({ job:'reminders', status:'error', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('error')
-    expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T08:00:00Z' }, { now }).state).toBe('stale')
+    expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-05T20:00:00Z' }, { now }).state).toBe('stale')
     expect(automationHealthList({})).toHaveLength(7)
+  })
+
+  it('respeta la ventana nocturna y la frecuencia diaria de los cron reales', () => {
+    const now = Date.parse('2026-08-07T07:55:00Z')
+    expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T20:05:00Z' }, { now }).state).toBe('healthy')
+    expect(evaluateAutomationRun({ job:'autoclose', status:'ok', finishedAt:'2026-08-06T22:10:00Z' }, { now }).state).toBe('healthy')
+    expect(evaluateAutomationRun({ job:'autoclose', status:'ok', finishedAt:'2026-08-05T22:10:00Z' }, { now }).state).toBe('stale')
   })
 
   it('resume procesos sanos, fallidos y pendientes para la auditorÃ­a operativa', () => {

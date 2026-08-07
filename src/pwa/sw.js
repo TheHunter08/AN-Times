@@ -64,9 +64,11 @@ setCatchHandler(async ({ event }) => {
 })
 
 // ─── ASSETS ESTÁTICOS ─────────────────────────────────────────────────────────
-// StaleWhileRevalidate para JS/CSS: responde rápido desde cache y actualiza en background
+// StaleWhileRevalidate para JS/CSS/workers: responde rápido desde cache y
+// actualiza en background. Los workers PDF/IA no forman parte del precache,
+// pero quedan disponibles offline después de que el usuario los use una vez.
 registerRoute(
-  ({ request }) => request.destination === 'script' || request.destination === 'style',
+  ({ request }) => ['script', 'style', 'worker'].includes(request.destination),
   new StaleWhileRevalidate({
     cacheName: 'static-assets',
     plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 })]
