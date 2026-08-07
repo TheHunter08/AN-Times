@@ -51,4 +51,18 @@ describe('buildComplianceSummary', () => {
     expect(summary.score).toBe(100)
     expect(summary.risks[0].id).toBe('empty')
   })
+
+  it('solo marca cierres vencidos que todavía no tienen ambas firmas', () => {
+    const summary = buildComplianceSummary({
+      cierres: [
+        { id:'pending', mes:'2026-06', firmaAdmin:true, firmaEmp:false },
+        { id:'signed', mes:'2026-06', firmaAdmin:true, firmaEmp:true },
+        { id:'future', mes:'2026-08', firmaAdmin:false, firmaEmp:false },
+      ],
+    }, NOW)
+
+    expect(summary.closures).toBe(2)
+    expect(summary.signedClosures).toBe(1)
+    expect(summary.risks.find(risk => risk.id === 'closures')?.count).toBe(1)
+  })
 })

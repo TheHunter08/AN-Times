@@ -43,6 +43,8 @@ interface OperationsProps {
   pushTotal: number
   pushCoverageState: 'loading' | 'ready' | 'error'
   pendingValidation: number
+  staleOpenShifts: number
+  pendingClosures: number
   documentCount: number
   launchBlockers: LaunchBlocker[]
   schedules: ReportSchedule[]
@@ -174,6 +176,8 @@ export function Operations(props: OperationsProps) {
             detail: props.pushCoverageState === 'error' ? 'Reintentar comprobación' : 'Revisar cobertura',
           },
           { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, action: () => props.onNavigate('validar'), detail: 'Abrir validación' },
+          { label: 'Jornadas sin cerrar', value: props.staleOpenShifts ? `${props.staleOpenShifts} requieren revisión` : 'Ninguna incidencia', ok: props.staleOpenShifts === 0, icon: <IconClock />, action: () => props.onNavigate('anomalias'), detail: 'Revisar anomalías' },
+          { label: 'Cierres mensuales', value: props.pendingClosures ? `${props.pendingClosures} sin completar` : 'Todos completados', ok: props.pendingClosures === 0, icon: <IconFileText />, action: () => props.onNavigate('cierre'), detail: 'Abrir cierres' },
           { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, action: () => props.onNavigate('documentos'), detail: 'Abrir documentos' },
         ].map(item => (
           <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={item.action} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); item.action() } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>

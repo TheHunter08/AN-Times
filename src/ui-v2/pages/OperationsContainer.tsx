@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/appStore.js'
 import { getPushCoverage, uploadPendingIfAny } from '../../services/dataService.js'
 import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
 import { getLaunchBlockers } from '../../utils/launchRequirements.js'
+import { buildComplianceSummary } from '../../utils/complianceSummary.js'
 import { Operations } from './Operations.js'
 
 export default function OperationsContainer({ onNavigate, onReviewEmployee }: { onNavigate: (page: string) => void; onReviewEmployee: (employeeId: string) => void }) {
@@ -37,6 +38,7 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
   const duplicatedAuthIds = [...authCounts.values()].filter(count => count > 1).length
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
   const pendingValidation = (db.records || []).filter((record: any) => record.fin && !record.deleted && !record.aceptada && !record.validado && !record.rechazado).length
+  const compliance = buildComplianceSummary(db)
   const [pushReady, setPushReady] = useState<number | null>(null)
   const [pushMissingIds, setPushMissingIds] = useState<string[]>([])
   const [pushCoverageState, setPushCoverageState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -73,7 +75,9 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
     duplicatedEmails={duplicatedEmails} duplicatedAuthIds={duplicatedAuthIds}
     signatureReady={signatureReady} signatureTotal={workers.length}
     pushReady={pushReady} pushTotal={workers.length} pushCoverageState={pushCoverageState}
-    pendingValidation={pendingValidation} documentCount={(db.documentos || []).length}
+    pendingValidation={pendingValidation} staleOpenShifts={compliance.incompleteRecords}
+    pendingClosures={compliance.closures - compliance.signedClosures}
+    documentCount={(db.documentos || []).length}
     launchBlockers={getLaunchBlockers(db, pushMissingIds)} schedules={schedules}
     automationHealth={db.config?.automationHealth || {}} migrationVerification={db.config?.migrationVerification || {}}
     visibleWidgets={visibleWidgets} onSync={onSync}
