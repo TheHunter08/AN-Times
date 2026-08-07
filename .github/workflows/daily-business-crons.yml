@@ -1,0 +1,40 @@
+name: Respaldo de procesos diarios
+
+on:
+  schedule:
+    # Respaldo posterior a las ventanas principales de Vercel. Los endpoints
+    # son idempotentes y completan únicamente el trabajo todavía pendiente.
+    - cron: '45 8 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: times-inc-daily-business-crons
+  cancel-in-progress: false
+
+jobs:
+  verify-daily-processes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+    steps:
+      - name: Validar configuración
+        run: test -n "${CRON_SECRET}"
+
+      - name: Generar informes programados pendientes
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-reports"
+
+      - name: Confirmar cierre mensual automático
+        if: always()
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-monthly-close"

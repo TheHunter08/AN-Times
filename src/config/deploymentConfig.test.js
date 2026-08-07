@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 const pkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
 const vercel = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8'))
 const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.js'), 'utf8')
+const dailyBusinessWorkflow = readFileSync(resolve(process.cwd(), '.github/workflows/daily-business-crons.yml'), 'utf8')
+const backupWorkflow = readFileSync(resolve(process.cwd(), '.github/workflows/backup-supabase.yml'), 'utf8')
 const vercelIgnore = readFileSync(resolve(process.cwd(), '.vercelignore'), 'utf8')
 const vitestConfig = readFileSync(resolve(process.cwd(), 'vitest.config.js'), 'utf8')
 const githubWorkflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
@@ -50,5 +52,13 @@ describe('deployment quality gate', () => {
     expect(rewrites.get('/api/cron-reminders-midday')).toBe('/api/cron-reminders')
     expect(rewrites.get('/api/cron-reminders-evening')).toBe('/api/cron-reminders-and-autoclose')
     expect(rewrites.get('/api/cron-reminders-night')).toBe('/api/cron-reminders-and-autoclose')
+  })
+
+  it('keeps GitHub backstops for every daily business process', () => {
+    expect(dailyBusinessWorkflow).toContain('/api/cron-reports')
+    expect(dailyBusinessWorkflow).toContain('/api/cron-monthly-close')
+    expect(dailyBusinessWorkflow).toContain('Authorization: Bearer ${CRON_SECRET}')
+    expect(backupWorkflow).toContain('/api/backup')
+    expect(backupWorkflow).toContain('Verificar backup productivo y registrar salud')
   })
 })
