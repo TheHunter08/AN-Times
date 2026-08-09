@@ -26,6 +26,7 @@ import { canCloseMonth } from '../utils/adminHelpers.js'
 import { finalizeRecord } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
 import { createNotification } from '../utils/notifications.js'
+import { buildEmployeeDayGuide } from '../utils/employeeDayGuide.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -1118,6 +1119,17 @@ export default function EmployeePage() {
     const dateLabel = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
     const extraMin = Math.max(0, weekMin - WK)
     const overtimeLabel = extraMin > 0 ? `+${Math.floor(extraMin / 60)}h ${p2(extraMin % 60)}m extra esta semana` : undefined
+    const shiftStart = uh.turnoInicio || ''
+    const shiftEnd = uh.turnoFin || ''
+    const smartGuide = buildEmployeeDayGuide({
+      state:timer.state,
+      now,
+      remainingMin:remainMin,
+      progressPct:pct,
+      shiftStart,
+      shiftEnd,
+      syncStatus,
+    })
 
     return {
       time: `${p2(Math.floor(totSecs / 3600))}:${p2(Math.floor((totSecs % 3600) / 60))}`,
@@ -1133,7 +1145,10 @@ export default function EmployeePage() {
       weeklyTotal: `${Math.floor(weekMin / 60)}h ${p2(weekMin % 60)}m`,
       recent: recent.slice(-6).reverse(),
       greeting,
+      shiftStart:shiftStart || undefined,
+      shiftEnd:shiftEnd || undefined,
       overtimeLabel,
+      smartGuide,
       syncLabel: syncStatus === 'syncing'
         ? 'Guardando cambios…'
         : syncStatus === 'error'
@@ -1143,7 +1158,7 @@ export default function EmployeePage() {
             : 'Guardado en este dispositivo',
       syncTone: syncStatus === 'error' ? 'error' : syncStatus === 'syncing' ? 'pending' : 'ok',
     }
-  }, [db.records, timer.state, timer.ws, uh.id, uh.centroTrabajo, greeting, syncStatus, realtimeStatus])
+  }, [db.records, timer.state, timer.ws, uh.id, uh.centroTrabajo, uh.turnoInicio, uh.turnoFin, greeting, syncStatus, realtimeStatus])
 
   const jornadaStats = useJornadaData(db, uh, timer)
   const jornadaPdf = useJornadaPdfExport(db, uh, toast)

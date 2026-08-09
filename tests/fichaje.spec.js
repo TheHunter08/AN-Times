@@ -107,6 +107,9 @@ test.describe('Pantalla del empleado', () => {
   test('muestra el control de jornada', async ({ page }) => {
     await expect(page.getByRole('button', { name: /Iniciar jornada.*Mantén pulsado/i })).toBeVisible()
     await expect(page.getByText('Tiempo trabajado', { exact: true })).toBeVisible()
+    await expect(page.getByText('Copiloto del día', { exact:true })).toBeVisible()
+    await expect(page.getByText('Local · privado', { exact:true })).toBeVisible()
+    await expect(page.getByText('Todo listo para tu próxima jornada', { exact:true })).toBeVisible()
   })
 
   test('navega a Vacaciones', async ({ page }) => {

@@ -10,6 +10,7 @@ import {
   IconPause,
   IconPlay,
   IconStop,
+  IconTrendUp,
 } from '../components/Icons.js'
 
 export type ClockState = 'idle' | 'working' | 'break'
@@ -51,6 +52,14 @@ export interface EmployeeHomeProps {
   overtimeLabel?: string
   syncLabel?: string
   syncTone?: 'ok' | 'pending' | 'error'
+  smartGuide?: {
+    tone: 'green' | 'orange' | 'primary'
+    label: string
+    title: string
+    detail: string
+    metric: string
+    metricLabel: string
+  }
   extraAction?: ReactNode
 }
 
@@ -128,6 +137,7 @@ export function EmployeeHome({
   overtimeLabel,
   syncLabel,
   syncTone = 'ok',
+  smartGuide,
   extraAction,
 }: EmployeeHomeProps) {
   const cfg = stateConfig[state]
@@ -476,7 +486,28 @@ export function EmployeeHome({
           {extraAction && <div className="employee-home-v7__extra">{extraAction}</div>}
         </article>
 
-        <aside className="employee-home-v7__side">
+        <aside className="employee-home-v7__side" data-guide={smartGuide ? 'true' : undefined}>
+          {smartGuide && (
+            <section className="employee-home-v7__panel employee-home-v7__guide" data-tone={smartGuide.tone} aria-labelledby={`${hintId}-guide`}>
+              <div className="employee-home-v7__guide-head">
+                <span><IconTrendUp width={14} height={14} /> Copiloto del día</span>
+                <i aria-hidden="true">Local · privado</i>
+              </div>
+              <div className="employee-home-v7__guide-body">
+                <div>
+                  <span className="employee-home-v7__eyebrow">{smartGuide.label}</span>
+                  <h2 id={`${hintId}-guide`}>{smartGuide.title}</h2>
+                  <p>{smartGuide.detail}</p>
+                </div>
+                <div className="employee-home-v7__guide-metric">
+                  <strong>{smartGuide.metric}</strong>
+                  <span>{smartGuide.metricLabel}</span>
+                </div>
+              </div>
+              <div className="employee-home-v7__guide-line" aria-hidden="true"><span style={{ width: `${safeProgress}%` }} /></div>
+              <small className="employee-home-v7__guide-note">Estimación explicable basada solo en tu jornada y objetivo actuales.</small>
+            </section>
+          )}
           {week && week.length > 0 && (
             <section className="employee-home-v7__panel employee-home-v7__week" aria-labelledby={`${hintId}-week`}>
               <div className="employee-home-v7__panel-heading">
@@ -973,6 +1004,26 @@ const employeeHomeStyles = `
     cursor: pointer;
   }
 
+  .employee-home-v7__guide { padding:var(--space-5); border-color:rgba(124,58,237,.25); background:linear-gradient(145deg,rgba(124,58,237,.11),transparent 60%),var(--bg-card); }
+  .employee-home-v7__guide[data-tone="green"] { border-color:rgba(16,185,129,.26); background:linear-gradient(145deg,rgba(16,185,129,.10),transparent 60%),var(--bg-card); }
+  .employee-home-v7__guide[data-tone="orange"] { border-color:rgba(245,158,11,.28); background:linear-gradient(145deg,rgba(245,158,11,.10),transparent 60%),var(--bg-card); }
+  .employee-home-v7__guide-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:var(--space-4); }
+  .employee-home-v7__guide-head>span { display:flex; align-items:center; gap:6px; color:var(--primary-light); font-size:10px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+  .employee-home-v7__guide[data-tone="green"] .employee-home-v7__guide-head>span { color:var(--success-400); }
+  .employee-home-v7__guide[data-tone="orange"] .employee-home-v7__guide-head>span { color:var(--warning-400); }
+  .employee-home-v7__guide-head i { color:var(--text-tertiary); font-size:9px; font-style:normal; }
+  .employee-home-v7__guide-body { display:grid; grid-template-columns:1fr auto; align-items:center; gap:14px; }
+  .employee-home-v7__guide-body h2 { margin:0; color:var(--text-primary); font-size:15px; line-height:1.25; letter-spacing:-.025em; }
+  .employee-home-v7__guide-body p { margin:7px 0 0; color:var(--text-tertiary); font-size:10px; line-height:1.45; }
+  .employee-home-v7__guide-metric { min-width:76px; padding:10px 8px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-elevated); text-align:center; }
+  .employee-home-v7__guide-metric strong { display:block; color:var(--text-primary); font-size:18px; font-variant-numeric:tabular-nums; letter-spacing:-.04em; }
+  .employee-home-v7__guide-metric span { display:block; margin-top:2px; color:var(--text-tertiary); font-size:8px; text-transform:uppercase; }
+  .employee-home-v7__guide-line { height:3px; margin-top:14px; overflow:hidden; border-radius:3px; background:var(--border-subtle); }
+  .employee-home-v7__guide-line span { display:block; height:100%; border-radius:inherit; background:var(--primary); transition:width .35s ease; }
+  .employee-home-v7__guide[data-tone="green"] .employee-home-v7__guide-line span { background:var(--success-400); }
+  .employee-home-v7__guide[data-tone="orange"] .employee-home-v7__guide-line span { background:var(--warning-400); }
+  .employee-home-v7__guide-note { display:block; margin-top:8px; color:var(--text-tertiary); font-size:8.5px; }
+
   .employee-home-v7__tap-alternative:hover,
   .employee-home-v7__tap-alternative:focus-visible { border-color: var(--primary-400); color: var(--primary-300); outline: none; }
 
@@ -1134,6 +1185,7 @@ const employeeHomeStyles = `
     grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: var(--space-5);
   }
+  .employee-home-v7__side[data-guide="true"] { grid-template-rows: auto repeat(2, minmax(0, 1fr)); }
   .employee-home-v7__panel { height: 100%; min-height: 0; padding: var(--space-5); border-radius: var(--radius-lg); }
 
   .employee-home-v7__panel-heading { align-items: center; margin-bottom: var(--space-5); }
@@ -1233,6 +1285,8 @@ const employeeHomeStyles = `
     .employee-home-v7 { max-width: 620px; }
     .employee-home-v7__layout { grid-template-columns: minmax(0, 1fr); }
     .employee-home-v7__side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(288px, 1fr); align-items: stretch; }
+    .employee-home-v7__side[data-guide="true"] { grid-template-rows: auto minmax(288px, 1fr); }
+    .employee-home-v7__side[data-guide="true"] .employee-home-v7__guide { grid-column: 1 / -1; }
   }
 
   @media (max-width: 620px) {
@@ -1241,6 +1295,8 @@ const employeeHomeStyles = `
     .employee-home-v7__streak > span:last-child { display: none; }
     .employee-home-v7__layout { display: flex; flex-direction: column; gap: var(--space-4); }
     .employee-home-v7__side { display: grid; grid-template-columns: 1fr; grid-auto-rows: 288px; gap: var(--space-4); }
+    .employee-home-v7__side[data-guide="true"] { grid-template-rows: auto; grid-auto-rows: 288px; }
+    .employee-home-v7__side[data-guide="true"] .employee-home-v7__guide { grid-column: auto; min-height: 0; }
     .employee-home-v7__hero { width: 100%; padding: var(--space-5) var(--space-4); border-radius: var(--radius-xl); }
     .employee-home-v7__panel { width: 100%; padding: var(--space-4); }
     .employee-home-v7__clock-wrap { min-height: 294px; }
