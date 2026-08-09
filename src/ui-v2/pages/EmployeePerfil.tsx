@@ -9,6 +9,8 @@ import { EmployeeDenuncia } from './EmployeeDenuncia.js'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
+import { buildEmployeeActivation } from '../../utils/employeeActivation.js'
+import { ActivationPath } from '../components/ActivationPath.js'
 
 
 
@@ -69,11 +71,13 @@ function RowDivider() {
 export interface EmployeePerfilProps {
   u: any; session: any; db: any; saveDB: (updater: any) => void; toast: (msg: string, ms?: number, kind?: string) => void
   doLogout: () => void; openModal: (name: string) => void
+  pushReady?: boolean; onActivateNotifications?: () => void
   perfilView?: 'perfil' | 'gastos' | 'denuncia'; setPerfilView: (v: 'perfil' | 'gastos' | 'denuncia') => void
 }
 
-export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, perfilView = 'perfil', setPerfilView }: EmployeePerfilProps) {
+export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, pushReady = false, onActivateNotifications, perfilView = 'perfil', setPerfilView }: EmployeePerfilProps) {
   const myRecs = useMemo(() => (db.records || []).filter((r: any) => r.empId === u.id && r.fin), [db.records, u.id])
+  const activation = useMemo(() => buildEmployeeActivation(db, u, pushReady), [db.firmas, u, pushReady])
 
   if (perfilView === 'gastos') return <EmployeeGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
   if (perfilView === 'denuncia') return <EmployeeDenuncia toast={toast} onBack={() => setPerfilView('perfil')} />
@@ -100,6 +104,12 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, perf
 
   const roleLabel = u.role === 'encargado' ? 'Encargado' : u.role === 'jefe_obra' ? 'Jefe de Obra' : 'Empleado'
   const avatarColor = colors.avatarPalette[Math.abs(u.name.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0)) % colors.avatarPalette.length]
+  const handleActivationAction = (action: string) => {
+    if (action === 'infoPersonal') openModal('infoPersonal')
+    else if (action === 'sign') openModal('sign')
+    else if (action === 'notifications') onActivateNotifications?.()
+    else if (action === 'logout') doLogout()
+  }
 
   return (
     <PullToRefresh>
@@ -137,6 +147,8 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, perf
             </div>
           </div>
         </div>
+
+        <ActivationPath model={activation} onAction={handleActivationAction} />
 
         <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[

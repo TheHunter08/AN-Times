@@ -1410,7 +1410,7 @@ export default function EmployeePage() {
             {currentEmpTab === 'calendario' && <EmployeeCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
             {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
             {currentEmpTab === 'turnos' && <EmployeeTurnos db={db} u={u} />}
-            {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+            {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} pushReady={launchRequirements.notificationsReady} onActivateNotifications={handleNotifActivate} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
           </Suspense>
         </div>
       </div>
@@ -1573,7 +1573,7 @@ export default function EmployeePage() {
           {currentEmpTab === 'calendario' && <EmployeeCalendario db={db} u={u} calMonth={calMonth} setCalMonth={setCalMonth} />}
           {currentEmpTab === 'mensajes' && <TabMensajes db={db} u={u} toast={toast} saveDB={saveDB} />}
           {currentEmpTab === 'turnos' && <EmployeeTurnos db={db} u={u} />}
-          {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
+          {currentEmpTab === 'perfil' && <EmployeePerfil u={u} session={session} db={db} saveDB={saveDB} toast={toast} doLogout={doLogout} openModal={openModal} pushReady={launchRequirements.notificationsReady} onActivateNotifications={handleNotifActivate} perfilView={perfilSubTab} setPerfilView={setPerfilSubTab} />}
         </Suspense>
       </div>
 

@@ -139,6 +139,15 @@ test.describe('Pantalla del empleado', () => {
     await expect(dialog.getByText('Descargar solo mediante Wi‑Fi', { exact:true })).toBeVisible()
   })
 
+  test('muestra una ruta de activación privada y abre el siguiente paso', async ({ page }) => {
+    await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
+    await expect(page.getByText('Ruta de activación', { exact:true })).toBeVisible()
+    await expect(page.getByText('3 pasos para completar tu cuenta', { exact:true })).toBeVisible()
+    await expect(page.getByText('40%', { exact:true })).toBeVisible()
+    await page.getByRole('button', { name:'Completar: Correo personal', exact:true }).click()
+    await expect(page.getByRole('dialog', { name:'Información personal', exact:true })).toBeVisible()
+  })
+
   test('muestra gastos legacy y guarda un gasto nuevo con control de sincronización', async ({ page }) => {
     const month = new Date().toISOString().slice(0, 7)
     await loginAsEmployee(page, { gastos:[
