@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createNotification, dedupeNotifications, stableNotificationId, updateNotification } from './notifications.js'
+import { createNotification, dedupeNotifications, notificationRowsToTombstone, stableNotificationId, updateNotification } from './notifications.js'
 
 describe('notificaciones', () => {
   it('genera el mismo id para el mismo evento lógico', () => {
@@ -27,5 +27,14 @@ describe('notificaciones', () => {
     const item = createNotification({ empId:'e1', action:'Aviso', dedupeKey:'aviso:e1', ts:'2026-07-21T10:00:00Z' })
     expect(item._upd).toBe(item.ts)
     expect(updateNotification(item, { leido:true }, '2026-07-21T11:00:00Z')._upd).toBe('2026-07-21T11:00:00Z')
+  })
+
+  it('no vuelve a procesar tombstones ya confirmados', () => {
+    const rows = [
+      { id:'row-a', entity_id:'a', deleted:false, data:{ id:'a' } },
+      { id:'row-b', entity_id:'b', deleted:true, data:{ id:'b', deleted:true } },
+      { id:'row-c', entity_id:'c', deleted:false, data:{ id:'c' } },
+    ]
+    expect(notificationRowsToTombstone(rows, new Set(['a']))).toEqual([rows[2]])
   })
 })

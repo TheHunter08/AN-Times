@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -15,7 +16,7 @@ function loadEnvFile(path) {
 loadEnvFile('.env')
 loadEnvFile('.env.local')
 const url = String(process.env.VITE_SB_URL || 'https://eyyhlcvpyiorpdnvqsll.supabase.co').replace(/\/$/, '')
-const key = String(process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I')
+const key = String(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I')
 const headers = { apikey:key, Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }
 const apply = process.argv.includes('--apply')
 const collections = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo']
@@ -30,7 +31,11 @@ async function request(path, options = {}) {
 
 const [blobRows, entityRows] = await Promise.all([
   request('app_data?select=data,updated_at&id=eq.1'),
-  request('app_entities?select=id,collection,entity_id,data,revision,deleted,updated_at'),
+  readAllRestRows({
+    baseUrl:url,
+    path:'app_entities?select=id,collection,entity_id,data,revision,deleted,updated_at&order=id.asc',
+    headers,
+  }),
 ])
 const blobRow = blobRows[0]
 if (!blobRow) throw new Error('No existe app_data id=1')

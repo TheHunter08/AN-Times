@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { planAuthIdentityLinks } from '../src/utils/authIdentityReconciliation.js'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -59,7 +60,7 @@ async function readAllAuthUsers() {
 }
 
 const [employees, authUsers, blobRows] = await Promise.all([
-  request('employees?select=id,email,auth_id,baja,data,updated_at'),
+  readAllRestRows({ baseUrl:url, path:'employees?select=id,email,auth_id,baja,data,updated_at&order=id.asc', headers:restHeaders }),
   readAllAuthUsers(),
   request('app_data?select=data,updated_at&id=eq.1'),
 ])

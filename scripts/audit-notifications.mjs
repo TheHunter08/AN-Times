@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { dedupeNotifications } from '../src/utils/notifications.js'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -21,9 +22,7 @@ const key = String(process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX
 const headers = { apikey:key, Authorization:`Bearer ${key}` }
 
 async function rows(path) {
-  const response = await fetch(`${url}/rest/v1/${path}`, { headers })
-  if (!response.ok) throw new Error(`${path.split('?')[0]} respondió ${response.status}`)
-  return response.json()
+  return readAllRestRows({ baseUrl:url, path, headers })
 }
 
 const [blobRows, entityRows] = await Promise.all([

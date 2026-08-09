@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { dedupeNotifications } from '../src/utils/notifications.js'
+import { dedupeNotifications, notificationRowsToTombstone } from '../src/utils/notifications.js'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -29,7 +30,7 @@ async function request(path, options = {}) {
 
 const [blobRows, entityRows] = await Promise.all([
   request('app_data?select=data,updated_at&id=eq.1'),
-  request('app_entities?select=id,entity_id,data,deleted,updated_at&collection=eq.notis'),
+  readAllRestRows({ baseUrl:url, path:'app_entities?select=id,entity_id,data,deleted,updated_at&collection=eq.notis&order=id.asc', headers }),
 ])
 const blobRow = blobRows[0]
 if (!blobRow) throw new Error('No existe app_data id=1')
@@ -46,7 +47,7 @@ const activeEntities = entityRows.filter(item => !item.deleted && !item.data?.de
 }))
 const cleaned = dedupeNotifications([...activeBlob, ...activeEntities])
 const retainedIds = new Set(cleaned.map(item => item.id))
-const rowsToDelete = entityRows.filter(item => !retainedIds.has(item.entity_id || item.data?.id) || item.deleted || item.data?.deleted)
+const rowsToDelete = notificationRowsToTombstone(entityRows, retainedIds)
 
 console.log(JSON.stringify({
   mode:apply ? 'apply' : 'dry-run',

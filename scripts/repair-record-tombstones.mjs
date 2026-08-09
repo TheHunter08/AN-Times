@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -27,7 +28,7 @@ async function request(path, options = {}) {
 
 const [blobRows, deletedRows] = await Promise.all([
   request('app_data?select=data,updated_at&id=eq.1'),
-  request('records?select=id&deleted=eq.true'),
+  readAllRestRows({ baseUrl:url, path:'records?select=id&deleted=eq.true&order=id.asc', headers }),
 ])
 const blobRow = blobRows[0]
 if (!blobRow) throw new Error('No existe app_data id=1')

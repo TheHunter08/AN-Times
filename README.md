@@ -1,58 +1,68 @@
-# TIMES INC — Control Horario Laboral
+# TIMES INC — Control horario laboral
 
-PWA de control horario con GPS, Firebase Auth, roles y panel de administración.
+PWA de control horario y gestión de equipos construida con React 18, Vite,
+Zustand y Supabase. Incluye fichaje offline, sincronización en tiempo real,
+vacaciones, gastos, turnos, documentos y firmas, cierres mensuales, informes,
+notificaciones push y panel operativo por roles.
 
-## 🚀 Deploy en Vercel
+## Desarrollo
+
+Requiere Node.js 24.
 
 ```bash
-# 1. Instala Vercel CLI
-npm i -g vercel
-
-# 2. Desde la carpeta del proyecto
-vercel
-
-# 3. Sigue las instrucciones — elige "Static"
+npm ci
+npm run dev
 ```
 
-O arrastra la carpeta a [vercel.com/new](https://vercel.com/new).
+La configuración local parte de `.env.example`. No se debe versionar ningún
+archivo `.env` con credenciales reales.
 
-## 📂 Estructura
+## Verificación
 
-```
-times-inc/
-├── index.html      # HTML principal
-├── style.css       # Estilos
-├── app.js          # Lógica de la aplicación
-├── firebase.js     # Firebase Auth (carga diferida)
-├── sw.js           # Service Worker (PWA offline)
-├── manifest.json   # PWA manifest
-├── icon.svg        # Icono de la app
-├── vercel.json     # Configuración Vercel
-└── .gitignore
+```bash
+npm run verify:deploy
+npm run test:e2e
 ```
 
-## 🔥 Configuración Firebase
+`verify:deploy` ejecuta TypeScript, build de producción, pruebas unitarias y
+control de tamaño del bundle/PWA. El build de Vercel usa el mismo comando.
 
-En `firebase.js`, reemplaza la configuración con la tuya:
+## Arquitectura activa
 
-```js
-apiKey: "AIzaSy...",
-authDomain: "tu-proyecto.firebaseapp.com",
-projectId: "tu-proyecto",
-```
+- `src/App.jsx`: sesión, PWA, sincronización y navegación profunda.
+- `src/pages/EmployeePage.jsx` y `src/ui-v2/pages/Employee*.tsx`: portal del empleado.
+- `src/ui-v2/AppV2Admin.tsx`: panel de administración activo.
+- `src/store/appStore.js`: estado global y único punto de mutación de `db`.
+- `src/services/dataServiceV2.js`: sincronización Supabase con respaldo del blob.
+- `src/pwa/sw.js`: caché offline, push y sincronización en segundo plano.
+- `api/`: automatizaciones y endpoints desplegados como funciones de Vercel.
+- `supabase/`: esquema, migraciones y políticas de seguridad.
 
-## 👤 Acceso Admin
+La aplicación está en migración gradual de `app_data` a tablas normalizadas.
+No se deben activar las políticas Auth de `supabase/policies_auth.sql` hasta que
+el Centro operativo indique que la vinculación y la paridad sostenida están listas.
 
-- Email: `admin@times-inc.com` + contraseña Firebase
-- O: Triple tap en el logo → botón admin visible
+## Acceso
 
-## 🔑 Acceso Empleados
+- Empleados: PIN local seguro o cuenta Supabase Auth por email y contraseña.
+- Administración: cuenta Auth autorizada mediante el perfil o
+  `db.config.adminEmails`.
+- El acceso PIN funciona offline y no crea una sesión JWT de Supabase.
 
-1. Los empleados inician sesión con **email + contraseña** (Firebase Auth)
-2. El email en Firebase debe coincidir con el email del empleado en la BD
-3. Alternativa: modo **PIN numérico** (botón "Usar PIN numérico")
+## Producción
 
-## 📱 Instalar como PWA
+La rama `main` se despliega en Vercel y ejecuta `npm run verify:deploy` antes de
+publicar. Las variables obligatorias y opcionales están documentadas en
+`.env.example`. El procedimiento de migración y operación está en
+`docs/OPERATIONS-ROLLOUT.md`.
 
-- **iOS Safari**: Compartir → "Añadir a pantalla de inicio"
-- **Android Chrome**: Banner automático o menú → "Instalar app"
+Aplicación: [times-inc.vercel.app](https://times-inc.vercel.app)
+
+## Instalar como PWA
+
+- iOS/iPadOS: Safari → Compartir → Añadir a pantalla de inicio.
+- Android: Chrome → Instalar aplicación.
+- Escritorio compatible: usar el icono de instalación del navegador.
+
+Una vez instalada, el menú del icono ofrece accesos directos a Jornada,
+Vacaciones, Mensajes y Pendientes.

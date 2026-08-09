@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { planPlaintextPinUpgrade } from '../src/utils/pinMigration.js'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -33,7 +34,7 @@ async function request(path, options = {}) {
 }
 
 const [tableRows, blobRows] = await Promise.all([
-  request('employees?select=id,pin_hash,pin_len,data,updated_at'),
+  readAllRestRows({ baseUrl:url, path:'employees?select=id,pin_hash,pin_len,data,updated_at&order=id.asc', headers }),
   request('app_data?select=data,updated_at&id=eq.1'),
 ])
 const blobRow = blobRows[0]

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnvFile(path) {
   try {
@@ -25,8 +26,8 @@ async function request(path, options = {}) {
 }
 
 const [employees, subscriptions] = await Promise.all([
-  request('employees?select=id,baja'),
-  request('push_subs?select=user_id,endpoint,updated_at'),
+  readAllRestRows({ baseUrl:url, path:'employees?select=id,baja&order=id.asc', headers }),
+  readAllRestRows({ baseUrl:url, path:'push_subs?select=user_id,endpoint,updated_at&order=endpoint.asc,user_id.asc', headers }),
 ])
 const activeIds = new Set(employees.filter(item => !item.baja).map(item => item.id))
 const byEndpoint = new Map()

@@ -71,3 +71,11 @@ export function dedupeNotifications(items) {
   }
   return result
 }
+
+export function notificationRowsToTombstone(rows, retainedIds) {
+  return (rows || []).filter(item => {
+    if (item?.deleted || item?.data?.deleted) return false
+    const id = item?.entity_id || item?.data?.id
+    return id && !retainedIds.has(id)
+  })
+}

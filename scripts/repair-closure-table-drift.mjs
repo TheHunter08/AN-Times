@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { toClosureRow } from '../src/services/tableSyncPlan.js'
+import { readAllRestRows } from './read-all-rest-rows.mjs'
 
 function loadEnv(path) {
   try {
@@ -29,8 +30,8 @@ async function request(path, options = {}) {
 
 const [blobRows, tableRows, employees] = await Promise.all([
   request('app_data?select=data&id=eq.1'),
-  request('cierres?select=id,emp_id,mes,deleted'),
-  request('employees?select=id'),
+  readAllRestRows({ baseUrl:url, path:'cierres?select=id,emp_id,mes,deleted&order=id.asc', headers }),
+  readAllRestRows({ baseUrl:url, path:'employees?select=id&order=id.asc', headers }),
 ])
 const blobClosures = (blobRows[0]?.data?.cierres || []).filter(item => item?.id && !item.deleted)
 const activeTable = tableRows.filter(item => !item.deleted)
