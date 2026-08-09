@@ -83,6 +83,18 @@ const valid = absent.filter(record =>
 )
 const invalid = absent.filter(record => !valid.includes(record))
 const rowsToInsert = valid.map(record => toRecordRow(record))
+const stale = blobRecords.filter(record => {
+  const row = tableById.get(String(record?.id))
+  if (!row || row.deleted || !employeeIds.has(String(record?.empId))) return false
+  const sourceTs = Date.parse(record?._upd || '')
+  const tableTs = Date.parse(row.updated_at || '')
+  return Number.isFinite(sourceTs)
+    && Number.isFinite(tableTs)
+    && tableTs + 2000 < sourceTs
+    && typeof record.inicio === 'string'
+    && Number.isFinite(Date.parse(record.inicio))
+})
+const staleRowsToUpsert = stale.map(record => toRecordRow(record))
 const blobIds = new Set(blobRecords.map(record => String(record?.id || '')).filter(Boolean))
 const rowsMissingFromBlob = tableRows.filter(row => !row.deleted && !blobIds.has(String(row.id)))
 const recordsToRestoreInBlob = rowsMissingFromBlob.map(fromRecord)
@@ -94,6 +106,7 @@ console.log(JSON.stringify({
   absentFromTable:absent.length,
   absentFromBlob:recordsToRestoreInBlob.length,
   insertable:rowsToInsert.length,
+  staleInTable:stale.length,
   invalidOrOrphaned:invalid.length,
   protectedTableTombstones:tombstonedInTable.length,
   candidates:valid.map(record => ({
@@ -101,6 +114,11 @@ console.log(JSON.stringify({
     inicio:record.inicio,
     fin:record.fin || null,
     updatedAt:record._upd || null,
+  })),
+  staleCandidates:stale.map(record => ({
+    id:record.id,
+    sourceUpdatedAt:record._upd || null,
+    tableUpdatedAt:tableById.get(String(record.id))?.updated_at || null,
   })),
   blobRestoreCandidates:recordsToRestoreInBlob.map(record => ({
     id:record.id,
@@ -110,7 +128,7 @@ console.log(JSON.stringify({
   })),
 }, null, 2))
 
-if (!apply || (!rowsToInsert.length && !recordsToRestoreInBlob.length)) process.exit(0)
+if (!apply || (!rowsToInsert.length && !staleRowsToUpsert.length && !recordsToRestoreInBlob.length)) process.exit(0)
 
 async function insertIgnoringDuplicates(rows) {
   if (!rows.length) return { inserted:0, failures:[] }
@@ -137,9 +155,35 @@ async function insertIgnoringDuplicates(rows) {
   }
 }
 
+async function upsertRows(rows) {
+  if (!rows.length) return { updated:0, failures:[] }
+  const path = 'records?on_conflict=id'
+  const options = {
+    method:'POST',
+    headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
+  }
+  try {
+    await request(path, { ...options, body:JSON.stringify(rows) })
+    return { updated:rows.length, failures:[] }
+  } catch (batchError) {
+    const failures = []
+    let updated = 0
+    for (const row of rows) {
+      try {
+        await request(path, { ...options, body:JSON.stringify(row) })
+        updated++
+      } catch (error) {
+        failures.push({ id:row.id, error:error.message })
+      }
+    }
+    return { updated, failures, batchError:batchError.message }
+  }
+}
+
 const result = await insertIgnoringDuplicates(rowsToInsert)
-if (result.failures.length) {
-  console.log(JSON.stringify({ ok:false, ...result }, null, 2))
+const staleResult = await upsertRows(staleRowsToUpsert)
+if (result.failures.length || staleResult.failures.length) {
+  console.log(JSON.stringify({ ok:false, insert:result, stale:staleResult }, null, 2))
   process.exitCode = 1
 } else if (recordsToRestoreInBlob.length) {
   const nextData = {
@@ -156,7 +200,9 @@ if (result.failures.length) {
   if (!patched?.length) throw new Error('app_data cambió durante la reparación; vuelve a ejecutar el comando')
 }
 console.log(JSON.stringify({
-  ok:result.failures.length === 0,
+  ok:result.failures.length === 0 && staleResult.failures.length === 0,
   ...result,
+  staleUpdated:staleResult.updated,
+  staleFailures:staleResult.failures,
   restoredInBlob:recordsToRestoreInBlob.length,
 }, null, 2))

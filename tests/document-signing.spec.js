@@ -31,6 +31,14 @@ async function openEmployeeDocuments(page) {
   await expect(page.getByRole('dialog', { name: 'Documentos' })).toBeVisible()
 }
 
+async function expectPdfPreview(page) {
+  if ((page.viewportSize()?.width || 0) <= 600) {
+    await expect(page.getByRole('button', { name:'Abrir PDF', exact:true })).toBeVisible()
+  } else {
+    await expect(page.locator('iframe')).toBeVisible({ timeout:10000 })
+  }
+}
+
 // loginAsEmployee/loginAsAdmin bloquean TODO supabase.co para no depender de
 // red real. Eso deja sin respuesta las llamadas REST de sincronización
 // (app_data), que entran en su motor de reintentos con backoff — ruido que
@@ -91,7 +99,7 @@ test('la firma se estampa exactamente donde el PDF subido dice "Firma del trabaj
   await openEmployeeDocuments(page)
 
   await page.getByRole('button', { name: 'Ver' }).click()
-  await expect(page.locator('iframe')).toBeVisible({ timeout: 10000 })
+  await expectPdfPreview(page)
   await page.getByRole('button', { name: 'Firmar', exact: true }).click()
   await page.getByRole('button', { name: 'Confirmar y firmar' }).click()
   await expect(page.getByText('Documento firmado correctamente')).toBeVisible({ timeout: 8000 })
@@ -131,7 +139,7 @@ test('empleado firma un documento subido en base64 y el admin lo ve firmado con 
 
   await page.getByRole('button', { name: 'Ver' }).click()
   await expect(page.getByText('Sin contenido adjunto')).toHaveCount(0)
-  await expect(page.locator('iframe')).toBeVisible({ timeout: 10000 })
+  await expectPdfPreview(page)
 
   await page.getByRole('button', { name: 'Firmar', exact: true }).click()
   await expect(page.getByText('Tu firma guardada:')).toBeVisible()
@@ -153,7 +161,7 @@ test('empleado firma un documento subido en base64 y el admin lo ve firmado con 
   // Verifica que el contenido firmado se puede volver a ver (no queda vacío)
   await page.getByRole('button', { name: 'Ver' }).click()
   await expect(page.getByText('Sin contenido adjunto')).toHaveCount(0)
-  await expect(page.locator('iframe')).toBeVisible({ timeout: 10000 })
+  await expectPdfPreview(page)
 
   // El administrador debe ver el mismo documento ya firmado, con badge y
   // poder descargarlo — usamos el registro real que dejó el empleado.

@@ -7,8 +7,9 @@ async function openAdminPage(page, group, item) {
   if (await menu.isVisible()) await menu.click()
   const nav = page.getByRole('navigation', { name:'Navegación principal', exact:true })
   const itemName = new RegExp(`^${item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i')
+  const groupName = new RegExp(`^${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i')
   const itemButton = nav.getByRole('button', { name:itemName })
-  if (!await itemButton.isVisible()) await nav.getByRole('button', { name:group, exact:true }).click()
+  if (!await itemButton.isVisible()) await nav.getByRole('button', { name:groupName }).click()
   await itemButton.click()
 }
 
@@ -89,9 +90,10 @@ test('el centro operativo identifica cada perfil incompleto', async ({ page }) =
   await openAdminPage(page, 'Sistema', 'Centro operativo')
 
   await expect(page.getByText(/No activar RLS todavía: 2 sin identidad vinculada, 2 sin correo válido/)).toBeVisible()
-  const blocker = page.getByRole('button', { name:/Revisar Empleado Prueba.*Falta email.*Falta crear acceso.*Falta firma.*Falta activar notificaciones/i })
+  const blocker = page.getByRole('button', { name:/Ver pasos para Empleado Prueba.*Falta email.*Falta crear acceso.*Falta firma.*Falta activar notificaciones/i })
   await expect(blocker).toBeVisible()
   await blocker.click()
+  await page.getByRole('button', { name:'Revisar perfil', exact:true }).click()
   await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
   await expect(page.getByText('Editar empleado', { exact:true })).toBeVisible()
   await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Empleado Prueba')
@@ -115,7 +117,7 @@ test('el centro operativo explica las acciones que solo puede completar el traba
   await openAdminPage(page, 'Sistema', 'Centro operativo')
 
   const instructions = page.getByRole('button', {
-    name:/Ver instrucciones para Empleado Prueba.*PIN heredado.*Falta activar notificaciones/i,
+    name:/Ver pasos para Empleado Prueba.*PIN heredado.*Falta activar notificaciones/i,
   })
   await expect(instructions).toBeVisible()
   await instructions.click()
@@ -142,7 +144,7 @@ test('el centro operativo guía la vinculación y firma sin abrir un editor inú
   await openAdminPage(page, 'Sistema', 'Centro operativo')
 
   const instructions = page.getByRole('button', {
-    name:/Ver instrucciones para Empleado Prueba.*Falta crear acceso.*Falta firma/i,
+    name:/Ver pasos para Empleado Prueba.*Falta crear acceso.*Falta firma/i,
   })
   await expect(instructions).toBeVisible()
   await instructions.click()
@@ -184,10 +186,10 @@ test('el centro operativo identifica los perfiles que comparten una identidad de
   await openAdminPage(page, 'Sistema', 'Centro operativo')
 
   const firstConflict = page.getByRole('button', {
-    name:/Ver instrucciones para Empleado Prueba.*Identidad de acceso duplicada/i,
+    name:/Ver pasos para Empleado Prueba.*Identidad de acceso duplicada/i,
   })
   const secondConflict = page.getByRole('button', {
-    name:/Ver instrucciones para Segundo Empleado.*Identidad de acceso duplicada/i,
+    name:/Ver pasos para Segundo Empleado.*Identidad de acceso duplicada/i,
   })
   await expect(firstConflict).toBeVisible()
   await expect(secondConflict).toBeVisible()

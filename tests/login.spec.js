@@ -11,10 +11,13 @@ test.describe('Acceso con PIN y email', () => {
   test('muestra marca, modos y empleado', async ({ page }) => {
     await expect(page.getByRole('main').getByText('TIMES INC', { exact:true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Email', exact: true })).toBeVisible()
+    await expect(page.getByLabel('Buscar perfil de empleado')).toBeVisible()
+    await page.getByLabel('Buscar perfil de empleado').fill('Em')
     await expect(page.getByRole('button', { name: /Empleado$/ })).toBeVisible()
   })
 
   test('seleccionar un empleado muestra el teclado PIN', async ({ page }) => {
+    await page.getByLabel('Buscar perfil de empleado').fill('Em')
     await page.getByRole('button', { name: /Empleado$/ }).click()
     await expect(page.getByRole('button', { name: '9', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '0', exact: true })).toBeVisible()
@@ -32,6 +35,7 @@ test.describe('Acceso con PIN y email', () => {
       empId:'e1',
     })))
 
+    await page.getByLabel('Buscar perfil de empleado').fill('Em')
     await page.getByRole('button', { name: /Empleado$/ }).click()
     for (let digit = 0; digit < 4; digit += 1) {
       await page.getByRole('button', { name: '1', exact:true }).click()
@@ -360,6 +364,7 @@ test.describe('Acceso con PIN y email', () => {
 test('un empleado bloqueado ve el contador', async ({ page }) => {
   await seedLogin(page, { pinLockouts: { e1: { until: Date.now() + 5 * 60 * 1000, attempts: 5 } } })
   await page.goto('/')
+  await page.getByLabel('Buscar perfil de empleado').fill('Em')
   await page.getByRole('button', { name: /Empleado$/ }).click()
   await expect(page.getByText(/Bloqueado.*\d:\d{2}/i)).toBeVisible({ timeout: 5000 })
 })

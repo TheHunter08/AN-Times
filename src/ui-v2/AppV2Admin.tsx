@@ -1088,10 +1088,11 @@ function ShiftsPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) =
       name: e.name,
       dept: e.dept || e.centroTrabajo || '',
       week: weekDays.map(d => {
-        const isWeekend = d.getDay() === 0 || d.getDay() === 6
-        if (isWeekend) return { status: 'weekend' as const }
         const dateStr = localDateStr(d)
         const turno = turnos.find((t: any) => t.empId === e.id && t.fecha === dateStr)
+        // Un turno explícito (guardia, jornada extraordinaria, etc.) también
+        // debe mostrarse en sábado o domingo. Antes el corte por fin de semana
+        // ocurría primero y ocultaba asignaciones reales.
         if (!turno) return {}
         return {
           type: (turno.tipo === 'guardia' || turno.tipo === 'vacaciones' || turno.tipo === 'libre' ? turno.tipo : 'normal') as 'normal' | 'guardia' | 'vacaciones' | 'libre',

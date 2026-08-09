@@ -54,19 +54,30 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Backup source invalid', detail: 'app_data principal no contiene records/employees válidos' })
     }
 
-    const date = new Date().toISOString().slice(0, 10)
+    const timestamp = new Date().toISOString()
     const body = JSON.stringify({
-      timestamp: new Date().toISOString(),
+      timestamp,
       hot:  hot?.data  ?? null,
       cold: cold?.data ?? null,
     })
+    const bodyBytes = Buffer.from(body, 'utf8')
 
-    const filename  = `backup-${date}.json`
-    const checksum = createHash('sha256').update(body).digest('hex')
+    // Cada ejecución crea un objeto inmutable. Sobrescribir un nombre diario y
+    // descargarlo inmediatamente permitía que Storage/CDN devolviera la versión
+    // anterior durante un reintento, produciendo un falso checksum mismatch.
+    const snapshotId = timestamp.replace(/[:.]/g, '-')
+    const filename = `backup-${snapshotId}.json`
+    const checksum = createHash('sha256').update(bodyBytes).digest('hex')
     const uploadRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, {
       method:  'POST',
-      headers: { ...SB_H_STORAGE, 'Content-Type': 'application/json', 'x-upsert': 'true', 'x-metadata': JSON.stringify({ checksum, records: hot.data.records.length, employees: hot.data.employees.length }) },
-      body,
+      headers: {
+        ...SB_H_STORAGE,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'x-upsert': 'false',
+        'x-metadata': JSON.stringify({ checksum, records: hot.data.records.length, employees: hot.data.employees.length }),
+      },
+      body: bodyBytes,
     })
 
     if (!uploadRes.ok) {
@@ -81,19 +92,21 @@ export default async function handler(req, res) {
     }
 
     // Verificación real: descargar el objeto recién escrito y comparar hash.
-    const verifyRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, { headers: SB_H_STORAGE })
+    const verifyRes = await fetch(`${SB_URL}/storage/v1/object/backups/${filename}`, {
+      headers: { ...SB_H_STORAGE, 'Cache-Control': 'no-cache' },
+    })
     if (!verifyRes.ok) {
       await recordRun({ status:'error', error:`Backup verification download failed ${verifyRes.status}` })
       return res.status(500).json({ error: 'Backup verification download failed', status: verifyRes.status })
     }
-    const verifiedBody = await verifyRes.text()
-    const verifiedChecksum = createHash('sha256').update(verifiedBody).digest('hex')
+    const verifiedBytes = Buffer.from(await verifyRes.arrayBuffer())
+    const verifiedChecksum = createHash('sha256').update(verifiedBytes).digest('hex')
     if (verifiedChecksum !== checksum) {
       await recordRun({ status:'error', error:'Backup checksum mismatch' })
       return res.status(500).json({ error: 'Backup checksum mismatch' })
     }
 
-    const sizeKB = Math.round(body.length / 1024)
+    const sizeKB = Math.round(bodyBytes.byteLength / 1024)
     console.log(`[backup] ${filename} subido — ${sizeKB} KB`)
     await recordRun({ checked:hot.data.records.length, processed:1, delivered:1 })
     return res.status(200).json({ ok: true, verified: true, filename, sizeKB, checksum, records: hot.data.records.length, employees: hot.data.employees.length })

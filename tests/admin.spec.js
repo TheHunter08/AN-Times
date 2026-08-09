@@ -6,8 +6,9 @@ async function openSection(page, group, item) {
   if (await menu.isVisible()) await menu.click()
   const nav = page.getByRole('navigation', { name:'Navegación principal', exact:true })
   const itemName = new RegExp(`^${item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i')
+  const groupName = new RegExp(`^${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i')
   const itemButton = nav.getByRole('button', { name:itemName })
-  if (!await itemButton.isVisible()) await nav.getByRole('button', { name:group, exact:true }).click()
+  if (!await itemButton.isVisible()) await nav.getByRole('button', { name:groupName }).click()
   await itemButton.click()
 }
 
@@ -136,7 +137,7 @@ test('exporta un recordatorio recurrente de informe al calendario', async ({ pag
   await page.goto('/')
   await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
   await openSection(page, 'Sistema', 'Centro operativo')
-  await expect(page.getByText('Google Calendar, Outlook o Apple Calendar')).toBeVisible()
+  await expect(page.getByRole('button', { name:'Calendario', exact:true })).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name:'Calendario', exact:true }).click()
   const download = await downloadPromise
