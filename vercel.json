@@ -20,6 +20,7 @@
     { "source": "/api/patch-pins", "destination": "/api/admin-tools?op=patch-pins" },
     { "source": "/api/send-push-all", "destination": "/api/admin-tools?op=send-push-all" },
     { "source": "/api/send-whatsapp", "destination": "/api/admin-tools?op=send-whatsapp" },
+    { "source": "/api/health", "destination": "/api/admin-tools?op=health" },
     { "source": "/api/cron-reminders-midday", "destination": "/api/cron-reminders" },
     { "source": "/api/cron-reminders-evening", "destination": "/api/cron-reminders-and-autoclose" },
     { "source": "/api/cron-reminders-night", "destination": "/api/cron-reminders-and-autoclose" },

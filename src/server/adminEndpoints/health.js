@@ -1,8 +1,8 @@
-import { buildProductionHealth } from '../src/server/productionHealth.js'
+import { buildProductionHealth } from '../productionHealth.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 
-export default async function handler(_req, res) {
+export default async function health(_req, res) {
   const sbUrl = clean(process.env.VITE_SB_URL)
   const sbKey = clean(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SB_ANON)
   res.setHeader?.('Cache-Control', 'no-store')
@@ -15,15 +15,15 @@ export default async function handler(_req, res) {
     })
     if (!response.ok) return res.status(503).json({ status:'degraded', healthy:false, error:'data_unavailable' })
     const blob = (await response.json())?.[0]?.data
-    const health = buildProductionHealth(blob)
+    const healthState = buildProductionHealth(blob)
     const redacted = {
-      ...health,
+      ...healthState,
       automations:{
-        ...health.automations,
-        jobs:health.automations.jobs.map(({ error:_, ...job }) => job),
+        ...healthState.automations,
+        jobs:healthState.automations.jobs.map(({ error:_, ...job }) => job),
       },
     }
-    return res.status(health.healthy ? 200 : 503).json(redacted)
+    return res.status(healthState.healthy ? 200 : 503).json(redacted)
   } catch {
     return res.status(503).json({ status:'degraded', healthy:false, error:'dependency_unreachable' })
   }

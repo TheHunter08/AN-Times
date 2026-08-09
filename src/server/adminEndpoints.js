@@ -3,6 +3,7 @@ import patchPins from './adminEndpoints/patch-pins.js'
 import sendPushAll from './adminEndpoints/send-push-all.js'
 import sendWhatsapp from './adminEndpoints/send-whatsapp.js'
 import monthlyClose from './adminEndpoints/monthly-close.js'
+import health from './adminEndpoints/health.js'
 
 const handlers = {
   'migrate-to-tables': migrateToTables,
@@ -10,6 +11,7 @@ const handlers = {
   'send-push-all': sendPushAll,
   'send-whatsapp': sendWhatsapp,
   'monthly-close': monthlyClose,
+  health,
 }
 
 export default function dispatchAdminEndpoint(req, res) {

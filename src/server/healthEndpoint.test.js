@@ -12,7 +12,7 @@ describe('health endpoint', () => {
     vi.stubEnv('VITE_SB_URL', 'https://fake.supabase.co')
     vi.stubEnv('VITE_SB_ANON', 'anon')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status:500 })))
-    const { default:handler } = await import('../../api/health.js')
+    const { default:handler } = await import('./adminEndpoints/health.js')
     const { result, res } = response()
     await handler({}, res)
     expect(result).toMatchObject({ statusCode:503, payload:{ status:'degraded', error:'data_unavailable' } })

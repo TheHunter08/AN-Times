@@ -53,6 +53,7 @@ describe('deployment quality gate', () => {
     expect(rewrites.get('/api/cron-reminders-midday')).toBe('/api/cron-reminders')
     expect(rewrites.get('/api/cron-reminders-evening')).toBe('/api/cron-reminders-and-autoclose')
     expect(rewrites.get('/api/cron-reminders-night')).toBe('/api/cron-reminders-and-autoclose')
+    expect(rewrites.get('/api/health')).toBe('/api/admin-tools?op=health')
   })
 
   it('keeps GitHub backstops for every daily business process', () => {
