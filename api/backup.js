@@ -13,6 +13,7 @@
 // Puedes configurar una política de expiración en el bucket para borrar backups > 4 años.
 import { createHash, timingSafeEqual } from 'crypto'
 import { createAutomationRun } from '../src/server/automationHealth.js'
+import { buildRestorePlan, inspectBackupSnapshot } from '../src/server/backupIntegrity.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 
 const cleanEnv    = s => (s || '').replace(/^﻿/, '').trim()
@@ -100,16 +101,20 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Backup verification download failed', status: verifyRes.status })
     }
     const verifiedBytes = Buffer.from(await verifyRes.arrayBuffer())
-    const verifiedChecksum = createHash('sha256').update(verifiedBytes).digest('hex')
-    if (verifiedChecksum !== checksum) {
-      await recordRun({ status:'error', error:'Backup checksum mismatch' })
-      return res.status(500).json({ error: 'Backup checksum mismatch' })
+    const inspection = inspectBackupSnapshot(verifiedBytes, { expectedChecksum:checksum })
+    if (!inspection.valid) {
+      await recordRun({ status:'error', error:'Backup verification failed' })
+      return res.status(500).json({ error:'Backup verification failed', detail:inspection.errors.join('; ') })
     }
+    // Materializa el plan de restauración en memoria. No escribe datos, pero
+    // garantiza que el snapshot recién creado no solo coincide byte a byte:
+    // también tiene la estructura mínima necesaria para recuperar hot/cold.
+    const restorePlan = buildRestorePlan(inspection)
 
     const sizeKB = Math.round(bodyBytes.byteLength / 1024)
     console.log(`[backup] ${filename} subido — ${sizeKB} KB`)
     await recordRun({ checked:hot.data.records.length, processed:1, delivered:1 })
-    return res.status(200).json({ ok: true, verified: true, filename, sizeKB, checksum, records: hot.data.records.length, employees: hot.data.employees.length })
+    return res.status(200).json({ ok:true, verified:true, restorable:true, restoreRows:restorePlan.targetRows.length, filename, sizeKB, checksum, records:hot.data.records.length, employees:hot.data.employees.length })
   } catch (e) {
     console.error('[backup] fatal:', e)
     await recordRun({ status:'error', error:e.message })

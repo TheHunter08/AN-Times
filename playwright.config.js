@@ -14,6 +14,12 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile-android', use: { ...devices['Pixel 5'] } },
+    { name: 'mobile-ios', use: { ...devices['iPhone 13'] } },
+    {
+      name: 'pwa-chromium',
+      testMatch: /pwa-offline\.spec\.js/,
+      use: { ...devices['Desktop Chrome'], serviceWorkers:'allow' },
+    },
   ],
   webServer: {
     command: 'npm run preview',

@@ -252,7 +252,18 @@ export async function cloudFetch(sinceTs = 0) {
       entitiesQuery,
     ])
     const responses = [empsR, recsR, vacsR, cierresR, obrasR, entitiesR]
-    if (responses.some(result => result.error) || (!isPartial && !empsR.data?.length)) return _v1Fetch()
+    // Las tablas de fase 2 ya son la fuente de verdad. Si una consulta falla
+    // de forma transitoria, no descargamos el blob legacy entero como
+    // "respaldo": puede pesar decenas de MB y un único error de red se
+    // multiplicaba por cada cliente activo como egress PostgREST. Conservamos
+    // el estado local y el siguiente sondeo/realtime reintentará la lectura
+    // incremental. El fallback al blob solo se mantiene para una instalación
+    // aún no migrada (employees vacío en una carga completa).
+    if (responses.some(result => result.error)) {
+      const failed = responses.find(result => result.error)
+      return { ok: false, data: null, status: failed.error.code || 'table_fetch_error' }
+    }
+    if (!isPartial && !empsR.data?.length) return _v1Fetch()
 
     const phase2Ready = [empsR.data, recsR.data, vacsR.data, cierresR.data, obrasR.data]
       .every(rows => !rows?.length || Object.prototype.hasOwnProperty.call(rows[0], 'data'))
@@ -311,8 +322,8 @@ export async function cloudFetch(sinceTs = 0) {
       },
     }
   } catch (error) {
-    console.warn('[v2] table-first fetch failed, fallback V1:', error.message)
-    return _v1Fetch()
+    console.warn('[v2] table-first fetch failed; preserving local state until retry:', error.message)
+    return { ok: false, data: null, status: 'table_fetch_error' }
   }
 }
 

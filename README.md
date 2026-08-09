@@ -22,10 +22,15 @@ archivo `.env` con credenciales reales.
 ```bash
 npm run verify:deploy
 npm run test:e2e
+npm run verify:backup-restore
 ```
 
 `verify:deploy` ejecuta TypeScript, build de producción, pruebas unitarias y
 control de tamaño del bundle/PWA. El build de Vercel usa el mismo comando.
+La suite E2E cubre escritorio, Android, una emulación WebKit de iPhone y un
+arranque PWA realmente offline. `verify:backup-restore` descarga la copia más
+reciente del bucket privado y materializa un plan de recuperación en memoria,
+sin escribir en producción.
 
 ## Arquitectura activa
 
@@ -57,6 +62,11 @@ publicar. Las variables obligatorias y opcionales están documentadas en
 `docs/OPERATIONS-ROLLOUT.md`.
 
 Aplicación: [times-inc.vercel.app](https://times-inc.vercel.app)
+
+El endpoint público `/api/health` solo expone estado técnico redactado (sin
+credenciales ni datos personales). Devuelve HTTP 503 si Supabase no responde,
+la estructura principal no es restaurable o una automatización está atrasada;
+el workflow operativo lo comprueba cada 30 minutos.
 
 ## Instalar como PWA
 

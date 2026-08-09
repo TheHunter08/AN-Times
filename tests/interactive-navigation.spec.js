@@ -411,7 +411,7 @@ test('una modificación conserva trazabilidad en auditoría y cierre mensual', a
 
   await openAdminPage(page, 'Análisis', 'Auditoría')
   await expect(page.getByText('Fichaje modificado', { exact:true })).toBeVisible()
-  await expect(page.getByText(/Android · Chrome|Linux · Chrome|Windows · Chrome|macOS · Chrome/).first()).toBeVisible()
+  await expect(page.getByText(/(?:Android|Linux|Windows|macOS) · Chrome|iOS · Safari/).first()).toBeVisible()
   await page.getByRole('button', { name:'Ver trazabilidad', exact:true }).click()
   await expect(page.getByText('Motivo: Ajuste autorizado por supervisión', { exact:true })).toBeVisible()
 
@@ -422,7 +422,7 @@ test('una modificación conserva trazabilidad en auditoría y cierre mensual', a
   await expect(closeDialog.getByText('07:15', { exact:true })).toBeVisible()
   await expect(closeDialog.getByText('15:45', { exact:true })).toBeVisible()
   await expect(page.getByText('Trazabilidad de modificaciones', { exact:true })).toBeVisible()
-  await expect(page.getByText(/Ajuste autorizado por supervisión.*Chrome/)).toBeVisible()
+  await expect(page.getByText(/Ajuste autorizado por supervisión.*(?:Chrome|Safari)/)).toBeVisible()
 })
 
 test('una notificación admin abre la pantalla relacionada', async ({ page }) => {
