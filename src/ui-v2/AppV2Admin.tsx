@@ -6,6 +6,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { AppShell } from './layout/AppShell.js'
 import { Dashboard } from './pages/Dashboard.js'
 import { Search } from './components/Search.js'
+import { CommandCenter } from './components/CommandCenter.js'
+import type { CommandCenterCommand } from './components/CommandCenter.js'
 import { Avatar } from './components/Avatar.js'
 import { colors } from './design-system/colors'
 import {
@@ -46,6 +48,7 @@ import { workBalanceOptions } from '../utils/workBalance.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import { automationHealthList } from '../server/automationHealth.js'
+import { buildOperationalPulse } from '../utils/operationalPulse.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -3185,6 +3188,7 @@ export default function AppV2Admin() {
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
   const [manualSyncing, setManualSyncing] = useState(false)
   const [showAI, setShowAI] = useState(false)
+  const [showCommandCenter, setShowCommandCenter] = useState(false)
   const name = session?.user?.name || 'Admin'
   const aiUser = session?.user || { id:'__admin__', name, role:'admin', isAdmin:true }
   const notis = useNotificationsData()
@@ -3225,6 +3229,18 @@ export default function AppV2Admin() {
       : undefined,
     badgeTone:p.id === 'operaciones' ? 'warning' as const : 'default' as const,
   }))
+  const operationalPulse = useMemo(() => buildOperationalPulse(db), [db])
+
+  useEffect(() => {
+    const onCommandShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase('es') === 'k') {
+        event.preventDefault()
+        setShowCommandCenter(open => !open)
+      }
+    }
+    document.addEventListener('keydown', onCommandShortcut)
+    return () => document.removeEventListener('keydown', onCommandShortcut)
+  }, [])
 
   // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'
   const effectivePage = isEnc
@@ -3277,6 +3293,42 @@ export default function AppV2Admin() {
     if (offlinePending && !window.confirm('Hay cambios pendientes de sincronizar. Si cierras sesión ahora seguirán guardados en este dispositivo. ¿Continuar?')) return
     logout()
   }
+
+  const commandCenterCommands = useMemo<CommandCenterCommand[]>(() => {
+    const pageCommands = visiblePages.map(page => ({
+      id:`page-${page.id}`,
+      label:page.label,
+      detail:`Abrir ${page.label.toLocaleLowerCase('es')}`,
+      group:page.group,
+      keywords:`sección navegar ${page.id}`,
+      badge:navBadges[page.id] || undefined,
+      icon:page.icon,
+      run:() => setAdminPage(page.id),
+    }))
+    const employeeCommands = (db.employees || [])
+      .filter((employee: any) => !employee.baja && !employee.isAdmin)
+      .map((employee: any) => ({
+        id:`employee-${employee.id}`,
+        label:employee.name || 'Empleado',
+        detail:[employee.centroTrabajo, employee.email].filter(Boolean).join(' · ') || 'Abrir sus fichajes',
+        group:'Personas',
+        keywords:`empleado persona ${employee.role || ''}`,
+        icon:<Avatar name={employee.name || 'Empleado'} size={24} />,
+        run:() => goToFichajes(employee.id),
+      }))
+    return [
+      {
+        id:'action-ai', label:'Preguntar a Times AI', detail:'Abrir el análisis operativo asistido', group:'Acciones',
+        keywords:'ia inteligencia asistente analizar', icon:<IconTrendUp />, run:() => setShowAI(true),
+      },
+      {
+        id:'action-employee-view', label:'Cambiar a vista empleado', detail:'Abrir Mi jornada y el portal personal', group:'Acciones',
+        keywords:'fichar jornada portal', icon:<IconHome />, run:() => setScreen('emp'),
+      },
+      ...pageCommands,
+      ...employeeCommands,
+    ]
+  }, [visiblePages, navBadges, db.employees, setAdminPage, setScreen])
 
   function renderPage() {
     const page = effectivePage
@@ -3358,6 +3410,15 @@ export default function AppV2Admin() {
           </div>
           <button
             type="button"
+            onClick={() => setShowCommandCenter(true)}
+            aria-label="Abrir centro de mando"
+            title="Centro de mando · Ctrl/⌘ K"
+            style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', gap:6, borderRadius:9, border:`1px solid ${colors.primary.glow}`, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer', fontSize:11, fontWeight:800 }}
+          >
+            <IconGrid width={15} height={15} /> <span className="uiv2-sync-label">Nexo</span><kbd style={{ padding:'1px 4px', border:`1px solid ${colors.border.default}`, borderRadius:4, fontSize:8, color:colors.text[500] }}>⌘K</kbd>
+          </button>
+          <button
+            type="button"
             onClick={syncNow}
             disabled={manualSyncing}
             title={`${offlinePending ? 'Cambios pendientes' : syncStatus === 'synced' ? 'Sincronizado' : 'Estado: ' + syncStatus}${syncError ? ` · ${syncError}` : ''}${lastSyncTime ? ` · Última copia ${new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })}` : ''}. Pulsa para sincronizar ahora.`}
@@ -3414,6 +3475,13 @@ export default function AppV2Admin() {
         <ModalAI visible db={{ ...db, _runtimeSync:{ syncStatus, syncError, offlinePending, lastSyncTime } }} u={aiUser} onClose={() => setShowAI(false)} />
       </Suspense>
     )}
+    <CommandCenter
+      visible={showCommandCenter}
+      commands={commandCenterCommands}
+      pulse={operationalPulse}
+      onClose={() => setShowCommandCenter(false)}
+      onNavigate={setAdminPage}
+    />
     </div>
   )
 }

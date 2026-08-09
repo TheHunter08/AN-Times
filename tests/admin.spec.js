@@ -23,6 +23,20 @@ test.describe('Panel de administración', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   })
 
+  test('abre el Nexo con el teclado y ejecuta comandos de navegación', async ({ page }) => {
+    await page.keyboard.press('Control+k')
+    const commandCenter = page.getByRole('dialog', { name:'Centro de mando' })
+    await expect(commandCenter).toBeVisible()
+    await expect(commandCenter.getByText(/Pulso operativo/).first()).toBeVisible()
+    await expect(commandCenter).toContainText('Cálculo explicable · sin enviar datos')
+
+    const commandSearch = commandCenter.getByRole('textbox', { name:'Buscar comandos' })
+    await commandSearch.fill('Auditoría')
+    await commandSearch.press('Enter')
+    await expect(page.getByRole('heading', { name:'Auditoría', exact:true })).toBeVisible({ timeout:8000 })
+    await expect(commandCenter).toHaveCount(0)
+  })
+
   test('informa al administrador de una reconciliación sin presentarla como error', async ({ page }) => {
     await page.evaluate(() => {
       window.dispatchEvent(new CustomEvent('times-conflict', { detail:{ count:2 } }))
