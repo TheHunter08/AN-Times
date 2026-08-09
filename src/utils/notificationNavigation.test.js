@@ -8,6 +8,7 @@ import {
 describe('navegación desde notificaciones', () => {
   it('interpreta enlaces admin directos, completos y codificados', () => {
     expect(parseNavigationTarget('/?go=admin:solicitudes')).toMatchObject({ role:'admin', target:'solicitudes' })
+    expect(parseNavigationTarget('/?go=admin%3Apendientes')).toMatchObject({ role:'admin', target:'pendientes' })
     expect(resolveAdminNotificationDestination({ target:'documentos' })).toBe('documentos')
     expect(resolveAdminNotificationDestination({ url:'https://app.test/?go=admin%3Avalidar' })).toBe('validar')
   })
@@ -19,6 +20,7 @@ describe('navegación desde notificaciones', () => {
 
   it('abre pestañas y modales correctos para empleados', () => {
     expect(resolveEmployeeNotificationDestination({ url:'/?go=emp:vacaciones' })).toEqual({ tab:'vacaciones' })
+    expect(resolveEmployeeNotificationDestination({ url:'/?tab=jornada' })).toEqual({ tab:'jornada' })
     expect(resolveEmployeeNotificationDestination({ target:'documentos' })).toEqual({ tab:'perfil', modal:'documentos' })
     expect(resolveEmployeeNotificationDestination({ target:'chat' })).toEqual({ tab:'inicio', modal:'chat' })
   })

@@ -68,31 +68,31 @@ export default defineConfig({
         ],
         shortcuts: [
           {
-            name: 'Fichar entrada',
-            short_name: 'Fichar',
-            description: 'Registrar entrada de jornada',
-            url: '/?tab=inicio',
-            icons: [{ src: '/icon.svg', sizes: 'any' }]
-          },
-          {
             name: 'Mi jornada',
             short_name: 'Jornada',
             description: 'Ver horas trabajadas hoy',
-            url: '/?tab=jornada',
+            url: '/?go=emp%3Ajornada',
             icons: [{ src: '/icon.svg', sizes: 'any' }]
           },
           {
             name: 'Solicitar vacaciones',
             short_name: 'Vacaciones',
             description: 'Ver y solicitar vacaciones',
-            url: '/?tab=vacaciones',
+            url: '/?go=emp%3Avacaciones',
             icons: [{ src: '/icon.svg', sizes: 'any' }]
           },
           {
             name: 'Mis mensajes',
             short_name: 'Mensajes',
             description: 'Chat con el administrador',
-            url: '/?tab=mensajes',
+            url: '/?go=emp%3Amensajes',
+            icons: [{ src: '/icon.svg', sizes: 'any' }]
+          },
+          {
+            name: 'Centro de pendientes',
+            short_name: 'Pendientes',
+            description: 'Abrir las tareas prioritarias de administración',
+            url: '/?go=admin%3Apendientes',
             icons: [{ src: '/icon.svg', sizes: 'any' }]
           }
         ],

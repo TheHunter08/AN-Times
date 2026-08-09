@@ -297,7 +297,7 @@ const EMP_TABS = ['inicio', 'jornada', 'vacaciones', 'calendario', 'turnos', 'pe
 function applyDeepLink(url) {
   try {
     const parsed = parseNavigationTarget(url)
-    if (!parsed) return
+    if (!parsed) return false
     const { setScreen, setAdminPage, setEmpTab, openModal, session } = useAppStore.getState()
     // Sin esta comprobación, un empleado normal que visitara una URL con
     // ?go=admin:... (o recibiera el enlace de otra forma) entraba directo al
@@ -305,6 +305,11 @@ function applyDeepLink(url) {
     // isAdmin/isEnc/isJO ya vienen recalculados desde el perfil real
     // (_roleFlagsFromProfile en appStore.js), no desde algo manipulable.
     const hasAdminAccess = !!(session?.isAdmin || session?.isEnc || session?.isJO)
+    const hasEmployeeSession = !!session?.user
+    // Un acceso directo de la PWA puede abrirse antes de que el usuario inicie
+    // sesión. En ese caso conservamos la URL para aplicar el destino justo
+    // después del login, sin saltarnos la pantalla de acceso.
+    if (!hasAdminAccess && !hasEmployeeSession) return false
     if (parsed.role === 'admin' && hasAdminAccess) {
       setScreen('admin', true)
       if (parsed.target) setAdminPage(parsed.target)
@@ -313,14 +318,15 @@ function applyDeepLink(url) {
       // Enlace de admin pero sin permiso (empleado normal): quedarse en su
       // propia pantalla en vez de no hacer nada silenciosamente.
       setScreen('emp', true)
-    } else if (parsed.role === 'emp' || EMP_TABS.includes(parsed.target)) {
+    } else if ((parsed.role === 'emp' || EMP_TABS.includes(parsed.target)) && hasEmployeeSession) {
       const destination = resolveEmployeeNotificationDestination({ url })
       setScreen('emp', true)
       setEmpTab(destination.tab)
       if (destination.modal) openModal(destination.modal)
     }
     window.history.replaceState({}, '', window.location.pathname)
-  } catch {}
+    return true
+  } catch { return false }
 }
 
 function ScreenLoader() {
@@ -579,7 +585,6 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    applyDeepLink(window.location.href)
     const onMsg = (event) => {
       if (event.data?.type === 'PUSH_CLICK') applyDeepLink(event.data.url)
       if (event.data?.type === 'BG_SYNC_DONE') {
@@ -682,6 +687,12 @@ export default function App() {
       clearInterval(heartbeatInterval)
     }
   }, [])
+
+  // Resuelve tanto una apertura en frío con sesión persistida como un
+  // acceso directo que quedó pendiente mientras se completaba el login.
+  useEffect(() => {
+    applyDeepLink(window.location.href)
+  }, [session?.user?.id, session?.isAdmin, session?.isEnc, session?.isJO])
 
   useEffect(() => {
     const applyTheme = (prefersDark) => {

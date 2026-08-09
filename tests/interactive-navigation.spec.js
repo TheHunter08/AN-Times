@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { employee, loginAsAdmin, loginAsEmployee } from './helpers/session.js'
+import { employee, loginAsAdmin, loginAsEmployee, seedLogin } from './helpers/session.js'
 import { localDateStr } from '../src/utils/time.js'
 
 async function openAdminPage(page, group, item) {
@@ -503,4 +503,41 @@ test('un clic push abre también los destinos que son modales', async ({ page })
   await expect(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })).toBeVisible({ timeout:15000 })
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('push-deeplink', { detail:'/?go=emp%3Amensajes' })))
   await expect(page.getByRole('dialog', { name:'Chat con administración', exact:true })).toBeVisible()
+})
+
+test('los accesos rápidos PWA abren su destino en una sesión persistida', async ({ page }) => {
+  await loginAsEmployee(page)
+  const manifestResponse = await page.request.get('/manifest.webmanifest')
+  expect(manifestResponse.ok()).toBe(true)
+  const manifest = await manifestResponse.json()
+  expect(manifest.shortcuts.map(({ short_name, url }) => ({ short_name, url }))).toEqual([
+    { short_name:'Jornada', url:'/?go=emp%3Ajornada' },
+    { short_name:'Vacaciones', url:'/?go=emp%3Avacaciones' },
+    { short_name:'Mensajes', url:'/?go=emp%3Amensajes' },
+    { short_name:'Pendientes', url:'/?go=admin%3Apendientes' },
+  ])
+  await page.goto('/?go=emp%3Ajornada')
+  await expect(page.getByText('Mi jornada', { exact:true }).first()).toBeVisible({ timeout:15000 })
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('el acceso rápido de administración abre el centro de pendientes', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/?go=admin%3Apendientes')
+  await expect(page.getByRole('heading', { name:'Centro de pendientes', exact:true })).toBeVisible({ timeout:15000 })
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('un acceso rápido conserva el destino hasta que exista una sesión válida', async ({ page }) => {
+  await seedLogin(page)
+  await page.goto('/?go=emp%3Avacaciones')
+  await expect(page.getByRole('button', { name:'PIN', exact:true })).toBeVisible({ timeout:15000 })
+  await expect(page).toHaveURL(/go=emp%3Avacaciones/)
+  await page.getByLabel('Buscar perfil de empleado').fill('Em')
+  await page.getByRole('button', { name:/Empleado$/ }).click()
+  for (let digit = 0; digit < 4; digit += 1) {
+    await page.getByRole('button', { name:'1', exact:true }).click()
+  }
+  await expect(page.getByText(/Solicitar vacaciones|Vacaciones/i).first()).toBeVisible({ timeout:15000 })
+  await expect(page).toHaveURL(/\/$/)
 })
