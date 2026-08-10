@@ -66,8 +66,8 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-dialog-title" tabIndex={-1} style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, maxHeight:'90dvh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
-          <div style={{ fontSize:36, marginBottom:8 }}>{isRecheck ? '🔔' : '👋'}</div>
-          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>{isRecheck ? 'Verifica tus notificaciones' : u.onboardingDone ? 'Completa los requisitos obligatorios' : `Bienvenido, ${u.name.split(' ')[0]}`}</div>
+          <div style={{ fontSize:36, marginBottom:8 }}>{isRecheck ? '🔔' : '🔒'}</div>
+          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>{isRecheck ? 'Verifica tus notificaciones' : 'Completa los requisitos obligatorios'}</div>
           {!isRecheck && <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Verifica tu cuenta en {STEPS.length} pasos para poder utilizar TIMES INC</div>}
         </div>
 
