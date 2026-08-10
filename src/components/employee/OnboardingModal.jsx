@@ -20,7 +20,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
   const dialogRef = useDialogA11y(visible && !done)
   const existingSignature = db.firmas?.[u?.id]?.main?.data || null
-  const isRecheck = Boolean(u.onboardingDone && existingSignature)
+  const isRecheck = Boolean(existingSignature)
   const permissionGuide = getNotificationPermissionGuide(
     typeof navigator !== 'undefined' ? navigator.userAgent : '',
     typeof window !== 'undefined' && !!(window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone),

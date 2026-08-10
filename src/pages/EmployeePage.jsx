@@ -1254,7 +1254,7 @@ export default function EmployeePage() {
       {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {showConfetti && <Confetti visible />}
-      {(!u.onboardingDone || !launchRequirements.ready) && (
+      {!launchRequirements.ready && (
         <OnboardingModal
           visible
           u={u}
