@@ -43,7 +43,6 @@ const ModalConfiguracion = lazyNamed(() => import('../components/employee/ModalC
 const ModalCierreSign = lazyNamed(() => import('../components/employee/ModalCierreSign.jsx'), 'ModalCierreSign')
 const Confetti = lazyNamed(() => import('../components/employee/Confetti.jsx'), 'Confetti')
 const ModalLogros = lazyNamed(() => import('../components/employee/ModalLogros.jsx'), 'ModalLogros')
-const WelcomeSlides = lazyNamed(() => import('../components/employee/WelcomeSlides.jsx'), 'WelcomeSlides')
 const OnboardingModal = lazyNamed(() => import('../components/employee/OnboardingModal.jsx'), 'OnboardingModal')
 const ModalChat = lazyNamed(() => import('../components/employee/ModalChat.jsx'), 'ModalChat')
 const ModalCorreccion = lazyNamed(() => import('../components/employee/ModalCorreccion.jsx'), 'ModalCorreccion')
@@ -1255,20 +1254,20 @@ export default function EmployeePage() {
       {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {showConfetti && <Confetti visible />}
-      {!u.onboardingDone || !launchRequirements.ready
-        ? <OnboardingModal
-            visible
-            u={u}
-            db={db}
-            saveDB={saveDB}
-            toast={toast}
-            pushReady={launchRequirements.notificationsReady}
-            notificationPermission={notifPerm}
-            onActivateNotifications={handleNotifActivate}
-            hasOpenShift={Boolean(openRec())}
-            onFinishOpenShift={finishCurrentShift}
-          />
-        : <WelcomeSlides />}
+      {(!u.onboardingDone || !launchRequirements.ready) && (
+        <OnboardingModal
+          visible
+          u={u}
+          db={db}
+          saveDB={saveDB}
+          toast={toast}
+          pushReady={launchRequirements.notificationsReady}
+          notificationPermission={notifPerm}
+          onActivateNotifications={handleNotifActivate}
+          hasOpenShift={Boolean(openRec())}
+          onFinishOpenShift={finishCurrentShift}
+        />
+      )}
     </Suspense>
   )
 

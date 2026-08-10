@@ -20,6 +20,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
   const dialogRef = useDialogA11y(visible && !done)
   const existingSignature = db.firmas?.[u?.id]?.main?.data || null
+  const isRecheck = Boolean(u.onboardingDone && existingSignature)
   const permissionGuide = getNotificationPermissionGuide(
     typeof navigator !== 'undefined' ? navigator.userAgent : '',
     typeof window !== 'undefined' && !!(window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone),
@@ -65,28 +66,30 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-dialog-title" tabIndex={-1} style={{ background:colors.bg[700], border:`1px solid ${colors.border.subtle}`, borderRadius:radius['2xl'], padding:'24px 20px', width:'100%', maxWidth:400, maxHeight:'90dvh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:20 }}>
-          <div style={{ fontSize:36, marginBottom:8 }}>👋</div>
-          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>{u.onboardingDone ? 'Completa los requisitos obligatorios' : `Bienvenido, ${u.name.split(' ')[0]}`}</div>
-          <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Verifica tu cuenta en {STEPS.length} pasos para poder utilizar TIMES INC</div>
+          <div style={{ fontSize:36, marginBottom:8 }}>{isRecheck ? '🔔' : '👋'}</div>
+          <div id="onboarding-dialog-title" style={{ fontSize:17, fontWeight:800, color:colors.text[900] }}>{isRecheck ? 'Verifica tus notificaciones' : u.onboardingDone ? 'Completa los requisitos obligatorios' : `Bienvenido, ${u.name.split(' ')[0]}`}</div>
+          {!isRecheck && <div style={{ fontSize:12, color:colors.text[500], marginTop:3 }}>Verifica tu cuenta en {STEPS.length} pasos para poder utilizar TIMES INC</div>}
         </div>
 
         {/* Step indicator */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', marginBottom:24 }}>
-          {STEPS.map((s, i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center' }}>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, transition:'all .25s',
-                  background: i < step ? colors.semantic.green : i === step ? colors.primary.base : colors.bg[500],
-                  color: i <= step ? '#fff' : colors.text[300],
-                  boxShadow: i === step ? `0 0 0 3px ${colors.primary.glow}` : 'none' }}>
-                  {i < step ? '✓' : i + 1}
+        {!isRecheck && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', marginBottom:24 }}>
+            {STEPS.map((s, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center' }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, transition:'all .25s',
+                    background: i < step ? colors.semantic.green : i === step ? colors.primary.base : colors.bg[500],
+                    color: i <= step ? '#fff' : colors.text[300],
+                    boxShadow: i === step ? `0 0 0 3px ${colors.primary.glow}` : 'none' }}>
+                    {i < step ? '✓' : i + 1}
+                  </div>
+                  <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color: i===step ? colors.primary.light : colors.text[300], whiteSpace:'nowrap' }}>{s}</div>
                 </div>
-                <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color: i===step ? colors.primary.light : colors.text[300], whiteSpace:'nowrap' }}>{s}</div>
+                {i < STEPS.length - 1 && <div style={{ width:28, height:2, background: i < step ? colors.semantic.green : colors.bg[400], margin:'0 4px', transition:'all .25s', marginBottom:16 }} />}
               </div>
-              {i < STEPS.length - 1 && <div style={{ width:28, height:2, background: i < step ? colors.semantic.green : colors.bg[400], margin:'0 4px', transition:'all .25s', marginBottom:16 }} />}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {hasOpenShift && (
           <div style={{ background:`color-mix(in srgb, ${colors.semantic.orange} 10%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.semantic.orange} 28%, transparent)`, borderRadius:radius.lg, padding:12, marginBottom:16 }}>
@@ -131,7 +134,11 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
                 )}
               </>
             )}
-            <button disabled={!pushReady} style={{ ...btnSecondary, width:'100%', opacity:pushReady ? 1 : .45, cursor:pushReady ? 'pointer' : 'not-allowed' }} onClick={() => pushReady && setStep(1)}>
+            <button disabled={!pushReady} style={{ ...btnSecondary, width:'100%', opacity:pushReady ? 1 : .45, cursor:pushReady ? 'pointer' : 'not-allowed' }} onClick={() => {
+              if (!pushReady) return
+              if (isRecheck) { setDone(true); toast('Notificaciones verificadas', 2500, 'ok'); return }
+              setStep(1)
+            }}>
               Continuar →
             </button>
           </div>
