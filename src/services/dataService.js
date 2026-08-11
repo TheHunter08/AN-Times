@@ -345,7 +345,10 @@ export function mergeDB(base, incoming) {
       })
     })(),
     monthSnapshots:      incoming.monthSnapshots       ?? base.monthSnapshots ?? {},
-    firmas:              incoming.firmas               ?? base.firmas ?? {},
+    // Unión por clave (no reemplazo entero): si el servidor todavía no tiene
+    // la firma de un empleado (push que no llegó a tiempo, fallo de red),
+    // no debe borrar la firma que sí está guardada localmente.
+    firmas:              { ...(base.firmas || {}), ...(incoming.firmas || {}) },
     documentos:          _unionById(base.documentos,          incoming.documentos,          'documentos'),
     audit:               _unionById(base.audit,               incoming.audit,               'audit'),
     correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje, 'correccionesFichaje'),

@@ -108,6 +108,32 @@ describe('tombstones: borrar una jornada no debe resucitar en el siguiente fetch
   })
 })
 
+// Regresión: si un fetchDB (al reabrir la app) llegaba antes de que el push
+// de una firma recién guardada aterrizara en el servidor, mergeDB()
+// reemplazaba el objeto `firmas` local entero por el del servidor —
+// borrando la firma que el empleado sí tenía guardada localmente y
+// disparando de nuevo el paso "Tu firma" del onboarding en cada apertura.
+describe('firmas: la firma guardada localmente no debe desaparecer si el servidor aún no la tiene', () => {
+  it('una firma local sobrevive a un fetchDB cuyo servidor todavía no la tiene (reproduce el bug si falla)', () => {
+    const local = { ...BASE, firmas: { e1: { main: { data: 'data:image/png;base64,firma-local', updatedAt: '2026-07-09T08:00:00.000Z' } } } }
+    const merged = mergeDB(local, { firmas: {} })
+    expect(merged.firmas.e1?.main?.data).toBe('data:image/png;base64,firma-local')
+  })
+
+  it('la firma del servidor para otro empleado se añade sin borrar la firma local existente', () => {
+    const local = { ...BASE, firmas: { e1: { main: { data: 'data:image/png;base64,firma-e1' } } } }
+    const merged = mergeDB(local, { firmas: { e2: { main: { data: 'data:image/png;base64,firma-e2' } } } })
+    expect(merged.firmas.e1?.main?.data).toBe('data:image/png;base64,firma-e1')
+    expect(merged.firmas.e2?.main?.data).toBe('data:image/png;base64,firma-e2')
+  })
+
+  it('una firma más reciente del servidor para el mismo empleado gana sobre la local', () => {
+    const local = { ...BASE, firmas: { e1: { main: { data: 'data:image/png;base64,firma-vieja', updatedAt: '2026-07-09T08:00:00.000Z' } } } }
+    const merged = mergeDB(local, { firmas: { e1: { main: { data: 'data:image/png;base64,firma-nueva', updatedAt: '2026-07-10T08:00:00.000Z' } } } })
+    expect(merged.firmas.e1?.main?.data).toBe('data:image/png;base64,firma-nueva')
+  })
+})
+
 describe('cola offline', () => {
   it('acumula tombstones de varios guardados sin cobertura', () => {
     expect(mergePendingDeletes(
