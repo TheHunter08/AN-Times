@@ -6,6 +6,7 @@ import { vacData, p2, calcMin, mhm, today, localDateStr } from '../../utils/time
 import { calcStreak } from '../../utils/streaks.js'
 import { EmployeeGastos } from './EmployeeGastos.js'
 import { EmployeeDenuncia } from './EmployeeDenuncia.js'
+import { EmployeeActualizaciones } from './EmployeeActualizaciones.js'
 import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
@@ -72,7 +73,7 @@ export interface EmployeePerfilProps {
   u: any; session: any; db: any; saveDB: (updater: any) => void; toast: (msg: string, ms?: number, kind?: string) => void
   doLogout: () => void; openModal: (name: string) => void
   pushReady?: boolean; onActivateNotifications?: () => void
-  perfilView?: 'perfil' | 'gastos' | 'denuncia'; setPerfilView: (v: 'perfil' | 'gastos' | 'denuncia') => void
+  perfilView?: 'perfil' | 'gastos' | 'denuncia' | 'actualizaciones'; setPerfilView: (v: 'perfil' | 'gastos' | 'denuncia' | 'actualizaciones') => void
 }
 
 export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, pushReady = false, onActivateNotifications, perfilView = 'perfil', setPerfilView }: EmployeePerfilProps) {
@@ -81,6 +82,7 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, push
 
   if (perfilView === 'gastos') return <EmployeeGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
   if (perfilView === 'denuncia') return <EmployeeDenuncia toast={toast} onBack={() => setPerfilView('perfil')} />
+  if (perfilView === 'actualizaciones') return <EmployeeActualizaciones toast={toast} onBack={() => setPerfilView('perfil')} />
 
   if (!db.records) return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -242,6 +244,12 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, push
           <MenuRow
             icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.kpiTone.amber.base} strokeWidth="2"><circle cx="12" cy="8" r="6" /><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32" /></svg>}
             iconBg={colors.kpiTone.amber.dim} label="Logros" onClick={() => openModal('logros')}
+          />
+          <RowDivider />
+          <MenuRow
+            icon={<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={colors.primary.light} strokeWidth="2"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" /></svg>}
+            iconBg={toneSoft(colors.primary.base, 13)} label="Actualizaciones"
+            onClick={() => setPerfilView('actualizaciones')}
           />
         </SectionCard>
 

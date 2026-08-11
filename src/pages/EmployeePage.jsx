@@ -131,7 +131,7 @@ export default function EmployeePage() {
   const geoWasInsideRef = useRef(null)     // rec.id de la jornada que estuvo dentro del radio
   const geoExitDismissedRef = useRef(null) // rec.id cuyo aviso de salida se descartó
   const [showConfetti, setShowConfetti] = useState(false)
-  const [perfilSubTab, setPerfilSubTab] = useState('perfil') // 'perfil' | 'gastos' | 'denuncia'
+  const [perfilSubTab, setPerfilSubTab] = useState('perfil') // 'perfil' | 'gastos' | 'denuncia' | 'actualizaciones'
   // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
   const [isLight, setIsLight] = useState(() => document.documentElement.getAttribute('data-theme') === 'light')
   const dbRef = useRef(db)
