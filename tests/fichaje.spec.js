@@ -139,13 +139,17 @@ test.describe('Pantalla del empleado', () => {
     await expect(dialog.getByText('Descargar solo mediante Wi‑Fi', { exact:true })).toBeVisible()
   })
 
-  test('muestra una ruta de activación privada y abre el siguiente paso', async ({ page }) => {
+  test('muestra una ruta de activación privada y permite completar la vinculación de cuenta', async ({ page }) => {
+    // El correo, la firma y las notificaciones ya son obligatorios para pasar del
+    // onboarding, así que aquí solo pueden quedar pendientes la cuenta vinculada y el PIN.
     await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
     await expect(page.getByText('Ruta de activación', { exact:true })).toBeVisible()
-    await expect(page.getByText('3 pasos para completar tu cuenta', { exact:true })).toBeVisible()
-    await expect(page.getByText('40%', { exact:true })).toBeVisible()
-    await page.getByRole('button', { name:'Completar: Correo personal', exact:true }).click()
-    await expect(page.getByRole('dialog', { name:'Información personal', exact:true })).toBeVisible()
+    await expect(page.getByText('2 pasos para completar tu cuenta', { exact:true })).toBeVisible()
+    await expect(page.getByText('60%', { exact:true })).toBeVisible()
+    await page.getByRole('button', { name:'Completar: Cuenta vinculada', exact:true }).click()
+    await expect(page.getByText('¿Cerrar sesión?', { exact:false })).toBeVisible()
+    await page.getByRole('button', { name:'Confirmar', exact:true }).click()
+    await expect(page.getByRole('button', { name:'PIN', exact:true })).toBeVisible({ timeout:8000 })
   })
 
   test('muestra gastos legacy y guarda un gasto nuevo con control de sincronización', async ({ page }) => {

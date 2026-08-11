@@ -1,6 +1,7 @@
 export const employee = {
   id: 'e1',
   name: 'Empleado Prueba',
+  email: 'empleado.prueba@times-inc.test',
   pin: '1111',
   pinLen: 4,
   color: '#7c3aed',

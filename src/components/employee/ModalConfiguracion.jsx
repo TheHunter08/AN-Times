@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useCallback, useRef } from 'react'
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useEffect } from 'react'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
@@ -40,6 +40,55 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [aiProgress, setAiProgress] = useState({ progress:0, text:'' })
   const [aiWifiOnly, setAiWifiOnly] = useState(() => getLocalAIWifiOnly())
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+  const [updateCheck, setUpdateCheck] = useState('idle') // idle | checking | up-to-date | applying | error
+  const updateBusyRef = useRef(false)
+
+  const checkForUpdate = useCallback(async () => {
+    if (updateBusyRef.current || !('serviceWorker' in navigator)) return
+    updateBusyRef.current = true
+    setUpdateCheck('checking')
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) { setUpdateCheck('error'); toast('No se pudo comprobar actualizaciones', 4000, 'err'); return }
+      await reg.update().catch(() => {})
+      let waitingSW = reg.waiting
+      if (!waitingSW && reg.installing) {
+        const sw = reg.installing
+        await new Promise(resolve => {
+          const done = () => { sw.removeEventListener('statechange', onChange); resolve() }
+          const onChange = () => { if (sw.state === 'installed' || sw.state === 'redundant') done() }
+          sw.addEventListener('statechange', onChange)
+          setTimeout(done, 8000)
+        })
+        waitingSW = reg.waiting
+      } else if (!waitingSW) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        waitingSW = reg.waiting
+      }
+      if (!waitingSW) {
+        setUpdateCheck('up-to-date')
+        toast('Ya tienes la última versión instalada', 3000, 'ok')
+        return
+      }
+      if (useAppStore.getState().offlinePending) {
+        setUpdateCheck('idle')
+        toast('Hay una actualización lista. Se instalará sola en cuanto termine de sincronizar tus datos pendientes.', 5500, 'warn')
+        return
+      }
+      setUpdateCheck('applying')
+      toast('Instalando nueva versión…', 2500, 'ok')
+      waitingSW.postMessage({ type: 'SKIP_WAITING' })
+      let reloaded = false
+      const reloadOnce = () => { if (!reloaded) { reloaded = true; window.location.reload() } }
+      navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once:true })
+      setTimeout(reloadOnce, 2500)
+    } catch {
+      setUpdateCheck('error')
+      toast('No se pudo comprobar actualizaciones', 4000, 'err')
+    } finally {
+      updateBusyRef.current = false
+    }
+  }, [toast])
 
   const refreshAIStorage = () => getLocalModelStorageInfo().then(setAiStorage)
   useEffect(() => { if (visible) refreshAIStorage() }, [visible])
@@ -192,6 +241,22 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
           ))}
           <div style={{ fontSize:10.5, lineHeight:1.45, color:colors.text[400], marginTop:7 }}>
             Los fichajes se guardan primero en el dispositivo. Si hay señal débil, quedan pendientes y se reintentan automáticamente.
+          </div>
+        </div>
+
+        <div style={{ padding:'14px 0', borderBottom:SEP }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900] }}>Actualizaciones</div>
+              <div style={{ fontSize:11, color:colors.text[500], marginTop:3 }}>Versión instalada: v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '—'}</div>
+            </div>
+            <button type="button" disabled={updateCheck === 'checking' || updateCheck === 'applying'} onClick={checkForUpdate}
+              style={{ background:colors.primary.base, color:'#fff', border:'none', borderRadius:radius.md, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:updateCheck === 'checking' || updateCheck === 'applying' ? 'not-allowed' : 'pointer', fontFamily:'inherit', flexShrink:0, opacity:updateCheck === 'checking' || updateCheck === 'applying' ? .6 : 1 }}>
+              {updateCheck === 'checking' ? 'Buscando…' : updateCheck === 'applying' ? 'Instalando…' : 'Buscar actualizaciones'}
+            </button>
+          </div>
+          <div style={{ fontSize:10.5, lineHeight:1.45, color:colors.text[400], marginTop:7 }}>
+            TIMES INC se actualiza solo en segundo plano en cuanto hay una versión nueva. Usa este botón si crees que tu versión está desactualizada.
           </div>
         </div>
 

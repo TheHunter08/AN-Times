@@ -146,7 +146,7 @@ export default function EmployeePage() {
   const pushReadyRef = useRef(false)
   const launchRequirements = useMemo(
     () => getLaunchRequirements(db, u?.id, pushStatus === 'ready'),
-    [db.firmas, u?.id, pushStatus]
+    [db.firmas, db.employees, u?.id, pushStatus]
   )
   const showNotifBanner = pushStatus !== 'ready'
   const pushBannerTitle = notifPerm === 'denied'

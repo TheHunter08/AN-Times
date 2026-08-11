@@ -1,18 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeEmail, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
-  const db = { firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } } }
+  const db = {
+    employees: [{ id:'emp1', email:'ana@empresa.com' }],
+    firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } },
+  }
 
   it('solo acepta una firma con datos reales', () => {
     expect(hasEmployeeSignature(db, 'emp1')).toBe(true)
     expect(hasEmployeeSignature({ firmas: { emp1: { main: {} } } }, 'emp1')).toBe(false)
   })
 
-  it('exige simultáneamente firma y registro push confirmado', () => {
+  it('solo acepta un email con formato válido', () => {
+    expect(hasEmployeeEmail(db, 'emp1')).toBe(true)
+    expect(hasEmployeeEmail({ employees: [{ id:'emp1', email:'' }] }, 'emp1')).toBe(false)
+    expect(hasEmployeeEmail({ employees: [{ id:'emp1' }] }, 'emp1')).toBe(false)
+  })
+
+  it('exige simultáneamente email, firma y registro push confirmado', () => {
     expect(getLaunchRequirements(db, 'emp1', true).ready).toBe(true)
     expect(getLaunchRequirements(db, 'emp1', false).ready).toBe(false)
-    expect(getLaunchRequirements({}, 'emp1', true).ready).toBe(false)
+    expect(getLaunchRequirements({ firmas: db.firmas }, 'emp1', true).ready).toBe(false)
+    expect(getLaunchRequirements({ employees: db.employees }, 'emp1', true).ready).toBe(false)
   })
   it('explica por empleado los bloqueos operativos pendientes', () => {
     const readinessDb = {

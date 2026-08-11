@@ -5,13 +5,20 @@ export function hasEmployeeSignature(db, employeeId) {
   return Boolean(employeeId && db?.firmas?.[employeeId]?.main?.data)
 }
 
+export function hasEmployeeEmail(db, employeeId) {
+  const employee = (db?.employees || []).find(e => e?.id === employeeId)
+  return isValidAccountEmail(employee?.email)
+}
+
 export function getLaunchRequirements(db, employeeId, pushReady) {
+  const emailReady = hasEmployeeEmail(db, employeeId)
   const signatureReady = hasEmployeeSignature(db, employeeId)
   const notificationsReady = pushReady === true
   return {
+    emailReady,
     signatureReady,
     notificationsReady,
-    ready: signatureReady && notificationsReady,
+    ready: emailReady && signatureReady && notificationsReady,
   }
 }
 

@@ -18,10 +18,10 @@ test.describe('Fichaje por QR', () => {
 })
 
 test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ page }) => {
-  const target = { id:'e2', name:'Trabajador QR', pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false }
+  const target = { id:'e2', name:'Trabajador QR', email:'trabajador.qr@times-inc.test', pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false }
   await loginAsEmployee(page, {
     employees:[
-      { id:'e1', name:'Encargado', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false },
+      { id:'e1', name:'Encargado', email:'encargado.qr@times-inc.test', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', onboardingDone:true, baja:false },
       target,
     ],
     firmas:{
