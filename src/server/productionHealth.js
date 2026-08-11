@@ -7,7 +7,11 @@ export function buildProductionHealth(blob, { now = Date.now() } = {}) {
     employees:Array.isArray(blob?.employees),
   }
   const dataHealthy = Object.values(collections).every(Boolean)
-  const healthy = dataHealthy && automations.unhealthy === 0
+  // El estado global (y el código HTTP) refleja si el servicio en sí
+  // responde con datos válidos. Una automatización atrasada es una señal
+  // operativa (visible en `automations`), no una caída del servicio, así
+  // que no debe tumbar los healthchecks que dependen del código HTTP.
+  const healthy = dataHealthy
   return {
     status:healthy ? 'healthy' : 'degraded',
     healthy,

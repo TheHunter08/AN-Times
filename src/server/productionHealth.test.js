@@ -11,12 +11,22 @@ describe('productionHealth', () => {
     expect(buildProductionHealth({ records:[], employees:[], config:{ automationHealth } }, { now }).status).toBe('healthy')
   })
 
-  it('se degrada si los datos son inválidos o una tarea está atrasada', () => {
+  it('se degrada si los datos son inválidos, aunque las automatizaciones estén al día', () => {
     const now = Date.parse('2026-08-09T12:00:00.000Z')
     const automationHealth = { backup:createAutomationRun('backup', { finishedAt:now - 30 * 3600000 }) }
     const result = buildProductionHealth({ records:[], config:{ automationHealth } }, { now })
     expect(result.status).toBe('degraded')
     expect(result.data.healthy).toBe(false)
+    expect(result.automations.jobs.find(job => job.job === 'backup')?.state).toBe('stale')
+  })
+
+  it('una tarea atrasada no tumba el estado global si los datos son válidos', () => {
+    const now = Date.parse('2026-08-09T12:00:00.000Z')
+    const automationHealth = { backup:createAutomationRun('backup', { finishedAt:now - 30 * 3600000 }) }
+    const result = buildProductionHealth({ records:[], employees:[], config:{ automationHealth } }, { now })
+    expect(result.status).toBe('healthy')
+    expect(result.healthy).toBe(true)
+    expect(result.automations.unhealthy).toBe(7)
     expect(result.automations.jobs.find(job => job.job === 'backup')?.state).toBe('stale')
   })
 })
