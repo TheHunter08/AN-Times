@@ -4,7 +4,7 @@ function obraAliases(obra) {
   return new Set([obra?.id, obra?.nombre, obra?.name, obra?.codigo].map(normalize).filter(Boolean))
 }
 
-function findObra(value, obras) {
+export function findObra(value, obras) {
   const key = normalize(value)
   if (!key) return null
   return (obras || []).find(obra => obraAliases(obra).has(key)) || null

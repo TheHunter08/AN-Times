@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.4.0',
+    date: '2026-08-11',
+    title: 'Ficha del empleado, buscador de login y huella/Face ID',
+    items: [
+      'El campo "Obra" en Información personal mostraba el nombre de la empresa en vez de la obra asignada — ya muestra la obra real.',
+      'En el inicio de sesión, el buscador de empleado no dejaba borrar lo escrito con retroceso — se capturaba como borrado de PIN por error.',
+      'Se restaura desde Configuración la opción para activar el acceso con huella o Face ID, que existía por dentro pero no tenía botón en ningún sitio.',
+    ],
+  },
+  {
     version: '4.3.2',
     date: '2026-08-11',
     title: 'Distinguir empleados homónimos en más pantallas',

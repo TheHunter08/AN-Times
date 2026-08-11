@@ -4,6 +4,7 @@ import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { vacData } from '../../utils/time.js'
 import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
+import { findObra } from '../../utils/obraAttribution.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 
@@ -49,6 +50,13 @@ export function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
     onClose()
   }
 
+  // "Obra" mostraba emp.empresa (el nombre de la empresa, no de la obra
+  // asignada) — se resuelve la obra real desde obrasAsignadas.
+  const obraNames = (emp.obrasAsignadas || [])
+    .map(ref => findObra(ref, db.obras)?.nombre || findObra(ref, db.obras)?.name || ref)
+    .filter(Boolean)
+  const obraLabel = obraNames.length ? obraNames.join(', ') : '—'
+
   const Field = ({ label, value, onChange, readonly }) => (
     <div style={{ marginBottom:14 }}>
       <div style={{ fontSize:11, color:colors.text[500], marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>{label}</div>
@@ -77,7 +85,7 @@ export function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
         <Field label="Nombre" value={nombre} onChange={setNombre} />
         <Field label="Email" value={email} onChange={setEmail} />
         <Field label="Teléfono" value={tel} onChange={setTel} />
-        <Field label="Obra" value={emp.empresa || '—'} readonly />
+        <Field label="Obra" value={obraLabel} readonly />
         <Field label="Centro de trabajo" value={emp.centroTrabajo || '—'} readonly />
         <Field label="Rol" value={emp.role==='encargado'?'Encargado':emp.role==='jefe_obra'?'Jefe de Obra':'Empleado'} readonly />
         <Field label="Fecha de alta" value={emp.fechaAlta || '—'} readonly />

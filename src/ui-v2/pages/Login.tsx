@@ -197,6 +197,10 @@ export function Login({
         {/* ── PIN MODE ───────────────────────────────────────────────── */}
         {mode === 'pin' && (
           <div tabIndex={0} onKeyDown={e => {
+            // El buscador de empleado vive dentro de este contenedor: sin este
+            // check, cada Backspace en él se interceptaba como borrado de PIN
+            // y el texto escrito no se podía borrar nunca.
+            if ((e.target as HTMLElement)?.tagName === 'INPUT') return
             if (/^\d$/.test(e.key)) { e.preventDefault(); onPinKey?.(e.key) }
             if (e.key === 'Backspace') { e.preventDefault(); onPinDel?.() }
           }} style={{

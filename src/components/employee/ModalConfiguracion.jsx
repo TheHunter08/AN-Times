@@ -12,6 +12,7 @@ import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { clearLocalModelCache, formatModelBytes, getLocalAIWifiOnly, getLocalModelNetworkState, getLocalModelStorageInfo, isLocalModelReady, isWebGPUSupported, loadLocalModel, LOCAL_MODEL_INFO, setLocalAIConsent, setLocalAIWifiOnly } from '../../utils/localAI.js'
 import { getNotificationPermissionGuide, notificationGuideText } from '../../utils/notificationPermission.js'
+import { checkPlatformAuth, clearBiometric, hasBiometric, registerBiometric } from '../../utils/webauthn.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:400, maxHeight:'92vh', overflowY:'auto' }
@@ -40,9 +41,14 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [aiProgress, setAiProgress] = useState({ progress:0, text:'' })
   const [aiWifiOnly, setAiWifiOnly] = useState(() => getLocalAIWifiOnly())
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+  const [bioSupported, setBioSupported] = useState(false)
+  const [bioRegistered, setBioRegistered] = useState(() => u?.id ? hasBiometric(u.id) : false)
+  const [bioBusy, setBioBusy] = useState(false)
 
   const refreshAIStorage = () => getLocalModelStorageInfo().then(setAiStorage)
   useEffect(() => { if (visible) refreshAIStorage() }, [visible])
+  useEffect(() => { if (visible) checkPlatformAuth().then(setBioSupported) }, [visible])
+  useEffect(() => { if (visible && u?.id) setBioRegistered(hasBiometric(u.id)) }, [visible, u?.id])
   useEffect(() => {
     if (!visible || typeof Notification === 'undefined') return
     const refreshPermission = () => setNotificationPermission(Notification.permission)
@@ -175,6 +181,38 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
         <Toggle label="Recordatorio de salida" value={notiSalida} onChange={setNotiSalida} />
         <Toggle label="GPS automático" value={gpsAuto} onChange={setGpsAuto} />
         <Toggle label="Modo claro" value={isLight} onChange={() => { toggleTheme(); setIsLight(l => !l); toast(isLight ? 'Modo oscuro activado' : 'Modo claro activado') }} />
+
+        {bioSupported && (
+          <div style={{ padding:'14px 0', borderBottom:SEP }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+              <div style={{ minWidth:0, flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:colors.text[900] }}>Acceso con huella o Face ID</div>
+                <div style={{ fontSize:11, color:colors.text[500], marginTop:3 }}>{bioRegistered ? 'Activado en este dispositivo' : 'Entra sin escribir el PIN'}</div>
+              </div>
+              {bioRegistered ? (
+                <button type="button" onClick={() => { clearBiometric(u.id); setBioRegistered(false); toast('Acceso biométrico desactivado', 3000) }}
+                  style={{ background:'none', border:`1px solid ${colors.border.default}`, color:colors.text[500], borderRadius:radius.md, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+                  Desactivar
+                </button>
+              ) : (
+                <button type="button" disabled={bioBusy} onClick={async () => {
+                  setBioBusy(true)
+                  try {
+                    await registerBiometric(u.id, u.name)
+                    setBioRegistered(true)
+                    toast('¡Listo! Ya puedes entrar sin PIN 🔓', 3500, 'ok')
+                  } catch {
+                    toast('No se pudo activar. Comprueba los permisos del dispositivo.', 4500, 'err')
+                  } finally {
+                    setBioBusy(false)
+                  }
+                }} style={{ background:colors.primary.base, color:'#fff', border:'none', borderRadius:radius.md, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:bioBusy?'not-allowed':'pointer', fontFamily:'inherit', flexShrink:0, opacity:bioBusy?.6:1 }}>
+                  {bioBusy ? 'Activando…' : 'Activar'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ padding:'14px 0', borderBottom:SEP }}>
           <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:10 }}>Diagnóstico de la aplicación</div>
