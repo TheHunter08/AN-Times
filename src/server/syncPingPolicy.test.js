@@ -5,15 +5,23 @@ describe('selección de dispositivos para sincronización cerrada', () => {
   const now = Date.parse('2026-07-21T18:00:00.000Z')
 
   it('despierta un dispositivo usado recientemente cuando toca la comprobación', () => {
-    expect(isSyncCandidate({ last_online: '2026-07-21T17:58:00Z', last_sync: '2026-07-21T17:55:00Z' }, now)).toBe(true)
+    expect(isSyncCandidate({ last_online: '2026-07-21T17:00:00Z', last_sync: '2026-07-21T17:30:00Z' }, now)).toBe(true)
   })
 
   it('no repite el push inmediatamente si acaba de comprobar la cola', () => {
     expect(isSyncCandidate({ last_online: '2026-07-21T17:55:00Z', last_sync: '2026-07-21T17:59:00Z' }, now)).toBe(false)
   })
 
+  it('no vuelve a marcar candidato a un dispositivo que sincronizó hace poco, aunque ya no sea "recentísimo"', () => {
+    // Regresión: el umbral (antes 4 min) era menor que el intervalo real del
+    // cron (cada 30 min), así que un dispositivo con actividad normal (p.ej.
+    // sincronizado hace 20 min) siempre volvía a calificar como candidato en
+    // cada ejecución y recibía un push vacío aunque estuviera al día.
+    expect(isSyncCandidate({ last_online: '2026-07-21T17:55:00Z', last_sync: '2026-07-21T17:40:00Z' }, now)).toBe(false)
+  })
+
   it('vuelve a despertar aunque no hubiera heartbeat posterior al último sync', () => {
-    expect(isSyncCandidate({ last_online: '2026-07-21T12:00:00Z', last_sync: '2026-07-21T17:50:00Z' }, now)).toBe(true)
+    expect(isSyncCandidate({ last_online: '2026-07-21T12:00:00Z', last_sync: '2026-07-21T17:20:00Z' }, now)).toBe(true)
   })
 
   it('usa la fecha de alta si el primer heartbeat todavía no llegó', () => {

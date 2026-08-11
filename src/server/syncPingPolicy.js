@@ -2,7 +2,17 @@
 // existe. Por eso cada dispositivo usado recientemente recibe una comprobación
 // periódica aunque last_online no haya podido actualizarse.
 export const PUSH_ACTIVE_WINDOW_MS = 7 * 24 * 60 * 60_000
-export const PUSH_RECHECK_INTERVAL_MS = 4 * 60_000
+// El cron que llama a este endpoint corría cada ~5 min ("12 jobs/hora", ver
+// sync-ping.yml); ahora comparte el runner semihoral de operational-crons.yml
+// (cada 30 min). Este umbral se quedó en 4 min tras esa consolidación, así
+// que un dispositivo con last_sync de hace 30 min (el caso normal en CADA
+// ejecución del cron) siempre superaba el umbral y volvía a ser "candidato"
+// sin falta — todo dispositivo activo recibía un push vacío en cada tick,
+// aunque acabara de sincronizar. Se sube a 25 min (algo por debajo de los 30
+// del cron, para no perder por poco un dispositivo realmente desactualizado)
+// para que un dispositivo que sincronizó en el ciclo anterior no reciba otro
+// aviso silencioso en el siguiente tick sin necesidad.
+export const PUSH_RECHECK_INTERVAL_MS = 25 * 60_000
 
 export function isSyncCandidate(subscription, now = Date.now()) {
   const timestamps = [subscription?.last_online, subscription?.updated_at]
