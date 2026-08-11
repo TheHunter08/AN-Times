@@ -72,6 +72,18 @@ const GEO_OPTS = { enableHighAccuracy: true, timeout: 25000, maximumAge: 120000 
 const STARTING_LOCK_MS = GEO_OPTS.timeout + 2000
 const PUSH_READY_TTL_MS = 30 * 24 * 60 * 60_000
 const pushReadyStorageKey = employeeId => `an_push_ready_${employeeId}`
+// Compartido entre el estado inicial y el efecto de revalidación: si no se usa
+// también al inicializar `pushStatus`, el primer render arranca en "checking"
+// aunque la caché ya confirme el dispositivo, y el modal de requisitos
+// obligatorios parpadea (aparece y se cierra solo) mientras el efecto se pone
+// al día milisegundos después.
+const getCachedPushReady = employeeId => {
+  if (!employeeId || typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
+  try {
+    const verifiedAt = Number(localStorage.getItem(pushReadyStorageKey(employeeId)) || 0)
+    return verifiedAt > 0 && Date.now() - verifiedAt < PUSH_READY_TTL_MS
+  } catch { return false }
+}
 
 export default function EmployeePage() {
   const { db, session, currentEmpTab, setEmpTab, saveDB, logout, toast, showConfirm, setScreen, openModal, closeModal, activeModal, modalData, syncStatus, realtimeStatus, offlinePending } = useAppStore(
@@ -140,6 +152,7 @@ export default function EmployeePage() {
   const [pushStatus, setPushStatus] = useState(() =>
     typeof Notification === 'undefined'
       ? 'unsupported'
+      : getCachedPushReady(u?.id) ? 'ready'
       : Notification.permission === 'granted' ? 'checking' : 'permission'
   )
   const pushAttemptRef = useRef(false)
@@ -214,11 +227,7 @@ export default function EmployeePage() {
   // permanece visible y se reintenta al recuperar red o volver a la app.
   useEffect(() => {
     if (!u?.id || !('Notification' in window)) return
-    let cachedReady = false
-    try {
-      const verifiedAt = Number(localStorage.getItem(pushReadyStorageKey(u.id)) || 0)
-      cachedReady = Notification.permission === 'granted' && verifiedAt > 0 && Date.now() - verifiedAt < PUSH_READY_TTL_MS
-    } catch {}
+    const cachedReady = getCachedPushReady(u.id)
     pushReadyRef.current = cachedReady
     setPushStatus(cachedReady ? 'ready' : Notification.permission === 'granted' ? 'checking' : 'permission')
     if (cachedReady && navigator.onLine) {

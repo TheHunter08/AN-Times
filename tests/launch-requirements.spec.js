@@ -46,4 +46,23 @@ test.describe('Requisitos obligatorios del empleado', () => {
     await expect(dialog.getByText('Dibuja tu firma', { exact:true })).toHaveCount(0)
     await expect(dialog.getByRole('button', { name:'Continuar →' })).toBeDisabled()
   })
+
+  test('con notificaciones ya verificadas en caché, el modal obligatorio no llega a aparecer ni un instante', async ({ page }) => {
+    // Regresión: el estado inicial de pushStatus no miraba la caché de 30 días,
+    // así que el modal se abría en el primer render y se cerraba solo en cuanto
+    // el efecto de revalidación confirmaba la caché milisegundos después.
+    await page.addInitScript(() => {
+      const observer = new MutationObserver(() => {
+        if (document.getElementById('onboarding-dialog-title')) window.__onboardingFlashed = true
+      })
+      window.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body, { childList:true, subtree:true })
+      })
+    })
+    await loginAsEmployee(page, {}, { pushReady:true })
+    await page.goto('/')
+    await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
+
+    expect(await page.evaluate(() => window.__onboardingFlashed)).toBeFalsy()
+  })
 })
