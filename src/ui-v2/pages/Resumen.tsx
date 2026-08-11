@@ -1,9 +1,11 @@
+import { useMemo } from 'react'
 import type { CSSProperties } from 'react'
 import { PageTitle } from '../components/PageTitle.js'
 import { Button } from '../components/Button.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconDownload, IconFileText } from '../components/Icons.js'
+import { buildDuplicateNameLabels } from '../../utils/employeeLabels.js'
 
 export type ResumenPeriodMode = 'month' | 'date' | 'range'
 
@@ -24,7 +26,7 @@ export interface ResumenRow {
 }
 
 export interface ResumenProps {
-  employees: Array<{ id: string; name: string }>
+  employees: Array<{ id: string; name: string; dept?: string }>
   employeeId: string | null
   onChangeEmployee: (id: string | null) => void
   mode: ResumenPeriodMode
@@ -71,6 +73,7 @@ export function Resumen(props: ResumenProps) {
     rangeFrom, rangeTo, onChangeRangeFrom, onChangeRangeTo,
     days, dayLabel, rows, onExportPdf, onExportExcel, exportingPdf, exportingExcel,
   } = props
+  const employeeLabels = useMemo(() => buildDuplicateNameLabels(employees), [employees])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 1400 }}>
@@ -97,7 +100,7 @@ export function Resumen(props: ResumenProps) {
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Empleado</div>
           <select value={employeeId ?? ''} onChange={e => onChangeEmployee(e.target.value || null)} style={{ ...fieldStyle, minWidth: 220 }}>
             <option value="">Todos los empleados</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {employees.map(e => <option key={e.id} value={e.id}>{employeeLabels.get(e.id) || e.name}</option>)}
           </select>
         </div>
 

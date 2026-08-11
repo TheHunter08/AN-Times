@@ -32,6 +32,7 @@ import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLa
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
+import { buildDuplicateNameLabels } from '../utils/employeeLabels.js'
 import { downloadXlsx, downloadCsv, downloadDataUrl } from '../utils/exportFiles.js'
 import { PDF_PAGE, pdfColors, drawTableHeaderRow, drawTableDataRow, drawStatRow, drawSectionTitle, drawDocumentFooters, addReportPage } from '../utils/pdfReport.js'
 import { downloadHoursReportXlsx } from '../utils/hoursReportXlsx.js'
@@ -1383,7 +1384,7 @@ function ExpensesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => vo
   }
 
   const employees = useMemo(() =>
-    (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin).map((e: any) => ({ id: e.id, name: e.name || '' })),
+    (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin).map((e: any) => ({ id: e.id, name: e.name || '', dept: e.dept || e.centroTrabajo })),
     [db.employees])
 
   const addManual = (empId: string, concepto: string, importe: number, categoria: string, fecha: string) => {
@@ -1415,6 +1416,7 @@ function DocumentsPage() {
   const [uploadType, setUploadType] = useState('contrato')
   const [uploadExpiry, setUploadExpiry] = useState('')
   const employees = useMemo(() => (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja), [db.employees])
+  const employeeLabels = useMemo(() => buildDuplicateNameLabels(employees.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo }))), [employees])
 
   const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'otro'> = {
     contrato: 'contrato', nomina: 'nomina', nómina: 'nomina',
@@ -1550,7 +1552,7 @@ function DocumentsPage() {
           </div>
           <label style={{ display:'grid', gap:6, fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase' }}>Empleado
             <select value={uploadEmpId} onChange={e => setUploadEmpId(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }}>
-              {employees.map((e:any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              {employees.map((e:any) => <option key={e.id} value={e.id}>{employeeLabels.get(e.id) || e.name}</option>)}
             </select>
           </label>
           <label style={{ display:'grid', gap:6, fontSize:11, fontWeight:700, color:colors.text[500], textTransform:'uppercase' }}>Tipo de documento
@@ -1982,7 +1984,7 @@ function ResumenPage() {
   const [exportingExcel, setExportingExcel] = useState(false)
 
   const employees = useMemo(
-    () => (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin && e.role !== 'admin').map((e: any) => ({ id: e.id, name: e.name || e.id })),
+    () => (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin && e.role !== 'admin').map((e: any) => ({ id: e.id, name: e.name || e.id, dept: e.dept || e.centroTrabajo })),
     [db.employees],
   )
 

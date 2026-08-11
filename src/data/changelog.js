@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.3.2',
+    date: '2026-08-11',
+    title: 'Distinguir empleados homónimos en más pantallas',
+    items: [
+      'Los selectores de empleado en "Subir documento", "Registrar gasto manual" y el filtro de Resumen añaden el centro de trabajo cuando dos empleados tienen exactamente el mismo nombre completo, en vez de mostrar dos opciones idénticas.',
+    ],
+  },
+  {
     version: '4.3.1',
     date: '2026-08-11',
     title: 'Distinguir empleados con el mismo nombre',

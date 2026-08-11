@@ -6,6 +6,7 @@ import { radius } from '../design-system/radius'
 import { IconCheck, IconX, IconReceipt, IconPlus } from '../components/Icons.js'
 import { ProductState } from '../components/ProductState.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
+import { buildDuplicateNameLabels } from '../../utils/employeeLabels.js'
 
 export interface ExpenseItem {
   id: string
@@ -19,7 +20,7 @@ export interface ExpenseItem {
 
 export interface ExpensesProps {
   items: ExpenseItem[]
-  employees?: { id: string; name: string }[]
+  employees?: { id: string; name: string; dept?: string }[]
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   onOpen?: (item: ExpenseItem) => void
@@ -51,8 +52,9 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function AddManualModal({ employees, onClose, onSave }: { employees: { id: string; name: string }[]; onClose: () => void; onSave: (empId: string, concepto: string, importe: number, categoria: ExpenseItem['category'], fecha: string) => void }) {
+function AddManualModal({ employees, onClose, onSave }: { employees: { id: string; name: string; dept?: string }[]; onClose: () => void; onSave: (empId: string, concepto: string, importe: number, categoria: ExpenseItem['category'], fecha: string) => void }) {
   const [empId, setEmpId] = useState(employees[0]?.id || '')
+  const employeeLabels = buildDuplicateNameLabels(employees)
   const [concepto, setConcepto] = useState('')
   const [importe, setImporte] = useState('')
   const [categoria, setCategoria] = useState<ExpenseItem['category']>('dieta')
@@ -82,7 +84,7 @@ function AddManualModal({ employees, onClose, onSave }: { employees: { id: strin
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>Empleado</div>
           <select value={empId} onChange={e => setEmpId(e.target.value)}
             style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {employees.map(e => <option key={e.id} value={e.id}>{employeeLabels.get(e.id) || e.name}</option>)}
           </select>
         </div>
 
