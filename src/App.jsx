@@ -60,17 +60,30 @@ function InAppNotification() {
 // Actualización silenciosa y segura de la PWA. Si hay cambios locales pendientes,
 // los sincroniza antes de activar el nuevo service worker; sin conexión, pospone
 // la recarga y reintenta automáticamente al volver a estar online.
+// Si hay cambios pendientes de sincronizar, esperar a que terminen antes de
+// activar la versión nueva evita interrumpir una escritura en curso — pero
+// esperar SIN LÍMITE deja al dispositivo bloqueado en la versión vieja para
+// siempre en cuanto esa sincronización nunca llega a completarse (sin red
+// duradera, un fallo silencioso, etc.). Los cambios pendientes ya se
+// persisten en IndexedDB/localStorage (ver dataService.js) y sobreviven a la
+// recarga, así que pasado este margen se aplica la actualización de todas
+// formas: es preferible una escritura reintentada tras recargar a quedarse
+// congelado en una versión antigua sin ningún aviso.
+const MAX_UPDATE_DEFER_MS = 3 * 60 * 1000
+
 function UpdateBanner() {
   const [waitingSW, setWaitingSW] = useState(null)
   const [phase, setPhase] = useState('waiting')
   const reloading   = useRef(false)
   const waitingRef  = useRef(null)
+  const waitingSinceRef = useRef(0)
   const applyingRef = useRef(false)
   const attemptRef  = useRef(false)
 
   const _setSW = (sw) => {
     if (!sw || waitingRef.current === sw) return
     waitingRef.current = sw
+    waitingSinceRef.current = Date.now()
     setWaitingSW(sw)
     setPhase('waiting')
   }
@@ -81,12 +94,13 @@ function UpdateBanner() {
     attemptRef.current = true
     try {
       const initialState = useAppStore.getState()
+      const deferredTooLong = Date.now() - waitingSinceRef.current > MAX_UPDATE_DEFER_MS
       // No interrumpir una escritura que todavía está llegando a Supabase.
-      if (!initialState.offlinePending && initialState.syncStatus === 'syncing') {
+      if (!initialState.offlinePending && initialState.syncStatus === 'syncing' && !deferredTooLong) {
         setPhase('syncing')
         return
       }
-      if (initialState.offlinePending) {
+      if (initialState.offlinePending && !deferredTooLong) {
         setPhase('syncing')
         try { await uploadPendingIfAny() } catch {}
         if (useAppStore.getState().offlinePending) { setPhase('waiting'); return }

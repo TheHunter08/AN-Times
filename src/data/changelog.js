@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.5.1',
+    date: '2026-08-11',
+    title: 'La app ya no se queda atascada en una versión vieja',
+    items: [
+      'Si un dispositivo tenía cambios sin sincronizar, la actualización esperaba a que terminaran de subirse antes de instalarse — sin límite de tiempo. Si esa sincronización nunca se completaba, el dispositivo se quedaba congelado en la versión antigua para siempre, sin ningún aviso.',
+      'Ahora, pasados 3 minutos de espera, la actualización se instala de todas formas. Los cambios pendientes no se pierden: se guardan en el propio dispositivo y se siguen reintentando después de actualizar.',
+    ],
+  },
+  {
     version: '4.5.0',
     date: '2026-08-11',
     title: 'Vinculación de cuenta automática y obligatoria',
