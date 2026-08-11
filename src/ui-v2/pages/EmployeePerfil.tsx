@@ -69,6 +69,18 @@ function RowDivider() {
   return <div style={{ height: 1, background: colors.border.subtle, marginLeft: 64 }} />
 }
 
+// .emp-body / .emp-dsk-content tienen overflow:hidden y esperan que cada
+// vista traiga su propio scroll (igual que hace "inicio" en EmployeePage).
+// Las subvistas de Perfil no pasan por PullToRefresh, así que necesitan
+// este wrapper para poder hacer scroll en la PWA instalada.
+function SubViewScroll({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 116, boxSizing: 'border-box' }}>
+      {children}
+    </div>
+  )
+}
+
 export interface EmployeePerfilProps {
   u: any; session: any; db: any; saveDB: (updater: any) => void; toast: (msg: string, ms?: number, kind?: string) => void
   doLogout: () => void; openModal: (name: string) => void
@@ -80,9 +92,9 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, push
   const myRecs = useMemo(() => (db.records || []).filter((r: any) => r.empId === u.id && r.fin), [db.records, u.id])
   const activation = useMemo(() => buildEmployeeActivation(db, u, pushReady), [db.firmas, u, pushReady])
 
-  if (perfilView === 'gastos') return <EmployeeGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} />
-  if (perfilView === 'denuncia') return <EmployeeDenuncia toast={toast} onBack={() => setPerfilView('perfil')} />
-  if (perfilView === 'actualizaciones') return <EmployeeActualizaciones toast={toast} onBack={() => setPerfilView('perfil')} />
+  if (perfilView === 'gastos') return <SubViewScroll><EmployeeGastos db={db} u={u} toast={toast} saveDB={saveDB} onBack={() => setPerfilView('perfil')} /></SubViewScroll>
+  if (perfilView === 'denuncia') return <SubViewScroll><EmployeeDenuncia toast={toast} onBack={() => setPerfilView('perfil')} /></SubViewScroll>
+  if (perfilView === 'actualizaciones') return <SubViewScroll><EmployeeActualizaciones toast={toast} onBack={() => setPerfilView('perfil')} /></SubViewScroll>
 
   if (!db.records) return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
