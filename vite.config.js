@@ -37,6 +37,7 @@ export default defineConfig({
           '**/pdf-*.js',
           '**/pdfSignatureAnchor-*.js',
           '**/pdf.worker.min-*.mjs',
+          '**/documentSigning-*.js',
         ],
       },
       manifest: {

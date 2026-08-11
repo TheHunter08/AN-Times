@@ -23,9 +23,9 @@ describe('deployment quality gate', () => {
   it('uses a deterministic install and verifies code before Vercel publishes it', () => {
     expect(vercel.installCommand).toBe('npm ci --include=dev')
     expect(vercel.buildCommand).toBe('npm run verify:deploy')
-    // Vite build es la fuente de verdad del proyecto. El tsc global conserva
-    // deuda heredada de ui-v2 y no debe impedir publicar un bundle verificado.
-    expect(pkg.scripts['verify:deploy']).toBe('npm run verify:release')
+    // La 4.5 mantiene el tipado limpio: Vercel debe ejecutar TypeScript antes
+    // de las pruebas y del build para impedir publicar una integración rota.
+    expect(pkg.scripts['verify:deploy']).toBe('npm run typecheck && npm run verify:release')
     for (const ignoredAsset of [
       '**/localai-*.js',
       '**/localAI-*.js',
@@ -33,6 +33,7 @@ describe('deployment quality gate', () => {
       '**/pdf-*.js',
       '**/pdfSignatureAnchor-*.js',
       '**/pdf.worker.min-*.mjs',
+      '**/documentSigning-*.js',
     ]) {
       expect(viteConfig).toContain(`'${ignoredAsset}'`)
     }

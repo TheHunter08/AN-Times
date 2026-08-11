@@ -21,7 +21,7 @@ if (totalGzip > INITIAL_BUDGET) {
 
 const assetNames = await readdir(new URL('assets/', DIST))
 const precacheSource = await readFile(new URL('sw.js', DIST), 'utf8')
-const onDemandAssetPattern = /^(?:localai-|localAI\.worker-|pdf-|pdfSignatureAnchor-|pdf\.worker\.min-)/i
+const onDemandAssetPattern = /^(?:localai-|localAI\.worker-|pdf-|pdfSignatureAnchor-|pdf\.worker\.min-|documentSigning-)/i
 const forbiddenPrecache = assetNames.filter(name =>
   onDemandAssetPattern.test(name) && precacheSource.includes(name)
 )

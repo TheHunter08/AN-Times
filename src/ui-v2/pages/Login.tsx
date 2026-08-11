@@ -463,7 +463,7 @@ export function Login({
                     type="button"
                     aria-pressed={selectedEmpId === employee.id}
                     onClick={() => onSelectEmp?.(employee.id)}
-                    style={{ minHeight:40, padding:'6px 11px', borderRadius:radius.pill, border:`1px solid ${selectedEmpId === employee.id ? colors.primary.base : colors.border.default}`, background:selectedEmpId === employee.id ? colors.primary.dim : colors.bg[600], color:colors.text[800], fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+                    style={{ minHeight:40, padding:'6px 11px', borderRadius:radius.pill, border:`1px solid ${selectedEmpId === employee.id ? colors.primary.base : colors.border.default}`, background:selectedEmpId === employee.id ? colors.primary.dim : colors.bg[600], color:colors.text[900], fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
                   >
                     {employee.name}{employee.dept ? ` · ${employee.dept}` : ''}
                   </button>)}
