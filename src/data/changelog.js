@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.3.1',
+    date: '2026-08-11',
+    title: 'Distinguir empleados con el mismo nombre',
+    items: [
+      'En la pantalla de inicio de sesión, si dos empleados comparten nombre de pila ahora se muestra también la inicial del apellido (y el centro de trabajo si aún así coinciden), en vez de mostrar solo el primer nombre para ambos.',
+    ],
+  },
+  {
     version: '4.3.0',
     date: '2026-08-11',
     title: 'Historial de jornada por mes y scroll en Perfil',

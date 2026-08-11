@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice } from '../components/Icons.js'
@@ -52,6 +52,30 @@ export interface LoginProps {
 
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 
+// Con solo el primer nombre, dos empleados como "Juan Pérez" y "Juan García"
+// son indistinguibles en el selector. Se añade la inicial del apellido (y,
+// si aún así coinciden, el centro de trabajo) solo a quienes lo necesitan.
+function buildEmployeeLabels(employees: EmpOption[]): Map<string, string> {
+  const nameOf = (e: EmpOption) => e.name.trim().split(/\s+/).filter(Boolean)
+  const firstOf = (e: EmpOption) => nameOf(e)[0] || e.name
+
+  const withInitial = (e: EmpOption) => {
+    const parts = nameOf(e)
+    return parts.length > 1 ? `${parts[0]} ${parts[1][0].toUpperCase()}.` : parts[0] || e.name
+  }
+
+  const labels = new Map<string, string>()
+  for (const e of employees) {
+    const collidesOnFirst = employees.some(other => other.id !== e.id && firstOf(other) === firstOf(e))
+    if (!collidesOnFirst) { labels.set(e.id, firstOf(e)); continue }
+
+    const label = withInitial(e)
+    const collidesOnInitial = employees.some(other => other.id !== e.id && firstOf(other) === firstOf(e) && withInitial(other) === label)
+    labels.set(e.id, collidesOnInitial && e.dept ? `${label} · ${e.dept}` : label)
+  }
+  return labels
+}
+
 export function Login({
   employees = [], pin = '', selectedEmpId = '', onSelectEmp, hasRememberedEmployee, onUseRememberedEmployee, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
@@ -80,6 +104,7 @@ export function Login({
   const visibleEmployees = normalizedEmployeeSearch.length < 2
     ? employees.filter(e => e.id === selectedEmpId)
     : employees.filter(e => `${e.name} ${e.dept || ''}`.toLocaleLowerCase('es').includes(normalizedEmployeeSearch))
+  const empLabels = useMemo(() => buildEmployeeLabels(employees), [employees])
   const pinDotCount = Math.min(6, Math.max(4, selEmp?.pinLen || 4))
   const submitBusy = !!(emailLoading || registerLoading || recoveryLoading || loading)
   const submitMissing = !password
@@ -236,7 +261,7 @@ export function Login({
                       }}>
                         {e.name.slice(0,1).toUpperCase()}
                       </span>
-                      {e.name.split(' ')[0]}
+                      {empLabels.get(e.id) || e.name.split(' ')[0]}
                     </button>
                   ))}
                   {protectedDirectory && normalizedEmployeeSearch.length < 2 && !selectedEmpId && <div role="status" style={{ padding:'10px 4px', color:colors.text[400], fontSize:12 }}>Por privacidad, escribe al menos 2 letras de tu nombre.</div>}
