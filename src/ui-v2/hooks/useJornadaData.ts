@@ -42,7 +42,10 @@ export function useJornadaData(db: any, u: any, timer: any) {
 
     const tlItems = realRecs.map((r: any) => ({ r, isCurrent: !r.fin }))
 
-    const histDays = Array.from({ length: 30 }, (_, i) => {
+    // Solo el mes en curso (del día 1 a ayer): antes era una ventana fija de
+    // 30 días, así que a principios de mes se veía mayormente el mes anterior.
+    const daysSoFarThisMonth = Math.max(0, now.getDate() - 1)
+    const histDays = Array.from({ length: daysSoFarThisMonth }, (_, i) => {
       const d = new Date(now); d.setDate(d.getDate() - i - 1); return localDateStr(d)
     })
     const histWithRecs = histDays

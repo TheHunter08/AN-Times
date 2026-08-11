@@ -55,11 +55,11 @@ export function EmployeeActualizaciones({ toast, onBack }: EmployeeActualizacion
       <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[500], margin: '0 2px 8px' }}>Novedades</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {APP_CHANGELOG.map(entry => (
-          <div key={entry.date} style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: 16 }}>
+          <div key={`${entry.version}-${entry.date}`} style={{ background: colors.bg[600], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.xl, padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[900] }}>{entry.title}</div>
-              <div style={{ fontSize: 11, color: colors.text[300], flexShrink: 0 }}>
-                {new Date(`${entry.date}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+              <div style={{ fontSize: 11, color: colors.text[300], flexShrink: 0, whiteSpace: 'nowrap' }}>
+                v{entry.version} · {new Date(`${entry.date}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
               </div>
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 5 }}>
