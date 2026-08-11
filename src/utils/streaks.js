@@ -12,6 +12,7 @@ export function calcStreak(records, empId, todayDate) {
       .map(r => r.inicio ? localDateStr(new Date(r.inicio)) : null)
       .filter(Boolean)
   )
+  const todayMonth = todayDate.slice(0, 7)
   let count = 0
   const d = new Date(todayDate + 'T00:00:00')
   if (!workedDays.has(todayDate)) {
@@ -20,6 +21,8 @@ export function calcStreak(records, empId, todayDate) {
   }
   while (count < 400) {
     const ds = localDateStr(d)
+    // La racha se reinicia cada mes: no debe arrastrar días del mes anterior.
+    if (ds.slice(0, 7) !== todayMonth) break
     if (!workedDays.has(ds)) break
     count++
     d.setDate(d.getDate() - 1)
