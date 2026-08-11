@@ -10,15 +10,22 @@ export function hasEmployeeEmail(db, employeeId) {
   return isValidAccountEmail(employee?.email)
 }
 
+export function hasEmployeeAuth(db, employeeId) {
+  const employee = (db?.employees || []).find(e => e?.id === employeeId)
+  return Boolean(employee?.authId || employee?.auth_id)
+}
+
 export function getLaunchRequirements(db, employeeId, pushReady) {
   const emailReady = hasEmployeeEmail(db, employeeId)
+  const authReady = hasEmployeeAuth(db, employeeId)
   const signatureReady = hasEmployeeSignature(db, employeeId)
   const notificationsReady = pushReady === true
   return {
     emailReady,
+    authReady,
     signatureReady,
     notificationsReady,
-    ready: emailReady && signatureReady && notificationsReady,
+    ready: emailReady && authReady && signatureReady && notificationsReady,
   }
 }
 

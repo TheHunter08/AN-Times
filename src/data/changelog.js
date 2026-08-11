@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.5.0',
+    date: '2026-08-11',
+    title: 'Vinculación de cuenta automática y obligatoria',
+    items: [
+      'El asistente obligatorio de bienvenida añade el paso "Cuenta": tras guardar tu correo, se te pide una contraseña y tu PIN de fichaje para crear y vincular tu cuenta de acceso en el momento, sin tener que cerrar sesión y repetirlo desde el login.',
+      'Nadie puede usar la app sin completar este paso — se suma a correo, notificaciones y firma como requisito obligatorio, igual que los demás.',
+      'El PIN sigue siendo obligatorio como prueba de identidad: solo quien conoce tu PIN puede vincular tu cuenta, para que nadie pueda suplantarte usando solo tu correo.',
+    ],
+  },
+  {
     version: '4.4.0',
     date: '2026-08-11',
     title: 'Ficha del empleado, buscador de login y huella/Face ID',

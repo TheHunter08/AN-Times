@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeEmail, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeAuth, hasEmployeeEmail, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
   const db = {
-    employees: [{ id:'emp1', email:'ana@empresa.com' }],
+    employees: [{ id:'emp1', email:'ana@empresa.com', authId:'auth-1' }],
     firmas: { emp1: { main: { data: 'data:image/jpeg;base64,firma' } } },
   }
 
@@ -18,11 +18,18 @@ describe('requisitos obligatorios de lanzamiento', () => {
     expect(hasEmployeeEmail({ employees: [{ id:'emp1' }] }, 'emp1')).toBe(false)
   })
 
-  it('exige simultáneamente email, firma y registro push confirmado', () => {
+  it('solo acepta una cuenta de Supabase Auth vinculada', () => {
+    expect(hasEmployeeAuth(db, 'emp1')).toBe(true)
+    expect(hasEmployeeAuth({ employees: [{ id:'emp1' }] }, 'emp1')).toBe(false)
+    expect(hasEmployeeAuth({ employees: [{ id:'emp1', auth_id:'legacy-1' }] }, 'emp1')).toBe(true)
+  })
+
+  it('exige simultáneamente email, cuenta vinculada, firma y registro push confirmado', () => {
     expect(getLaunchRequirements(db, 'emp1', true).ready).toBe(true)
     expect(getLaunchRequirements(db, 'emp1', false).ready).toBe(false)
     expect(getLaunchRequirements({ firmas: db.firmas }, 'emp1', true).ready).toBe(false)
     expect(getLaunchRequirements({ employees: db.employees }, 'emp1', true).ready).toBe(false)
+    expect(getLaunchRequirements({ employees: [{ id:'emp1', email:'ana@empresa.com' }], firmas: db.firmas }, 'emp1', true).ready).toBe(false)
   })
   it('explica por empleado los bloqueos operativos pendientes', () => {
     const readinessDb = {

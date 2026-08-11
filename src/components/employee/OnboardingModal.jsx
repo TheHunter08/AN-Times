@@ -6,32 +6,45 @@ import { radius } from '../../ui-v2/design-system/radius'
 import { TextField } from '../../ui-v2/components/FormField.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { getNotificationPermissionGuide } from '../../utils/notificationPermission.js'
-import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
+import { getRegistrationEligibility, isValidAccountEmail, normalizeAccountEmail, validateAccountPassword, verifyRegistrationPin } from '../../utils/authRegistration.js'
+import { getLockoutState, recordFailedAttempt, clearLockout } from '../../utils/pinSecurity.js'
+import { linkEmployeeAuthIdentity, relinkEmployeeAuthIdentity } from '../../utils/authIdentity.js'
+import { signUpEmail, isAuthReady } from '../../services/authService.js'
+import { auditLog } from '../../services/dataService.js'
 
 const btnPrimary = { padding:'12px', borderRadius:radius.lg, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:14, fontFamily:'inherit', cursor:'pointer', boxShadow:`0 4px 14px ${colors.primary.glow}` }
 const btnSecondary = { padding:'12px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:14, fontFamily:'inherit', cursor:'pointer' }
 const btnSmSec = { padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
 const inpStyle = { width:'100%', padding:'12px 14px', borderRadius:radius.lg, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[900], fontSize:15, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }
 
-// Pasos: Correo(0) → Notificaciones(1) → Firma(2) → Recordatorio(3)
+// Pasos: Correo(0) → Cuenta(1) → Notificaciones(2) → Firma(3) → Recordatorio(4)
 const STEP_EMAIL = 0
-const STEP_NOTIFICATIONS = 1
-const STEP_SIGNATURE = 2
-const STEP_REMINDER = 3
+const STEP_ACCOUNT = 1
+const STEP_NOTIFICATIONS = 2
+const STEP_SIGNATURE = 3
+const STEP_REMINDER = 4
 
 // ─── ONBOARDING (primer login empleado) ─────────────────────────────────────
 export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, notificationPermission, onActivateNotifications, hasOpenShift, onFinishOpenShift }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const existingSignature = db.firmas?.[u?.id]?.main?.data || null
-  const existingEmail = (db.employees || []).find(e => e.id === u?.id)?.email || u?.email || ''
+  const currentEmployee = (db.employees || []).find(e => e.id === u?.id) || u || {}
+  const existingEmail = currentEmployee.email || u?.email || ''
   const emailReady = isValidAccountEmail(existingEmail)
-  const isRecheck = Boolean(existingSignature && emailReady)
+  const authReady = Boolean(currentEmployee.authId || currentEmployee.auth_id)
+  const isRecheck = Boolean(existingSignature && emailReady && authReady)
 
-  const [step, setStep] = useState(() => (!emailReady ? STEP_EMAIL : STEP_NOTIFICATIONS))
+  const [step, setStep] = useState(() => (!emailReady ? STEP_EMAIL : !authReady ? STEP_ACCOUNT : STEP_NOTIFICATIONS))
   const [done, setDone] = useState(false)
   const [capturedSignature, setCapturedSignature] = useState(null)
   const [reminderTime, setReminderTime] = useState(() => getCfg('reminderTime', '20:00'))
   const [emailInput, setEmailInput] = useState(existingEmail)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [accountPasswordConfirm, setAccountPasswordConfirm] = useState('')
+  const [accountPin, setAccountPin] = useState('')
+  const [accountBusy, setAccountBusy] = useState(false)
+  const [accountError, setAccountError] = useState('')
+  const [accountNotice, setAccountNotice] = useState('')
   const dialogRef = useDialogA11y(visible && !done)
   const permissionGuide = getNotificationPermissionGuide(
     typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -43,7 +56,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   if (!visible || done) return null
 
   const saveEmailAndContinue = () => {
-    if (emailReady) { setStep(STEP_NOTIFICATIONS); return }
+    if (emailReady) { setStep(STEP_ACCOUNT); return }
     const normalized = normalizeAccountEmail(emailInput)
     if (!isValidAccountEmail(normalized)) { toast('Introduce un email válido para continuar.', 4000, 'warn'); return }
     const duplicate = (db.employees || []).find(e => e.id !== u.id && normalizeAccountEmail(e.email) === normalized)
@@ -51,7 +64,100 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
     saveDB(fresh => ({
       employees: (fresh.employees || []).map(e => e.id === u.id ? { ...e, email: normalized } : e),
     }))
-    setStep(STEP_NOTIFICATIONS)
+    setStep(STEP_ACCOUNT)
+  }
+
+  // Crea la cuenta de Supabase Auth del empleado y la vincula a su perfil —
+  // misma lógica de LoginV2.handleRegister (elegibilidad, contraseña, prueba
+  // de PIN, signUpEmail, vinculación/recuperación de identidad), reutilizada
+  // aquí para no obligar a cerrar sesión y repetirlo desde la pantalla de
+  // login. No se toca LoginV2.tsx: ese flujo sigue funcionando igual para
+  // quien prefiera vincularse desde ahí.
+  const linkAccountAndContinue = async () => {
+    setAccountError('')
+    setAccountNotice('')
+    if (authReady) { setStep(STEP_NOTIFICATIONS); return }
+    if (!isAuthReady()) { setAccountError('Sin conexión con el servidor. Inténtalo más tarde.'); return }
+
+    const eligibility = getRegistrationEligibility(db.employees, existingEmail, { allowLinkedRecovery:true })
+    if (!eligibility.ok || eligibility.employee.id !== u.id) {
+      setAccountError('No se pudo verificar tu perfil. Contacta con Administración.')
+      return
+    }
+    const passwordError = validateAccountPassword(accountPassword)
+    if (passwordError) { setAccountError(passwordError); return }
+    if (accountPassword !== accountPasswordConfirm) { setAccountError('Las contraseñas no coinciden.'); return }
+
+    const pinLockout = getLockoutState(u.id, db)
+    if (pinLockout.locked) {
+      setAccountError(`PIN bloqueado temporalmente. Inténtalo en ${pinLockout.remainingMin || 1} min.`)
+      return
+    }
+    const pinCheck = await verifyRegistrationPin(eligibility.employee, accountPin)
+    if (!pinCheck.ok) {
+      if (pinCheck.reason === 'employee_without_pin') {
+        setAccountError('Tu perfil todavía no tiene PIN. Pide a Administración que lo configure antes de vincular la cuenta.')
+        return
+      }
+      let failedState = null
+      saveDB(fresh => {
+        const failed = recordFailedAttempt(u.id, fresh)
+        failedState = failed.state
+        return failed.lockoutData ? { pinLockouts:failed.lockoutData } : null
+      })
+      setAccountError(failedState?.locked
+        ? 'PIN incorrecto. Tu perfil ha quedado bloqueado temporalmente.'
+        : `PIN incorrecto${failedState?.remaining != null ? ` (${failedState.remaining} intentos)` : ''}.`)
+      return
+    }
+    saveDB(fresh => ({ pinLockouts:clearLockout(u.id, fresh) }))
+
+    setAccountBusy(true)
+    try {
+      const result = await signUpEmail(normalizeAccountEmail(existingEmail), accountPassword)
+      if (result.session && result.user?.id) {
+        let linkOutcome
+        if (eligibility.recovery && eligibility.existingAuthId !== result.user.id) {
+          let relinked = false
+          saveDB(fresh => {
+            const r = relinkEmployeeAuthIdentity(fresh.employees, u.id, eligibility.existingAuthId, result.user.id)
+            relinked = r.ok
+            if (!r.changed) return null
+            const withAudit = auditLog(fresh, 'Cuenta de acceso recuperada', u.name || u.id, u.name || 'Empleado', {
+              category:'seguridad', entityType:'employee', entityId:u.id,
+              before:{ authId:eligibility.existingAuthId }, after:{ authId:result.user.id },
+            })
+            return { employees:r.employees, audit:withAudit.audit }
+          })
+          linkOutcome = { ok:relinked }
+        } else {
+          let outcome = { ok:false }
+          saveDB(fresh => {
+            const r = linkEmployeeAuthIdentity(fresh.employees, u.id, result.user.id)
+            outcome = r
+            return r.changed ? { employees:r.employees } : null
+          })
+          linkOutcome = outcome
+        }
+        if (!linkOutcome.ok) {
+          setAccountError(linkOutcome.reason === 'identity_in_use'
+            ? 'Esta cuenta ya está vinculada a otro perfil. Contacta con Administración.'
+            : 'No se pudo vincular la cuenta. Contacta con Administración.')
+          return
+        }
+        toast(eligibility.recovery ? 'Cuenta recuperada y vinculada correctamente' : 'Cuenta creada y vinculada correctamente', 5000, 'ok')
+        setStep(STEP_NOTIFICATIONS)
+      } else if (eligibility.recovery && result.user?.identities?.length === 0) {
+        setAccountError('La cuenta anterior todavía existe. Contacta con Administración si no puedes acceder.')
+      } else {
+        setAccountNotice('Hemos enviado un enlace de confirmación a tu correo. Ábrelo y, cuando vuelvas, tu cuenta quedará vinculada automáticamente.')
+        toast('Revisa tu correo para confirmar la cuenta', 6000, 'ok')
+      }
+    } catch (error) {
+      setAccountError(error?.message || 'No se pudo crear la cuenta. Inténtalo de nuevo.')
+    } finally {
+      setAccountBusy(false)
+    }
   }
 
   const saveSignatureAndContinue = () => {
@@ -74,6 +180,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   const finish = () => {
     const signatureData = existingSignature || capturedSignature
     if (!emailReady) { setStep(STEP_EMAIL); toast('Debes añadir tu correo personal para continuar.', 5000, 'warn'); return }
+    if (!authReady) { setStep(STEP_ACCOUNT); toast('Debes vincular tu cuenta para continuar.', 5000, 'warn'); return }
     if (!pushReady) { setStep(STEP_NOTIFICATIONS); toast('Debes activar y registrar las notificaciones para continuar.', 5000, 'warn'); return }
     if (!signatureData) { setStep(STEP_SIGNATURE); toast('Debes guardar tu firma para continuar.', 5000, 'warn'); return }
     saveDB(fresh => ({
@@ -84,7 +191,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
     toast('¡Configuración lista! Ya puedes usar la app.', 3000, 'ok')
   }
 
-  const STEPS = ['Correo', 'Notificaciones', 'Tu firma', 'Recordatorio']
+  const STEPS = ['Correo', 'Cuenta', 'Notificaciones', 'Tu firma', 'Recordatorio']
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
@@ -149,6 +256,48 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
             <button style={{ ...btnPrimary, width:'100%' }} onClick={saveEmailAndContinue}>
               {emailReady ? 'Continuar →' : 'Guardar correo →'}
             </button>
+          </div>
+        )}
+
+        {/* Paso: Vincular cuenta (Supabase Auth) */}
+        {step === STEP_ACCOUNT && (
+          <div>
+            <div style={{ textAlign:'center', marginBottom:14 }}>
+              <div style={{ fontSize:40, marginBottom:10 }}>🔐</div>
+              <div style={{ fontSize:14, fontWeight:700, color:colors.text[900], marginBottom:4 }}>Vincula tu cuenta</div>
+              <div style={{ fontSize:12, color:colors.text[500], lineHeight:1.7 }}>
+                Crea una contraseña para <strong>{existingEmail}</strong> y confirma tu PIN de fichaje para probar que eres tú. Es obligatorio para proteger tu acceso.
+              </div>
+            </div>
+            {accountNotice ? (
+              <div style={{ background:`color-mix(in srgb, ${colors.primary.base} 8%, transparent)`, border:`1px solid color-mix(in srgb, ${colors.primary.base} 20%, transparent)`, borderRadius:radius.lg, padding:'12px 14px', fontSize:12, color:colors.text[700], lineHeight:1.6 }}>
+                {accountNotice}
+              </div>
+            ) : (
+              <>
+                <input
+                  type="password" autoComplete="new-password" placeholder="Contraseña nueva (mín. 8 caracteres)"
+                  value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
+                  style={{ ...inpStyle, marginBottom:10 }}
+                />
+                <input
+                  type="password" autoComplete="new-password" placeholder="Repite la contraseña"
+                  value={accountPasswordConfirm} onChange={e => setAccountPasswordConfirm(e.target.value)}
+                  style={{ ...inpStyle, marginBottom:10 }}
+                />
+                <input
+                  type="password" inputMode="numeric" autoComplete="off" placeholder="Tu PIN de fichaje"
+                  value={accountPin} onChange={e => setAccountPin(e.target.value.replace(/\D/g, ''))}
+                  style={{ ...inpStyle, marginBottom:14 }}
+                />
+                {accountError && (
+                  <div style={{ fontSize:11.5, color:colors.semantic.red, marginBottom:12, lineHeight:1.5 }}>{accountError}</div>
+                )}
+                <button style={{ ...btnPrimary, width:'100%' }} disabled={accountBusy} onClick={linkAccountAndContinue}>
+                  {accountBusy ? 'Vinculando…' : 'Crear y vincular mi cuenta →'}
+                </button>
+              </>
+            )}
           </div>
         )}
 
