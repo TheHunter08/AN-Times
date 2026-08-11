@@ -25,6 +25,7 @@ import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
 import { finalizeRecord } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
+import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
 import { createNotification } from '../utils/notifications.js'
 import { buildEmployeeDayGuide } from '../utils/employeeDayGuide.js'
 
@@ -585,7 +586,7 @@ export default function EmployeePage() {
       })
 
       // 5. Documentos pendientes de firma (una vez al día a partir de las 9h)
-      const pendDocs = (db.documentos || []).filter(d => d.empId === u.id && !d.firma)
+      const pendDocs = (db.documentos || []).filter(d => d.empId === u.id && !hasSignedDocumentArtifact(d))
       if (pendDocs.length > 0) {
         const key = 'an_docs_' + u.id
         if (!hasSent(key, todayStr) && hh >= 9) {

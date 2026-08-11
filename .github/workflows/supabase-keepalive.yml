@@ -1,9 +1,9 @@
 name: Supabase Keepalive
 
 on:
-  schedule:
-    # Cada 3 días a las 04:00 UTC — evita la pausa por inactividad del plan Free
-    - cron: '0 4 */3 * *'
+  # operational-crons.yml consulta producción cada 30 minutos mediante
+  # endpoints con service role. El disparo manual comprueba el endpoint de
+  # salud y nunca escribe app_data con la clave anónima.
   workflow_dispatch:
 
 jobs:
@@ -11,38 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
+    env:
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
     steps:
-      - name: Ping Supabase con escritura
+      - name: Comprobar actividad y salud de Supabase
         run: |
-          _raw_url="${{ secrets.VITE_SB_URL }}"
-          _raw_anon="${{ secrets.VITE_SB_ANON }}"
-          SB_URL=$(printf '%s' "${_raw_url:?VITE_SB_URL secret is required}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          SB_ANON=$(printf '%s' "${_raw_anon:?VITE_SB_ANON secret is required}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-
-          echo "=== Supabase keepalive — $(date -u) ==="
-
-          # 1. Leer datos actuales
-          RESP=$(curl -sf \
-            -H "apikey: $SB_ANON" \
-            -H "Authorization: Bearer $SB_ANON" \
-            "$SB_URL/rest/v1/app_data?id=eq.1&select=updated_at")
-          echo "Lectura OK: $RESP"
-
-          # 2. PATCH: actualizar _keepalive_ts en app_data (write real → cuenta como actividad)
-          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          PATCH=$(curl -sf -o /dev/null -w "%{http_code}" \
-            -X PATCH \
-            -H "apikey: $SB_ANON" \
-            -H "Authorization: Bearer $SB_ANON" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            "$SB_URL/rest/v1/app_data?id=eq.1" \
-            -d "{\"updated_at\": \"$TS\"}")
-
-          echo "PATCH status: $PATCH"
-          if [ "$PATCH" = "204" ] || [ "$PATCH" = "200" ]; then
-            echo "✅ Keepalive completado — Supabase activo"
-          else
-            echo "⚠️  PATCH devolvió $PATCH — revisar"
-            exit 1
-          fi
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ')
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            "${APP_URL}/api/health"

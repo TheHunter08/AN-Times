@@ -2,19 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { evaluateRlsTransition, evaluateSafeMigration, RLS_RUNTIME_CAPABILITIES } from './securityReadiness.js'
 
 describe('preparación real de RLS', () => {
-  it('no confunde identidades completas con una ruta de datos preparada', () => {
+  it('mantiene bloqueada la activación hasta contrastar auth_id con Auth', () => {
     const result = evaluateRlsTransition({
       authTotal:2, authReady:2, emailReady:2, duplicatedAuthIds:0,
     })
     expect(result.ready).toBe(false)
     expect(result.state).toBe('NO_ACTIVAR_RLS_RUNTIME')
     expect(result.runtimeBlockers).toEqual([
-      'cliente de datos todavía anónimo',
-      'el acceso PIN todavía no tiene una sesión oficial de Supabase Auth',
       'auth_id todavía no se ha contrastado con auth.users',
-      'blob legado todavía activo',
     ])
-    expect(RLS_RUNTIME_CAPABILITIES.authenticatedDataPath).toBe(false)
+    expect(RLS_RUNTIME_CAPABILITIES).toMatchObject({
+      authenticatedDataPath:true,
+      pinAccessRetired:true,
+      legacyBlobRetired:true,
+    })
   })
 
   it('prioriza los bloqueos de identidad que impedirían entrar', () => {

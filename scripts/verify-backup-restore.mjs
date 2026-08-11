@@ -65,5 +65,6 @@ console.log(JSON.stringify({
   timestamp:plan.timestamp,
   counts:plan.counts,
   restoreRows:plan.targetRows.map(row => row.id),
+  restoreTables:(plan.targetTables || []).map(entry => ({ table:entry.table, rows:entry.rows.length })),
   mode:'dry-run (ningún dato escrito)',
 }, null, 2))

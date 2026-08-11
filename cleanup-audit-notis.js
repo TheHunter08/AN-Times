@@ -14,18 +14,19 @@
 // necesario — ajusta si quieres ser más agresivo):
 //   - notis:  se borran las YA LEÍDAS con más de 6 meses.
 //             Las no leídas nunca se tocan, sin importar su antigüedad.
-//   - audit:  se borran las de más de 2 años (muy por debajo de los
-//             4 años legales de `records`/`cierres`, que este script
-//             NUNCA toca).
+//   - audit:  se conserva un mínimo de 4 años, igual que la evidencia de
+//             jornada a la que puede quedar vinculada.
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
-const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
-if (!SB_URL || !SB_ANON) { console.error('[cleanup] VITE_SB_URL / VITE_SB_ANON not set'); process.exit(1) }
+const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+if (!SB_URL || !SB_SERVICE) { console.error('[cleanup] VITE_SB_URL / SB_SERVICE_KEY not set'); process.exit(1) }
 
-const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}`, Prefer: 'return=minimal,count=exact' }
+// Las eliminaciones de retención son administrativas: nunca deben depender
+// de políticas anon y deben seguir funcionando después de activar Auth/RLS.
+const SB_HEADERS = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, Prefer: 'return=minimal,count=exact' }
 
 const NOTIS_RETENTION_MONTHS = 6
-const AUDIT_RETENTION_YEARS = 2
+const AUDIT_RETENTION_YEARS = 4
 
 function isoMonthsAgo(months) {
   const d = new Date()
@@ -46,6 +47,17 @@ async function deleteOldEntities(collection, cutoffIso, extraFilter = '') {
   return parseInt(res.headers.get('content-range')?.split('/')[1] || '0', 10)
 }
 
+async function deleteOldAuditEvents(cutoffIso) {
+  const url = `${SB_URL}/rest/v1/audit_events?created_at=lt.${encodeURIComponent(cutoffIso)}`
+  const res = await fetch(url, { method:'DELETE', headers:SB_HEADERS })
+  if (!res.ok) {
+    // Compatibilidad durante el despliegue previo a crear audit_events.
+    if (res.status === 400 || res.status === 404) return 0
+    throw new Error(`[audit_events] DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  }
+  return parseInt(res.headers.get('content-range')?.split('/')[1] || '0', 10)
+}
+
 async function run() {
   const notisCutoff = isoMonthsAgo(NOTIS_RETENTION_MONTHS)
   const auditCutoff = isoYearsAgo(AUDIT_RETENTION_YEARS)
@@ -55,8 +67,12 @@ async function run() {
   console.log(`✓ ${notisDeleted} notis borradas`)
 
   console.log(`Borrando audit anterior a ${auditCutoff}...`)
-  const auditDeleted = await deleteOldEntities('audit', auditCutoff)
-  console.log(`✓ ${auditDeleted} entradas de audit borradas`)
+  const [legacyAuditDeleted, auditEventsDeleted] = await Promise.all([
+    deleteOldEntities('audit', auditCutoff),
+    deleteOldAuditEvents(auditCutoff),
+  ])
+  const auditDeleted = legacyAuditDeleted + auditEventsDeleted
+  console.log(`Audit eliminado tras 4 años: ${auditDeleted} entradas`)
 
   const pushDeliveryCutoff = isoMonthsAgo(1)
   console.log(`Borrando claves de deduplicación push anteriores a ${pushDeliveryCutoff}...`)

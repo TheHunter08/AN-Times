@@ -9,6 +9,7 @@ import { monthlyExtras } from './src/utils/time.js'
 import { workBalanceOptions } from './src/utils/workBalance.js'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import { isAuthRlsServerMode } from './src/server/securityMode.js'
 
 process.env.TZ = 'Europe/Madrid'
 
@@ -24,6 +25,7 @@ const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_S
 const PUSH_URL = cleanEnv(process.env.PUSH_URL) || 'https://times-inc.vercel.app/api/sendpush'
 const PUSH_SECRET = cleanEnv(process.env.PUSH_SECRET)
 const SB_KEY = SB_SERVICE || SB_ANON
+const AUTH_RLS_MODE = isAuthRlsServerMode()
 
 const SB_HEADERS = {
   apikey: SB_KEY,
@@ -38,6 +40,28 @@ const SB_HEADERS = {
 const madridDateStr = iso => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso))
 
 async function readDB() {
+  if (AUTH_RLS_MODE) {
+    const [employeesResponse, recordsResponse, closuresResponse, vacationsResponse, entitiesResponse] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers:SB_HEADERS }),
+      fetch(`${SB_URL}/rest/v1/records?select=*&deleted=eq.false`, { headers:SB_HEADERS }),
+      fetch(`${SB_URL}/rest/v1/cierres?select=*&deleted=eq.false`, { headers:SB_HEADERS }),
+      fetch(`${SB_URL}/rest/v1/vacaciones?select=*&deleted=eq.false`, { headers:SB_HEADERS }),
+      fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(medicos,ausencias,config)`, { headers:SB_HEADERS }),
+    ])
+    if (![employeesResponse, recordsResponse, closuresResponse, vacationsResponse, entitiesResponse].every(response => response.ok)) throw new Error('normalized monthly-close source unavailable')
+    const db = {
+      employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, isAdmin:row.role === 'admin' })),
+      records:(await recordsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, inicio:row.inicio, fin:row.fin, centro:row.centro, workSecs:row.work_secs, breakSecs:row.break_secs, closed:row.closed })),
+      cierres:(await closuresResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado })),
+      vacaciones:(await vacationsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, fechaInicio:row.fecha_inicio, fechaFin:row.fecha_fin, estado:row.estado })),
+      medicos:[], ausencias:[], config:{},
+    }
+    for (const row of await entitiesResponse.json()) {
+      if (row.entity_id === '__singleton__') db[row.collection] = row.data || {}
+      else if (Array.isArray(db[row.collection])) db[row.collection].push(row.data || {})
+    }
+    return { data:db, ts:null }
+  }
   const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_HEADERS })
   if (!res.ok) throw new Error(`DB read failed: ${res.status}`)
   const rows = await res.json()
@@ -46,6 +70,7 @@ async function readDB() {
 }
 
 async function writeDB(data, expectedTs) {
+  if (AUTH_RLS_MODE) return
   // Lock optimista: solo escribe si updated_at no ha cambiado desde la lectura
   const cond = expectedTs ? `?id=eq.1&updated_at=eq.${encodeURIComponent(expectedTs)}` : '?id=eq.1'
   const res = await fetch(`${SB_URL}/rest/v1/app_data${cond}`, {
@@ -104,7 +129,7 @@ export async function runMonthlyClose(now = new Date()) {
     return { ok:true, mes, processed:0, skipped:'period-open' }
   }
 
-  if (!SB_URL || !SB_KEY) throw new Error('VITE_SB_URL / credencial Supabase no configurados')
+  if (!SB_URL || !SB_KEY || (AUTH_RLS_MODE && !SB_SERVICE)) throw new Error('VITE_SB_URL / service role Supabase no configurados')
 
   const result = await readDB()
   if (!result) throw new Error('No se pudo leer la BD')

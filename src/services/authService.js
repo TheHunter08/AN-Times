@@ -156,6 +156,31 @@ export async function signUpEmail(email, pass) {
   return data
 }
 
+export async function activateAccountWithPin(employeeId, pin, email, password) {
+  const response = await fetch('/api/activate-account', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    cache:'no-store',
+    body:JSON.stringify({ employeeId, pin, email, password }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw { code:payload?.code || response.status, message:payload?.error || 'No se pudo activar la cuenta' }
+  }
+  return payload
+}
+
+export async function searchAccountEmployees(query) {
+  const normalized = String(query || '').trim()
+  if (normalized.length < 2) return []
+  const response = await fetch(`/api/account-bootstrap?q=${encodeURIComponent(normalized)}`, {
+    method:'GET', cache:'no-store', headers:{ Accept:'application/json' },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar el directorio de activación')
+  return Array.isArray(payload?.employees) ? payload.employees : []
+}
+
 export async function getAuthSession() {
   if (!supabase) return null
   const { data, error } = await supabase.auth.getSession()

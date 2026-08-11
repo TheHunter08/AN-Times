@@ -18,12 +18,13 @@ export interface EmployeeRow {
   phone?: string
   obrasAsignadas?: string[]
   centroTrabajo?: string
-  accountStatus?: 'linked' | 'ready' | 'missing-email' | 'missing-pin'
+  accountStatus?: 'linked' | 'pending-confirmation' | 'ready' | 'missing-email' | 'missing-pin'
   pinStatus?: 'modern' | 'legacy' | 'missing'
 }
 
 const accountCfg = {
   linked: { label: 'Cuenta vinculada', color: colors.semantic.green, bg: 'rgba(16,185,129,.1)' },
+  'pending-confirmation': { label: 'Confirmación pendiente', color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)' },
   ready: { label: 'Lista para vincular', color: colors.primary.light, bg: colors.primary.dim },
   'missing-email': { label: 'Falta correo', color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)' },
   'missing-pin': { label: 'Falta PIN', color: colors.semantic.orange, bg: 'rgba(245,158,11,.1)' },
@@ -62,6 +63,7 @@ export interface EmployeesProps {
   onSelect?: (id: string) => void
   onViewTimesheets?: (id: string) => void
   onDeactivate?: (id: string) => void
+  onResendConfirmation?: (id: string, email: string) => Promise<void>
 }
 
 const statusCfg: Record<EmployeeRow['status'], { label: string; color: string; bg: string; dot: string }> = {
@@ -110,16 +112,28 @@ const FILTERS = [
   { key: 'off', label: 'Inactivo' },
 ] as const
 
-export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate }: EmployeesProps) {
+const ACCOUNT_FILTERS = [
+  { key:'all', label:'Todas las cuentas' },
+  { key:'needs-action', label:'Requieren acción' },
+  { key:'pending-confirmation', label:'Pendientes de confirmar' },
+  { key:'linked', label:'Vinculadas' },
+] as const
+
+export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate, onResendConfirmation }: EmployeesProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
+  const [accountFilter, setAccountFilter] = useState<'all' | 'needs-action' | 'pending-confirmation' | 'linked'>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
+  const [resendingConfirmation, setResendingConfirmation] = useState(false)
   const profileDialogRef = useDialogA11y(Boolean(profileEmp), () => setProfileEmp(null))
 
   const filtered = rows.filter(r => {
     const matchSearch = (r.name + r.dept + (r.role ?? '') + (r.email ?? '')).toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' || r.status === filter
-    return matchSearch && matchFilter
+    const matchAccount = accountFilter === 'all'
+      || (accountFilter === 'needs-action' && r.accountStatus !== 'linked')
+      || r.accountStatus === accountFilter
+    return matchSearch && matchFilter && matchAccount
   })
 
   const total   = rows.length
@@ -128,6 +142,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
   const off     = rows.filter(r => r.status === 'off').length
   const linkedAccounts = rows.filter(r => r.accountStatus === 'linked').length
   const readyAccounts = rows.filter(r => r.accountStatus === 'ready').length
+  const pendingConfirmations = rows.filter(r => r.accountStatus === 'pending-confirmation').length
   const blockedAccounts = rows.filter(r => r.accountStatus === 'missing-email' || r.accountStatus === 'missing-pin').length
   const legacyPins = rows.filter(r => r.pinStatus === 'legacy').length
 
@@ -172,10 +187,10 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
           color: colors.text[500], fontSize: 12, lineHeight: 1.55,
         }}>
           <strong style={{ display: 'block', color: colors.text[900], marginBottom: 3 }}>Acceso por email</strong>
-          <span>{linkedAccounts} vinculadas · {readyAccounts} listas para vincular · {blockedAccounts} con requisitos pendientes.</span>
+          <span>{linkedAccounts} vinculadas · {pendingConfirmations} pendientes de confirmar · {readyAccounts} listas para vincular · {blockedAccounts} con requisitos pendientes.</span>
           {linkedAccounts < total && (
             <span style={{ display: 'block', marginTop: 3 }}>
-              Para habilitar una cuenta, guarda un correo único y un PIN en el perfil. Después el empleado debe usar “Primera vez: vincular mi cuenta”.
+              El empleado debe entrar con su PIN. Si falta correo o cuenta oficial, Times INC abrirá automáticamente la activación y enviará la confirmación por email.
             </span>
           )}
           {legacyPins > 0 && (
@@ -228,6 +243,18 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             </button>
           ))}
         </div>
+        <select
+          aria-label="Filtrar por estado de cuenta"
+          value={accountFilter}
+          onChange={event => setAccountFilter(event.target.value as typeof accountFilter)}
+          style={{
+            minHeight:34, padding:'6px 10px', borderRadius:radius.md,
+            border:`1px solid ${colors.border.subtle}`, background:colors.bg[700],
+            color:colors.text[700], fontFamily:'inherit', fontSize:12, fontWeight:600,
+          }}
+        >
+          {ACCOUNT_FILTERS.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+        </select>
       </div>
 
       {/* Grid de tarjetas */}
@@ -319,6 +346,24 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             )}
 
             {/* Actions */}
+            {profileEmp.accountStatus === 'pending-confirmation' && profileEmp.email && onResendConfirmation && (
+              <button
+                type="button"
+                disabled={resendingConfirmation}
+                onClick={async () => {
+                  setResendingConfirmation(true)
+                  try { await onResendConfirmation(profileEmp.id, profileEmp.email || '') }
+                  finally { setResendingConfirmation(false) }
+                }}
+                style={{
+                  padding:'10px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`,
+                  background:colors.bg[600], color:colors.primary.light, fontSize:12.5,
+                  fontWeight:700, cursor:resendingConfirmation ? 'wait' : 'pointer', fontFamily:'inherit',
+                }}
+              >
+                {resendingConfirmation ? 'Reenviando confirmación…' : 'Reenviar correo de confirmación'}
+              </button>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => { onViewTimesheets?.(profileEmp.id); setProfileEmp(null) }}

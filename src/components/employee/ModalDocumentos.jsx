@@ -3,8 +3,10 @@ import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
 import { auditLog, queuePush, supabase } from '../../services/dataService.js'
+import { authSupabase } from '../../services/authService.js'
 import { DocPreview } from '../DocPreview.jsx'
-import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage, blobToDataUrl } from '../../utils/pdfSign.js'
+import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage, blobToDataUrl, dataUrlToBlob } from '../../utils/pdfSign.js'
+import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, hasSignedDocumentArtifact, sha256DataUrl } from '../../utils/documentSigning.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
@@ -42,22 +44,27 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const myDocs = (db.documentos || [])
     .filter(d => d.empId === u?.id)
     .map(d => ({ ...d, titulo: d.titulo || d.nombre || d.name || 'Documento' }))
-  const pendientes = myDocs.filter(d => !d.firma)
-  const firmados = myDocs.filter(d => d.firma)
+  // Un registro de firma sin archivo firmado no es un documento completado.
+  // Se mantiene en pendientes para poder reparar datos creados por versiones
+  // antiguas que guardaban un falso éxito cuando fallaba el estampado.
+  const pendientes = myDocs.filter(d => !hasSignedDocumentArtifact(d))
+  const firmados = myDocs.filter(hasSignedDocumentArtifact)
   const myFirma = db.firmas?.[u?.id]?.main
 
   // Obtiene URLs firmadas para documentos guardados en Storage
   const pendingStorageIds = myDocs
-    .filter(d => d.storagePath && !d.fileData && !d.data && !(d.id in resolvedUrls))
+    .filter(d => (d.signedStoragePath || d.storagePath) && !documentInlineArtifact(d) && !(d.id in resolvedUrls))
     .map(d => d.id).join(',')
   useEffect(() => {
-    if (!pendingStorageIds || !supabase) return
+    const storage = authSupabase || supabase
+    if (!pendingStorageIds || !storage) return
     let cancelled = false
     pendingStorageIds.split(',').filter(Boolean).forEach(async id => {
       const doc = myDocs.find(d => d.id === id)
-      if (!doc?.storagePath) return
+      if (!doc?.signedStoragePath && !doc?.storagePath) return
       try {
-        const { data, error } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600)
+        const path = doc.signedStoragePath || doc.storagePath
+        const { data, error } = await storage.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(path, 3600)
         if (!cancelled && !error && data?.signedUrl) {
           setResolvedUrls(prev => ({ ...prev, [id]: data.signedUrl }))
         }
@@ -69,7 +76,7 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   // Normaliza el doc para DocPreview: unifica los distintos nombres de campo
   const normalizeDoc = (doc) => ({
     ...doc,
-    fileData: doc.fileData || doc.data || null,
+    fileData: documentInlineArtifact(doc),
     url: doc.url || resolvedUrls[doc.id] || null,
   })
 
@@ -84,40 +91,87 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     // Si el original vive solo en Storage, hay que descargarlo antes de poder
     // estampar la firma (stampSignatureOnPdf/Image necesitan un data URL).
     let fileData = doc.fileData || doc.data || null
-    const hadOriginalContent = !!fileData
     let downloadFailed = false
+    let originalSha256 = null
+    let signedSha256 = null
+    let signedStoragePath = null
     try {
-      if (!fileData && doc.storagePath && supabase) {
-        const { data: signed, error: signErr } = await supabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 300)
+      const storage = authSupabase || supabase
+      // Los documentos jornada de versiones antiguas podían guardar la firma
+      // sin conservar el PDF. Solo se reparan tras una acción expresa del
+      // empleado: se reconstruye un original sin firma desde el cierre
+      // canónico y se estampa una evidencia nueva con la fecha actual.
+      if (!fileData && !doc.storagePath) {
+        const legacyClosure = findLegacyJornadaClosure(doc, db)
+        if (legacyClosure) {
+          const { buildCierreIndividualPDF } = await import('../../utils/cierrePdf.js')
+          const rebuilt = await buildCierreIndividualPDF({
+            cierre:{
+              ...legacyClosure,
+              empName:legacyClosure.empName || doc.empName || u.name,
+              generadoAt:legacyClosure.generadoAt || doc.createdAt || firmadoAt,
+              generadoPor:legacyClosure.generadoPor || 'TIMES INC',
+              firma:null,
+              firmaEmp:false,
+            },
+            empresa:u.empresa || db.config?.empresaNombre || 'TIMES INC',
+          })
+          fileData = rebuilt.dataUrl
+        }
+        if (!fileData && doc.tipo === 'jornada') throw new Error('Cierre mensual no disponible para reconstrucción')
+      }
+      if (!fileData && doc.storagePath && storage) {
+        const { data: signed, error: signErr } = await storage.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 300)
         if (signErr || !signed?.signedUrl) throw new Error(signErr?.message || 'No se pudo descargar el documento original')
         const res = await fetch(signed.signedUrl)
         if (!res.ok) throw new Error('No se pudo descargar el documento original')
         fileData = await blobToDataUrl(await res.blob())
       }
+      originalSha256 = await sha256DataUrl(fileData)
       const printable = await makePrintableSignature(myFirma.data)
       const label = `Firmado digitalmente por ${u.name} · ${new Date(firmadoAt).toLocaleString('es-ES')}`
-      if (fileData?.startsWith('data:application/pdf')) {
+      const kind = documentDataKind(fileData, { mime:doc.mime, name:doc.nombre || doc.titulo })
+      if (kind === 'pdf') {
         fileData = await stampSignatureOnPdf(fileData, printable, label)
-      } else if (fileData?.startsWith('data:image')) {
+      } else if (kind === 'image') {
         fileData = await stampSignatureOnImage(fileData, printable, label)
+      } else {
+        throw new Error('Formato no compatible con firma incrustada')
+      }
+      signedSha256 = await sha256DataUrl(fileData)
+      // El artefacto definitivo vive preferentemente en Storage. Guardarlo
+      // otra vez como base64 dentro de app_entities infla el documento y puede
+      // hacer fallar la sincronizacion del JSON completo; esa era la causa de
+      // que el responsable viera la firma registrada pero no pudiera abrir el
+      // archivo firmado. Si Storage no esta disponible se conserva el data URL
+      // como respaldo compatible con instalaciones antiguas.
+      if (storage) {
+        const signedBlob = dataUrlToBlob(fileData)
+        const extension = kind === 'pdf' ? 'pdf' : (signedBlob.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+        const path = `${u.id}/${doc.id}-signed-${Date.now()}.${extension}`
+        const { error: uploadError } = await storage.storage.from(DOCUMENTOS_BUCKET).upload(path, signedBlob, {
+          contentType:signedBlob.type,
+          upsert:true,
+        })
+        if (uploadError) console.warn('[FIRMA] Storage no disponible; se conserva respaldo base64:', uploadError.message)
+        else signedStoragePath = path
       }
     } catch (e) {
-      // Distingue dos fallos muy distintos: no poder ESTAMPAR visualmente la
-      // firma sobre un contenido que sí tenemos (degradado, pero el
-      // documento sigue teniendo contenido real que mostrar) frente a no
-      // haber podido obtener el contenido en absoluto (típicamente al
-      // descargarlo de Storage) — en ese segundo caso, seguir adelante
-      // guardaría un documento marcado como "firmado" pero sin nada que
-      // mostrar nunca, algo peor que no firmarlo: se corta aquí y se deja
-      // reintentar en vez de fingir un éxito.
-      if (!hadOriginalContent && !fileData) {
-        console.error('[FIRMA] No se pudo descargar el documento original, no se firma:', e)
-        toast('⚠️ No se pudo descargar el documento para firmarlo. Comprueba tu conexión e inténtalo de nuevo.', 6000, 'warn')
-        downloadFailed = true
-      } else {
-        console.warn('[FIRMA] No se pudo estampar la firma en el archivo:', e)
-        toast('⚠️ No se pudo insertar la firma en el archivo, se guardó solo el registro')
-      }
+      // Nunca se guarda solo el registro: eso producía documentos que la UI
+      // llamaba "firmados" aunque el archivo siguiera siendo el original.
+      console.error('[FIRMA] No se pudo generar el documento firmado:', e)
+      const errorMessage = String(e?.message || '')
+      const unsupported = errorMessage.includes('Formato no compatible')
+      const downloadError = errorMessage.includes('descargar el documento original')
+      const missingLegacySource = errorMessage.includes('Cierre mensual no disponible')
+      toast(missingLegacySource
+        ? '⚠️ No existe el cierre mensual necesario para reconstruir este documento. Pide al administrador que regenere el cierre.'
+        : unsupported
+          ? '⚠️ Este formato no admite firma incrustada. Pide que te lo envíen como PDF o imagen.'
+          : downloadError
+            ? '⚠️ No se pudo descargar el documento para firmarlo. Sigue pendiente; comprueba tu conexión o permisos.'
+            : '⚠️ No se pudo insertar la firma. El documento sigue pendiente; comprueba tu conexión e inténtalo de nuevo.', 6000, 'warn')
+      downloadFailed = true
     }
     if (downloadFailed) { setStamping(false); return }
     const notiAction = 'Documento firmado'
@@ -130,9 +184,24 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
       saveDB(fresh => {
         const updated = (fresh.documentos || []).map(d => d.id === doc.id ? {
           ...d,
-          // fileData estampado (o el original si no se pudo estampar)
-          fileData: fileData || d.fileData || d.data || null,
-          firma: { firmadoAt, signatureData: myFirma.data, empName: u.name }
+          // Solo llega aquí el archivo ya estampado: cualquier error anterior
+          // mantiene el documento pendiente y permite reintentar.
+          fileData: signedStoragePath ? null : (fileData || d.fileData || d.data || null),
+          signedStoragePath: signedStoragePath || d.signedStoragePath || null,
+          firma: {
+            firmadoAt,
+            signatureData: myFirma.data,
+            empName: u.name,
+            empId: u.id,
+            authId: u.authId || u.auth_id || null,
+            method: 'electronic_simple',
+            evidenceVersion: 2,
+            originalSha256,
+            signedSha256,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          },
+          _upd: firmadoAt,
+          _rev: Math.max(1, Number(d._rev) || 1) + 1,
         } : d)
         const noti = createNotification({ empId:'__admin__', action:notiAction, detail:notiDetail, dedupeKey:`documento:${doc.id}:firma:${u.id}`, ts:firmadoAt })
         const withAudit = auditLog(fresh, notiAction, `${u.name}: "${doc.titulo}"`, u.name)
@@ -167,8 +236,8 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Ver
         </button>
-        {!d.firma && <button style={btnSmPrimary} onClick={() => setSigning(d)}>Firmar</button>}
-        {d.firma && d.firma.signatureData && <img src={d.firma.signatureData} alt="firma" style={{ height:28, borderRadius:4, border:`1px solid ${colors.border.default}`, background:colors.bg[500] }} />}
+        {!hasSignedDocumentArtifact(d) && <button style={btnSmPrimary} onClick={() => setSigning(d)}>{d.firma ? 'Reparar firma' : 'Firmar'}</button>}
+        {hasSignedDocumentArtifact(d) && d.firma.signatureData && <img src={d.firma.signatureData} alt="firma" style={{ height:28, borderRadius:4, border:`1px solid ${colors.border.default}`, background:colors.bg[500] }} />}
       </div>
     </div>
   )

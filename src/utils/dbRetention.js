@@ -3,14 +3,28 @@ function removedIds(before, after) {
   return (before || []).map(item => item?.id).filter(id => id && !kept.has(id))
 }
 
+const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000
+export const LEGAL_AUDIT_RETENTION_MS = 4 * YEAR_MS
+export const GENERAL_AUDIT_RETENTION_MS = YEAR_MS
+
+function isLegalAuditEvent(item) {
+  const category = String(item?.category || '').toLowerCase()
+  const entityType = String(item?.entityType || '').toLowerCase()
+  return category === 'jornada' || category === 'documento' ||
+    ['record', 'record_batch', 'cierre', 'cierre_batch', 'document', 'legal_notice'].includes(entityType)
+}
+
 export function pruneDbRetention(db, now = Date.now()) {
   let next = db
   const deleted = {}
 
   if (db.audit?.length > 300) {
-    const cutoff = now - 30 * 24 * 60 * 60 * 1000
-    const recent = db.audit.filter(item => new Date(item.ts).getTime() > cutoff)
-    const audit = recent.length >= 50 ? recent : db.audit.slice(-300)
+    const audit = db.audit.filter(item => {
+      const time = new Date(item?.ts).getTime()
+      if (!Number.isFinite(time)) return true
+      const retention = isLegalAuditEvent(item) ? LEGAL_AUDIT_RETENTION_MS : GENERAL_AUDIT_RETENTION_MS
+      return time > now - retention
+    })
     const ids = removedIds(db.audit, audit)
     if (ids.length) deleted.audit = ids
     next = { ...next, audit }

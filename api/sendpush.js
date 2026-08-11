@@ -1,6 +1,8 @@
 // API endpoint: POST /api/sendpush — envía Web Push a un usuario via Supabase.
 // Formato ESM porque package.json tiene "type": "module".
 import webpush from 'web-push'
+import { actorCanNotify } from '../src/server/pushAuthorization.js'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 import { createHash, timingSafeEqual } from 'crypto'
 import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
 
@@ -62,7 +64,11 @@ const VAPID_PUBLIC  = isValidVapidPub(_vpub) ? _vpub : null
 const VAPID_PRIVATE = isValidVapidPrv(_vprv) ? _vprv : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE    = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
+const SB_SERVER_KEY = SB_SERVICE || SB_ANON
+const AUTH_RLS_MODE = isAuthRlsServerMode()
 if (!SB_URL || !SB_ANON) console.error('[sendpush] VITE_SB_URL / VITE_SB_ANON not set')
+if (AUTH_RLS_MODE && !SB_SERVICE) console.error('[sendpush] SUPABASE_SERVICE_ROLE_KEY es obligatoria en modo Auth/RLS')
 const PUSH_SECRET   = process.env.PUSH_SECRET
 const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
@@ -82,7 +88,7 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 async function sbGet(userId) {
   if (!SB_URL || !SB_ANON) return null
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}&select=user_id,endpoint,p256dh,auth&order=updated_at.desc&limit=1`
-  const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } })
+  const r = await fetch(url, { headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` } })
   if (!r.ok) return null
   const rows = await r.json()
   return rows?.[0] || null
@@ -91,7 +97,7 @@ async function sbGet(userId) {
 async function sbGetAll() {
   if (!SB_URL || !SB_ANON) return []
   const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`
-  const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } })
+  const r = await fetch(url, { headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` } })
   if (!r.ok) return []
   return await r.json()
 }
@@ -99,7 +105,7 @@ async function sbGetAll() {
 async function sbDelete(userId) {
   if (!SB_URL || !SB_ANON) return
   const url = `${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`
-  await fetch(url, { method: 'DELETE', headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }).catch(() => {})
+  await fetch(url, { method: 'DELETE', headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` } }).catch(() => {})
 }
 
 async function claimPushDelivery(userId, dedupeKey, tag, title, body) {
@@ -112,7 +118,7 @@ async function claimPushDelivery(userId, dedupeKey, tag, title, body) {
   try {
     const response = await fetch(`${SB_URL}/rest/v1/app_entities?on_conflict=id`, {
       method:'POST',
-      headers:{ apikey:SB_ANON, Authorization:`Bearer ${SB_ANON}`, 'Content-Type':'application/json', Prefer:'resolution=ignore-duplicates,return=representation' },
+      headers:{ apikey:SB_SERVER_KEY, Authorization:`Bearer ${SB_SERVER_KEY}`, 'Content-Type':'application/json', Prefer:'resolution=ignore-duplicates,return=representation' },
       body:JSON.stringify({
         id:`push_delivery:${digest}`, company_id:COMPANY_ID, collection:'push_delivery', entity_id:digest,
         data:{ userId, dedupeKey:dedupeKey || null, expiresAt:new Date(Date.now() + 30 * 86400000).toISOString() },
@@ -135,7 +141,7 @@ async function releasePushDelivery(id) {
   const url = `${SB_URL}/rest/v1/app_entities?id=eq.${encodeURIComponent(id)}`
   await fetch(url, {
     method: 'DELETE',
-    headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` },
+    headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` },
   }).catch(() => {})
 }
 
@@ -144,6 +150,22 @@ async function sendOne(sub, payload) {
     { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
     payload
   )
+}
+
+async function authenticatedBrowserActor(token) {
+  if (!token || !SB_URL || !SB_ANON || !SB_SERVICE) return null
+  const authResponse = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers:{ apikey:SB_ANON, Authorization:`Bearer ${token}` },
+  })
+  if (!authResponse.ok) return null
+  const authUser = await authResponse.json().catch(() => null)
+  if (!authUser?.id) return null
+  const profileResponse = await fetch(
+    `${SB_URL}/rest/v1/employees?auth_id=eq.${encodeURIComponent(authUser.id)}&baja=eq.false&select=id,role,company_id&limit=1`,
+    { headers:{ apikey:SB_SERVICE, Authorization:`Bearer ${SB_SERVICE}` } },
+  )
+  if (!profileResponse.ok) return null
+  return (await profileResponse.json().catch(() => []))?.[0] || null
 }
 
 export default async function handler(req, res) {
@@ -164,14 +186,21 @@ export default async function handler(req, res) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
     const hasValidToken = PUSH_SECRET && token && token.length === PUSH_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(PUSH_SECRET))
     const hasValidOrigin = isTrustedAppOrigin(req.headers.origin)
-    // Server-to-server calls: require PUSH_SECRET. Browser calls: require valid origin.
+    // Server-to-server calls: require PUSH_SECRET. En modo seguro el navegador
+    // presenta además su JWT Supabase y el servidor comprueba su rol/objetivo.
     if (!hasValidToken && !hasValidOrigin) return res.status(401).json({ error: 'Unauthorized' })
 
     if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Missing Supabase config' })
+    if (AUTH_RLS_MODE && !SB_SERVICE) return res.status(500).json({ error:'Secure push backend is not configured' })
 
     const { userId, title, body, tag, url, dedupeKey } = req.body || {}
     if (!userId || !title) return res.status(400).json({ error: 'Missing userId or title' })
     if (userId === '__all__' && !hasValidToken) return res.status(403).json({ error: 'Broadcast requires server authorization' })
+    if (AUTH_RLS_MODE && !hasValidToken) {
+      const actor = await authenticatedBrowserActor(token)
+      if (!actor) return res.status(401).json({ error:'Official Supabase session required' })
+      if (!actorCanNotify(actor, userId)) return res.status(403).json({ error:'Push target not permitted' })
+    }
 
     const safeUrl = typeof url === 'string' && url.startsWith('/') ? url : '/'
     const _tag = tag || 'times'

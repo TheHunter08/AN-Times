@@ -7,6 +7,7 @@ import { parseNavigationTarget, resolveEmployeeNotificationDestination } from '.
 import { flushPushQueue, broadcastSync, uploadPendingIfAny, sendHeartbeat, _updateLastSync } from './services/dataService.js'
 import { getAuthSession, onAuthStateChange } from './services/authService.js'
 import { isOfficialAuthMethod, isOfficialSessionAuthorized } from './utils/sessionAuthorization.js'
+import { SECURITY_DEPLOYMENT } from './config/securityDeployment.js'
 // v2 UI — nuevas pantallas con datos reales
 import LoginV2 from './ui-v2/LoginV2.tsx'
 const AppV2Admin = lazy(() => import('./ui-v2/AppV2Admin.tsx'))
@@ -394,6 +395,11 @@ export default function App() {
   // sesión Auth válida. El PIN y la biometría mantienen su funcionamiento
   // offline y no pasan por este guard.
   useEffect(() => {
+    const hasActiveAppSession = !!(session?.user?.id || session?.isAdmin || session?.authMethod)
+    if (SECURITY_DEPLOYMENT.requireOfficialAuth && hasActiveAppSession && !isOfficialAuthMethod(session.authMethod)) {
+      logout()
+      return
+    }
     if (!isOfficialAuthMethod(session?.authMethod)) return
     let active = true
     const pendingTimers = new Set()

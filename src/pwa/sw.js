@@ -222,6 +222,9 @@ self.addEventListener('push', (event) => {
 self.addEventListener('pushsubscriptionchange', (event) => {
   event.waitUntil((async () => {
     try {
+      // El SW no puede acceder de forma segura a la sesión Auth de la página.
+      // En modo RLS la suscripción se reclama al volver a abrir la app.
+      if (_AUTH_RLS_MODE) return
       // 1. Obtener la nueva suscripción del PushManager
       let newSub = null
       try {
@@ -296,6 +299,8 @@ self.addEventListener('notificationclick', (event) => {
 // definidas en el build, pero ahora coincide siempre con constants.js.
 const _SB_URL  = import.meta.env.VITE_SB_URL  || 'https://eyyhlcvpyiorpdnvqsll.supabase.co'
 const _SB_ANON = import.meta.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I'
+const _AUTH_RLS_MODE = String(import.meta.env.VITE_SECURITY_MODE || '').toLowerCase() === 'auth_rls'
+  && import.meta.env.VITE_SECURITY_ACTIVATION_SEAL === 'TIMES_INC_AUTH_RLS_2026_08_11'
 const _IDB_NAME  = 'times-inc-sync'
 const _IDB_STORE = 'q'
 // El esquema de producción admite únicamente app_data.id=1.
@@ -466,7 +471,7 @@ function _mergeRecordsSW(base, incoming) {
   return [...map.values()]
 }
 
-const _LIST_KEYS = ['empresas', 'obras', 'centrosTrabajo', 'employees', 'vacaciones', 'medicos', 'ausencias', 'mensajes', 'notis', 'cierres', 'documentos', 'audit', 'correccionesFichaje', 'chats', 'gastos', 'denuncias', 'wellbeing', 'turnos', 'partesTrabajo', 'anomalias_vistas']
+const _LIST_KEYS = ['empresas', 'obras', 'centrosTrabajo', 'employees', 'vacaciones', 'medicos', 'ausencias', 'mensajes', 'notis', 'cierres', 'documentos', 'audit', 'correccionesFichaje', 'chats', 'gastos', 'denuncias', 'wellbeing', 'turnos', 'partesTrabajo', 'legalAcknowledgements', 'anomalias_vistas']
 const _MAP_KEYS  = ['monthSnapshots', 'firmas', 'notisSent', 'pinLockouts', 'config']
 
 function _mergeDeletedSW(...groups) {
@@ -521,6 +526,9 @@ async function _fetchServerData() {
 let _bgSyncFlight = false
 // Devuelve true si había datos pendientes y se subieron con éxito, false si no había nada
 async function _bgSync() {
+  // La cola permanece intacta hasta que una página con sesión Auth válida la
+  // suba. La anon key no debe volver a abrir una vía lateral al blob/tablas.
+  if (_AUTH_RLS_MODE) return false
   if (_bgSyncFlight) return false
   _bgSyncFlight = true
   try {

@@ -22,6 +22,8 @@ export {
   supabase,
   loadLocal,
   saveLocal,
+  clearLocal,
+  localDbStorageKey,
   mergeDB,
   scheduleSave,
   startRealtime,
@@ -48,12 +50,15 @@ import {
   cloudFetchTs as _v1FetchTs,
   cloudPush  as _v1Push,
   setPostBlobSyncHandler,
+  setPrimarySyncHandler,
   withConnectivityRetry,
 } from './dataService.js'
+import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
 import {
   COMPANY_ID,
   buildTableSyncPlan,
   ENTITY_COLLECTIONS,
+  MAP_ENTITY_COLLECTIONS,
   SINGLETON_COLLECTIONS,
   softDeletePayload,
   toEmployeeRow as toEmployee,
@@ -137,6 +142,15 @@ function fromObra(o) {
   return { ...(o.data ?? {}), id: o.id, nombre: o.nombre, coords: o.coords, radio: o.radio ?? 200, activa: !!o.activa, _upd: o.updated_at }
 }
 
+function fromAuditEvent(row) {
+  return {
+    ...(row.data ?? {}), id:row.id, action:row.action,
+    detail:row.detail ?? row.data?.detail ?? null,
+    actorEmpId:row.actor_emp_id ?? null,
+    ts:row.created_at, _upd:row.updated_at ?? row.created_at,
+  }
+}
+
 // ── Mappers App→DB (camelCase → snake_case) ──────────────────────────────────
 
 // Mutaciones críticas de fichajes: el panel de encargado necesita confirmación
@@ -191,14 +205,20 @@ async function fetchAllRecords(sinceIso = null) {
 // Reloj ligero calculado sobre las tablas. app_data deja de participar en las
 // lecturas normales, aunque se mantiene como respaldo durante la fase 2.
 export async function cloudFetchTs() {
-  if (!supabase) return _v1FetchTs()
+  if (!supabase) return SECURITY_DEPLOYMENT.authenticatedDataPath
+    ? { ok:false, ts:0, status:'no_authenticated_client' }
+    : _v1FetchTs()
   try {
     const { data, error } = await supabase.rpc('get_app_sync_state', { p_company_id: COMPANY_ID })
-    if (error) return _v1FetchTs()
+    if (error) return SECURITY_DEPLOYMENT.authenticatedDataPath
+      ? { ok:false, ts:0, status:error.code || 'sync_state_error' }
+      : _v1FetchTs()
     const ts = data ? new Date(data).getTime() : 0
     return { ok: true, ts: Number.isFinite(ts) ? ts : 0 }
   } catch {
-    return _v1FetchTs()
+    return SECURITY_DEPLOYMENT.authenticatedDataPath
+      ? { ok:false, ts:0, status:'sync_state_error' }
+      : _v1FetchTs()
   }
 }
 
@@ -243,15 +263,17 @@ export async function cloudFetch(sinceTs = 0) {
       .select('collection,entity_id,data,revision,deleted,updated_at')
       .eq('company_id', COMPANY_ID)
     if (sinceIso) entitiesQuery = entitiesQuery.gt('updated_at', sinceIso)
-    const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR] = await Promise.all([
+    const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR, auditEventsR] = await Promise.all([
       employeeQuery,
       fetchAllRecords(sinceIso),
       tableQuery('vacaciones'),
       tableQuery('cierres'),
       tableQuery('obras'),
       entitiesQuery,
+      tableQuery('audit_events'),
     ])
-    const responses = [empsR, recsR, vacsR, cierresR, obrasR, entitiesR]
+    const auditTableMissing = ['42P01', 'PGRST205'].includes(auditEventsR.error?.code)
+    const responses = [empsR, recsR, vacsR, cierresR, obrasR, entitiesR, ...(auditTableMissing ? [] : [auditEventsR])]
     // Las tablas de fase 2 ya son la fuente de verdad. Si una consulta falla
     // de forma transitoria, no descargamos el blob legacy entero como
     // "respaldo": puede pesar decenas de MB y un único error de red se
@@ -263,22 +285,25 @@ export async function cloudFetch(sinceTs = 0) {
       const failed = responses.find(result => result.error)
       return { ok: false, data: null, status: failed.error.code || 'table_fetch_error' }
     }
-    if (!isPartial && !empsR.data?.length) return _v1Fetch()
+    if (!isPartial && !empsR.data?.length && !SECURITY_DEPLOYMENT.authenticatedDataPath) return _v1Fetch()
 
     const phase2Ready = [empsR.data, recsR.data, vacsR.data, cierresR.data, obrasR.data]
       .every(rows => !rows?.length || Object.prototype.hasOwnProperty.call(rows[0], 'data'))
-    if (!phase2Ready) return _v1Fetch()
+    if (!phase2Ready) return SECURITY_DEPLOYMENT.authenticatedDataPath
+      ? { ok:false, data:null, status:'normalized_schema_incomplete' }
+      : _v1Fetch()
 
     const deleted = {}
     const entityData = isPartial
       ? {}
       : Object.fromEntries(ENTITY_COLLECTIONS.map(collection => [collection, []]))
     if (!isPartial) for (const collection of SINGLETON_COLLECTIONS) entityData[collection] = {}
+    if (!isPartial) for (const collection of MAP_ENTITY_COLLECTIONS) entityData[collection] = {}
 
     const grouped = new Map()
     for (const row of (entitiesR.data ?? [])) {
       if (row.deleted) {
-        if (ENTITY_COLLECTIONS.includes(row.collection)) noteRemoteDelete(deleted, row.collection, row.entity_id)
+        if (ENTITY_COLLECTIONS.includes(row.collection) || MAP_ENTITY_COLLECTIONS.includes(row.collection)) noteRemoteDelete(deleted, row.collection, row.entity_id)
         continue
       }
       if (!grouped.has(row.collection)) grouped.set(row.collection, [])
@@ -297,6 +322,12 @@ export async function cloudFetch(sinceTs = 0) {
       const row = grouped.get(collection)?.find(item => item.entity_id === '__singleton__')
       if (row) entityData[collection] = row.data
     }
+    for (const collection of MAP_ENTITY_COLLECTIONS) {
+      const rows = grouped.get(collection)
+      if (!rows && isPartial) continue
+      entityData[collection] = Object.fromEntries((rows ?? []).map(row => [row.entity_id, row.data]))
+    }
+    if (!auditTableMissing) entityData.audit = (auditEventsR.data ?? []).map(fromAuditEvent)
 
     const records = (recsR.data ?? []).filter(row => !row.deleted).map(fromRecord)
     for (const row of (recsR.data ?? [])) if (row.deleted) noteRemoteDelete(deleted, 'records', row.id)
@@ -504,6 +535,24 @@ const OPTIONAL_CLOSURE_COLUMNS = [
   'non_contract_min',
 ]
 let _legacyClosureSchema = false
+let _secureActorCache = null
+
+export function shouldUpdateClosuresWithoutInsert(role, authenticatedDataPath = SECURITY_DEPLOYMENT.authenticatedDataPath) {
+  return authenticatedDataPath && !['admin', 'jefe_obra'].includes(role)
+}
+
+async function secureActor() {
+  if (!SECURITY_DEPLOYMENT.authenticatedDataPath) return null
+  const { data:{ session } = {} } = await supabase.auth.getSession()
+  const authId = session?.user?.id
+  if (!authId) throw new Error('Sesión Auth obligatoria para sincronizar')
+  if (_secureActorCache?.authId === authId) return _secureActorCache
+  const { data, error } = await supabase.from('employees')
+    .select('id,role,auth_id').eq('auth_id', authId).maybeSingle()
+  if (error || !data?.id) throw error || new Error('Identidad de empleado no vinculada')
+  _secureActorCache = { authId, empId:data.id, role:data.role }
+  return _secureActorCache
+}
 
 export function rowsForAvailableSchema(table, rows, legacyClosureSchema = _legacyClosureSchema) {
   if (table !== 'cierres' || !legacyClosureSchema) return rows
@@ -521,7 +570,24 @@ async function _upsertResilient(table, rows) {
   const pending = rows.filter(row => !_isQuarantined(table, row))
   if (!pending.length) return
   const prepared = rowsForAvailableSchema(table, pending)
-  let { error } = await supabase.from(table).upsert(prepared, { onConflict: 'id' })
+  const actor = table === 'cierres' ? await secureActor() : null
+  if (actor && shouldUpdateClosuresWithoutInsert(actor.role)) {
+    const failures = []
+    for (const row of prepared) {
+      const { data, error } = await supabase.from('cierres')
+        .update(row)
+        .eq('id', row.id)
+        .select('id')
+        .maybeSingle()
+      if (error || !data?.id) failures.push(row.id)
+    }
+    if (failures.length) throw new Error(`cierres: ${failures.length} cierres no existentes o no autorizados`)
+    return
+  }
+  const upsertOptions = table === 'audit_events'
+    ? { onConflict:'id', ignoreDuplicates:true }
+    : { onConflict:'id' }
+  let { error } = await supabase.from(table).upsert(prepared, upsertOptions)
   if (!error) return
   if (isOptionalClosureSchemaError(table, error)) {
     _legacyClosureSchema = true
@@ -540,7 +606,7 @@ async function _upsertResilient(table, rows) {
   const quarantined = []
   for (const row of pending) {
     const [preparedRow] = rowsForAvailableSchema(table, [row])
-    const { error: rowErr } = await supabase.from(table).upsert(preparedRow, { onConflict: 'id' })
+    const { error: rowErr } = await supabase.from(table).upsert(preparedRow, upsertOptions)
     if (rowErr) {
       // Solo los errores de datos/integridad se aíslan con caducidad. Los
       // fallos de permisos, RLS o esquema permanecen pendientes porque pueden
@@ -567,11 +633,21 @@ async function _upsertResilient(table, rows) {
 // pinLockouts hacia la tabla normalizada durante toda la sesión, sin ningún
 // aviso salvo un console.info que nadie ve.
 let _entitiesTableAvailable = null
+let _auditEventsTableAvailable = null
 async function hasEntitiesTable() {
   if (_entitiesTableAvailable === true) return true
   const { error } = await supabase.from('app_entities').select('id').limit(1)
   if (!error) { _entitiesTableAvailable = true; return true }
   console.info('[v2] app_entities no disponible (aún no desplegada o error transitorio); se mantiene app_data como respaldo:', error.message)
+  return false
+}
+
+async function hasAuditEventsTable() {
+  if (_auditEventsTableAvailable === true) return true
+  const { error } = await supabase.from('audit_events').select('id').limit(1)
+  if (!error) { _auditEventsTableAvailable = true; return true }
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) throw new Error(`audit_events no disponible: ${error.message}`)
+  console.info('[v2] audit_events pendiente de migración; audit continúa en app_entities:', error.message)
   return false
 }
 
@@ -587,6 +663,11 @@ async function _syncToTables(db, deleted, syncHint) {
   const entityDelete = plan.deletes.find(op => op.table === 'app_entities')
   const entitiesNeeded = !!(entityUpsert?.rows.length || entityDelete?.ids.length)
   const entitiesEnabled = entitiesNeeded ? await hasEntitiesTable() : false
+  const auditBatch = plan.upserts.find(op => op.table === 'audit_events')
+  const auditEventsEnabled = auditBatch?.rows.length ? await hasAuditEventsTable() : false
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath && entityUpsert) {
+    entityUpsert.rows = entityUpsert.rows.filter(row => row.collection !== 'audit')
+  }
   const skipped = Object.entries(plan.skipped || {}).filter(([, count]) => count > 0)
   if (skipped.length) {
     console.warn('[v2] filas legacy omitidas sin bloquear la sincronización:', Object.fromEntries(skipped))
@@ -595,7 +676,9 @@ async function _syncToTables(db, deleted, syncHint) {
   const employeeBatch = plan.upserts.find(op => op.table === 'employees')
   if (employeeBatch?.rows.length) await _upsertResilient(employeeBatch.table, employeeBatch.rows)
   const upsertOps = plan.upserts
-    .filter(op => op.table !== 'employees' && op.rows.length && (op.table !== 'app_entities' || entitiesEnabled))
+    .filter(op => op.table !== 'employees' && op.rows.length
+      && (op.table !== 'app_entities' || entitiesEnabled)
+      && (op.table !== 'audit_events' || auditEventsEnabled))
     .map(op => _upsertResilient(op.table, op.rows))
   const upsertResults = await Promise.allSettled(upsertOps)
   const upsertFailures = upsertResults.filter(r => r.status === 'rejected' || r.value?.error)
@@ -616,7 +699,13 @@ async function _syncToTables(db, deleted, syncHint) {
 
 // Debe registrarse también para uploadPendingIfAny(): una recuperación
 // offline no se considera terminada hasta que blob y tablas coinciden.
-setPostBlobSyncHandler(_syncToTables)
+if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+  setPostBlobSyncHandler(null)
+  setPrimarySyncHandler(_syncToTables)
+} else {
+  setPrimarySyncHandler(null)
+  setPostBlobSyncHandler(_syncToTables)
+}
 
 // ── postgres_changes: aplica directamente las filas recibidas ────────────
 // Complementa el canal broadcast con escucha directa en las tablas — cubre
@@ -646,11 +735,14 @@ export function tableChangeToPatch(table, payload) {
   if (table === 'app_entities') {
     const collection = row.collection
     const entityId = row.entity_id
-    if (!ENTITY_COLLECTIONS.includes(collection) && !SINGLETON_COLLECTIONS.includes(collection)) return null
+    if (!ENTITY_COLLECTIONS.includes(collection) && !MAP_ENTITY_COLLECTIONS.includes(collection) && !SINGLETON_COLLECTIONS.includes(collection)) return null
     if (isDeleted) return SINGLETON_COLLECTIONS.includes(collection) ? null : deletedPatch(collection, entityId)
     if (!row.data || typeof row.data !== 'object') return null
     if (SINGLETON_COLLECTIONS.includes(collection)) {
       return { _partial: true, [collection]: row.data, _ts: Date.now() }
+    }
+    if (MAP_ENTITY_COLLECTIONS.includes(collection)) {
+      return { _partial:true, [collection]:{ [entityId]:row.data }, _ts:Date.now() }
     }
     return {
       _partial: true,
@@ -665,17 +757,19 @@ export function tableChangeToPatch(table, payload) {
     vacaciones: fromVac,
     cierres: fromCierre,
     obras: fromObra,
+    audit_events: fromAuditEvent,
   }
   const mapper = definitions[table]
   if (!mapper || row.id == null) return null
-  if (isDeleted) return deletedPatch(table, row.id)
-  return { _partial: true, [table]: [mapper(row)], _ts: Date.now() }
+  const collection = table === 'audit_events' ? 'audit' : table
+  if (isDeleted) return deletedPatch(collection, row.id)
+  return { _partial: true, [collection]: [mapper(row)], _ts: Date.now() }
 }
 
 export function startTableRealtime(onRefresh) {
   if (!supabase) return
   stopTableRealtime()
-  _tableRealtimeCh = supabase
+  let channel = supabase
     .channel('db-table-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'records',    filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'records', payload))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'employees',  filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'employees', payload))
@@ -683,7 +777,12 @@ export function startTableRealtime(onRefresh) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres',    filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'cierres', payload))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'obras',      filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'obras', payload))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities', filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'app_entities', payload))
-    .subscribe()
+  // La tabla se crea con la migración Auth/RLS. No suscribirla en despliegues
+  // legacy evita que una tabla todavía inexistente invalide el canal completo.
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+    channel = channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_events', filter: `company_id=eq.${COMPANY_ID}` }, payload => _debouncedRefresh(onRefresh, 'audit_events', payload))
+  }
+  _tableRealtimeCh = channel.subscribe()
 }
 
 export function stopTableRealtime() {

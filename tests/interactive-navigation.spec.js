@@ -99,6 +99,45 @@ test('el centro operativo identifica cada perfil incompleto', async ({ page }) =
   await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Empleado Prueba')
 })
 
+test('administración distingue cuentas pendientes de confirmar antes de habilitar RLS', async ({ page }) => {
+  let resendBody = null
+  await loginAsAdmin(page, {
+    employees:[{
+      ...employee,
+      email:'pendiente@times.test',
+      authId:'auth-pendiente',
+      authActivationPending:true,
+      pin:'pbkdf2:salt:hash:600000',
+    }],
+  })
+  await page.route(/supabase\.co\/rest\/v1\/push_subs.*select=user_id/i, route => route.fulfill({
+    status:200, contentType:'application/json', body:JSON.stringify([{ user_id:employee.id }]),
+  }))
+  await page.route(/supabase\.co\/auth\/v1\/resend/i, route => {
+    resendBody = route.request().postDataJSON()
+    return route.fulfill({ status:200, contentType:'application/json', body:'{}' })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Equipo', 'Empleados')
+
+  await expect(page.getByText('Confirmación pendiente', { exact:true })).toBeVisible()
+  await expect(page.getByRole('note')).toContainText('1 pendientes de confirmar')
+  await page.getByLabel('Filtrar por estado de cuenta').selectOption('pending-confirmation')
+  await expect(page.getByText('Empleado Prueba', { exact:true }).first()).toBeVisible()
+  await page.getByRole('button', { name:'Ver perfil', exact:true }).click()
+  await page.getByRole('button', { name:'Reenviar correo de confirmación', exact:true }).click()
+  await expect(page.getByText(/Supabase enviará un nuevo enlace/i)).toBeVisible()
+  expect(resendBody).toMatchObject({ type:'signup', email:'pendiente@times.test' })
+  await page.getByRole('button', { name:'Cerrar perfil', exact:true }).click()
+
+  await openAdminPage(page, 'Sistema', 'Centro operativo')
+  const blocker = page.getByRole('button', { name:/Ver pasos para Empleado Prueba.*Falta confirmar correo/i })
+  await expect(blocker).toBeVisible()
+  await blocker.click()
+  await expect(page.getByText(/todavía debe abrir el enlace recibido por correo/i)).toBeVisible()
+})
+
 test('el centro operativo explica las acciones que solo puede completar el trabajador', async ({ page }) => {
   await loginAsAdmin(page, {
     firmas:{ [employee.id]:{ main:{ data:'data:image/png;base64,firma' } } },

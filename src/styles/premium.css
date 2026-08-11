@@ -500,6 +500,23 @@ button:disabled, [aria-disabled="true"] { cursor:not-allowed !important; filter:
   background:color-mix(in srgb,var(--premium-surface) 95%,transparent) !important;
   border-color:var(--premium-line) !important;
 }
+
+/* Objetivos tactiles: en obra muchos usos son con una mano o con guantes.
+   Los iconos del topbar y varias acciones inline medían 32-38 px. En móvil
+   se eleva el área interactiva sin agrandar necesariamente el icono. */
+@media (pointer: coarse), (max-width: 767px) {
+  #sAdmin button,
+  #sEmp button,
+  #sLogin button {
+    min-height: 44px !important;
+  }
+
+  #sAdmin button[aria-label],
+  #sEmp button[aria-label],
+  #sLogin button[aria-label] {
+    min-width: 44px !important;
+  }
+}
 [data-theme="light"] #sAdmin .uiv2-sidebar-item.uiv2-active {
   color:var(--premium-brand-strong) !important;
   background:rgba(109,40,217,.10) !important;

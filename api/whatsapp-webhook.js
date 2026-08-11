@@ -29,16 +29,21 @@
 //   5. Suscribirse al campo "messages"
 // ─────────────────────────────────────────────────────────────────────────────
 import { timingSafeEqual } from 'crypto'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL          = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON         = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE      = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
+const SB_KEY          = SB_SERVICE || SB_ANON
+const AUTH_RLS_MODE   = isAuthRlsServerMode()
+const COMPANY_ID      = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 const WA_TOKEN        = process.env.WHATSAPP_TOKEN
 const WA_PHONE_ID     = process.env.WHATSAPP_PHONE_ID
 const VERIFY_TOKEN    = process.env.WHATSAPP_VERIFY_TOKEN
 const WEBHOOK_SECRET  = process.env.WHATSAPP_WEBHOOK_SECRET
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 
 function isAuthorizedRequest(req) {
   if (!WEBHOOK_SECRET) return false
@@ -80,6 +85,48 @@ async function saveAppData(data) {
   // comprobar r.ok, un PATCH rechazado por Supabase (400/500) se daba por
   // guardado con éxito en silencio.
   if (!r.ok) throw new Error(`saveAppData PATCH failed: ${r.status}`)
+}
+
+async function getNormalizedData() {
+  const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,name,telefono,centro_trabajo,role,baja&company_id=eq.${COMPANY_ID}&baja=eq.false`
+  const employeeResponse = await fetch(employeesUrl, { headers: SB_H })
+  if (!employeeResponse.ok) throw new Error(`employees read failed: ${employeeResponse.status}`)
+  const employees = (await employeeResponse.json()).map(row => ({
+    id:row.id, name:row.name, telefono:row.telefono,
+    centroTrabajo:row.centro_trabajo, role:row.role, baja:!!row.baja,
+  }))
+  return { employees, records:[] }
+}
+
+async function getOpenRecords(empId) {
+  const url = `${SB_URL}/rest/v1/records?select=*&company_id=eq.${COMPANY_ID}&emp_id=eq.${encodeURIComponent(empId)}&fin=is.null&deleted=eq.false`
+  const response = await fetch(url, { headers: SB_H })
+  if (!response.ok) throw new Error(`records read failed: ${response.status}`)
+  return (await response.json()).map(row => ({
+    ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name,
+    inicio:row.inicio, fin:row.fin, centro:row.centro, workSecs:row.work_secs || 0,
+    breakSecs:row.break_secs || 0, breaks:row.breaks || [], closed:!!row.closed,
+    _upd:row.updated_at,
+  }))
+}
+
+async function saveNormalizedRecord(record) {
+  const now = new Date().toISOString()
+  const next = { ...record, _upd:now }
+  const row = {
+    id:next.id, company_id:COMPANY_ID, emp_id:next.empId, emp_name:next.empName || null,
+    inicio:next.inicio, fin:next.fin || null, centro:next.centro || null,
+    work_secs:next.workSecs || 0, break_secs:next.breakSecs || 0,
+    breaks:next.breaks || [], closed:!!next.closed, aceptada:!!next.aceptada,
+    correcciones:next.correcciones || [], data:next, deleted:false,
+    deleted_at:null, updated_at:now,
+  }
+  const response = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+    method:'POST',
+    headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+    body:JSON.stringify(row),
+  })
+  if (!response.ok) throw new Error(`records upsert failed: ${response.status}`)
 }
 
 async function sendWhatsAppReply(to, message) {
@@ -226,11 +273,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: 'non-text' })
     }
 
-    if (!SB_URL || !SB_ANON) return res.status(200).json({ ok: false, error: 'Supabase no configurado' })
+    if (!SB_URL || !SB_KEY || (AUTH_RLS_MODE && !SB_SERVICE)) {
+      return res.status(200).json({ ok:false, error:AUTH_RLS_MODE ? 'service role no configurado' : 'Supabase no configurado' })
+    }
 
     const fromPhone = normalizePhone(msg.from)
-    const db = await getAppData()
-    if (!db) return res.status(200).json({ ok: false, error: 'no app_data' })
+    const db = AUTH_RLS_MODE ? await getNormalizedData() : await getAppData()
+    if (!db) return res.status(200).json({ ok: false, error: AUTH_RLS_MODE ? 'no normalized data' : 'no app_data' })
 
     const emp = (db.employees || []).find(e => !e.baja && normalizePhone(e.telefono) === fromPhone)
     if (!emp) {
@@ -238,10 +287,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: 'unknown employee' })
     }
 
+    if (AUTH_RLS_MODE) db.records = await getOpenRecords(emp.id)
     const { reply, changed } = await handleMessage(db, emp, msg.text?.body || '')
     if (changed) {
       try {
-        await saveAppData(db)
+        if (AUTH_RLS_MODE) {
+          const changedRecord = (db.records || []).find(record => record.empId === emp.id && (!record.fin || record.closed))
+          if (!changedRecord) throw new Error('changed record not found')
+          await saveNormalizedRecord(changedRecord)
+        } else {
+          await saveAppData(db)
+        }
       } catch (saveErr) {
         // Si el guardado falla, el empleado se quedaba sin fichaje Y sin ninguna
         // respuesta (creía haber fichado). Avisar del fallo en vez de silencio.

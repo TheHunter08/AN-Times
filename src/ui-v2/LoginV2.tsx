@@ -6,8 +6,8 @@ import { Login } from './pages/Login.js'
 import { useAppStore } from '../store/appStore.js'
 import { linkEmployeeAuthIdentity, relinkEmployeeAuthIdentity } from '../utils/authIdentity.js'
 import { useShallow } from 'zustand/react/shallow'
-import { signInEmail, signUpEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword, resendConfirmationEmail, updatePassword } from '../services/authService.js'
-import { getActiveEmployeesByEmail, getRegistrationEligibility, normalizeAccountEmail, validateAccountPassword, verifyRegistrationPin } from '../utils/authRegistration.js'
+import { activateAccountWithPin, searchAccountEmployees, signInEmail, signOut as authSignOut, isAuthReady, onAuthStateChange, resetPassword, resendConfirmationEmail, updatePassword } from '../services/authService.js'
+import { getActiveEmployeesByEmail, getEmployeeActivationEligibility, getRegistrationEligibility, isValidAccountEmail, normalizeAccountEmail, validateAccountPassword, verifyRegistrationPin } from '../utils/authRegistration.js'
 import { sortedEmps } from '../utils/time.js'
 import { auditLog } from '../services/dataService.js'
 import {
@@ -18,6 +18,7 @@ import { clearPinToken } from '../utils/pinAuthToken.js'
 import { checkPlatformAuth, hasBiometric, authenticateBiometric } from '../utils/webauthn.js'
 import { useConnectivity } from '../hooks/useConnectivity.js'
 import type { LoginMode } from './pages/Login.js'
+import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
 
 const EMAIL_LK_KEY = 'an_email_lk'
 const EMAIL_MAX_ATTEMPTS = 5
@@ -66,7 +67,7 @@ export default function LoginV2() {
   // Mode
   const [mode, setMode] = useState<LoginMode>(() => {
     const url = new URL(window.location.href)
-    return url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery') ? 'email' : 'pin'
+    return SECURITY_DEPLOYMENT.requireOfficialAuth || url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery') ? 'email' : 'pin'
   })
 
   // PIN state
@@ -88,6 +89,13 @@ export default function LoginV2() {
   const [emailPinRequired, setEmailPinRequired] = useState(false)
   const [emailError, setEmailError]     = useState('')
   const [registrationNotice, setRegistrationNotice] = useState('')
+  const [requiredActivation, setRequiredActivation] = useState<null | {
+    employeeId:string
+    employeeName:string
+    email:string
+    verifiedPin:string
+    expiresAt:number
+  }>(null)
   const [resetLoading, setResetLoading] = useState(false)
   const [recoveryLoading, setRecoveryLoading] = useState(false)
   const [recoveryMode, setRecoveryMode] = useState(() => {
@@ -95,6 +103,8 @@ export default function LoginV2() {
     return url.searchParams.get('reset') === '1' || window.location.hash.includes('type=recovery')
   })
   const [confirmationLoading, setConfirmationLoading] = useState(false)
+  const [activationEmployees, setActivationEmployees] = useState<any[]>([])
+  const [employeeDirectoryLoading, setEmployeeDirectoryLoading] = useState(false)
   const { online } = useConnectivity()
 
   const verifyingRef = useRef(false)
@@ -102,6 +112,23 @@ export default function LoginV2() {
   const interactiveEmailRef = useRef(false)
 
   const emps = sortedEmps(db).filter((e: any) => !e.isAdmin && !e.baja)
+
+  const handleEmployeeSearch = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setActivationEmployees([])
+      setEmployeeDirectoryLoading(false)
+      return
+    }
+    setEmployeeDirectoryLoading(true)
+    try {
+      setActivationEmployees(await searchAccountEmployees(query))
+    } catch (error: any) {
+      setActivationEmployees([])
+      setEmailError(error?.message || 'No se pudo consultar el directorio de activación')
+    } finally {
+      setEmployeeDirectoryLoading(false)
+    }
+  }, [])
 
   // Recordar último empleado seleccionado
   useEffect(() => {
@@ -184,15 +211,52 @@ export default function LoginV2() {
     return relinked
   }, [saveDB])
 
-  const doAdminLogin = useCallback((authMethod = 'admin') => {
-    setSession({ user: null, isAdmin: true, isEnc: false, isJO: false, authMethod, authenticatedAt: Date.now() })
-    setScreen('admin', true)
-    toast('Modo admin activado')
-  }, [setSession, setScreen, toast])
+  const applyImmediateAccountActivation = useCallback((emp: any, email: string, authId: string) => {
+    const nowIso = new Date().toISOString()
+    saveDB((fresh: any) => {
+      const current = (fresh.employees || []).find((item: any) => item.id === emp.id)
+      if (!current) return null
+      const employees = (fresh.employees || []).map((item: any) => item.id === emp.id
+        ? {
+            ...item,
+            email:normalizeAccountEmail(email),
+            authId,
+            auth_id:authId,
+            authActivationPending:false,
+            authActivatedAt:nowIso,
+            _upd:nowIso,
+          }
+        : item)
+      const withAudit = auditLog(fresh, 'Cuenta oficial activada', current.name || current.id, current.name || 'Empleado', {
+        category:'seguridad', entityType:'employee', entityId:current.id,
+        before:{ email:current.email || null, authId:current.authId || current.auth_id || null },
+        after:{ email:normalizeAccountEmail(email), authId },
+      })
+      return { employees, audit:withAudit.audit }
+    })
+  }, [saveDB])
+
+  const markOfficialAccountConfirmed = useCallback((employeeId: string) => {
+    saveDB((fresh: any) => {
+      const current = (fresh.employees || []).find((item: any) => item.id === employeeId)
+      if (!current?.authActivationPending) return null
+      const nowIso = new Date().toISOString()
+      return {
+        employees:(fresh.employees || []).map((item: any) => item.id === employeeId
+          ? { ...item, authActivationPending:false, _upd:nowIso }
+          : item),
+      }
+    })
+  }, [saveDB])
 
   // ── PIN handlers ──────────────────────────────────────────────────────────
 
   const handlePinKey = useCallback(async (k: string) => {
+    if (!SECURITY_DEPLOYMENT.allowPrimaryPinLogin) {
+      setPinError('En el modo seguro debes acceder con tu cuenta de email.')
+      setMode('email')
+      return
+    }
     if (pin.length >= 6 || verifyingRef.current) return
     if (!selectedEmpId) return
     const newPin = pin + k
@@ -238,6 +302,20 @@ export default function LoginV2() {
             e.id === emp.id ? { ...e, pin: hashed, pinLen: newPin.length, _upd:nowIso } : e
           ),
         }))
+      }
+      if (!isValidAccountEmail(emp.email) || !(emp.authId || emp.auth_id) || emp.authActivationPending) {
+        setRequiredActivation({
+          employeeId:emp.id,
+          employeeName:emp.name || 'Empleado',
+          email:isValidAccountEmail(emp.email) ? normalizeAccountEmail(emp.email) : '',
+          verifiedPin:newPin,
+          expiresAt:Date.now() + 10 * 60 * 1000,
+        })
+        setMode('email')
+        setEmailError('Para continuar debes activar tu cuenta oficial con un correo al que tengas acceso.')
+        setPin('')
+        clearPinToken()
+        return
       }
       doLogin(emp)
       setPin('')
@@ -286,13 +364,20 @@ export default function LoginV2() {
   // ── Biometric ─────────────────────────────────────────────────────────────
 
   const handleBioLogin = async () => {
+    if (!SECURITY_DEPLOYMENT.allowPrimaryBiometricLogin) {
+      setPinError('En el modo seguro debes acceder con tu cuenta de email.')
+      setMode('email')
+      return
+    }
     if (!selectedEmpId) return
     const emp = (db.employees || []).find((e: any) => e.id === selectedEmpId)
     if (!emp) return
     setBioLoading(true)
     try {
       const ok = await authenticateBiometric(emp.id)
-      if (ok) doLogin(emp, 'biometric')
+      if (ok && (!isValidAccountEmail(emp.email) || !(emp.authId || emp.auth_id) || emp.authActivationPending)) {
+        setPinError('Para activar tu cuenta oficial, introduce tu PIN una última vez y después añade tu correo.')
+      } else if (ok) doLogin(emp, 'biometric')
       else setPinError('Autenticación biométrica fallida')
     } catch {
       setPinError('Error en autenticación biométrica')
@@ -318,7 +403,19 @@ export default function LoginV2() {
       credentialsAccepted = true
       const userEmail = result.user?.email
       clearEmailLockout()
-      await useAppStore.getState().fetchDB()
+      // El arranque puede tener todavía una lectura sin sesión en curso. En
+      // modo Auth/RLS, fetchDB devuelve pronto si dbLoading ya está activo y
+      // agenda una segunda lectura; no debemos buscar el perfil hasta que esa
+      // lectura autenticada haya terminado o mostraríamos falsamente
+      // «cuenta no registrada» a un empleado válido.
+      await useAppStore.getState().fetchDB({ forceTables:true })
+      const refreshDeadline = Date.now() + 10_000
+      while (
+        (useAppStore.getState().dbLoading || useAppStore.getState().dbRefreshPending)
+        && Date.now() < refreshDeadline
+      ) {
+        await new Promise(resolve => setTimeout(resolve, 25))
+      }
       const freshDB = useAppStore.getState().db
       const em = normalizeAccountEmail(userEmail)
       const matchingEmployees = getActiveEmployeesByEmail(freshDB.employees, em)
@@ -382,11 +479,13 @@ export default function LoginV2() {
         return
       }
       if (identityMismatch) toast('Cuenta recuperada y vinculada correctamente', 5000, 'ok')
+      if (emp) markOfficialAccountConfirmed(emp.id)
       if (emp && employeeAdmin) {
         setEmailPinRequired(false)
         doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
-        doAdminLogin('email')
+        await authSignOut()
+        setEmailError('La cuenta administrativa debe vincularse a su perfil oficial. Usa «Primera vez: vincular mi cuenta», selecciona el perfil administrador e introduce su PIN.')
       } else if (emp) {
         setEmailPinRequired(false)
         doLogin(emp, 'email')
@@ -469,14 +568,53 @@ export default function LoginV2() {
     if (!online) { setEmailError('Crear la cuenta requiere conexión. Puedes seguir entrando con PIN.'); return }
     if (!isAuthReady()) { setEmailError('Sin conexión con el servidor. Usa el PIN.'); return }
 
+    const selectedActivationEmployee = activationEmployees.find(item => item.id === selectedEmpId)
+    if (selectedActivationEmployee && !requiredActivation) {
+      const employee = selectedActivationEmployee
+      if (!employee) { setEmailError('Busca y selecciona primero tu perfil de empleado.'); return }
+      const normalizedEmail = normalizeAccountEmail(email)
+      if (!isValidAccountEmail(normalizedEmail)) { setEmailError('Introduce un correo válido al que tengas acceso.'); return }
+      const passwordError = validateAccountPassword(password)
+      if (passwordError) { setEmailError(passwordError); return }
+      if (!/^\d{4,6}$/.test(employeePin)) { setEmailError('Introduce tu PIN habitual de fichaje.'); return }
+
+      setRegisterLoading(true)
+      interactiveEmailRef.current = true
+      try {
+        const activation = await activateAccountWithPin(employee.id, employeePin, normalizedEmail, password)
+        await signInEmail(normalizedEmail, password)
+        await useAppStore.getState().fetchDB({ forceTables:true })
+        const freshEmployee = (useAppStore.getState().db.employees || []).find((item: any) => item.id === employee.id)
+        if (!freshEmployee) throw new Error('La cuenta se activó, pero no se pudo cargar el perfil. Cierra y vuelve a entrar.')
+        setActivationEmployees([])
+        setSelectedEmpId('')
+        doLogin(freshEmployee, 'email')
+        toast(activation.created ? 'Cuenta creada y activada correctamente' : 'Cuenta recuperada y activada correctamente', 6000, 'ok')
+      } catch (error: any) {
+        await authSignOut()
+        setEmailError(error?.message || 'No se pudo crear la cuenta. Inténtalo de nuevo.')
+      } finally {
+        interactiveEmailRef.current = false
+        setRegisterLoading(false)
+      }
+      return
+    }
+
     // Una identidad guardada puede apuntar a un usuario de Supabase Auth que
     // ya fue eliminado. Tras acreditar el PIN permitimos intentar recrearlo:
     // Supabase seguirá rechazando el alta si la cuenta anterior aún existe.
-    const eligibility: any = getRegistrationEligibility(
-      db.employees,
-      email,
-      { allowLinkedRecovery:true },
-    )
+    const forcedActivation = requiredActivation && requiredActivation.expiresAt > Date.now()
+      ? requiredActivation
+      : null
+    if (requiredActivation && !forcedActivation) {
+      setRequiredActivation(null)
+      setMode('pin')
+      setEmailError('La comprobación del PIN ha caducado. Selecciona de nuevo tu perfil e introduce el PIN.')
+      return
+    }
+    const eligibility: any = forcedActivation
+      ? getEmployeeActivationEligibility(db.employees, forcedActivation.employeeId, email)
+      : getRegistrationEligibility(db.employees, email, { allowLinkedRecovery:true })
     if (!eligibility.ok) {
       setEmailError(
         eligibility.reason === 'already_linked'
@@ -494,7 +632,9 @@ export default function LoginV2() {
       setEmailError(`PIN bloqueado temporalmente. Inténtalo en ${pinLockout.remainingMin || 1} min.`)
       return
     }
-    const pinCheck: any = await verifyRegistrationPin(eligibility.employee, employeePin)
+    const pinCheck: any = forcedActivation
+      ? await verifyRegistrationPin(eligibility.employee, forcedActivation.verifiedPin)
+      : await verifyRegistrationPin(eligibility.employee, employeePin)
     if (!pinCheck.ok) {
       if (pinCheck.reason === 'employee_without_pin') {
         setEmailError('Tu perfil todavía no tiene PIN. Pide al administrador que lo configure antes de crear la cuenta.')
@@ -516,32 +656,26 @@ export default function LoginV2() {
     setRegisterLoading(true)
     interactiveEmailRef.current = true
     try {
-      const result = await signUpEmail(normalizeAccountEmail(email), password)
-      if (result.session && result.user?.id) {
-        const identityLinkResult: any = eligibility.recovery && eligibility.existingAuthId !== result.user.id
-          ? { ok:relinkAuthIdAfterProof(eligibility.employee, eligibility.existingAuthId, result.user.id) }
-          : linkAuthIdIfMissing(eligibility.employee, result.user.id)
-        if (!identityLinkResult.ok) {
-          await authSignOut()
-          setEmailError(identityLinkResult.reason === 'identity_in_use'
-            ? 'Esta cuenta ya está vinculada a otro perfil. Pide al administrador que revise el vínculo anterior.'
-            : 'Este empleado ya está vinculado a otra cuenta. Contacta al administrador.')
-          return
-        }
-        doLogin(eligibility.employee, 'email')
-        toast(
-          eligibility.recovery
-            ? 'Cuenta recuperada y vinculada correctamente'
-            : 'Cuenta creada y vinculada correctamente',
-          5000,
-          'ok',
-        )
-      } else if (eligibility.recovery && result.user?.identities?.length === 0) {
-        setEmailError('La cuenta anterior todavía existe. Entra con tu contraseña o utiliza «¿La olvidaste?».')
-      } else {
-        setRegistrationNotice('Abre el enlace enviado a tu correo (revisa también spam). Después vuelve aquí y entra con ese correo y la contraseña que acabas de crear. Si aparece el campo PIN, introduce tu PIN de fichaje una última vez para completar la vinculación.')
-        toast('Cuenta creada. Revisa tu correo y confirma el enlace antes de entrar.', 7000, 'ok')
-      }
+      const normalizedEmail = normalizeAccountEmail(email)
+      const activationPin = forcedActivation?.verifiedPin || employeePin
+      const activation = await activateAccountWithPin(eligibility.employee.id, activationPin, normalizedEmail, password)
+      applyImmediateAccountActivation(eligibility.employee, activation.email, activation.authId)
+      await signInEmail(normalizedEmail, password)
+      await useAppStore.getState().fetchDB()
+      const freshEmployee = (useAppStore.getState().db.employees || []).find((item: any) => item.id === eligibility.employee.id)
+      setRequiredActivation(null)
+      doLogin(freshEmployee || {
+        ...eligibility.employee,
+        email:activation.email,
+        authId:activation.authId,
+        auth_id:activation.authId,
+        authActivationPending:false,
+      }, 'email')
+      toast(
+        activation.created ? 'Cuenta creada y activada correctamente' : 'Cuenta recuperada y activada correctamente',
+        6000,
+        'ok',
+      )
     } catch (error: any) {
       setEmailError(error?.message || 'No se pudo crear la cuenta. Inténtalo de nuevo.')
     } finally {
@@ -582,6 +716,7 @@ export default function LoginV2() {
           setEmailPinRequired(true)
           setEmailError('Introduce correo, contraseña y tu PIN de fichaje para completar la primera vinculación.')
         } else if (linkedAuthId === session.user.id) {
+          markOfficialAccountConfirmed(emp.id)
           doLogin(emp, 'oauth')
         } else {
           await authSignOut()
@@ -590,7 +725,12 @@ export default function LoginV2() {
         }
       } else {
         const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => normalizeAccountEmail(x))
-        if (configuredEmails.includes(userEmail)) doAdminLogin('oauth')
+        if (configuredEmails.includes(userEmail)) {
+          await authSignOut()
+          if (!active) return
+          setMode('email')
+          setEmailError('La cuenta administrativa debe vincularse a su perfil oficial mediante «Primera vez: vincular mi cuenta» y el PIN del administrador.')
+        }
         else {
           await authSignOut()
           if (!active) return
@@ -649,6 +789,7 @@ export default function LoginV2() {
       mode={mode}
       onSetMode={setMode}
       employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo, pinLen: e.pinLen || (typeof e.pin === 'string' && !isPinHashed(e.pin) ? e.pin.length : 4) }))}
+      activationEmployees={activationEmployees.map((e: any) => ({ id:e.id, name:e.name, dept:e.dept, pinLen:e.pinLen }))}
       pin={pin}
       selectedEmpId={selectedEmpId}
       onSelectEmp={handleSelectEmp}
@@ -679,9 +820,19 @@ export default function LoginV2() {
       emailPinRequired={emailPinRequired}
       emailError={emailError}
       registrationNotice={registrationNotice}
+      requiredAccountActivation={requiredActivation ? {
+        employeeId:requiredActivation.employeeId,
+        employeeName:requiredActivation.employeeName,
+        email:requiredActivation.email,
+      } : null}
       onRegistrationNoticeDone={() => setRegistrationNotice('')}
       online={online}
       lastSyncLabel={lastSyncTime ? new Date(lastSyncTime).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : undefined}
+      allowPinLogin={SECURITY_DEPLOYMENT.allowPrimaryPinLogin}
+      accountActivationRequiresEmployeeSelection={SECURITY_DEPLOYMENT.requireOfficialAuth}
+      accountActivationEmployeeSearch
+      employeeDirectoryLoading={employeeDirectoryLoading}
+      onEmployeeSearch={handleEmployeeSearch}
     />
   )
 }

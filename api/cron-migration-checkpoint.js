@@ -1,12 +1,15 @@
 import { timingSafeEqual } from 'crypto'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 import { buildMigrationCheckpoint, evaluateMigrationParity } from '../src/server/migrationParity.js'
+import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
 const SB_ANON = clean(process.env.VITE_SB_ANON)
 const SB_SERVICE = clean(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
+const AUTH_RLS_MODE = isAuthRlsServerMode()
 const headers = { apikey:SB_SERVICE || SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
 
 async function readAll(table, select) {
@@ -59,6 +62,10 @@ export default async function handler(req, res) {
   if (!SB_URL || !SB_ANON || !SB_SERVICE) return res.status(500).json({ error:'Supabase service config missing' })
   const startedAt = Date.now()
   try {
+    if (AUTH_RLS_MODE) {
+      await persistAutomationRun(createAutomationRun('migration', { startedAt, checked:1, processed:1 }))
+      return res.status(200).json({ ok:true, retired:true, reason:'normalized tables are authoritative' })
+    }
     const [blob, employees, records, vacaciones, cierres, obras, entities] = await Promise.all([
       readBlob(),
       readAll('employees', 'id,updated_at'),

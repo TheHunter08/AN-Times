@@ -4,6 +4,7 @@ import writeXlsxFile from 'write-excel-file/node'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 import { buildScheduledReportRows, isScheduleDue, parseReportRecipients, reportPeriod } from '../src/server/scheduledReports.js'
 import { isMissingStorageBucketResponse } from '../src/server/storageBuckets.js'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -12,7 +13,9 @@ const SB_SERVICE = clean(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERV
 const CRON_SECRET = process.env.CRON_SECRET
 const RESEND_API_KEY = clean(process.env.RESEND_API_KEY)
 const REPORT_FROM_EMAIL = clean(process.env.REPORT_FROM_EMAIL)
-const headers = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
+const AUTH_RLS_MODE = isAuthRlsServerMode()
+const SB_KEY = SB_SERVICE || SB_ANON
+const headers = { apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` }
 const storageHeaders = SB_SERVICE ? { apikey:SB_SERVICE, Authorization:`Bearer ${SB_SERVICE}` } : headers
 
 async function ensureReportBucket() {
@@ -42,17 +45,39 @@ async function ensureReportBucket() {
 }
 
 async function readDB() {
+  if (AUTH_RLS_MODE) {
+    const [configResponse, employeesResponse, recordsResponse] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/app_entities?id=eq.config%3A__singleton__&select=data,updated_at`, { headers }),
+      fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers }),
+      fetch(`${SB_URL}/rest/v1/records?select=*&deleted=eq.false`, { headers }),
+    ])
+    if (![configResponse, employeesResponse, recordsResponse].every(response => response.ok)) throw new Error('normalized report source unavailable')
+    const configRow = (await configResponse.json())?.[0]
+    if (!configRow) throw new Error('config entity unavailable')
+    return {
+      updated_at:configRow.updated_at,
+      data:{
+        config:configRow.data || {},
+        employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja })),
+        records:(await recordsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name, inicio:row.inicio, fin:row.fin, centro:row.centro, workSecs:row.work_secs, closed:row.closed })),
+      },
+    }
+  }
   const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers })
   if (!response.ok) throw new Error(`app_data read ${response.status}`)
   return (await response.json())?.[0] || null
 }
 
 async function writeDB(data, expectedUpdatedAt) {
-  const query = `id=eq.1&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`
-  const response = await fetch(`${SB_URL}/rest/v1/app_data?${query}`, {
+  const query = AUTH_RLS_MODE
+    ? `id=eq.config%3A__singleton__&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`
+    : `id=eq.1&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`
+  const table = AUTH_RLS_MODE ? 'app_entities' : 'app_data'
+  const payload = AUTH_RLS_MODE ? { data:data.config || {}, updated_at:new Date().toISOString() } : { data, updated_at:new Date().toISOString() }
+  const response = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
     method:'PATCH',
     headers:{ ...headers, 'Content-Type':'application/json', Prefer:'return=representation' },
-    body:JSON.stringify({ data, updated_at:new Date().toISOString() }),
+    body:JSON.stringify(payload),
   })
   if (!response.ok) throw new Error(`app_data write ${response.status}`)
   const rows = await response.json()

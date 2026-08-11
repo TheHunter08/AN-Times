@@ -22,6 +22,7 @@ interface DbEmployee {
   isJO?: boolean
   authId?: string
   auth_id?: string
+  authActivationPending?: boolean
   pin?: string
 }
 interface DbRecord {
@@ -80,6 +81,7 @@ export function useEmployeesData() {
       .map((id: string) => obrasById.get(id)?.nombre || id)
       .filter(Boolean)
     const accountStatus: EmployeeRow['accountStatus'] =
+      e.authActivationPending ? 'pending-confirmation' :
       e.authId || e.auth_id ? 'linked' :
       !isValidAccountEmail(e.email) ? 'missing-email' :
       !e.pin ? 'missing-pin' :

@@ -1,7 +1,33 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, recordTombstones, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
+import { auditLog, buildBlobDelta, mergeDB, persistedAuthUserId, recordTombstones, resolveLocalDbStorageKey, resolvePendingStorageKeys, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
+
+describe('caché local aislada por Supabase Auth', () => {
+  it('no abre ninguna caché segura sin una identidad oficial', () => {
+    expect(resolveLocalDbStorageKey({ authenticatedDataPath:true, authUserId:null })).toBeNull()
+  })
+
+  it('usa una clave distinta por usuario y conserva la clave legacy fuera de RLS', () => {
+    expect(resolveLocalDbStorageKey({ authenticatedDataPath:true, authUserId:'auth-1' })).toBe('an_times_auth_auth-1')
+    expect(resolveLocalDbStorageKey({ authenticatedDataPath:false, authUserId:'auth-1' })).toBe('an_times_v1')
+  })
+
+  it('separa también la cola offline y no crea una cola segura anónima', () => {
+    expect(resolvePendingStorageKeys({ authenticatedDataPath:true, authUserId:null })).toBeNull()
+    expect(resolvePendingStorageKeys({ authenticatedDataPath:true, authUserId:'auth-1' })).toEqual({
+      idb:'pending:auth-1', fallback:'an_times_pending_sync_auth-1',
+    })
+    expect(resolvePendingStorageKeys({ authenticatedDataPath:false })).toEqual({
+      idb:'pending', fallback:'an_times_pending_sync',
+    })
+  })
+
+  it('lee el usuario de la sesión persistida sin confiar en la sesión de la app', () => {
+    expect(persistedAuthUserId(JSON.stringify({ user:{ id:'auth-2' }, access_token:'x.y.z' }))).toBe('auth-2')
+    expect(persistedAuthUserId('{malformado')).toBeNull()
+  })
+})
 
 describe('isConnectivityError', () => {
   it('trata timeouts y fallos de fetch como problema de conectividad', () => {
@@ -105,6 +131,26 @@ describe('tombstones: borrar una jornada no debe resucitar en el siguiente fetch
     expect(merged.obras.find(item => item.id === 'o2').nombre).toBe('Sur actualizado')
     expect(merged.obras.some(item => item.id === 'o1')).toBe(true)
     expect(merged.monthSnapshots).toEqual(local.monthSnapshots)
+  })
+
+  it('conserva la evidencia legal al cargar y fusionar el estado local', () => {
+    const acknowledgement = { id:'legal-e1-v2', empId:'e1', noticeVersion:'2.0', _upd:'2026-08-11T10:00:00Z' }
+    const merged = mergeDB({ ...BASE, legalAcknowledgements:[] }, { legalAcknowledgements:[acknowledgement] })
+    expect(merged.legalAcknowledgements).toEqual([acknowledgement])
+  })
+
+  it('fusiona una firma incremental sin ocultar las demás', () => {
+    const merged = mergeDB({ ...BASE, firmas:{ e1:{ main:{ data:'a' } } } }, {
+      _partial:true, firmas:{ e2:{ main:{ data:'b' } } },
+    })
+    expect(Object.keys(merged.firmas).sort()).toEqual(['e1', 'e2'])
+  })
+
+  it('aplica tombstones remotos también a mapas privados', () => {
+    const merged = mergeDB({ ...BASE, firmas:{ e1:{}, e2:{} } }, {
+      _partial:true, _deleted:{ firmas:['e1'] },
+    })
+    expect(merged.firmas).toEqual({ e2:{} })
   })
 })
 

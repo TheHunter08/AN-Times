@@ -7,6 +7,8 @@ const handlers = vi.hoisted(() => ({
   whatsapp: vi.fn(),
   monthlyClose: vi.fn(),
   health: vi.fn(),
+  activateAccount: vi.fn(),
+  accountBootstrap: vi.fn(),
 }))
 
 vi.mock('./adminEndpoints/migrate-to-tables.js', () => ({ default: handlers.migrate }))
@@ -15,6 +17,7 @@ vi.mock('./adminEndpoints/send-push-all.js', () => ({ default: handlers.pushAll 
 vi.mock('./adminEndpoints/send-whatsapp.js', () => ({ default: handlers.whatsapp }))
 vi.mock('./adminEndpoints/monthly-close.js', () => ({ default: handlers.monthlyClose }))
 vi.mock('./adminEndpoints/health.js', () => ({ default: handlers.health }))
+vi.mock('./accountActivation.js', () => ({ default: handlers.activateAccount, accountBootstrap:handlers.accountBootstrap }))
 
 import dispatchAdminEndpoint from './adminEndpoints.js'
 
@@ -35,6 +38,8 @@ describe('dispatchAdminEndpoint', () => {
     ['send-whatsapp', 'whatsapp'],
     ['monthly-close', 'monthlyClose'],
     ['health', 'health'],
+    ['activate-account', 'activateAccount'],
+    ['account-bootstrap', 'accountBootstrap'],
   ])('conserva la ruta histórica %s', (op, handlerName) => {
     const req = { query: { op } }
     const res = response()

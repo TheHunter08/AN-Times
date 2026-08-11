@@ -25,7 +25,7 @@ import { useRequestsData } from './hooks/useRequestsData.js'
 import { useNotificationsData } from './hooks/useNotificationsData.js'
 import { auditLog, queuePush, uploadPendingIfAny, isConnectivityError } from '../services/dataService.js'
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
-import { authSupabase } from '../services/authService.js'
+import { authSupabase, resendConfirmationEmail } from '../services/authService.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
 import { effectiveDailyTargetMin } from '../utils/laborCalendar.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
@@ -50,6 +50,8 @@ import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import { automationHealthList } from '../server/automationHealth.js'
 import { buildOperationalPulse } from '../utils/operationalPulse.js'
+import { hasSignedDocumentArtifact, shouldUsePrivateDocumentStorage } from '../utils/documentSigning.js'
+import { buildInspectionEvidenceSummary } from '../utils/inspectionEvidence.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -778,6 +780,16 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed 
     toast(`${emp.name} dado de baja`, 3000, 'warn')
   }
 
+  const handleResendConfirmation = async (_id: string, email: string) => {
+    try {
+      await resendConfirmationEmail(email)
+      toast('Si la cuenta sigue pendiente, Supabase enviará un nuevo enlace. Revisa también spam.', 6500, 'ok')
+    } catch (error: any) {
+      toast(error?.message || 'No se pudo reenviar la confirmación', 5000, 'warn')
+      throw error
+    }
+  }
+
   const openEdit = (id: string) => {
     const emp = (db.employees || []).find((e: any) => e.id === id)
     if (!emp) return
@@ -803,7 +815,7 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed 
 
   return (
     <>
-      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} onDeactivate={handleDeactivate} />
+      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} onDeactivate={handleDeactivate} onResendConfirmation={handleResendConfirmation} />
       {modal && (
         <EmployeeModal initial={modal.mode === 'edit' ? modal.emp : undefined} onClose={() => setModal(null)} />
       )}
@@ -1433,9 +1445,10 @@ function DocumentsPage() {
   // subirlo).
   const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
     if (doc.fileData) return doc.fileData
-    if (doc.storagePath && authSupabase) {
+    const storagePath = doc.signedStoragePath || doc.storagePath
+    if (storagePath && authSupabase) {
       try {
-        const { data, error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(doc.storagePath, 3600, filename ? { download: filename } : undefined)
+        const { data, error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(storagePath, 3600, filename ? { download: filename } : undefined)
         if (!error && data?.signedUrl) return data.signedUrl
       } catch { /* cae al respaldo de abajo */ }
     }
@@ -1472,7 +1485,7 @@ function DocumentsPage() {
     size: d.size || d.peso || '—',
     uploadedOn: fmtDate(d.ts || d.fecha || d.createdAt),
     expiresOn: d.expiresOn || '',
-    signed: !!d.firma,
+    signed: hasSignedDocumentArtifact(d),
     signedOn: d.firma?.firmadoAt ? new Date(d.firma.firmadoAt).toLocaleDateString('es-ES') : undefined,
     onDownload: handleDownload,
     onPreview: handlePreview,
@@ -1507,11 +1520,18 @@ function DocumentsPage() {
     const docId = gid()
     let storagePath: string | null = null
     let data: string | null = null
+    const targetEmployee = employees.find((employee: any) => employee.id === meta.empId)
+    const targetHasOfficialAuth = shouldUsePrivateDocumentStorage(targetEmployee, Boolean(authSupabase))
     // Igual que con los PDFs de cierre: preferimos Storage (cuota separada,
     // 1 GB) sobre guardar el archivo en base64 dentro del JSONB (se come la
     // cuota de base de datos, 500 MB). Si falla o no hay bucket todavía, cae
     // al comportamiento anterior para no bloquear la subida.
-    if (authSupabase) {
+    // Un empleado que todavia entra solo por PIN no tiene JWT para solicitar
+    // una URL privada de Storage. Durante la transicion guardamos su archivo
+    // inline para que pueda verlo y firmarlo; en cuanto tenga auth_id se usa
+    // el bucket privado. Evita crear documentos nuevos inaccesibles para la
+    // mayoria del equipo mientras se completan las cuentas oficiales.
+    if (targetHasOfficialAuth) {
       try {
         const path = `${meta.empId}/${docId}-${file.name}`
         const { error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: true })
@@ -1534,6 +1554,7 @@ function DocumentsPage() {
       id: docId, empId: meta.empId, empName: meta.empName, tipo: meta.tipo,
       nombre: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
       mime: file.type, storagePath, data, createdAt: now, expiresOn: meta.expiresOn || null, _upd: now,
+      storageAccess: storagePath ? 'authenticated' : 'inline_transition',
     }] }))
     toast(`Documento subido a ${meta.empName}`, 3000, 'ok')
     uploadMeta.current = null
@@ -1541,7 +1562,7 @@ function DocumentsPage() {
   }
 
   return <>
-    <input ref={uploadRef} type="file" hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={e => { uploadFile(e.target.files?.[0]); e.currentTarget.value = '' }} />
+    <input ref={uploadRef} type="file" hidden accept=".pdf,.jpg,.jpeg,.png" onChange={e => { uploadFile(e.target.files?.[0]); e.currentTarget.value = '' }} />
     <Documents items={items} onUpload={requestUpload} />
     {uploadOpen && (
       <div className="uiv2-sheet-overlay" onClick={() => setUploadOpen(false)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.68)', backdropFilter:'blur(8px)' }}>
@@ -1564,7 +1585,7 @@ function DocumentsPage() {
             <input type="date" value={uploadExpiry} onChange={e => setUploadExpiry(e.target.value)} style={{ minHeight:46, padding:'0 12px', borderRadius:10, background:colors.bg[600], color:colors.text[900], border:`1px solid ${colors.border.default}` }} />
           </label>
           <button onClick={chooseFile} style={{ minHeight:48, display:'flex', alignItems:'center', justifyContent:'center', gap:7, border:0, borderRadius:12, background:colors.primary.base, color:'#fff', fontSize:14, fontWeight:750, cursor:'pointer' }}><IconPlus width={15} height={15}/> Seleccionar archivo</button>
-          <div style={{ fontSize:11, color:colors.text[400], textAlign:'center' }}>PDF, Word, Excel o imagen · máximo 8 MB</div>
+          <div style={{ fontSize:11, color:colors.text[400], textAlign:'center' }}>PDF o imagen · máximo 8 MB · formatos compatibles con firma incrustada</div>
         </div>
       </div>
     )}
@@ -1718,12 +1739,14 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   }
 
   const handleExportInspection = async () => {
+    const evidence = buildInspectionEvidenceSummary(db)
     const employeesById = new Map<string, any>((db.employees || []).map((employee: any) => [employee.id, employee]))
     const cutoff = new Date(compliance.retentionCutoff).getTime()
     const retained = (db.records || [])
       .filter((record: any) => record.inicio && new Date(record.inicio).getTime() >= cutoff)
       .sort((a: any, b: any) => String(a.inicio).localeCompare(String(b.inicio)))
-    const signedCierres = (db.cierres || []).filter((cierre: any) => cierre.integrityHash)
+    const signedCierres = evidence.signedClosures
+    const signedDocuments = evidence.signedDocuments
 
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
     const pdfCols = pdfColors(rgb)
@@ -1735,13 +1758,14 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     const REC_COLS = [{ label: 'Fecha', w: 62 }, { label: 'Empleado', w: 118 }, { label: 'Horario', w: 88 }, { label: 'Horas', w: 55 }, { label: 'Centro / Obra', w: 108 }, { label: 'Estado', w: 55 }, { label: 'Cambios', w: 39 }]
     const RISK_COLS = [{ label: 'Riesgo detectado', w: CW - 80 }, { label: 'Casos', w: 80 }]
     const HASH_COLS = [{ label: 'Mes', w: 50 }, { label: 'Empleado', w: 140 }, { label: 'Hash SHA-256', w: CW - 50 - 140 }]
+    const DOC_HASH_COLS = [{ label: 'Documento', w: 150 }, { label: 'Empleado', w: 120 }, { label: 'Hash SHA-256', w: CW - 150 - 120 }]
 
     let page: any, y = 0, pageNum = 0
     const newPage = (subtitle: string) => {
       pageNum++
       ;({ page, y } = addReportPage(pdfDoc, {
         ml: ML, mr: MR, cw: CW, pw: PW, ph: PH, pageNum, colors: pdfCols, fontR, fontB,
-        empresa: 'TIMES INC', title: 'PAQUETE DE INSPECCIÓN — REGISTRO HORARIO', subtitle,
+        empresa: evidence.companyName, title: 'PAQUETE DE INSPECCIÓN — REGISTRO HORARIO', subtitle,
       }))
     }
     newPage('Base legal: artículo 34.9 del Estatuto de los Trabajadores · RDL 8/2019')
@@ -1761,6 +1785,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       items: [
         { label: 'REGISTROS VALIDADOS', val: `${compliance.validationPct}%` },
         { label: 'CIERRES FIRMADOS', val: `${compliance.closurePct}%` },
+        { label: 'PERSONAL INFORMADO', val: `${evidence.informedWorkers}/${evidence.workers}` },
       ],
     })
     y -= 20
@@ -1806,7 +1831,21 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
         if (y - 15 < 60) { newPage('Integridad de cierres firmados (continuación)'); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: HASH_COLS, colors: pdfCols, fontB }) }
         y = drawTableDataRow(page, {
           ml: ML, cw: CW, y, cols: HASH_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB,
-          vals: [cierre.mes, cierre.empName || employeesById.get(cierre.empId)?.name || cierre.empId, cierre.integrityHash],
+          vals: [cierre.month, cierre.employee, cierre.sha256],
+        })
+      })
+    }
+
+    if (signedDocuments.length) {
+      y -= 16
+      if (y - 40 < 60) newPage('Integridad de documentos firmados (continuación)')
+      y = drawSectionTitle(page, { ml: ML, y, text: `INTEGRIDAD DE DOCUMENTOS FIRMADOS · SHA-256 (${signedDocuments.length})`, colors: pdfCols, fontB })
+      y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: DOC_HASH_COLS, colors: pdfCols, fontB })
+      signedDocuments.forEach((document: any, i: number) => {
+        if (y - 15 < 60) { newPage('Integridad de documentos firmados (continuación)'); y = drawTableHeaderRow(page, { ml: ML, y, cw: CW, cols: DOC_HASH_COLS, colors: pdfCols, fontB }) }
+        y = drawTableDataRow(page, {
+          ml: ML, cw: CW, y, cols: DOC_HASH_COLS, striped: i % 2 !== 0, colors: pdfCols, fontR, fontB,
+          vals: [document.name, document.employee, document.sha256],
         })
       })
     }

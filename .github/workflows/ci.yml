@@ -28,3 +28,12 @@ jobs:
 
       - name: Verificar release completa
         run: npm run verify:deploy
+
+      - name: Instalar navegador de pruebas
+        run: npx playwright install --with-deps chromium
+
+      - name: Verificar flujos críticos actuales
+        run: npm run test:e2e:smoke
+
+      - name: Verificar activación Auth/RLS
+        run: npm run test:e2e:auth-rls

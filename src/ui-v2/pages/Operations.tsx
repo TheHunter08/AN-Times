@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { ProductState } from '../components/ProductState.js'
@@ -46,6 +46,11 @@ interface OperationsProps {
   staleOpenShifts: number
   pendingClosures: number
   documentCount: number
+  documentReadiness: { total:number; signed:number; pending:number; signatureWithoutArtifact:number; privateWithoutAuth:number; signedWithoutIntegrity:number; ready:boolean }
+  legalConfig: { controllerName: string; taxId: string; address: string; privacyEmail: string; dpoEmail: string }
+  legalIssues: string[]
+  legalAcknowledged: number
+  legalAcknowledgementTotal: number
   launchBlockers: LaunchBlocker[]
   schedules: ReportSchedule[]
   automationHealth?: Record<string, any>
@@ -57,6 +62,7 @@ interface OperationsProps {
   onToggleSchedule: (id: string) => void
   onDeleteSchedule: (id: string) => void
   onChangeWidgets: (ids: string[]) => void
+  onSaveLegalConfig: (config: OperationsProps['legalConfig']) => void
   onNavigate: (page: string) => void
   onReviewEmployee: (employeeId: string) => void
 }
@@ -84,6 +90,9 @@ export function Operations(props: OperationsProps) {
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly')
   const [format, setFormat] = useState<'pdf' | 'excel'>('pdf')
   const [recipients, setRecipients] = useState('')
+  const [legalForm, setLegalForm] = useState(props.legalConfig)
+
+  useEffect(() => { setLegalForm(props.legalConfig) }, [props.legalConfig])
 
   const syncNow = async () => {
     if (syncing) return
@@ -190,7 +199,8 @@ export function Operations(props: OperationsProps) {
           { label: 'Validaciones reales', value: props.pendingValidation ? `${props.pendingValidation} pendientes` : 'Ninguna pendiente', ok: props.pendingValidation === 0, icon: <IconClock />, action: () => props.onNavigate('validar'), detail: 'Abrir validación' },
           { label: 'Jornadas sin cerrar', value: props.staleOpenShifts ? `${props.staleOpenShifts} requieren revisión` : 'Ninguna incidencia', ok: props.staleOpenShifts === 0, icon: <IconClock />, action: () => props.onNavigate('anomalias'), detail: 'Revisar anomalías' },
           { label: 'Cierres mensuales', value: props.pendingClosures ? `${props.pendingClosures} sin completar` : 'Todos completados', ok: props.pendingClosures === 0, icon: <IconFileText />, action: () => props.onNavigate('cierre'), detail: 'Abrir cierres' },
-          { label: 'Documentos', value: props.documentCount ? `${props.documentCount} guardados` : 'Sin documentos', ok: props.documentCount > 0, icon: <IconFileText />, action: () => props.onNavigate('documentos'), detail: 'Abrir documentos' },
+          { label: 'Documentos', value: !props.documentReadiness.ready ? `${props.documentReadiness.signatureWithoutArtifact + props.documentReadiness.privateWithoutAuth} con incidencia` : props.documentCount ? `${props.documentReadiness.signed} firmados · ${props.documentReadiness.pending} pendientes` : 'Sin documentos', ok: props.documentReadiness.ready, icon: <IconFileText />, action: () => props.onNavigate('documentos'), detail: 'Abrir documentos' },
+          { label: 'Información legal', value: props.legalIssues.length ? `${props.legalIssues.length} datos pendientes` : `${props.legalAcknowledged}/${props.legalAcknowledgementTotal} informados`, ok: props.legalIssues.length === 0 && props.legalAcknowledged === props.legalAcknowledgementTotal, icon: <IconShield />, action: () => document.getElementById('legal-company-settings')?.scrollIntoView({ behavior:'smooth', block:'center' }), detail: 'Revisar configuración' },
         ].map(item => (
           <Card key={item.label} padding={4} role="button" tabIndex={0} aria-label={`${item.label}: ${item.value}. ${item.detail}`} onClick={item.action} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); item.action() } }} className="ti-operations__health-card" style={{ minHeight: 106 }}>
             <div className={`ti-operations__health-icon${item.ok ? ' is-ok' : ''}`}>{item.icon}</div>
@@ -283,7 +293,10 @@ export function Operations(props: OperationsProps) {
                       <span>Dos perfiles comparten la misma identidad de acceso. No actives RLS ni cambies correos para ocultar el conflicto: debe revisarse qué perfil es el propietario correcto antes de desvincular el otro.</span>
                     )}
                     {blocker.issues.includes('Falta crear acceso') && (
-                      <span>Debe abrir la pantalla de acceso, elegir “Acceso con email” y pulsar “Primera vez: vincular mi cuenta”. Usará el correo de su perfil, su PIN habitual y una contraseña nueva.</span>
+                      <span>Debe entrar con su PIN habitual. Times INC abrirá automáticamente la activación, solicitará un correo único y una contraseña, y enviará el enlace de confirmación.</span>
+                    )}
+                    {blocker.issues.includes('Falta confirmar correo') && (
+                      <span>La cuenta ya existe y está vinculada, pero todavía debe abrir el enlace recibido por correo y después iniciar sesión con email y contraseña.</span>
                     )}
                     {blocker.issues.includes('Falta firma') && (
                       <span>Al entrar como empleado se abrirá la configuración obligatoria. En el paso “Tu firma” debe dibujarla y guardarla; no puede registrarse desde Administración.</span>
@@ -313,6 +326,19 @@ export function Operations(props: OperationsProps) {
       </Card>
 
       <section className="ti-operations__grid">
+        <Card id="legal-company-settings">
+          <div className="ti-operations__section-title"><div><strong>Responsable y privacidad</strong><span>Datos que verán los trabajadores en la información legal</span></div><span className="ti-operations__pill">Empresa única</span></div>
+          <div className="ti-operations__form">
+            <input style={inputStyle} value={legalForm.controllerName} onChange={event => setLegalForm({ ...legalForm, controllerName:event.target.value })} aria-label="Razón social" placeholder="Razón social de la empresa" />
+            <div><input style={inputStyle} value={legalForm.taxId} onChange={event => setLegalForm({ ...legalForm, taxId:event.target.value })} aria-label="CIF o NIF" placeholder="CIF / NIF" /><input style={inputStyle} type="email" value={legalForm.privacyEmail} onChange={event => setLegalForm({ ...legalForm, privacyEmail:event.target.value })} aria-label="Email de privacidad" placeholder="privacidad@empresa.com" /></div>
+            <input style={inputStyle} value={legalForm.address} onChange={event => setLegalForm({ ...legalForm, address:event.target.value })} aria-label="Domicilio de la empresa" placeholder="Domicilio completo" />
+            <input style={inputStyle} type="email" value={legalForm.dpoEmail} onChange={event => setLegalForm({ ...legalForm, dpoEmail:event.target.value })} aria-label="Email del delegado de protección de datos" placeholder="Delegado de protección de datos (opcional)" />
+            {props.legalIssues.length > 0 && <div className="ti-operations__hint" role="alert">{props.legalIssues.join(' · ')}</div>}
+            <button type="button" onClick={() => props.onSaveLegalConfig({ ...legalForm, controllerName:legalForm.controllerName.trim(), taxId:legalForm.taxId.trim(), address:legalForm.address.trim(), privacyEmail:legalForm.privacyEmail.trim(), dpoEmail:legalForm.dpoEmail.trim() })}>Guardar información legal</button>
+          </div>
+          <p className="ti-operations__hint">Guardar una nueva versión no sustituye el asesoramiento legal. Deben validarse los textos con la actividad, convenio, representantes y medidas de control reales de la empresa.</p>
+        </Card>
+
         <Card>
           <div className="ti-operations__section-title"><div><strong>Sincronización</strong><span>Estado de esta instalación</span></div><button type="button" onClick={syncNow} disabled={syncing}>{syncing ? 'Sincronizando…' : 'Sincronizar ahora'}</button></div>
           <dl className="ti-operations__details">

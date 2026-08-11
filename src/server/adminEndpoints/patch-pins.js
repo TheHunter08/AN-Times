@@ -7,11 +7,12 @@
 // Prerequisito en Supabase SQL Editor:
 //   ALTER TABLE employees ADD COLUMN IF NOT EXISTS pin_len int;
 import { timingSafeEqual } from 'crypto'
+import { isAuthRlsServerMode } from '../securityMode.js'
 
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON    = cleanEnv(process.env.VITE_SB_ANON)
-const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY)
+const SB_SERVICE = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
 
 const KEY  = SB_SERVICE || SB_ANON
@@ -27,12 +28,15 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
+  if (!SB_URL || !SB_SERVICE) return res.status(500).json({ error: 'Supabase service config missing' })
+  if (isAuthRlsServerMode()) {
+    return res.status(410).json({ error:'Los PIN legacy están retirados en modo Auth/RLS' })
+  }
 
   try {
     // 1. Leer blob
     const blobRes = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, {
-      headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+      headers: SB_H
     })
     const blobRows = await blobRes.json()
     const db = blobRows?.[0]?.data || {}
