@@ -35,18 +35,30 @@ const [blobRows, tableRows, employees] = await Promise.all([
 ])
 const blobClosures = (blobRows[0]?.data?.cierres || []).filter(item => item?.id && !item.deleted)
 const activeTable = tableRows.filter(item => !item.deleted)
+const deletedTable = tableRows.filter(item => item.deleted)
 const tableIds = new Set(activeTable.map(item => String(item.id)))
 const employeeIds = new Set(employees.map(item => String(item.id)))
 const tableByNaturalKey = new Map(activeTable.map(item => [`${item.emp_id}|${item.mes}`, item]))
+const deletedByNaturalKey = new Map(deletedTable.map(item => [`${item.emp_id}|${item.mes}`, item]))
 const missing = blobClosures.filter(item => !tableIds.has(String(item.id)))
 const conflicts = missing.filter(item => {
   const existing = tableByNaturalKey.get(`${item.empId}|${item.mes}`)
   return existing && String(existing.id) !== String(item.id)
 })
 const conflictIds = new Set(conflicts.map(item => String(item.id)))
+const tombstoneConflicts = missing.filter(item => {
+  const existing = deletedByNaturalKey.get(`${item.empId}|${item.mes}`)
+  return existing && String(existing.id) !== String(item.id)
+})
+const tombstoneConflictIds = new Set(tombstoneConflicts.map(item => String(item.id)))
 const orphans = missing.filter(item => !employeeIds.has(String(item.empId)))
 const orphanIds = new Set(orphans.map(item => String(item.id)))
-const insertable = missing.filter(item => !conflictIds.has(String(item.id)) && !orphanIds.has(String(item.id)))
+const insertable = missing.filter(item =>
+  !conflictIds.has(String(item.id))
+  && !tombstoneConflictIds.has(String(item.id))
+  && !orphanIds.has(String(item.id))
+)
+const repairable = [...insertable, ...tombstoneConflicts]
 
 console.log(JSON.stringify({
   mode:apply ? 'apply' : 'dry-run',
@@ -55,15 +67,20 @@ console.log(JSON.stringify({
   missing:missing.length,
   insertable:insertable.length,
   naturalKeyConflicts:conflicts.map(item => ({ id:item.id, empId:item.empId, mes:item.mes, existingId:tableByNaturalKey.get(`${item.empId}|${item.mes}`)?.id })),
+  tombstoneConflicts:tombstoneConflicts.map(item => ({ id:item.id, empId:item.empId, mes:item.mes, existingId:deletedByNaturalKey.get(`${item.empId}|${item.mes}`)?.id })),
   orphaned:orphans.map(item => ({ id:item.id, empId:item.empId, mes:item.mes })),
-  candidates:insertable.map(item => ({ id:item.id, empId:item.empId, mes:item.mes })),
+  candidates:repairable.map(item => ({ id:item.id, empId:item.empId, mes:item.mes })),
 }, null, 2))
 
-if (!apply || !insertable.length) process.exit(conflicts.length || orphans.length ? 2 : 0)
+if (!apply || !repairable.length) process.exit(conflicts.length || orphans.length ? 2 : 0)
+if (conflicts.length || orphans.length) process.exit(2)
 
-const rows = insertable.map(item => toClosureRow(item, new Date().toISOString()))
+const rows = repairable.map(item => toClosureRow(item, new Date().toISOString()))
 const upsert = async batch => {
-  const response = await fetch(`${url}/rest/v1/cierres?on_conflict=id`, {
+  // La clave natural es única incluso para tombstones. Al reactivar un cierre
+  // legítimo del blob, el upsert cambia de forma atómica el antiguo id borrado
+  // por el id vigente y evita una ventana DELETE+INSERT sin fila recuperable.
+  const response = await fetch(`${url}/rest/v1/cierres?on_conflict=company_id,emp_id,mes`, {
     method:'POST',
     headers:{ ...headers, Prefer:'resolution=merge-duplicates,return=minimal' },
     body:JSON.stringify(batch),
@@ -79,8 +96,8 @@ if (!batch.ok) {
     if (!result.ok) failures.push({ id:row.id, status:result.status, detail:result.detail })
   }
 }
-const verified = await request(`cierres?select=id&id=in.(${insertable.map(item => encodeURIComponent(item.id)).join(',')})`)
+const verified = await request(`cierres?select=id&id=in.(${repairable.map(item => encodeURIComponent(item.id)).join(',')})`)
 const verifiedIds = new Set(verified.map(item => String(item.id)))
-const notVerified = insertable.filter(item => !verifiedIds.has(String(item.id))).map(item => item.id)
-console.log(JSON.stringify({ ok:failures.length === 0 && notVerified.length === 0, inserted:insertable.length - failures.length, failures, notVerified }, null, 2))
+const notVerified = repairable.filter(item => !verifiedIds.has(String(item.id))).map(item => item.id)
+console.log(JSON.stringify({ ok:failures.length === 0 && notVerified.length === 0, repaired:repairable.length - failures.length, failures, notVerified }, null, 2))
 if (failures.length || notVerified.length) process.exitCode = 1

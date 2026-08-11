@@ -1,12 +1,13 @@
 import { create } from 'zustand'
-import { loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch, detachPushUser } from '../services/dataServiceV2.js'
+import { clearLocal, loadLocal, mergeDB, saveLocal, cloudPush, cloudFetch, cloudFetchTs, startRealtime, stopRealtime, recordTombstones, mergePendingDeletes, startPresence, stopPresence, startTableRealtime, stopTableRealtime, persistRecordRow, tableChangeToPatch, detachPushUser } from '../services/dataServiceV2.js'
 import { signOut as authSignOut } from '../services/authService.js'
 import { INITIAL_DB } from '../config/constants.js'
 import { sanitizeSession } from '../utils/sessionSecurity.js'
 import { normalizeToastOptions } from '../utils/toastOptions.js'
 import { pruneDbRetention } from '../utils/dbRetention.js'
-import { buildSyncHint, withForcedSyncIds } from '../services/tableSyncPlan.js'
+import { buildSyncHint, MAP_ENTITY_COLLECTIONS, withForcedSyncIds } from '../services/tableSyncPlan.js'
 import { clearPinToken } from '../utils/pinAuthToken.js'
+import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
 
 const storedSes = (() => {
   try {
@@ -77,6 +78,11 @@ function _diffDeleted(before, partial) {
   const out = {}
   for (const key of Object.keys(partial)) {
     const b = before?.[key], a = partial[key]
+    if (MAP_ENTITY_COLLECTIONS.includes(key) && b && a && typeof b === 'object' && typeof a === 'object') {
+      const removed = Object.keys(b).filter(id => !Object.prototype.hasOwnProperty.call(a, id))
+      if (removed.length) out[key] = removed
+      continue
+    }
     if (!Array.isArray(b) || !Array.isArray(a) || b.length === 0) continue
     const isObjArr = b[0] && typeof b[0] === 'object' && b[0].id !== undefined
     const removed = isObjArr
@@ -341,9 +347,12 @@ export const useAppStore = create((set, get) => ({
       try { localStorage.removeItem(`an_push_ready_${userId}`) } catch {}
       detachPushUser(userId).catch(() => {})
     }
-    // authSignOut captura primero el JWT para revocarlo y elimina la copia
-    // local antes de devolver la promesa. No esperamos a la red para cambiar
-    // de pantalla.
+    // En modo RLS el siguiente usuario del dispositivo no debe heredar ni en
+    // memoria ni en localStorage la caché privada del usuario anterior.
+    if (SECURITY_DEPLOYMENT.authenticatedDataPath) clearLocal()
+    // detachPushUser captura e inicia la limpieza con el JWT actual antes de
+    // que signOut lo retire. La salida local y el cambio de pantalla siguen
+    // siendo inmediatos aunque la red no responda.
     authSignOut().catch(() => {})
     // Limpia restos del JWT personalizado que pudieron guardar versiones
     // anteriores. El flujo PIN actual no crea sesiones de Supabase.
@@ -353,6 +362,7 @@ export const useAppStore = create((set, get) => ({
     try { sessionStorage.removeItem('an_times_admin_page') } catch {}
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
     set({
+      ...(SECURITY_DEPLOYMENT.authenticatedDataPath ? { db:{ ...INITIAL_DB } } : {}),
       session: { user: null, isAdmin: false, isEnc: false, isJO: false },
       timer: { ws: 0, bs: 0, state: 'idle' },
       currentScreen: 'login',

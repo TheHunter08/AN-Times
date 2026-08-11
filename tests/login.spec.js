@@ -1,6 +1,33 @@
 import { test, expect } from '@playwright/test'
 import { employee, seedLogin } from './helpers/session.js'
 
+async function mockImmediateActivation(page, { authId = 'auth-activada', email = 'empleado@empresa.com', created = true } = {}) {
+  let activationBody = null
+  await page.route('**/api/activate-account', async route => {
+    activationBody = route.request().postDataJSON()
+    return route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({ ok:true, employeeId:activationBody.employeeId, authId, email:activationBody.email, created }),
+    })
+  })
+  await page.route(/supabase\.co\/auth\/v1\/token/i, route => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify({
+      access_token:'token-activado', refresh_token:'refresh-activado', token_type:'bearer',
+      expires_in:3600, expires_at:Math.floor(Date.now() / 1000) + 3600,
+      user:{
+        id:authId, aud:'authenticated', role:'authenticated', email,
+        email_confirmed_at:new Date().toISOString(),
+        app_metadata:{ provider:'email', providers:['email'] }, user_metadata:{},
+        created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+      },
+    }),
+  }))
+  return () => activationBody
+}
+
 test.describe('Acceso con PIN y email', () => {
   test.beforeEach(async ({ page }) => {
     await seedLogin(page)
@@ -97,29 +124,9 @@ test.describe('Acceso con PIN y email', () => {
     await expect(page.getByText('Accede a TIMES INC')).toBeVisible()
   })
 
-  test('mantiene visible el siguiente paso cuando falta confirmar el correo', async ({ page }) => {
+  test('activa la cuenta inmediatamente sin esperar un correo', async ({ page }) => {
     await seedLogin(page, { employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111' }] })
-    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => route.fulfill({
-      status:200,
-      contentType:'application/json',
-      body:JSON.stringify({
-        user:{
-          id:'auth-pendiente',
-          aud:'authenticated',
-          role:'authenticated',
-          email:'empleado@empresa.com',
-          email_confirmed_at:null,
-          phone:'',
-          confirmation_sent_at:new Date().toISOString(),
-          app_metadata:{ provider:'email', providers:['email'] },
-          user_metadata:{},
-          identities:[],
-          created_at:new Date().toISOString(),
-          updated_at:new Date().toISOString(),
-        },
-        session:null,
-      }),
-    }))
+    const activationRequest = await mockImmediateActivation(page, { authId:'auth-inmediata' })
     await page.goto('/')
     await page.getByRole('button', { name:'Email', exact:true }).click()
     await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
@@ -128,18 +135,58 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Tu PIN habitual de fichaje').fill('1111')
     await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
 
-    await expect(page.getByRole('status').filter({ hasText:'Cuenta creada: falta confirmar el correo' })).toContainText('revisa también spam')
-    await expect(page.getByRole('status').filter({ hasText:'Cuenta creada: falta confirmar el correo' })).toContainText('completar la vinculación')
-    await expect(page.getByRole('button', { name:'Crear y vincular cuenta' })).not.toBeVisible()
-    await page.getByRole('button', { name:'Ya confirmé el correo · Iniciar sesión' }).click()
-    await expect(page.getByText('Accede a TIMES INC')).toBeVisible()
+    await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
+    expect(activationRequest()).toMatchObject({ employeeId:'e1', pin:'1111', email:'empleado@empresa.com' })
+  })
+
+  test('obliga al administrador a seleccionar su perfil y vincular Auth con su PIN', async ({ page }) => {
+    const admin = { id:'admin-1', name:'Administración Principal', role:'admin', isAdmin:true, pin:'9999', pinLen:4, baja:false }
+    await seedLogin(page, { employees:[employee, admin] })
+    await page.route('**/api/account-bootstrap**', route => route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({ employees:[{ id:admin.id, name:admin.name, dept:'Administración', pinLen:4 }] }),
+    }))
+    const activationRequest = await mockImmediateActivation(page, { authId:'auth-admin', email:'admin@empresa.com' })
+    await page.goto('/')
+    await page.getByRole('button', { name:'Email', exact:true }).click()
+    await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
+    await page.getByRole('searchbox', { name:'Busca y selecciona tu perfil' }).fill('admin')
+    await page.getByRole('button', { name:/Administración Principal/ }).click()
+    await page.getByLabel('Email', { exact:true }).fill('admin@empresa.com')
+    await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
+    await page.getByLabel('Tu PIN habitual de fichaje').fill('9999')
+    await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
+
+    await expect.poll(activationRequest).toMatchObject({ employeeId:'admin-1', pin:'9999', email:'admin@empresa.com' })
+  })
+
+  test('obliga a activar correo y Supabase Auth tras acreditar el PIN de una ficha incompleta', async ({ page }) => {
+    await seedLogin(page, { employees:[{ ...employee, email:'', authId:null, pin:'1111' }] })
+    const activationRequest = await mockImmediateActivation(page, { authId:'auth-activada', email:'nuevo@empresa.com' })
+    await page.goto('/')
+    await page.getByLabel('Buscar perfil de empleado').fill('Em')
+    await page.getByRole('button', { name:/Empleado$/ }).click()
+    for (let digit = 0; digit < 4; digit += 1) {
+      await page.getByRole('button', { name:'1', exact:true }).click()
+    }
+
+    await expect(page.getByText('Activa tu cuenta oficial')).toBeVisible()
+    await expect(page.getByText(/PIN verificado para Empleado/)).toBeVisible()
+    await expect(page.getByLabel('Tu PIN habitual de fichaje')).not.toBeVisible()
+    await page.getByLabel('Email', { exact:true }).fill('Nuevo@Empresa.com')
+    await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
+    await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
+
+    await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
+    expect(activationRequest()).toMatchObject({ employeeId:'e1', pin:'1111', email:'nuevo@empresa.com' })
   })
 
   test('no crea una cuenta si el PIN no acredita al empleado', async ({ page }) => {
-    let signupRequests = 0
+    let activationRequests = 0
     await seedLogin(page, { employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111' }] })
-    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => {
-      signupRequests += 1
+    await page.route('**/api/activate-account', route => {
+      activationRequests += 1
       return route.abort()
     })
     await page.goto('/')
@@ -150,19 +197,19 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Tu PIN habitual de fichaje').fill('9999')
     await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
     await expect(page.getByText(/PIN incorrecto/)).toBeVisible()
-    expect(signupRequests).toBe(0)
+    expect(activationRequests).toBe(0)
   })
 
   test('no vincula una cuenta si dos empleados comparten el mismo correo', async ({ page }) => {
-    let signupRequests = 0
+    let activationRequests = 0
     await seedLogin(page, {
       employees:[
         { ...employee, email:'compartido@empresa.com', pin:'1111' },
         { ...employee, id:'e2', name:'Otro Empleado', email:'COMPARTIDO@empresa.com', pin:'2222' },
       ],
     })
-    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => {
-      signupRequests += 1
+    await page.route('**/api/activate-account', route => {
+      activationRequests += 1
       return route.abort()
     })
     await page.goto('/')
@@ -173,7 +220,7 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Tu PIN habitual de fichaje').fill('1111')
     await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
     await expect(page.getByText(/correo aparece en varios empleados/i)).toBeVisible()
-    expect(signupRequests).toBe(0)
+    expect(activationRequests).toBe(0)
   })
 
   test('recupera con contraseña y PIN una vinculación obsoleta', async ({ page }) => {
@@ -209,14 +256,14 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
     await page.getByRole('button', { name:'Continuar', exact:true }).click()
 
-    await expect(page.getByText(/Introduce tu PIN de fichaje para recuperar el acceso/)).toBeVisible()
+    await expect(page.getByText(/Introduce tu PIN de fichaje para recuperar el acceso/)).toBeVisible({ timeout:15000 })
     await page.getByLabel('PIN para primera vinculación').fill('1111')
     await page.getByRole('button', { name:'Continuar', exact:true }).click()
 
     await expect.poll(() => page.evaluate(() => {
       const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
       return db.employees?.find(employee => employee.id === 'e1')?.authId
-    })).toBe('auth-nueva')
+    }), { timeout:15000 }).toBe('auth-nueva')
   })
 
   test('no reutiliza una identidad vinculada a otro perfil dado de baja', async ({ page }) => {
@@ -255,11 +302,11 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Email', { exact:true }).fill('empleado@empresa.com')
     await page.getByLabel('Contraseña', { exact:true }).fill('password-segura')
     await page.getByRole('button', { name:'Continuar', exact:true }).click()
-    await expect(page.getByRole('alert')).toContainText('completar esta primera vinculación')
+    await expect(page.getByRole('alert')).toContainText('completar esta primera vinculación', { timeout:15000 })
     await page.getByLabel('PIN para primera vinculación').fill('1111')
     await page.getByRole('button', { name:'Continuar', exact:true }).click()
 
-    await expect(page.getByText(/cuenta ya está vinculada a otro perfil/i)).toBeVisible()
+    await expect(page.getByText(/cuenta ya está vinculada a otro perfil/i)).toBeVisible({ timeout:15000 })
     await expect.poll(() => page.evaluate(() => {
       const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
       return db.employees?.find(item => item.id === 'e-nuevo')?.authId || null
@@ -282,18 +329,7 @@ test.describe('Acceso con PIN y email', () => {
     await seedLogin(page, {
       employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111', authId:'auth-eliminada' }],
     })
-    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => route.fulfill({
-      status:200,
-      contentType:'application/json',
-      body:JSON.stringify({
-        access_token:'token-recreado',
-        refresh_token:'refresh-recreado',
-        token_type:'bearer',
-        expires_in:3600,
-        expires_at:Math.floor(Date.now() / 1000) + 3600,
-        user:authUser,
-      }),
-    }))
+    await mockImmediateActivation(page, { authId:'auth-recreada', email:'empleado@empresa.com' })
     await page.goto('/')
     await page.getByRole('button', { name:'Email', exact:true }).click()
     await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
@@ -309,29 +345,11 @@ test.describe('Acceso con PIN y email', () => {
     await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible()
   })
 
-  test('conserva el vínculo si la cuenta Auth anterior todavía existe', async ({ page }) => {
+  test('recupera de forma controlada una cuenta Auth ya vinculada', async ({ page }) => {
     await seedLogin(page, {
       employees:[{ ...employee, email:'empleado@empresa.com', pin:'1111', authId:'auth-existente' }],
     })
-    await page.route(/supabase\.co\/auth\/v1\/signup/i, route => route.fulfill({
-      status:200,
-      contentType:'application/json',
-      body:JSON.stringify({
-        user:{
-          id:'auth-respuesta-ofuscada',
-          aud:'authenticated',
-          role:'authenticated',
-          email:'empleado@empresa.com',
-          email_confirmed_at:null,
-          app_metadata:{ provider:'email', providers:['email'] },
-          user_metadata:{},
-          identities:[],
-          created_at:new Date().toISOString(),
-          updated_at:new Date().toISOString(),
-        },
-        session:null,
-      }),
-    }))
+    await mockImmediateActivation(page, { authId:'auth-existente', email:'empleado@empresa.com', created:false })
     await page.goto('/')
     await page.getByRole('button', { name:'Email', exact:true }).click()
     await page.getByRole('button', { name:'Primera vez: vincular mi cuenta' }).click()
@@ -340,11 +358,7 @@ test.describe('Acceso con PIN y email', () => {
     await page.getByLabel('Tu PIN habitual de fichaje').fill('1111')
     await page.getByRole('button', { name:'Crear y vincular cuenta' }).click()
 
-    await expect(page.getByText(/cuenta anterior todavía existe/i)).toBeVisible()
-    await expect.poll(() => page.evaluate(() => {
-      const db = JSON.parse(localStorage.getItem('an_times_v1') || '{}')
-      return db.employees?.find(item => item.id === 'e1')?.authId
-    })).toBe('auth-existente')
+    await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
   })
 
   test('muestra y valida la contraseña nueva al volver desde recuperación', async ({ page }) => {

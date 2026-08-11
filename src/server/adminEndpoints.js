@@ -4,6 +4,7 @@ import sendPushAll from './adminEndpoints/send-push-all.js'
 import sendWhatsapp from './adminEndpoints/send-whatsapp.js'
 import monthlyClose from './adminEndpoints/monthly-close.js'
 import health from './adminEndpoints/health.js'
+import activateAccount, { accountBootstrap } from './accountActivation.js'
 
 const handlers = {
   'migrate-to-tables': migrateToTables,
@@ -12,6 +13,8 @@ const handlers = {
   'send-whatsapp': sendWhatsapp,
   'monthly-close': monthlyClose,
   health,
+  'activate-account': activateAccount,
+  'account-bootstrap': accountBootstrap,
 }
 
 export default function dispatchAdminEndpoint(req, res) {

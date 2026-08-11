@@ -11,7 +11,9 @@
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
-const SB_H    = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_SERVICE = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
+const SB_KEY  = SB_SERVICE || SB_ANON
+const SB_H    = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 
 const HASH_RE = /^[a-f0-9]{64}$/i
 
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
   if (!HASH_RE.test(hash)) {
     return res.status(400).json({ error: 'Parámetro "hash" inválido — debe ser un SHA-256 en hexadecimal (64 caracteres)' })
   }
-  if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
+  if (!SB_URL || !SB_SERVICE) return res.status(500).json({ error: 'Supabase service config missing' })
 
   try {
     // El hash se guarda dentro de la columna JSONB `data` (cierre.integrityHash),

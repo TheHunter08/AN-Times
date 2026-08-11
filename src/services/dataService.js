@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
+import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
+import { AUTH_STORAGE_KEY, authSupabase } from './authService.js'
 import { dedupeNotifications } from '../utils/notifications.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
@@ -30,6 +32,7 @@ const _FETCH_TIMEOUT_MS = 9000
 // Storage sigue usando la sesión autenticada (sus políticas sí la necesitan).
 // Al activar policies_auth.sql habrá que retirar este puente de Fase 1.
 export function withPhase1RestAuth(url, options = {}) {
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) return options
   let isProjectRestRequest = false
   try {
     const requestUrl = new URL(String(url))
@@ -56,7 +59,9 @@ function _timeoutFetch(url, options = {}) {
 // ── Cliente Supabase ──────────────────────────────────────────────────────────
 const _SUPABASE_SINGLETON_KEY = '__times_inc_supabase_data_v2__'
 export const supabase = (SB_URL && SB_ANON)
-  ? (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, {
+  ? (SECURITY_DEPLOYMENT.authenticatedDataPath
+    ? authSupabase
+    : (globalThis[_SUPABASE_SINGLETON_KEY] ||= createClient(SB_URL, SB_ANON, {
       global: { fetch: _timeoutFetch },
       // Este cliente transporta exclusivamente los datos de Fase 1. No debe
       // restaurar ni adoptar una sesión de Supabase Auth: si lo hiciera,
@@ -68,7 +73,7 @@ export const supabase = (SB_URL && SB_ANON)
         detectSessionInUrl: false,
         storageKey: 'times-inc-data-anon',
       },
-    }))
+    })))
   : null
 
 const TABLE      = 'app_data'
@@ -123,22 +128,64 @@ function _splitHotCold(db) {
 }
 
 // ── Local storage ─────────────────────────────────────────────────────────────
+export function persistedAuthUserId(rawValue) {
+  try {
+    const persisted = JSON.parse(rawValue || 'null')
+    if (persisted?.user?.id) return String(persisted.user.id)
+    const token = persisted?.access_token
+    if (!token) return null
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(normalized + '='.repeat((4 - normalized.length % 4) % 4)))
+    return decoded?.sub ? String(decoded.sub) : null
+  } catch { return null }
+}
+
+export function resolveLocalDbStorageKey({ authenticatedDataPath = false, authUserId = null } = {}) {
+  if (!authenticatedDataPath) return 'an_times_v1'
+  return authUserId ? `an_times_auth_${authUserId}` : null
+}
+
+export function localDbStorageKey() {
+  let rawAuth = null
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+    try { rawAuth = localStorage.getItem(AUTH_STORAGE_KEY) } catch {}
+  }
+  const authUserId = persistedAuthUserId(rawAuth)
+  return resolveLocalDbStorageKey({
+    authenticatedDataPath:SECURITY_DEPLOYMENT.authenticatedDataPath,
+    authUserId,
+  })
+}
+
 export function loadLocal() {
+  const storageKey = localDbStorageKey()
+  // Sin sesión oficial no se abre ninguna caché heredada ni de otro usuario.
+  if (!storageKey) return { ...INITIAL_DB }
   let raw = null
-  try { raw = localStorage.getItem('an_times_v1') } catch { return { ...INITIAL_DB } }
+  try { raw = localStorage.getItem(storageKey) } catch { return { ...INITIAL_DB } }
   if (!raw) return { ...INITIAL_DB }
   try {
     return mergeDB(INITIAL_DB, JSON.parse(raw))
   } catch (err) {
     // Datos locales corruptos: log + limpiar para no quedar bloqueados al arrancar
     console.error('[loadLocal] corrupt localStorage, resetting:', err)
-    try { localStorage.removeItem('an_times_v1') } catch {}
+    try { localStorage.removeItem(storageKey) } catch {}
     return { ...INITIAL_DB }
   }
 }
 
 export function saveLocal(db) {
-  try { localStorage.setItem('an_times_v1', JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
+  const storageKey = localDbStorageKey()
+  if (!storageKey) return
+  try { localStorage.setItem(storageKey, JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
+}
+
+export function clearLocal() {
+  const storageKey = localDbStorageKey()
+  if (!storageKey) return
+  try { localStorage.removeItem(storageKey) } catch {}
 }
 
 // ── Tombstones ─────────────────────────────────────────────────────────────────
@@ -274,12 +321,16 @@ export function mergeDB(base, incoming) {
   if (incoming._deleted && typeof incoming._deleted === 'object') {
     base = { ...base }
     for (const [key, ids] of Object.entries(incoming._deleted)) {
-      if (!Array.isArray(base[key]) || !Array.isArray(ids) || !ids.length) continue
+      if (!Array.isArray(ids) || !ids.length) continue
       const deletedIds = new Set(ids.map(String))
-      base[key] = base[key].filter(item => {
-        const id = item && typeof item === 'object' ? item.id : item
-        return !deletedIds.has(String(id))
-      })
+      if (Array.isArray(base[key])) {
+        base[key] = base[key].filter(item => {
+          const id = item && typeof item === 'object' ? item.id : item
+          return !deletedIds.has(String(id))
+        })
+      } else if (base[key] && typeof base[key] === 'object') {
+        base[key] = Object.fromEntries(Object.entries(base[key]).filter(([id]) => !deletedIds.has(String(id))))
+      }
     }
   }
   const adm = base.employees?.find(e => e.isAdmin) || {
@@ -345,7 +396,9 @@ export function mergeDB(base, incoming) {
       })
     })(),
     monthSnapshots:      incoming.monthSnapshots       ?? base.monthSnapshots ?? {},
-    firmas:              incoming.firmas               ?? base.firmas ?? {},
+    firmas:              incoming._partial
+      ? { ...(base.firmas || {}), ...(incoming.firmas || {}) }
+      : (incoming.firmas ?? base.firmas ?? {}),
     documentos:          _unionById(base.documentos,          incoming.documentos,          'documentos'),
     audit:               _unionById(base.audit,               incoming.audit,               'audit'),
     correccionesFichaje: _unionById(base.correccionesFichaje, incoming.correccionesFichaje, 'correccionesFichaje'),
@@ -355,6 +408,7 @@ export function mergeDB(base, incoming) {
     wellbeing:           _unionById(base.wellbeing,           incoming.wellbeing,           'wellbeing'),
     turnos:              _unionById(base.turnos,              incoming.turnos,              'turnos'),
     partesTrabajo:       _unionById(base.partesTrabajo,       incoming.partesTrabajo,       'partesTrabajo'),
+    legalAcknowledgements:_unionById(base.legalAcknowledgements, incoming.legalAcknowledgements, 'legalAcknowledgements'),
     anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           mergedNotisSent,
     // El servidor debe ganar por clave (igual que `config` justo debajo) — al
@@ -410,6 +464,7 @@ function _mergeForPush(serverData, localPayload, deleted) {
     wellbeing:           _unionById(s.wellbeing,           l.wellbeing,           'wellbeing'),
     turnos:              _unionById(s.turnos,              l.turnos,              'turnos'),
     partesTrabajo:       _unionById(s.partesTrabajo,       l.partesTrabajo,       'partesTrabajo'),
+    legalAcknowledgements:_unionById(s.legalAcknowledgements, l.legalAcknowledgements, 'legalAcknowledgements'),
     anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
@@ -492,7 +547,23 @@ let _saveTimer  = null
 // ── IndexedDB helpers para Background Sync ────────────────────────────────────
 const _IDB_NAME = 'times-inc-sync'
 const _IDB_STORE = 'q'
-const _PENDING_FALLBACK_KEY = 'an_times_pending_sync'
+
+export function resolvePendingStorageKeys({ authenticatedDataPath = false, authUserId = null } = {}) {
+  if (!authenticatedDataPath) return { idb:'pending', fallback:'an_times_pending_sync' }
+  if (!authUserId) return null
+  return { idb:`pending:${authUserId}`, fallback:`an_times_pending_sync_${authUserId}` }
+}
+
+function pendingStorageKeys() {
+  let rawAuth = null
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+    try { rawAuth = localStorage.getItem(AUTH_STORAGE_KEY) } catch {}
+  }
+  return resolvePendingStorageKeys({
+    authenticatedDataPath:SECURITY_DEPLOYMENT.authenticatedDataPath,
+    authUserId:persistedAuthUserId(rawAuth),
+  })
+}
 
 function _idbOpen() {
   return new Promise((res, rej) => {
@@ -545,6 +616,7 @@ let _onlineListenerPending = false
 let _bgSyncRetries = 0
 let _pendingWriteFlight = Promise.resolve()
 let _postBlobSyncHandler = null
+let _primarySyncHandler = null
 let _deltaRpcAvailable = null
 
 // dataServiceV2 registra aquí la escritura de tablas. Mantener el hook en la
@@ -552,6 +624,13 @@ let _deltaRpcAvailable = null
 // recuperar una cola offline, no solo durante guardados normales con la app abierta.
 export function setPostBlobSyncHandler(handler) {
   _postBlobSyncHandler = typeof handler === 'function' ? handler : null
+}
+
+// En modo Auth/RLS las tablas dejan de ser una copia secundaria: son la unica
+// fuente remota. Reutilizamos la cola offline madura de esta capa, pero el
+// handler sustituye por completo la escritura del blob.
+export function setPrimarySyncHandler(handler) {
+  _primarySyncHandler = typeof handler === 'function' ? handler : null
 }
 
 export function mergePendingDeletes(previous, incoming) {
@@ -656,11 +735,15 @@ export function mergePendingSyncEntries(previous, incoming, now = Date.now()) {
 }
 
 function _fallbackPendingGet() {
-  try { return JSON.parse(localStorage.getItem(_PENDING_FALLBACK_KEY) || 'null') } catch { return null }
+  const keys = pendingStorageKeys()
+  if (!keys) return null
+  try { return JSON.parse(localStorage.getItem(keys.fallback) || 'null') } catch { return null }
 }
 
 async function _readPending() {
-  const idb = await _idbGet('pending')
+  const keys = pendingStorageKeys()
+  if (!keys) return null
+  const idb = await _idbGet(keys.idb)
   const fallback = _fallbackPendingGet()
   if (!idb) return fallback
   if (!fallback) return idb
@@ -668,19 +751,21 @@ async function _readPending() {
 }
 
 async function _writePending(value) {
+  const keys = pendingStorageKeys()
+  if (!keys) throw new Error('No hay una identidad Auth válida para guardar la cola segura')
   try {
-    await _idbSet('pending', value)
+    await _idbSet(keys.idb, value)
   } catch {
     // Safari privado y algunos WebViews pueden bloquear IndexedDB aunque
     // localStorage sí funcione. Mantener una segunda copia evita perder la cola.
-    try { localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(value)) } catch {}
+    try { localStorage.setItem(keys.fallback, JSON.stringify(value)) } catch {}
     return
   }
   // Mantener también el espejo síncrono mientras la operación siga pendiente.
   // Si se borrase aquí, un guardado nuevo podría arrancar antes de leer IDB y
   // reemplazar la cola perdiendo tombstones anteriores. _clearBgSync elimina
   // ambas copias juntas solo después de confirmar blob y tablas.
-  try { localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(value)) } catch {}
+  try { localStorage.setItem(keys.fallback, JSON.stringify(value)) } catch {}
 }
 
 async function _storeForBgSync(data, deleted, syncHint) {
@@ -827,8 +912,10 @@ async function _runBgSyncFallback() {
     // (aunque el fichaje offline aún no esté en Supabase). Eso hacía que el guard
     // interpretara "ya sincronizado" cuando en realidad solo habían llegado datos del admin.
     // La fuente de verdad correcta es IDB: si existe 'pending', hay que subirlo.
-    const merged = await _writeMergedOrDelta(data, deleted, syncHint)
-    if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted, syncHint)
+    const merged = _primarySyncHandler
+      ? (await _primarySyncHandler(data, deleted, syncHint), data)
+      : await _writeMergedOrDelta(data, deleted, syncHint)
+    if (!_primarySyncHandler && _postBlobSyncHandler) await _postBlobSyncHandler(merged, deleted, syncHint)
     merged._ts = Date.now()
     saveLocal(merged)
     _broadcastUpdate(merged._ts)
@@ -867,19 +954,21 @@ async function _runBgSyncFallback() {
 
 async function _clearBgSync(revision) {
   await _pendingWriteFlight.catch(() => {})
+  const keys = pendingStorageKeys()
+  if (!keys) return false
   const current = await _readPending()
   if (!current) return true
   // No borrar una operación que llegó mientras esta petición estaba en vuelo.
   if (revision != null && current.revision != null && current.revision !== revision) return false
-  await _idbDel('pending')
-  try { localStorage.removeItem(_PENDING_FALLBACK_KEY) } catch {}
+  await _idbDel(keys.idb)
+  try { localStorage.removeItem(keys.fallback) } catch {}
   return true
 }
 
 function _drainQueue() {
   if (_pushFlight || _pushQueue.length === 0) return
   const entry = _pushQueue.shift()
-  const freshDb = entry.db || JSON.parse(localStorage.getItem('an_times_v1') || 'null')
+  const freshDb = entry.db || loadLocal()
   if (!freshDb) return
   _doCloudPush(freshDb, entry.deleted, entry.onSuccess, entry.onError, entry.syncHint)
 }
@@ -888,8 +977,9 @@ function _markPendingFallback(payload, deleted, syncHint) {
   const previous = _fallbackPendingGet()
   const pending = mergePendingSyncEntries(previous, { payload, deleted, syncHint })
   const { revision, deleted: effectiveDeleted, syncHint: effectiveSyncHint } = pending
+  const keys = pendingStorageKeys()
   try {
-    localStorage.setItem(_PENDING_FALLBACK_KEY, JSON.stringify(pending))
+    if (keys) localStorage.setItem(keys.fallback, JSON.stringify(pending))
   } catch {}
   return { revision, effectiveDeleted, effectiveSyncHint }
 }
@@ -910,9 +1000,11 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
   // subir nunca en esos dispositivos — ni la app en primer plano lo
   // reintentaba (todo pasaba a depender de Background Sync, que iOS no
   // soporta) hasta que el usuario cerraba y reabría la app.
-  _writeMergedOrDelta(payload, effectiveDeleted, effectiveSyncHint)
+  ;(_primarySyncHandler
+    ? Promise.resolve(_primarySyncHandler(payload, effectiveDeleted, effectiveSyncHint)).then(() => payload)
+    : _writeMergedOrDelta(payload, effectiveDeleted, effectiveSyncHint))
     .then(async merged => {
-      if (_postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted, effectiveSyncHint)
+      if (!_primarySyncHandler && _postBlobSyncHandler) await _postBlobSyncHandler(merged, effectiveDeleted, effectiveSyncHint)
       return merged
     })
     .then((merged) => {
@@ -1001,6 +1093,11 @@ let _realtimeTimer   = null
 
 export function startRealtime(currentGetDB, onUpdate, getServerTs, onStatusChange) {
   if (!supabase) return
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+    stopRealtime()
+    onStatusChange?.('TABLES_ONLY')
+    return
+  }
   stopRealtime()
   _realtimeChannel = supabase
     .channel('app_data_rt', { config: { broadcast: { self: false } } })
@@ -1209,6 +1306,18 @@ export async function pushSubscribe(userId, vapidPub) {
       console.error('[PUSH] Suscripción sin claves p256dh/auth')
       return { ok: false, reason: 'no_keys' }
     }
+    if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+      const { error } = await supabase.rpc('claim_push_subscription', {
+        p_endpoint:sub.endpoint,
+        p_p256dh:buf2b64(key),
+        p_auth:buf2b64(auth),
+      })
+      if (error) {
+        console.error('[PUSH] no se pudo reclamar la suscripción autenticada:', error)
+        return { ok:false, reason:'db_failed', error:error.message }
+      }
+      return { ok:true, endpoint:sub.endpoint }
+    }
     // Un endpoint representa un dispositivo, no una persona. Si en el mismo
     // móvil inició sesión otro empleado anteriormente, eliminar esa asociación
     // evita que el usuario actual reciba sus avisos privados.
@@ -1240,9 +1349,25 @@ export async function pushSubscribe(userId, vapidPub) {
 // el siguiente usuario pueda asociarla sin volver a pedir permiso.
 export async function detachPushUser(userId) {
   if (!userId) return
+  let secureDelete = null
+  if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+    try {
+      const accessToken = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')?.access_token
+      if (accessToken) {
+        secureDelete = _timeoutFetch(
+          `${SB_URL}/rest/v1/${PUSH_TABLE}?user_id=eq.${encodeURIComponent(userId)}`,
+          { method:'DELETE', headers:{ apikey:SB_ANON, Authorization:`Bearer ${accessToken}`, Prefer:'return=minimal' } },
+        )
+      }
+    } catch {}
+  }
   // Cerrar primero la puerta local: aunque no haya red para borrar la fila
   // remota, el SW dejará de mostrar de inmediato avisos del usuario anterior.
   await _idbDel('push_user_id')
+  if (secureDelete) {
+    try { await secureDelete } catch {}
+    return
+  }
   if (!supabase || !('serviceWorker' in navigator)) return
   try {
     const reg = await navigator.serviceWorker.ready
@@ -1327,6 +1452,12 @@ async function _doSendPush(to, title, body, tag, safeUrl, dedupeKey = null) {
   }
   try {
     const headers = { 'Content-Type': 'application/json' }
+    if (SECURITY_DEPLOYMENT.authenticatedDataPath) {
+      try {
+        const token = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')?.access_token
+        if (token) headers.Authorization = `Bearer ${token}`
+      } catch {}
+    }
     const res = await fetch('/api/sendpush', { method: 'POST', headers, body: JSON.stringify({ userId: to, title, body, tag, url: safeUrl, dedupeKey }) })
     if (!res.ok) {
       const text = await res.text().catch(() => '')

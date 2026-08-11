@@ -1,26 +1,22 @@
 name: Resumen Semanal
 
 on:
-  schedule:
-    # Sábado: la semana de lunes a viernes ya está cerrada y el déficit es definitivo.
-    - cron: '0 8 * * 6'
+  # El resumen semanal forma parte de /api/cron-reminders y comparte su
+  # deduplicación persistente. El disparo manual reutiliza ese endpoint seguro.
   workflow_dispatch:
 
 jobs:
   summary:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install web-push --no-save
-      - name: Resumen semanal de horas
-        run: node push-weekly-summary.js
-        env:
-          VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
-          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-          VITE_SB_URL:   ${{ secrets.VITE_SB_URL }}
-          VITE_SB_ANON:  ${{ secrets.VITE_SB_ANON }}
+      - name: Generar resumen semanal mediante el endpoint seguro
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ')
+          test -n "${CRON_SECRET}"
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-reminders"

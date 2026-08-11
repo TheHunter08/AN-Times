@@ -14,9 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Borrar audit y notis antiguos
         env:
           VITE_SB_URL: ${{ secrets.VITE_SB_URL }}
-          VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
+          SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
         run: node cleanup-audit-notis.js

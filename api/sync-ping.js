@@ -14,6 +14,7 @@ import { timingSafeEqual } from 'crypto'
 import { createAutomationRun } from '../src/server/automationHealth.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -23,6 +24,9 @@ const VAPID_PUBLIC  = isValid(toB64Url(process.env.VAPID_PUBLIC))  ? toB64Url(pr
 const VAPID_PRIVATE = isValid(toB64Url(process.env.VAPID_PRIVATE)) ? toB64Url(process.env.VAPID_PRIVATE) : null
 const SB_URL        = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
+const SB_SERVICE    = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
+const SB_KEY        = SB_SERVICE || SB_ANON
+const AUTH_RLS_MODE = isAuthRlsServerMode()
 const CRON_SECRET   = process.env.CRON_SECRET
 const COMPANY_ID    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 
@@ -39,12 +43,12 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
   }
 }
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 async function getSyncState() {
-  if (!SB_URL || !SB_ANON) return { candidates: [], coverage: getDeviceCoverage() }
+  if (!SB_URL || !SB_KEY) return { candidates: [], coverage: getDeviceCoverage() }
   const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`
   const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync,updated_at`
-  const signaturesUrl = `${SB_URL}/rest/v1/app_entities?select=data&company_id=eq.${COMPANY_ID}&collection=eq.firmas&entity_id=eq.__singleton__`
+  const signaturesUrl = `${SB_URL}/rest/v1/app_entities?select=entity_id,data&company_id=eq.${COMPANY_ID}&collection=eq.firmas&deleted=eq.false`
   try {
     const [employeesResponse, subscriptionsResponse, signaturesResponse] = await Promise.all([
       fetch(employeesUrl, { headers: SB_H }),
@@ -57,7 +61,12 @@ async function getSyncState() {
     const employees = await employeesResponse.json()
     const subscriptions = await subscriptionsResponse.json()
     const signatureRows = await signaturesResponse.json()
-    const coverage = getLaunchCoverage(employees, subscriptions, signatureRows?.[0]?.data || {})
+    const signatures = {}
+    for (const row of signatureRows || []) {
+      if (row.entity_id === '__singleton__') Object.assign(signatures, row.data || {})
+      else if (row.entity_id) signatures[row.entity_id] = row.data || {}
+    }
+    const coverage = getLaunchCoverage(employees, subscriptions, signatures)
     return {
       coverage,
       // El total registrado y los móviles que necesitan un ping son métricas distintas.
@@ -70,7 +79,7 @@ async function getSyncState() {
 }
 
 async function deleteSub(userId) {
-  if (!SB_URL || !SB_ANON) return
+  if (!SB_URL || !SB_KEY) return
   fetch(`${SB_URL}/rest/v1/push_subs?user_id=eq.${encodeURIComponent(userId)}`, {
     method: 'DELETE', headers: SB_H
   }).catch(() => {})
@@ -94,9 +103,9 @@ export default async function handler(req, res) {
     await recordRun({ status:'error', error:_vapidError })
     return res.status(500).json({ error: _vapidError })
   }
-  if (!SB_URL || !SB_ANON) {
+  if (!SB_URL || !SB_KEY || (AUTH_RLS_MODE && !SB_SERVICE)) {
     await recordRun({ status:'error', error:'Supabase config missing' })
-    return res.status(500).json({ error: 'Supabase config missing' })
+    return res.status(500).json({ error: AUTH_RLS_MODE ? 'Supabase service role missing' : 'Supabase config missing' })
   }
 
   try {
@@ -109,6 +118,13 @@ export default async function handler(req, res) {
       signatureReadyDevices: coverage.signatureReadyWorkers,
       fullyReadyDevices: coverage.fullyReadyWorkers,
       missingSignatures: coverage.missingSignatureIds.length,
+    }
+    if (AUTH_RLS_MODE) {
+      await recordRun({ checked:coverageResult.expectedDevices })
+      return res.status(200).json({
+        ok:true, ...coverageResult, candidates:0, sent:0,
+        reason:'La cola segura se sincroniza al abrir la PWA con su sesión Auth',
+      })
     }
     if (!candidates.length) {
       console.log(`[sync-ping] expected=${coverageResult.expectedDevices} registered=${coverageResult.registeredDevices} signed=${coverageResult.signatureReadyDevices} ready=${coverageResult.fullyReadyDevices} missing=${coverageResult.missingDevices} candidates=0 sent=0`)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSyncHint, buildTableSyncPlan, entityRowId, softDeletePayload, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow, withForcedSyncIds } from './tableSyncPlan.js'
+import { buildSyncHint, buildTableSyncPlan, entityAccessMetadata, entityRowId, softDeletePayload, toAuditEventRow, toClosureRow, toEmployeeRow, toEntityRows, toRecordRow, toVacationRow, withForcedSyncIds } from './tableSyncPlan.js'
 
 describe('plan de sincronización offline V2', () => {
   const now = Date.parse('2026-07-13T12:00:00.000Z')
@@ -43,6 +43,27 @@ describe('plan de sincronización offline V2', () => {
     expect(rows.map(row => row.id)).toEqual(['documentos:d1', 'gastos:g1', 'config:__singleton__'])
     expect(rows.find(row => row.id === 'gastos:g1').updated_at).toBe('2026-07-13T10:00:00Z')
     expect(rows.find(row => row.id === 'config:__singleton__').data).toEqual({ wdMin:480 })
+  })
+
+  it('divide el mapa de firmas en una fila privada por trabajador', () => {
+    const rows = toEntityRows({
+      firmas:{ e1:{ main:{ data:'firma-ana', updatedAt:'2026-07-13T11:00:00Z' } }, e2:{ main:{ data:'firma-luis' } } },
+    }, '2026-07-13T12:00:00Z')
+    expect(rows.map(row => row.id)).toEqual(['firmas:e1', 'firmas:e2'])
+    expect(rows[0]).toMatchObject({
+      access_scope:'employee', subject_emp_id:'e1', participant_emp_ids:['e1'],
+      updated_at:'2026-07-13T11:00:00Z',
+    })
+    expect(rows[0].data.main.data).toBe('firma-ana')
+  })
+
+  it('clasifica chats por participantes y deja filas huérfanas solo para admin', () => {
+    expect(entityAccessMetadata('chats', { from:'e1', to:'admin' })).toEqual({
+      access_scope:'employee', subject_emp_id:null, participant_emp_ids:['e1', 'admin'],
+    })
+    expect(entityAccessMetadata('documentos', { titulo:'sin propietario' })).toEqual({
+      access_scope:'admin', subject_emp_id:null, participant_emp_ids:[],
+    })
   })
 
   it('crea tombstones de entidades con ids deterministas', () => {
@@ -156,6 +177,14 @@ describe('plan de sincronización offline V2', () => {
     })
   })
 
+  it('detecta solo la firma modificada dentro del mapa por empleado', () => {
+    const before = { firmas:{ e1:{ main:{ data:'a' } }, e2:{ main:{ data:'b' } } } }
+    const after = { firmas:{ ...before.firmas, e2:{ main:{ data:'nueva' } } } }
+    expect(buildSyncHint(before, after)).toEqual({
+      changedKeys:['firmas'], entityIds:{ firmas:['e2'] }, recordIds:[],
+    })
+  })
+
   it('fuerza el registro crítico aunque Realtime ya haya adelantado el estado local', () => {
     const record = { id:'r-race', validado:true, _upd:'2026-07-22T12:00:00Z' }
     const automatic = buildSyncHint({ records:[record] }, { records:[record] })
@@ -178,6 +207,8 @@ describe('plan de sincronización offline V2', () => {
       changedKeys:['audit'], entityIds:{ audit:['a2'] }, recordIds:[],
     })
     expect(plan.upserts.find(op => op.table === 'app_entities').rows.map(row => row.id)).toEqual(['audit:a2'])
+    expect(plan.upserts.find(op => op.table === 'audit_events').rows.map(row => row.id)).toEqual(['a2'])
+    expect(toAuditEventRow(db.audit[1])).toMatchObject({ id:'a2', action:'nueva', actor_emp_id:null })
   })
 
   it('valida un fichaje contra todos los empleados aunque cambie otro perfil a la vez', () => {

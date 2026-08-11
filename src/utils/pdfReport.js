@@ -97,7 +97,7 @@ export async function drawSignatureBlock(pdfDoc, page, {
 
 export function drawFooterLegal(page, { ml, cw, colors, fontR, y = 24 }) {
   page.drawText(
-    'Documento generado automáticamente por TIMES INC conforme al RDL 8/2019 de registro diario de jornada. Datos con valor probatorio.',
+    'Documento electrónico generado por TIMES INC para el registro horario del art. 34.9 ET. Verifique su integridad y trazabilidad en la aplicación.',
     { x: ml, y, size: 5.5, font: fontR, color: colors.gray, maxWidth: cw }
   )
 }

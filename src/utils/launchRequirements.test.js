@@ -45,6 +45,17 @@ describe('requisitos obligatorios de lanzamiento', () => {
     expect(blockers[0].issues).toContain('PIN heredado: iniciar sesión')
   })
 
+  it('mantiene bloqueado RLS mientras el correo de Auth no esté confirmado', () => {
+    const blockers = getLaunchBlockers({
+      employees:[{
+        id:'emp1', name:'Ana', email:'ana@empresa.com', authId:'auth-1',
+        authActivationPending:true, role:'empleado', pin:'pbkdf2:salt:hash:600000',
+      }],
+      firmas:db.firmas,
+    })
+    expect(blockers[0].issues).toContain('Falta confirmar correo')
+  })
+
   it('identifica todos los perfiles implicados en correos e identidades duplicadas', () => {
     const blockers = getLaunchBlockers({
       employees:[
@@ -69,7 +80,7 @@ describe('requisitos obligatorios de lanzamiento', () => {
     })
 
     expect(text).toContain('Hola Ana')
-    expect(text).toContain('Primera vez: vincular mi cuenta')
+    expect(text).toContain('abrirá automáticamente la activación')
     expect(text).toContain('actualizará su protección automáticamente')
     expect(text).toContain('no envíes tu contraseña ni tu PIN')
     expect(text).not.toContain('pbkdf2')
@@ -82,6 +93,7 @@ describe('requisitos obligatorios de lanzamiento', () => {
     })
     expect(getLaunchBlockerActions(['Falta PIN'])).toEqual({ profileFixable:true, employeeActionRequired:false })
     expect(getLaunchBlockerActions(['Falta firma'])).toEqual({ profileFixable:false, employeeActionRequired:true })
+    expect(getLaunchBlockerActions(['Falta confirmar correo'])).toEqual({ profileFixable:false, employeeActionRequired:true })
   })
 
   it('genera un plan consolidado ordenado y sin credenciales', () => {

@@ -19,13 +19,13 @@ import { timingSafeEqual } from 'crypto'
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON    = cleanEnv(process.env.VITE_SB_ANON)
-const SB_SERVICE = cleanEnv(process.env.SB_SERVICE_KEY)
+const SB_SERVICE = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
 
 // Usar service key si está disponible (evita problemas de RLS durante la migración)
 const KEY     = SB_SERVICE || SB_ANON
 const SB_H    = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
-const SB_H_RD = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H_RD = SB_H
 
 const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','denuncias','wellbeing','turnos','partesTrabajo']
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  if (!SB_URL || !SB_ANON) return res.status(500).json({ error: 'Supabase config missing' })
+  if (!SB_URL || !SB_SERVICE) return res.status(500).json({ error: 'Supabase service config missing' })
 
   try {
     // ── 1. Leer datos actuales del blob ─────────────────────────────────

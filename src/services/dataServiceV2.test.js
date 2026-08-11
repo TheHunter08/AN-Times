@@ -6,6 +6,7 @@ import {
   isPermanentRowError,
   mergeRecordVersions,
   rowsForAvailableSchema,
+  shouldUpdateClosuresWithoutInsert,
   tableChangeToPatch,
 } from './dataServiceV2.js'
 
@@ -40,6 +41,13 @@ describe('reconciliación tabla/blob de jornadas', () => {
 })
 
 describe('compatibilidad del esquema semanal de cierres', () => {
+  it('un empleado solo puede actualizar un cierre existente; responsables pueden crearlo', () => {
+    expect(shouldUpdateClosuresWithoutInsert('empleado', true)).toBe(true)
+    expect(shouldUpdateClosuresWithoutInsert('encargado', true)).toBe(true)
+    expect(shouldUpdateClosuresWithoutInsert('admin', true)).toBe(false)
+    expect(shouldUpdateClosuresWithoutInsert('jefe_obra', true)).toBe(false)
+  })
+
   it('mantiene las columnas nuevas cuando el esquema está migrado', () => {
     const rows = [{ id:'c1', target_min:2400, deficit_min:60, data:{ targetMin:2400 } }]
     expect(rowsForAvailableSchema('cierres', rows, false)).toEqual(rows)
@@ -84,6 +92,22 @@ describe('parches ligeros de Realtime', () => {
     })
 
     expect(patch.gastos[0]).toMatchObject({ id:'g1', total:25, _rev:3, _upd:'2026-07-21T10:00:00Z' })
+  })
+
+  it('incorpora una firma privada sin reemplazar el mapa completo', () => {
+    const patch = tableChangeToPatch('app_entities', {
+      eventType:'UPDATE',
+      new:{ collection:'firmas', entity_id:'e1', data:{ main:{ data:'firma' } } },
+    })
+    expect(patch).toEqual({ _partial:true, firmas:{ e1:{ main:{ data:'firma' } } }, _ts:expect.any(Number) })
+  })
+
+  it('mapea la auditoría append-only a la colección de la app', () => {
+    const patch = tableChangeToPatch('audit_events', {
+      eventType:'INSERT',
+      new:{ id:'a1', action:'fichaje', detail:'entrada', actor_emp_id:'e1', created_at:'2026-08-11T08:00:00Z', data:{ user:'Ana' } },
+    })
+    expect(patch.audit[0]).toMatchObject({ id:'a1', action:'fichaje', detail:'entrada', actorEmpId:'e1', user:'Ana' })
   })
 })
 

@@ -1,4 +1,4 @@
-import { isValidAccountEmail, normalizeAccountEmail } from './authRegistration.js'
+import { isEmployeeOfficialAccountReady, isValidAccountEmail, normalizeAccountEmail } from './authRegistration.js'
 import { needsRehash } from './pinSecurity.js'
 
 export function hasEmployeeSignature(db, employeeId) {
@@ -40,6 +40,7 @@ export function getLaunchBlockers(db, missingPushIds = []) {
       else if ((emailCounts.get(normalizeAccountEmail(employee.email)) || 0) > 1) issues.push('Correo compartido con otro perfil')
       if (!employee.authId && !employee.auth_id) issues.push('Falta crear acceso')
       else if ((authIdentityCounts.get(String(employee.authId || employee.auth_id)) || 0) > 1) issues.push('Identidad de acceso duplicada')
+      else if (!isEmployeeOfficialAccountReady(employee)) issues.push('Falta confirmar correo')
       if (isWorker && !employee.pin) issues.push('Falta PIN')
       if (isWorker && employee.pin && needsRehash(employee.pin)) issues.push('PIN heredado: iniciar sesión')
       if (isWorker && !hasEmployeeSignature(db, employee.id)) issues.push('Falta firma')
@@ -64,9 +65,10 @@ export function getLaunchBlockerActions(issues = []) {
 }
 
 const ISSUE_INSTRUCTIONS = {
-  'Falta email': 'Pide a Administración que añada un correo personal y único a tu perfil.',
-  'Correo compartido con otro perfil': 'Pide a Administración que sustituya el correo compartido por uno personal y único.',
-  'Falta crear acceso': 'En la pantalla de acceso, elige “Acceso con email” y después “Primera vez: vincular mi cuenta”. Usa el correo de tu perfil, crea una contraseña e introduce tu PIN habitual cuando se solicite.',
+  'Falta email': 'Entra con tu PIN habitual. Times INC te pedirá automáticamente un correo único al que tengas acceso.',
+  'Correo compartido con otro perfil': 'Pide a Administración que sustituya el correo compartido por una dirección única que solo utilice tu perfil.',
+  'Falta crear acceso': 'Entra con tu PIN habitual. Times INC abrirá automáticamente la activación; crea una contraseña y confirma el enlace enviado a tu correo.',
+  'Falta confirmar correo': 'Abre el enlace de confirmación enviado por Times INC. Después vuelve a la app e inicia sesión con tu correo y contraseña.',
   'Identidad de acceso duplicada': 'Contacta con Administración para revisar qué perfil debe conservar la identidad antes de volver a vincular la cuenta.',
   'Falta PIN': 'Pide a Administración que configure un PIN de fichaje antes de intentar vincular la cuenta.',
   'PIN heredado: iniciar sesión': 'Cierra sesión y entra una vez con tu PIN habitual. Times INC actualizará su protección automáticamente; no necesitas cambiarlo.',

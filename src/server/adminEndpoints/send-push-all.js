@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
+import { isAuthRlsServerMode } from '../securityMode.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -20,12 +21,15 @@ if (!isValid(VAPID_PUBLIC) || !isValid(VAPID_PRIVATE)) {
 
 const SB_URL  = cleanEnv(process.env.VITE_SB_URL)
 const SB_ANON = cleanEnv(process.env.VITE_SB_ANON)
-if (!SB_URL || !SB_ANON) console.error('[send-push-all] VITE_SB_URL / VITE_SB_ANON not set')
+const SB_SERVICE = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SB_SERVICE_KEY)
+const SB_KEY = SB_SERVICE || SB_ANON
+const AUTH_RLS_MODE = isAuthRlsServerMode()
+if (!SB_URL || !SB_KEY) console.error('[send-push-all] Supabase config not set')
 
 // Usar solo CRON_SECRET (sin prefijo VITE_) para que no quede expuesto en el bundle del cliente
 const CRON_SECRET = process.env.CRON_SECRET
 
-const SB_H = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
+const SB_H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 
 // Este endpoint (broadcast a toda/parte de la plantilla) no tenía ningún
 // rate-limit — dado que la vía "browser" solo autentica por Origin (falsificable
@@ -52,6 +56,17 @@ try {
 }
 
 async function getAppData() {
+  if (AUTH_RLS_MODE) {
+    const [employeesResponse, recordsResponse] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/employees?select=id,name,role,baja&company_id=eq.ffffffff-ffff-ffff-ffff-ffffffffffff`, { headers:SB_H }),
+      fetch(`${SB_URL}/rest/v1/records?select=emp_id,inicio,fin&company_id=eq.ffffffff-ffff-ffff-ffff-ffffffffffff&fin=is.null&deleted=eq.false`, { headers:SB_H }),
+    ])
+    if (!employeesResponse.ok || !recordsResponse.ok) return null
+    return {
+      employees:(await employeesResponse.json()).map(row => ({ id:row.id, name:row.name, role:row.role, baja:!!row.baja, isAdmin:row.role === 'admin' })),
+      records:(await recordsResponse.json()).map(row => ({ empId:row.emp_id, inicio:row.inicio, fin:row.fin })),
+    }
+  }
   const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_H })
   if (!r.ok) return null
   const rows = await r.json()
@@ -72,6 +87,10 @@ async function deleteSub(userId) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+
+  if (!SB_URL || !SB_KEY || (AUTH_RLS_MODE && !SB_SERVICE)) {
+    return res.status(500).json({ error:AUTH_RLS_MODE ? 'Supabase service role missing' : 'Supabase config missing' })
+  }
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'
   if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests' })

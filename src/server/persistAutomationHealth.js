@@ -1,4 +1,5 @@
 import { mergeAutomationHealth } from './automationHealth.js'
+import { isAuthRlsServerMode } from './securityMode.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 
@@ -10,15 +11,23 @@ export async function persistAutomationRun(run, {
 } = {}) {
   if (!sbUrl || !sbKey) throw new Error('Supabase automation health config missing')
   const headers = { apikey:sbKey, Authorization:`Bearer ${sbKey}`, 'Content-Type':'application/json' }
+  const secureMode = isAuthRlsServerMode()
 
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const read = await fetchImpl(`${sbUrl}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers })
+    const readUrl = secureMode
+      ? `${sbUrl}/rest/v1/app_entities?id=eq.config%3A__singleton__&select=data,updated_at`
+      : `${sbUrl}/rest/v1/app_data?id=eq.1&select=data,updated_at`
+    const read = await fetchImpl(readUrl, { headers })
     if (!read.ok) throw new Error(`automation health read ${read.status}`)
     const row = (await read.json())?.[0]
-    if (!row?.data || !row.updated_at) throw new Error('app_data unavailable while recording automation health')
+    if (!row?.data || !row.updated_at) throw new Error('automation health state unavailable')
 
-    const next = { ...mergeAutomationHealth(row.data, run), _ts:Date.now() }
-    const write = await fetchImpl(`${sbUrl}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
+    const merged = mergeAutomationHealth(secureMode ? { config:row.data } : row.data, run)
+    const next = secureMode ? merged.config : { ...merged, _ts:Date.now() }
+    const writeUrl = secureMode
+      ? `${sbUrl}/rest/v1/app_entities?id=eq.config%3A__singleton__&updated_at=eq.${encodeURIComponent(row.updated_at)}`
+      : `${sbUrl}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(row.updated_at)}`
+    const write = await fetchImpl(writeUrl, {
       method:'PATCH',
       headers:{ ...headers, Prefer:'return=representation' },
       body:JSON.stringify({ data:next, updated_at:new Date().toISOString() }),
@@ -27,5 +36,5 @@ export async function persistAutomationRun(run, {
     if ((await write.json())?.length) return run
   }
 
-  throw new Error('app_data changed while recording automation health')
+  throw new Error('automation health state changed while recording run')
 }

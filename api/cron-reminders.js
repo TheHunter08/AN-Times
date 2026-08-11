@@ -20,6 +20,8 @@ import { timingSafeEqual } from 'crypto'
 import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
+import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
+import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 import { pendingValidationRecords } from '../src/utils/recordValidation.js'
 import { closureSignatureBacklog } from '../src/utils/closureSignatures.js'
 
@@ -34,6 +36,7 @@ const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
 const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 if (!SB_URL || !SB_ANON) console.error('[cron-reminders] VITE_SB_URL / VITE_SB_ANON not set')
 const CRON_SECRET   = process.env.CRON_SECRET
+const AUTH_RLS_MODE = isAuthRlsServerMode()
 
 let _cronVapidError = null
 if (!VAPID_PRIVATE) {
@@ -48,9 +51,30 @@ if (!VAPID_PRIVATE) {
   }
 }
 
-const SB_H = { apikey:SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}` }
+const SB_KEY = SB_SERVICE || SB_ANON
+const SB_H = { apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` }
 
 async function getAppData() {
+  if (AUTH_RLS_MODE) {
+    const [employeesResponse, recordsResponse, closuresResponse, entitiesResponse] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers:SB_H }),
+      fetch(`${SB_URL}/rest/v1/records?select=*&deleted=eq.false`, { headers:SB_H }),
+      fetch(`${SB_URL}/rest/v1/cierres?select=*&deleted=eq.false`, { headers:SB_H }),
+      fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(documentos,notisSent,config)`, { headers:SB_H }),
+    ])
+    if (![employeesResponse, recordsResponse, closuresResponse, entitiesResponse].every(response => response.ok)) return null
+    const db = {
+      employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' })),
+      records:(await recordsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, inicio:row.inicio, fin:row.fin, aceptada:row.aceptada, validado:row.validado, rechazado:row.rechazado, closed:row.closed, _upd:row.updated_at })),
+      cierres:(await closuresResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado, firmaAdmin:row.firma_admin, firmaEmp:row.firma_emp, _upd:row.updated_at })),
+      documentos:[], notisSent:{}, config:{},
+    }
+    for (const row of await entitiesResponse.json()) {
+      if (row.entity_id === '__singleton__') db[row.collection] = row.data || {}
+      else if (row.collection === 'documentos') db.documentos.push(row.data || {})
+    }
+    return db
+  }
   const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_H })
   if (!r.ok) return null
   const rows = await r.json()
@@ -62,15 +86,22 @@ async function markNotisSent(current, keys) {
   const latest = await getAppData()
   if (!latest) throw new Error('no app_data while marking notifications')
   const merged = { ...latest, notisSent: { ...(latest.notisSent || {}), ...keys }, _ts: Date.now() }
-  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
+  const target = AUTH_RLS_MODE
+    ? `${SB_URL}/rest/v1/app_entities?id=eq.notisSent%3A__singleton__`
+    : `${SB_URL}/rest/v1/app_data?id=eq.1`
+  const payload = AUTH_RLS_MODE
+    ? { data:merged.notisSent, updated_at:new Date().toISOString() }
+    : { data:merged, updated_at:new Date().toISOString() }
+  const response = await fetch(target, {
     method: 'PATCH',
     headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ data: merged, updated_at: new Date().toISOString() })
+    body:JSON.stringify(payload)
   })
   if (!response.ok) throw new Error(`markNotisSent patch ${response.status}`)
 }
 
 async function markAutomationRun(run) {
+  if (AUTH_RLS_MODE) return persistAutomationRun(run)
   const latest = await getAppData()
   if (!latest) throw new Error('no app_data while marking automation health')
   const merged = { ...mergeAutomationHealth(latest, run), _ts:Date.now() }
@@ -158,6 +189,7 @@ export default async function handler(req, res) {
   const hasValidSecret = token.length === CRON_SECRET.length && timingSafeEqual(Buffer.from(token), Buffer.from(CRON_SECRET))
   if (!hasValidSecret) return res.status(401).json({ error: 'Unauthorized' })
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
+  if (!SB_URL || !SB_ANON || !SB_SERVICE) return res.status(500).json({ error:'Supabase service config missing' })
 
   if (_cronVapidError) return res.status(500).json({ error: _cronVapidError })
 

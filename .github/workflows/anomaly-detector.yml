@@ -1,28 +1,23 @@
 name: Anomaly Detector – Jornadas sin cerrar
 
 on:
-  schedule:
-    # ~23:00-24:00 Madrid. Antes había dos entradas (21h/22h UTC) pensadas para
-    # invierno/verano, pero cron no distingue estaciones — las dos se ejecutaban
-    # SIEMPRE, duplicando la descarga completa de app_data cada noche sin razón.
-    - cron: '0 22 * * *'
+  # Sustituido por operational-crons.yml -> /api/cron-autoclose, que usa
+  # service role y tablas normalizadas. El disparo manual reutiliza el mismo
+  # endpoint seguro en vez del antiguo lector anónimo de app_data.
   workflow_dispatch:
 
 jobs:
   detect:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install web-push --no-save
-      - name: Detectar jornadas abiertas
-        run: node anomaly-detector.js
-        env:
-          VAPID_PUBLIC:  ${{ secrets.VAPID_PUBLIC }}
-          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-          VITE_SB_URL:   ${{ secrets.VITE_SB_URL }}
-          VITE_SB_ANON:  ${{ secrets.VITE_SB_ANON }}
+      - name: Detectar y cerrar jornadas largas mediante el endpoint seguro
+        run: |
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ')
+          test -n "${CRON_SECRET}"
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-autoclose"

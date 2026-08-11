@@ -3,8 +3,58 @@ export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 // (submit_denuncia/track_denuncia, ver migration-2026-07-18-denuncias-
 // privadas.sql) precisamente para que no se sincronice en bloque a todos
 // los clientes como el resto de estas colecciones.
-export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo']
-export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','firmas','anomalias_vistas','notisSent','pinLockouts','config']
+export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo','legalAcknowledgements']
+export const MAP_ENTITY_COLLECTIONS = ['firmas']
+export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','anomalias_vistas','notisSent','config']
+// Los bloqueos de PIN son un control local del dispositivo. Sincronizarlos
+// permitia que un usuario alterase o leyese el estado de bloqueo de otros.
+export const LOCAL_ONLY_COLLECTIONS = ['pinLockouts']
+
+const ADMIN_ENTITY_COLLECTIONS = new Set(['audit', 'partesTrabajo', 'mensajes'])
+const COMPANY_ENTITY_COLLECTIONS = new Set()
+const COMPANY_SINGLETON_COLLECTIONS = new Set(['empresas', 'centrosTrabajo', 'notisSent', 'config'])
+
+function firstValue(item, keys) {
+  for (const key of keys) {
+    const value = item?.[key]
+    if (value !== undefined && value !== null && String(value).trim()) return String(value)
+  }
+  return null
+}
+
+export function entityAccessMetadata(collection, item, entityId = null) {
+  if (ADMIN_ENTITY_COLLECTIONS.has(collection)) {
+    return { access_scope:'admin', subject_emp_id:null, participant_emp_ids:[] }
+  }
+  if (COMPANY_ENTITY_COLLECTIONS.has(collection)) {
+    return { access_scope:'company', subject_emp_id:null, participant_emp_ids:[] }
+  }
+
+  const subject = collection === 'firmas'
+    ? String(entityId || '').trim() || null
+    : firstValue(item, ['empId', 'employeeId', 'trabajadorId', 'userId', 'empleadoId'])
+  const participants = [...new Set([
+    subject,
+    firstValue(item, ['fromId', 'from_id', 'from', 'remitenteId']),
+    firstValue(item, ['toId', 'to_id', 'to', 'destinatarioId']),
+  ].filter(Boolean))]
+
+  // Una fila sin propietario verificable nunca se expone a empleados. Queda
+  // visible para administracion para poder corregir el dato legacy.
+  return {
+    access_scope: subject || participants.length ? 'employee' : 'admin',
+    subject_emp_id: subject,
+    participant_emp_ids: participants,
+  }
+}
+
+export function singletonAccessMetadata(collection) {
+  return {
+    access_scope: COMPANY_SINGLETON_COLLECTIONS.has(collection) ? 'company' : 'admin',
+    subject_emp_id:null,
+    participant_emp_ids:[],
+  }
+}
 
 function valuesEqual(before, after) {
   if (before === after) return true
@@ -23,6 +73,12 @@ function changedArrayIds(before, after) {
   return ids
 }
 
+function changedMapIds(before, after) {
+  if (!after || typeof after !== 'object' || Array.isArray(after)) return null
+  const previous = before && typeof before === 'object' && !Array.isArray(before) ? before : {}
+  return Object.keys(after).filter(key => !valuesEqual(previous[key], after[key]))
+}
+
 // saveDB recibe a veces un parche pequeño y otras veces una copia completa de
 // db. Comparar contra el estado anterior evita interpretar esa copia completa
 // como si todas las tablas hubieran cambiado. Para las colecciones granulares
@@ -34,6 +90,7 @@ export function buildSyncHint(before, partial) {
     if (key === '_ts' || key === '_serverTs' || valuesEqual(before?.[key], value)) continue
     changedKeys.push(key)
     const ids = changedArrayIds(before?.[key], value)
+      ?? (MAP_ENTITY_COLLECTIONS.includes(key) ? changedMapIds(before?.[key], value) : null)
     if (ids) entityIds[key] = ids
   }
   return { changedKeys, entityIds, recordIds: entityIds.records || [] }
@@ -65,12 +122,21 @@ export function toEntityRows(db, nowIso = new Date().toISOString()) {
     for (const item of (db[collection] ?? [])) {
       if (!item || !hasValue(String(item.id ?? ''))) continue
       const entityId = String(item.id)
-      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:entityId, data:item, revision:Math.max(1, Number(item._rev) || 1), deleted:false, updated_at:item._upd ?? item.ts ?? nowIso })
+      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:entityId, data:item, ...entityAccessMetadata(collection, item, entityId), revision:Math.max(1, Number(item._rev) || 1), deleted:false, updated_at:item._upd ?? item.ts ?? nowIso })
+    }
+  }
+  for (const collection of MAP_ENTITY_COLLECTIONS) {
+    const map = db[collection]
+    if (!map || typeof map !== 'object' || Array.isArray(map)) continue
+    for (const [entityId, item] of Object.entries(map)) {
+      if (!hasValue(String(entityId))) continue
+      const updatedAt = item?.main?.updatedAt ?? item?._upd ?? nowIso
+      rows.push({ id:entityRowId(collection, entityId), company_id:COMPANY_ID, collection, entity_id:String(entityId), data:item ?? {}, ...entityAccessMetadata(collection, item, entityId), revision:Math.max(1, Number(item?._rev) || 1), deleted:false, updated_at:updatedAt })
     }
   }
   for (const collection of SINGLETON_COLLECTIONS) {
     if (db[collection] === undefined) continue
-    rows.push({ id:entityRowId(collection, '__singleton__'), company_id:COMPANY_ID, collection, entity_id:'__singleton__', data:db[collection], revision:1, deleted:false, updated_at:nowIso })
+    rows.push({ id:entityRowId(collection, '__singleton__'), company_id:COMPANY_ID, collection, entity_id:'__singleton__', data:db[collection], ...singletonAccessMetadata(collection), revision:1, deleted:false, updated_at:nowIso })
   }
   return rows
 }
@@ -152,6 +218,20 @@ export function toWorksiteRow(o, nowIso = new Date().toISOString()) {
   }
 }
 
+export function toAuditEventRow(item, nowIso = new Date().toISOString()) {
+  const eventTime = item.ts ?? item._upd ?? nowIso
+  return {
+    id:String(item.id),
+    company_id:COMPANY_ID,
+    actor_emp_id:null, // el trigger Auth lo fija y no confía en el cliente
+    action:String(item.action || 'evento'),
+    detail:item.detail ?? null,
+    data:item,
+    created_at:eventTime,
+    updated_at:eventTime,
+  }
+}
+
 // records/vacaciones/cierres/obras tienen columna deleted_at (migraciones
 // 2026-07-14 phase1/phase2); app_entities SOLO tiene `deleted boolean` — nunca
 // se le añadió deleted_at. Incluirla en el UPDATE hace que PostgREST rechace
@@ -219,6 +299,10 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
   const worksiteHintIds = hintedIds('obras')
   const worksiteCandidates = (db.obras ?? []).filter(o => includes('obras') && (!worksiteHintIds || worksiteHintIds.has(String(o?.id))) && !deletedWorksites.has(o?.id))
   const worksites = worksiteCandidates.filter(o => hasValue(o?.id) && hasValue(o?.nombre))
+  const auditHintIds = hintedIds('audit')
+  const auditEvents = (db.audit ?? []).filter(item =>
+    includes('audit') && hasValue(String(item?.id ?? '')) && (!auditHintIds || auditHintIds.has(String(item.id)))
+  )
   const entityRows = toEntityRows(db, nowIso).filter(row => {
     if (!includes(row.collection)) return false
     const ids = hintedIds(row.collection)
@@ -232,6 +316,7 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
       { table: 'vacaciones', rows: vacations.map(v => toVacationRow(v, nowIso)) },
       { table: 'cierres', rows: closures.map(c => toClosureRow(c, nowIso)) },
       { table: 'obras', rows: worksites.map(o => toWorksiteRow(o, nowIso)) },
+      { table: 'audit_events', rows: auditEvents.map(item => toAuditEventRow(item, nowIso)) },
       { table: 'app_entities', rows: entityRows },
     ],
     skipped: {
@@ -247,7 +332,7 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
       { table: 'employees', ids: [...new Set(deleted?.employees ?? [])], mode: 'deactivate' },
       { table: 'cierres', ids: [...deletedClosures], mode: 'soft_delete' },
       { table: 'obras', ids: [...deletedWorksites], mode: 'soft_delete' },
-      { table: 'app_entities', ids: ENTITY_COLLECTIONS.flatMap(collection => [...new Set(deleted?.[collection] ?? [])].map(id => entityRowId(collection, id))), mode: 'soft_delete' },
+      { table: 'app_entities', ids: [...ENTITY_COLLECTIONS, ...MAP_ENTITY_COLLECTIONS].flatMap(collection => [...new Set(deleted?.[collection] ?? [])].map(id => entityRowId(collection, id))), mode: 'soft_delete' },
     ],
   }
 }

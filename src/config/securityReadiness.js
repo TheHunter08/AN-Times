@@ -2,10 +2,12 @@
 // true cuando el flujo correspondiente esté implementado y probado de extremo
 // a extremo. Tener todos los auth_id poblados es necesario, pero no suficiente.
 export const RLS_RUNTIME_CAPABILITIES = Object.freeze({
-  authenticatedDataPath:false,
+  authenticatedDataPath:true,
   pinSupabaseSessions:false,
+  pinAccessRetired:true,
   authIdsVerifiedAgainstAuthUsers:false,
-  legacyBlobRetired:false,
+  legacyBlobRetired:true,
+  secureCollectionsPrepared:true,
 })
 
 export function evaluateRlsTransition({
@@ -26,11 +28,14 @@ export function evaluateRlsTransition({
 
   const runtimeBlockers = []
   if (!capabilities.authenticatedDataPath) runtimeBlockers.push('cliente de datos todavía anónimo')
-  if (!capabilities.pinSupabaseSessions) {
+  if (!capabilities.pinSupabaseSessions && !capabilities.pinAccessRetired) {
     runtimeBlockers.push('el acceso PIN todavía no tiene una sesión oficial de Supabase Auth')
   }
   if (!capabilities.authIdsVerifiedAgainstAuthUsers) {
     runtimeBlockers.push('auth_id todavía no se ha contrastado con auth.users')
+  }
+  if (capabilities.secureCollectionsPrepared === false) {
+    runtimeBlockers.push('falta aplicar la migración de colecciones privadas y auditoría')
   }
   if (!capabilities.legacyBlobRetired) runtimeBlockers.push('blob legado todavía activo')
 

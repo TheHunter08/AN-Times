@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { getPushCoverage, uploadPendingIfAny } from '../../services/dataService.js'
-import { isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
+import { isEmployeeOfficialAccountReady, isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
 import { getLaunchBlockers } from '../../utils/launchRequirements.js'
 import { buildComplianceSummary } from '../../utils/complianceSummary.js'
 import { pendingValidationRecords } from '../../utils/recordValidation.js'
+import { getLegalConfig, hasCurrentLegalAcknowledgement, legalConfigIssues } from '../../utils/legalCompliance.js'
+import { summarizeDocumentReadiness } from '../../utils/documentReadiness.js'
 import { Operations } from './Operations.js'
 
 export default function OperationsContainer({ onNavigate, onReviewEmployee }: { onNavigate: (page: string) => void; onReviewEmployee: (employeeId: string) => void }) {
@@ -23,7 +25,7 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
   const visibleWidgets = (db.config?.adminDashboard?.visibleWidgets || defaultWidgets).map((id: string) => legacyWidgetIds[id] || id)
   const employees = (db.employees || []).filter((employee: any) => !employee.baja)
   const workers = employees.filter((employee: any) => employee.role !== 'admin' && !employee.isAdmin)
-  const authReady = employees.filter((employee: any) => employee.auth_id || employee.authId).length
+  const authReady = employees.filter((employee: any) => isEmployeeOfficialAccountReady(employee)).length
   const emailReady = employees.filter((employee: any) => isValidAccountEmail(employee.email)).length
   const emailCounts = new Map<string, number>()
   const authCounts = new Map<string, number>()
@@ -40,6 +42,10 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
   const pendingValidation = pendingValidationRecords(db.records).length
   const compliance = buildComplianceSummary(db)
+  const legalConfig = getLegalConfig(db)
+  const legalIssues = legalConfigIssues(db)
+  const legalAcknowledged = workers.filter((employee: any) => hasCurrentLegalAcknowledgement(db, employee.id)).length
+  const documentReadiness = summarizeDocumentReadiness(db)
   const [pushReady, setPushReady] = useState<number | null>(null)
   const [pushMissingIds, setPushMissingIds] = useState<string[]>([])
   const [pushCoverageState, setPushCoverageState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -78,7 +84,9 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
     pushReady={pushReady} pushTotal={workers.length} pushCoverageState={pushCoverageState}
     pendingValidation={pendingValidation} staleOpenShifts={compliance.incompleteRecords}
     pendingClosures={compliance.closures - compliance.signedClosures}
-    documentCount={(db.documentos || []).length}
+    documentCount={(db.documentos || []).length} documentReadiness={documentReadiness}
+    legalConfig={legalConfig} legalIssues={legalIssues}
+    legalAcknowledged={legalAcknowledged} legalAcknowledgementTotal={workers.length}
     launchBlockers={getLaunchBlockers(db, pushMissingIds)} schedules={schedules}
     automationHealth={db.config?.automationHealth || {}} migrationVerification={db.config?.migrationVerification || {}}
     visibleWidgets={visibleWidgets} onSync={onSync}
@@ -87,6 +95,7 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
     onToggleSchedule={(id: string) => updateConfig({ reportSchedules:schedules.map((schedule: any) => schedule.id === id ? { ...schedule, enabled:!schedule.enabled, _upd:new Date().toISOString() } : schedule) })}
     onDeleteSchedule={(id: string) => updateConfig({ reportSchedules:schedules.filter((schedule: any) => schedule.id !== id) })}
     onChangeWidgets={(ids: string[]) => updateConfig({ adminDashboard:{ ...(db.config?.adminDashboard || {}), visibleWidgets:ids } })}
+    onSaveLegalConfig={(legal: any) => { updateConfig({ legal }); toast('Información legal guardada', 2400, 'ok') }}
     onNavigate={onNavigate} onReviewEmployee={onReviewEmployee}
   />
 }

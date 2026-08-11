@@ -21,6 +21,8 @@
     { "source": "/api/send-push-all", "destination": "/api/admin-tools?op=send-push-all" },
     { "source": "/api/send-whatsapp", "destination": "/api/admin-tools?op=send-whatsapp" },
     { "source": "/api/health", "destination": "/api/admin-tools?op=health" },
+    { "source": "/api/activate-account", "destination": "/api/admin-tools?op=activate-account" },
+    { "source": "/api/account-bootstrap", "destination": "/api/admin-tools?op=account-bootstrap" },
     { "source": "/api/cron-reminders-midday", "destination": "/api/cron-reminders" },
     { "source": "/api/cron-reminders-evening", "destination": "/api/cron-reminders-and-autoclose" },
     { "source": "/api/cron-reminders-night", "destination": "/api/cron-reminders-and-autoclose" },

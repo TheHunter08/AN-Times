@@ -3,8 +3,10 @@ import { createHmac } from 'node:crypto'
 import { readAllRestRows } from './read-all-rest-rows.mjs'
 import { isValidAccountEmail, normalizeAccountEmail } from '../src/utils/authRegistration.js'
 import { evaluateRlsTransition, RLS_RUNTIME_CAPABILITIES } from '../src/config/securityReadiness.js'
+import { evaluateSecurityDeployment } from '../src/config/securityDeployment.js'
 import { summarizeAutomationHealth } from '../src/server/automationHealth.js'
 import { isPinHashed, needsRehash } from '../src/utils/pinSecurity.js'
+import { summarizeDocumentReadiness } from '../src/utils/documentReadiness.js'
 
 function loadEnvFile(path) {
   try {
@@ -25,9 +27,17 @@ loadEnvFile('.env')
 const url = String(process.env.VITE_SB_URL || 'https://eyyhlcvpyiorpdnvqsll.supabase.co').replace(/\/$/, '')
 const key = String(process.env.VITE_SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eWhsY3ZweWlvcnBkbnZxc2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTc5MzIsImV4cCI6MjA5NzU3MzkzMn0.UTQnmQGtTehAhfz93uw3KpXOVjR5IC97HKt1SOrg51I')
 
-const headers = { apikey:key, Authorization:`Bearer ${key}` }
+const auditToken = serviceToken() || key
+const headers = { apikey:key, Authorization:`Bearer ${auditToken}` }
 async function rows(path) {
   return readAllRestRows({ baseUrl:url, path, headers })
+}
+
+async function resourceAvailable(path) {
+  try {
+    const response = await fetch(`${url}/rest/v1/${path}`, { headers:{ ...headers, Range:'0-0' } })
+    return response.ok
+  } catch { return false }
 }
 
 function serviceToken() {
@@ -57,16 +67,44 @@ async function readAuthUsers() {
   }
 }
 
-const [employees, subscriptions, records, closures, blobRows, authUsers] = await Promise.all([
+const securityDeployment = evaluateSecurityDeployment(process.env)
+const [employees, subscriptions, records, vacations, closures, entityRows, blobRows, authUsers, secureEntitiesReady, auditEventsReady] = await Promise.all([
   rows('employees?select=id,role,baja,email,auth_id,pin_hash,data'),
   rows('push_subs?select=user_id,endpoint'),
-  rows('records?select=id,fin,aceptada,validado,rechazado,closed,deleted'),
+  rows('records?select=id,emp_id,fin,aceptada,validado,rechazado,closed,deleted,updated_at'),
+  rows('vacaciones?select=id,emp_id,estado,deleted,updated_at'),
   rows('cierres?select=id,emp_id,mes,estado,firma_admin,firma_emp,target_min,deficit_min,balance_min,justified_min,non_contract_min,data,deleted'),
+  rows('app_entities?select=collection,entity_id,data,deleted,updated_at'),
   rows('app_data?select=data,updated_at&id=eq.1'),
   readAuthUsers(),
+  resourceAvailable('app_entities?select=id,access_scope,subject_emp_id,participant_emp_ids&limit=1'),
+  resourceAvailable('audit_events?select=id&limit=1'),
 ])
 
 const blob = blobRows[0]?.data || {}
+function normalizedDb() {
+  const db = {
+    employees:employees.map(row => ({ ...(row.data || {}), id:row.id, role:row.role, baja:row.baja, email:row.email, authId:row.auth_id })),
+    records:records.filter(row => !row.deleted).map(row => ({ id:row.id, empId:row.emp_id, fin:row.fin, _upd:row.updated_at })),
+    vacaciones:vacations.filter(row => !row.deleted).map(row => ({ id:row.id, empId:row.emp_id, estado:row.estado, _upd:row.updated_at })),
+    firmas:{},
+  }
+  for (const row of entityRows.filter(item => !item.deleted)) {
+    if (row.collection === 'firmas') {
+      if (row.entity_id === '__singleton__') Object.assign(db.firmas, row.data || {})
+      else db.firmas[row.entity_id] = row.data || {}
+      continue
+    }
+    if (row.entity_id === '__singleton__') db[row.collection] = row.data
+    else {
+      if (!Array.isArray(db[row.collection])) db[row.collection] = []
+      db[row.collection].push(row.data || {})
+    }
+  }
+  return db
+}
+const operationalDb = securityDeployment.active ? normalizedDb() : blob
+const documentReadiness = summarizeDocumentReadiness(operationalDb)
 const workers = employees.filter(item => !item.baja && item.role !== 'admin' && !item.isAdmin)
 const blobWorkers = (blob.employees || []).filter(item => !item.baja && item.role !== 'admin' && !item.isAdmin)
 const activeEmployees = employees.filter(item => !item.baja)
@@ -75,7 +113,7 @@ const workerIds = new Set(workers.map(item => item.id))
 const subscribed = new Set(subscriptions.map(item => item.user_id).filter(id => workerIds.has(id)))
 const endpointCounts = new Map()
 for (const item of subscriptions) endpointCounts.set(item.endpoint, (endpointCounts.get(item.endpoint) || 0) + 1)
-const signatures = blob.firmas || {}
+const signatures = operationalDb.firmas || {}
 const signed = workers.filter(item => Boolean(signatures[item.id]?.main?.data))
 const nowMonth = new Date().toLocaleDateString('en-CA', { timeZone:'Europe/Madrid', year:'numeric', month:'2-digit' }).slice(0, 7)
 const invalidCurrentClosures = closures.filter(item => item.mes >= nowMonth && !item.firma_admin && !item.firma_emp && !item.deleted)
@@ -100,9 +138,9 @@ const deletedRecordIds = new Set(records.filter(item => item.deleted).map(item =
 const tableRecordIds = new Set(activeRecords.map(item => item.id))
 const blobRecordIds = new Set((blob.records || []).map(item => item.id))
 const validUpdatedAt = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
-const openBlobRecords = (blob.records || []).filter(item => item && !item.fin && !item.deleted)
-const pendingBlobVacations = (blob.vacaciones || []).filter(item => item && item.estado === 'pendiente' && !item.deleted)
-const pendingBlobExpenses = (blob.gastos || []).filter(item => item && item.estado === 'pendiente' && !item.deleted)
+const openBlobRecords = (operationalDb.records || []).filter(item => item && !item.fin && !item.deleted)
+const pendingBlobVacations = (operationalDb.vacaciones || []).filter(item => item && item.estado === 'pendiente' && !item.deleted)
+const pendingBlobExpenses = (operationalDb.gastos || []).filter(item => item && item.estado === 'pendiente' && !item.deleted)
 // Un registro presente en el blob pero marcado como deleted en la tabla no
 // está "perdido": es un tombstone que debe limpiar el proceso específico sin
 // resucitarlo. Separarlo evita que la auditoría recomiende una reparación
@@ -168,11 +206,13 @@ const checks = {
   pendingEndedClosures: pendingEndedClosures.length,
   normalizedWeeklyClosures: normalizedWeeklyClosures.length,
   weeklyClosureDrift: weeklyClosureDrift.length,
-  automationHealth:summarizeAutomationHealth(blob.config?.automationHealth),
+  automationHealth:summarizeAutomationHealth(operationalDb.config?.automationHealth),
+  documentReadiness,
 }
 const auditedCapabilities = {
   ...RLS_RUNTIME_CAPABILITIES,
   authIdsVerifiedAgainstAuthUsers:checks.authUsersAudited && checks.orphanedAuthLinks === 0,
+  secureCollectionsPrepared:secureEntitiesReady && auditEventsReady,
 }
 const rlsTransition = evaluateRlsTransition({
   authTotal:activeEmployees.length,
@@ -185,13 +225,23 @@ const rlsTransition = evaluateRlsTransition({
 checks.rlsTransitionState = rlsTransition.state
 checks.rlsRuntimeCapabilities = auditedCapabilities
 checks.rlsRuntimeBlockers = rlsTransition.runtimeBlockers
+checks.securityDeployment = securityDeployment
 
 console.log(JSON.stringify(checks, null, 2))
+const pinCredentialBlockers = securityDeployment.active
+  // Auth sustituye al PIN y policies_auth.sql retira sus hashes. Solo un PIN
+  // en texto claro bloquea la activación; los hashes legacy se archivan para
+  // rollback fuera del alcance del cliente.
+  ? checks.workerDataWithPlaintextPin
+  : checks.workersWithLegacyPin + checks.workersMissingPin +
+    checks.workerDataWithPlaintextPin + checks.workerDataWithLegacyHash +
+    checks.blobWorkersWithLegacyPin + checks.blobWorkersMissingPin
 const blockers = checks.missingDeviceSubscriptions + checks.missingSignatures + checks.employeesMissingAuth +
-  checks.employeesMissingEmail + checks.duplicatedEmployeeEmails + checks.duplicatedAuthIdentities + checks.missingInTables + checks.missingInBlob +
-  checks.invalidCurrentClosures + checks.workersWithLegacyPin + checks.workersMissingPin +
-  checks.workerDataWithPlaintextPin + checks.workerDataWithLegacyHash +
-  checks.blobWorkersWithLegacyPin + checks.blobWorkersMissingPin + checks.openRecordsMissingUpd +
+  checks.employeesMissingEmail + checks.duplicatedEmployeeEmails + checks.duplicatedAuthIdentities +
+  (securityDeployment.active ? 0 : checks.missingInTables + checks.missingInBlob) +
+  checks.invalidCurrentClosures + pinCredentialBlockers + checks.openRecordsMissingUpd +
   checks.pendingVacationsMissingUpd + checks.pendingExpensesMissingUpd + checks.rlsRuntimeBlockers.length +
+  checks.securityDeployment.issues.length +
+  checks.documentReadiness.signatureWithoutArtifact + checks.documentReadiness.privateWithoutAuth +
   checks.weeklyClosureDrift + checks.automationHealth.unhealthy + (checks.orphanedAuthLinks || 0)
 if (process.argv.includes('--strict') && blockers) process.exitCode = 1

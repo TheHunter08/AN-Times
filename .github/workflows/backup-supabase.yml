@@ -12,78 +12,34 @@ jobs:
     timeout-minutes: 10
 
     env:
-      VITE_SB_URL:  ${{ secrets.VITE_SB_URL }}
-      VITE_SB_ANON: ${{ secrets.VITE_SB_ANON }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
 
     steps:
-      - name: Download app_data snapshot
-        run: |
-          SB_URL="${VITE_SB_URL:?VITE_SB_URL secret is required}"
-          SB_ANON="${VITE_SB_ANON:?VITE_SB_ANON secret is required}"
-          # Strip BOM, carriage return, newline and spaces (handles copy-paste artefacts in secrets)
-          SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          DATE=$(date +%Y-%m-%d)
-
-          echo "Backing up app_data..."
-          curl -sf \
-            -H "apikey: $SB_ANON" \
-            -H "Authorization: Bearer $SB_ANON" \
-            "$SB_URL/rest/v1/app_data?id=eq.1&select=*" \
-            -o "backup_app_data_${DATE}.json"
-
-          echo "Backing up push_subs..."
-          curl -sf \
-            -H "apikey: $SB_ANON" \
-            -H "Authorization: Bearer $SB_ANON" \
-            "$SB_URL/rest/v1/push_subs?select=user_id,updated_at" \
-            -o "backup_push_subs_${DATE}.json"
-
-          echo "Backup size: $(du -sh backup_app_data_${DATE}.json)"
-          echo "backup_date=$DATE" >> $GITHUB_OUTPUT
+      # /api/backup selecciona automáticamente blob legacy o todas las tablas
+      # normalizadas según el modo activo, usa service role en el servidor,
+      # almacena una copia inmutable y verifica checksum + plan de restauración.
+      - name: Crear y verificar backup productivo
         id: backup
-
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: supabase-backup-${{ steps.backup.outputs.backup_date }}
-          path: backup_*.json
-          retention-days: 30
-
-      - name: Validate backup
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          SIZE=$(stat -c%s "backup_app_data_${DATE}.json" 2>/dev/null || echo 0)
-          if [ "$SIZE" -lt 50 ]; then
-            echo "ERROR: Backup file too small ($SIZE bytes). Data may be missing."
-            exit 1
-          fi
-          echo "Backup OK: ${SIZE} bytes"
-
-      - name: Verificar backup productivo y registrar salud
         run: |
           APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
           test -n "${CRON_SECRET}"
+          DATE=$(date +%Y-%m-%d)
           curl --fail-with-body --silent --show-error \
-            --retry 3 --retry-all-errors --retry-delay 5 --max-time 120 \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 180 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${APP_URL}/api/backup"
+            "${APP_URL}/api/backup" \
+            -o "backup_result_${DATE}.json"
+          echo "backup_date=$DATE" >> $GITHUB_OUTPUT
 
-      - name: Keepalive write — evita pausa Supabase Free
+      - name: Validar evidencia de restauración
         run: |
-          SB_URL="${VITE_SB_URL:?VITE_SB_URL secret is required}"
-          SB_ANON="${VITE_SB_ANON:?VITE_SB_ANON secret is required}"
-          SB_URL=$(printf '%s' "$SB_URL" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          SB_ANON=$(printf '%s' "$SB_ANON" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
-          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-            -X PATCH \
-            -H "apikey: $SB_ANON" \
-            -H "Authorization: Bearer $SB_ANON" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            "$SB_URL/rest/v1/app_data?id=eq.1" \
-            -d "{\"updated_at\": \"$TS\"}")
-          echo "Keepalive PATCH: $STATUS"
+          DATE=$(date +%Y-%m-%d)
+          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('backup_result_${DATE}.json','utf8')); if(!r.ok||!r.verified||!r.restorable||!r.checksum||!r.filename) throw new Error('Backup no verificable'); console.log('Backup verificado:', r.filename, r.records, 'registros, checksum', r.checksum.slice(0,12))"
+
+      - name: Conservar comprobante de backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ steps.backup.outputs.backup_date }}
+          path: backup_result_*.json
+          retention-days: 90

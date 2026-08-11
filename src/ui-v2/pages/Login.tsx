@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react'
 import { colors } from '../design-system/colors'
+import { useEffect } from 'react'
 import { radius } from '../design-system/radius'
 import { IconLock, IconMail, IconEye, IconEyeOff, IconClock, IconShield, IconDevice } from '../components/Icons.js'
 import { ErrorBanner } from '../components/FormField.js'
@@ -11,6 +12,7 @@ export interface EmpOption { id: string; name: string; dept?: string; pinLen?: n
 export interface LoginProps {
   // PIN
   employees?: EmpOption[]
+  activationEmployees?: EmpOption[]
   pin?: string
   selectedEmpId?: string
   onSelectEmp?: (id: string) => void
@@ -40,6 +42,7 @@ export interface LoginProps {
   emailError?: string
   emailPinRequired?: boolean
   registrationNotice?: string
+  requiredAccountActivation?: { employeeId:string; employeeName:string; email?:string } | null
   onRegistrationNoticeDone?: () => void
   // Mode
   mode?: LoginMode
@@ -48,16 +51,23 @@ export interface LoginProps {
   error?: string
   online?: boolean
   lastSyncLabel?: string
+  allowPinLogin?: boolean
+  accountActivationRequiresEmployeeSelection?: boolean
+  accountActivationEmployeeSearch?: boolean
+  employeeDirectoryLoading?: boolean
+  onEmployeeSearch?: (query:string) => void
 }
 
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 
 export function Login({
-  employees = [], pin = '', selectedEmpId = '', onSelectEmp, hasRememberedEmployee, onUseRememberedEmployee, onPinKey, onPinDel,
+  employees = [], activationEmployees = [], pin = '', selectedEmpId = '', onSelectEmp, hasRememberedEmployee, onUseRememberedEmployee, onPinKey, onPinDel,
   pinError, pinShaking, pinLocked, bioAvailable, empHasBio, onBioLogin, bioLoading,
-  onLogin, onRegister, onForgotPassword, onUpdatePassword, onResendConfirmation, resetLoading, recoveryLoading, recoveryMode, confirmationLoading, emailLoading, registerLoading, emailError, emailPinRequired, registrationNotice, onRegistrationNoticeDone,
+  onLogin, onRegister, onForgotPassword, onUpdatePassword, onResendConfirmation, resetLoading, recoveryLoading, recoveryMode, confirmationLoading, emailLoading, registerLoading, emailError, emailPinRequired, registrationNotice, requiredAccountActivation, onRegistrationNoticeDone,
   mode = 'pin', onSetMode,
-  loading, error, online = true, lastSyncLabel,
+  loading, error, online = true, lastSyncLabel, allowPinLogin = true,
+  accountActivationRequiresEmployeeSelection = false, employeeDirectoryLoading = false, onEmployeeSearch,
+  accountActivationEmployeeSearch = false,
 }: LoginProps) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -66,6 +76,20 @@ export function Login({
   const [showPass, setShowPass] = useState(false)
   const [creatingAccount, setCreatingAccount] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
+
+  useEffect(() => {
+    if (!requiredAccountActivation) return
+    setCreatingAccount(true)
+    setEmail(requiredAccountActivation.email || '')
+    setPassword('')
+    setRegistrationPin('')
+  }, [requiredAccountActivation?.employeeId])
+
+  useEffect(() => {
+    if (!accountActivationEmployeeSearch || !creatingAccount) return
+    const timer = window.setTimeout(() => onEmployeeSearch?.(employeeSearch), 300)
+    return () => window.clearTimeout(timer)
+  }, [accountActivationEmployeeSearch, creatingAccount, employeeSearch, onEmployeeSearch])
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,7 +109,8 @@ export function Login({
   const submitMissing = !password
     || (!recoveryMode && !email)
     || (recoveryMode && !passwordConfirmation)
-    || (!recoveryMode && (creatingAccount || emailPinRequired) && !registrationPin)
+    || (!recoveryMode && (creatingAccount || emailPinRequired) && !requiredAccountActivation && !registrationPin)
+    || (!recoveryMode && creatingAccount && accountActivationRequiresEmployeeSelection && !requiredAccountActivation && !selectedEmpId)
   const submitDisabled = submitBusy || submitMissing
 
   return (
@@ -144,7 +169,7 @@ export function Login({
         </div>
 
         {/* Toggle PIN / Email */}
-        {!recoveryMode && <div style={{
+        {!recoveryMode && allowPinLogin && !requiredAccountActivation && <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 18,
           background: colors.bg[700], border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius.lg, padding: 4,
@@ -170,7 +195,7 @@ export function Login({
         </div>}
 
         {/* ── PIN MODE ───────────────────────────────────────────────── */}
-        {mode === 'pin' && (
+        {mode === 'pin' && allowPinLogin && (
           <div tabIndex={0} onKeyDown={e => {
             if (/^\d$/.test(e.key)) { e.preventDefault(); onPinKey?.(e.key) }
             if (e.key === 'Backspace') { e.preventDefault(); onPinDel?.() }
@@ -330,18 +355,20 @@ export function Login({
           }}>
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: colors.text[900], letterSpacing: '-.4px', marginBottom: 4 }}>
-                {recoveryMode ? 'Crea una contraseña nueva' : creatingAccount ? 'Crea y vincula tu cuenta' : 'Accede a TIMES INC'}
+                {recoveryMode ? 'Crea una contraseña nueva' : requiredAccountActivation ? 'Activa tu cuenta oficial' : creatingAccount ? 'Crea y vincula tu cuenta' : 'Accede a TIMES INC'}
               </div>
               <div style={{ fontSize: 12, color: colors.text[500] }}>
                 {recoveryMode
                   ? 'Elige una contraseña segura de al menos 8 caracteres.'
                   : creatingAccount
-                  ? 'La cuenta se asociará a tu perfil de empleado existente.'
+                  ? requiredAccountActivation
+                    ? `PIN verificado para ${requiredAccountActivation.employeeName}. Añade tu correo para continuar.`
+                    : 'La cuenta se asociará a tu perfil de empleado existente.'
                   : 'Detectaremos automáticamente tu perfil y permisos.'}
               </div>
             </div>
 
-            {creatingAccount && !registrationNotice && !recoveryMode && (
+            {creatingAccount && !registrationNotice && !recoveryMode && !requiredAccountActivation && (
               <ol aria-label="Cómo vincular tu cuenta" style={{
                 margin: '0 0 14px', padding: '12px 12px 12px 34px',
                 borderRadius: radius.md, border: `1px solid ${colors.border.subtle}`,
@@ -382,6 +409,37 @@ export function Login({
             )}
 
             {(recoveryMode || !registrationNotice) && <form onSubmit={submitEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {!recoveryMode && creatingAccount && accountActivationEmployeeSearch && !requiredAccountActivation && <div>
+                <label htmlFor="activation-employee-search" style={{ fontSize:10.5, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px', display:'block', marginBottom:6 }}>
+                  Busca y selecciona tu perfil
+                </label>
+                <input
+                  id="activation-employee-search"
+                  type="search"
+                  value={employeeSearch}
+                  onChange={event => {
+                    setEmployeeSearch(event.target.value)
+                    onSelectEmp?.('')
+                  }}
+                  placeholder="Escribe al menos 2 letras de tu nombre"
+                  autoComplete="off"
+                  className="uiv2-login-input"
+                  style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:radius.sm, border:`1px solid ${colors.border.default}`, background:colors.bg[600], color:colors.text[900], fontSize:13, fontFamily:'inherit', outline:'none' }}
+                />
+                <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginTop:8 }}>
+                  {employeeDirectoryLoading && <span style={{ color:colors.text[400], fontSize:11.5 }}>Buscando…</span>}
+                  {!employeeDirectoryLoading && employeeSearch.trim().length >= 2 && activationEmployees.length === 0 && <span style={{ color:colors.text[400], fontSize:11.5 }}>No hay coincidencias. Prueba con nombre o apellido.</span>}
+                  {activationEmployees.map(employee => <button
+                    key={employee.id}
+                    type="button"
+                    aria-pressed={selectedEmpId === employee.id}
+                    onClick={() => onSelectEmp?.(employee.id)}
+                    style={{ minHeight:40, padding:'6px 11px', borderRadius:radius.pill, border:`1px solid ${selectedEmpId === employee.id ? colors.primary.base : colors.border.default}`, background:selectedEmpId === employee.id ? colors.primary.dim : colors.bg[600], color:colors.text[800], fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+                  >
+                    {employee.name}{employee.dept ? ` · ${employee.dept}` : ''}
+                  </button>)}
+                </div>
+              </div>}
               {!recoveryMode && <div>
                 <label htmlFor="login-email" style={{ fontSize: 10.5, fontWeight: 700, color: colors.text[500], textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
                   Email
@@ -475,7 +533,7 @@ export function Login({
                 </div>
               </div>}
 
-              {!recoveryMode && (creatingAccount || emailPinRequired) && (
+              {!recoveryMode && (creatingAccount || emailPinRequired) && !requiredAccountActivation && (
                 <div>
                   <label htmlFor="registration-pin" style={{ display:'block', marginBottom:6, fontSize:10.5, fontWeight:700, color:colors.text[500], textTransform:'uppercase', letterSpacing:'.5px' }}>
                     {creatingAccount ? 'Tu PIN habitual de fichaje' : 'PIN para primera vinculación'}
@@ -532,13 +590,15 @@ export function Login({
                   ? (registerLoading ? 'Creando y vinculando…' : 'Crear y vincular cuenta')
                   : (emailLoading || loading ? 'Entrando…' : 'Continuar')}
               </button>
-              {!recoveryMode && <button
+              {!recoveryMode && !requiredAccountActivation && <button
                 type="button"
                 disabled={emailLoading || registerLoading || confirmationLoading || loading}
                 onClick={() => {
                   setCreatingAccount(value => !value)
                   setPassword('')
                   setRegistrationPin('')
+                  setEmployeeSearch('')
+                  if (creatingAccount && accountActivationEmployeeSearch) onSelectEmp?.('')
                   onRegistrationNoticeDone?.()
                 }}
                 style={{ padding: 5, border: 'none', background: 'transparent', color: colors.primary.light, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
@@ -563,7 +623,9 @@ export function Login({
                 {confirmationLoading ? 'Reenviando confirmación…' : '¿No llegó la confirmación? Reenviar'}
               </button>}
               {creatingAccount && !recoveryMode && <div role="note" style={{ color: colors.text[400], fontSize: 10.5, lineHeight: 1.45, textAlign: 'center' }}>
-                El PIN solo acredita que eres el empleado correcto. Tu contraseña será la que usarás para entrar por email.
+                {requiredAccountActivation
+                  ? 'Tu PIN ya ha acreditado el perfil. Supabase enviará un enlace para verificar que el correo te pertenece.'
+                  : 'El PIN solo acredita que eres el empleado correcto. Tu contraseña será la que usarás para entrar por email.'}
               </div>}
             </form>}
           </div>

@@ -1,3 +1,7 @@
+import { LEGAL_NOTICE_VERSION } from '../../src/utils/legalCompliance.js'
+
+const VALID_SIGNATURE_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+
 export const employee = {
   id: 'e1',
   name: 'Empleado Prueba',
@@ -22,9 +26,20 @@ export function baseDB(extra = {}) {
     notis: [],
     chats: [],
     cierres: [],
-    firmas: { [employee.id]: { main: { data:'data:image/jpeg;base64,firma-prueba', updatedAt:'2026-01-01T00:00:00.000Z', empName:employee.name } } },
+    firmas: { [employee.id]: { main: { data:VALID_SIGNATURE_PNG, updatedAt:'2026-01-01T00:00:00.000Z', empName:employee.name } } },
     obras: [],
     audit: [],
+    legalAcknowledgements: [{
+      id:`legal_${employee.id}_${LEGAL_NOTICE_VERSION}`,
+      empId:employee.id,
+      empName:employee.name,
+      noticeVersion:LEGAL_NOTICE_VERSION,
+      eventType:'information_received',
+      acknowledgedAt:'2026-08-11T00:00:00.000Z',
+      serverConfirmed:true,
+      evidenceState:'confirmed',
+      _upd:'2026-08-11T00:00:00.000Z',
+    }],
     config: {},
     ...extra,
   }
