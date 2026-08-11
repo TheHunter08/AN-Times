@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExpectedMigrationEntries, buildMigrationCheckpoint, evaluateMigrationParity } from './migrationParity.js'
+import { buildExpectedMigrationEntries, buildMigrationCheckpoint, evaluateMigrationParity, migrationCheckpointDay } from './migrationParity.js'
 
 describe('migrationParity', () => {
   const db = {
@@ -40,5 +40,16 @@ describe('migrationParity', () => {
     expect(repeated.consecutiveConsistentChecks).toBe(1)
     expect(nextDay.consecutiveConsistentChecks).toBe(2)
     expect(buildMigrationCheckpoint(nextDay, { consistent:false, mismatchCount:1 }, '2026-08-08T04:00:00Z')).toMatchObject({ startedAt:null, consecutiveConsistentChecks:0 })
+  })
+  it('cuenta los días operativos en Europe/Madrid y no por fecha UTC', () => {
+    const previous = buildMigrationCheckpoint({}, { consistent:true, mismatchCount:0 }, '2026-08-11T21:42:00Z')
+    const afterMidnightMadrid = buildMigrationCheckpoint(previous, { consistent:true, mismatchCount:0 }, '2026-08-11T22:45:00Z')
+    const sameMadridDayAfterUtcMidnight = buildMigrationCheckpoint(afterMidnightMadrid, { consistent:true, mismatchCount:0 }, '2026-08-12T01:00:00Z')
+
+    expect(migrationCheckpointDay(previous.lastCheckAt)).toBe('2026-08-11')
+    expect(migrationCheckpointDay(afterMidnightMadrid.lastCheckAt)).toBe('2026-08-12')
+    expect(afterMidnightMadrid.consecutiveConsistentChecks).toBe(2)
+    expect(afterMidnightMadrid.lastCountedDay).toBe('2026-08-12')
+    expect(sameMadridDayAfterUtcMidnight.consecutiveConsistentChecks).toBe(2)
   })
 })

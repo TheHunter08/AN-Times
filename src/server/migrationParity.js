@@ -8,6 +8,20 @@ const DEDICATED = [
   ['obras', 'obras'],
 ]
 
+const CHECKPOINT_TIME_ZONE = 'Europe/Madrid'
+
+export function migrationCheckpointDay(value) {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone:CHECKPOINT_TIME_ZONE,
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+  }).formatToParts(date).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
 function validId(value) {
   return value !== undefined && value !== null && String(value).trim() !== ''
 }
@@ -68,11 +82,14 @@ export function evaluateMigrationParity(db, tableRows = {}, { staleToleranceMs =
 }
 
 export function buildMigrationCheckpoint(previous = {}, parity, nowIso = new Date().toISOString()) {
-  const sameDay = String(previous.lastCheckAt || '').slice(0, 10) === nowIso.slice(0, 10)
+  const currentDay = migrationCheckpointDay(nowIso)
+  const previousCountedDay = String(previous.lastCountedDay || migrationCheckpointDay(previous.lastCheckAt))
+  const sameDay = previousCountedDay === currentDay
   return {
     ...parity,
     startedAt:parity.consistent ? (previous.consistent && previous.startedAt ? previous.startedAt : nowIso) : null,
     lastCheckAt:nowIso,
+    lastCountedDay:parity.consistent ? (sameDay ? previousCountedDay : currentDay) : null,
     consecutiveConsistentChecks:parity.consistent
       ? (sameDay ? Math.max(1, Number(previous.consecutiveConsistentChecks) || 1) : (previous.consistent ? Number(previous.consecutiveConsistentChecks) || 0 : 0) + 1)
       : 0,

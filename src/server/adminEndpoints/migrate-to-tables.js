@@ -15,6 +15,7 @@
 // Usa SB_SERVICE_KEY si está disponible (recomendado para saltar RLS durante la
 // migración); si no, usa el anon key (requiere que policies.sql esté aplicado).
 import { timingSafeEqual } from 'crypto'
+import { buildMigrationCheckpoint } from '../migrationParity.js'
 
 const cleanEnv   = s => (s || '').replace(/^﻿/, '').trim()
 const SB_URL     = cleanEnv(process.env.VITE_SB_URL)
@@ -69,19 +70,10 @@ async function persistMigrationVerification(consistent, mismatch) {
     if (!row?.data) throw new Error('No existe app_data para guardar el checkpoint')
     const previous = row.data.config?.migrationVerification || {}
     const nowIso = new Date().toISOString()
-    const today = nowIso.slice(0, 10)
-    const alreadyCheckedToday = String(previous.lastCheckAt || '').slice(0, 10) === today
-    const checkpoint = {
+    const checkpoint = buildMigrationCheckpoint(previous, {
       consistent,
       mismatchCount:mismatch.length,
-      startedAt:consistent ? (previous.consistent && previous.startedAt ? previous.startedAt : nowIso) : null,
-      lastCheckAt:nowIso,
-      consecutiveConsistentChecks:consistent
-        ? (alreadyCheckedToday ? Math.max(1, Number(previous.consecutiveConsistentChecks) || 1) : (previous.consistent ? Number(previous.consecutiveConsistentChecks) || 0 : 0) + 1)
-        : 0,
-      rollbackReady:true,
-      blobMode:'dual-write',
-    }
+    }, nowIso)
     const next = { ...row.data, config:{ ...(row.data.config || {}), migrationVerification:checkpoint }, _ts:Date.now() }
     const update = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
       method:'PATCH', headers:{ ...SB_H, Prefer:'return=representation' },
