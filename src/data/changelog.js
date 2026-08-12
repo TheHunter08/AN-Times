@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.3',
+    date: '2026-08-12',
+    title: 'La recuperación de cuenta ya no se queda colgada',
+    items: [
+      'Al recuperar el acceso con contraseña y PIN (cuenta vinculada a un correo antiguo, o vinculada a otro perfil dado de baja), la pantalla podía quedarse en "Entrando…" sin mostrar el paso siguiente si el cierre de sesión de limpieza tardaba en responder.',
+      'Ese cierre de sesión ya no bloquea el aviso: el mensaje para introducir el PIN de recuperación aparece de inmediato, y la limpieza de la sesión anterior sigue en segundo plano.',
+    ],
+  },
+  {
     version: '4.6.2',
     date: '2026-08-12',
     title: 'Un solo paso para activar la cuenta',

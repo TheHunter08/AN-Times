@@ -420,7 +420,10 @@ export default function LoginV2() {
       const em = normalizeAccountEmail(userEmail)
       const matchingEmployees = getActiveEmployeesByEmail(freshDB.employees, em)
       if (matchingEmployees.length > 1) {
-        await authSignOut()
+        // El cierre de sesión remoto es un aviso de mejor esfuerzo: si se
+        // queda colgado (red lenta o caída), no debe bloquear el mensaje que
+        // ya sabemos que hay que mostrar.
+        void authSignOut()
         setEmailError('Ese correo aparece en varios empleados. El administrador debe corregir los perfiles antes de vincular la cuenta.')
         return
       }
@@ -434,14 +437,14 @@ export default function LoginV2() {
       if (emp && (!linkedAuthId || identityMismatch)) {
         const pinLockout: any = getLockoutState(emp.id, freshDB)
         if (pinLockout.locked) {
-          await authSignOut()
+          void authSignOut()
           setEmailPinRequired(true)
           setEmailError(`PIN bloqueado temporalmente. Inténtalo en ${pinLockout.remainingMin || 1} min.`)
           return
         }
         const pinCheck: any = await verifyRegistrationPin(emp, employeePin)
         if (!pinCheck.ok) {
-          await authSignOut()
+          void authSignOut()
           setEmailPinRequired(true)
           if (pinCheck.reason === 'employee_without_pin') {
             setEmailError('Tu perfil todavía no tiene PIN. Pide al administrador que lo configure antes de vincular la cuenta.')
@@ -472,7 +475,7 @@ export default function LoginV2() {
           ? linkAuthIdIfMissing(emp, authUserId)
           : { ok:true }
       if (emp && !identityLinkResult.ok) {
-        await authSignOut()
+        void authSignOut()
         setEmailError(identityLinkResult.reason === 'identity_in_use'
           ? 'Esta cuenta ya está vinculada a otro perfil. Pide al administrador que revise el vínculo anterior.'
           : 'La vinculación cambió mientras verificábamos el acceso. Inténtalo de nuevo o contacta al administrador.')
@@ -484,18 +487,18 @@ export default function LoginV2() {
         setEmailPinRequired(false)
         doLogin(emp, 'email')
       } else if (!emp && configuredAdmin) {
-        await authSignOut()
+        void authSignOut()
         setEmailError('La cuenta administrativa debe vincularse a su perfil oficial. Usa «Primera vez: vincular mi cuenta», selecciona el perfil administrador e introduce su PIN.')
       } else if (emp) {
         setEmailPinRequired(false)
         doLogin(emp, 'email')
       } else {
-        await authSignOut()
+        void authSignOut()
         recordEmailFailed()
         setEmailError('Tu cuenta no está registrada. Contacta al administrador.')
       }
     } catch (ex: any) {
-      await authSignOut()
+      void authSignOut()
       const newLk: any = credentialsAccepted ? null : recordEmailFailed()
       if (newLk?.locked) {
         const m = Math.floor((newLk.remainingSecs || 0) / 60), s = (newLk.remainingSecs || 0) % 60
