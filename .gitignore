@@ -12,3 +12,4 @@ test-results/
 graphify-out/
 outputs/
 .env*
+playwright.local.config.js
