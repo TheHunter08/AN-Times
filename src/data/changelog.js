@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.4',
+    date: '2026-08-12',
+    title: 'La pantalla de activación ya no promete un correo que no llega',
+    items: [
+      'Al activar la cuenta con el PIN, el mensaje decía "Supabase enviará un enlace para verificar tu correo" — pero la cuenta se activa al instante y ese correo nunca se envía. El empleado se quedaba esperando una confirmación que no iba a llegar.',
+      'Se ha corregido el texto en las dos pantallas de activación (obligatoria tras el PIN, y la de "Primera vez: vincular mi cuenta") para explicar que la cuenta queda activa al guardar la contraseña, sin ningún correo que confirmar.',
+    ],
+  },
+  {
     version: '4.6.3',
     date: '2026-08-12',
     title: 'La recuperación de cuenta ya no se queda colgada',

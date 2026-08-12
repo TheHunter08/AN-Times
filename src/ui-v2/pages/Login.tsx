@@ -391,7 +391,7 @@ export function Login({
                   ? 'Elige una contraseña segura de al menos 8 caracteres.'
                   : creatingAccount
                   ? requiredAccountActivation
-                    ? `PIN verificado para ${requiredAccountActivation.employeeName}. Añade tu correo para continuar.`
+                    ? `PIN verificado para ${requiredAccountActivation.employeeName}. Elige una contraseña para activar tu cuenta al instante.`
                     : 'La cuenta se asociará a tu perfil de empleado existente.'
                   : 'Detectaremos automáticamente tu perfil y permisos.'}
               </div>
@@ -406,7 +406,7 @@ export function Login({
               }}>
                 <li><strong style={{ color: colors.text[900] }}>Correo:</strong> usa el que la empresa guardó en tu ficha.</li>
                 <li><strong style={{ color: colors.text[900] }}>PIN:</strong> introduce tu PIN habitual de fichaje; no es un código nuevo.</li>
-                <li><strong style={{ color: colors.text[900] }}>Confirmación:</strong> abre el enlace del email y vuelve. En esa primera entrada puede pedirte el PIN otra vez para guardar la vinculación.</li>
+                <li><strong style={{ color: colors.text[900] }}>Contraseña:</strong> la que elijas aquí será la que uses para entrar por email a partir de ahora. La cuenta queda activa al instante; no llega ningún correo que confirmar.</li>
               </ol>
             )}
 
@@ -653,8 +653,8 @@ export function Login({
               </button>}
               {creatingAccount && !recoveryMode && <div role="note" style={{ color: colors.text[400], fontSize: 10.5, lineHeight: 1.45, textAlign: 'center' }}>
                 {requiredAccountActivation
-                  ? 'Tu PIN ya ha acreditado el perfil. Supabase enviará un enlace para verificar que el correo te pertenece.'
-                  : 'El PIN solo acredita que eres el empleado correcto. Tu contraseña será la que usarás para entrar por email.'}
+                  ? 'Tu PIN ya ha acreditado el perfil. Al guardar la contraseña, tu cuenta queda activada al instante — no llega ningún correo que confirmar.'
+                  : 'El PIN solo acredita que eres el empleado correcto. Tu contraseña será la que usarás para entrar por email; la cuenta se activa al instante, sin correo de confirmación.'}
               </div>}
             </form>}
           </div>
