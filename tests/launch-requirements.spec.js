@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { employee, loginAsEmployee } from './helpers/session.js'
+import { loginAsEmployee } from './helpers/session.js'
 
 test.describe('Requisitos obligatorios del empleado', () => {
   test('no permite omitir el registro de notificaciones (empleado nuevo)', async ({ page }) => {
@@ -25,16 +25,11 @@ test.describe('Requisitos obligatorios del empleado', () => {
     await expect(page.getByText(/La firma es obligatoria/i)).toBeVisible()
   })
 
-  test('exige un correo personal válido y sin duplicados antes de continuar', async ({ page }) => {
-    await loginAsEmployee(page, { employees:[{ ...employee, email:'' }] })
-    await page.goto('/')
-
-    const dialog = page.getByRole('dialog', { name:/requisitos obligatorios/i })
-    await expect(dialog).toBeVisible({ timeout:15000 })
-    await expect(dialog.getByText('Tu correo personal', { exact:true })).toBeVisible()
-    await dialog.getByRole('button', { name:'Guardar correo →' }).click()
-    await expect(page.getByText(/Introduce un email válido/i)).toBeVisible()
-  })
+  // Correo y cuenta vinculada ya no se piden aquí: LoginV2.tsx exige ambos
+  // (verificados en el servidor vía /api/activate-account) antes de dejar
+  // completar el login por PIN, así que ninguna sesión activa puede llegar
+  // a este modal sin ellos — ver 'obliga a activar correo y Supabase Auth
+  // tras acreditar el PIN de una ficha incompleta' en login.spec.js.
 
   test('un empleado con firma y correo ya guardados solo debe reconfirmar notificaciones', async ({ page }) => {
     await loginAsEmployee(page, {}, { pushReady:false })
