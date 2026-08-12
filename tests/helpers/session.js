@@ -4,6 +4,7 @@ const VALID_SIGNATURE_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAA
 
 export const employee = {
   id: 'e1',
+  authId: '00000000-0000-4000-8000-000000000001',
   name: 'Empleado Prueba',
   email: 'empleado.prueba@times-inc.test',
   pin: '1111',
