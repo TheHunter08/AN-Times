@@ -4,6 +4,21 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.0',
+    date: '2026-08-12',
+    title: 'Migración segura de cuentas, documentos y datos',
+    items: [
+      'La activación de cuenta es obligatoria: cada persona vincula su ficha usando su PIN, un correo propio y una contraseña personal antes de poder continuar.',
+      'Las cuentas se crean o recuperan en Supabase Auth y quedan enlazadas a la ficha real del empleado, sin contraseñas compartidas ni accesos administrativos heredados.',
+      'Los documentos firmados guardan el PDF con la firma incrustada y huellas de integridad; el jefe de obra puede abrir los documentos firmados que están dentro de su ámbito.',
+      'Los documentos históricos incompletos se mantienen pendientes para una reparación y firma expresa, sin reutilizar silenciosamente una firma antigua.',
+      'La aplicación mantiene datos en tablas normalizadas con sincronización resistente a filas inválidas, borrados auditados y protección frente a cambios que vuelven atrás.',
+      'El Centro operativo muestra activaciones, firmas, dispositivos, paridad y requisitos pendientes antes de habilitar la seguridad RLS definitiva.',
+      'La transición Auth/RLS permanece protegida hasta completar siete comprobaciones diarias reales y todas las activaciones personales, evitando dejar empleados fuera.',
+      'El contador de comprobaciones usa la fecha de Europe/Madrid para no perder ni duplicar días alrededor de medianoche.',
+    ],
+  },
+  {
     version: '4.5.1',
     date: '2026-08-11',
     title: 'La app ya no se queda atascada en una versión vieja',

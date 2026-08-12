@@ -36,7 +36,7 @@ export function useAppUpdate(toast) {
       }
       if (useAppStore.getState().offlinePending) {
         setUpdateCheck('idle')
-        toast('Hay una actualización lista. Se instalará sola en cuanto termine de sincronizar tus datos pendientes.', 5500, 'warn')
+        toast('Hay una actualización lista. Se instalará al terminar de sincronizar o, como máximo, en 3 minutos. Tus cambios pendientes seguirán guardados.', 6500, 'warn')
         return
       }
       setUpdateCheck('applying')
