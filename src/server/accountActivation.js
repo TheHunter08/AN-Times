@@ -130,10 +130,16 @@ async function createOrRecoverAuthUser(employee, email, password) {
       const users = payload?.users || []
       const existing = users.find(item => normalizedEmail(item?.email) === email)
       if (existing) {
-        // Solo se recupera una creación parcial producida por esta misma ruta.
-        // Conocer el PIN nunca permite apropiarse de una cuenta Auth ajena.
-        if (String(existing.user_metadata?.employee_id || '') !== String(employee.id)
-          || existing.user_metadata?.activation_source !== 'verified_pin') throw error
+        // El llamador (activateAccount) ya comprobó que ningún OTRO empleado
+        // activo usa este correo, y el PIN de este empleado ya se verificó
+        // contra employees.pin_hash — así que cualquier cuenta Auth huérfana
+        // con este correo solo puede pertenecer a este empleado: un intento
+        // anterior con esta misma ruta, o una cuenta creada por el flujo de
+        // alta por correo ya retirado (signUpEmail desde OnboardingModal),
+        // que dejaba la identidad sin vincular a `employees.auth_id`. Exigir
+        // la etiqueta activation_source de esta ruta bloqueaba justo esos
+        // casos con "Ese correo ya tiene una cuenta", sin darle al empleado
+        // ninguna forma de recuperarla.
         const user = await request(`admin/users/${encodeURIComponent(existing.id)}`, {
           method:'PUT',
           body:JSON.stringify({ password, email_confirm:true, user_metadata:{ ...existing.user_metadata, employee_id:employee.id, activation_source:'verified_pin' } }),

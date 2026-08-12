@@ -104,6 +104,53 @@ describe('activación oficial de cuenta', () => {
     expect(blobUpdated).toBe(true)
   })
 
+  it('recupera una cuenta Auth huérfana aunque no lleve la etiqueta de esta ruta', async () => {
+    configureEnv()
+    let blobUpdated = false
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const value = String(url)
+      if (value.includes('account_activation_attempts?')) return new Response('[]')
+      if (value.includes('/rest/v1/employees?id=eq.e1') && options.method !== 'PATCH') return new Response(JSON.stringify([{
+        id:'e1', company_id:'c1', name:'Empleado', pin_hash:'1234', data:{ role:'empleado' }, updated_at:'2026-08-11T10:00:00Z',
+      }]))
+      if (value.includes('/rest/v1/employees?email=eq.')) return new Response('[]')
+      if (value.endsWith('/auth/v1/admin/users')) {
+        // El alta directa falla: ya existe una cuenta Auth huérfana con este
+        // correo, creada por el flujo de alta por correo ya retirado (sin la
+        // etiqueta activation_source de esta ruta).
+        return new Response(JSON.stringify({ msg:'A user with this email address has already been registered' }), { status:422 })
+      }
+      if (value.includes('/auth/v1/admin/users?page=1')) return new Response(JSON.stringify({
+        users:[{ id:'auth-huerfano', email:'empleado@example.com', user_metadata:{} }],
+      }))
+      if (value.includes('/auth/v1/admin/users/auth-huerfano')) {
+        const body = JSON.parse(options.body)
+        expect(body).toMatchObject({ password:'segura123', email_confirm:true })
+        return new Response(JSON.stringify({ id:'auth-huerfano' }))
+      }
+      if (value.includes('/rest/v1/employees?id=eq.e1') && options.method === 'PATCH') {
+        return new Response(JSON.stringify([{ id:'e1' }]))
+      }
+      if (value.includes('/rest/v1/app_data?id=eq.1&select=')) return new Response(JSON.stringify([{
+        data:{ employees:[{ id:'e1', name:'Empleado', pin:'1234' }] }, updated_at:'2026-08-11T10:00:00Z',
+      }]))
+      if (value.includes('/rest/v1/app_data?id=eq.1&updated_at=eq.') && options.method === 'PATCH') {
+        blobUpdated = true
+        return new Response(JSON.stringify([{ id:1 }]))
+      }
+      if (value.includes('/rpc/clear_account_activation_failures')) return new Response('null')
+      if (value.endsWith('/rest/v1/audit_events')) return new Response(null, { status:204 })
+      throw new Error(`Petición inesperada: ${value}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { default:handler } = await import('./accountActivation.js')
+    const { res, result } = response()
+    await handler({ method:'POST', body:{ employeeId:'e1', pin:'1234', email:'empleado@example.com', password:'segura123' } }, res)
+    expect(result.statusCode).toBe(200)
+    expect(result.payload).toMatchObject({ ok:true, employeeId:'e1', authId:'auth-huerfano', email:'empleado@example.com', created:false })
+    expect(blobUpdated).toBe(true)
+  })
+
   it('usa el PIN archivado después del corte RLS', async () => {
     configureEnv()
     const fetchMock = vi.fn(async (url, options = {}) => {

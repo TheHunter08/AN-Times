@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.5',
+    date: '2026-08-12',
+    title: 'Activar la cuenta ya no falla con "ese correo ya tiene una cuenta"',
+    items: [
+      'Un empleado que ya hubiera intentado activar su cuenta con el sistema antiguo (retirado esta semana) se quedaba con una cuenta de acceso a medio crear. Al intentarlo de nuevo con el PIN, el servidor rechazaba la activación con "Ese correo ya tiene una cuenta" y no dejaba avanzar.',
+      'Ahora, si el PIN ya se verificó y el correo no pertenece a ningún otro compañero, el servidor recupera esa cuenta a medio crear en vez de bloquear la activación.',
+    ],
+  },
+  {
     version: '4.6.4',
     date: '2026-08-12',
     title: 'La pantalla de activación ya no promete un correo que no llega',
