@@ -51,6 +51,7 @@ export default defineConfig({
           '**/pdfSignatureAnchor-*.js',
           '**/pdf.worker.min-*.mjs',
           '**/documentSigning-*.js',
+          '**/Documents-*.js',
           '**/version.json',
         ],
       },

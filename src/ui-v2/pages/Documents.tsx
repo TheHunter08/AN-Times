@@ -18,8 +18,11 @@ export interface DocumentItem {
   expiresOn?: string
   signed?: boolean
   signedOn?: string
+  needsRepair?: boolean
+  repairRequested?: boolean
   onDownload?: (id: string) => void
   onPreview?: (id: string) => void
+  onRequestRepair?: (id: string) => void
 }
 
 export interface DocumentsProps {
@@ -99,12 +102,16 @@ export function Documents({ items, onUpload }: DocumentsProps) {
             </div>
             <div style={{ fontSize: 11.5, color: colors.text[500] }}>{doc.empName}</div>
             {doc.signed && <div style={{ fontSize:11, fontWeight:650, color: colors.semantic.green }}>✓ Firmado{doc.signedOn ? ` el ${doc.signedOn}` : ''}</div>}
+            {doc.needsRepair && <div role="status" style={{ fontSize:11, fontWeight:700, lineHeight:1.45, color:colors.semantic.orange }}>⚠ Firma incompleta: falta el archivo firmado</div>}
             {doc.expiresOn && <div style={{ fontSize:11, fontWeight:650, color:expiryColor }}>{expiryDays !== null && expiryDays < 0 ? 'Documento caducado' : expiryDays !== null && expiryDays <= 30 ? `Caduca en ${expiryDays} días` : `Caduca el ${new Date(`${doc.expiresOn}T12:00:00`).toLocaleDateString('es-ES')}`}</div>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, color: colors.text[300] }}>{doc.size} · {doc.uploadedOn}</span>
-              <div style={{ display:'flex', gap:6 }}><button onClick={event => { event.stopPropagation(); doc.onPreview?.(doc.id) }} style={{ padding:'6px 9px', borderRadius:radius.xs, border:`1px solid ${colors.border.subtle}`, background:'transparent', color:colors.text[700], fontSize:11.5, cursor:'pointer' }}>Ver</button><button onClick={event => { event.stopPropagation(); doc.onDownload?.(doc.id) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                {doc.needsRepair && <button disabled={doc.repairRequested} onClick={event => { event.stopPropagation(); doc.onRequestRepair?.(doc.id) }} style={{ padding:'6px 9px', borderRadius:radius.xs, border:`1px solid ${colors.semantic.orange}`, background:'transparent', color:colors.semantic.orange, fontSize:11.5, fontWeight:650, cursor:doc.repairRequested ? 'default' : 'pointer', opacity:doc.repairRequested ? .65 : 1 }}>{doc.repairRequested ? 'Solicitud enviada' : 'Pedir nueva firma'}</button>}
+                <button onClick={event => { event.stopPropagation(); doc.onPreview?.(doc.id) }} style={{ padding:'6px 9px', borderRadius:radius.xs, border:`1px solid ${colors.border.subtle}`, background:'transparent', color:colors.text[700], fontSize:11.5, cursor:'pointer' }}>{doc.needsRepair ? 'Ver original' : 'Ver'}</button><button onClick={event => { event.stopPropagation(); doc.onDownload?.(doc.id) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: radius.xs, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                 <IconDownload width={12} height={12} /> Descargar
-              </button></div>
+                </button>
+              </div>
             </div>
           </div>
           )

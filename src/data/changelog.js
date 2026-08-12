@@ -12,6 +12,7 @@ export const APP_CHANGELOG = [
       'Las cuentas se crean o recuperan en Supabase Auth y quedan enlazadas a la ficha real del empleado, sin contraseñas compartidas ni accesos administrativos heredados.',
       'Los documentos firmados guardan el PDF con la firma incrustada y huellas de integridad; el jefe de obra puede abrir los documentos firmados que están dentro de su ámbito.',
       'Los documentos históricos incompletos se mantienen pendientes para una reparación y firma expresa, sin reutilizar silenciosamente una firma antigua.',
+      'Administración identifica las firmas históricas sin PDF final y puede pedir al empleado una nueva firma desde la propia tarjeta del documento.',
       'La aplicación mantiene datos en tablas normalizadas con sincronización resistente a filas inválidas, borrados auditados y protección frente a cambios que vuelven atrás.',
       'El Centro operativo muestra activaciones, firmas, dispositivos, paridad y requisitos pendientes antes de habilitar la seguridad RLS definitiva.',
       'La transición Auth/RLS permanece protegida hasta completar siete comprobaciones diarias reales y todas las activaciones personales, evitando dejar empleados fuera.',

@@ -1477,6 +1477,25 @@ function DocumentsPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const requestSignatureRepair = (id: string) => {
+    const doc = (db.documentos || []).find((item: any) => item.id === id)
+    if (!doc?.empId || !doc?.firma || hasSignedDocumentArtifact(doc)) return
+    const nowIso = new Date().toISOString()
+    const dedupeKey = `documento:${doc.id}:reparar:${doc.firma?.firmadoAt || 'legacy'}`
+    const detail = `“${doc.nombre || doc.name || 'Documento'}” necesita una nueva firma para generar el archivo firmado correctamente.`
+    saveDB((fresh: any) => {
+      const notification = createNotification({ empId:doc.empId, action:'Documento pendiente de nueva firma', detail, dedupeKey, ts:nowIso })
+      const withAudit = auditLog(fresh, 'Reparación de firma solicitada', `${doc.empName || 'Empleado'}: ${doc.nombre || doc.name || doc.id}`, 'Administración')
+      return {
+        documentos:(fresh.documentos || []).map((item: any) => item.id === id ? { ...item, repairRequestedAt:nowIso, _upd:nowIso } : item),
+        notis:[...(fresh.notis || []).filter((item: any) => item.id !== notification.id), notification],
+        audit:withAudit.audit,
+      }
+    })
+    queuePush(doc.empId, 'Documento pendiente de nueva firma', detail, 'documentos', '/?go=emp:documentos', dedupeKey)
+    toast('Solicitud enviada al empleado', 3000, 'ok')
+  }
+
   const items = useMemo(() => (db.documentos || []).map((d: any) => ({
     id: d.id,
     name: d.nombre || d.name || 'Documento',
@@ -1487,8 +1506,11 @@ function DocumentsPage() {
     expiresOn: d.expiresOn || '',
     signed: hasSignedDocumentArtifact(d),
     signedOn: d.firma?.firmadoAt ? new Date(d.firma.firmadoAt).toLocaleDateString('es-ES') : undefined,
+    needsRepair:Boolean(d.firma) && !hasSignedDocumentArtifact(d),
+    repairRequested:Boolean(d.repairRequestedAt && String(d.repairRequestedAt) >= String(d.firma?.firmadoAt || '')),
     onDownload: handleDownload,
     onPreview: handlePreview,
+    onRequestRepair:requestSignatureRepair,
   })), [db.documentos])
 
   const requestUpload = () => {

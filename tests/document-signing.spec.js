@@ -183,6 +183,38 @@ test('empleado firma un documento subido en base64 y el admin lo ve firmado con 
   await expect.poll(() => downloadHref).toMatch(/^data:application\/pdf;base64,/)
 })
 
+test('administración detecta una firma histórica incompleta y solicita una nueva firma', async ({ page }) => {
+  await loginAsAdmin(page, {
+    documentos: [{
+      id:'doc-legacy-repair', empId:employee.id, empName:employee.name, tipo:'contrato',
+      nombre:'Contrato histórico.pdf', data:PDF_DATA_URL, mime:'application/pdf', size:'2 KB',
+      firma:{ firmadoAt:'2026-08-10T10:00:00.000Z', empId:employee.id, empName:employee.name },
+      createdAt:'2026-08-10T09:00:00.000Z',
+    }],
+  })
+  await stubRestSuccess(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openAdminPage(page, 'Gestión', 'Documentos')
+
+  await expect(page.getByRole('status')).toContainText('Firma incompleta')
+  await page.getByRole('button', { name:'Pedir nueva firma' }).click()
+  await expect(page.getByText('Solicitud enviada al empleado')).toBeVisible()
+  await expect(page.getByRole('button', { name:'Solicitud enviada' })).toBeDisabled()
+
+  const repaired = await page.evaluate(() => {
+    const db = JSON.parse(localStorage.getItem('an_times_v1'))
+    return {
+      document:db.documentos.find(item => item.id === 'doc-legacy-repair'),
+      notification:db.notis.find(item => item.empId === 'e1' && item.action === 'Documento pendiente de nueva firma'),
+    }
+  })
+  expect(repaired.document.repairRequestedAt).toBeTruthy()
+  expect(repaired.document.firma).toBeTruthy()
+  expect(repaired.document.fileData).toBeFalsy()
+  expect(repaired.notification.dedupeKey).toContain('doc-legacy-repair')
+})
+
 test('empleado firma un documento guardado solo en Storage (sin base64 local)', async ({ page }) => {
   const storagePath = `${employee.id}/doc-storage.pdf`
   let signRequests = 0
