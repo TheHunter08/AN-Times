@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeAuth, hasEmployeeEmail, hasEmployeeSignature } from './launchRequirements.js'
+import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions, getLaunchBlockers, getLaunchRequirements, hasEmployeeSignature } from './launchRequirements.js'
 
 describe('requisitos obligatorios de lanzamiento', () => {
   const db = {
@@ -12,24 +12,11 @@ describe('requisitos obligatorios de lanzamiento', () => {
     expect(hasEmployeeSignature({ firmas: { emp1: { main: {} } } }, 'emp1')).toBe(false)
   })
 
-  it('solo acepta un email con formato válido', () => {
-    expect(hasEmployeeEmail(db, 'emp1')).toBe(true)
-    expect(hasEmployeeEmail({ employees: [{ id:'emp1', email:'' }] }, 'emp1')).toBe(false)
-    expect(hasEmployeeEmail({ employees: [{ id:'emp1' }] }, 'emp1')).toBe(false)
-  })
-
-  it('solo acepta una cuenta de Supabase Auth vinculada', () => {
-    expect(hasEmployeeAuth(db, 'emp1')).toBe(true)
-    expect(hasEmployeeAuth({ employees: [{ id:'emp1' }] }, 'emp1')).toBe(false)
-    expect(hasEmployeeAuth({ employees: [{ id:'emp1', auth_id:'legacy-1' }] }, 'emp1')).toBe(true)
-  })
-
-  it('exige simultáneamente email, cuenta vinculada, firma y registro push confirmado', () => {
+  it('exige simultáneamente firma y registro push confirmado — correo y cuenta ya los garantiza LoginV2 antes de entrar', () => {
     expect(getLaunchRequirements(db, 'emp1', true).ready).toBe(true)
     expect(getLaunchRequirements(db, 'emp1', false).ready).toBe(false)
-    expect(getLaunchRequirements({ firmas: db.firmas }, 'emp1', true).ready).toBe(false)
+    expect(getLaunchRequirements({ firmas: db.firmas }, 'emp1', true).ready).toBe(true)
     expect(getLaunchRequirements({ employees: db.employees }, 'emp1', true).ready).toBe(false)
-    expect(getLaunchRequirements({ employees: [{ id:'emp1', email:'ana@empresa.com' }], firmas: db.firmas }, 'emp1', true).ready).toBe(false)
   })
   it('explica por empleado los bloqueos operativos pendientes', () => {
     const readinessDb = {

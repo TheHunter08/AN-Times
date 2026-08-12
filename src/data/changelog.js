@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.2',
+    date: '2026-08-12',
+    title: 'Un solo paso para activar la cuenta',
+    items: [
+      'Había dos pantallas distintas pidiendo "activa tu cuenta": una en el inicio de sesión (verificada en el servidor) y otra, redundante, después de entrar con PIN. Podían pedir la contraseña o el PIN dos veces y dar mensajes de error distintos para el mismo problema.',
+      'Ahora solo existe la del inicio de sesión. Es la más segura de las dos (comprueba el PIN en el servidor y crea la cuenta al instante, sin esperar un correo de confirmación), así que se ha quitado el paso duplicado.',
+    ],
+  },
+  {
     version: '4.6.1',
     date: '2026-08-12',
     title: 'Menos errores al vincular la cuenta',

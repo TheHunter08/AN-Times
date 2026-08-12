@@ -5,27 +5,19 @@ export function hasEmployeeSignature(db, employeeId) {
   return Boolean(employeeId && db?.firmas?.[employeeId]?.main?.data)
 }
 
-export function hasEmployeeEmail(db, employeeId) {
-  const employee = (db?.employees || []).find(e => e?.id === employeeId)
-  return isValidAccountEmail(employee?.email)
-}
-
-export function hasEmployeeAuth(db, employeeId) {
-  const employee = (db?.employees || []).find(e => e?.id === employeeId)
-  return Boolean(employee?.authId || employee?.auth_id)
-}
-
+// Correo y cuenta vinculada ya NO se comprueban aquí: LoginV2.tsx exige
+// ambos (vía /api/activate-account, verificado en servidor) antes de dejar
+// completar el login — ver handlePinKey. Cualquier empleado que llegue a
+// evaluar este requisito ya los tiene, así que exigirlos de nuevo aquí solo
+// duplicaba la comprobación con una versión más débil (cliente) y abría un
+// segundo modal de "activa tu cuenta" después del de LoginV2.
 export function getLaunchRequirements(db, employeeId, pushReady) {
-  const emailReady = hasEmployeeEmail(db, employeeId)
-  const authReady = hasEmployeeAuth(db, employeeId)
   const signatureReady = hasEmployeeSignature(db, employeeId)
   const notificationsReady = pushReady === true
   return {
-    emailReady,
-    authReady,
     signatureReady,
     notificationsReady,
-    ready: emailReady && authReady && signatureReady && notificationsReady,
+    ready: signatureReady && notificationsReady,
   }
 }
 
