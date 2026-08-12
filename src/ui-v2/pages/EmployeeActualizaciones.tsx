@@ -1,5 +1,6 @@
 // Página "Actualizaciones" — versión ui-v2. Muestra la versión instalada,
 // un botón para buscar actualizaciones y el changelog de la app.
+import { useEffect, useState } from 'react'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { useAppUpdate } from '../../hooks/useAppUpdate.js'
 import { APP_CHANGELOG } from '../../data/changelog.js'
@@ -19,7 +20,20 @@ const STATUS_LABEL: Record<string, string> = {
 export function EmployeeActualizaciones({ toast, onBack }: EmployeeActualizacionesProps) {
   const { updateCheck, checkForUpdate } = useAppUpdate(toast)
   const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '—'
+  const [published, setPublished] = useState<{ version:string; commit?:string } | null>(null)
   const busy = updateCheck === 'checking' || updateCheck === 'applying'
+  const versionBehind = Boolean(published?.version && published.version !== version)
+
+  useEffect(() => {
+    let active = true
+    fetch(`/version.json?t=${Date.now()}`, { cache:'no-store', headers:{ Accept:'application/json' } })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('version unavailable')))
+      .then(payload => {
+        if (active && typeof payload?.version === 'string') setPublished({ version:payload.version, commit:payload.commit })
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   return (
     <div style={{ padding: 16, paddingBottom: 40, maxWidth: 520, margin: '0 auto' }}>
@@ -38,6 +52,12 @@ export function EmployeeActualizaciones({ toast, onBack }: EmployeeActualizacion
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: colors.text[900] }}>Versión instalada</div>
           <div style={{ fontSize: 12, color: colors.text[500], marginTop: 2 }}>v{version}</div>
+          {published && (
+            <div role="status" style={{ fontSize: 11, fontWeight: 700, color: versionBehind ? colors.semantic.orange : colors.semantic.green, marginTop: 4 }}>
+              {versionBehind ? `Actualización disponible: v${published.version}` : `Coincide con producción · v${published.version}`}
+              {published.commit && published.commit !== 'local' ? ` · ${published.commit.slice(0, 7)}` : ''}
+            </div>
+          )}
           <div style={{ fontSize: 11, lineHeight: 1.5, color: colors.text[300], marginTop: 8 }}>
             TIMES INC se actualiza sola en segundo plano en cuanto hay una versión nueva.
             Usa este botón si crees que tu versión está desactualizada.

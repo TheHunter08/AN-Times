@@ -4,6 +4,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+const publishedCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'local').slice(0, 40)
+
+const publishedVersionAsset = () => ({
+  name:'times-inc-version',
+  generateBundle() {
+    this.emitFile({
+      type:'asset',
+      fileName:'version.json',
+      source:JSON.stringify({ version:pkg.version, commit:publishedCommit }),
+    })
+  },
+})
 
 export default defineConfig({
   server: {
@@ -13,6 +25,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    publishedVersionAsset(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
@@ -38,6 +51,7 @@ export default defineConfig({
           '**/pdfSignatureAnchor-*.js',
           '**/pdf.worker.min-*.mjs',
           '**/documentSigning-*.js',
+          '**/version.json',
         ],
       },
       manifest: {

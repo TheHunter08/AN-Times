@@ -14,5 +14,6 @@ describe('APP_CHANGELOG', () => {
     expect(releaseText).toContain('Supabase Auth')
     expect(releaseText).toContain('firma incrustada')
     expect(releaseText).toContain('RLS')
+    expect(releaseText).toContain('versión instalada')
   })
 })

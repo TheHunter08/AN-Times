@@ -16,6 +16,7 @@ export const APP_CHANGELOG = [
       'El Centro operativo muestra activaciones, firmas, dispositivos, paridad y requisitos pendientes antes de habilitar la seguridad RLS definitiva.',
       'La transición Auth/RLS permanece protegida hasta completar siete comprobaciones diarias reales y todas las activaciones personales, evitando dejar empleados fuera.',
       'El contador de comprobaciones usa la fecha de Europe/Madrid para no perder ni duplicar días alrededor de medianoche.',
+      'La pantalla Actualizaciones compara la versión instalada con la publicada en producción y muestra el identificador del despliegue para detectar cachés antiguas.',
     ],
   },
   {
