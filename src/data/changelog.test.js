@@ -10,7 +10,8 @@ describe('APP_CHANGELOG', () => {
   })
 
   it('explica al usuario los cambios materiales de la migración 4.6', () => {
-    const releaseText = APP_CHANGELOG[0].items.join(' ')
+    const entry = APP_CHANGELOG.find(e => e.version === '4.6.0')
+    const releaseText = entry.items.join(' ')
     expect(releaseText).toContain('Supabase Auth')
     expect(releaseText).toContain('firma incrustada')
     expect(releaseText).toContain('RLS')

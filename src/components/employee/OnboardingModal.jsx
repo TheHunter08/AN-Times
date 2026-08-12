@@ -45,6 +45,7 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
   const [accountBusy, setAccountBusy] = useState(false)
   const [accountError, setAccountError] = useState('')
   const [accountNotice, setAccountNotice] = useState('')
+  const [accountReveal, setAccountReveal] = useState(false)
   const dialogRef = useDialogA11y(visible && !done)
   const permissionGuide = getNotificationPermissionGuide(
     typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -276,20 +277,25 @@ export function OnboardingModal({ visible, u, db, saveDB, toast, pushReady, noti
             ) : (
               <>
                 <input
-                  type="password" autoComplete="new-password" placeholder="Contraseña nueva (mín. 8 caracteres)"
+                  type={accountReveal ? 'text' : 'password'} autoComplete="new-password" placeholder="Contraseña nueva"
                   value={accountPassword} onChange={e => setAccountPassword(e.target.value)}
-                  style={{ ...inpStyle, marginBottom:10 }}
+                  style={{ ...inpStyle, marginBottom:4 }}
                 />
+                <div style={{ fontSize:10.5, color:colors.text[400], marginBottom:10 }}>Mínimo 8 caracteres</div>
                 <input
-                  type="password" autoComplete="new-password" placeholder="Repite la contraseña"
+                  type={accountReveal ? 'text' : 'password'} autoComplete="new-password" placeholder="Repite la contraseña"
                   value={accountPasswordConfirm} onChange={e => setAccountPasswordConfirm(e.target.value)}
                   style={{ ...inpStyle, marginBottom:10 }}
                 />
                 <input
-                  type="password" inputMode="numeric" autoComplete="off" placeholder="Tu PIN de fichaje"
+                  type={accountReveal ? 'text' : 'password'} inputMode="numeric" autoComplete="off" placeholder="Tu PIN de fichaje"
                   value={accountPin} onChange={e => setAccountPin(e.target.value.replace(/\D/g, ''))}
-                  style={{ ...inpStyle, marginBottom:14 }}
+                  style={{ ...inpStyle, marginBottom:8 }}
                 />
+                <label style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14, cursor:'pointer' }}>
+                  <input type="checkbox" checked={accountReveal} onChange={e => setAccountReveal(e.target.checked)} style={{ margin:0 }} />
+                  <span style={{ fontSize:11.5, color:colors.text[500] }}>Mostrar lo que he escrito</span>
+                </label>
                 {accountError && (
                   <div style={{ fontSize:11.5, color:colors.semantic.red, marginBottom:12, lineHeight:1.5 }}>{accountError}</div>
                 )}

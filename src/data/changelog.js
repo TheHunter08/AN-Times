@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.1',
+    date: '2026-08-12',
+    title: 'Menos errores al vincular la cuenta',
+    items: [
+      'En el paso "Vincula tu cuenta", la contraseña y el PIN se escribían siempre ocultos con puntos, sin poder comprobar lo que se había tecleado — fácil equivocarse sin darse cuenta y que saliera "PIN incorrecto" o "contraseña no válida" por un error de escritura, no por el dato en sí.',
+      'Ahora hay una casilla "Mostrar lo que he escrito" para verlo en claro antes de enviarlo, y el requisito de la contraseña (mínimo 8 caracteres) se ve desde el principio, no solo cuando falla.',
+    ],
+  },
+  {
     version: '4.6.0',
     date: '2026-08-12',
     title: 'Migración segura de cuentas, documentos y datos',
