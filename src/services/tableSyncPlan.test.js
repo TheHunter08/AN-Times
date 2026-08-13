@@ -17,6 +17,22 @@ describe('plan de sincronización offline V2', () => {
     expect(rows.map(row => row.id)).toEqual(['open', 'recent'])
   })
 
+  it('sube un fichaje frío si la pista de sincronización lo señala explícitamente (reintento de cola offline)', () => {
+    // Un fichaje cerrado hace más de 48h que sigue pendiente en la cola
+    // offline (zona sin cobertura durante días) no debe descartarse solo por
+    // antiguo: la pista de qué cambió ya dice explícitamente que hace falta
+    // subirlo.
+    const plan = buildTableSyncPlan({
+      employees: [{ id: 'e1', name: 'Ana' }],
+      records: [
+        { id: 'cold-pendiente', empId: 'e1', inicio: '2026-05-01T08:00:00Z', fin: '2026-05-01T16:00:00Z', _upd: '2026-05-01T16:00:00Z' },
+        { id: 'cold-ya-sincronizado', empId: 'e1', inicio: '2026-05-02T08:00:00Z', fin: '2026-05-02T16:00:00Z', _upd: '2026-05-02T16:00:00Z' },
+      ],
+    }, null, now, { changedKeys:['records'], entityIds:{ records:['cold-pendiente'] }, recordIds:['cold-pendiente'] })
+    const rows = plan.upserts.find(op => op.table === 'records').rows
+    expect(rows.map(row => row.id)).toEqual(['cold-pendiente'])
+  })
+
   it('no vuelve a insertar elementos eliminados y conserva sus tombstones', () => {
     const plan = buildTableSyncPlan({
       records: [{ id: 'r1', empId: 'e1', inicio: '2026-07-13T08:00:00Z' }],

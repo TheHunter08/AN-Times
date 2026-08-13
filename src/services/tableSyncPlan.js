@@ -275,8 +275,16 @@ export function buildTableSyncPlan(db, deleted, now = Date.now(), syncHint = nul
   const employeeIds = new Set(allEmployees.map(e => e.id))
   const employeeCandidates = (db.employees ?? []).filter(e => !employeeHintIds || employeeHintIds.has(String(e?.id)))
   const employees = employeeCandidates.filter(e => hasValue(e?.id) && hasValue(e?.name))
+  // El corte de 48h evita resubir cada fichaje histórico cerrado en un
+  // barrido genérico sin pista (recordIds null: p.ej. una resincronización
+  // periódica). Pero si syncHint SÍ señala qué fichajes cambiaron (el caso
+  // normal: fichar, o la cola offline reintentando uno concreto), ese
+  // fichaje ya pasó el filtro `recordIds.has(r?.id)` de más arriba — aplicar
+  // el corte también ahí lo descartaba para siempre en cuanto pasaban 48h
+  // sin cobertura, aunque la cola offline lo siguiera reintentando: el
+  // fichaje se marcaba como sincronizado sin haber llegado nunca a Supabase.
   const recordCandidates = (db.records ?? []).filter(
-    r => includes('records') && (!recordIds || recordIds.has(r?.id)) && !deletedRecords.has(r?.id) && (!r?.fin || !r?._upd || r._upd > cutoff)
+    r => includes('records') && (!recordIds || recordIds.has(r?.id)) && !deletedRecords.has(r?.id) && (recordIds || !r?.fin || !r?._upd || r._upd > cutoff)
   )
   const recentRecords = recordCandidates.filter(
     r => hasValue(r?.id) && employeeIds.has(r?.empId) && isDateValue(r?.inicio)

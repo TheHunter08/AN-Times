@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.6',
+    date: '2026-08-12',
+    title: 'Los fichajes con muchos días sin cobertura ya no se pierden',
+    items: [
+      'Un fichaje cerrado que llevaba más de 48 horas sin poder subir (varios días sin cobertura en la obra) se descartaba en silencio la próxima vez que la cola offline lo reintentaba: la app lo marcaba como sincronizado sin haber llegado nunca a Supabase.',
+      'Ahora, si el dispositivo ya sabe que ese fichaje concreto está pendiente de subir, lo sube sin importar cuánto tiempo lleve esperando cobertura.',
+    ],
+  },
+  {
     version: '4.6.5',
     date: '2026-08-12',
     title: 'Activar la cuenta ya no falla con "ese correo ya tiene una cuenta"',
