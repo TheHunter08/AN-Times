@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.7',
+    date: '2026-08-12',
+    title: 'El autocierre de jornadas de más de 10h vuelve a funcionar',
+    items: [
+      'El aviso automático que cierra una jornada tras 10 horas sin fichar salida comprobaba las jornadas abiertas contra una copia antigua de los datos que ya no se mantiene al día — precisamente los fichajes de empleados con cobertura débil, los que más tardan en cerrar, eran los que menos se veían reflejados ahí.',
+      'Ahora comprueba directamente contra los fichajes reales del servidor, así que ninguna jornada abierta se le escapa sin importar la cobertura de quien la inició.',
+    ],
+  },
+  {
     version: '4.6.6',
     date: '2026-08-12',
     title: 'Los fichajes con muchos días sin cobertura ya no se pierden',

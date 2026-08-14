@@ -57,6 +57,25 @@ async function persistHealth(run) {
   }
 }
 
+// El cliente escribe cada fichaje directamente en la tabla `records` en
+// cuanto se crea (ver appStore.js: persistRecordRow, prioritario sobre la
+// reconciliación del blob completo) — la tabla es la fuente viva de jornadas
+// abiertas independientemente de si el runtime Auth/RLS está sellado.
+// Decidir aquí qué cerrar a partir del blob (`app_data.data.records`, que
+// solo se pone al día en segundo plano y con más fragilidad en cobertura
+// débil) dejaba fuera justo los fichajes de empleados con conexión
+// intermitente: los que más necesitan el autocierre de las 10h nunca se
+// veían como candidatos.
+async function readOpenRecords() {
+  const response = await fetch(`${SB_URL}/rest/v1/records?select=*&fin=is.null&deleted=eq.false`, { headers })
+  if (!response.ok) throw new Error(`records read ${response.status}`)
+  return (await response.json()).map(row => ({
+    ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name,
+    inicio:row.inicio, fin:row.fin, breaks:row.breaks || [], workSecs:row.work_secs || 0,
+    breakSecs:row.break_secs || 0, closed:!!row.closed, _upd:row.updated_at,
+  }))
+}
+
 async function upsertRecords(records) {
   if (!records.length) return []
   const rows = records.map(record => toRecordRow(record, record._upd))
@@ -112,28 +131,19 @@ export default async function handler(req, res) {
   if (!SB_URL || !SB_ANON || !SB_SERVICE) return res.status(500).json({ error:'Supabase service config missing' })
   const startedAt = Date.now()
   try {
-    const row = await readDB()
-    if (!row?.data) throw new Error('app_data no disponible')
-    const records = row.data.records || []
-    const open = records.filter(record => !record.fin && !record.deleted)
+    const open = await readOpenRecords()
     const candidates = open.filter(record => startedAt - new Date(record.inicio).getTime() > TEN_HOURS_MS)
     if (!candidates.length) {
       await persistHealth(createAutomationRun('autoclose', { startedAt, checked:open.length }))
       return res.status(200).json({ ok:true, checked:open.length, closed:0 })
     }
-    const ids = new Set(candidates.map(record => record.id))
-    const closed = []
-    const updatedRecords = records.map(record => {
-      if (!ids.has(record.id)) return record
+    const closed = candidates.map(record => {
       const closeTime = new Date(new Date(record.inicio).getTime() + TEN_HOURS_MS).toISOString()
-      const next = { ...finalizeRecord(record, { now:closeTime }), autoClosedAt:new Date().toISOString() }
-      closed.push(next)
-      return next
+      return { ...finalizeRecord(record, { now:closeTime }), autoClosedAt:new Date().toISOString() }
     })
     const tableFailures = await upsertRecords(closed)
     const run = createAutomationRun('autoclose', { startedAt, checked:open.length, processed:closed.length, status:tableFailures.length ? 'error' : 'ok', error:tableFailures[0] || null })
-    const next = { ...mergeAutomationHealth(row.data, run), records:updatedRecords, _ts:Date.now() }
-    await writeDB(next, row.updated_at)
+    await persistHealth(run)
     const delivery = await notifyClosed(closed)
     return res.status(200).json({ ok:true, checked:open.length, closed:closed.length, tableFailures:tableFailures.length, pushSent:delivery.sent, pushSkipped:delivery.skipped })
   } catch (error) {
