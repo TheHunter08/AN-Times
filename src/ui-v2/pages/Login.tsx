@@ -114,37 +114,27 @@ export function Login({
   const submitDisabled = submitBusy || submitMissing
 
   return (
-    <div className="v7-login-shell" style={{
+    <div className="v8-login-shell" style={{
       minHeight: '100dvh', display: 'flex', alignItems: 'stretch', justifyContent: 'center',
-      background: colors.bg[900], position: 'relative', overflow: 'hidden',
+      background: '#07070C', position: 'relative', overflow: 'hidden',
       fontFamily: 'Inter, SF Pro Display, -apple-system, sans-serif',
     }}>
-      {/* Glows de fondo */}
-      <div className="uiv2-login-glow-a" style={{
-        position: 'absolute', top: -160, left: -160, width: 520, height: 520,
-        borderRadius: '50%', background: 'var(--uiv2-primary-dim)', filter: 'blur(110px)', pointerEvents: 'none',
-      }} />
-      <div className="uiv2-login-glow-b" style={{
-        position: 'absolute', bottom: -100, right: -100, width: 400, height: 400,
-        borderRadius: '50%', background: 'var(--uiv2-accent-dim)', filter: 'blur(90px)', pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px)`,
-        backgroundSize: '44px 44px',
-      }} />
+      <div className="v8-login-noise" />
 
-      <aside className="v7-login-brand-panel" aria-label="TIMES INC Workforce Operating System">
-        <div className="v7-brand-mark">T</div>
-        <div>
-          <div className="v7-brand-kicker">TIMES INC</div>
-          <h1>Control horario y gestión de equipos.</h1>
-          <p>Accede a tu jornada o al panel correspondiente. Tu rol se detecta automáticamente.</p>
-        </div>
-        <div className="v7-brand-points">
-          <span><IconShield width={17} height={17} /> Acceso protegido</span>
-          <span><IconClock width={17} height={17} /> Registro en tiempo real</span>
-          <span><IconDevice width={17} height={17} /> Disponible como PWA</span>
+      <aside className="v7-login-brand-panel v8-brand-panel" aria-label="TIMES INC Workforce Operating System">
+        <div className="v8-brand-cut" />
+        <div className="v8-brand-content">
+          <div className="v7-brand-mark v8-brand-mark">T</div>
+          <div>
+            <div className="v7-brand-kicker v8-brand-kicker">TIMES INC</div>
+            <h1 className="v8-brand-h1">Control horario<br />sin fricción.</h1>
+            <p className="v8-brand-p">Accede a tu jornada o al panel correspondiente. Tu rol se detecta automáticamente.</p>
+          </div>
+          <div className="v7-brand-points v8-brand-points">
+            <span><IconShield width={17} height={17} /> Acceso protegido</span>
+            <span><IconClock width={17} height={17} /> Registro en tiempo real</span>
+            <span><IconDevice width={17} height={17} /> Disponible como PWA</span>
+          </div>
         </div>
       </aside>
 
@@ -650,31 +640,51 @@ export function Login({
       </main>
 
       <style>{`
-        @keyframes uiv2LoginGlowA { 0%,100%{transform:scale(1) translate(0,0);} 50%{transform:scale(1.08) translate(20px,10px);} }
-        @keyframes uiv2LoginGlowB { 0%,100%{transform:scale(1) translate(0,0);} 50%{transform:scale(1.06) translate(-15px,-10px);} }
-        .uiv2-login-glow-a { animation: uiv2LoginGlowA 10s ease-in-out infinite; }
-        .uiv2-login-glow-b { animation: uiv2LoginGlowB 12s ease-in-out infinite; }
         @keyframes uiv2LogoFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
         .uiv2-logo-float { animation: uiv2LogoFloat 4s ease-in-out infinite; }
         .uiv2-login-input { transition: border-color .15s; }
         .uiv2-login-input::placeholder { color: ${colors.text[300]}; }
-        .uiv2-login-submit:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1px); }
-        .uiv2-login-submit:not(:disabled):active { transform: scale(.98); }
+        .uiv2-login-submit:not(:disabled):hover { filter: brightness(1.08); transform: translateY(-2px); }
+        .uiv2-login-submit:not(:disabled):active { transform: scale(.98) translateY(0); }
         .uiv2-pin-key:hover { background: var(--uiv2-primary-dim) !important; border-color: var(--uiv2-border-strong) !important; }
         .uiv2-pin-key:active { transform: scale(.96); background: var(--uiv2-primary-glow) !important; }
         @keyframes uiv2PinShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
         .uiv2-pin-shake { animation: uiv2PinShake .4s cubic-bezier(.36,.07,.19,.97); }
+
+        /* v8 — bold flat color block, hard diagonal cut, no ambient blur */
+        .v8-login-noise {
+          position:absolute; inset:0; pointer-events:none; opacity:.5; z-index:0;
+          background-image:
+            linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+          background-size: 56px 56px;
+        }
         .v7-login-brand-panel { display:none; }
         .v7-login-main { position:relative; z-index:1; flex:1; display:flex; align-items:center; justify-content:center; padding:48px 24px; }
         @media (min-width: 960px) {
           .v7-login-shell { justify-content:stretch !important; }
-          .v7-login-brand-panel { display:flex; width:min(46vw,680px); flex-direction:column; justify-content:space-between; padding:56px 64px; position:relative; z-index:1; border-right:1px solid var(--border-subtle); background:linear-gradient(180deg,rgba(53,104,255,.08),transparent 45%),#080b12; }
-          .v7-brand-mark { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#2450e6,#3568ff 58%,#7c5cff); color:#fff; font-size:24px; font-weight:700; box-shadow:0 12px 36px rgba(53,104,255,.25); }
-          .v7-brand-kicker { color:#8dadff; font-size:12px; font-weight:700; letter-spacing:.12em; margin-bottom:16px; }
-          .v7-login-brand-panel h1 { margin:0; max-width:520px; color:#f7f9fc; font-size:clamp(36px,4vw,56px); line-height:1.06; letter-spacing:-.045em; font-weight:600; }
-          .v7-login-brand-panel p { max-width:500px; margin:22px 0 0; color:#aeb8ca; font-size:15px; line-height:1.65; }
-          .v7-brand-points { display:flex; flex-wrap:wrap; gap:12px 24px; color:#77839a; font-size:12px; }
-          .v7-brand-points span { display:flex; align-items:center; gap:8px; }
+          .v8-brand-panel {
+            display:flex; width:min(44vw,660px); position:relative; z-index:1;
+            background: #3D6BFF; overflow:hidden;
+            clip-path: polygon(0 0, 100% 0, calc(100% - 64px) 100%, 0 100%);
+          }
+          .v8-brand-cut {
+            position:absolute; inset:0; pointer-events:none;
+            background:
+              radial-gradient(120% 90% at 100% 0%, rgba(255,255,255,.16), transparent 55%),
+              linear-gradient(200deg, rgba(10,10,20,.05) 0%, rgba(10,10,20,.55) 100%);
+          }
+          .v8-brand-content { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:space-between; padding:56px 72px 56px 56px; width:100%; }
+          .v8-brand-mark {
+            width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+            background:#0A0A0E; color:#fff; font-size:26px; font-weight:800;
+            box-shadow: 0 14px 0 rgba(0,0,0,.14);
+          }
+          .v8-brand-kicker { color:rgba(255,255,255,.78); font-size:12px; font-weight:800; letter-spacing:.16em; margin:28px 0 16px; }
+          .v8-brand-h1 { margin:0; max-width:460px; color:#fff; font-size:clamp(38px,4.2vw,58px); line-height:1.02; letter-spacing:-.045em; font-weight:700; }
+          .v8-brand-p { max-width:420px; margin:22px 0 0; color:rgba(255,255,255,.82); font-size:15px; line-height:1.65; font-weight:500; }
+          .v8-brand-points { display:flex; flex-direction:column; gap:12px; color:rgba(255,255,255,.85); font-size:12.5px; font-weight:700; }
+          .v8-brand-points span { display:flex; align-items:center; gap:9px; }
           .v7-login-main { min-width:460px; }
         }
         @media (max-width: 520px) {

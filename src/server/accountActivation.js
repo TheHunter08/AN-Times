@@ -1,4 +1,4 @@
-import { verifyPin } from '../utils/pinSecurity.js'
+import { verifyPin, hashPin } from '../utils/pinSecurity.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -51,8 +51,16 @@ async function clearFailures(employeeId) {
 }
 
 async function archivedPin(employeeId) {
-  const rows = await request(`employee_pin_archive?employee_id=eq.${encodeURIComponent(employeeId)}&select=pin_hash,pin_len`)
-  return rows?.[0] || null
+  try {
+    const rows = await request(`employee_pin_archive?employee_id=eq.${encodeURIComponent(employeeId)}&select=pin_hash,pin_len`)
+    return rows?.[0] || null
+  } catch (error) {
+    // La tabla de rollback solo existe una vez ejecutado policies_auth.sql.
+    // Antes de esa migración, "sin archivo" es el estado normal, no un fallo:
+    // no debe tumbar la activación de cuentas que sí tienen pin_hash directo.
+    if (error?.status === 404 || error?.payload?.code === 'PGRST205') return null
+    throw error
+  }
 }
 
 export async function accountBootstrap(req, res) {
@@ -195,10 +203,16 @@ export default async function activateAccount(req, res) {
     const pinCredential = employee.pin_hash
       ? { pin_hash:employee.pin_hash, pin_len:employee.pin_len }
       : await archivedPin(employee.id)
-    if (!pinCredential?.pin_hash) return res.status(404).json({ error:'Empleado activo no encontrado o sin PIN configurado' })
+    // Arranque de la cuenta admin: la ficha con role='admin' puede existir sin
+    // PIN ni auth_id nunca configurados (alta inicial de empresa). No hay hash
+    // contra el que verificar, así que esta única vez el PIN introducido pasa
+    // a ser el PIN oficial en vez de comprobarse contra uno existente. En
+    // cuanto queda auth_id vinculado, esta puerta se cierra para siempre.
+    const isAdminBootstrap = employee.role === 'admin' && !employee.auth_id && !pinCredential?.pin_hash
+    if (!isAdminBootstrap && !pinCredential?.pin_hash) return res.status(404).json({ error:'Empleado activo no encontrado o sin PIN configurado' })
     if (duplicateRows?.length) return res.status(409).json({ error:'Ese correo ya pertenece a otro empleado' })
 
-    if (!await verifyPin(pin, pinCredential.pin_hash, employee.id)) {
+    if (!isAdminBootstrap && !await verifyPin(pin, pinCredential.pin_hash, employee.id)) {
       const failed = await registerFailure(employeeId)
       const locked = failed?.locked_until && new Date(failed.locked_until).getTime() > Date.now()
       return res.status(locked ? 429 : 401).json({
@@ -213,8 +227,18 @@ export default async function activateAccount(req, res) {
     const nowIso = new Date().toISOString()
     const linkedEmployee = await linkEmployeeTable(employee.id, email, authId, nowIso)
 
+    let bootstrapPinHash = null
+    if (isAdminBootstrap) {
+      bootstrapPinHash = await hashPin(pin, employee.id)
+      await request(`employees?id=eq.${encodeURIComponent(employee.id)}`, {
+        method:'PATCH', headers:{ Prefer:'return=minimal' },
+        body:JSON.stringify({ pin_hash:bootstrapPinHash, pin_len:pin.length, updated_at:nowIso }),
+      })
+    }
+
     await writeBlobEmployee(String(employee.id), {
       email, authId, auth_id:authId, authActivationPending:false, authActivatedAt:nowIso, _upd:nowIso,
+      ...(bootstrapPinHash ? { pin:bootstrapPinHash, pinHash:bootstrapPinHash, pinLen:pin.length } : {}),
     })
     await clearFailures(employeeId)
     await request('audit_events', {
