@@ -8,6 +8,7 @@ const db = {
     { id:'e3', authId:'auth-3', baja:true },
     { id:'e-admin', authId:'auth-admin', role:'admin' },
     { id:'e-jo', authId:'auth-jo', role:'jefe_obra' },
+    { id:'e-auditor', authId:'auth-auditor', role:'auditor' },
   ],
   config: { adminEmails:['Admin@Example.com'] },
 }
@@ -72,5 +73,18 @@ describe('isOfficialSessionAuthorized', () => {
       authSession,
       db,
     )).toBe(false)
+    expect(isOfficialSessionAuthorized(
+      { authMethod:'email', user:{ id:'e1' }, isAuditor:true },
+      authSession,
+      db,
+    )).toBe(false)
+  })
+
+  it('autoriza al auditor de solo lectura solo mediante una ficha enlazada', () => {
+    expect(isOfficialSessionAuthorized(
+      { authMethod:'email', user:{ id:'e-auditor' }, isAuditor:true },
+      { user:{ id:'auth-auditor' } },
+      db,
+    )).toBe(true)
   })
 })

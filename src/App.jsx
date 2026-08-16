@@ -319,7 +319,7 @@ function applyDeepLink(url) {
     // panel de administración completo — setScreen no comprobaba ningún rol.
     // isAdmin/isEnc/isJO ya vienen recalculados desde el perfil real
     // (_roleFlagsFromProfile en appStore.js), no desde algo manipulable.
-    const hasAdminAccess = !!(session?.isAdmin || session?.isEnc || session?.isJO)
+    const hasAdminAccess = !!(session?.isAdmin || session?.isEnc || session?.isJO || session?.isAuditor)
     const hasEmployeeSession = !!session?.user
     // Un acceso directo de la PWA puede abrirse antes de que el usuario inicie
     // sesión. En ese caso conservamos la URL para aplicar el destino justo
@@ -712,7 +712,7 @@ export default function App() {
   // acceso directo que quedó pendiente mientras se completaba el login.
   useEffect(() => {
     applyDeepLink(window.location.href)
-  }, [session?.user?.id, session?.isAdmin, session?.isEnc, session?.isJO])
+  }, [session?.user?.id, session?.isAdmin, session?.isEnc, session?.isJO, session?.isAuditor])
 
   useEffect(() => {
     const applyTheme = (prefersDark) => {
@@ -772,8 +772,8 @@ export default function App() {
         {currentScreen === 'emp'   && <EmployeePage />}
         {/* Segunda barrera además de applyDeepLink: currentScreen==='admin' solo
             renderiza el panel si la sesión de verdad tiene rol elevado — session
-            ya viene con isAdmin/isEnc/isJO recalculados desde el perfil real. */}
-        {currentScreen === 'admin' && (session?.isAdmin || session?.isEnc || session?.isJO) && <AppV2Admin />}
+            ya viene con isAdmin/isEnc/isJO/isAuditor recalculados desde el perfil real. */}
+        {currentScreen === 'admin' && (session?.isAdmin || session?.isEnc || session?.isJO || session?.isAuditor) && <AppV2Admin />}
       </Suspense>
       <ToastContainer />
       <GlobalConfirm />

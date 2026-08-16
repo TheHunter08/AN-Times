@@ -171,12 +171,16 @@ export default function LoginV2() {
       isAdmin: isAdminRole,
       isEnc: emp.role === 'encargado',
       isJO: emp.role === 'jefe_obra',
+      // Solo lectura: acceso exclusivo al Paquete de inspección (ver
+      // AppV2Admin.tsx AUDITOR_PAGES). No es un empleado con jornada propia,
+      // así que entra directo al panel en vez de a la vista de fichar.
+      isAuditor: emp.role === 'auditor',
       authMethod,
       authenticatedAt: Date.now(),
     }
     setSession(ses)
     try { localStorage.setItem('an_times_rem', JSON.stringify({ empId: emp.id })) } catch {}
-    if (ses.isAdmin) setScreen('admin', true)
+    if (ses.isAdmin || ses.isAuditor) setScreen('admin', true)
     else setScreen('emp', true)
   }, [setSession, setScreen])
 

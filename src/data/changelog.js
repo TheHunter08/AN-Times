@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.8',
+    date: '2026-08-16',
+    title: 'Nuevo rol: Auditor de solo lectura para inspecciones',
+    items: [
+      'Se añade el rol "Auditor", pensado para una inspección de Trabajo y Seguridad Social: entra directo al Paquete de inspección (fichajes, incidencias, hashes de integridad) y no puede editar nada — ni fichajes, ni vacaciones, ni empleados.',
+      'Se puede crear desde Empleados → Nueva persona, eligiendo el rol "Auditor (solo lectura)".',
+      'Preparado también para cuando se active Auth/RLS: el auditor solo tendrá permiso de lectura en base de datos, nunca de escritura.',
+    ],
+  },
+  {
     version: '4.6.7',
     date: '2026-08-12',
     title: 'El autocierre de jornadas de más de 10h vuelve a funcionar',

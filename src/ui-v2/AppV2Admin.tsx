@@ -116,6 +116,7 @@ const ROLES = [
   { value: 'encargado',  label: 'Encargado' },
   { value: 'jefe_obra',  label: 'Jefe de obra' },
   { value: 'admin',      label: 'Administrador' },
+  { value: 'auditor',    label: 'Auditor (solo lectura)' },
 ]
 
 interface EmpForm {
@@ -3176,6 +3177,10 @@ function MessagesPage() {
 
 // Páginas visibles para encargado/jefe de obra (panel supervisor limitado)
 const ENC_PAGES = ['en_linea', 'fichajes', 'planning', 'validar', 'solicitudes', 'mensajes', 'notificaciones']
+// Auditor: acceso de solo lectura para una inspección de Seguridad Social /
+// Inspección de Trabajo — únicamente el Paquete de inspección (exportar, no
+// editar). No tiene jornada propia ni necesita ver el resto del panel.
+const AUDITOR_PAGES = ['informes']
 
 export default function AppV2Admin() {
   const { session, currentAdminPage, setAdminPage, logout, setScreen, syncStatus, syncError, offlinePending, lastSyncTime, fetchDB, db } = useAppStore(
@@ -3208,9 +3213,14 @@ export default function AppV2Admin() {
   // Detectar si es encargado/jefe_obra en lugar de admin
   const isEnc = !session?.isAdmin && (session?.isEnc || session?.isJO)
   const encRoleLabel = session?.isJO ? 'Jefe de obra' : 'Encargado'
+  // Auditor de solo lectura: nunca coincide con admin/encargado/jefe de obra.
+  const isAuditor = !session?.isAdmin && !session?.isEnc && !session?.isJO && !!session?.isAuditor
 
   // Filtrar páginas según rol
-  const visiblePages = useMemo(() => isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES, [isEnc])
+  const visiblePages = useMemo(
+    () => isAuditor ? PAGES.filter(p => AUDITOR_PAGES.includes(p.id)) : isEnc ? PAGES.filter(p => ENC_PAGES.includes(p.id)) : PAGES,
+    [isAuditor, isEnc],
+  )
   const { pendingHours, pendingRequests, pendingExpenses } = useMemo(() => ({
     pendingHours: (db.records || []).filter(isRecordPendingValidation).length,
     pendingRequests: (db.vacaciones || []).filter((v: any) => v.estado === 'pendiente').length
@@ -3253,13 +3263,19 @@ export default function AppV2Admin() {
     return () => document.removeEventListener('keydown', onCommandShortcut)
   }, [])
 
-  // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'
-  const effectivePage = isEnc
-    ? (ENC_PAGES.includes(currentAdminPage || '') ? (currentAdminPage || 'validar') : 'validar')
-    : (currentAdminPage || 'dashboard')
+  // Página por defecto según rol; si el encargado llega con 'dashboard', redirigir a 'validar'.
+  // El auditor SIEMPRE se queda en 'informes' — este clamp es la barrera real
+  // (independiente de qué botón o atajo intente moverlo a otra página; ver
+  // renderPage() más abajo, que solo lee effectivePage).
+  const effectivePage = isAuditor
+    ? 'informes'
+    : isEnc
+      ? (ENC_PAGES.includes(currentAdminPage || '') ? (currentAdminPage || 'validar') : 'validar')
+      : (currentAdminPage || 'dashboard')
 
   const roleLabel = session?.isJO || session?.user?.role === 'jefe_obra'
     ? 'Jefe de obra · Administrador'
+    : isAuditor ? 'Auditor · Solo lectura'
     : isEnc ? encRoleLabel : 'Administrador'
 
   function goToFichajes(empId: string) {
@@ -3316,6 +3332,10 @@ export default function AppV2Admin() {
       icon:page.icon,
       run:() => setAdminPage(page.id),
     }))
+    // El auditor no navega a fichajes individuales por empleado (solo tiene
+    // el Paquete de inspección) ni a acciones operativas que no le
+    // corresponden — mismo criterio que restringe visiblePages/effectivePage.
+    if (isAuditor) return pageCommands
     const employeeCommands = (db.employees || [])
       .filter((employee: any) => !employee.baja && !employee.isAdmin)
       .map((employee: any) => ({
@@ -3339,7 +3359,7 @@ export default function AppV2Admin() {
       ...pageCommands,
       ...employeeCommands,
     ]
-  }, [visiblePages, navBadges, db.employees, setAdminPage, setScreen])
+  }, [visiblePages, navBadges, db.employees, setAdminPage, setScreen, isAuditor])
 
   function renderPage() {
     const page = effectivePage
@@ -3398,7 +3418,9 @@ export default function AppV2Admin() {
               <IconLogout width={15} height={15} />
             </button>
           </div>
-          {setScreen && session?.user?.id && (
+          {/* El auditor no tiene jornada propia: no mostrar el salto a la
+              vista de empleado (fichar, vacaciones…), no le corresponde. */}
+          {setScreen && session?.user?.id && !isAuditor && (
             <button onClick={() => setScreen('emp')} style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[700], fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <IconHome width={13} height={13} /> Vista empleado
             </button>
@@ -3439,15 +3461,17 @@ export default function AppV2Admin() {
             <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor', boxShadow:offlinePending?'0 0 0 3px rgba(245,158,11,.14)':'none' }} />
             <span className="uiv2-sync-label">{manualSyncing ? 'Sincronizando…' : offlinePending ? '1 lote pendiente' : syncStatus === 'synced' ? 'Al día' : 'Reintentar'}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setShowAI(true)}
-            aria-label="Abrir Times AI"
-            title="Times AI · análisis operativo"
-            style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:9, border:`1px solid ${colors.primary.glow}`, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer', fontSize:11, fontWeight:800 }}
-          >
-            ✦ <span className="uiv2-sync-label" style={{ marginLeft:5 }}>IA</span>
-          </button>
+          {!isAuditor && (
+            <button
+              type="button"
+              onClick={() => setShowAI(true)}
+              aria-label="Abrir Times AI"
+              title="Times AI · análisis operativo"
+              style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:9, border:`1px solid ${colors.primary.glow}`, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer', fontSize:11, fontWeight:800 }}
+            >
+              ✦ <span className="uiv2-sync-label" style={{ marginLeft:5 }}>IA</span>
+            </button>
+          )}
           <button
             type="button"
             aria-label={isLight ? 'Activar modo oscuro' : 'Activar modo claro'}
@@ -3457,19 +3481,21 @@ export default function AppV2Admin() {
           >
             {isLight ? <IconMoon width={18} height={18} /> : <IconSun width={18} height={18} />}
           </button>
-          <button
-            onClick={() => setAdminPage('notificaciones')}
-            type="button"
-            aria-label={unreadCount > 0 ? `Notificaciones, ${unreadCount} sin leer` : 'Notificaciones'}
-            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: colors.text[700], display: 'flex', padding: 4 }}
-          >
-            <IconBell width={20} height={20} />
-            {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, background: colors.semantic?.red || '#EF4444', color: '#fff', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: `2px solid ${colors.bg[700]}` }}>
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {!isAuditor && (
+            <button
+              onClick={() => setAdminPage('notificaciones')}
+              type="button"
+              aria-label={unreadCount > 0 ? `Notificaciones, ${unreadCount} sin leer` : 'Notificaciones'}
+              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: colors.text[700], display: 'flex', padding: 4 }}
+            >
+              <IconBell width={20} height={20} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, background: colors.semantic?.red || '#EF4444', color: '#fff', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: `2px solid ${colors.bg[700]}` }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar name={name} size={30} />
             <span style={{ fontSize: 12, fontWeight: 640, color: colors.text[900] }}>{name.split(' ')[0]}</span>

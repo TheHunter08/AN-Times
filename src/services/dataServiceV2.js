@@ -84,6 +84,7 @@ export function fromEmployee(e) {
     isAdmin: e.role === 'admin',
     isEnc:   e.role === 'encargado',
     isJO:    e.role === 'jefe_obra',
+    isAuditor: e.role === 'auditor',
   }
 }
 

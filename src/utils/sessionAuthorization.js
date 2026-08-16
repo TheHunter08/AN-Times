@@ -24,9 +24,11 @@ export function isOfficialSessionAuthorized(appSession, authSession, db) {
     const mayAdmin = role === 'admin' || role === 'jefe_obra' || employee.isAdmin === true
     const mayManageSite = role === 'jefe_obra'
     const maySupervise = role === 'encargado'
+    const mayAudit = role === 'auditor'
     if (appSession.isAdmin && !mayAdmin) return false
     if (appSession.isJO && !mayManageSite) return false
     if (appSession.isEnc && !maySupervise) return false
+    if (appSession.isAuditor && !mayAudit) return false
     return true
   }
 

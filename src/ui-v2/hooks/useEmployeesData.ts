@@ -75,6 +75,7 @@ export function useEmployeesData() {
       resolvedRole === 'encargado'   ? 'Encargado' :
       resolvedRole === 'jefe_obra'   ? 'Jefe de obra' :
       resolvedRole === 'admin'       ? 'Administrador' :
+      resolvedRole === 'auditor'     ? 'Auditor' :
       resolvedRole || '—'
 
     const obrasNames = (e.obrasAsignadas || [])

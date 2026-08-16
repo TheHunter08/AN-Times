@@ -38,6 +38,7 @@ function _roleFlagsFromProfile(profile) {
     isAdmin: role === 'admin' || role === 'jefe_obra' || !!profile?.isAdmin,
     isEnc: role === 'encargado' || !!profile?.isEnc,
     isJO: role === 'jefe_obra' || !!profile?.isJO,
+    isAuditor: role === 'auditor' || !!profile?.isAuditor,
   }
 }
 
@@ -54,12 +55,12 @@ function _runtimeSession(session, db) {
 // _runtimeSession, así que currentScreen podía mandar a la pantalla de
 // admin a una sesión cuyo rol real ya no lo era.
 const initialSession = (() => {
-  if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false }
+  if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false }
   if (storedSes.user) {
     const stillActive = (initialDb.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
     if (!stillActive) {
       try { localStorage.removeItem('an_times_ses') } catch {}
-      return { user: null, isAdmin: false, isEnc: false, isJO: false }
+      return { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false }
     }
   }
   return _runtimeSession(storedSes, initialDb)
@@ -363,7 +364,7 @@ export const useAppStore = create((set, get) => ({
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
     set({
       ...(SECURITY_DEPLOYMENT.authenticatedDataPath ? { db:{ ...INITIAL_DB } } : {}),
-      session: { user: null, isAdmin: false, isEnc: false, isJO: false },
+      session: { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false },
       timer: { ws: 0, bs: 0, state: 'idle' },
       currentScreen: 'login',
       currentEmpTab: 'inicio',
@@ -401,7 +402,7 @@ export const useAppStore = create((set, get) => ({
     // incluye jefe_obra) manda directo a 'admin'; un encargado (isEnc) o un
     // empleado normal arrancan siempre en 'emp', igual que al iniciar sesión
     // — pueden pasar a 'admin' voluntariamente con el botón del panel.
-    return initialSession.isAdmin ? 'admin' : (initialSession.user ? 'emp' : 'login')
+    return (initialSession.isAdmin || initialSession.isAuditor) ? 'admin' : (initialSession.user ? 'emp' : 'login')
   })(),
   currentEmpTab: 'inicio',
   // Sobrevive a un refresco de página (F5) dentro de la misma pestaña, pero

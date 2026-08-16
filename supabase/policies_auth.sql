@@ -55,6 +55,18 @@ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public, pg_temp AS $$
   );
 $$;
 
+-- Función helper: true si el usuario es auditor (solo lectura, p.ej. para una
+-- inspección de la Inspección de Trabajo y Seguridad Social). No concede
+-- ningún permiso de escritura por sí sola — solo se añade a las políticas
+-- SELECT de las tablas que necesita el Paquete de inspección.
+CREATE OR REPLACE FUNCTION auth_is_auditor() RETURNS boolean
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public, pg_temp AS $$
+  SELECT COALESCE(
+    (SELECT role = 'auditor' FROM employees WHERE auth_id = auth.uid() AND NOT baja LIMIT 1),
+    false
+  );
+$$;
+
 -- Helpers SECURITY DEFINER: las políticas de employees solo dejan ver la fila
 -- propia. Consultar employees directamente desde otra policy haría que RLS
 -- ocultase a los compañeros y rompería la cola de un dispositivo compartido.
@@ -169,6 +181,7 @@ CREATE POLICY "emp_read_self" ON employees
     auth_id = auth.uid()
     OR (auth_is_admin() AND auth_same_company(company_id))
     OR auth_can_supervise_employee(id)
+    OR (auth_is_auditor() AND auth_same_company(company_id))
   );
 
 CREATE POLICY "admin_write_employees" ON employees
@@ -239,6 +252,7 @@ CREATE POLICY "emp_read_own_records" ON records
     emp_id = auth_emp_id()
     OR (auth_is_admin() AND auth_same_company(company_id))
     OR (auth_same_company(company_id) AND auth_can_supervise_employee(emp_id))
+    OR (auth_is_auditor() AND auth_same_company(company_id))
   );
 
 CREATE POLICY "company_insert_records" ON records
@@ -312,6 +326,7 @@ CREATE POLICY "emp_read_vacaciones" ON vacaciones
     emp_id = auth_emp_id()
     OR (auth_is_admin() AND auth_same_company(company_id))
     OR (auth_same_company(company_id) AND auth_can_supervise_employee(emp_id))
+    OR (auth_is_auditor() AND auth_same_company(company_id))
   );
 
 CREATE POLICY "company_insert_vacaciones" ON vacaciones
@@ -423,6 +438,7 @@ CREATE POLICY "emp_cierres" ON cierres
     emp_id = auth_emp_id()
     OR (auth_is_admin() AND auth_same_company(company_id))
     OR (auth_same_company(company_id) AND auth_can_supervise_employee(emp_id))
+    OR (auth_is_auditor() AND auth_same_company(company_id))
   );
 
 CREATE POLICY "emp_sign_cierre" ON cierres

@@ -51,6 +51,24 @@ describe('activación SQL Auth/RLS', () => {
     expect(supervisorEntities).not.toMatch(/collection IN \([^)]*(documentos|firmas|medicos|wellbeing|legalAcknowledgements|gastos)/)
   })
 
+  it('da lectura de empresa al auditor de solo lectura sin abrir escritura', () => {
+    const policies = sql('policies_auth.sql')
+    expect(policies).toContain('CREATE OR REPLACE FUNCTION auth_is_auditor')
+    expect(policies).toMatch(/CREATE POLICY "emp_read_self" ON employees[\s\S]*?auth_is_auditor\(\)/)
+    expect(policies).toMatch(/CREATE POLICY "emp_read_own_records" ON records[\s\S]*?auth_is_auditor\(\)/)
+    expect(policies).toMatch(/CREATE POLICY "emp_read_vacaciones" ON vacaciones[\s\S]*?auth_is_auditor\(\)/)
+    expect(policies).toMatch(/CREATE POLICY "emp_cierres" ON cierres[\s\S]*?auth_is_auditor\(\)/)
+
+    // auth_is_auditor() no debe aparecer en ninguna política de escritura
+    // (INSERT/UPDATE/DELETE/ALL) de estas cuatro tablas — el rol es de solo
+    // lectura por diseño.
+    const writePolicyBlocks = policies.match(
+      /CREATE POLICY "[^"]+" ON (employees|records|vacaciones|cierres)\s+FOR (INSERT|UPDATE|DELETE|ALL)[\s\S]*?;/g,
+    ) || []
+    expect(writePolicyBlocks.length).toBeGreaterThan(0)
+    for (const block of writePolicyBlocks) expect(block).not.toContain('auth_is_auditor')
+  })
+
   it('incluye rollback recuperable sin borrar evidencias', () => {
     const rollback = sql('policies_auth_rollback.sql')
     expect(rollback).toContain('employee_pin_archive')
