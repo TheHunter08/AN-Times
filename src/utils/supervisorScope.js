@@ -8,8 +8,16 @@ function normalize(value) {
 // isJO se trataba igual que isEnc aquí, así que un jefe de obra con acceso
 // de página completo solo veía a un subconjunto de sus empleados en
 // Planning, Fichajes, Solicitudes, etc.
+// Se excluye jefe_obra explícitamente (no solo "no lo cuenta como scoped"):
+// un empleado ascendido de encargado a jefe de obra sin que se limpiara el
+// booleano legacy `isEnc` (_roleFlagsFromProfile en appStore.js hace
+// isEnc:role==='encargado'||!!profile?.isEnc, así que un `isEnc` antiguo
+// persiste aunque el rol ya sea otro) volvía a quedar restringido pese a
+// tener acceso completo — justo el mismo síntoma para jefe de obra que el
+// bug de arriba para encargado.
 export function isScopedSupervisor(session) {
   const user = session?.user || {}
+  if (session?.isJO || user.role === 'jefe_obra') return false
   return Boolean(session?.isEnc || user.role === 'encargado')
 }
 
@@ -55,9 +63,15 @@ export function getScopedEmployees({ employees = [], obras = [], supervisor, unr
     const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
     const employeeWorks = assignedWorks(employee)
     const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
-    const centerMatches = !supervisorCenter || employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter) || supervisorObraCenters.includes(employeeCenter)
-    const workMatches = supervisorWorks.size === 0 || [...supervisorWorks].some(work => employeeWorks.has(work)) || supervisorObraCenters.includes(employeeCenter)
-    return centerMatches && workMatches
+    const centerMatches = Boolean(supervisorCenter) && (employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter) || supervisorObraCenters.includes(employeeCenter))
+    const workMatches = supervisorWorks.size > 0 && ([...supervisorWorks].some(work => employeeWorks.has(work)) || supervisorObraCenters.includes(employeeCenter))
+    // Cuando el supervisor tiene AMBAS dimensiones (centro y obras), basta con
+    // que el empleado encaje en cualquiera de las dos — antes se exigían las
+    // dos a la vez, así que un empleado asignado solo por obra (sin
+    // centroTrabajo igual al del supervisor) o solo por centro (sin ninguna
+    // de las obras del supervisor) desaparecía del directorio aunque
+    // perteneciera realmente a su equipo.
+    return centerMatches || workMatches
   })
 }
 
@@ -93,25 +107,28 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
 
       const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
       const recordWorkCenter = centersByWork.get(recordWorkId)
-      const centerMatches = !supervisorCenter ||
+      const centerMatches = Boolean(supervisorCenter) && (
         employeeCenter === supervisorCenter ||
         recordCenter === supervisorCenter ||
         employeeWorkCenters.includes(supervisorCenter) ||
-        recordWorkCenter === supervisorCenter
+        recordWorkCenter === supervisorCenter)
 
       // supervisorWorks puede contener nombres o IDs; recordWorkId es siempre
       // el ID (convertido por workNames). Se comprueba también recordCenter
       // (el nombre en bruto) por si obrasAsignadas guarda nombres.
       const supervisorObraCenters = [...supervisorWorks].map(wId => centersByWork.get(wId)).filter(Boolean)
-      const workMatches = supervisorWorks.size === 0 ||
+      const workMatches = supervisorWorks.size > 0 && (
         [...supervisorWorks].some(workId => employeeWorks.has(workId)) ||
         supervisorWorks.has(recordWorkId) ||
         supervisorWorks.has(recordCenter) ||
         supervisorObraCenters.includes(employeeCenter) ||
-        supervisorObraCenters.includes(recordCenter)
+        supervisorObraCenters.includes(recordCenter))
 
       // Sin ninguna asignación no se abre accidentalmente el acceso a todo.
       if (!supervisorCenter && supervisorWorks.size === 0) return false
-      return centerMatches && workMatches
+      // Con las dos dimensiones configuradas, basta con que encaje en
+      // cualquiera de las dos — ver el comentario equivalente en
+      // getScopedEmployees más arriba.
+      return centerMatches || workMatches
     })
 }

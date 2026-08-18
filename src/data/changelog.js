@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.14',
+    date: '2026-08-18',
+    title: 'Encargados y jefes de obra vuelven a ver a todo su equipo',
+    items: [
+      'Cuando un encargado tenía centro de trabajo y obras asignadas a la vez, solo veía a los empleados que coincidían en las DOS cosas — alguien asignado únicamente por obra (con otro centro) o únicamente por centro (con otra obra) desaparecía de su lista, aunque fuera parte real de su equipo. Ahora basta con coincidir en cualquiera de las dos.',
+      'Un jefe de obra que en algún momento fue encargado podía quedar igualmente restringido por un dato antiguo que nunca se limpió al ascenderlo. Ahora un jefe de obra nunca queda restringido, sin importar ese dato heredado.',
+    ],
+  },
+  {
     version: '4.6.13',
     date: '2026-08-18',
     title: 'Corrige avisos incorrectos de jornadas pendientes de validar',

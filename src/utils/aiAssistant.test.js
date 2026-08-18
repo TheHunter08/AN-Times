@@ -31,19 +31,23 @@ describe('Times AI operativo', () => {
     expect(getAIChips({ role:'empleado' })).not.toContain('¿Quién olvidó fichar?')
   })
 
-  it('limita la respuesta del encargado a su centro y obra', () => {
+  it('la respuesta del encargado incluye a quien coincide en centro o en obra, pero no a quien no coincide en ninguna', () => {
     const manager = { id:'boss', name:'Responsable', role:'encargado', centroTrabajo:'Centro Norte', obrasAsignadas:['obra-a'] }
     const scopedDb = {
       employees:[
         { id:'a', name:'Ana Norte', centroTrabajo:'Centro Norte', obrasAsignadas:['obra-a'] },
-        { id:'b', name:'Bea Otra', centroTrabajo:'Centro Norte', obrasAsignadas:['obra-b'] },
+        // Solo comparte la obra (centro distinto) — antes desaparecía por exigirse las dos a la vez.
+        { id:'b', name:'Bea Obra', centroTrabajo:'Centro Sur', obrasAsignadas:['obra-a'] },
+        // No comparte ni centro ni obra: debe seguir fuera del ámbito del encargado.
+        { id:'c', name:'Carla Ajena', centroTrabajo:'Centro Sur', obrasAsignadas:['obra-b'] },
       ],
       obras:[{ id:'obra-a', nombre:'Obra A' }, { id:'obra-b', nombre:'Obra B' }],
       records:[], vacaciones:[], cierres:[], gastos:[], documentos:[],
     }
     const answer = aiAnswer('¿Quién olvidó fichar?', scopedDb, manager)
     expect(answer).toContain('Ana Norte')
-    expect(answer).not.toContain('Bea Otra')
+    expect(answer).toContain('Bea Obra')
+    expect(answer).not.toContain('Carla Ajena')
   })
 
   it('resume actividad por obra usando el centro real de cada fichaje', () => {
