@@ -19,9 +19,8 @@ import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
 import { adminWeeklyDeficitBody, completedWeeklySummary, employeeWeeklySummaryBody } from '../src/utils/weeklySummary.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
-import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
+import { createAutomationRun } from '../src/server/automationHealth.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
-import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 import { pendingValidationRecords } from '../src/utils/recordValidation.js'
 import { closureSignatureBacklog } from '../src/utils/closureSignatures.js'
 
@@ -36,7 +35,6 @@ const SB_ANON       = cleanEnv(process.env.VITE_SB_ANON)
 const SB_SERVICE    = cleanEnv(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 if (!SB_URL || !SB_ANON) console.error('[cron-reminders] VITE_SB_URL / VITE_SB_ANON not set')
 const CRON_SECRET   = process.env.CRON_SECRET
-const AUTH_RLS_MODE = isAuthRlsServerMode()
 
 let _cronVapidError = null
 if (!VAPID_PRIVATE) {
@@ -54,63 +52,50 @@ if (!VAPID_PRIVATE) {
 const SB_KEY = SB_SERVICE || SB_ANON
 const SB_H = { apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` }
 
+// Antes esta función descargaba SIEMPRE el blob `app_data` completo
+// (historial entero de fichajes, gastos, chats, documentos...) en cada
+// ejecución del cron — 48 veces al día. Las tablas normalizadas y las filas
+// singleton de app_entities ya son la fuente que lee el cliente (ver
+// cloudFetch() en dataServiceV2.js: "las tablas son la fuente principal de
+// lectura") y se mantienen al día en cada guardado, así que usarlas aquí
+// también es seguro y evita ese re-descarga masivo. Los fichajes NO se piden
+// aquí sin acotar — los rellena fetchLiveRecords() más abajo, acotado a 7 días.
 async function getAppData() {
-  if (AUTH_RLS_MODE) {
-    const [employeesResponse, recordsResponse, closuresResponse, entitiesResponse] = await Promise.all([
-      fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers:SB_H }),
-      fetch(`${SB_URL}/rest/v1/records?select=*&deleted=eq.false`, { headers:SB_H }),
-      fetch(`${SB_URL}/rest/v1/cierres?select=*&deleted=eq.false`, { headers:SB_H }),
-      fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(documentos,notisSent,config)`, { headers:SB_H }),
-    ])
-    if (![employeesResponse, recordsResponse, closuresResponse, entitiesResponse].every(response => response.ok)) return null
-    const db = {
-      employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' })),
-      records:(await recordsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, inicio:row.inicio, fin:row.fin, aceptada:row.aceptada, validado:row.validado, rechazado:row.rechazado, closed:row.closed, _upd:row.updated_at })),
-      cierres:(await closuresResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado, firmaAdmin:row.firma_admin, firmaEmp:row.firma_emp, _upd:row.updated_at })),
-      documentos:[], notisSent:{}, config:{},
-    }
-    for (const row of await entitiesResponse.json()) {
-      if (row.entity_id === '__singleton__') db[row.collection] = row.data || {}
-      else if (row.collection === 'documentos') db.documentos.push(row.data || {})
-    }
-    return db
+  const [employeesResponse, closuresResponse, entitiesResponse] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers:SB_H }),
+    fetch(`${SB_URL}/rest/v1/cierres?select=*&deleted=eq.false`, { headers:SB_H }),
+    fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(documentos,notisSent,config)`, { headers:SB_H }),
+  ])
+  if (![employeesResponse, closuresResponse, entitiesResponse].every(response => response.ok)) return null
+  const db = {
+    employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' })),
+    records:[],
+    cierres:(await closuresResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado, firmaAdmin:row.firma_admin, firmaEmp:row.firma_emp, _upd:row.updated_at })),
+    documentos:[], notisSent:{}, config:{},
   }
-  const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data`, { headers: SB_H })
-  if (!r.ok) return null
-  const rows = await r.json()
-  return rows?.[0]?.data || null
+  for (const row of await entitiesResponse.json()) {
+    if (row.entity_id === '__singleton__') db[row.collection] = row.data || {}
+    else if (row.collection === 'documentos') db.documentos.push(row.data || {})
+  }
+  return db
 }
 
 async function markNotisSent(current, keys) {
   if (!current || !Object.keys(keys || {}).length) return
-  const latest = await getAppData()
-  if (!latest) throw new Error('no app_data while marking notifications')
-  const merged = { ...latest, notisSent: { ...(latest.notisSent || {}), ...keys }, _ts: Date.now() }
-  const target = AUTH_RLS_MODE
-    ? `${SB_URL}/rest/v1/app_entities?id=eq.notisSent%3A__singleton__`
-    : `${SB_URL}/rest/v1/app_data?id=eq.1`
-  const payload = AUTH_RLS_MODE
-    ? { data:merged.notisSent, updated_at:new Date().toISOString() }
-    : { data:merged, updated_at:new Date().toISOString() }
-  const response = await fetch(target, {
+  const readResponse = await fetch(`${SB_URL}/rest/v1/app_entities?id=eq.notisSent%3A__singleton__&select=data`, { headers: SB_H })
+  if (!readResponse.ok) throw new Error(`notisSent read ${readResponse.status}`)
+  const latest = (await readResponse.json())?.[0]?.data || {}
+  const merged = { ...latest, ...keys }
+  const response = await fetch(`${SB_URL}/rest/v1/app_entities?id=eq.notisSent%3A__singleton__`, {
     method: 'PATCH',
     headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body:JSON.stringify(payload)
+    body:JSON.stringify({ data:merged, updated_at:new Date().toISOString() })
   })
   if (!response.ok) throw new Error(`markNotisSent patch ${response.status}`)
 }
 
 async function markAutomationRun(run) {
-  if (AUTH_RLS_MODE) return persistAutomationRun(run)
-  const latest = await getAppData()
-  if (!latest) throw new Error('no app_data while marking automation health')
-  const merged = { ...mergeAutomationHealth(latest, run), _ts:Date.now() }
-  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1`, {
-    method:'PATCH',
-    headers:{ ...SB_H, 'Content-Type':'application/json', Prefer:'return=minimal' },
-    body:JSON.stringify({ data:merged, updated_at:new Date().toISOString() }),
-  })
-  if (!response.ok) throw new Error(`automation health patch ${response.status}`)
+  return persistAutomationRun(run)
 }
 
 async function getPushSubs() {
@@ -220,10 +205,8 @@ export default async function handler(req, res) {
   try {
     const db = await getAppData()
     if (!db) return res.status(500).json({ error: 'no app_data' })
-    if (!AUTH_RLS_MODE) {
-      const liveRecords = await fetchLiveRecords()
-      if (liveRecords) db.records = liveRecords
-    }
+    const liveRecords = await fetchLiveRecords()
+    if (liveRecords) db.records = liveRecords
 
     const now       = nowInSpain()
     const today     = todayInSpain()

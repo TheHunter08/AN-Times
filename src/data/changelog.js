@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.11',
+    date: '2026-08-18',
+    title: 'Corrige la causa de fondo del consumo excesivo de datos',
+    items: [
+      'El arreglo anterior (4.6.10) solo paraba el pico de un día. La causa de fondo venía de antes: los avisos automáticos de fichaje, el cierre de jornadas de más de 10h y la comprobación de que la app sigue viva descargaban y volvían a subir la copia completa de todos los datos de la empresa cada 30 minutos, 48 veces al día, aunque solo necesitaran un dato pequeño (la configuración o el registro de la última ejecución).',
+      'Ahora esas tres tareas usan directamente el dato pequeño que necesitan, sin tocar la copia completa — se elimina la mayor parte del consumo diario de fondo, no solo el pico puntual.',
+    ],
+  },
+  {
     version: '4.6.10',
     date: '2026-08-18',
     title: 'Corrige un consumo excesivo de datos en Supabase',
