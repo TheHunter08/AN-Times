@@ -125,8 +125,19 @@ async function getPushSubs() {
 // "¿ya fichó hoy?" a partir de app_data.data.records (que solo se actualiza
 // en segundo plano) mandaba el recordatorio de fichaje a gente que ya había
 // fichado, si el blob todavía no se había puesto al día.
+//
+// IMPORTANTE: sin acotar, esto traía TODO el histórico de fichajes de la
+// empresa en cada ejecución (cada 30 min) — consumió en un día el egress
+// mensual entero del plan gratuito de Supabase. Las comprobaciones de este
+// cron ("¿ya fichó hoy?", jornada abierta > umbral, convenio 9h/12h) solo
+// necesitan los fichajes ABIERTOS (siempre pocos, sin importar su fecha) más
+// los CERRADOS de los últimos días — nunca el histórico completo.
 async function fetchLiveRecords() {
-  const response = await fetch(`${SB_URL}/rest/v1/records?select=id,emp_id,inicio,fin&deleted=eq.false`, { headers: SB_H })
+  const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const response = await fetch(
+    `${SB_URL}/rest/v1/records?select=id,emp_id,inicio,fin&deleted=eq.false&or=(fin.is.null,inicio.gte.${encodeURIComponent(sinceIso)})`,
+    { headers: SB_H },
+  )
   if (!response.ok) return null
   return (await response.json()).map(row => ({ id: row.id, empId: row.emp_id, inicio: row.inicio, fin: row.fin }))
 }

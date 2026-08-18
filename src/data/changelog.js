@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.10',
+    date: '2026-08-18',
+    title: 'Corrige un consumo excesivo de datos en Supabase',
+    items: [
+      'El arreglo del recordatorio de fichaje de hoy mismo traía sin darse cuenta el histórico completo de fichajes de la empresa en cada ejecución del aviso (cada 30 minutos) — llegó a consumir en un día casi toda la cuota mensual gratuita de Supabase.',
+      'Ahora solo trae los fichajes abiertos y los de los últimos 7 días, que es todo lo que necesita para funcionar.',
+    ],
+  },
+  {
     version: '4.6.9',
     date: '2026-08-18',
     title: 'El recordatorio de fichaje ya no llega si ya habías fichado',
