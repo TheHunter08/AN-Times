@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.12',
+    date: '2026-08-18',
+    title: 'El recordatorio de fichaje ya no avisa a quien está de vacaciones',
+    items: [
+      'El aviso "¿Has fichado hoy?" (por push del servidor y también dentro de la propia app) no comprobaba si el empleado tenía vacaciones, baja médica o una ausencia aprobada cubriendo el día — así que llegaba igualmente aunque no le tocara trabajar.',
+      'Ahora ambos avisos comprueban antes si el día está justificado y, si lo está, no se envía nada.',
+    ],
+  },
+  {
     version: '4.6.11',
     date: '2026-08-18',
     title: 'Corrige la causa de fondo del consumo excesivo de datos',

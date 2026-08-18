@@ -23,6 +23,7 @@ import { createAutomationRun } from '../src/server/automationHealth.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { pendingValidationRecords } from '../src/utils/recordValidation.js'
 import { closureSignatureBacklog } from '../src/utils/closureSignatures.js'
+import { workBalanceOptions } from '../src/utils/workBalance.js'
 
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url  = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -60,24 +61,38 @@ const SB_H = { apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` }
 // lectura") y se mantienen al día en cada guardado, así que usarlas aquí
 // también es seguro y evita ese re-descarga masivo. Los fichajes NO se piden
 // aquí sin acotar — los rellena fetchLiveRecords() más abajo, acotado a 7 días.
+// vacaciones/medicos/ausencias se piden porque workBalanceOptions() los
+// necesita para no avisar de fichaje a quien tiene una ausencia justificada
+// vigente hoy (ver isJustifiedAbsenceToday más abajo).
 async function getAppData() {
-  const [employeesResponse, closuresResponse, entitiesResponse] = await Promise.all([
+  const [employeesResponse, closuresResponse, vacacionesResponse, entitiesResponse] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers:SB_H }),
     fetch(`${SB_URL}/rest/v1/cierres?select=*&deleted=eq.false`, { headers:SB_H }),
-    fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(documentos,notisSent,config)`, { headers:SB_H }),
+    fetch(`${SB_URL}/rest/v1/vacaciones?select=*&deleted=eq.false`, { headers:SB_H }),
+    fetch(`${SB_URL}/rest/v1/app_entities?select=collection,entity_id,data&deleted=eq.false&collection=in.(documentos,notisSent,config,medicos,ausencias)`, { headers:SB_H }),
   ])
-  if (![employeesResponse, closuresResponse, entitiesResponse].every(response => response.ok)) return null
+  if (![employeesResponse, closuresResponse, vacacionesResponse, entitiesResponse].every(response => response.ok)) return null
   const db = {
     employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' })),
     records:[],
     cierres:(await closuresResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado, firmaAdmin:row.firma_admin, firmaEmp:row.firma_emp, _upd:row.updated_at })),
-    documentos:[], notisSent:{}, config:{},
+    vacaciones:(await vacacionesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, fechaInicio:row.fecha_inicio, fechaFin:row.fecha_fin, tipo:row.tipo || 'vacaciones', estado:row.estado || 'pendiente', motivo:row.motivo, _upd:row.updated_at })),
+    documentos:[], medicos:[], ausencias:[], notisSent:{}, config:{},
   }
   for (const row of await entitiesResponse.json()) {
     if (row.entity_id === '__singleton__') db[row.collection] = row.data || {}
-    else if (row.collection === 'documentos') db.documentos.push(row.data || {})
+    else if (db[row.collection]) db[row.collection].push(row.data || {})
   }
   return db
+}
+
+// Igual que en workBalanceOptions (src/utils/workBalance.js), usado por el
+// cálculo de horas para no contar como déficit un día con vacaciones/baja
+// médica/ausencia aprobada — aquí evita mandar "¿ya fichaste?" a alguien que
+// tiene el día cubierto por una de esas tres.
+function isJustifiedAbsenceToday(db, employee, today) {
+  return workBalanceOptions(db, employee).justifiedAbsences
+    .some(absence => absence.empId === employee.id && absence.start <= today && today <= absence.end)
 }
 
 async function markNotisSent(current, keys) {
@@ -262,9 +277,13 @@ export default async function handler(req, res) {
       const openRec = empRecs.find(r => !r.fin)
       const todayRecs = empRecs.filter(r => r.inicio && dateKeyInSpain(r.inicio) === today)
       const hasFichado = todayRecs.length > 0
+      const justifiedToday = isJustifiedAbsenceToday(db, emp, today)
 
       // ── 1. Recordatorio de fichaje (solo lunes a viernes) ──────────────────
-      if (isWeekday) {
+      // No se avisa a quien tiene vacaciones/baja médica/ausencia aprobada
+      // cubriendo hoy — no ha fichado porque no le toca trabajar, no porque
+      // se le haya olvidado.
+      if (isWeekday && !justifiedToday) {
         const entradaTimes = db.config?.reminders?.entrada?.length
           ? db.config.reminders.entrada
           : (emp.reminderTime ? [emp.reminderTime] : ['08:30'])

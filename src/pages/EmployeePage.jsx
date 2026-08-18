@@ -28,6 +28,7 @@ import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequ
 import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
 import { createNotification } from '../utils/notifications.js'
 import { buildEmployeeDayGuide } from '../utils/employeeDayGuide.js'
+import { workBalanceOptions } from '../utils/workBalance.js'
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(module => ({ default: module[name] })))
 const WellbeingModal = lazy(() => import('../components/WellbeingModal.jsx'))
@@ -524,7 +525,11 @@ export default function EmployeePage() {
         const _empRec = (db.employees || []).find(e => e.id === u.id)
         const [rh, rm] = (_empRec?.reminderTime || getCfg('reminderTime', '20:00')).split(':').map(Number)
         const minsPast = (hh - rh) * 60 + (mm - rm)
-        if (minsPast >= 0) {
+        // No avisar si hoy está cubierto por vacaciones/baja médica/ausencia
+        // aprobada — no ha fichado porque no le toca, no porque se le olvidó.
+        const justifiedToday = _empRec && workBalanceOptions(db, _empRec).justifiedAbsences
+          .some(absence => absence.empId === u.id && absence.start <= todayStr && todayStr <= absence.end)
+        if (minsPast >= 0 && !justifiedToday) {
           const hasFichado = (db.records || []).some(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
           const lastKey = 'an_rem_' + u.id
           if (!hasFichado && !hasSent(lastKey, todayStr)) {
