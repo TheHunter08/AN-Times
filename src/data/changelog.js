@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.9',
+    date: '2026-08-18',
+    title: 'El recordatorio de fichaje ya no llega si ya habías fichado',
+    items: [
+      'El aviso "¿Has fichado hoy?" comprobaba contra una copia antigua de los datos que no se actualiza al instante — así que a veces llegaba aunque ya hubieras iniciado la jornada, sobre todo poco después de fichar.',
+      'Ahora comprueba directamente contra la tabla real de fichajes, igual que el autocierre de jornadas.',
+    ],
+  },
+  {
     version: '4.6.8',
     date: '2026-08-16',
     title: 'Nuevo rol: Auditor de solo lectura para inspecciones',

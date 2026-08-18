@@ -119,6 +119,18 @@ async function getPushSubs() {
   return r.json()
 }
 
+// El cliente escribe cada fichaje directamente en la tabla `records` en
+// cuanto se crea (appStore.js: persistRecordRow, prioritario sobre la
+// reconciliación del blob completo) — igual que en cron-autoclose.js, decidir
+// "¿ya fichó hoy?" a partir de app_data.data.records (que solo se actualiza
+// en segundo plano) mandaba el recordatorio de fichaje a gente que ya había
+// fichado, si el blob todavía no se había puesto al día.
+async function fetchLiveRecords() {
+  const response = await fetch(`${SB_URL}/rest/v1/records?select=id,emp_id,inicio,fin&deleted=eq.false`, { headers: SB_H })
+  if (!response.ok) return null
+  return (await response.json()).map(row => ({ id: row.id, empId: row.emp_id, inicio: row.inicio, fin: row.fin }))
+}
+
 async function deleteSub(userId, endpoint) {
   await fetch(`${SB_URL}/rest/v1/push_subs?${pushSubscriptionDeleteFilter(userId, endpoint)}`, {
     method: 'DELETE', headers: SB_H
@@ -197,6 +209,10 @@ export default async function handler(req, res) {
   try {
     const db = await getAppData()
     if (!db) return res.status(500).json({ error: 'no app_data' })
+    if (!AUTH_RLS_MODE) {
+      const liveRecords = await fetchLiveRecords()
+      if (liveRecords) db.records = liveRecords
+    }
 
     const now       = nowInSpain()
     const today     = todayInSpain()
