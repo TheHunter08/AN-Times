@@ -130,16 +130,27 @@ async function getPushSubs() {
 // empresa en cada ejecución (cada 30 min) — consumió en un día el egress
 // mensual entero del plan gratuito de Supabase. Las comprobaciones de este
 // cron ("¿ya fichó hoy?", jornada abierta > umbral, convenio 9h/12h) solo
-// necesitan los fichajes ABIERTOS (siempre pocos, sin importar su fecha) más
-// los CERRADOS de los últimos días — nunca el histórico completo.
+// necesitan los fichajes ABIERTOS (siempre pocos, sin importar su fecha), los
+// CERRADOS de los últimos días, y los cerrados MÁS ANTIGUOS que todavía no
+// se han validado (aceptada/validado/rechazado siguen en false) — si un
+// admin se retrasa validando, esa jornada no debe dejar de recordarse solo
+// porque tenga más de una semana. El resto del histórico nunca hace falta
+// aquí. También se piden aceptada/validado/rechazado/break_secs: sin ellos,
+// pendingValidationRecords() los veía siempre como undefined y marcaba TODO
+// cierre reciente como pendiente (incluso ya validado), y el cálculo de
+// convenio >9h no restaba los descansos.
 async function fetchLiveRecords() {
   const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const response = await fetch(
-    `${SB_URL}/rest/v1/records?select=id,emp_id,inicio,fin&deleted=eq.false&or=(fin.is.null,inicio.gte.${encodeURIComponent(sinceIso)})`,
+    `${SB_URL}/rest/v1/records?select=id,emp_id,inicio,fin,break_secs,aceptada,validado,rechazado&deleted=eq.false` +
+    `&or=(fin.is.null,inicio.gte.${encodeURIComponent(sinceIso)},and(aceptada.eq.false,validado.eq.false,rechazado.eq.false))`,
     { headers: SB_H },
   )
   if (!response.ok) return null
-  return (await response.json()).map(row => ({ id: row.id, empId: row.emp_id, inicio: row.inicio, fin: row.fin }))
+  return (await response.json()).map(row => ({
+    id: row.id, empId: row.emp_id, inicio: row.inicio, fin: row.fin,
+    breakSecs: row.break_secs || 0, aceptada: row.aceptada, validado: row.validado, rechazado: row.rechazado,
+  }))
 }
 
 async function deleteSub(userId, endpoint) {

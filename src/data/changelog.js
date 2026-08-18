@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.13',
+    date: '2026-08-18',
+    title: 'Corrige avisos incorrectos de jornadas pendientes de validar',
+    items: [
+      'Al arreglar el consumo de datos, el aviso de "jornadas pendientes de validar" y la comprobación de convenio (máximo 9h/día) se quedaron sin poder distinguir una jornada ya validada de una pendiente — avisaban de todas las jornadas cerradas recientes por igual, incluso las ya revisadas, y no restaban los descansos al calcular las 9h.',
+      'También se corrige que una jornada cerrada hacía más de una semana sin validar dejaba de recordarse solo por su antigüedad; ahora se sigue avisando mientras siga sin validar, sin importar cuánto tiempo lleve pendiente.',
+    ],
+  },
+  {
     version: '4.6.12',
     date: '2026-08-18',
     title: 'El recordatorio de fichaje ya no avisa a quien está de vacaciones',
