@@ -87,9 +87,14 @@ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public, pg_temp AS $$
 $$;
 
 -- Ambito operativo del encargado. Replica el filtro de la PWA sin confiar en
--- datos enviados por el navegador: misma empresa y coincidencia de centro y,
--- cuando el encargado tiene obras asignadas, tambien de obra o del centro al
--- que pertenece esa obra. Un encargado sin centro ni obra no obtiene equipo.
+-- datos enviados por el navegador: misma empresa y coincidencia de centro O,
+-- cuando el encargado tiene obras asignadas, de obra o del centro al que
+-- pertenece esa obra. Un encargado sin centro ni obra no obtiene equipo.
+-- Antes se exigian centro Y obra a la vez cuando el encargado tenia las dos
+-- cosas asignadas (caso habitual) — un empleado vinculado solo por obra (con
+-- otro centro) o solo por centro (con otra obra) quedaba fuera del equipo
+-- del encargado en la base de datos aunque la PWA (ya corregida) lo mostrara
+-- en pantalla. Ver el mismo fix en supervisorScope.js (getScopedEmployees).
 CREATE OR REPLACE FUNCTION auth_can_supervise_employee(target_emp_id text) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, pg_temp AS $$
 DECLARE
@@ -128,8 +133,8 @@ BEGIN
       AND lower(NULLIF(btrim(COALESCE(work.data->>'centroTrabajo', work.data->>'centro_trabajo')), '')) = target_center
   ) INTO actor_work_reaches_target_center;
 
-  centers_match := actor_center IS NULL
-    OR target_center = actor_center
+  centers_match := actor_center IS NOT NULL AND (
+    target_center = actor_center
     OR EXISTS (
       SELECT 1 FROM obras work
       WHERE work.company_id = actor.company_id
@@ -140,18 +145,20 @@ BEGIN
           WHERE lower(btrim(target_work)) IN (lower(btrim(work.id)), lower(btrim(work.nombre)))
         )
     )
-    OR actor_work_reaches_target_center;
+    OR actor_work_reaches_target_center
+  );
 
-  works_match := NOT actor_has_works
-    OR EXISTS (
+  works_match := actor_has_works AND (
+    EXISTS (
       SELECT 1
       FROM unnest(COALESCE(actor.obras_asignadas, '{}'::text[])) actor_work
       JOIN unnest(COALESCE(target.obras_asignadas, '{}'::text[])) target_work
         ON lower(btrim(actor_work)) = lower(btrim(target_work))
     )
-    OR actor_work_reaches_target_center;
+    OR actor_work_reaches_target_center
+  );
 
-  RETURN (actor_center IS NOT NULL OR actor_has_works) AND centers_match AND works_match;
+  RETURN (actor_center IS NOT NULL OR actor_has_works) AND (centers_match OR works_match);
 END;
 $$;
 

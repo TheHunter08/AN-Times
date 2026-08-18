@@ -41,8 +41,8 @@ BEGIN
       AND lower(NULLIF(btrim(COALESCE(work.data->>'centroTrabajo', work.data->>'centro_trabajo')), '')) = target_center
   ) INTO actor_work_reaches_target_center;
 
-  centers_match := actor_center IS NULL
-    OR target_center = actor_center
+  centers_match := actor_center IS NOT NULL AND (
+    target_center = actor_center
     OR EXISTS (
       SELECT 1 FROM obras work
       WHERE work.company_id = actor.company_id
@@ -53,18 +53,24 @@ BEGIN
           WHERE lower(btrim(target_work)) IN (lower(btrim(work.id)), lower(btrim(work.nombre)))
         )
     )
-    OR actor_work_reaches_target_center;
+    OR actor_work_reaches_target_center
+  );
 
-  works_match := NOT actor_has_works
-    OR EXISTS (
+  works_match := actor_has_works AND (
+    EXISTS (
       SELECT 1
       FROM unnest(COALESCE(actor.obras_asignadas, '{}'::text[])) actor_work
       JOIN unnest(COALESCE(target.obras_asignadas, '{}'::text[])) target_work
         ON lower(btrim(actor_work)) = lower(btrim(target_work))
     )
-    OR actor_work_reaches_target_center;
+    OR actor_work_reaches_target_center
+  );
 
-  RETURN (actor_center IS NOT NULL OR actor_has_works) AND centers_match AND works_match;
+  -- Antes se exigia centers_match Y works_match a la vez cuando el encargado
+  -- tenia ambas dimensiones asignadas (caso habitual) — un empleado
+  -- vinculado solo por obra o solo por centro quedaba fuera de su equipo.
+  -- Ver el mismo fix en supervisorScope.js (getScopedEmployees, PWA).
+  RETURN (actor_center IS NOT NULL OR actor_has_works) AND (centers_match OR works_match);
 END;
 $$;
 
