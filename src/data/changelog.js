@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.16',
+    date: '2026-09-15',
+    title: 'Menos consumo de datos al generar informes programados',
+    items: [
+      'El envío automático de informes programados (semanales/mensuales por correo) descargaba y volvía a subir el histórico completo de fichajes de la empresa en cada ejecución diaria, y podía hacerlo varias veces si había más de un informe programado a la vez. Ahora solo pide los fichajes del periodo que necesita cada informe.',
+    ],
+  },
+  {
     version: '4.6.15',
     date: '2026-09-15',
     title: 'Menos consumo de datos en el cierre mensual automático',
