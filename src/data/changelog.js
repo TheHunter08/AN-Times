@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.15',
+    date: '2026-09-15',
+    title: 'Menos consumo de datos en el cierre mensual automático',
+    items: [
+      'El cierre mensual automático (el que genera cada día el resumen del mes anterior) descargaba y volvía a subir el histórico completo de fichajes de la empresa desde el primer día, aunque solo necesitara los del mes que cierra. Ahora solo pide lo que le hace falta.',
+      'La escritura duplicada en la copia de seguridad interna también se elimina: el cierre ya se guarda de forma completa y segura en su tabla, así que ese segundo paso solo consumía datos sin aportar nada.',
+    ],
+  },
+  {
     version: '4.6.14',
     date: '2026-08-18',
     title: 'Encargados y jefes de obra vuelven a ver a todo su equipo',

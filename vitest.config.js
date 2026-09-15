@@ -3,8 +3,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     // Los tests viven fuera de api/: Vercel interpreta cualquier .js dentro de
-    // esa carpeta como una función serverless desplegable.
-    include: ['src/**/*.test.js'],
+    // esa carpeta como una función serverless desplegable. auto-cierre-mensual.js
+    // vive en la raíz (fuera de api/, sin ese riesgo) pero su test se quedaba
+    // fuera también al no matchear 'src/**' — nunca se ejecutaba en
+    // npm test/verify:deploy pese a existir.
+    include: ['src/**/*.test.js', '*.test.js'],
     exclude: ['node_modules/**', '.claude/**', 'tests/**'],
     environment: 'jsdom',
     // Fija la zona horaria de negocio (RD, UTC-4, sin horario de verano) para que
