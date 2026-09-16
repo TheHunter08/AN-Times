@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.17',
+    date: '2026-09-16',
+    title: 'Corrige el aviso masivo a "empleados activos ahora"',
+    items: [
+      'La opción de admin para avisar solo a quien está fichado en este momento no incluía a quien había fichado justo después de medianoche, ni a quien seguía con la jornada abierta desde el día anterior (turno nocturno, o pendiente de cerrar). Ahora se basa solo en si la jornada sigue abierta, que es lo que de verdad significa "activo ahora".',
+    ],
+  },
+  {
     version: '4.6.16',
     date: '2026-09-15',
     title: 'Menos consumo de datos al generar informes programados',
