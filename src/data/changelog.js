@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.18',
+    date: '2026-09-16',
+    title: 'El aviso de convenio (más de 9h al día) detecta turnos de madrugada',
+    items: [
+      'La alerta a administración por superar las 9h ordinarias del día no contaba una jornada que había empezado justo después de medianoche — no se disparaba el aviso aunque el empleado llevara más de 9h trabajadas.',
+    ],
+  },
+  {
     version: '4.6.17',
     date: '2026-09-16',
     title: 'Corrige el aviso masivo a "empleados activos ahora"',

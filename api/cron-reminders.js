@@ -485,7 +485,11 @@ export default async function handler(req, res) {
       for (const emp of employees) {
         try {
           const empRecs2 = records.filter(r => r.empId === emp.id)
-          const todayRecs2 = empRecs2.filter(r => r.inicio?.startsWith(today))
+          // dateKeyInSpain (no r.inicio?.startsWith(today)): inicio se guarda en
+          // UTC, today es la fecha local de Madrid — un fichaje justo después de
+          // medianoche en Madrid quedaba fuera del cómputo de horas de "hoy" y
+          // podía dejar pasar sin avisar una infracción real del límite de 9h.
+          const todayRecs2 = empRecs2.filter(r => r.inicio && dateKeyInSpain(r.inicio) === today)
 
           // 7a. Jornada diaria > 9 h
           const todayTotalMin = Math.floor(todayRecs2.reduce((s, r) => {
