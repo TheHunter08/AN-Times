@@ -110,6 +110,7 @@ export default function LoginV2() {
   const verifyingRef = useRef(false)
   const opIdRef      = useRef(0)
   const interactiveEmailRef = useRef(false)
+  const wasLockedRef = useRef(false)
 
   const emps = sortedEmps(db).filter((e: any) => !e.isAdmin && !e.baja)
 
@@ -150,9 +151,21 @@ export default function LoginV2() {
     if (!selectedEmpId) { setPinError(''); return }
     const emp = (db.employees || []).find((e: any) => e.id === selectedEmpId)
     if (!emp) return
+    // wasLockedRef distingue "se acaba de desbloquear" (sí hay que limpiar el
+    // mensaje "Bloqueado — 0:00") de "nunca estuvo bloqueado, pero db cambió
+    // por otro motivo" (p.ej. handlePinKey guarda el intento fallido con
+    // saveDB, lo que reejecuta este efecto) — sin esta distinción, el aviso
+    // "PIN incorrecto (N intentos restantes)" recién puesto por handlePinKey
+    // se borraba casi al instante en el siguiente render.
     const update = () => {
       const lk = getLockoutState(emp.id, db)
-      if (!lk.locked) { setPinError(''); setPinLocked(false); return false }
+      if (!lk.locked) {
+        if (wasLockedRef.current) setPinError('')
+        wasLockedRef.current = false
+        setPinLocked(false)
+        return false
+      }
+      wasLockedRef.current = true
       const secs = lk.remainingSecs || 0
       const m = Math.floor(secs / 60), s = secs % 60
       setPinError(`Bloqueado — ${m}:${String(s).padStart(2, '0')} restantes`)
@@ -791,11 +804,27 @@ export default function LoginV2() {
     }
   }, [])
 
+  // Solo para el toggle manual PIN/Email del usuario (no para los setMode(...)
+  // internos que el propio flujo dispara justo después de fijar un mensaje
+  // concreto, p.ej. "En el modo seguro debes acceder con tu cuenta de email.")
+  // — sin esto, un error de un intento fallido en un modo seguía visible al
+  // volver a ese modo más tarde, sin que hubiera pasado nada nuevo.
+  const handleSetMode = (next: LoginMode) => {
+    setPinError('')
+    setEmailError('')
+    setMode(next)
+  }
+
   return (
     <Login
       mode={mode}
-      onSetMode={setMode}
-      employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo, pinLen: e.pinLen || (typeof e.pin === 'string' && !isPinHashed(e.pin) ? e.pin.length : 4) }))}
+      onSetMode={handleSetMode}
+      // Si el PIN ya está hasheado y pinLen no se persistió (hash legacy sin
+      // rehash todavía), no se puede saber su longitud real — por defecto
+      // caía a 4, y un PIN legacy de 5-6 dígitos dejaba de mostrar puntos a
+      // partir del 5º dígito tecleado (aunque el login seguía funcionando).
+      // 6 (el máximo aceptado) nunca oculta dígitos ya escritos.
+      employees={emps.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo, pinLen: e.pinLen || (typeof e.pin === 'string' && !isPinHashed(e.pin) ? e.pin.length : 6) }))}
       activationEmployees={activationEmployees.map((e: any) => ({ id:e.id, name:e.name, dept:e.dept, pinLen:e.pinLen }))}
       pin={pin}
       selectedEmpId={selectedEmpId}

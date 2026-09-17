@@ -9,6 +9,10 @@ import { radius } from '../../ui-v2/design-system/radius'
 export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   const [text, setText] = useState('')
   const bottomRef = useRef(null)
+  // Enter + clic casi simultáneos (o auto-repeat de Enter) pueden disparar dos
+  // llamadas a send() con el mismo texto antes de que el re-render vacíe el
+  // input — deduplicar por texto+ventana de tiempo (mismo patrón que Messages.tsx).
+  const lastSentRef = useRef(null)
 
   const chats   = db.chats || []
   const adminId = 'admin'
@@ -32,6 +36,9 @@ export function ModalChat({ visible, db, u, onClose, saveDB, toast }) {
   const send = () => {
     const t = text.trim()
     if (!t) return
+    const last = lastSentRef.current
+    if (last && last.text === t && Date.now() - last.ts < 800) return
+    lastSentRef.current = { text: t, ts: Date.now() }
     const msg = { id: gid(), from: u.id, to: adminId, text: t, ts: Date.now(), leido: false }
     saveDB(freshDb => ({ chats: [...(freshDb.chats || []), msg] }))
     queuePush('__admin__', `Mensaje de ${u.name}`, t, 'chat', '/?go=admin:mensajes')

@@ -44,6 +44,7 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
   const [bioSupported, setBioSupported] = useState(false)
   const [bioRegistered, setBioRegistered] = useState(() => u?.id ? hasBiometric(u.id) : false)
   const [bioBusy, setBioBusy] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
 
   const refreshAIStorage = () => getLocalModelStorageInfo().then(setAiStorage)
   useEffect(() => { if (visible) refreshAIStorage() }, [visible])
@@ -127,17 +128,21 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
           <div style={{ padding:'14px 0', borderBottom:SEP }}>
             <div style={{ fontSize:14, color:colors.text[900], fontWeight:700 }}>Notificaciones bloqueadas</div>
             <div style={{ fontSize:11, color:colors.text[500], lineHeight:1.55, marginTop:5 }}>{notificationGuideText(permissionGuide)}</div>
-            <button type="button" onClick={async () => {
-              const current = Notification.permission
-              setNotificationPermission(current)
-              if (current !== 'granted') {
-                toast('El permiso sigue bloqueado. Completa los pasos y vuelve a comprobar.', 5000, 'warn')
-                return
-              }
-              toast('Permiso detectado. Registrando dispositivo…', 3000, 'ok')
-              const result = await pushSubscribe(u.id, VAPID_PUB)
-              toast(result?.ok ? 'Notificaciones activadas en este dispositivo' : 'No se pudo registrar el dispositivo. Revisa la conexión e inténtalo de nuevo.', 5000, result?.ok ? 'ok' : 'err')
-            }} style={{ ...btnPrimary, width:'auto', padding:'7px 12px', fontSize:12 }}>Ya lo activé · Comprobar</button>
+            <button type="button" disabled={pushBusy} onClick={async () => {
+              if (pushBusy) return
+              setPushBusy(true)
+              try {
+                const current = Notification.permission
+                setNotificationPermission(current)
+                if (current !== 'granted') {
+                  toast('El permiso sigue bloqueado. Completa los pasos y vuelve a comprobar.', 5000, 'warn')
+                  return
+                }
+                toast('Permiso detectado. Registrando dispositivo…', 3000, 'ok')
+                const result = await pushSubscribe(u.id, VAPID_PUB)
+                toast(result?.ok ? 'Notificaciones activadas en este dispositivo' : 'No se pudo registrar el dispositivo. Revisa la conexión e inténtalo de nuevo.', 5000, result?.ok ? 'ok' : 'err')
+              } finally { setPushBusy(false) }
+            }} style={{ ...btnPrimary, width:'auto', padding:'7px 12px', fontSize:12, cursor:pushBusy?'not-allowed':'pointer', opacity:pushBusy?.6:1 }}>{pushBusy ? 'Comprobando…' : 'Ya lo activé · Comprobar'}</button>
           </div>
         )}
         {perm === 'granted' && (
@@ -151,15 +156,17 @@ export function ModalConfiguracion({ visible, u, db, onClose, toast, saveDB }) {
                 <div style={{ fontSize:14, color:colors.text[900] }}>Probar notificación</div>
                 <div style={{ fontSize:11, color:colors.text[500], marginTop:2 }}>Envía un push a este dispositivo</div>
               </div>
-              <button onClick={async () => {
+              <button disabled={pushBusy} onClick={async () => {
+                if (pushBusy) return
+                setPushBusy(true)
                 try {
                   const r = await pushSubscribe(u.id, VAPID_PUB)
                   if (!r?.ok) { toast(r?.error || r?.reason || 'No se pudo suscribir', 7000, 'err'); return }
                   const res = await queuePush(u.id, '🔔 Prueba de notificación', 'Si ves esto, el sistema funciona correctamente.', 'test-' + Date.now(), '/')
                   if (res?.ok) toast('Push enviado — revisa la barra de estado', 4000, 'ok')
                   else toast('Push falló: ' + (res?.error || res?.status || 'desconocido'), 7000, 'err')
-                } catch (e) { toast('Error: ' + e.message, 6000, 'err') }
-              }} style={{ background:colors.primary.base, color:'#fff', border:'none', borderRadius:radius.md, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>Probar</button>
+                } catch (e) { toast('Error: ' + e.message, 6000, 'err') } finally { setPushBusy(false) }
+              }} style={{ background:colors.primary.base, color:'#fff', border:'none', borderRadius:radius.md, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:pushBusy?'not-allowed':'pointer', fontFamily:'inherit', flexShrink:0, opacity:pushBusy?.6:1 }}>{pushBusy ? 'Probando…' : 'Probar'}</button>
             </div>
           </>
         )}

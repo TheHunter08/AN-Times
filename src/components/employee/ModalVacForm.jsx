@@ -2,7 +2,7 @@
 import { useModalBack } from '../../hooks/useModalBack.js'
 import { useSwipeDismiss } from '../../hooks/useSwipeDismiss.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
-import { vacData, gid, fds } from '../../utils/time.js'
+import { vacData, gid, fds, today } from '../../utils/time.js'
 import { queuePush } from '../../services/dataService.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
@@ -34,6 +34,7 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     // descontaría los días dos veces del saldo real del empleado.
     if (sending) return
     if (!fi || !ff) { toast('Selecciona fechas'); return }
+    if (fi < today()) { toast('La fecha de inicio no puede ser anterior a hoy'); return }
     const s = new Date(fi + 'T00:00:00'), e = new Date(ff + 'T00:00:00')
     if (s > e) { toast('Fecha fin debe ser posterior'); return }
     const days = Math.round((e - s) / 86400000) + 1
@@ -58,11 +59,11 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
         <div style={{ display:'flex', gap:12, marginBottom:14 }}>
           <div style={{ flex:1 }}>
             <label style={LBL}>Desde</label>
-            <input type="date" value={fi} onChange={e => setFi(e.target.value)} style={INP} />
+            <input type="date" min={today()} value={fi} onChange={e => setFi(e.target.value)} style={INP} />
           </div>
           <div style={{ flex:1 }}>
             <label style={LBL}>Hasta</label>
-            <input type="date" value={ff} onChange={e => setFf(e.target.value)} style={INP} />
+            <input type="date" min={fi || today()} value={ff} onChange={e => setFf(e.target.value)} style={INP} />
           </div>
         </div>
         {fi && ff && new Date(fi+'T00:00:00') <= new Date(ff+'T00:00:00') && (

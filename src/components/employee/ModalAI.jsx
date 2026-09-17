@@ -23,6 +23,7 @@ export function ModalAI({ visible, db, u, onClose }) {
   const [localAIProgress, setLocalAIProgress] = useState({ progress: 0, text: '' })
   const [localAIError, setLocalAIError] = useState('')
   const webgpuOk = isWebGPUSupported()
+  const localAIFailuresRef = useRef(0)
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
@@ -72,12 +73,27 @@ export function ModalAI({ visible, db, u, onClose }) {
     setThinking(true)
     if (localAIState === 'ready') {
       try {
-        const ans = await askLocalModel(text, buildAIContext(db, u))
+        // Sin timeout, si el motor WebGPU se cuelga (contexto perdido, tab en
+        // background prolongado) la promesa no resuelve ni rechaza nunca —
+        // "thinking" se quedaba en true para siempre y el usuario no podía
+        // enviar más mensajes ni veía ningún error.
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000))
+        const ans = await Promise.race([askLocalModel(text, buildAIContext(db, u)), timeout])
+        localAIFailuresRef.current = 0
         setThinking(false)
         setMsgs(m => [...m, { role: 'bot', text: ans, local: true }])
         try { navigator.vibrate(6) } catch {}
       } catch (e) {
         console.error('[localAI] chat error', e)
+        // Tras varios fallos seguidos el motor probablemente está roto de
+        // verdad (no un timeout puntual) — degradar a 'error' evita repetir
+        // el mismo intento fallido en bucle sin que el usuario se entere de
+        // que la IA local dejó de funcionar (la insignia seguía en "lista").
+        localAIFailuresRef.current += 1
+        if (localAIFailuresRef.current >= 3) {
+          setLocalAIState('error')
+          setLocalAIError(e?.message || String(e))
+        }
         const ans = aiAnswer(text, db, u)
         setThinking(false)
         setMsgs(m => [...m, { role: 'bot', text: ans }])

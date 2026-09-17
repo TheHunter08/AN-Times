@@ -11,6 +11,7 @@ import { PullToRefresh } from '../../components/employee/PullToRefresh.jsx'
 import { colors, radius, toneSoft } from '../design-system/employeeTokens.js'
 import { WeeklyBalanceBreakdown } from '../components/WeeklyBalanceBreakdown.js'
 import { useDialogA11y } from '../../hooks/useDialogA11y.js'
+import { useClock } from '../../hooks/useClock.js'
 
 
 function PdfBtn({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
@@ -51,6 +52,7 @@ export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: Employe
   const pdfDialogRef = useDialogA11y(Boolean(pdf.informeUrl), pdf.closeInforme)
   const { o, totMin, brkMin, monthMin, weekMin, extraMin, normMin, wdEfectivo, tlItems, histWithRecs, pendingValidation } = stats
   const now = new Date()
+  const { clockDate } = useClock()
   const weeklyBalance = monthlyExtras(db.records || [], u.id, today().slice(0, 7), workBalanceOptions(db, u, { now }))
 
   if (!db.records) return (
@@ -70,7 +72,7 @@ export function EmployeeJornada({ db, u, timer, stats, pdf, openModal }: Employe
             <div>
               <h1 style={{ margin: 0, fontSize: 'var(--font-heading-xl)', fontWeight: 'var(--font-semibold)', color: colors.text[900], letterSpacing: '-.035em', lineHeight: 'var(--leading-heading)' }}>Mi jornada</h1>
               <div style={{ fontSize: 13, color: colors.text[500], marginTop: 5, textTransform: 'capitalize' }}>
-                {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {clockDate || now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
               </div>
             </div>
             {o ? (

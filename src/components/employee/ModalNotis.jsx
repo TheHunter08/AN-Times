@@ -12,8 +12,14 @@ const DRAG = { width:36, height:4, borderRadius:2, background:colors.border.defa
 
 export function ModalNotis({ visible, db, onClose, toast, saveDB, u, onNavigate }) {
   const [search, setSearch] = useState('')
+  // Ordenar explícitamente por fecha antes de recortar a las últimas 50: el
+  // orden de salida de dedupeNotifications no está garantizado tras un merge
+  // de sincronización entre dispositivos (una notificación actualizada más
+  // tarde puede conservar la posición de su primera aparición), así que
+  // slice(-50) por posición podía descartar la más reciente por error.
   const notis = dedupeNotifications(db.notis || [])
     .filter(n => n.empId === u?.id && !n.deleted)
+    .sort((a, b) => Date.parse(a._upd || a.ts || 0) - Date.parse(b._upd || b.ts || 0))
     .slice(-50)
     .reverse()
     .filter(n => !search || (n.action||'').toLowerCase().includes(search.toLowerCase()) || (n.detail||'').toLowerCase().includes(search.toLowerCase()))

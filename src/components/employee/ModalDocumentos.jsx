@@ -20,8 +20,8 @@ const btnSecondary = { padding:'12px 20px', borderRadius:radius.lg, border:`1px 
 const btnSm = { display:'flex', alignItems:'center', gap:4, padding:'6px 12px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`, background:colors.bg[500], color:colors.text[700], fontWeight:600, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
 const btnSmPrimary = { padding:'6px 12px', borderRadius:radius.md, border:'none', background:colors.primary.base, color:'#fff', fontWeight:700, fontSize:11, fontFamily:'inherit', cursor:'pointer' }
 
-const TIPO_COLORS = { nomina:colors.primary.light, contrato:colors.secondary.base, jornada:colors.semantic.orange }
-const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada mensual' }
+const TIPO_COLORS = { nomina:colors.primary.light, contrato:colors.secondary.base, jornada:colors.semantic.orange, vacaciones:colors.semantic.green }
+const TIPO_LABELS = { nomina:'Nómina', contrato:'Contrato', jornada:'Jornada mensual', vacaciones:'Vacaciones' }
 
 export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   const [signing, setSigning] = useState(null)

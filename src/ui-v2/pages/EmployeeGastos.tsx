@@ -115,6 +115,7 @@ export function EmployeeGastos({ db, u, toast, saveDB, onBack }: EmployeeGastosP
     e.preventDefault()
     if (!concepto.trim()) { toast?.('Indica el concepto', 3500, 'err'); return }
     if (!importe || +importe <= 0) { toast?.('El importe debe ser mayor que 0', 3500, 'err'); return }
+    if (fecha > today()) { toast?.('La fecha no puede ser futura', 3500, 'err'); return }
     setSubmitting(true)
     try {
       const nowIso = new Date().toISOString()

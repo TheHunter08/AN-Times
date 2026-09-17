@@ -17,7 +17,11 @@ export function PendingCenter({ onNavigate }: { onNavigate: (page: string) => vo
     if (!d.expiresOn) return false
     return (new Date(`${d.expiresOn}T23:59:59`).getTime() - now) / 86400000 <= 30
   }).length
-  const pendingClosures = (db.cierres || []).filter((c:any) => canCloseMonth(c.mes) && !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
+  // !c.desactualizado: un cierre stale (fichaje editado tras generarse) ya no
+  // aparece en la lista de MonthlyClose (ver AppV2Admin.tsx), así que tampoco
+  // debe seguir contando aquí — si no, el badge nunca bajaba aunque se
+  // regenerara el cierre correcto para ese mismo empleado/mes.
+  const pendingClosures = (db.cierres || []).filter((c:any) => canCloseMonth(c.mes) && !c.desactualizado && !(c.firmaAdmin && (c.firmaEmp || c.firma))).length
   const cards = [
     { label:'Jornadas abiertas +10h', value:openTooLong, page:'en_linea', tone:colors.semantic.red },
     { label:'Horas por validar', value:pendingHours, page:'validar', tone:colors.semantic.orange },

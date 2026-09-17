@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import type { EmployeeRow } from '../pages/Employees.js'
-import { mhm, calcMin, today, localDateStr } from '../../utils/time.js'
+import { mhm, calcMin, calcSecs, today, localDateStr } from '../../utils/time.js'
 import { isValidAccountEmail } from '../../utils/authRegistration.js'
 import { needsRehash } from '../../utils/pinSecurity.js'
 
@@ -47,6 +47,14 @@ export function useEmployeesData() {
     for (const record of recs) {
       if (!record.fin) {
         if (!liveByEmployee.has(record.empId)) liveByEmployee.set(record.empId, record)
+        // Jornada en curso: cuenta lo trabajado hasta ahora para que "Horas
+        // hoy" no aparezca vacío mientras el empleado no ficha salida.
+        if (record.inicio && localDateStr(new Date(record.inicio)) === todayStr) {
+          minutesTodayByEmployee.set(
+            record.empId,
+            (minutesTodayByEmployee.get(record.empId) || 0) + Math.floor(calcSecs(record).work / 60),
+          )
+        }
         continue
       }
       if (record.inicio && localDateStr(new Date(record.inicio)) === todayStr) {

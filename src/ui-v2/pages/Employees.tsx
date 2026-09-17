@@ -124,7 +124,7 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
   const [accountFilter, setAccountFilter] = useState<'all' | 'needs-action' | 'pending-confirmation' | 'linked'>('all')
   const [profileEmp, setProfileEmp] = useState<EmployeeRow | null>(null)
-  const [resendingConfirmation, setResendingConfirmation] = useState(false)
+  const [resendingConfirmationId, setResendingConfirmationId] = useState<string | null>(null)
   const profileDialogRef = useDialogA11y(Boolean(profileEmp), () => setProfileEmp(null))
 
   const filtered = rows.filter(r => {
@@ -349,19 +349,20 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
             {profileEmp.accountStatus === 'pending-confirmation' && profileEmp.email && onResendConfirmation && (
               <button
                 type="button"
-                disabled={resendingConfirmation}
+                disabled={resendingConfirmationId === profileEmp.id}
                 onClick={async () => {
-                  setResendingConfirmation(true)
-                  try { await onResendConfirmation(profileEmp.id, profileEmp.email || '') }
-                  finally { setResendingConfirmation(false) }
+                  const id = profileEmp.id
+                  setResendingConfirmationId(id)
+                  try { await onResendConfirmation(id, profileEmp.email || '') }
+                  finally { setResendingConfirmationId(current => current === id ? null : current) }
                 }}
                 style={{
                   padding:'10px', borderRadius:radius.md, border:`1px solid ${colors.border.default}`,
                   background:colors.bg[600], color:colors.primary.light, fontSize:12.5,
-                  fontWeight:700, cursor:resendingConfirmation ? 'wait' : 'pointer', fontFamily:'inherit',
+                  fontWeight:700, cursor:resendingConfirmationId === profileEmp.id ? 'wait' : 'pointer', fontFamily:'inherit',
                 }}
               >
-                {resendingConfirmation ? 'Reenviando confirmación…' : 'Reenviar correo de confirmación'}
+                {resendingConfirmationId === profileEmp.id ? 'Reenviando confirmación…' : 'Reenviar correo de confirmación'}
               </button>
             )}
             <div style={{ display: 'flex', gap: 10 }}>

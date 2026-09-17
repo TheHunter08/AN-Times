@@ -61,7 +61,7 @@ export function HistorialReciente({ histWithRecs, openModal, u }) {
                       {r.correcciones?.length > 0 && (
                         <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
                           {r.correcciones.map((c, ci) => (
-                            <div key={ci} style={{ fontSize:10, color:colors.text[300], display:'flex', gap:5, alignItems:'flex-start', padding:'3px 6px', background:colors.bg[500], borderRadius:6, border:`1px solid ${colors.border.subtle}` }}>
+                            <div key={c.id || c.ts || ci} style={{ fontSize:10, color:colors.text[300], display:'flex', gap:5, alignItems:'flex-start', padding:'3px 6px', background:colors.bg[500], borderRadius:6, border:`1px solid ${colors.border.subtle}` }}>
                               <span style={{ flexShrink:0 }}>✏️</span>
                               <span>
                                 <strong style={{ color:colors.text[500] }}>{c.por || 'Admin'}</strong>

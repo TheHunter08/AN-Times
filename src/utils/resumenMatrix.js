@@ -48,14 +48,24 @@ export function dayColumnLabel(dateStr, sameMonth) {
 }
 
 /**
- * @param {{ employees?: any[], records?: any[], vacaciones?: any[], period: any, employeeId?: string|null }} args
+ * @param {{ employees?: any[], records?: any[], vacaciones?: any[], period: any, employeeId?: string|null, holidays?: Record<string,string> }} args
  */
-export function buildResumenMatrix({ employees = [], records = [], vacaciones = [], period, employeeId = null }) {
+export function buildResumenMatrix({ employees = [], records = [], vacaciones = [], period, employeeId = null, holidays = {} }) {
   const days = resolvePeriodDays(period)
   const sameMonth = days.length > 0 && days.every(d => d.slice(0, 7) === days[0].slice(0, 7))
 
+  // !e.baja || tiene fichajes en el periodo: mismo criterio que
+  // AppV2Admin.tsx (handleDownloadExcel/handleDownloadPDF) — sin esto, un
+  // empleado que causó baja a mitad de mes desaparecía del resumen entero,
+  // perdiendo también las horas que sí trabajó antes de la baja.
+  const daySet0 = new Set(days)
+  const empHasRecordInPeriod = new Set(
+    (records || [])
+      .filter(r => r?.fin && r?.inicio && r?.empId && daySet0.has(localDateStr(new Date(r.inicio))))
+      .map(r => r.empId)
+  )
   const scoped = (employees || [])
-    .filter(e => e && !e.baja && !e.isAdmin && e.role !== 'admin' && (!employeeId || e.id === employeeId))
+    .filter(e => e && !e.isAdmin && e.role !== 'admin' && (!e.baja || empHasRecordInPeriod.has(e.id)) && (!employeeId || e.id === employeeId))
     .map(e => ({ ...e, _role: resolveRole(e) }))
     .sort((a, b) =>
       (ROLE_ORDER[a._role] ?? 9) - (ROLE_ORDER[b._role] ?? 9) ||
@@ -87,10 +97,13 @@ export function buildResumenMatrix({ employees = [], records = [], vacaciones = 
       const isVacation = vacKeys.has(key)
       const dow = new Date(d + 'T00:00:00').getDay()
       const isWeekend = dow === 0 || dow === 6
-      // Sábado y domingo son descanso, no ausencia; los días futuros tampoco
+      const isHoliday = Boolean(holidays[d])
+      // Sábado y domingo son descanso, no ausencia; los festivos tampoco (antes
+      // solo se excluía el fin de semana, así que un festivo entre semana sin
+      // fichajes aparecía marcado como ausencia); los días futuros tampoco
       // cuentan como ausencia porque el empleado aún no ha podido fichar.
-      const isAbsent = minutes === 0 && !isVacation && !isWeekend && d <= todayStr
-      return { date: d, minutes, hours: minutes / 60, isVacation, isWeekend, isAbsent }
+      const isAbsent = minutes === 0 && !isVacation && !isWeekend && !isHoliday && d <= todayStr
+      return { date: d, minutes, hours: minutes / 60, isVacation, isWeekend, isHoliday, isAbsent }
     })
     const totalMinutes = cells.reduce((sum, c) => sum + c.minutes, 0)
     return {

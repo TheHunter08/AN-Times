@@ -30,8 +30,12 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
     setGeneratingRangePdf(true)
     try {
       const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+      // r.inicio se guarda en UTC (toISOString()); compararlo como string
+      // contra "exportFrom + 'T00:00:00'" (fecha local naive) descartaba
+      // fichajes nocturnos cuyo instante UTC cae en el día anterior aunque
+      // localmente ocurrieran dentro del rango pedido.
       const rangeRecs = (db.records || [])
-        .filter((r: any) => r.empId === u.id && r.fin && r.inicio >= exportFrom + 'T00:00:00' && r.inicio <= exportTo + 'T23:59:59')
+        .filter((r: any) => r.empId === u.id && r.fin && r.inicio && (() => { const ds = localDateStr(new Date(r.inicio)); return ds >= exportFrom && ds <= exportTo })())
         .sort((a: any, b: any) => a.inicio.localeCompare(b.inicio))
       const totalMin2 = rangeRecs.reduce((s: number, r: any) => s + calcMin(r), 0)
       const rangeLabel = `${exportFrom} – ${exportTo}`
@@ -77,7 +81,9 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       setInformeBlob(blob)
-      setInformeUrl(URL.createObjectURL(blob))
+      // Revocar la URL anterior si el usuario generó otro informe sin cerrar
+      // el visor: si no, cada exportación sucesiva filtraba un blob más.
+      setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob) })
       setShowRangeExport(false)
     } catch (e: any) {
       toast('Error al generar PDF de rango: ' + (e?.message || e))
@@ -202,7 +208,7 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       setInformeBlob(blob)
       setInformeHash(hashHex)
-      setInformeUrl(URL.createObjectURL(blob))
+      setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob) })
     } catch (e: any) {
       toast('Error al generar el PDF: ' + (e?.message || e))
     } finally {
@@ -226,11 +232,16 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
         weekStartKey.slice(0, 7),
         workBalanceOptions(db, u, { now:now2 }),
       ).weekly.find((week: any) => week.start === weekStartKey)
+      const weekEndExclusive = new Date(weekEnd2.getFullYear(), weekEnd2.getMonth(), weekEnd2.getDate() + 1)
       const weekRecs2 = (db.records || []).filter((r: any) => {
         if (r.empId !== u.id || !r.fin || !r.inicio) return false
         const startedAt = new Date(r.inicio)
         const weekday = startedAt.getDay()
-        return startedAt >= ws2 && weekday >= 1 && weekday <= 5
+        // Sin el tope superior (weekEndExclusive), un fichaje con fecha futura
+        // (reloj de dispositivo desfasado, corrección con fecha equivocada)
+        // cuyo día caiga entre lunes y viernes se colaba en el informe "de
+        // esta semana" aunque fuera de una semana posterior.
+        return startedAt >= ws2 && startedAt < weekEndExclusive && weekday >= 1 && weekday <= 5
       }).sort((a: any, b: any) => a.inicio.localeCompare(b.inicio))
       const totalMin2 = weekBalance?.minutes || 0
       const weekLabel = `Semana laboral del ${ws2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })} al ${weekEnd2.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`
@@ -307,7 +318,9 @@ export function useJornadaPdfExport(db: any, u: any, toast: (msg: string) => voi
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       setInformeBlob(blob)
-      setInformeUrl(URL.createObjectURL(blob))
+      // Revocar la URL anterior si el usuario generó otro informe sin cerrar
+      // el visor: si no, cada exportación sucesiva filtraba un blob más.
+      setInformeUrl(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob) })
     } catch (e: any) {
       toast('Error al generar el PDF: ' + (e?.message || e))
     } finally {
