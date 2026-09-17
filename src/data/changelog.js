@@ -4,6 +4,93 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.18',
+    date: '2026-09-16',
+    title: 'El aviso de convenio (más de 9h al día) detecta turnos de madrugada',
+    items: [
+      'La alerta a administración por superar las 9h ordinarias del día no contaba una jornada que había empezado justo después de medianoche — no se disparaba el aviso aunque el empleado llevara más de 9h trabajadas.',
+    ],
+  },
+  {
+    version: '4.6.17',
+    date: '2026-09-16',
+    title: 'Corrige el aviso masivo a "empleados activos ahora"',
+    items: [
+      'La opción de admin para avisar solo a quien está fichado en este momento no incluía a quien había fichado justo después de medianoche, ni a quien seguía con la jornada abierta desde el día anterior (turno nocturno, o pendiente de cerrar). Ahora se basa solo en si la jornada sigue abierta, que es lo que de verdad significa "activo ahora".',
+    ],
+  },
+  {
+    version: '4.6.16',
+    date: '2026-09-15',
+    title: 'Menos consumo de datos al generar informes programados',
+    items: [
+      'El envío automático de informes programados (semanales/mensuales por correo) descargaba y volvía a subir el histórico completo de fichajes de la empresa en cada ejecución diaria, y podía hacerlo varias veces si había más de un informe programado a la vez. Ahora solo pide los fichajes del periodo que necesita cada informe.',
+    ],
+  },
+  {
+    version: '4.6.15',
+    date: '2026-09-15',
+    title: 'Menos consumo de datos en el cierre mensual automático',
+    items: [
+      'El cierre mensual automático (el que genera cada día el resumen del mes anterior) descargaba y volvía a subir el histórico completo de fichajes de la empresa desde el primer día, aunque solo necesitara los del mes que cierra. Ahora solo pide lo que le hace falta.',
+      'La escritura duplicada en la copia de seguridad interna también se elimina: el cierre ya se guarda de forma completa y segura en su tabla, así que ese segundo paso solo consumía datos sin aportar nada.',
+    ],
+  },
+  {
+    version: '4.6.14',
+    date: '2026-08-18',
+    title: 'Encargados y jefes de obra vuelven a ver a todo su equipo',
+    items: [
+      'Cuando un encargado tenía centro de trabajo y obras asignadas a la vez, solo veía a los empleados que coincidían en las DOS cosas — alguien asignado únicamente por obra (con otro centro) o únicamente por centro (con otra obra) desaparecía de su lista, aunque fuera parte real de su equipo. Ahora basta con coincidir en cualquiera de las dos.',
+      'Un jefe de obra que en algún momento fue encargado podía quedar igualmente restringido por un dato antiguo que nunca se limpió al ascenderlo. Ahora un jefe de obra nunca queda restringido, sin importar ese dato heredado.',
+    ],
+  },
+  {
+    version: '4.6.13',
+    date: '2026-08-18',
+    title: 'Corrige avisos incorrectos de jornadas pendientes de validar',
+    items: [
+      'Al arreglar el consumo de datos, el aviso de "jornadas pendientes de validar" y la comprobación de convenio (máximo 9h/día) se quedaron sin poder distinguir una jornada ya validada de una pendiente — avisaban de todas las jornadas cerradas recientes por igual, incluso las ya revisadas, y no restaban los descansos al calcular las 9h.',
+      'También se corrige que una jornada cerrada hacía más de una semana sin validar dejaba de recordarse solo por su antigüedad; ahora se sigue avisando mientras siga sin validar, sin importar cuánto tiempo lleve pendiente.',
+    ],
+  },
+  {
+    version: '4.6.12',
+    date: '2026-08-18',
+    title: 'El recordatorio de fichaje ya no avisa a quien está de vacaciones',
+    items: [
+      'El aviso "¿Has fichado hoy?" (por push del servidor y también dentro de la propia app) no comprobaba si el empleado tenía vacaciones, baja médica o una ausencia aprobada cubriendo el día — así que llegaba igualmente aunque no le tocara trabajar.',
+      'Ahora ambos avisos comprueban antes si el día está justificado y, si lo está, no se envía nada.',
+    ],
+  },
+  {
+    version: '4.6.11',
+    date: '2026-08-18',
+    title: 'Corrige la causa de fondo del consumo excesivo de datos',
+    items: [
+      'El arreglo anterior (4.6.10) solo paraba el pico de un día. La causa de fondo venía de antes: los avisos automáticos de fichaje, el cierre de jornadas de más de 10h y la comprobación de que la app sigue viva descargaban y volvían a subir la copia completa de todos los datos de la empresa cada 30 minutos, 48 veces al día, aunque solo necesitaran un dato pequeño (la configuración o el registro de la última ejecución).',
+      'Ahora esas tres tareas usan directamente el dato pequeño que necesitan, sin tocar la copia completa — se elimina la mayor parte del consumo diario de fondo, no solo el pico puntual.',
+    ],
+  },
+  {
+    version: '4.6.10',
+    date: '2026-08-18',
+    title: 'Corrige un consumo excesivo de datos en Supabase',
+    items: [
+      'El arreglo del recordatorio de fichaje de hoy mismo traía sin darse cuenta el histórico completo de fichajes de la empresa en cada ejecución del aviso (cada 30 minutos) — llegó a consumir en un día casi toda la cuota mensual gratuita de Supabase.',
+      'Ahora solo trae los fichajes abiertos y los de los últimos 7 días, que es todo lo que necesita para funcionar.',
+    ],
+  },
+  {
+    version: '4.6.9',
+    date: '2026-08-18',
+    title: 'El recordatorio de fichaje ya no llega si ya habías fichado',
+    items: [
+      'El aviso "¿Has fichado hoy?" comprobaba contra una copia antigua de los datos que no se actualiza al instante — así que a veces llegaba aunque ya hubieras iniciado la jornada, sobre todo poco después de fichar.',
+      'Ahora comprueba directamente contra la tabla real de fichajes, igual que el autocierre de jornadas.',
+    ],
+  },
+  {
     version: '4.6.8',
     date: '2026-08-16',
     title: 'Nuevo rol: Auditor de solo lectura para inspecciones',

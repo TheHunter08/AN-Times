@@ -1,61 +1,18 @@
 import { timingSafeEqual } from 'crypto'
 import webpush from 'web-push'
-import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
+import { createAutomationRun } from '../src/server/automationHealth.js'
+import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 import { toRecordRow } from '../src/services/tableSyncPlan.js'
 import { finalizeRecord } from '../src/utils/recordLifecycle.js'
-import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
 const SB_ANON = clean(process.env.VITE_SB_ANON)
 const SB_SERVICE = clean(process.env.SB_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const CRON_SECRET = process.env.CRON_SECRET
-const AUTH_RLS_MODE = isAuthRlsServerMode()
 const headers = { apikey:SB_SERVICE || SB_ANON, Authorization:`Bearer ${SB_SERVICE || SB_ANON}`, 'Content-Type':'application/json' }
 const TEN_HOURS_MS = 10 * 60 * 60 * 1000
-
-async function readDB() {
-  if (AUTH_RLS_MODE) {
-    const [recordsResponse, configResponse] = await Promise.all([
-      fetch(`${SB_URL}/rest/v1/records?select=*&fin=is.null&deleted=eq.false`, { headers }),
-      fetch(`${SB_URL}/rest/v1/app_entities?id=eq.config%3A__singleton__&select=data,updated_at`, { headers }),
-    ])
-    if (!recordsResponse.ok || !configResponse.ok) throw new Error(`normalized read ${recordsResponse.status}/${configResponse.status}`)
-    const records = (await recordsResponse.json()).map(row => ({
-      ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name,
-      inicio:row.inicio, fin:row.fin, breaks:row.breaks || [], workSecs:row.work_secs || 0,
-      breakSecs:row.break_secs || 0, closed:!!row.closed, _upd:row.updated_at,
-    }))
-    const configRow = (await configResponse.json())?.[0]
-    if (!configRow) throw new Error('config entity unavailable')
-    return { data:{ records, config:configRow.data || {} }, updated_at:configRow.updated_at }
-  }
-  const response = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers })
-  if (!response.ok) throw new Error(`app_data read ${response.status}`)
-  return (await response.json())?.[0] || null
-}
-
-async function writeDB(data, expectedUpdatedAt) {
-  const url = AUTH_RLS_MODE
-    ? `${SB_URL}/rest/v1/app_entities?id=eq.config%3A__singleton__&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`
-    : `${SB_URL}/rest/v1/app_data?id=eq.1&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`
-  const payload = AUTH_RLS_MODE ? { data:data.config || {}, updated_at:new Date().toISOString() } : { data, updated_at:new Date().toISOString() }
-  const response = await fetch(url, {
-    method:'PATCH', headers:{ ...headers, Prefer:'return=representation' },
-    body:JSON.stringify(payload),
-  })
-  if (!response.ok) throw new Error(`app_data write ${response.status}`)
-  if (!(await response.json())?.length) throw new Error('app_data cambió durante el autocierre')
-}
-
-async function persistHealth(run) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const row = await readDB()
-    const next = { ...mergeAutomationHealth(row.data, run), _ts:Date.now() }
-    try { await writeDB(next, row.updated_at); return } catch (error) { if (attempt === 1) throw error }
-  }
-}
 
 // El cliente escribe cada fichaje directamente en la tabla `records` en
 // cuanto se crea (ver appStore.js: persistRecordRow, prioritario sobre la
@@ -134,7 +91,7 @@ export default async function handler(req, res) {
     const open = await readOpenRecords()
     const candidates = open.filter(record => startedAt - new Date(record.inicio).getTime() > TEN_HOURS_MS)
     if (!candidates.length) {
-      await persistHealth(createAutomationRun('autoclose', { startedAt, checked:open.length }))
+      await persistAutomationRun(createAutomationRun('autoclose', { startedAt, checked:open.length }))
       return res.status(200).json({ ok:true, checked:open.length, closed:0 })
     }
     const closed = candidates.map(record => {
@@ -143,12 +100,12 @@ export default async function handler(req, res) {
     })
     const tableFailures = await upsertRecords(closed)
     const run = createAutomationRun('autoclose', { startedAt, checked:open.length, processed:closed.length, status:tableFailures.length ? 'error' : 'ok', error:tableFailures[0] || null })
-    await persistHealth(run)
+    await persistAutomationRun(run)
     const delivery = await notifyClosed(closed)
     return res.status(200).json({ ok:true, checked:open.length, closed:closed.length, tableFailures:tableFailures.length, pushSent:delivery.sent, pushSkipped:delivery.skipped })
   } catch (error) {
     console.error('[cron-autoclose]', error)
-    try { await persistHealth(createAutomationRun('autoclose', { status:'error', startedAt, error:error?.message || error })) } catch {}
+    try { await persistAutomationRun(createAutomationRun('autoclose', { status:'error', startedAt, error:error?.message || error })) } catch {}
     return res.status(500).json({ error:'Autoclose failed' })
   }
 }

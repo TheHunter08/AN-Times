@@ -118,15 +118,15 @@ export default async function handler(req, res) {
     if (target === 'all') {
       recipients = allEmps
     } else if (target === 'activos') {
-      // Fecha en huso horario de Madrid, no UTC (new Date().toISOString() shiftea
-      // el día en España) — igual que cron-reminders.js. En la ventana horaria
-      // donde UTC y Madrid caen en días distintos, "activos hoy" podía omitir o
-      // incluir empleados de forma incorrecta.
-      const nowSpain = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }))
-      const todayStr = `${nowSpain.getFullYear()}-${String(nowSpain.getMonth()+1).padStart(2,'0')}-${String(nowSpain.getDate()).padStart(2,'0')}`
-      const activeIds = new Set(
-        (db.records || []).filter(r => !r.fin && r.inicio?.startsWith(todayStr)).map(r => r.empId)
-      )
+      // "Activos" = tiene la jornada abierta ahora mismo (!r.fin) — no importa
+      // qué día empezó. El filtro anterior exigía además que `inicio`
+      // empezara por la fecha de HOY en Madrid, comparando un string de fecha
+      // en Madrid contra `inicio` tal cual (guardado en UTC): a quien fichaba
+      // justo después de medianoche en Madrid (mientras el UTC seguía en el
+      // día anterior) o a quien llevaba un turno abierto desde el día
+      // anterior (nocturno, o pendiente de autocierre) se le dejaba fuera del
+      // broadcast pese a estar fichado en ese momento.
+      const activeIds = new Set((db.records || []).filter(r => !r.fin).map(r => r.empId))
       recipients = allEmps.filter(e => activeIds.has(e.id))
     } else if (target?.role) {
       recipients = allEmps.filter(e => e.role === target.role)

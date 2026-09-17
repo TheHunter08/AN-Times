@@ -16,8 +16,13 @@ const employees = [
 ]
 
 describe('getScopedOnlineRecords', () => {
-  it('solo muestra fichajes abiertos de la misma obra y centro', () => {
-    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id)).toEqual(['ok'])
+  // El supervisor tiene centro Y obra asignados. Antes se exigían los dos a
+  // la vez, así que un empleado que solo compartía la obra (otro centro) o
+  // solo el centro (otra obra) desaparecía aunque perteneciera a su equipo —
+  // esto era precisamente el bug reportado ("no salen todos los empleados").
+  it('muestra fichajes de empleados que coinciden en el centro o en la obra del supervisor', () => {
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id).sort())
+      .toEqual(['ok', 'other-center', 'other-work'].sort())
   })
 
   it('acepta el nombre de la obra guardado como ubicación del fichaje', () => {
@@ -36,8 +41,15 @@ describe('getScopedOnlineRecords', () => {
     expect(getScopedOnlineRecords({ records, employees, obras, supervisor: {}, unrestricted: true })).toHaveLength(3)
   })
 
-  it('limita el directorio del supervisor a su centro y obra', () => {
-    expect(getScopedEmployees({ employees, supervisor }).map(item => item.id)).toEqual(['same'])
+  it('el directorio del supervisor incluye a quien coincide en centro o en obra (no exige las dos)', () => {
+    expect(getScopedEmployees({ employees, supervisor }).map(item => item.id).sort())
+      .toEqual(['otherCenter', 'otherWork', 'same'].sort())
+  })
+
+  it('sigue sin incluir a un empleado que no comparte ni centro ni obra con el supervisor', () => {
+    const unrelated = { id: 'unrelated', name: 'Zoe', centroTrabajo: 'Centro Este', obrasAsignadas: ['obra-z'] }
+    expect(getScopedEmployees({ employees: [...employees, unrelated], supervisor }).map(item => item.id))
+      .not.toContain('unrelated')
   })
 
   it('no incluye administradores ni bajas en el ámbito global', () => {
@@ -61,6 +73,14 @@ describe('isScopedSupervisor', () => {
     expect(isScopedSupervisor({ isJO: true, user: {} })).toBe(false)
     expect(isScopedSupervisor({ user: { role: 'jefe_obra' } })).toBe(false)
     expect(isScopedSupervisor(null)).toBe(false)
+  })
+
+  it('no restringe a un jefe de obra aunque conserve un isEnc heredado de antes de su ascenso', () => {
+    // _roleFlagsFromProfile (appStore.js) calcula isEnc:role==='encargado'||!!profile?.isEnc
+    // — un empleado ascendido de encargado a jefe de obra sin que se limpiara
+    // ese booleano legacy llegaba aquí con isEnc:true e isJO:true a la vez.
+    expect(isScopedSupervisor({ isEnc: true, isJO: true, user: { role: 'jefe_obra' } })).toBe(false)
+    expect(isScopedSupervisor({ isEnc: true, user: { role: 'jefe_obra', isEnc: true } })).toBe(false)
   })
 })
 
@@ -91,8 +111,9 @@ describe('vínculo obra→centro de trabajo', () => {
     expect(result.map(item => item.id)).toEqual(['dani'])
   })
 
-  it('el comportamiento original (mismo centro y obra exigidos a la vez) se mantiene si la obra no está adscrita a ningún centro', () => {
-    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id)).toEqual(['ok'])
+  it('sin vínculo obra→centro, coincidir en cualquiera de las dos dimensiones sigue bastando', () => {
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id).sort())
+      .toEqual(['ok', 'other-center', 'other-work'].sort())
   })
 
   it('getScopedOnlineRecords: jefe de obra con obra asignada por nombre ve fichaje cuyo centro coincide con el nombre (sin conversión a ID)', () => {
