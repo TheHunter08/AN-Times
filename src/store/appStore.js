@@ -158,7 +158,7 @@ export const useAppStore = create((set, get) => ({
     // No se espera esta promesa: la UI y el guardado local ya son inmediatos y
     // cloudPush mantiene la cola offline como respaldo si la red falla.
     if (!options.skipPriorityPersist) {
-      for (const record of priorityRecords) persistRecordRow(record).catch(() => {})
+      for (const record of priorityRecords) persistRecordRow(record).catch(e => console.error('[saveDB] persistRecordRow priority failed:', record?.id, e))
     }
     cloudPush(merged, deleted,
       // cloudPush ahora fusiona con el servidor antes de subir (ver _mergeWithServer

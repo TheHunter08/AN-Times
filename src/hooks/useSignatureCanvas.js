@@ -47,10 +47,17 @@ export function useSignatureCanvas() {
     // El color del fondo depende del tema y puede tener canales >30. Detectar
     // tinta leyendo píxeles aceptaba por error un lienzo vacío como firma.
     if (!hasInkRef.current) return null
-    const small = document.createElement('canvas'); small.width = 320; small.height = 120
+    // Mantener la proporción real del canvas de origen (640x180, 640x200
+    // según el modal) en vez de forzar siempre 320x120 (2.667:1): forzar el
+    // ratio estiraba la firma horizontalmente. drawSignatureBlock ya calcula
+    // la altura del PDF a partir del ratio real de la imagen, así que no
+    // depende de un tamaño de salida fijo.
+    const targetW = 320
+    const targetH = Math.round(targetW * (c.height / c.width))
+    const small = document.createElement('canvas'); small.width = targetW; small.height = targetH
     const ctx2 = small.getContext('2d')
-    ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-700').trim() || '#0D1218'; ctx2.fillRect(0, 0, 320, 120)
-    ctx2.drawImage(c, 0, 0, 320, 120)
+    ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-700').trim() || '#0D1218'; ctx2.fillRect(0, 0, targetW, targetH)
+    ctx2.drawImage(c, 0, 0, targetW, targetH)
     return small.toDataURL('image/jpeg', 0.7)
   }, [])
 

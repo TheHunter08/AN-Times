@@ -11,8 +11,18 @@ export function useVacacionesData(db: any, u: any, vac: any, toast: (msg: string
 
   const cancelVac = useCallback((id: string) => {
     showConfirm('¿Cancelar esta solicitud de vacaciones?', () => {
-      saveDB((freshDb: any) => ({ vacaciones: (freshDb.vacaciones || []).filter((v: any) => v.id !== id || v.estado !== 'pendiente') }))
-      toast('Solicitud cancelada', 3000, 'warn')
+      let removed = false
+      saveDB((freshDb: any) => {
+        const before = (freshDb.vacaciones || []).length
+        const vacaciones = (freshDb.vacaciones || []).filter((v: any) => v.id !== id || v.estado !== 'pendiente')
+        removed = vacaciones.length < before
+        return { vacaciones }
+      })
+      // saveDB corre de forma síncrona sobre el estado más reciente, así que
+      // `removed` ya refleja si la solicitud seguía pendiente en ese momento —
+      // si el admin la aprobó/rechazó justo antes, no hay nada que cancelar.
+      if (removed) toast('Solicitud cancelada', 3000, 'warn')
+      else toast('Esta solicitud ya ha sido revisada y no se puede cancelar', 4000, 'warn')
     })
   }, [saveDB, toast, showConfirm])
 

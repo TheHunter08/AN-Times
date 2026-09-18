@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { getPushCoverage, uploadPendingIfAny } from '../../services/dataService.js'
 import { isEmployeeOfficialAccountReady, isValidAccountEmail, normalizeAccountEmail } from '../../utils/authRegistration.js'
@@ -42,7 +42,17 @@ export default function OperationsContainer({ onNavigate, onReviewEmployee }: { 
   const signatureReady = workers.filter((employee: any) => Boolean(db.firmas?.[employee.id]?.main?.data)).length
   const pendingValidation = pendingValidationRecords(db.records).length
   const compliance = buildComplianceSummary(db)
-  const legalConfig = getLegalConfig(db)
+  // Memoizado: getLegalConfig(db) devuelve un objeto NUEVO en cada llamada.
+  // Este contenedor se suscribe a `db` entero, así que cualquier cambio no
+  // relacionado (llega un mensaje, se sincroniza una jornada) generaba una
+  // referencia nueva de legalConfig en cada render — y el useEffect de
+  // Operations.tsx que sincroniza su form local con esta prop pisaba lo que
+  // el admin estuviera escribiendo en Responsable y privacidad justo en ese
+  // instante. Memoizar sobre los campos reales evita el reset espurio.
+  const legalConfig = useMemo(
+    () => getLegalConfig(db),
+    [db.config?.legal, db.empresas?.[0]?.nombre, db.empresas?.[0]?.name],
+  )
   const legalIssues = legalConfigIssues(db)
   const legalAcknowledged = workers.filter((employee: any) => hasCurrentLegalAcknowledgement(db, employee.id)).length
   const documentReadiness = summarizeDocumentReadiness(db)

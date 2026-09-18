@@ -8,11 +8,10 @@ export function PomodoroWidget() {
   const _pkey = 'an_pomodoro'
   const _load = () => { try { return JSON.parse(localStorage.getItem(_pkey) || 'null') } catch { return null } }
   const _save = s => { try { localStorage.setItem(_pkey, JSON.stringify(s)) } catch {} }
-  const _init = _load() || { active: false, phase: 'work', secs: WS, count: 0 }
-  const [active, setActive] = useState(_init.active)
-  const [phase, setPhase] = useState(_init.phase)
-  const [secs, setSecs] = useState(_init.secs)
-  const [count, setCount] = useState(_init.count)
+  const [active, setActive] = useState(() => (_load() || { active: false }).active)
+  const [phase, setPhase] = useState(() => (_load() || { phase: 'work' }).phase)
+  const [secs, setSecs] = useState(() => (_load() || { secs: WS }).secs)
+  const [count, setCount] = useState(() => (_load() || { count: 0 }).count)
 
   useEffect(() => { _save({ active, phase, secs, count }) }, [active, phase, secs, count])
 

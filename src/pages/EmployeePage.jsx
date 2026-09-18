@@ -27,6 +27,7 @@ import { finalizeRecord } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
 import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
 import { createNotification } from '../utils/notifications.js'
+import { ACHIEVEMENTS, liveUnlockedIds } from '../utils/achievements.js'
 import { buildEmployeeDayGuide } from '../utils/employeeDayGuide.js'
 import { workBalanceOptions } from '../utils/workBalance.js'
 
@@ -43,6 +44,7 @@ const ModalInfoPersonal = lazyNamed(() => import('../components/employee/ModalIn
 const ModalDocumentos = lazyNamed(() => import('../components/employee/ModalDocumentos.jsx'), 'ModalDocumentos')
 const ModalConfiguracion = lazyNamed(() => import('../components/employee/ModalConfiguracion.jsx'), 'ModalConfiguracion')
 const ModalCierreSign = lazyNamed(() => import('../components/employee/ModalCierreSign.jsx'), 'ModalCierreSign')
+const ModalVacSign = lazyNamed(() => import('../components/employee/ModalVacSign.jsx'), 'ModalVacSign')
 const Confetti = lazyNamed(() => import('../components/employee/Confetti.jsx'), 'Confetti')
 const ModalLogros = lazyNamed(() => import('../components/employee/ModalLogros.jsx'), 'ModalLogros')
 const OnboardingModal = lazyNamed(() => import('../components/employee/OnboardingModal.jsx'), 'OnboardingModal')
@@ -132,6 +134,9 @@ export default function EmployeePage() {
   const geoDismissedRef = useRef(false)
   const geoWasInsideRef = useRef(null)     // rec.id de la jornada que estuvo dentro del radio
   const geoExitDismissedRef = useRef(null) // rec.id cuyo aviso de salida se descartó
+  const hadOpenRecRef = useRef(false)      // si la última posición comprobada tenía jornada abierta
+  const confettiTimeoutRef = useRef(null)
+  useEffect(() => () => { if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current) }, [])
   const [showConfetti, setShowConfetti] = useState(false)
   const [perfilSubTab, setPerfilSubTab] = useState('perfil') // 'perfil' | 'gastos' | 'denuncia' | 'actualizaciones'
   // Bug fix: derive from DOM so initial icon matches actual theme (dark=☀️, light=🌙)
@@ -265,29 +270,12 @@ export default function EmployeePage() {
     }
   }, [u?.id, ensurePushReady])
 
-  // Recordatorio de fichaje — verifica cada minuto si hay que notificar
-  useEffect(() => {
-    if (!u?.reminderTime || !u?.id) return
-    const check = () => {
-      const now = new Date()
-      const [rh, rm] = u.reminderTime.split(':').map(Number)
-      if (now.getHours() * 60 + now.getMinutes() < rh * 60 + rm) return
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-      const worked = (dbRef.current?.records || []).some(r => r.empId === u.id && r.inicio && localDateStr(new Date(r.inicio)) === todayStr)
-      if (worked) return
-      const key = `rem_${u.id}_${todayStr}`
-      if (localStorage.getItem(key)) return
-      try {
-        if (Notification.permission === 'granted') {
-          new Notification('⏰ Recuerda fichar', { body: `Son las ${u.reminderTime}. ¿Has iniciado tu jornada?`, icon: '/pwa-192x192.png' })
-          localStorage.setItem(key, '1')
-        }
-      } catch {}
-    }
-    check()
-    const id = setInterval(check, 60_000)
-    return () => clearInterval(id)
-  }, [u?.reminderTime, u?.id])
+  // Recordatorio de fichaje: lo gestiona checkSmartNotis (punto 1, más abajo),
+  // que además respeta getCfg('notiFichaje') y sincroniza el estado de envío
+  // entre dispositivos vía db.notisSent. Un segundo efecto aquí duplicaba el
+  // aviso (notificación nativa + push/campana casi simultáneas) porque usaba
+  // su propia clave de deduplicación en localStorage, independiente de la de
+  // checkSmartNotis.
 
   // Live document title: "⏱️ 3h 24m · TIMES INC" while jornada is active
   useEffect(() => {
@@ -337,6 +325,8 @@ export default function EmployeePage() {
       if (!obras.length) return
       const lat = pos.coords.latitude, lng = pos.coords.longitude
       const openRec = (dbRef.current?.records || []).find(r => r.empId === u.id && !r.fin)
+      const hadOpenRec = hadOpenRecRef.current
+      hadOpenRecRef.current = !!openRec
 
       if (openRec) {
         setGeoPrompt(null)
@@ -367,6 +357,11 @@ export default function EmployeePage() {
 
       // Sin jornada abierta: aviso de ENTRADA (comportamiento original)
       setGeoExitPrompt(null)
+      // Al fichar salida (openRec pasa de existir a null) se reabre la
+      // posibilidad de sugerir fichar entrada — si no, descartar el aviso
+      // una sola vez lo desactivaba para el resto de la sesión, incluidos
+      // días siguientes, hasta recargar la app entera.
+      if (hadOpenRec) geoDismissedRef.current = false
       geoWasInsideRef.current = null
       if (geoDismissedRef.current) return
       const inRange = obras.find(o => distTo(lat, lng, o) <= (o.radio != null ? o.radio : 200))
@@ -696,12 +691,42 @@ export default function EmployeePage() {
         }
       }
 
+      // 9. Logro desbloqueado — antes solo se detectaba (y notificaba) si el
+      // empleado abría manualmente la pestaña "Logros" (AchievementsSection
+      // solo se monta ahí), así que la notificación nunca llegaba en el
+      // momento real en que se conseguía. Aquí se persiste de forma
+      // acumulativa en employee.achievements (nunca se quita un logro ya
+      // ganado, ver AchievementsSection.jsx).
+      let newAchievementEmployees = null
+      {
+        const myRecsForAchievements = (db.records || []).filter(r => r.empId === u.id)
+        const streakForAchievements = calcStreak(db.records || [], u.id, todayStr)
+        const emp = (db.employees || []).find(e => e.id === u.id)
+        const persistedIds = new Set(emp?.achievements || [])
+        const liveIds = liveUnlockedIds(myRecsForAchievements, streakForAchievements)
+        const newIds = liveIds.filter(id => !persistedIds.has(id))
+        if (newIds.length > 0) {
+          const allIds = [...new Set([...persistedIds, ...liveIds])]
+          newIds.forEach(id => {
+            const a = ACHIEVEMENTS.find(item => item.id === id)
+            if (!a) return
+            const achKey = `an_achiev_${id}`
+            if (hasSent(achKey)) return
+            markSent(achKey)
+            sendPush(u.id, `🏆 ¡Logro desbloqueado! ${a.icon} ${a.title}`, a.desc, 'logros', '/?go=emp:perfil', achKey)
+            addBell(achKey, `🏆 ¡Logro desbloqueado! ${a.icon} ${a.title}`, a.desc)
+          })
+          newAchievementEmployees = (dbRef.current.employees || []).map(e => e.id === u.id ? { ...e, achievements: allIds } : e)
+        }
+      }
+
       // Batch save: una sola escritura por ciclo. Combina notisSent + bell notis.
       // Merge new keys into current dbRef to avoid stale-snapshot overwrites.
-      if (dirty || bellNotis.length) {
+      if (dirty || bellNotis.length || newAchievementEmployees) {
         const partial = {}
         if (dirty) partial.notisSent = { ...(dbRef.current.notisSent || {}), ...notisSent }
         if (bellNotis.length) partial.notis = [...(dbRef.current.notis || []), ...bellNotis]
+        if (newAchievementEmployees) partial.employees = newAchievementEmployees
         saveDB(partial)
       }
       } catch(e) { console.error('[smartNotis]', e) }
@@ -747,6 +772,11 @@ export default function EmployeePage() {
         6000,
         'warn'
       )
+      return false
+    }
+    const hasUnsignedApprovedVac = (db.vacaciones || []).some(v => v.empId === u?.id && v.estado === 'aprobada' && !v.firmaEmp)
+    if (hasUnsignedApprovedVac) {
+      toast('Firma el documento de tus vacaciones aprobadas antes de fichar.', 6000, 'warn')
       return false
     }
     const todayStr = today()
@@ -870,7 +900,18 @@ export default function EmployeePage() {
     }))
     try { navigator.vibrate(15) } catch {}
     toast('Jornada iniciada en ' + centro, 3000, 'ok')
-  }, [u, db, pendingGPS, closeModal, saveDB, toast])
+    // Check-in de bienestar al iniciar jornada — el modal y handleWellbeingSubmit
+    // ya existían pero nada los conectaba a un fichaje real (feature fantasma:
+    // wellbeingRecId nunca se establecía). Una vez al día como máximo.
+    const wbKey = `wb_shown_${u.id}_${today()}`
+    try {
+      if (!localStorage.getItem(wbKey)) {
+        localStorage.setItem(wbKey, '1')
+        setWellbeingRecId(rec.id)
+        setShowWellbeing(true)
+      }
+    } catch {}
+  }, [u, db, gpsStatus, pendingGPS, closeModal, saveDB, toast])
 
   // Fichaje de entrada vía QR — mismas comprobaciones que doStart (jornada
   // idle, sin vacaciones activas), pero el centro ya viene decidido por el
@@ -924,7 +965,8 @@ export default function EmployeePage() {
     try { navigator.vibrate([15, 50, 30]) } catch {}
     toast('Jornada finalizada — ' + mhm(Math.floor(t.work / 60)), 3000, 'ok')
     setShowConfetti(true)
-    setTimeout(() => setShowConfetti(false), 2600)
+    if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current)
+    confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2600)
     // Capturar GPS en background y actualizar el registro cuando resuelva
     if (navigator.geolocation) {
       const stopId = closed.id
@@ -1190,6 +1232,14 @@ export default function EmployeePage() {
     [db.cierres, uh.id]
   )
 
+  // Vacaciones aprobadas sin firmar: firma obligatoria antes de seguir usando
+  // la app (ver ModalVacSign.jsx) — a diferencia de los cierres mensuales,
+  // que solo muestran un aviso descartable.
+  const pendingVacSignEmp = useMemo(
+    () => (db.vacaciones || []).filter(v => v.empId === uh.id && v.estado === 'aprobada' && !v.firmaEmp),
+    [db.vacaciones, uh.id]
+  )
+
   const handleNotificationNavigate = useCallback((item) => {
     const destination = resolveEmployeeNotificationDestination(item)
     closeModal()
@@ -1269,6 +1319,9 @@ export default function EmployeePage() {
       {activeModal === 'chat' && <ModalChat visible db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {activeModal === 'correccion' && <ModalCorreccion visible data={modalData} db={db} u={u} onClose={closeModal} saveDB={saveDB} toast={toast} />}
       {showConfetti && <Confetti visible />}
+      {launchRequirements.ready && pendingVacSignEmp.length > 0 && (
+        <ModalVacSign visible db={db} u={u} toast={toast} saveDB={saveDB} />
+      )}
       {!launchRequirements.ready && (
         <OnboardingModal
           visible

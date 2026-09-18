@@ -614,6 +614,7 @@ async function _idbDel(key) {
 // Background Sync API (el timer guarda cada 30s, _storeForBgSync se llama
 // en cada guardado offline — sin el guard se añaden hasta 20+ listeners).
 let _onlineListenerPending = false
+let _onlineListenerHandler = null
 let _bgSyncRetries = 0
 let _pendingWriteFlight = Promise.resolve()
 let _postBlobSyncHandler = null
@@ -794,9 +795,11 @@ async function _storeForBgSync(data, deleted, syncHint) {
       _onlineListenerPending = true
       const onOnline = async () => {
         _onlineListenerPending = false
+        _onlineListenerHandler = null
         window.removeEventListener('online', onOnline)
         await _bgSyncFallback()
       }
+      _onlineListenerHandler = onOnline
       window.addEventListener('online', onOnline)
     }
     // Slow-path: Background Sync para cuando la app está cerrada.
@@ -1012,6 +1015,10 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
       _pushFlight = false
       _saveRetry = 0
       _onlineListenerPending = false
+      if (_onlineListenerHandler) {
+        window.removeEventListener('online', _onlineListenerHandler)
+        _onlineListenerHandler = null
+      }
       // Limpiar solo la versión que acabamos de confirmar. Si llegó otra
       // operación mientras la petición volaba, queda intacta y se sube después.
       saveLocal(merged)
@@ -1033,7 +1040,6 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
     .catch((e) => {
       console.error('[cloudPush] error:', e)
       _pushFlight = false
-      onError?.()
       // Guardar en IDB desde el primer fallo: si el usuario cierra la app
       // durante los reintentos, el SW Background Sync puede completar la
       // sincronización sin necesidad de que la app esté abierta.
@@ -1052,6 +1058,12 @@ function _doCloudPush(db, deleted, onSuccess, onError, syncHint) {
         setTimeout(() => _drainQueue(), delay)
       } else {
         _saveRetry = 0
+        // syncStatus (y los toasts) solo deben pasar a "error" cuando se agotan
+        // los reintentos en primer plano — llamarlo en cada fallo individual
+        // hacía que un simple pico de latencia que se resolvía en el segundo
+        // intento (1-2s después) mostrara "No se pudo sincronizar" un instante
+        // antes de arreglarse solo, confundiendo al usuario.
+        onError?.()
         if (isConnectivityError(e)) window.dispatchEvent(new CustomEvent('times-save-failed'))
         else window.dispatchEvent(new CustomEvent('times-save-error', { detail: { message: e?.message || 'Error del servidor' } }))
       }

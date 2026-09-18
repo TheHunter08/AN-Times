@@ -60,9 +60,18 @@ export function Messages({ conversations, onSend, onSelectConversation }: Messag
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selId])
 
+  // Enter + clic casi simultáneos (o auto-repeat de Enter) pueden disparar dos
+  // llamadas a send() con el mismo `text` antes de que el re-render lo vacíe
+  // (los eventos son handlers separados, no reentrantes, así que un guard
+  // síncrono simple no basta). Deduplicar por texto+ventana de tiempo sí cubre
+  // el caso real.
+  const lastSentRef = useRef<{ empId: string; text: string; ts: number } | null>(null)
   const send = () => {
     const t = text.trim()
     if (!t || !selId) return
+    const last = lastSentRef.current
+    if (last && last.empId === selId && last.text === t && Date.now() - last.ts < 800) return
+    lastSentRef.current = { empId: selId, text: t, ts: Date.now() }
     const msg: DemoMessage = { id: Date.now().toString(), from: 'admin', text: t, time: 'Ahora' }
     setMsgs(prev => ({ ...prev, [selId]: [...(prev[selId] ?? []), msg] }))
     onSend?.(selId, t)

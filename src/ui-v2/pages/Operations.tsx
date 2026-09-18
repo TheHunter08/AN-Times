@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { ProductState } from '../components/ProductState.js'
@@ -6,6 +6,7 @@ import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconCheck, IconClock, IconFileText, IconShield } from '../components/Icons.js'
 import { buildReportScheduleICS, downloadICS } from '../../utils/calendarExport.js'
+import { gid } from '../../utils/time.js'
 import { evaluateRlsTransition, evaluateSafeMigration } from '../../config/securityReadiness.js'
 import { automationHealthList } from '../../server/automationHealth.js'
 import { buildLaunchBlockerInstructions, buildLaunchPlanSummary, getLaunchBlockerActions } from '../../utils/launchRequirements.js'
@@ -103,7 +104,11 @@ export function Operations(props: OperationsProps) {
   const addSchedule = () => {
     if (!name.trim() || !recipients.trim()) return
     props.onSaveSchedule({
-      id: `report_${Date.now().toString(36)}`,
+      // gid() (aleatorio) en vez de Date.now().toString(36): un doble clic
+      // rápido generaba el mismo id (mismo milisegundo), y OperationsContainer
+      // añade el schedule sin deduplicar por id — dos filas con la misma key
+      // de React que además compartían "pausar"/"eliminar" al filtrar por id.
+      id: `report_${gid()}`,
       name: name.trim(), frequency, format, recipients: recipients.trim(), enabled: true,
       _upd: new Date().toISOString(),
     })
@@ -161,17 +166,26 @@ export function Operations(props: OperationsProps) {
     }
   }
 
+  const copyHelpTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const planCopiedTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (copyHelpTimeoutRef.current) window.clearTimeout(copyHelpTimeoutRef.current)
+    if (planCopiedTimeoutRef.current) window.clearTimeout(planCopiedTimeoutRef.current)
+  }, [])
+
   const copyEmployeeInstructions = async (blocker: LaunchBlocker) => {
     if (await copyText(buildLaunchBlockerInstructions(blocker))) {
       setCopiedHelpId(blocker.employeeId)
-      window.setTimeout(() => setCopiedHelpId(current => current === blocker.employeeId ? null : current), 2500)
+      if (copyHelpTimeoutRef.current) window.clearTimeout(copyHelpTimeoutRef.current)
+      copyHelpTimeoutRef.current = window.setTimeout(() => setCopiedHelpId(current => current === blocker.employeeId ? null : current), 2500)
     } else setCopiedHelpId(null)
   }
 
   const copyLaunchPlan = async () => {
     if (!(await copyText(buildLaunchPlanSummary(props.launchBlockers)))) return
     setPlanCopied(true)
-    window.setTimeout(() => setPlanCopied(false), 2500)
+    if (planCopiedTimeoutRef.current) window.clearTimeout(planCopiedTimeoutRef.current)
+    planCopiedTimeoutRef.current = window.setTimeout(() => setPlanCopied(false), 2500)
   }
 
   return (

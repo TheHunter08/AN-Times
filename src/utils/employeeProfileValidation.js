@@ -1,15 +1,20 @@
 import { isValidAccountEmail, normalizeAccountEmail } from './authRegistration.js'
 
 const PIN_PATTERN = /^\d{4,6}$/
+const PHONE_PATTERN = /^\+?[\d\s()-]{9,15}$/
 
 export function validateEmployeeProfile(form, employees = [], isEdit = false) {
   const name = String(form?.name || '').trim()
   const email = normalizeAccountEmail(form?.email)
   const pin = String(form?.pin || '')
+  const telefono = String(form?.telefono || '').trim()
 
   if (!name) return { ok: false, error: 'El nombre es obligatorio' }
   if (!isValidAccountEmail(email)) {
     return { ok: false, error: 'Introduce un email válido. Es necesario para crear el acceso seguro.' }
+  }
+  if (telefono && !PHONE_PATTERN.test(telefono)) {
+    return { ok: false, error: 'Introduce un teléfono válido (solo dígitos, espacios, +, - o paréntesis).' }
   }
 
   const duplicate = employees.find((employee) =>

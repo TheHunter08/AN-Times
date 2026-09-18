@@ -134,7 +134,12 @@ export function Requests({ rows, onOpen }: RequestsProps) {
 function RequestCard({ row, onOpen }: { row: RequestRow; onOpen?: (row: RequestRow) => void }) {
   const tc = getTypeCfg(row.type)
   const sc = statusCfg[row.status]
-  const isPending = row.status === 'pending'
+  // Los botones se deshabilitan en el primer clic: aprobar/rechazar dos veces
+  // por un doble clic dispara push y auditoría duplicados aunque el resultado
+  // final sea el mismo. `key={row.id}` en la lista padre remonta esta tarjeta
+  // (y reinicia `decided`) cuando cambia de fila.
+  const [decided, setDecided] = useState(false)
+  const isPending = row.status === 'pending' && !decided
 
   return (
     <div
@@ -188,15 +193,17 @@ function RequestCard({ row, onOpen }: { row: RequestRow; onOpen?: (row: RequestR
           <>
             <button
               className="uiv2-req-approve"
-              onClick={event => { event.stopPropagation(); row.onApprove?.(row.id) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(16,185,129,.14)', color: colors.semantic.green, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
+              disabled={decided}
+              onClick={event => { event.stopPropagation(); setDecided(true); row.onApprove?.(row.id) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(16,185,129,.14)', color: colors.semantic.green, cursor: decided ? 'default' : 'pointer', opacity: decided ? .6 : 1, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
             >
               <IconCheck width={13} height={13} /> Aprobar
             </button>
             <button
               className="uiv2-req-reject"
-              onClick={event => { event.stopPropagation(); row.onReject?.(row.id) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
+              disabled={decided}
+              onClick={event => { event.stopPropagation(); setDecided(true); row.onReject?.(row.id) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: radius.md, border: 'none', background: 'rgba(239,68,68,.14)', color: colors.semantic.red, cursor: decided ? 'default' : 'pointer', opacity: decided ? .6 : 1, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', transition: 'background .15s' }}
             >
               <IconX width={13} height={13} /> Rechazar
             </button>

@@ -2,9 +2,9 @@
 // app (useAppStore) sin tocar lógica de negocio, escrituras ni Supabase.
 // Reutiliza las mismas utilidades puras (today/calcMin/mhm) que ya usa
 // PanelDashboard.jsx en la app real, para no duplicar ni divergir cálculos.
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useAppStore } from '../../store/appStore.js'
-import { today, calcMin, mhm, localDateStr, isWorkday, workWeekDates } from '../../utils/time.js'
+import { today, calcMin, calcSecs, mhm, localDateStr, isWorkday, workWeekDates } from '../../utils/time.js'
 import { effectiveDailyTargetMin } from '../../utils/laborCalendar.js'
 import type { KPI, ActivityItem, VacationPerson } from '../pages/Dashboard.js'
 import type { AreaChartPoint } from '../components/AreaChart.js'
@@ -73,6 +73,13 @@ export function useDashboardData(): DashboardData {
       if (!record.fin) {
         presentTodayIds.add(record.empId)
         record.enDescanso ? breakCount++ : workingCount++
+        // Jornada en curso: cuenta lo trabajado hasta ahora para que el KPI
+        // "Horas trabajadas hoy" no marque 0h mientras nadie haya fichado salida.
+        if (record.inicio) {
+          const day = localDateStr(new Date(record.inicio))
+          const minutes = Math.floor(calcSecs(record).work / 60)
+          dayMinutes.set(day, (dayMinutes.get(day) || 0) + minutes)
+        }
         continue
       }
       if (!record.inicio) continue
@@ -119,18 +126,33 @@ export function useDashboardData(): DashboardData {
       { label:'Ausentes hoy', value:String(absentCount), tone:'accent' },
       { label:'Horas trabajadas hoy', value:mhm(dayMinutes.get(todayStr) || 0), tone:'primary' },
     ]
-    const activity: ActivityItem[] = (db.audit || []).slice(-10).reverse().map((entry, index) => ({
-      id:String(index),
-      text:`${entry.action}${entry.detail ? ` — ${entry.detail}` : ''}${entry.user ? ` · ${entry.user}` : ''}`,
-      time:entry.ts ? new Date(entry.ts).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '',
-      tone:activityTone(entry.action),
-    }))
+    const activity: ActivityItem[] = (db.audit || []).slice(-10).reverse().map((entry, index) => {
+      let time = ''
+      if (entry.ts) {
+        const d = new Date(entry.ts)
+        const hm = d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })
+        time = localDateStr(d) === todayStr ? hm : `${d.toLocaleDateString('es-ES', { day:'numeric', month:'short' })}, ${hm}`
+      }
+      return {
+        id:String(index),
+        text:`${entry.action}${entry.detail ? ` — ${entry.detail}` : ''}${entry.user ? ` · ${entry.user}` : ''}`,
+        time,
+        tone:activityTone(entry.action),
+      }
+    })
     return { kpis, activity, trend:buildTrend(0), compareTrend:buildTrend(1), vacationsToday }
   }, [db.employees, db.records, db.vacaciones, db.audit, db.config?.wdMin])
 
+  const [greetHour, setGreetHour] = useState(() => new Date().getHours())
+  useEffect(() => {
+    const id = setInterval(() => setGreetHour(new Date().getHours()), 60000)
+    return () => clearInterval(id)
+  }, [])
+
   const name = session?.user?.name?.split(' ')?.[0] ?? ''
+  const greetWord = greetHour >= 6 && greetHour < 14 ? 'Buenos días' : greetHour >= 14 && greetHour < 21 ? 'Buenas tardes' : 'Buenas noches'
   return {
-    greeting: name ? `Buenos días, ${name}` : 'Buenos días',
+    greeting: name ? `${greetWord}, ${name}` : greetWord,
     ...computed,
   }
 }

@@ -165,6 +165,15 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         if (matches) { toast(`Ese PIN ya lo usa ${candidate.name || 'otro empleado'}. Elige uno distinto.`, 5000, 'warn'); return }
       }
     }
+    // Sin esta comprobación, dejar turnoInicio/turnoFin vacíos o iguales
+    // (p.ej. ambos en el valor por defecto "08:00" sin que el admin los
+    // tocara) generaba 45 días de turnos de 0h útiles sin ningún aviso,
+    // sobrescribiendo silenciosamente cualquier turno ya existente en ese
+    // rango para el empleado (upsert por fecha).
+    if (form.crearTurnos && (!form.turnoInicio || !form.turnoFin || form.turnoInicio === form.turnoFin)) {
+      toast('Indica una hora de inicio y fin de turno distintas antes de crear los turnos', 4500, 'warn')
+      return
+    }
     setSending(true)
     const nowIso = new Date().toISOString()
     // Hashear ANTES de saveDB: el updater de saveDB es síncrono y no puede
@@ -1223,18 +1232,18 @@ function ValidateHoursPage() {
     toast('Jornada rechazada', 2500, 'warn')
   }
 
-  const handleModify = async (id: string, entry: string, exit: string) => {
+  const handleModify = async (id: string, entry: string, exit: string, reason: string) => {
     const rec = (db.records || []).find((r: any) => r.id === id)
-    if (!rec) return
-    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
+    if (!rec) return false
+    if (outOfScope(rec.empId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return false }
     if (isRecordMonthLocked(db.cierres || [], rec.empId, rec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn')
-      return
+      return false
     }
     const times = recordTimesFromClock(rec, entry, exit)
     if (!times) {
       toast('Introduce una hora válida', 3000, 'warn')
-      return
+      return false
     }
     const { inicio: newInicio, fin: newFin } = times
     const nowIso = new Date().toISOString()
@@ -1246,12 +1255,12 @@ function ValidateHoursPage() {
     const freshRec = (freshDbNow.records || []).find((r: any) => r.id === id) || rec
     if (isRecordMonthLocked(freshDbNow.cierres || [], freshRec.empId, freshRec.inicio)) {
       toast('Mes firmado y bloqueado. Reabre el cierre antes de modificarlo.', 5000, 'warn')
-      return
+      return false
     }
     const breaks = clipBreaksToWindow(freshRec.breaks || [], newInicio, newFin)
     const recalculated = calcSecs({ ...freshRec, inicio: inicioIso, fin: finIso, breaks })
     const correction = {
-      id: gid(), ts: nowIso, tipo: 'admin', motivo: 'Corrección de horario desde Validar horas',
+      id: gid(), ts: nowIso, tipo: 'admin', motivo: reason || 'Corrección de horario desde Validar horas',
       oldInicio: freshRec.inicio, oldFin: freshRec.fin, newInicio: inicioIso, newFin: finIso,
       by: session?.user?.name || 'Admin',
       device: currentDeviceLabel(),
@@ -1275,9 +1284,11 @@ function ValidateHoursPage() {
         }
       }, { forceSyncIds:{ records:[id] }, skipPriorityPersist:true })
       toast('Horario modificado y sincronizado', 3000, 'ok')
+      return true
     } catch (error: any) {
       console.error('[records] modify failed:', error)
       toast(syncErrorMessage('No se pudo guardar el horario', error), 5000, 'warn')
+      return false
     }
   }
 
@@ -2063,8 +2074,8 @@ function ResumenPage() {
   }, [mode, monthValue, dateValue, rangeFrom, rangeTo])
 
   const matrix = useMemo(
-    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId }),
-    [db.employees, db.records, db.vacaciones, period, employeeId],
+    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId, holidays: workBalanceOptions(db).holidays }),
+    [db.employees, db.records, db.vacaciones, period, employeeId, db.config?.usarFestivosMadrid, db.config?.festivosExtra],
   )
 
   const dayLabel = (date: string) => dayColumnLabel(date, matrix.sameMonth)
@@ -2721,7 +2732,10 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
 
   const handleSave = () => {
     if (sending) return
-    if (!nombre.trim()) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    const trimmedNombre = nombre.trim()
+    if (!trimmedNombre) { toast('El nombre es obligatorio', 2500, 'warn'); return }
+    const duplicate = (db.obras || []).some((o: any) => o.id !== initial?.id && (o.nombre || '').trim().toLowerCase() === trimmedNombre.toLowerCase())
+    if (duplicate) { toast('Ya existe una obra con ese nombre', 3500, 'warn'); return }
     const normalizedCoords = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
     if (hasAnyCoord && !normalizedCoords) { toast('Revisa la latitud y la longitud: deben ser números dentro de rango (-90..90 / -180..180)', 4000, 'warn'); return }
     setSending(true)
@@ -3130,11 +3144,17 @@ function MessagesPage() {
 
   const conversations = useMemo(() => {
     return emps.map((e: any) => {
+      // Comparación numérica, no de string: el lado empleado guarda `ts`
+      // como epoch ms (Date.now(), ver TabMensajes.jsx/ModalChat.jsx) mientras
+      // que aquí se guarda como ISO string — comparar como texto ordenaba
+      // siempre "1758...".localeCompare("2026-...") con el número primero,
+      // así que todos los mensajes del empleado aparecían antes que los del
+      // admin sin importar la hora real. new Date(...) parsea ambos formatos.
       const conv = chats
         .filter((m: any) =>
           (m.from === e.id && m.to === adminId) || (m.from === adminId && m.to === e.id)
         )
-        .sort((a: any, b: any) => String(a.ts || '').localeCompare(String(b.ts || '')))
+        .sort((a: any, b: any) => (new Date(a.ts || 0).getTime() || 0) - (new Date(b.ts || 0).getTime() || 0))
 
       const unread = chats.filter((m: any) => m.from === e.id && m.to === adminId && !m.leido).length
       const last = conv[conv.length - 1]
@@ -3153,7 +3173,13 @@ function MessagesPage() {
           time: fmtTime(m.ts),
         })),
       }
-    }).filter((c: any) => c.messages.length > 0 || emps.length <= 5)
+    })
+    // Antes se ocultaban las conversaciones sin mensajes cuando había más de
+    // 5 empleados visibles, así que un empleado recién dado de alta que aún
+    // no había escrito no aparecía en la lista y el admin no podía iniciar
+    // el primer contacto (Messages no tiene otra forma de elegir empleado).
+    // El buscador de Messages.tsx ya permite encontrar a cualquiera por
+    // nombre, así que no hace falta ocultar a nadie.
   }, [chats, emps, adminId])
 
   const handleSend = (empId: string, text: string) => {

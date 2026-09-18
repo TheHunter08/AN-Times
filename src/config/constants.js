@@ -53,6 +53,10 @@ export const DOCUMENTOS_BUCKET = 'documentos-empleado'
 // focos de crecimiento continuo de la cuota de base de datos.
 export const GASTOS_BUCKET = 'gastos-fotos'
 
+// Mismo razonamiento que CIERRE_PDF_BUCKET: el PDF de vacaciones firmado que
+// el empleado envía al jefe de obra al aprobarse su solicitud.
+export const VACACIONES_PDF_BUCKET = 'vacaciones-pdf'
+
 export { FESTIVOS_MADRID, FESTIVOS_MADRID_2026 } from './holidays.js'
 
 export const INITIAL_DB = {

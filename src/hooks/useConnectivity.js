@@ -82,9 +82,15 @@ function startMonitoring() {
   window.addEventListener('online', onOnline)
   if (navigator.onLine === false) verify()
 
-  retryTimer = window.setInterval(() => {
-    if (!snapshot.online || navigator.onLine === false) verify()
-  }, 10000)
+  // Antes solo reverificaba si ya se creía "offline" (!snapshot.online) o si
+  // navigator.onLine era false. Eso deja un agujero real: una red con
+  // interfaz activa pero sin salida a Internet (WiFi sin uplink, DNS
+  // bloqueado, firewall corporativo hacia Supabase) nunca dispara el evento
+  // 'offline' del navegador, así que snapshot.online se quedaba en `true`
+  // para siempre — sin banner de "Sin cobertura" y sin bloquear acciones que
+  // sí requieren red (recuperar contraseña, registro, en LoginV2.tsx).
+  // Reverificar siempre, aunque se crea online, cierra ese agujero.
+  retryTimer = window.setInterval(() => { verify() }, 10000)
 }
 
 function subscribe(listener) {

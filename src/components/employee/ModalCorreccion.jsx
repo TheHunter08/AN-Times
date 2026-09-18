@@ -18,12 +18,14 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   const [fin, setFin]         = useState('')
   const [motivo, setMotivo]   = useState('')
   const [sending, setSending] = useState(false)
+  const [confirmNight, setConfirmNight] = useState(false)
 
   useEffect(() => {
     if (visible && rec) {
       setInicio(ftimeInput(rec.inicio))
       setFin(ftimeInput(rec.fin))
       setMotivo('')
+      setConfirmNight(false)
     }
   }, [visible, rec])
 
@@ -31,9 +33,23 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   const dialogRef = useDialogA11y(visible, onClose)
   if (!visible || !rec) return null
 
+  // recordTimesFromClock interpreta una salida <= entrada como turno nocturno
+  // que cruza la medianoche y suma un día a `fin` — correcto para guardias
+  // reales, pero un simple typo (p.ej. teclear "07:59" en vez de "17:59")
+  // generaba silenciosamente una jornada de ~24h sin ningún aviso, que podía
+  // llegar así al admin para aprobar. Se pide confirmación explícita cuando
+  // la duración resultante es anómala en vez de bloquear turnos nocturnos reales.
+  const previewTimes = inicio && fin ? recordTimesFromClock(rec, inicio, fin) : null
+  const previewHours = previewTimes ? (previewTimes.fin.getTime() - previewTimes.inicio.getTime()) / 3600000 : 0
+  const looksLikeNightShift = previewTimes && previewHours > 16
+
   const send = () => {
     if (!motivo.trim()) { toast('Añade un motivo para la corrección'); return }
     if (!inicio) { toast('Indica la hora de entrada correcta'); return }
+    if (looksLikeNightShift && !confirmNight) {
+      toast(`La duración resultante es de ${Math.round(previewHours)}h — marca la casilla para confirmar que es un turno nocturno`, 5000, 'warn')
+      return
+    }
     setSending(true)
     const times = recordTimesFromClock(rec, inicio, fin || inicio)
     if (!times) { toast('Indica horas válidas'); setSending(false); return }
@@ -71,6 +87,12 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
 
         <TextField label="Nueva hora de entrada" type="time" value={inicio} onChange={e => setInicio(e.target.value)} />
         <TextField label="Nueva hora de salida" type="time" value={fin} onChange={e => setFin(e.target.value)} />
+        {looksLikeNightShift && (
+          <label style={{ display:'flex', alignItems:'flex-start', gap:8, background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, fontSize:12, color:colors.semantic.orange, cursor:'pointer' }}>
+            <input type="checkbox" checked={confirmNight} onChange={e => setConfirmNight(e.target.checked)} style={{ marginTop:2 }} />
+            <span>La salida es anterior a la entrada, así que la duración resultante es de <strong>{Math.round(previewHours)}h</strong> (turno que cruza la medianoche). Marca esta casilla para confirmar que es correcto.</span>
+          </label>
+        )}
         <div style={{ marginBottom: 20 }}>
           <TextField label="Motivo de la corrección *" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej: Me olvidé de fichar la salida…" />
         </div>

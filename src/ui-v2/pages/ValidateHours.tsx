@@ -28,7 +28,7 @@ export interface ValidateHoursProps {
   weekLabel?: string
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
-  onModify?: (id: string, entry: string, exit: string) => void
+  onModify?: (id: string, entry: string, exit: string, reason: string) => Promise<boolean> | boolean
   onDelete?: (id: string) => void
   onApproveMany?: (ids: string[]) => void
   onRejectMany?: (ids: string[]) => void
@@ -53,6 +53,8 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editEntry, setEditEntry] = useState('')
   const [editExit, setEditExit] = useState('')
+  const [editReason, setEditReason] = useState('')
+  const [saving, setSaving] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const editDialogRef = useDialogA11y(Boolean(editingId), () => setEditingId(null))
   const editedRows = useRef(new Map<string, { entry: string; exit: string }>())
@@ -96,12 +98,18 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
     setEditingId(row.id)
     setEditEntry(row.entry)
     setEditExit(row.exit)
+    setEditReason('')
   }
-  const handleSaveModify = () => {
-    if (!editingId) return
-    editedRows.current.set(editingId, { entry: editEntry, exit: editExit })
-    setLocalRows(prev => prev.map(r => r.id === editingId ? { ...r, entry: editEntry, exit: editExit, status: 'approved' } : r))
-    onModify?.(editingId, editEntry, editExit)
+  const canSaveModify = Boolean(editEntry) && Boolean(editExit) && editReason.trim().length > 0
+  const handleSaveModify = async () => {
+    if (!editingId || !canSaveModify || saving) return
+    const id = editingId
+    setSaving(true)
+    const result = await onModify?.(id, editEntry, editExit, editReason.trim())
+    setSaving(false)
+    if (result === false) return
+    editedRows.current.set(id, { entry: editEntry, exit: editExit })
+    setLocalRows(prev => prev.map(r => r.id === id ? { ...r, entry: editEntry, exit: editExit, status: 'approved' } : r))
     setEditingId(null)
   }
   const handleDelete = (id: string) => {
@@ -337,10 +345,21 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Salida</div>
                 <input type="time" value={editExit} onChange={e => setEditExit(e.target.value)} aria-label="Hora de salida" style={inputStyle} />
               </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Motivo (obligatorio)</div>
+                <input
+                  type="text"
+                  value={editReason}
+                  onChange={e => setEditReason(e.target.value)}
+                  aria-label="Motivo de la modificación"
+                  placeholder="Ej: corrección por olvido de fichar"
+                  style={{ ...inputStyle, border: `1px solid ${editReason.trim() ? colors.border.default : colors.semantic.orange}` }}
+                />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-              <button onClick={handleSaveModify} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Guardar</button>
+              <button onClick={handleSaveModify} disabled={!canSaveModify || saving} style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: canSaveModify && !saving ? 'pointer' : 'default', opacity: canSaveModify && !saving ? 1 : 0.6, fontFamily: 'inherit' }}>{saving ? 'Guardando…' : 'Guardar'}</button>
             </div>
           </div>
         </div>

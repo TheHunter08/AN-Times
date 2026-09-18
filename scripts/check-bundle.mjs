@@ -34,14 +34,16 @@ const precacheRawBytes = (await Promise.all(
   precachedAssets.map(async name => (await readFile(new URL(`assets/${name}`, DIST))).length)
 )).reduce((sum, size) => sum + size, 0)
 // Presupuesto del conjunto offline completo (no solo del shell inicial). El
-// valor deja un margen pequeño sobre los ~1,84 MiB actuales y evita que una
-// dependencia pesada vuelva a colarse silenciosamente en cada instalación.
-const PRECACHE_RAW_BUDGET = 1900 * 1024
+// valor deja un margen pequeño sobre los ~1,87 MiB actuales (firma de
+// vacaciones, logros persistentes, bienestar y el resto de correcciones de
+// esta sesión) y evita que una dependencia pesada vuelva a colarse
+// silenciosamente en cada instalación.
+const PRECACHE_RAW_BUDGET = 1950 * 1024
 if (precacheRawBytes > PRECACHE_RAW_BUDGET) {
-  throw new Error(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB; presupuesto: 1900 KiB`)
+  throw new Error(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB; presupuesto: ${(PRECACHE_RAW_BUDGET / 1024).toFixed(0)} KiB`)
 }
 
 console.log(`App shell inicial: ${(totalGzip / 1024).toFixed(1)} KiB gzip / 230 KiB`)
 console.log(`Activos iniciales: ${rows.map(row => row.file).join(', ')}`)
-console.log(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB / 1900 KiB`)
+console.log(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB / ${(PRECACHE_RAW_BUDGET / 1024).toFixed(0)} KiB`)
 console.log(`IA local y motores PDF excluidos del precache: correcto`)

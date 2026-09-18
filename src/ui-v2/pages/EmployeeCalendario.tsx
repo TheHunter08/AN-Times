@@ -64,37 +64,41 @@ export function EmployeeCalendario({ db, u, calMonth, setCalMonth }: EmployeeCal
     return map
   }, [db.records, u.id, monthStr])
 
+  // Tope de 366 iteraciones: una fechaFin corrupta o muy alejada en el futuro
+  // (año invertido, error de tipeo del admin) no debe congelar la UI expandiendo
+  // el rango día a día indefinidamente en cada render.
+  const MAX_RANGE_DAYS = 366
+  const expandRange = (s: Date, e: Date) => {
+    const days: string[] = []
+    const d = new Date(s)
+    let i = 0
+    while (d <= e && i < MAX_RANGE_DAYS) { days.push(lds(d)); d.setDate(d.getDate() + 1); i++ }
+    return days
+  }
+
   const vacDays = useMemo(() => new Set(
     (db.vacaciones || []).filter((v: any) => v.empId === u.id && v.estado === 'aprobada').flatMap((v: any) => {
-      const days: string[] = []
       const s = new Date(v.fechaInicio + 'T00:00:00'), e = new Date(v.fechaFin + 'T00:00:00')
-      const d = new Date(s)
-      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate() + 1) }
-      return days
+      if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return []
+      return expandRange(s, e)
     })
   ), [db.vacaciones, u.id])
 
   const absDays = useMemo(() => new Set(
     (db.ausencias || []).filter((a: any) => a.empId === u.id).flatMap((a: any) => {
-      const days: string[] = []
       const s = new Date((a.fechaInicio || a.fecha || '') + 'T00:00:00')
       const e = new Date((a.fechaFin || a.fechaInicio || a.fecha || '') + 'T00:00:00')
       if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return []
-      const d = new Date(s)
-      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate() + 1) }
-      return days
+      return expandRange(s, e)
     })
   ), [db.ausencias, u.id])
 
   const medDays = useMemo(() => new Set(
     (db.medicos || []).filter((a: any) => a.empId === u.id).flatMap((a: any) => {
-      const days: string[] = []
       const s = new Date((a.fechaInicio || a.fecha || '') + 'T00:00:00')
       const e = new Date((a.fechaFin || a.fechaInicio || a.fecha || '') + 'T00:00:00')
       if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) return []
-      const d = new Date(s)
-      while (d <= e) { days.push(lds(d)); d.setDate(d.getDate() + 1) }
-      return days
+      return expandRange(s, e)
     })
   ), [db.medicos, u.id])
 

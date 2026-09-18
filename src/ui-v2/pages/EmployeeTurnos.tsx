@@ -63,8 +63,10 @@ export function EmployeeTurnos({ db, u }: EmployeeTurnosProps) {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const todayYMDForUpcoming = toYMD(today)
+  const nowHM = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
   const upcoming = turnos
-    .filter((t: any) => t.fecha >= toYMD(today) && t.tipo !== 'libre')
+    .filter((t: any) => t.tipo !== 'libre' && (t.fecha > todayYMDForUpcoming || (t.fecha === todayYMDForUpcoming && (!t.horaFin || t.horaFin > nowHM))))
     .sort((a: any, b: any) => (a.fecha || '').localeCompare(b.fecha || ''))
     .slice(0, 3)
 
@@ -165,7 +167,7 @@ export function EmployeeTurnos({ db, u }: EmployeeTurnosProps) {
         })}
       </div>
 
-      {turnos.length === 0 && (
+      {!days.some(d => getTurno(d)) && (
         <div style={{ textAlign: 'center', color: colors.text[300], marginTop: 24, fontSize: '.9rem' }}>
           No tienes turnos asignados esta semana
         </div>
