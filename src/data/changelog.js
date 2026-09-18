@@ -4,6 +4,19 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.23',
+    date: '2026-09-18',
+    title: 'Auditoría de seguridad y permisos, segunda ronda',
+    items: [
+      'Corregido un fichaje duplicado por WhatsApp: si Meta reintentaba la entrega del mismo mensaje, dos instancias del servidor podían procesarlo a la vez y crear dos fichajes (o una salida duplicada) para el mismo empleado. Ahora la deduplicación es persistente, no solo en memoria.',
+      'Borrar una solicitud de vacaciones ahora también elimina el PDF firmado asociado (antes quedaba huérfano en el almacenamiento y como documento fantasma en el panel).',
+      'Se avisa si una nueva solicitud/asignación de vacaciones se solapa en fechas con otra ya pendiente o aprobada del mismo empleado.',
+      'Se avisa (con confirmación) si se asignan más días de vacaciones de los que le corresponden a un empleado, en vez de ocultarlo en silencio.',
+      'Si fallan las notificaciones push del autocierre automático (por ejemplo, claves VAPID mal configuradas), ahora queda registrado como error en el panel de salud en vez de pasar desapercibido.',
+      'Reforzada la paginación en varias lecturas del servidor (cierres, vacaciones, suscripciones push) para que no se trunquen en silencio si la empresa crece.',
+    ],
+  },
+  {
     version: '4.6.22',
     date: '2026-09-18',
     title: 'Auditoría de seguridad y permisos: encargados, vacaciones y cierres',

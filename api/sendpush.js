@@ -5,6 +5,7 @@ import { actorCanNotify } from '../src/server/pushAuthorization.js'
 import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 import { createHash, timingSafeEqual } from 'crypto'
 import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
+import { readAllRestRows } from '../scripts/read-all-rest-rows.mjs'
 
 // ── In-memory rate limiter (per IP): max 30 requests per minute ──────────────
 const _rl = new Map()
@@ -96,10 +97,14 @@ async function sbGet(userId) {
 
 async function sbGetAll() {
   if (!SB_URL || !SB_ANON) return []
-  const url = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`
-  const r = await fetch(url, { headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` } })
-  if (!r.ok) return []
-  return await r.json()
+  try {
+    return await readAllRestRows({
+      baseUrl: SB_URL, path: 'push_subs?select=user_id,endpoint,p256dh,auth',
+      headers: { apikey: SB_SERVER_KEY, Authorization: `Bearer ${SB_SERVER_KEY}` },
+    })
+  } catch {
+    return []
+  }
 }
 
 async function sbDelete(userId) {

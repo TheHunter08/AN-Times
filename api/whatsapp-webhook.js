@@ -28,7 +28,7 @@
 //   4. Verify token: el mismo valor que pongas en WHATSAPP_VERIFY_TOKEN
 //   5. Suscribirse al campo "messages"
 // ─────────────────────────────────────────────────────────────────────────────
-import { timingSafeEqual } from 'crypto'
+import { timingSafeEqual, createHash } from 'crypto'
 import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
@@ -55,17 +55,35 @@ function isAuthorizedRequest(req) {
   return timingSafeEqual(a, b)
 }
 
-// Dedupe en memoria: Meta puede reintentar el mismo webhook si no respondemos
-// rápido con 200. No es persistente entre cold starts, pero cubre el caso común.
-const _seenMsgIds = new Map()
-function isDuplicateMsg(id) {
-  const now = Date.now()
-  if (_seenMsgIds.has(id)) return true
-  _seenMsgIds.set(id, now)
-  if (_seenMsgIds.size > 500) {
-    for (const [k, t] of _seenMsgIds) { if (now - t > 10 * 60_000) _seenMsgIds.delete(k) }
+// Dedupe persistente (igual que claimPushDelivery en sendpush.js): un Map en
+// memoria de proceso NO sobrevive a que Meta reintente el mismo webhook y la
+// petición aterrice en otra instancia serverless — algo frecuente incluso
+// sin cold start, bajo concurrencia normal. Dos instancias con su propio Map
+// vacío podían procesar el mismo mensaje en paralelo y crear DOS fichajes (o
+// una salida duplicada) para el mismo empleado — justo el tipo de bug que
+// este endpoint existe para evitar. El insert con ignore-duplicates en
+// app_entities es atómico a nivel de base de datos: solo una de las dos
+// peticiones concurrentes "gana" la reserva.
+const WHATSAPP_DEDUPE_TTL_MS = 24 * 60 * 60 * 1000
+async function claimWhatsAppMessage(msgId) {
+  if (!SB_URL || !SB_KEY) return true
+  const digest = createHash('sha256').update(String(msgId)).digest('hex')
+  try {
+    const response = await fetch(`${SB_URL}/rest/v1/app_entities?on_conflict=id`, {
+      method: 'POST',
+      headers: { ...SB_H, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({
+        id: `whatsapp_msg:${digest}`, company_id: COMPANY_ID, collection: 'whatsapp_msg', entity_id: digest,
+        data: { msgId, expiresAt: new Date(Date.now() + WHATSAPP_DEDUPE_TTL_MS).toISOString() },
+        revision: 1, deleted: false, updated_at: new Date().toISOString(),
+      }),
+    })
+    if (!response.ok) { console.warn('[whatsapp-webhook] persistent dedupe unavailable:', response.status); return true }
+    const inserted = await response.json().catch(() => [])
+    return inserted.length > 0
+  } catch {
+    return true
   }
-  return false
 }
 
 async function getAppData() {
@@ -267,7 +285,8 @@ export default async function handler(req, res) {
     // El dedupe va ANTES de comprobar el tipo: si Meta reintenta el webhook
     // de un mensaje no-textual (no recibió 200 a tiempo), el chequeo de tipo
     // reenviaba la respuesta "solo puedo leer texto" en cada reintento.
-    if (isDuplicateMsg(msg.id)) return res.status(200).json({ ok: true, deduped: true })
+    const claimed = await claimWhatsAppMessage(msg.id)
+    if (!claimed) return res.status(200).json({ ok: true, deduped: true })
     if (msg.type !== 'text') {
       await sendWhatsAppReply(msg.from, 'Solo puedo leer mensajes de texto: *entrada*, *salida*, *pausa*, *reanudar* o *estado*.')
       return res.status(200).json({ ok: true, skipped: 'non-text' })

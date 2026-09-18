@@ -562,7 +562,18 @@ function VacacionesAdminPage() {
   const onAssign = (empId: string, fechaInicio: string, fechaFin: string, motivo: string) => {
     const emp = emps.find((e: any) => e.id === empId)
     if (!emp) return
+    // Sin este chequeo, dos asignaciones/aprobaciones de vacaciones del mismo
+    // empleado podían solaparse en el tiempo sin ningún aviso.
+    const overlapping = (db.vacaciones || []).some((v: any) => v.empId === empId && v.estado !== 'rechazada' && v.fechaInicio <= fechaFin && v.fechaFin >= fechaInicio)
+    if (overlapping) { toast('Ya existe una vacación (pendiente o aprobada) que se solapa con esas fechas', 4500, 'warn'); return }
     const dias = Math.max(1, Math.round((new Date(fechaFin + 'T00:00:00').getTime() - new Date(fechaInicio + 'T00:00:00').getTime()) / 86400000) + 1)
+    // vacData().available ya resta lo usado/pendiente, pero recorta a 0 con
+    // Math.max — sin este aviso, asignar más días de los que le corresponden
+    // al empleado pasaba desapercibido en vez de ser una decisión consciente
+    // (el admin puede querer conceder días extra a propósito, así que se
+    // avisa y se pide confirmar en vez de bloquear).
+    const availDays = vacDataUtil(empId, db).available
+    if (dias > availDays && !window.confirm(`${emp.name} solo tiene ${availDays} día${availDays === 1 ? '' : 's'} disponibles y esta asignación son ${dias}. ¿Asignar igualmente?`)) return
     const who = session?.user?.name || 'Admin'
     const nowIso = new Date().toISOString()
     const vac = { id: gid(), empId, empName: emp.name, fechaInicio, fechaFin, dias, motivo: motivo || 'Vacaciones', estado: 'aprobada', ts: nowIso, _upd: nowIso, asignadoPor: who }
@@ -578,6 +589,8 @@ function VacacionesAdminPage() {
   const onApprove = (id: string) => {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
+    const overlapping = (db.vacaciones || []).some((v: any) => v.id !== id && v.empId === vac.empId && v.estado === 'aprobada' && v.fechaInicio <= vac.fechaFin && v.fechaFin >= vac.fechaInicio)
+    if (overlapping) { toast('Ya hay una vacación aprobada de este empleado que se solapa con estas fechas', 4500, 'warn'); return }
     const nowIso = new Date().toISOString()
     // Comprueba el estado FRESCO dentro del propio saveDB (no el `vac` de
     // arriba, capturado al render) y aborta con null si ya no está
@@ -623,7 +636,22 @@ function VacacionesAdminPage() {
   }
 
   const onDelete = (id: string) => {
-    saveDB((fresh: any) => ({ vacaciones: (fresh.vacaciones || []).filter((v: any) => v.id !== id) }))
+    // El PDF de vacaciones firmadas se sube a `${empId}/${vacId}.pdf` en
+    // VACACIONES_PDF_BUCKET (ModalVacSign.jsx) y su registro en `documentos`
+    // guarda `vacId` (o, para documentos antiguos anteriores a ese campo, el
+    // storagePath sigue terminando en `/${id}.pdf`) — sin esto, borrar la
+    // solicitud dejaba el PDF huérfano en Storage y un documento "firmado"
+    // fantasma en el panel, referido a una vacación que ya no existe.
+    const linkedDoc = (db.documentos || []).find((d: any) =>
+      d.tipo === 'vacaciones' && (d.vacId === id || String(d.signedStoragePath || '').endsWith(`/${id}.pdf`))
+    )
+    saveDB((fresh: any) => ({
+      vacaciones: (fresh.vacaciones || []).filter((v: any) => v.id !== id),
+      documentos: linkedDoc ? (fresh.documentos || []).filter((d: any) => d.id !== linkedDoc.id) : (fresh.documentos || []),
+    }))
+    if (linkedDoc?.signedStoragePath && authSupabase) {
+      authSupabase.storage.from(VACACIONES_PDF_BUCKET).remove([linkedDoc.signedStoragePath]).catch(() => {})
+    }
     toast('Solicitud eliminada', 2500, 'warn')
   }
 

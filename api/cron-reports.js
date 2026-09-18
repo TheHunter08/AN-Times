@@ -4,6 +4,7 @@ import writeXlsxFile from 'write-excel-file/node'
 import { createAutomationRun, mergeAutomationHealth } from '../src/server/automationHealth.js'
 import { buildScheduledReportRows, isScheduleDue, parseReportRecipients, reportPeriod } from '../src/server/scheduledReports.js'
 import { isMissingStorageBucketResponse } from '../src/server/storageBuckets.js'
+import { readAllRestRows } from '../scripts/read-all-rest-rows.mjs'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -71,15 +72,23 @@ async function writeConfig(config, expectedUpdatedAt) {
 // Los fichajes que puede necesitar un informe (semanal o mensual, siempre
 // referidos al periodo más reciente ya cerrado) nunca se remontan a más de
 // ~31 días atrás — nunca hace falta el histórico completo para generarlos.
+// readAllRestRows pagina con Range — sin esto, una empresa con más plantilla
+// o con muchos fichajes en la ventana de 40 días podía superar el límite por
+// página de PostgREST (1000 filas) y el informe se generaba incompleto sin
+// ningún error visible.
 async function readReportSource(sinceIso) {
-  const [employeesResponse, recordsResponse] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/employees?select=*&baja=eq.false`, { headers }),
-    fetch(`${SB_URL}/rest/v1/records?select=*&deleted=eq.false&inicio=gte.${encodeURIComponent(sinceIso)}`, { headers }),
-  ])
-  if (![employeesResponse, recordsResponse].every(response => response.ok)) throw new Error('normalized report source unavailable')
+  let employeeRows, recordRows
+  try {
+    ;[employeeRows, recordRows] = await Promise.all([
+      readAllRestRows({ baseUrl:SB_URL, path:'employees?select=*&baja=eq.false', headers }),
+      readAllRestRows({ baseUrl:SB_URL, path:`records?select=*&deleted=eq.false&inicio=gte.${encodeURIComponent(sinceIso)}`, headers }),
+    ])
+  } catch {
+    throw new Error('normalized report source unavailable')
+  }
   return {
-    employees:(await employeesResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja })),
-    records:(await recordsResponse.json()).map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name, inicio:row.inicio, fin:row.fin, centro:row.centro, workSecs:row.work_secs, closed:row.closed })),
+    employees:employeeRows.map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja })),
+    records:recordRows.map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, empName:row.emp_name, inicio:row.inicio, fin:row.fin, centro:row.centro, workSecs:row.work_secs, closed:row.closed })),
   }
 }
 

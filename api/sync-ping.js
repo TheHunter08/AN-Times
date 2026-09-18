@@ -15,6 +15,7 @@ import { createAutomationRun } from '../src/server/automationHealth.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { getDeviceCoverage, getLaunchCoverage, isSyncCandidate } from '../src/server/syncPingPolicy.js'
 import { isAuthRlsServerMode } from '../src/server/securityMode.js'
+import { readAllRestRows } from '../scripts/read-all-rest-rows.mjs'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -44,23 +45,18 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 }
 
 const SB_H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+// readAllRestRows pagina con Range — sin esto, push_subs (varios dispositivos
+// por empleado) o employees podían truncarse en silencio pasado el límite
+// por página de PostgREST, dejando fuera justo a los dispositivos más
+// recientes/antiguos del sync-ping.
 async function getSyncState() {
   if (!SB_URL || !SB_KEY) return { candidates: [], coverage: getDeviceCoverage() }
-  const employeesUrl = `${SB_URL}/rest/v1/employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`
-  const subscriptionsUrl = `${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync,updated_at`
-  const signaturesUrl = `${SB_URL}/rest/v1/app_entities?select=entity_id,data&company_id=eq.${COMPANY_ID}&collection=eq.firmas&deleted=eq.false`
   try {
-    const [employeesResponse, subscriptionsResponse, signaturesResponse] = await Promise.all([
-      fetch(employeesUrl, { headers: SB_H }),
-      fetch(subscriptionsUrl, { headers: SB_H }),
-      fetch(signaturesUrl, { headers: SB_H }),
+    const [employees, subscriptions, signatureRows] = await Promise.all([
+      readAllRestRows({ baseUrl: SB_URL, path: `employees?select=id,role,baja&company_id=eq.${COMPANY_ID}`, headers: SB_H }),
+      readAllRestRows({ baseUrl: SB_URL, path: 'push_subs?select=user_id,endpoint,p256dh,auth,last_online,last_sync,updated_at', headers: SB_H }),
+      readAllRestRows({ baseUrl: SB_URL, path: `app_entities?select=entity_id,data&company_id=eq.${COMPANY_ID}&collection=eq.firmas&deleted=eq.false`, headers: SB_H }),
     ])
-    if (!employeesResponse.ok || !subscriptionsResponse.ok || !signaturesResponse.ok) {
-      throw new Error(`coverage fetch failed: ${employeesResponse.status}/${subscriptionsResponse.status}/${signaturesResponse.status}`)
-    }
-    const employees = await employeesResponse.json()
-    const subscriptions = await subscriptionsResponse.json()
-    const signatureRows = await signaturesResponse.json()
     const signatures = {}
     for (const row of signatureRows || []) {
       if (row.entity_id === '__singleton__') Object.assign(signatures, row.data || {})

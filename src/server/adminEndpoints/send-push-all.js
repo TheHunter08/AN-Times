@@ -7,6 +7,7 @@
 import webpush from 'web-push'
 import { timingSafeEqual } from 'crypto'
 import { isAuthRlsServerMode } from '../securityMode.js'
+import { readAllRestRows } from '../../../scripts/read-all-rest-rows.mjs'
 
 const cleanEnv = s => (s || '').replace(/^﻿/, '').trim()
 const toB64Url = s => cleanEnv(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -73,10 +74,16 @@ async function getAppData() {
   return rows?.[0]?.data || null
 }
 
+// readAllRestRows pagina con Range — sin esto, un broadcast a toda la
+// plantilla podía omitir en silencio los dispositivos que caían pasado el
+// límite por página de PostgREST (1000 filas) según creciera el número de
+// suscripciones (varios dispositivos por empleado).
 async function getPushSubs() {
-  const r = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_H })
-  if (!r.ok) return []
-  return r.json()
+  try {
+    return await readAllRestRows({ baseUrl: SB_URL, path: 'push_subs?select=user_id,endpoint,p256dh,auth', headers: SB_H })
+  } catch {
+    return []
+  }
 }
 
 async function deleteSub(userId) {

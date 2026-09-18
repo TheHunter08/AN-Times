@@ -37,6 +37,12 @@ export function ModalVacForm({ visible, db, u, onClose, toast, saveDB }) {
     if (fi < today()) { toast('La fecha de inicio no puede ser anterior a hoy'); return }
     const s = new Date(fi + 'T00:00:00'), e = new Date(ff + 'T00:00:00')
     if (s > e) { toast('Fecha fin debe ser posterior'); return }
+    // Sin este chequeo, dos solicitudes que se solapan podían enviarse (cada
+    // una cabe en el saldo disponible en el momento de enviarla) y aprobarse
+    // ambas por separado, generando dos períodos "aprobados" superpuestos,
+    // cada uno con su propio PDF de firma y notificación al jefe de obra.
+    const overlapping = (db.vacaciones || []).some(v => v.empId === u.id && v.estado !== 'rechazada' && v.fechaInicio <= ff && v.fechaFin >= fi)
+    if (overlapping) { toast('Ya tienes una solicitud de vacaciones (pendiente o aprobada) que se solapa con estas fechas', 4500, 'warn'); return }
     const days = Math.round((e - s) / 86400000) + 1
     const availDays = vacData(u.id, db).available
     if (days > availDays) { toast(`Solo tienes ${availDays} día${availDays !== 1 ? 's' : ''} disponibles`, 4000, 'warn'); return }

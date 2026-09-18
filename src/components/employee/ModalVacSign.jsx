@@ -88,7 +88,7 @@ export function ModalVacSign({ visible, db, u, toast, saveDB }) {
       // firma se dibuja al generarlo), a diferencia del flujo de ModalDocumentos
       // donde `data` guarda el original sin firmar pendiente de estampar.
       const doc = {
-        id: gid(), empId: u.id, empName: u.name, tipo: 'vacaciones',
+        id: gid(), empId: u.id, empName: u.name, tipo: 'vacaciones', vacId: selVac.id,
         nombre: `Vacaciones firmadas ${fmtDate(selVac.fechaInicio)} - ${fmtDate(selVac.fechaFin)}`,
         firma: vacFinal.firma,
         signedStoragePath: documentoId || null,

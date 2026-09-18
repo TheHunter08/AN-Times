@@ -5,6 +5,7 @@ import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 import { toRecordRow } from '../src/services/tableSyncPlan.js'
 import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../src/utils/recordLifecycle.js'
+import { readAllRestRows } from '../scripts/read-all-rest-rows.mjs'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -57,9 +58,13 @@ async function notifyClosed(records) {
   const privateKey = clean(process.env.VAPID_PRIVATE)
   if (!publicKey || !privateKey) return { sent:0, skipped:records.length, reason:'VAPID no configurado' }
   try { webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', publicKey, privateKey) } catch { return { sent:0, skipped:records.length, reason:'VAPID inválido' } }
-  const response = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers })
-  if (!response.ok) return { sent:0, skipped:records.length, reason:`push_subs ${response.status}` }
-  const grouped = groupPushSubscriptions(await response.json())
+  let subs
+  try {
+    subs = await readAllRestRows({ baseUrl:SB_URL, path:'push_subs?select=user_id,endpoint,p256dh,auth', headers })
+  } catch (error) {
+    return { sent:0, skipped:records.length, reason:`push_subs ${error.message}` }
+  }
+  const grouped = groupPushSubscriptions(subs)
   let sent = 0
   for (const record of records) {
     const subs = grouped.get(record.empId) || []
@@ -99,9 +104,22 @@ export default async function handler(req, res) {
       return { ...finalizeRecord(record, { now:closeTime, maxOpenBreakMin:MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE }), autoClosedAt:new Date().toISOString() }
     })
     const tableFailures = await upsertRecords(closed)
-    const run = createAutomationRun('autoclose', { startedAt, checked:open.length, processed:closed.length, status:tableFailures.length ? 'error' : 'ok', error:tableFailures[0] || null })
-    await persistAutomationRun(run)
     const delivery = await notifyClosed(closed)
+    // Antes esto se calculaba ANTES de llamar a notifyClosed, así que un
+    // fallo total de notificación (VAPID sin configurar o inválido) nunca
+    // podía marcar el run como 'error': la jornada se cerraba bien pero
+    // NINGÚN empleado era avisado, sin que el panel de salud lo detectara.
+    // No se trata como error el caso normal de que a algún empleado le
+    // falte suscripción push (delivery.sent puede ser 0 solo porque nadie
+    // tenía suscripción, no porque VAPID esté mal) — solo el fallo total de
+    // configuración, señalado por `delivery.reason`.
+    const deliveryMisconfigured = closed.length > 0 && delivery.sent === 0 && Boolean(delivery.reason)
+    const run = createAutomationRun('autoclose', {
+      startedAt, checked:open.length, processed:closed.length,
+      status: (tableFailures.length || deliveryMisconfigured) ? 'error' : 'ok',
+      error: tableFailures[0] || (deliveryMisconfigured ? `Push de autocierre no enviado: ${delivery.reason}` : null),
+    })
+    await persistAutomationRun(run)
     return res.status(200).json({ ok:true, checked:open.length, closed:closed.length, tableFailures:tableFailures.length, pushSent:delivery.sent, pushSkipped:delivery.skipped })
   } catch (error) {
     console.error('[cron-autoclose]', error)
