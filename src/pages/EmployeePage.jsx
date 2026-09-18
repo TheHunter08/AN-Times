@@ -23,7 +23,7 @@ import { evaluateGeofence, normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
-import { finalizeRecord } from '../utils/recordLifecycle.js'
+import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
 import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
 import { createNotification } from '../utils/notifications.js'
@@ -631,10 +631,13 @@ export default function EmployeePage() {
             if (!freshRec || freshRec.fin) return
             markSent(acKey)
             // El cierre se fija exactamente a las 10 h, aunque el navegador se
-            // despierte más tarde. finalizeRecord también incorpora un descanso
-            // que siguiera activo y evita contabilizarlo como trabajo.
+            // despierte más tarde. Si quedó un descanso sin cerrar, se cuenta
+            // como máximo MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE minutos de descanso
+            // — sin este tope, un descanso nunca cerrado (se le olvidó, perdió
+            // cobertura) se extendía hasta la hora del autocierre y podía
+            // dejar la jornada entera en 0h trabajadas.
             const closeTime = new Date(new Date(freshRec.inicio).getTime() + 10 * 60 * 60 * 1000).toISOString()
-            const closed2 = { ...finalizeRecord(freshRec, { now: closeTime }), autoClosedAt: new Date().toISOString() }
+            const closed2 = { ...finalizeRecord(freshRec, { now: closeTime, maxOpenBreakMin: MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE }), autoClosedAt: new Date().toISOString() }
             const t2 = { work: closed2.workSecs, brk: closed2.breakSecs }
             // localDateStr(new Date(inicio)) (no inicio.slice(0,10)): inicio se guarda en
             // UTC — un cierre automático de madrugada mostraba el día siguiente al real.

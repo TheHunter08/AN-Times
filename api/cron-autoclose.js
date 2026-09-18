@@ -4,7 +4,7 @@ import { createAutomationRun } from '../src/server/automationHealth.js'
 import { persistAutomationRun } from '../src/server/persistAutomationHealth.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from '../src/server/pushSubscriptions.js'
 import { toRecordRow } from '../src/services/tableSyncPlan.js'
-import { finalizeRecord } from '../src/utils/recordLifecycle.js'
+import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../src/utils/recordLifecycle.js'
 
 const clean = value => String(value || '').replace(/^\uFEFF/, '').trim()
 const SB_URL = clean(process.env.VITE_SB_URL)
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     }
     const closed = candidates.map(record => {
       const closeTime = new Date(new Date(record.inicio).getTime() + TEN_HOURS_MS).toISOString()
-      return { ...finalizeRecord(record, { now:closeTime }), autoClosedAt:new Date().toISOString() }
+      return { ...finalizeRecord(record, { now:closeTime, maxOpenBreakMin:MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE }), autoClosedAt:new Date().toISOString() }
     })
     const tableFailures = await upsertRecords(closed)
     const run = createAutomationRun('autoclose', { startedAt, checked:open.length, processed:closed.length, status:tableFailures.length ? 'error' : 'ok', error:tableFailures[0] || null })

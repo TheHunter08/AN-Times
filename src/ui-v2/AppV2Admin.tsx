@@ -43,7 +43,7 @@ import { getScopedOnlineRecords, getScopedEmployees, isScopedSupervisor } from '
 import { verifyPin, hashPin } from '../utils/pinSecurity.js'
 import { buildComplianceSummary } from '../utils/complianceSummary.js'
 import { isRecordPendingValidation, recordValidationState, selectValidationRecords } from '../utils/recordValidation.js'
-import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET } from '../config/constants.js'
+import { CIERRE_PDF_BUCKET, DOCUMENTOS_BUCKET, VACACIONES_PDF_BUCKET } from '../config/constants.js'
 import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { workBalanceOptions } from '../utils/workBalance.js'
@@ -1459,9 +1459,15 @@ function DocumentsPage() {
   const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
     if (doc.fileData) return doc.fileData
     const storagePath = doc.signedStoragePath || doc.storagePath
+    // El PDF de vacaciones firmadas (ModalVacSign.jsx) se sube a
+    // VACACIONES_PDF_BUCKET, no a DOCUMENTOS_BUCKET como el resto de
+    // documentos — pedir la URL firmada siempre en DOCUMENTOS_BUCKET hacía
+    // fallar la búsqueda para ese tipo (bucket equivocado) y el PDF nunca
+    // aparecía, aunque el registro sí existiera en `documentos`.
+    const bucket = doc.tipo === 'vacaciones' ? VACACIONES_PDF_BUCKET : DOCUMENTOS_BUCKET
     if (storagePath && authSupabase) {
       try {
-        const { data, error } = await authSupabase.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(storagePath, 3600, filename ? { download: filename } : undefined)
+        const { data, error } = await authSupabase.storage.from(bucket).createSignedUrl(storagePath, 3600, filename ? { download: filename } : undefined)
         if (!error && data?.signedUrl) return data.signedUrl
       } catch { /* cae al respaldo de abajo */ }
     }

@@ -10,7 +10,7 @@ import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, has
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
-import { DOCUMENTOS_BUCKET } from '../../config/constants.js'
+import { DOCUMENTOS_BUCKET, VACACIONES_PDF_BUCKET } from '../../config/constants.js'
 
 const OV   = { position:'fixed', inset:0, background:'rgba(0,0,0,.65)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:1000 }
 const MOD  = { background:colors.bg[700], borderRadius:`${radius['2xl']} ${radius['2xl']} 0 0`, padding:'20px 18px 40px', width:'100%', maxWidth:560, maxHeight:'92vh', overflowY:'auto' }
@@ -64,7 +64,12 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
       if (!doc?.signedStoragePath && !doc?.storagePath) return
       try {
         const path = doc.signedStoragePath || doc.storagePath
-        const { data, error } = await storage.storage.from(DOCUMENTOS_BUCKET).createSignedUrl(path, 3600)
+        // El PDF de vacaciones firmadas (ModalVacSign.jsx) se sube a
+        // VACACIONES_PDF_BUCKET, no a DOCUMENTOS_BUCKET como el resto —
+        // pedirlo siempre en DOCUMENTOS_BUCKET fallaba por bucket equivocado
+        // y el documento nunca terminaba de cargar para ese tipo.
+        const bucket = doc.tipo === 'vacaciones' ? VACACIONES_PDF_BUCKET : DOCUMENTOS_BUCKET
+        const { data, error } = await storage.storage.from(bucket).createSignedUrl(path, 3600)
         if (!cancelled && !error && data?.signedUrl) {
           setResolvedUrls(prev => ({ ...prev, [id]: data.signedUrl }))
         }

@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.20',
+    date: '2026-09-18',
+    title: 'Corrige horas en 0 tras autocierre y el PDF de vacaciones firmadas',
+    items: [
+      'Si a alguien se le olvidaba fichar la salida del descanso y su jornada se cerraba automáticamente a las 10h, ese descanso "abierto" se contaba desde que empezó hasta el cierre automático — podía comerse casi toda la jornada y dejarla en 0 horas trabajadas aunque sí se hubiera trabajado. Ahora un descanso sin cerrar solo descuenta como máximo 1 hora; el resto se cuenta como trabajado.',
+      'El PDF de vacaciones firmadas (nueva firma obligatoria antes de seguir usando la app) se guardaba en un almacén distinto al que consulta la pantalla de Documentos, así que nunca llegaba a mostrarse ni a los jefes de obra ni al propio empleado. Ya se guarda y se consulta en el mismo sitio.',
+    ],
+  },
+  {
     version: '4.6.19',
     date: '2026-09-18',
     title: 'Los documentos y PDF firmados vuelven a abrirse al pulsar "Ver"',
