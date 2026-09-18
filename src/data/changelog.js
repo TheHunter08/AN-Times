@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.21',
+    date: '2026-09-18',
+    title: 'El PDF de vacaciones firmadas ya se puede encontrar en Documentos',
+    items: [
+      'En el panel de administración, el documento de vacaciones firmadas caía en la categoría genérica "Otro" — sin etiqueta ni filtro propio, el jefe de obra no lo distinguía del resto y no lo encontraba aunque sí existiera. Ahora tiene su propia categoría "Vacaciones".',
+      'Se añade una herramienta de auditoría (npm run audit:autoclose-break-drift) para localizar fichajes ya cerrados antes de la corrección de la v4.6.20 cuyo descanso sin cerrar dejó las horas trabajadas en 0 — útil para detectar cierres mensuales ya generados que arrastren ese dato incorrecto.',
+    ],
+  },
+  {
     version: '4.6.20',
     date: '2026-09-18',
     title: 'Corrige horas en 0 tras autocierre y el PDF de vacaciones firmadas',

@@ -1443,9 +1443,13 @@ function DocumentsPage() {
   const employees = useMemo(() => (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja), [db.employees])
   const employeeLabels = useMemo(() => buildDuplicateNameLabels(employees.map((e: any) => ({ id: e.id, name: e.name, dept: e.dept || e.centroTrabajo }))), [employees])
 
-  const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'otro'> = {
+  // Sin 'vacaciones' aquí, el PDF de vacaciones firmadas (ModalVacSign.jsx,
+  // tipo:'vacaciones') caía en la categoría genérica "Otro" — el jefe de obra
+  // no tenía forma de filtrar por "Vacaciones" ni de reconocerlo por su
+  // etiqueta, así que aunque el documento sí existiera nunca lo encontraba.
+  const catMap: Record<string, 'contrato' | 'nomina' | 'certificado' | 'vacaciones' | 'otro'> = {
     contrato: 'contrato', nomina: 'nomina', nómina: 'nomina',
-    certificado: 'certificado',
+    certificado: 'certificado', vacaciones: 'vacaciones',
   }
 
   // Resuelve una URL utilizable. `fileData` se comprueba primero porque es

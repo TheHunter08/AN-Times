@@ -11,7 +11,7 @@ import { ProductState } from '../components/ProductState.js'
 export interface DocumentItem {
   id: string
   name: string
-  category: 'contrato' | 'nomina' | 'certificado' | 'otro'
+  category: 'contrato' | 'nomina' | 'certificado' | 'vacaciones' | 'otro'
   empName: string
   size: string
   uploadedOn: string
@@ -31,21 +31,23 @@ export interface DocumentsProps {
 }
 
 const catLabel: Record<DocumentItem['category'], string> = {
-  contrato: 'Contrato', nomina: 'Nómina', certificado: 'Certificado', otro: 'Otro',
+  contrato: 'Contrato', nomina: 'Nómina', certificado: 'Certificado', vacaciones: 'Vacaciones', otro: 'Otro',
 }
-const catTone: Record<DocumentItem['category'], 'purple' | 'orange' | 'green' | 'gray'> = {
-  contrato: 'purple', nomina: 'orange', certificado: 'green', otro: 'gray',
+const catTone: Record<DocumentItem['category'], 'purple' | 'orange' | 'green' | 'red' | 'gray'> = {
+  contrato: 'purple', nomina: 'orange', certificado: 'green', vacaciones: 'red', otro: 'gray',
 }
 const catColor: Record<DocumentItem['category'], string> = {
   contrato: colors.primary.light,
   nomina:   colors.accent.base,
   certificado: colors.semantic.green,
+  vacaciones: colors.semantic.red,
   otro: colors.text[500],
 }
 const catBg: Record<DocumentItem['category'], string> = {
   contrato: colors.primary.dim,
   nomina: colors.accent.dim,
   certificado: 'rgba(16,185,129,.14)',
+  vacaciones: 'rgba(239,68,68,.12)',
   otro: 'rgba(148,163,184,.10)',
 }
 
@@ -57,7 +59,7 @@ export function Documents({ items, onUpload }: DocumentsProps) {
     .filter(d => cat === 'all' || d.category === cat)
     .filter(d => (d.name + d.empName).toLowerCase().includes(search.toLowerCase()))
 
-  const cats = ['all', 'contrato', 'nomina', 'certificado', 'otro'] as const
+  const cats = ['all', 'contrato', 'nomina', 'certificado', 'vacaciones', 'otro'] as const
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900 }}>
