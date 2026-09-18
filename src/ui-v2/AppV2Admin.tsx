@@ -29,6 +29,7 @@ import { authSupabase, resendConfirmationEmail } from '../services/authService.j
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
 import { effectiveDailyTargetMin } from '../utils/laborCalendar.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
+import { dataUrlToBlob } from '../utils/pdfSign.js'
 import { employeeBelongsToObra, resolveRecordObraId } from '../utils/obraAttribution.js'
 import { formatObraCoords, normalizeObraCoords } from '../utils/obraGeo.js'
 import { toggleTheme } from '../utils/userConfig.js'
@@ -1475,7 +1476,12 @@ function DocumentsPage() {
     if (!doc) return
     const url = await resolveDocUrl(doc)
     if (!url) { toast('Vista previa no disponible', 3000, 'warn'); return }
-    window.open(url, '_blank', 'noopener,noreferrer')
+    // Los navegadores modernos (Chrome, Safari, Firefox) bloquean la
+    // navegación de una pestaña nueva directamente a una URL data: — la
+    // pestaña se abre pero se queda en blanco, sin ningún error visible. Un
+    // documento sin subir a Storage (fileData en base64) siempre devolvía
+    // aquí una URL data: — hay que convertirla a blob: antes de abrirla.
+    window.open(url.startsWith('data:') ? URL.createObjectURL(dataUrlToBlob(url)) : url, '_blank', 'noopener,noreferrer')
   }
 
   const requestSignatureRepair = (id: string) => {

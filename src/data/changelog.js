@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.19',
+    date: '2026-09-18',
+    title: 'Los documentos y PDF firmados vuelven a abrirse al pulsar "Ver"',
+    items: [
+      'Al ver un documento (foto subida desde el móvil, o la vista previa de administración) que todavía no estaba en el almacenamiento seguro, "Abrir" abría una pestaña nueva que se quedaba completamente en blanco — los navegadores modernos bloquean por seguridad abrir directamente ese tipo de enlace. Ahora se convierte antes a un formato que sí se puede abrir.',
+    ],
+  },
+  {
     version: '4.6.18',
     date: '2026-09-16',
     title: 'El aviso de convenio (más de 9h al día) detecta turnos de madrugada',

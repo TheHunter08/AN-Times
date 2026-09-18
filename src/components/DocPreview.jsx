@@ -108,7 +108,11 @@ export function DocPreview({ d, db, empId }) {
       <div>
         <img src={fileData} alt={d.titulo} style={{ width:'100%', maxHeight:'50vh', objectFit:'contain', borderRadius: radius.sm, border:`1px solid ${colors.border.default}`, background:'#fff', display:'block' }} />
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
-          <button onClick={() => window.open(fileData, '_blank')}
+          {/* window.open(fileData) con fileData en base64 (data:) se abría en
+              blanco: los navegadores modernos bloquean la navegación directa
+              de una pestaña a una URL data:, sin ningún error visible. blobUrl
+              (ya calculado arriba con useBlobUrl) sí se puede abrir. */}
+          <button onClick={() => window.open(blobUrl || fileData, '_blank')}
             style={{ flex:1, padding:'9px 12px', fontSize:12, fontWeight:700, background: colors.bg[400], color: colors.text[700], border:`1px solid ${colors.border.default}`, borderRadius: radius.md, cursor:'pointer', fontFamily:'inherit' }}>
             ↗ Abrir
           </button>
