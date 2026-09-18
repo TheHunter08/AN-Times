@@ -16,6 +16,10 @@ export const MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE = 60
 // no hay forma de saber si de verdad siguió de descanso o si volvió a
 // trabajar y solo falló el botón de "fin de descanso", así que se opta por
 // no restarle horas trabajadas al empleado ante esa incertidumbre.
+/**
+ * @param {object} record
+ * @param {{ now?: string, actor?: { name?: string, id?: string } | null, reason?: string | null, maxOpenBreakMin?: number | null }} [options]
+ */
 export function finalizeRecord(record, { now = new Date().toISOString(), actor = null, reason = null, maxOpenBreakMin = null } = {}) {
   const breaks = [...(record.breaks || [])]
   let enDescanso = record.enDescanso

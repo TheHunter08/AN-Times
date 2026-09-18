@@ -27,6 +27,7 @@ import { auditLog, queuePush, uploadPendingIfAny, isConnectivityError } from '..
 import { supabase, persistRecordRow, deleteRecordRow } from '../services/dataServiceV2.js'
 import { authSupabase, resendConfirmationEmail } from '../services/authService.js'
 import { gid, today, mhm, localDateStr, localMonthKey, calcSecs, monthlyExtras, recWorkSecs, recordsInWorkWeek, vacData as vacDataUtil } from '../utils/time.js'
+import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../utils/recordLifecycle.js'
 import { effectiveDailyTargetMin } from '../utils/laborCalendar.js'
 import { buildRecordSnapshot, canCloseMonth, clipBreaksToWindow, currentDeviceLabel, isRecordMonthLocked, recordTimesFromClock, refreshUnsignedClosures } from '../utils/adminHelpers.js'
 import { dataUrlToBlob } from '../utils/pdfSign.js'
@@ -578,7 +579,16 @@ function VacacionesAdminPage() {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
     const nowIso = new Date().toISOString()
+    // Comprueba el estado FRESCO dentro del propio saveDB (no el `vac` de
+    // arriba, capturado al render) y aborta con null si ya no está
+    // pendiente — sin esto, un doble clic o dos pestañas de admin con
+    // estado desactualizado podían aprobar/rechazar dos veces la misma
+    // solicitud, o revertir una resolución ya tomada.
+    let applied = false
     saveDB((fresh: any) => {
+      const current = (fresh.vacaciones || []).find((v: any) => v.id === id)
+      if (!current || current.estado !== 'pendiente') return null
+      applied = true
       const updated = (fresh.vacaciones || []).map((v: any) =>
         v.id === id ? { ...v, estado: 'aprobada', resolvedAt: nowIso, _upd: nowIso } : v
       )
@@ -586,6 +596,7 @@ function VacacionesAdminPage() {
       const noti = createNotification({ empId:vac.empId, action:'Vacaciones aprobadas', dedupeKey:`vac:${vac.id}:aprobada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
+    if (!applied) { toast('Esta solicitud ya fue resuelta', 3000, 'warn'); return }
     if (vac.empId) queuePush(vac.empId, 'Vacaciones aprobadas', '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:aprobada`)
     toast('Solicitud aprobada', 3000, 'ok')
   }
@@ -594,7 +605,11 @@ function VacacionesAdminPage() {
     const vac = (db.vacaciones || []).find((v: any) => v.id === id)
     if (!vac) return
     const nowIso = new Date().toISOString()
+    let applied = false
     saveDB((fresh: any) => {
+      const current = (fresh.vacaciones || []).find((v: any) => v.id === id)
+      if (!current || current.estado !== 'pendiente') return null
+      applied = true
       const updated = (fresh.vacaciones || []).map((v: any) =>
         v.id === id ? { ...v, estado: 'rechazada', motivoRechazo: motivoRechazo || '', resolvedAt: nowIso, _upd: nowIso } : v
       )
@@ -602,6 +617,7 @@ function VacacionesAdminPage() {
       const noti = createNotification({ empId:vac.empId, action:'Vacaciones rechazadas', detail:motivoRechazo || '', dedupeKey:`vac:${vac.id}:rechazada`, ts:nowIso })
       return { vacaciones: updated, audit: withAudit.audit, notis: [...(fresh.notis || []), noti] }
     })
+    if (!applied) { toast('Esta solicitud ya fue resuelta', 3000, 'warn'); return }
     if (vac.empId) queuePush(vac.empId, 'Vacaciones rechazadas', motivoRechazo || '', 'vacaciones', '/?go=emp:vacaciones', `vac:${vac.id}:rechazada`)
     toast('Solicitud rechazada', 3000, 'warn')
   }
@@ -2942,6 +2958,17 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   const user = session?.user || {}
   const isScopedRole = isScopedSupervisor(session)
   const hasScope = !isScopedRole || Boolean(user.centroTrabajo || user.dept || user.obrasAsignadas?.length)
+  // Defense in depth: las políticas de Supabase para `records` son abiertas
+  // (anon_all), así que el filtrado de getScopedOnlineRecords/getScopedEmployees
+  // (usado para pintar `rows`) es la única barrera de ámbito — se repite aquí,
+  // igual que en TimesheetsPage/ValidateHoursPage, para que finishShift/
+  // toggleBreak/finishMany/remindMissing nunca actúen sobre un empleado fuera
+  // del equipo del encargado aunque llegue un id por otra vía.
+  const scopedEmpIds = useMemo(() => isScopedRole
+    ? new Set(getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: user, unrestricted: false }).map((e: any) => e.id))
+    : null,
+  [isScopedRole, db.employees, db.obras, user])
+  const outOfScope = (empId: string) => scopedEmpIds !== null && !scopedEmpIds.has(empId)
 
   const rows = useMemo(() => getScopedOnlineRecords({
     records: db.records || [],
@@ -2990,6 +3017,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   // mutación de un record solo se confirma en local si el guardado
   // incremental de Supabase tuvo éxito.
   const finishShift = async (row: any) => {
+    if (outOfScope(row.employeeId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     if (!window.confirm(`¿Finalizar la jornada de ${row.name}? La hora de salida será la actual.`)) return
     const reason = window.prompt('Motivo obligatorio para finalizar la jornada:')?.trim()
     if (!reason) { toast('Debes indicar el motivo del cierre', 3000, 'warn'); return }
@@ -2999,27 +3027,14 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
     const nowIso = new Date().toISOString()
     const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
 
-    const breaks = [...(current.breaks || [])]
-    if (current.enDescanso && current.bStartTs) breaks.push({ start: current.bStartTs, end: nowIso })
-    const closed: any = {
-      ...current,
-      fin: nowIso,
-      breaks,
-      enDescanso: false,
-      bStartTs: null,
-      closed: true,
-      cerradoPor: actor,
-      cerradoPorId: user.id || 'admin',
-      cierreManual: true,
-      motivoCierre: reason,
-      operationId: globalThis.crypto?.randomUUID?.() ?? current.operationId ?? null,
-      _rev: (current._rev || 0) + 1,
-      _upd: nowIso,
-    }
-    const totals = calcSecs(closed)
-    closed.workSecs = totals.work
-    closed.breakSecs = totals.brk
-    const workedMinutes = Math.floor(totals.work / 60)
+    // finalizeRecord con maxOpenBreakMin: si la jornada tenía un descanso sin
+    // cerrar (se le olvidó al empleado), cerrarla manualmente mucho después
+    // de que empezara ese descanso reproducía el mismo bug que el
+    // autocierre por inactividad — el descanso "abierto" se contaba hasta
+    // ahora mismo y podía dejar la jornada entera en 0h trabajadas (ver
+    // MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE en recordLifecycle.js).
+    const closed: any = finalizeRecord(current, { now: nowIso, actor: { name: actor, id: user.id || 'admin' }, reason, maxOpenBreakMin: MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE })
+    const workedMinutes = Math.floor(closed.workSecs / 60)
 
     try { await persistRecordRow(closed) } catch (error: any) {
       toast(syncErrorMessage('No se pudo finalizar la jornada', error), 5000, 'warn')
@@ -3056,6 +3071,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   }
 
   const toggleBreak = async (row: any) => {
+    if (outOfScope(row.employeeId)) { toast('No tienes acceso a este fichaje', 4000, 'warn'); return }
     const current = (db.records || []).find((record: any) => record.id === row.id)
     if (!current || current.fin) return
     const nowIso = new Date().toISOString()
@@ -3086,22 +3102,24 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
   }
 
   const finishMany = async (selectedRows:any[]) => {
-    if (!window.confirm(`¿Finalizar las ${selectedRows.length} jornadas visibles con la hora actual?`)) return
+    const inScopeRows = selectedRows.filter(row => !outOfScope(row.employeeId))
+    if (inScopeRows.length < selectedRows.length) {
+      toast(`${selectedRows.length - inScopeRows.length} fichaje${selectedRows.length - inScopeRows.length !== 1 ? 's' : ''} fuera de tu equipo se omitieron`, 4000, 'warn')
+    }
+    if (!inScopeRows.length) return
+    if (!window.confirm(`¿Finalizar las ${inScopeRows.length} jornadas visibles con la hora actual?`)) return
     const reason = window.prompt('Motivo obligatorio para el cierre múltiple:')?.trim()
     if (!reason) { toast('Debes indicar el motivo', 3000, 'warn'); return }
     const nowIso = new Date().toISOString()
     const actor = user.name || (session?.isAdmin ? 'Administración' : 'Supervisor')
-    const ids = new Set(selectedRows.map(row => row.id))
+    const ids = new Set(inScopeRows.map(row => row.id))
 
+    // finalizeRecord con maxOpenBreakMin — mismo motivo que finishShift: un
+    // descanso sin cerrar no debe comerse la jornada entera al cerrarla
+    // manualmente en lote.
     const closedRecords = (db.records || [])
       .filter((record: any) => ids.has(record.id) && !record.fin)
-      .map((record: any) => {
-        const breaks = [...(record.breaks || [])]
-        if (record.enDescanso && record.bStartTs) breaks.push({ start:record.bStartTs, end:nowIso })
-        const closed:any = { ...record, fin:nowIso, breaks, enDescanso:false, bStartTs:null, closed:true, cerradoPor:actor, cerradoPorId:user.id || 'admin', cierreManual:true, motivoCierre:reason, operationId:globalThis.crypto?.randomUUID?.() ?? record.operationId ?? null, _rev:(record._rev || 0) + 1, _upd:nowIso }
-        const totals = calcSecs(closed); closed.workSecs=totals.work; closed.breakSecs=totals.brk
-        return closed
-      })
+      .map((record: any) => finalizeRecord(record, { now: nowIso, actor: { name: actor, id: user.id || 'admin' }, reason, maxOpenBreakMin: MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE }))
     if (!closedRecords.length) return
 
     // Promise.allSettled (no Promise.all): con .all, si UNA sola escritura
@@ -3122,7 +3140,7 @@ function OnlineTeamPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: strin
       return auditLog(next, 'Jornadas finalizadas en lote', `${successfulRecords.length} empleados · ${reason}`, actor)
     }, { forceSyncIds:{ records:successfulRecords.map((record: any) => record.id) }, skipPriorityPersist:true })
     const successfulIds = new Set(successfulRecords.map((r: any) => r.id))
-    selectedRows.filter(row => successfulIds.has(row.id)).forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
+    inScopeRows.filter(row => successfulIds.has(row.id)).forEach(row => queuePush(row.employeeId, 'Jornada finalizada', `${actor} ha finalizado tu jornada. Motivo: ${reason}`, 'jornada', '/?tab=jornada'))
     if (successfulRecords.length < closedRecords.length) {
       toast(`${successfulRecords.length}/${closedRecords.length} jornadas finalizadas — el resto no se pudo sincronizar`, 5000, 'warn')
     } else {
@@ -3137,6 +3155,7 @@ function MessagesPage() {
   const db      = useAppStore(s => s.db) as any
   const session = useAppStore(s => s.session)
   const saveDB  = useAppStore(s => s.saveDB)
+  const toast   = useAppStore(s => s.toast)
 
   // Identidad fija del canal "administración" en el chat — NUNCA el id real
   // de sesión. Un jefe de obra o encargado inicia sesión con isAdmin=true
@@ -3150,7 +3169,7 @@ function MessagesPage() {
   const isScopedRole = isScopedSupervisor(session)
   const emps = isScopedRole
     ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
-    : (db.employees || []).filter((e: any) => !e.isAdmin)
+    : (db.employees || []).filter((e: any) => !e.isAdmin && !e.baja)
 
   const conversations = useMemo(() => {
     return emps.map((e: any) => {
@@ -3192,7 +3211,13 @@ function MessagesPage() {
     // nombre, así que no hace falta ocultar a nadie.
   }, [chats, emps, adminId])
 
+  // Defense in depth: `emps` ya está acotado a los empleados del encargado
+  // (getScopedEmployees), pero las políticas de Supabase son abiertas — sin
+  // esta comprobación, un `empId` fuera de esa lista permitía a un
+  // encargado enviar un mensaje a cualquier empleado de la empresa, firmado
+  // como "Admin" (ver el comentario sobre adminId más arriba).
   const handleSend = (empId: string, text: string) => {
+    if (!emps.some((e: any) => e.id === empId)) { toast('No tienes acceso a esta conversación', 4000, 'warn'); return }
     const newChat = {
       id: gid(), from: adminId, to: empId,
       text, ts: new Date().toISOString(), leido: false,

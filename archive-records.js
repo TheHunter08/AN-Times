@@ -21,6 +21,22 @@ if (!SB_URL || !SB_ANON) { console.error('[archive] VITE_SB_URL / VITE_SB_ANON n
 const SB_HEADERS = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` }
 const ARCHIVE_ROW_ID = 2
 
+// `inicio` se guarda en UTC; el runner de GitHub Actions corre en UTC por
+// defecto. Comparar el string UTC crudo (r.inicio.slice(0,10)) contra un
+// cutoff calculado igual dejaba un margen de hasta 2h de diferencia con el
+// día real en España (mismo antipatrón ya corregido en cron-reminders.js/
+// send-push-all.js) — aquí solo decide qué se archiva, así que el impacto es
+// acotado, pero podía archivar o retener un fichaje con un día de más/menos.
+function dateKeyInSpain(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 async function sbReadData(id) {
   const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: SB_HEADERS })
   const rows = await res.json()
@@ -50,7 +66,7 @@ async function run() {
   const now    = new Date()
   const cutoff = new Date(now)
   cutoff.setDate(cutoff.getDate() - 90)
-  const cutoffStr = cutoff.toISOString().slice(0, 10)
+  const cutoffStr = dateKeyInSpain(cutoff)
 
   console.log(`Archivando registros anteriores a ${cutoffStr}...`)
 
@@ -60,8 +76,8 @@ async function run() {
   const records = db.records || []
   if (!records.length) { console.log('No hay registros.'); return }
 
-  const toArchive = records.filter(r => r.inicio && r.inicio.slice(0, 10) < cutoffStr)
-  const toKeep    = records.filter(r => !r.inicio || r.inicio.slice(0, 10) >= cutoffStr)
+  const toArchive = records.filter(r => r.inicio && dateKeyInSpain(r.inicio) < cutoffStr)
+  const toKeep    = records.filter(r => !r.inicio || dateKeyInSpain(r.inicio) >= cutoffStr)
 
   if (!toArchive.length) {
     console.log('No hay registros para archivar.')
@@ -72,7 +88,7 @@ async function run() {
   const archiveDb = (await sbReadData(ARCHIVE_ROW_ID)) || { monthSnapshots: {} }
   const newSnapshots = { ...(archiveDb.monthSnapshots || {}) }
   for (const rec of toArchive) {
-    const monthKey = rec.inicio.slice(0, 7) // "YYYY-MM"
+    const monthKey = dateKeyInSpain(rec.inicio).slice(0, 7) // "YYYY-MM"
     if (!newSnapshots[monthKey]) newSnapshots[monthKey] = { records: [] }
     newSnapshots[monthKey].records = [...(newSnapshots[monthKey].records || []), rec]
   }

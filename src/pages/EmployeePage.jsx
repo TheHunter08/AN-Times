@@ -23,6 +23,7 @@ import { evaluateGeofence, normalizeObraCoords } from '../utils/obraGeo.js'
 import { OfflineBanner } from '../components/employee/OfflineBanner.jsx'
 import { decodeCentroQR, decodeEmployeeQR } from '../utils/qr.js'
 import { canCloseMonth } from '../utils/adminHelpers.js'
+import { getScopedEmployees } from '../utils/supervisorScope.js'
 import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
 import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
@@ -1045,12 +1046,14 @@ export default function EmployeePage() {
         return
       }
       if (empId === u.id) { toast('Este es tu propio QR — usa "Fichar con QR" para tu jornada', 4000, 'warn'); return }
-      const isJO = isJefeObra
-      const encCentros = [...new Set([...(u.obrasAsignadas || []), ...(u.centroTrabajo ? [u.centroTrabajo] : [])])]
-      const emp = (db.employees || []).find(e =>
-        e.id === empId && !e.isAdmin && !e.baja &&
-        (isJO || !encCentros.length || !e.centroTrabajo || encCentros.includes(e.centroTrabajo) || (e.obrasAsignadas || []).some(o => encCentros.includes(o)))
-      )
+      // Mismo ámbito que el resto del panel de encargado (getScopedEmployees,
+      // ya usado en AppV2Admin) — la comprobación anterior trataba "el
+      // encargado no tiene centro/obra configurada" o "el empleado no tiene
+      // centroTrabajo" como "permitir a cualquiera", justo al revés de lo
+      // que debe pasar sin ámbito configurado: dejaba fichar por QR a
+      // empleados de otra obra.
+      const emp = getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: u, unrestricted: isJefeObra })
+        .find(e => e.id === empId)
       if (!emp) { toast('No tienes permiso para fichar a este empleado', 4000, 'err'); return }
       if (!hasEmployeeSignature(db, emp.id)) {
         toast(`${emp.name} debe completar y guardar su firma obligatoria antes de iniciar una jornada.`, 5000, 'warn')
@@ -1060,8 +1063,16 @@ export default function EmployeePage() {
       const targetOpen = recs.find(r => r.empId === emp.id && !r.fin)
       if (targetOpen) {
         showConfirm(`¿Finalizar la jornada de ${emp.name}?`, () => {
-          const closed = finalizeRecord(targetOpen, { actor: u })
-          saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === targetOpen.id ? closed : r) }))
+          // Relee justo antes de cerrar: el propio empleado (u otro
+          // encargado) pudo cerrar o modificar esta jornada desde su móvil
+          // mientras el diálogo de confirmación estaba abierto — cerrar
+          // sobre el snapshot obsoleto capturado al escanear el QR
+          // sobrescribía ese cierre real (hora de salida, ubicación) con uno
+          // calculado con datos viejos.
+          const freshTarget = (useAppStore.getState().db.records || []).find(r => r.id === targetOpen.id)
+          if (!freshTarget || freshTarget.fin) { toast(`La jornada de ${emp.name} ya no está abierta.`, 4000, 'warn'); return }
+          const closed = finalizeRecord(freshTarget, { actor: u })
+          saveDB(freshDb => ({ records: (freshDb.records || []).map(r => r.id === freshTarget.id ? closed : r) }))
           queuePush(emp.id, '■ Jornada finalizada', `${u.name} ha finalizado tu jornada laboral mediante QR.`, 'jornada', '/?tab=inicio')
           toast(`Jornada finalizada para ${emp.name} — ${mhm(Math.floor(closed.workSecs / 60))}`, 3500, 'ok')
         })
@@ -1253,11 +1264,15 @@ export default function EmployeePage() {
   // Cierres del equipo pendientes de firma del supervisor (encargado/jefe de obra)
   const teamCierresPendientes = useMemo(() => {
     if (!isSuper) return []
-    const centro = uh.centroTrabajo || ''
     const empMap = new Map((db.employees || []).map(e => [e.id, e]))
+    // getScopedEmployees (misma utilidad que AppV2Admin) en vez de comparar
+    // centroTrabajo en crudo — un supervisor asignado solo por obra
+    // (obrasAsignadas, sin centroTrabajo propio) tenía `centro === ''`, que
+    // no coincide con ningún empleado real, así que este aviso nunca le
+    // aparecía aunque sí viera correctamente a su equipo en el panel admin.
     const teamIds = new Set(
-      (db.employees || [])
-        .filter(e => !e.isAdmin && !e.baja && e.centroTrabajo === centro && e.id !== uh.id)
+      getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: uh, unrestricted: isJefeObra })
+        .filter(e => e.id !== uh.id)
         .map(e => e.id)
     )
     // Fallback: también excluir IDs guardados en config para cuando firmaSupervisor
@@ -1266,7 +1281,7 @@ export default function EmployeePage() {
     return (db.cierres || [])
       .filter(c => teamIds.has(c.empId) && !c.firmaSupervisor && !firmadosSet.has(c.id))
       .map(c => ({ id: c.id, empName: c.empName || empMap.get(c.empId)?.name || c.empId, mes: c.mes || '' }))
-  }, [db.cierres, db.employees, db.config, isSuper, uh.centroTrabajo, uh.id])
+  }, [db.cierres, db.employees, db.obras, db.config, isSuper, isJefeObra, uh.centroTrabajo, uh.obrasAsignadas, uh.id])
 
   // Guard DESPUÉS de todos los hooks (ver comentario junto a `uh` más arriba).
   if (!u) return null

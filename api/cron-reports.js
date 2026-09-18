@@ -209,7 +209,21 @@ export default async function handler(req, res) {
     const runs = []
     for (const schedule of due) {
       const period = reportPeriod(schedule.frequency, now)
-      const claim = await claimSchedule(schedule.id, period.key)
+      let claim
+      try {
+        claim = await claimSchedule(schedule.id, period.key)
+      } catch (error) {
+        // claimSchedule agota sus reintentos si `config:__singleton__` sigue
+        // cambiando bajo los pies (varios crons escriben esa misma fila). Sin
+        // este try/catch, esa excepción abortaba TODO el bucle — incluidos
+        // los informes de iteraciones anteriores que ya se habían generado,
+        // subido a Storage y enviado por email, cuyo `runs` nunca llegaba al
+        // bloque de abajo que los marca como completados (lastRunKey). En la
+        // siguiente ejecución del cron, isScheduleDue() los volvía a ver como
+        // pendientes y los reenviaba por email duplicados.
+        runs.push({ id:`${schedule.id}_${period.key}`, scheduleId:schedule.id, name:schedule.name, periodKey:period.key, period:period.label, format:schedule.format, status:'error', error:`No se pudo reservar el informe: ${String(error?.message || error).slice(0, 200)}`, finishedAt:new Date().toISOString(), _upd:new Date().toISOString() })
+        continue
+      }
       if (!claim) continue
       const current = claim.schedule
       try {

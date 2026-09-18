@@ -19,6 +19,7 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   const [motivo, setMotivo]   = useState('')
   const [sending, setSending] = useState(false)
   const [confirmNight, setConfirmNight] = useState(false)
+  const [confirmReopen, setConfirmReopen] = useState(false)
 
   useEffect(() => {
     if (visible && rec) {
@@ -26,6 +27,7 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
       setFin(ftimeInput(rec.fin))
       setMotivo('')
       setConfirmNight(false)
+      setConfirmReopen(false)
     }
   }, [visible, rec])
 
@@ -42,10 +44,21 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
   const previewTimes = inicio && fin ? recordTimesFromClock(rec, inicio, fin) : null
   const previewHours = previewTimes ? (previewTimes.fin.getTime() - previewTimes.inicio.getTime()) / 3600000 : 0
   const looksLikeNightShift = previewTimes && previewHours > 16
+  // Si la jornada ya estaba cerrada (rec.fin) y el campo de salida se deja
+  // vacío, la corrección se guardaba con propFin:null y, al aprobarla, el
+  // admin sobrescribía la jornada cerrada dejándola abierta de nuevo — sin
+  // ningún aviso, ni para quien pedía la corrección ni para quien la
+  // aprobaba. Se exige confirmación explícita, igual que con el turno
+  // nocturno de arriba.
+  const willReopenClosedShift = Boolean(rec.fin) && !fin
 
   const send = () => {
     if (!motivo.trim()) { toast('Añade un motivo para la corrección'); return }
     if (!inicio) { toast('Indica la hora de entrada correcta'); return }
+    if (willReopenClosedShift && !confirmReopen) {
+      toast('Vas a dejar esta jornada sin hora de salida (quedará abierta) — marca la casilla para confirmarlo', 5000, 'warn')
+      return
+    }
     if (looksLikeNightShift && !confirmNight) {
       toast(`La duración resultante es de ${Math.round(previewHours)}h — marca la casilla para confirmar que es un turno nocturno`, 5000, 'warn')
       return
@@ -87,6 +100,12 @@ export function ModalCorreccion({ visible, data, db, u, onClose, saveDB, toast }
 
         <TextField label="Nueva hora de entrada" type="time" value={inicio} onChange={e => setInicio(e.target.value)} />
         <TextField label="Nueva hora de salida" type="time" value={fin} onChange={e => setFin(e.target.value)} />
+        {willReopenClosedShift && (
+          <label style={{ display:'flex', alignItems:'flex-start', gap:8, background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, fontSize:12, color:colors.semantic.orange, cursor:'pointer' }}>
+            <input type="checkbox" checked={confirmReopen} onChange={e => setConfirmReopen(e.target.checked)} style={{ marginTop:2 }} />
+            <span>Has borrado la hora de salida de una jornada que ya estaba cerrada — <strong>quedará sin cerrar</strong> hasta que se fiche o corrija de nuevo. Marca esta casilla para confirmarlo.</span>
+          </label>
+        )}
         {looksLikeNightShift && (
           <label style={{ display:'flex', alignItems:'flex-start', gap:8, background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:radius.lg, padding:'10px 12px', marginBottom:14, fontSize:12, color:colors.semantic.orange, cursor:'pointer' }}>
             <input type="checkbox" checked={confirmNight} onChange={e => setConfirmNight(e.target.checked)} style={{ marginTop:2 }} />

@@ -1,14 +1,18 @@
 /**
- * TIMES INC – Auto-cierre de jornadas abiertas > 10h
- * Corre vía GitHub Actions cada 30 minutos (ver .github/workflows/autoclose-jornada.yml).
- * Cierra registros sin fin que lleven más de 10h abiertos y notifica al empleado.
+ * TIMES INC – Auto-cierre de jornadas abiertas > 10h (respaldo manual)
+ * Corre vía GitHub Actions (workflow_dispatch, ver .github/workflows/autoclose-jornada.yml)
+ * cuando el cron de Vercel (api/cron-autoclose.js) falla. Cierra registros sin
+ * fin que lleven más de 10h abiertos y notifica al empleado — misma lógica
+ * que api/cron-autoclose.js, para que el respaldo manual no reintroduzca
+ * bugs ya corregidos allí.
  */
 
 import webpush from 'web-push'
-import { finalizeRecord } from './src/utils/recordLifecycle.js'
+import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from './src/utils/recordLifecycle.js'
 import { toRecordRow } from './src/services/tableSyncPlan.js'
 import { groupPushSubscriptions, pushSubscriptionDeleteFilter } from './src/server/pushSubscriptions.js'
-import { createAutomationRun, mergeAutomationHealth } from './src/server/automationHealth.js'
+import { createAutomationRun } from './src/server/automationHealth.js'
+import { persistAutomationRun } from './src/server/persistAutomationHealth.js'
 
 // Limpia BOM (﻿) y espacios que GitHub Secrets puede incluir al copiar desde Windows
 const cleanEnv  = s => (s || '').replace(/^﻿/, '').trim()
@@ -28,76 +32,56 @@ if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
 }
 webpush.setVapidDetails('mailto:ismael.angeles.c@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE)
 
-const SB_HEADERS = {
+const headers = {
   apikey: SB_ANON,
   Authorization: `Bearer ${SB_SERVICE || SB_ANON}`,
   'Content-Type': 'application/json',
 }
 
-async function readDB() {
-  const res = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.1&select=data,updated_at`, { headers: SB_HEADERS })
-  if (!res.ok) throw new Error(`DB read failed: ${res.status}`)
-  const rows = await res.json()
-  return rows?.[0] ? { data: rows[0].data, ts: rows[0].updated_at } : null
+// La tabla `records` es la fuente viva de jornadas abiertas — el cliente
+// escribe cada fichaje ahí directamente (persistRecordRow, prioritario sobre
+// la reconciliación del blob completo). Decidir qué cerrar a partir del blob
+// `app_data.data.records` (que solo se pone al día en segundo plano y con
+// más fragilidad en cobertura débil) dejaba fuera justo los fichajes de
+// empleados con conexión intermitente: los que más necesitan el autocierre.
+async function readOpenRecords() {
+  const response = await fetch(`${SB_URL}/rest/v1/records?select=*&fin=is.null&deleted=eq.false`, { headers })
+  if (!response.ok) throw new Error(`records read ${response.status}`)
+  return (await response.json()).map(row => ({
+    ...(row.data || {}), id: row.id, empId: row.emp_id, empName: row.emp_name,
+    inicio: row.inicio, fin: row.fin, breaks: row.breaks || [], workSecs: row.work_secs || 0,
+    breakSecs: row.break_secs || 0, closed: !!row.closed, _upd: row.updated_at,
+  }))
 }
 
-async function writeDB(data, expectedTs) {
-  const cond = expectedTs ? `?id=eq.1&updated_at=eq.${encodeURIComponent(expectedTs)}` : '?id=eq.1'
-  const res = await fetch(`${SB_URL}/rest/v1/app_data${cond}`, {
-    method: 'PATCH',
-    headers: { ...SB_HEADERS, Prefer: 'return=minimal,count=exact' },
-    body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
-  })
-  if (!res.ok) throw new Error(`DB write failed: ${res.status}`)
-  const count = parseInt(res.headers.get('Content-Range')?.split('/')[1] || '1', 10)
-  if (count === 0) throw new Error('Escritura rechazada: la BD cambió mientras procesábamos.')
-}
-
-async function persistAutomationRun(run) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const latest = await readDB()
-    if (!latest) throw new Error('No se pudo guardar la salud del autocierre')
-    try {
-      await writeDB({ ...mergeAutomationHealth(latest.data, run), _ts:Date.now() }, latest.ts)
-      return
-    } catch (error) {
-      if (attempt === 1) throw error
-    }
-  }
-}
-
-async function upsertRecordRows(records) {
+async function upsertRecords(records) {
   if (!records.length) return []
   const rows = records.map(record => toRecordRow(record, record._upd))
   const upsert = async batch => {
-    const res = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(batch),
+    const response = await fetch(`${SB_URL}/rest/v1/records?on_conflict=id`, {
+      method: 'POST', headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(batch),
     })
-    return { res, detail: res.ok ? '' : (await res.text()).slice(0, 180) }
+    return { ok: response.ok, status: response.status, detail: response.ok ? '' : (await response.text()).slice(0, 180) }
   }
-
   const batch = await upsert(rows)
-  if (batch.res.ok) return []
-
+  if (batch.ok) return []
   const failures = []
   for (const row of rows) {
     const attempt = await upsert([row])
-    if (!attempt.res.ok) failures.push(`${row.id}: ${attempt.res.status} ${attempt.detail}`)
+    if (!attempt.ok) failures.push(`${row.id}: ${attempt.status} ${attempt.detail}`)
   }
   return failures
 }
 
 async function readPushSubs() {
-  const res = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers: SB_HEADERS })
+  const res = await fetch(`${SB_URL}/rest/v1/push_subs?select=user_id,endpoint,p256dh,auth`, { headers })
   if (!res.ok) throw new Error(`push_subs read failed: ${res.status}`)
   return (await res.json()) || []
 }
 
 async function deletePushSub(userId, endpoint) {
   await fetch(`${SB_URL}/rest/v1/push_subs?${pushSubscriptionDeleteFilter(userId, endpoint)}`, {
-    method: 'DELETE', headers: SB_HEADERS
+    method: 'DELETE', headers,
   }).catch(() => {})
 }
 
@@ -128,20 +112,12 @@ const mhm = min => {
 
 async function run() {
   const startedAt = Date.now()
-  const now = startedAt
-  const row = await readDB()
-  if (!row) { console.log('No se pudo leer Supabase.'); return }
-
-  const db = row.data
-  const openRecs = (db.records || []).filter(r => !r.fin)
-
-  const toClose = openRecs.filter(r => (now - new Date(r.inicio).getTime()) > TEN_HOURS_MS)
+  const open = await readOpenRecords()
+  const toClose = open.filter(r => (startedAt - new Date(r.inicio).getTime()) > TEN_HOURS_MS)
 
   if (!toClose.length) {
-    await persistAutomationRun(createAutomationRun('autoclose', {
-      startedAt, checked:openRecs.length, processed:0,
-    }))
-    console.log(`Sin jornadas abiertas >10h. Open total: ${openRecs.length}`)
+    await persistAutomationRun(createAutomationRun('autoclose', { startedAt, checked: open.length, processed: 0 }))
+    console.log(`Sin jornadas abiertas >10h. Open total: ${open.length}`)
     return
   }
 
@@ -157,25 +133,24 @@ async function run() {
   }
   const subsByUser = groupPushSubscriptions(pushSubs)
 
-  const closedRecords = []
-  const updatedRecords = db.records.map(r => {
-    if (!toClose.find(c => c.id === r.id)) return r
-    const closeTime = new Date(new Date(r.inicio).getTime() + TEN_HOURS_MS).toISOString()
-    const closed = { ...finalizeRecord(r, { now: closeTime }), autoClosedAt: new Date().toISOString() }
-    closedRecords.push(closed)
-    return closed
+  // finalizeRecord con maxOpenBreakMin: un descanso sin cerrar no debe
+  // comerse la jornada entera al autocerrar (ver MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE
+  // en recordLifecycle.js) — sin este tope, este mismo script reproducía el
+  // bug de "0h trabajadas" ya corregido en api/cron-autoclose.js.
+  const closedRecords = toClose.map(record => {
+    const closeTime = new Date(new Date(record.inicio).getTime() + TEN_HOURS_MS).toISOString()
+    return { ...finalizeRecord(record, { now: closeTime, maxOpenBreakMin: MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE }), autoClosedAt: new Date().toISOString() }
   })
 
-  const healthRun = createAutomationRun('autoclose', {
-    startedAt, checked:openRecs.length, processed:closedRecords.length,
-  })
-  const newDB = { ...mergeAutomationHealth(db, healthRun), records: updatedRecords, _ts: now }
-  const recordSyncFailures = await upsertRecordRows(closedRecords)
-  await writeDB(newDB, row.ts)
-  console.log('BD actualizada.')
-  if (recordSyncFailures.length) {
-    console.warn(`No se pudieron reflejar ${recordSyncFailures.length} autocierres en la tabla records; app_data quedó actualizado para su resincronización.`)
+  const tableFailures = await upsertRecords(closedRecords)
+  if (tableFailures.length) {
+    console.warn(`No se pudieron reflejar ${tableFailures.length} autocierres en la tabla records:`, tableFailures.join('; '))
   }
+  await persistAutomationRun(createAutomationRun('autoclose', {
+    startedAt, checked: open.length, processed: closedRecords.length,
+    status: tableFailures.length ? 'error' : 'ok', error: tableFailures[0] || null,
+  }))
+  console.log('Tabla records actualizada.')
 
   for (const rec of toClose) {
     const closed = closedRecords.find(item => item.id === rec.id)
@@ -198,7 +173,7 @@ run().catch(async err => {
   console.error(err)
   try {
     await persistAutomationRun(createAutomationRun('autoclose', {
-      status:'error', startedAt:processStartedAt, error:err?.message || err,
+      status: 'error', startedAt: processStartedAt, error: err?.message || err,
     }))
   } catch (healthError) {
     console.error('No se pudo registrar el fallo del autocierre:', healthError.message)

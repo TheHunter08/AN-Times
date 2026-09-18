@@ -4,6 +4,22 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.22',
+    date: '2026-09-18',
+    title: 'Auditoría de seguridad y permisos: encargados, vacaciones y cierres',
+    items: [
+      'Corregido un fallo de seguridad: un encargado podía fichar entrada o salida de un empleado de OTRA obra escaneando su QR, si al encargado o al empleado les faltaba algún dato de obra/centro. Ahora se respeta siempre el mismo ámbito que en el resto del panel.',
+      'La firma obligatoria de vacaciones podía marcarse como completada aunque el PDF no llegara a generarse ni subirse (sin conexión, fallo puntual) — ahora se avisa del error y se puede reintentar, en vez de dar por firmado un documento vacío.',
+      'Un encargado o admin que cerraba manualmente la jornada de un empleado con un descanso sin cerrar podía dejarla en 0 horas trabajadas, el mismo bug ya corregido para el cierre automático a las 10h — ahora aplica el mismo límite en el cierre manual e individual y en el cierre en lote.',
+      'El aviso de "cierre mensual pendiente de firma" ahora también le llega a los encargados/jefes de obra asignados solo por obra (sin centro de trabajo propio).',
+      'Corregir un fichaje dejando vacía la hora de salida podía reabrir en silencio una jornada que ya estaba cerrada — ahora se pide confirmación explícita.',
+      'Aprobar o rechazar dos veces la misma solicitud de vacaciones (doble clic, dos pestañas abiertas) ya no revierte una resolución ya tomada.',
+      'Un encargado ya no puede enviar mensajes a empleados fuera de su equipo desde el panel de Mensajes.',
+      'Los informes programados por email: un fallo puntual al generar uno ya no bloqueaba ni duplicaba el envío del resto del lote.',
+      'Varios ajustes menores de robustez encontrados en una auditoría general de la app (fichajes, vacaciones, documentos y crons del servidor).',
+    ],
+  },
+  {
     version: '4.6.21',
     date: '2026-09-18',
     title: 'El PDF de vacaciones firmadas ya se puede encontrar en Documentos',

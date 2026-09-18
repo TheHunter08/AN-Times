@@ -35,62 +35,82 @@ export function ModalVacSign({ visible, db, u, toast, saveDB }) {
     const signatureData = getSignatureData()
     if (!signatureData) { toast('Dibuja tu firma antes de confirmar'); return }
     setFirmando(true)
-    const firmadoAt = new Date().toISOString()
-    const vacFirmada = { ...selVac, firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
-    let documentoId = null
-    let pdfData = null
+    // try/finally: sin esto, cualquier excepción no prevista (p.ej. saveDB
+    // lanzando por cuota de localStorage) dejaba el botón en "Generando
+    // PDF…" deshabilitado para siempre — este modal no tiene botón de
+    // cerrar/cancelar (firma obligatoria), así que el empleado se quedaba
+    // sin forma de salir ni de reintentar.
     try {
-      const { dataUrl, blob } = await buildVacacionPDF({ vac:vacFirmada, empresa:u.empresa })
-      // Mismo criterio que el PDF de cierre mensual: preferir Storage (cuota
-      // separada) sobre guardar el base64 en la fila de `vacaciones`. Si falla
-      // la subida (sin conexión, bucket no configurado) se cae a guardar el
-      // PDF inline para no bloquear la firma por un problema de red.
-      if (authSupabase) {
-        try {
-          const path = `${vacFirmada.empId}/${vacFirmada.id}.pdf`
-          const { error } = await authSupabase.storage.from(VACACIONES_PDF_BUCKET).upload(path, blob, { contentType:'application/pdf', upsert:true })
-          if (!error) documentoId = path
-          else console.warn('[vacaciones] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
-        } catch (uploadErr) {
-          console.warn('[vacaciones] Error al subir el PDF a Storage, se guarda localmente:', uploadErr.message)
+      const firmadoAt = new Date().toISOString()
+      const vacFirmada = { ...selVac, firma:{ signatureData, firmadoAt, empName:u.name }, firmaEmp:true, _upd:firmadoAt }
+      let documentoId = null
+      let pdfData = null
+      let pdfFailed = false
+      try {
+        const { dataUrl, blob } = await buildVacacionPDF({ vac:vacFirmada, empresa:u.empresa })
+        // Mismo criterio que el PDF de cierre mensual: preferir Storage (cuota
+        // separada) sobre guardar el base64 en la fila de `vacaciones`. Si falla
+        // la subida (sin conexión, bucket no configurado) se cae a guardar el
+        // PDF inline para no bloquear la firma por un problema de red.
+        if (authSupabase) {
+          try {
+            const path = `${vacFirmada.empId}/${vacFirmada.id}.pdf`
+            const { error } = await authSupabase.storage.from(VACACIONES_PDF_BUCKET).upload(path, blob, { contentType:'application/pdf', upsert:true })
+            if (!error) documentoId = path
+            else console.warn('[vacaciones] No se pudo subir el PDF a Storage, se guarda localmente:', error.message)
+          } catch (uploadErr) {
+            console.warn('[vacaciones] Error al subir el PDF a Storage, se guarda localmente:', uploadErr.message)
+          }
         }
+        if (!documentoId) pdfData = dataUrl
+      } catch (e) {
+        console.warn('[vacaciones] No se pudo generar el PDF firmado:', e)
+        pdfFailed = true
       }
-      if (!documentoId) pdfData = dataUrl
-    } catch (e) {
-      console.warn('[vacaciones] No se pudo generar el PDF firmado:', e)
+      // Sin ningún artefacto (ni en Storage ni inline) no hay nada que
+      // firmar de verdad: seguir adelante marcaba firmaEmp=true, creaba un
+      // documento vacío e irrecuperable en `documentos` (no hay origen desde
+      // el que regenerarlo, a diferencia de un cierre mensual) y notificaba
+      // al jefe de obra "vacaciones firmadas" aunque no existiera ningún
+      // PDF. Se corta aquí para que el empleado pueda reintentar.
+      if (pdfFailed || (!documentoId && !pdfData)) {
+        toast('No se pudo generar el PDF de tus vacaciones. Comprueba tu conexión e inténtalo de nuevo.', 5000, 'err')
+        return
+      }
+      const vacFinal = { ...vacFirmada, documentoId, pdfData }
+      // El documento firmado se añade también a `documentos` para que sea
+      // visible/descargable desde el panel de administración (Documentos) —
+      // el jefe de obra ya tiene acceso completo a ese panel, así que no hace
+      // falta un canal de entrega aparte.
+      // fileData/signedStoragePath (no `data`): son los campos que
+      // hasSignedDocumentArtifact/documentInlineArtifact (documentSigning.js)
+      // reconocen como el artefacto YA firmado — este PDF nace firmado (la
+      // firma se dibuja al generarlo), a diferencia del flujo de ModalDocumentos
+      // donde `data` guarda el original sin firmar pendiente de estampar.
+      const doc = {
+        id: gid(), empId: u.id, empName: u.name, tipo: 'vacaciones',
+        nombre: `Vacaciones firmadas ${fmtDate(selVac.fechaInicio)} - ${fmtDate(selVac.fechaFin)}`,
+        firma: vacFinal.firma,
+        signedStoragePath: documentoId || null,
+        fileData: documentoId ? null : pdfData,
+        createdAt: firmadoAt, _upd: firmadoAt,
+      }
+      const noti = createNotification({
+        empId:'__admin__', action:'Vacaciones firmadas',
+        detail:`${u.name} firmó sus vacaciones del ${fmtDate(selVac.fechaInicio)} al ${fmtDate(selVac.fechaFin)} — enviado al jefe de obra`,
+        dedupeKey:`vac:${selVac.id}:firma`, ts:firmadoAt,
+      })
+      saveDB(fresh => ({
+        vacaciones:(fresh.vacaciones || []).map(v => v.id === selVac.id ? { ...v, ...vacFinal } : v),
+        documentos:[...(fresh.documentos || []), doc],
+        notis:[...(fresh.notis || []), noti],
+      }))
+      queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:documentos', `vac:${selVac.id}:firma`)
+      toast('Vacaciones firmadas y enviadas al jefe de obra', 3500, 'ok')
+      setSelIdx(0)
+    } finally {
+      setFirmando(false)
     }
-    const vacFinal = { ...vacFirmada, documentoId, pdfData }
-    // El documento firmado se añade también a `documentos` para que sea
-    // visible/descargable desde el panel de administración (Documentos) —
-    // el jefe de obra ya tiene acceso completo a ese panel, así que no hace
-    // falta un canal de entrega aparte.
-    // fileData/signedStoragePath (no `data`): son los campos que
-    // hasSignedDocumentArtifact/documentInlineArtifact (documentSigning.js)
-    // reconocen como el artefacto YA firmado — este PDF nace firmado (la
-    // firma se dibuja al generarlo), a diferencia del flujo de ModalDocumentos
-    // donde `data` guarda el original sin firmar pendiente de estampar.
-    const doc = {
-      id: gid(), empId: u.id, empName: u.name, tipo: 'vacaciones',
-      nombre: `Vacaciones firmadas ${fmtDate(selVac.fechaInicio)} - ${fmtDate(selVac.fechaFin)}`,
-      firma: vacFinal.firma,
-      signedStoragePath: documentoId || null,
-      fileData: documentoId ? null : pdfData,
-      createdAt: firmadoAt, _upd: firmadoAt,
-    }
-    const noti = createNotification({
-      empId:'__admin__', action:'Vacaciones firmadas',
-      detail:`${u.name} firmó sus vacaciones del ${fmtDate(selVac.fechaInicio)} al ${fmtDate(selVac.fechaFin)} — enviado al jefe de obra`,
-      dedupeKey:`vac:${selVac.id}:firma`, ts:firmadoAt,
-    })
-    saveDB(fresh => ({
-      vacaciones:(fresh.vacaciones || []).map(v => v.id === selVac.id ? { ...v, ...vacFinal } : v),
-      documentos:[...(fresh.documentos || []), doc],
-      notis:[...(fresh.notis || []), noti],
-    }))
-    queuePush('__admin__', noti.action, noti.detail, 'times-vac', '/?go=admin:documentos', `vac:${selVac.id}:firma`)
-    toast('Vacaciones firmadas y enviadas al jefe de obra', 3500, 'ok')
-    setFirmando(false)
-    setSelIdx(0)
   }
 
   return (
