@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.25',
+    date: '2026-09-21',
+    title: 'Herramienta para corregir cierres mensuales ya afectados por el bug de horas en 0',
+    items: [
+      'Añadida npm run repair:autoclose-break-drift (y su versión de solo lectura, audit:autoclose-break-drift) para corregir fichajes ya cerrados antes de la v4.6.20 cuyo descanso sin cerrar dejó las horas trabajadas en 0. Recalcula cada fichaje afectado con el mismo tope ya usado en producción, y avisa (sin tocarlos) de qué cierres mensuales ya generados quedan desactualizados — separando los firmados (requieren reabrir y volver a firmar) de los pendientes.',
+    ],
+  },
+  {
     version: '4.6.24',
     date: '2026-09-21',
     title: 'El PDF de vacaciones firmadas se reconstruye si nunca llegó a guardarse',
