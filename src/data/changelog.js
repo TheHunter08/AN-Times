@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.6.24',
+    date: '2026-09-21',
+    title: 'El PDF de vacaciones firmadas se reconstruye si nunca llegó a guardarse',
+    items: [
+      'Encontrada la causa real de que el PDF de vacaciones firmadas siguiera sin aparecer: la firma (vacaciones) y el documento con el PDF se guardan por separado, y podían desincronizarse entre sí — quedando la vacación marcada como firmada pero sin ningún documento asociado en Documentos, en el propio dispositivo del empleado o en el panel del jefe de obra.',
+      'Ahora, si esto ocurre, el PDF se reconstruye automáticamente a partir de los datos ya guardados de la vacación (firma incluida) tanto en Documentos (jefe de obra) como en Mis documentos (empleado), y se repara en segundo plano para futuras consultas.',
+    ],
+  },
+  {
     version: '4.6.23',
     date: '2026-09-18',
     title: 'Auditoría de seguridad y permisos, segunda ronda',

@@ -52,7 +52,8 @@ import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import { automationHealthList } from '../server/automationHealth.js'
 import { buildOperationalPulse } from '../utils/operationalPulse.js'
-import { hasSignedDocumentArtifact, shouldUsePrivateDocumentStorage } from '../utils/documentSigning.js'
+import { findMissingVacacionDocuments, hasSignedDocumentArtifact, shouldUsePrivateDocumentStorage } from '../utils/documentSigning.js'
+import { buildVacacionPDF } from '../utils/vacacionPdf.js'
 import { buildInspectionEvidenceSummary } from '../utils/inspectionEvidence.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
 
@@ -1496,6 +1497,39 @@ function DocumentsPage() {
     certificado: 'certificado', vacaciones: 'vacaciones',
   }
 
+  // Un documento de vacaciones puede firmarse (vacaciones.firmaEmp=true)
+  // sin que la entrada en `documentos` llegue a sincronizarse a Supabase —
+  // son dos escrituras separadas del mismo saveDB, sin atomicidad entre
+  // ellas. findMissingVacacionDocuments detecta esos casos cruzando por
+  // empId+firma.firmadoAt; se muestran igual en la lista (ya que SÍ están
+  // firmados) y su PDF se reconstruye al vuelo desde los propios datos de
+  // la vacación en vez de depender de esa subida que nunca llegó.
+  const missingVacDocs = useMemo(() => findMissingVacacionDocuments(db), [db.vacaciones, db.documentos])
+  const allDocuments = useMemo(() => [...(db.documentos || []), ...missingVacDocs], [db.documentos, missingVacDocs])
+
+  // Reparación silenciosa: si la subida a Storage funciona ahora, se deja el
+  // documento correctamente enlazado para que las próximas vistas no tengan
+  // que regenerar el PDF cada vez.
+  const healMissingVacacionDocument = async (vac: any, blob: Blob) => {
+    if (!authSupabase) return
+    try {
+      const path = `${vac.empId}/${vac.id}.pdf`
+      const { error } = await authSupabase.storage.from(VACACIONES_PDF_BUCKET).upload(path, blob, { contentType:'application/pdf', upsert:true })
+      if (error) return
+      saveDB((fresh: any) => {
+        const alreadyThere = (fresh.documentos || []).some((d: any) => d.tipo === 'vacaciones' && d.empId === vac.empId && d.firma?.firmadoAt === vac.firma?.firmadoAt)
+        if (alreadyThere) return null
+        const doc = {
+          id: gid(), empId: vac.empId, empName: vac.empName, tipo: 'vacaciones', vacId: vac.id,
+          nombre: `Vacaciones firmadas ${vac.fechaInicio} - ${vac.fechaFin}`,
+          firma: vac.firma, signedStoragePath: path, fileData: null,
+          createdAt: vac.firma.firmadoAt, _upd: new Date().toISOString(),
+        }
+        return { documentos: [...(fresh.documentos || []), doc] }
+      })
+    } catch { /* silencioso: se reintentará en la próxima vista */ }
+  }
+
   // Resuelve una URL utilizable. `fileData` se comprueba primero porque es
   // donde queda el contenido DEFINITIVO tras la firma del empleado (ver
   // firmarDoc en ModalDocumentos.jsx): el original en Storage (`storagePath`)
@@ -1505,6 +1539,16 @@ function DocumentsPage() {
   // heredados (documentos antiguos, o si Storage no estaba disponible al
   // subirlo).
   const resolveDocUrl = async (doc: any, filename?: string): Promise<string | null> => {
+    if (doc.needsRegeneration) {
+      try {
+        const emp = (db.employees || []).find((e: any) => e.id === doc._vac.empId)
+        const { blob } = await buildVacacionPDF({ vac: doc._vac, empresa: emp?.empresa })
+        healMissingVacacionDocument(doc._vac, blob).catch(() => {})
+        return URL.createObjectURL(blob)
+      } catch {
+        return null
+      }
+    }
     if (doc.fileData) return doc.fileData
     const storagePath = doc.signedStoragePath || doc.storagePath
     // El PDF de vacaciones firmadas (ModalVacSign.jsx) se sube a
@@ -1523,7 +1567,7 @@ function DocumentsPage() {
   }
 
   const handleDownload = async (id: string) => {
-    const doc = (db.documentos || []).find((d: any) => d.id === id)
+    const doc = allDocuments.find((d: any) => d.id === id)
     if (!doc) return
     const filename = doc.nombre || doc.name || `documento-${id}`
     const url = await resolveDocUrl(doc, filename)
@@ -1537,7 +1581,7 @@ function DocumentsPage() {
   }
 
   const handlePreview = async (id: string) => {
-    const doc = (db.documentos || []).find((d: any) => d.id === id)
+    const doc = allDocuments.find((d: any) => d.id === id)
     if (!doc) return
     const url = await resolveDocUrl(doc)
     if (!url) { toast('Vista previa no disponible', 3000, 'warn'); return }
@@ -1550,8 +1594,8 @@ function DocumentsPage() {
   }
 
   const requestSignatureRepair = (id: string) => {
-    const doc = (db.documentos || []).find((item: any) => item.id === id)
-    if (!doc?.empId || !doc?.firma || hasSignedDocumentArtifact(doc)) return
+    const doc = allDocuments.find((item: any) => item.id === id)
+    if (!doc || doc.needsRegeneration || !doc?.empId || !doc?.firma || hasSignedDocumentArtifact(doc)) return
     const nowIso = new Date().toISOString()
     const dedupeKey = `documento:${doc.id}:reparar:${doc.firma?.firmadoAt || 'legacy'}`
     const detail = `“${doc.nombre || doc.name || 'Documento'}” necesita una nueva firma para generar el archivo firmado correctamente.`
@@ -1568,7 +1612,7 @@ function DocumentsPage() {
     toast('Solicitud enviada al empleado', 3000, 'ok')
   }
 
-  const items = useMemo(() => (db.documentos || []).map((d: any) => ({
+  const items = useMemo(() => allDocuments.map((d: any) => ({
     id: d.id,
     name: d.nombre || d.name || 'Documento',
     category: catMap[(d.tipo || d.category || '').toLowerCase()] || 'otro',
@@ -1576,14 +1620,17 @@ function DocumentsPage() {
     size: d.size || d.peso || '—',
     uploadedOn: fmtDate(d.ts || d.fecha || d.createdAt),
     expiresOn: d.expiresOn || '',
-    signed: hasSignedDocumentArtifact(d),
+    // Un documento pendiente de regenerar SÍ está firmado (la firma vive en
+    // la propia vacación) — solo falta reconstruir el archivo, no es un caso
+    // de "firma incompleta" que requiera pedirle al empleado que vuelva a firmar.
+    signed: d.needsRegeneration ? true : hasSignedDocumentArtifact(d),
     signedOn: d.firma?.firmadoAt ? new Date(d.firma.firmadoAt).toLocaleDateString('es-ES') : undefined,
-    needsRepair:Boolean(d.firma) && !hasSignedDocumentArtifact(d),
+    needsRepair: !d.needsRegeneration && Boolean(d.firma) && !hasSignedDocumentArtifact(d),
     repairRequested:Boolean(d.repairRequestedAt && String(d.repairRequestedAt) >= String(d.firma?.firmadoAt || '')),
     onDownload: handleDownload,
     onPreview: handlePreview,
     onRequestRepair:requestSignatureRepair,
-  })), [db.documentos])
+  })), [allDocuments])
 
   const requestUpload = () => {
     if (!employees.length) { toast('Primero debes crear un empleado', 3000, 'warn'); return }

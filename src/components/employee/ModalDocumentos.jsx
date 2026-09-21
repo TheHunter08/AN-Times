@@ -6,7 +6,9 @@ import { auditLog, queuePush, supabase } from '../../services/dataService.js'
 import { authSupabase } from '../../services/authService.js'
 import { DocPreview } from '../DocPreview.jsx'
 import { makePrintableSignature, stampSignatureOnPdf, stampSignatureOnImage, blobToDataUrl, dataUrlToBlob } from '../../utils/pdfSign.js'
-import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, hasSignedDocumentArtifact, sha256DataUrl } from '../../utils/documentSigning.js'
+import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, findMissingVacacionDocuments, hasSignedDocumentArtifact, sha256DataUrl } from '../../utils/documentSigning.js'
+import { buildVacacionPDF } from '../../utils/vacacionPdf.js'
+import { gid } from '../../utils/time.js'
 import { colors } from '../../ui-v2/design-system/colors'
 import { radius } from '../../ui-v2/design-system/radius'
 import { createNotification } from '../../utils/notifications.js'
@@ -41,19 +43,27 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
   // cabecera del modal, la confirmación de firma y la notificación al admin
   // mostraban literalmente "undefined" para cualquier documento subido desde
   // el panel de administración.
-  const myDocs = (db.documentos || [])
-    .filter(d => d.empId === u?.id)
+  // Una vacación puede firmarse (vacaciones.firmaEmp=true) sin que la
+  // entrada en `documentos` llegue a sincronizarse a Supabase — son dos
+  // escrituras separadas del mismo saveDB, sin atomicidad entre ellas. Si
+  // este dispositivo pierde su copia local (reinstalación, otro móvil) y
+  // solo recibe el fetch de `vacaciones` con firmaEmp=true, el PDF nunca
+  // aparecía aunque sí conste como firmado. findMissingVacacionDocuments
+  // reconstruye ese hueco desde la propia vacación (fechas + firma dibujada).
+  const missingVacDocs = findMissingVacacionDocuments(db).filter(d => d.empId === u?.id)
+  const myDocs = [...(db.documentos || []).filter(d => d.empId === u?.id), ...missingVacDocs]
     .map(d => ({ ...d, titulo: d.titulo || d.nombre || d.name || 'Documento' }))
+  const isEffectivelySigned = d => d.needsRegeneration || hasSignedDocumentArtifact(d)
   // Un registro de firma sin archivo firmado no es un documento completado.
   // Se mantiene en pendientes para poder reparar datos creados por versiones
   // antiguas que guardaban un falso éxito cuando fallaba el estampado.
-  const pendientes = myDocs.filter(d => !hasSignedDocumentArtifact(d))
-  const firmados = myDocs.filter(hasSignedDocumentArtifact)
+  const pendientes = myDocs.filter(d => !isEffectivelySigned(d))
+  const firmados = myDocs.filter(isEffectivelySigned)
   const myFirma = db.firmas?.[u?.id]?.main
 
   // Obtiene URLs firmadas para documentos guardados en Storage
   const pendingStorageIds = myDocs
-    .filter(d => (d.signedStoragePath || d.storagePath) && !documentInlineArtifact(d) && !(d.id in resolvedUrls))
+    .filter(d => (d.signedStoragePath || d.storagePath || d.needsRegeneration) && !documentInlineArtifact(d) && !(d.id in resolvedUrls))
     .map(d => d.id).join(',')
   useEffect(() => {
     const storage = authSupabase || supabase
@@ -61,6 +71,35 @@ export function ModalDocumentos({ visible, db, u, onClose, toast, saveDB }) {
     let cancelled = false
     pendingStorageIds.split(',').filter(Boolean).forEach(async id => {
       const doc = myDocs.find(d => d.id === id)
+      if (doc?.needsRegeneration) {
+        try {
+          const { blob } = await buildVacacionPDF({ vac: doc._vac, empresa: u.empresa })
+          if (cancelled) return
+          setResolvedUrls(prev => ({ ...prev, [id]: URL.createObjectURL(blob) }))
+          // Reparación silenciosa: si la subida funciona ahora, deja el
+          // documento correctamente enlazado para que no haya que
+          // regenerarlo cada vez que se abre esta pantalla.
+          if (authSupabase) {
+            const path = `${doc._vac.empId}/${doc._vac.id}.pdf`
+            authSupabase.storage.from(VACACIONES_PDF_BUCKET).upload(path, blob, { contentType:'application/pdf', upsert:true })
+              .then(({ error }) => {
+                if (error) return
+                saveDB(fresh => {
+                  const alreadyThere = (fresh.documentos || []).some(item => item.tipo === 'vacaciones' && item.empId === doc._vac.empId && item.firma?.firmadoAt === doc._vac.firma?.firmadoAt)
+                  if (alreadyThere) return null
+                  const healed = {
+                    id: gid(), empId: doc._vac.empId, empName: doc._vac.empName, tipo: 'vacaciones', vacId: doc._vac.id,
+                    nombre: `Vacaciones firmadas ${doc._vac.fechaInicio} - ${doc._vac.fechaFin}`,
+                    firma: doc._vac.firma, signedStoragePath: path, fileData: null,
+                    createdAt: doc._vac.firma.firmadoAt, _upd: new Date().toISOString(),
+                  }
+                  return { documentos: [...(fresh.documentos || []), healed] }
+                })
+              }).catch(() => {})
+          }
+        } catch {}
+        return
+      }
       if (!doc?.signedStoragePath && !doc?.storagePath) return
       try {
         const path = doc.signedStoragePath || doc.storagePath

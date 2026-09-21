@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, hasSignedDocumentArtifact, sha256DataUrl, shouldUsePrivateDocumentStorage } from './documentSigning.js'
+import { documentDataKind, documentInlineArtifact, findLegacyJornadaClosure, findMissingVacacionDocuments, hasSignedDocumentArtifact, sha256DataUrl, shouldUsePrivateDocumentStorage } from './documentSigning.js'
 
 describe('document signing state', () => {
   it('does not treat signature metadata without a signed file as completed', () => {
@@ -41,5 +41,32 @@ describe('document signing state', () => {
       { tipo:'jornada', empId:'e1', mes:'2026-06', data:'original' },
       { cierres:[newer] },
     )).toBeNull()
+  })
+
+  it('detects a vacation firmada without a matching documento (documento nunca sincronizó)', () => {
+    const vac = {
+      id:'v1', empId:'e1', empName:'Ana', estado:'aprobada', firmaEmp:true,
+      fechaInicio:'2026-08-17', fechaFin:'2026-08-23',
+      firma:{ signatureData:'data:image/png;base64,AA==', firmadoAt:'2026-08-10T09:00:00.000Z' },
+    }
+    const stubs = findMissingVacacionDocuments({ vacaciones:[vac], documentos:[] })
+    expect(stubs).toHaveLength(1)
+    expect(stubs[0]).toMatchObject({ vacId:'v1', empId:'e1', tipo:'vacaciones', needsRegeneration:true })
+  })
+
+  it('no duplica una vacación cuyo documento sí llegó a sincronizarse (mismo empId + firmadoAt)', () => {
+    const vac = {
+      id:'v1', empId:'e1', empName:'Ana', estado:'aprobada', firmaEmp:true,
+      fechaInicio:'2026-08-17', fechaFin:'2026-08-23',
+      firma:{ signatureData:'data:image/png;base64,AA==', firmadoAt:'2026-08-10T09:00:00.000Z' },
+    }
+    const doc = { id:'d1', empId:'e1', tipo:'vacaciones', firma:{ firmadoAt:'2026-08-10T09:00:00.000Z' }, signedStoragePath:'e1/v1.pdf' }
+    expect(findMissingVacacionDocuments({ vacaciones:[vac], documentos:[doc] })).toEqual([])
+  })
+
+  it('ignora vacaciones sin firmar o sin firma dibujada', () => {
+    const sinFirmar = { id:'v2', empId:'e1', estado:'aprobada', firmaEmp:false }
+    const sinDatoDeFirma = { id:'v3', empId:'e1', estado:'aprobada', firmaEmp:true, firma:{ firmadoAt:'2026-08-10T09:00:00.000Z' } }
+    expect(findMissingVacacionDocuments({ vacaciones:[sinFirmar, sinDatoDeFirma], documentos:[] })).toEqual([])
   })
 })
