@@ -114,7 +114,7 @@ test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) 
   await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
   await openSection(page, 'Equipo', 'Empleados')
 
-  await expect(page.getByRole('note')).toContainText('2 vinculadas · 1 listas para vincular · 1 con requisitos pendientes')
+  await expect(page.getByRole('note')).toContainText('2 vinculadas · 0 pendientes de confirmar · 1 listas para vincular · 1 con requisitos pendientes')
   await expect(page.getByRole('note')).toContainText('1 PIN heredado necesita una actualización segura')
   await expect(page.getByText('Cuenta vinculada', { exact:true })).toHaveCount(2)
   await expect(page.getByText('Lista para vincular', { exact:true })).toBeVisible()

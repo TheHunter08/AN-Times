@@ -40,7 +40,7 @@ test('muestra las obras asignadas por id al iniciar una jornada', async ({ page 
   await page.waitForTimeout(400)
   await page.mouse.up()
 
-  const dialog = page.getByRole('dialog', { name:/Seleccionar centro de trabajo/i })
+  const dialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('option', { name:'Nave Norte', exact:true })).toBeAttached()
   await expect(dialog.getByRole('option', { name:'Reforma Centro', exact:true })).toBeAttached()
@@ -48,7 +48,12 @@ test('muestra las obras asignadas por id al iniciar una jornada', async ({ page 
 })
 
 test('completa una entrada y una salida y conserva el fichaje cerrado', async ({ page }) => {
-  await loginAsEmployee(page, { centrosTrabajo:['Obra Principal'] })
+  // Sin obrasAsignadas directas, se ofrece la obra adscrita al centro de
+  // trabajo del empleado (nunca el centro en sí) — ver employeeObraOptions.
+  await loginAsEmployee(page, {
+    centrosTrabajo:['Obra Principal'],
+    obras:[{ id:'obra-principal', nombre:'Obra Principal', centroTrabajo:'Obra Principal', activa:true }],
+  })
   await page.goto('/')
 
   const hold = async (button) => {
@@ -63,7 +68,7 @@ test('completa una entrada y una salida y conserva el fichaje cerrado', async ({
   }
 
   await hold(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i }))
-  const centerDialog = page.getByRole('dialog', { name:/Seleccionar centro de trabajo/i })
+  const centerDialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
   await expect(centerDialog).toBeVisible()
   await centerDialog.getByRole('button', { name:'Iniciar jornada', exact:true }).click()
 
