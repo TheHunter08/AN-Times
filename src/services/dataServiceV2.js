@@ -84,6 +84,7 @@ export function fromEmployee(e) {
     isAdmin: e.role === 'admin',
     isEnc:   e.role === 'encargado',
     isJO:    e.role === 'jefe_obra',
+    isJefeCentro: e.role === 'jefe_centro',
     isAuditor: e.role === 'auditor',
   }
 }
@@ -539,7 +540,7 @@ let _legacyClosureSchema = false
 let _secureActorCache = null
 
 export function shouldUpdateClosuresWithoutInsert(role, authenticatedDataPath = SECURITY_DEPLOYMENT.authenticatedDataPath) {
-  return authenticatedDataPath && !['admin', 'jefe_obra'].includes(role)
+  return authenticatedDataPath && !['admin', 'jefe_obra', 'jefe_centro'].includes(role)
 }
 
 async function secureActor() {

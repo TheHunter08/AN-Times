@@ -120,8 +120,11 @@ export default function EmployeePage() {
     if (!su) return null
     return (db.employees || []).find(e => e.id === su.id) || su
   }, [session.user?.id, db.employees])
-  // Usar session.isEnc/isJO como fallback cuando u.role no está actualizado post-reconcile
-  const isSuper = u ? (u.role === 'encargado' || u.role === 'jefe_obra' || session.isEnc || session.isJO) : false
+  // Usar session.isEnc/isJO/isJefeCentro como fallback cuando u.role no está
+  // actualizado post-reconcile. isJefeObra (NO isSuper) es el único que se
+  // usa como `unrestricted` en getScopedEmployees — un jefe de centro debe
+  // seguir acotado a su centro, así que cuenta para isSuper pero no aquí.
+  const isSuper = u ? (u.role === 'encargado' || u.role === 'jefe_obra' || u.role === 'jefe_centro' || session.isEnc || session.isJO || session.isJefeCentro) : false
   const isJefeObra = u ? (u.role === 'jefe_obra' || session.isJO) : false
   const [pendingGPS, setPendingGPS] = useState(null)
   const [gpsStatus, setGpsStatus] = useState('idle') // 'idle' | 'pending' | 'ok' | 'fail'
@@ -808,10 +811,15 @@ export default function EmployeePage() {
   const doStart = () => {
     if (!checkFichajePreconditions()) return
     if (activeModal === 'selCentro') return
+    const cs = employeeObraOptions(u, db.obras || [])
+    // Cambio de modelo: solo se puede fichar en una obra, nunca en el centro
+    // de trabajo directamente. Sin ninguna obra propia ni adscrita a su
+    // centro, no hay nada que ofrecer — avisa en vez de abrir un selector
+    // vacío que no deja avanzar.
+    if (!cs.length) { toast('No tienes ninguna obra asignada. Pide a tu encargado o administrador que te asigne una antes de fichar.', 6000, 'warn'); return }
     startingRef.current = true
     setTimeout(() => { startingRef.current = false }, STARTING_LOCK_MS)
-    const cs = employeeObraOptions(u, db.obras || [], db.centrosTrabajo || [])
-    openModal('selCentro', { centros: cs, current: u?.centroTrabajo || '' })
+    openModal('selCentro', { centros: cs, current: cs.length === 1 ? cs[0] : '' })
     geoAbortRef.current = false
     const myNonce = ++geoNonceRef.current
     setPendingGPS(null)
@@ -841,7 +849,7 @@ export default function EmployeePage() {
   // estos parámetros y se comporta exactamente igual que antes.
   const confirmarCentro = useCallback((centro, forcedGpsStatus, forcedGPS) => {
     startingRef.current = false
-    if (!centro) { toast('Selecciona un centro de trabajo'); return }
+    if (!centro) { toast('Selecciona una obra'); return }
     const effectiveGpsStatus = forcedGpsStatus !== undefined ? forcedGpsStatus : gpsStatus
     const effectiveGPS = forcedGPS !== undefined ? forcedGPS : pendingGPS
     // GPS obligatorio: bloquear si la obra lo requiere y no hay ubicación
@@ -1026,8 +1034,8 @@ export default function EmployeePage() {
     setQrScanOpen(false)
     const centro = decodeCentroQR(text)
     if (centro) {
-      const cs = employeeObraOptions(u, db.obras || [], db.centrosTrabajo || [])
-      if (!cs.includes(centro)) { toast(`"${centro}" no es un centro de trabajo registrado`, 4000, 'err'); return }
+      const cs = employeeObraOptions(u, db.obras || [])
+      if (!cs.includes(centro)) { toast(`"${centro}" no es una obra asignada a tu cuenta`, 4000, 'err'); return }
       const o = openRec()
       if (!o) {
         doStartWithCentro(centro)

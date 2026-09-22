@@ -16,24 +16,38 @@ export function employeeBelongsToObra(employee, obra) {
   return (employee?.obrasAsignadas || []).some(value => aliases.has(normalize(value)))
 }
 
-export function employeeObraOptions(employee, obras, legacyCenters = []) {
-  const assignedReferences = employee?.obrasAsignadas || []
-  const assignedNames = assignedReferences.map(reference => {
-    const obra = findObra(reference, obras)
-    return obra?.nombre || obra?.name || obra?.id || String(reference ?? '').trim()
-  })
-  const current = String(employee?.centroTrabajo || employee?.dept || '').trim()
-  const candidates = assignedReferences.length
-    ? [...assignedNames, current]
-    : [current, ...(legacyCenters || [])]
-
+function dedupe(values) {
   const seen = new Set()
-  return candidates.filter(value => {
+  return values.filter(value => {
     const key = normalize(value)
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true
   })
+}
+
+// Cambio de modelo: al fichar, el empleado SOLO elige una obra — nunca su
+// centro de trabajo directamente, aunque ese campo se siga usando para
+// clasificar/agrupar empleados y obras. Con obras asignadas directamente
+// (obrasAsignadas), se ofrecen esas. Sin ninguna, se ofrecen las obras
+// ADSCRITAS a su centro de trabajo (mismo vínculo obra→centro que ya usa
+// supervisorScope.js) — nunca el nombre del centro en sí. Un empleado sin
+// obra propia ni obra adscrita a su centro no tiene ninguna opción para
+// fichar: hace falta que un admin le asigne una obra.
+export function employeeObraOptions(employee, obras) {
+  const assignedReferences = employee?.obrasAsignadas || []
+  if (assignedReferences.length) {
+    return dedupe(assignedReferences.map(reference => {
+      const obra = findObra(reference, obras)
+      return obra?.nombre || obra?.name || obra?.id || String(reference ?? '').trim()
+    }))
+  }
+
+  const employeeCenter = normalize(employee?.centroTrabajo || employee?.dept)
+  if (!employeeCenter) return []
+  return dedupe((obras || [])
+    .filter(obra => normalize(obra?.centroTrabajo) === employeeCenter)
+    .map(obra => obra?.nombre || obra?.name || obra?.id))
 }
 
 /**

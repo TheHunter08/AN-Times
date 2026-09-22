@@ -46,6 +46,7 @@ describe('compatibilidad del esquema semanal de cierres', () => {
     expect(shouldUpdateClosuresWithoutInsert('encargado', true)).toBe(true)
     expect(shouldUpdateClosuresWithoutInsert('admin', true)).toBe(false)
     expect(shouldUpdateClosuresWithoutInsert('jefe_obra', true)).toBe(false)
+    expect(shouldUpdateClosuresWithoutInsert('jefe_centro', true)).toBe(false)
   })
 
   it('mantiene las columnas nuevas cuando el esquema está migrado', () => {

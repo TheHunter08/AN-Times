@@ -116,7 +116,7 @@ export function EmployeePerfil({ u, db, saveDB, toast, doLogout, openModal, push
   const yearDays = new Set(yearRecs.map((r: any) => localDateStr(new Date(r.inicio)))).size
   const streak = calcStreak(db.records, u.id, today())
 
-  const roleLabel = u.role === 'encargado' ? 'Encargado' : u.role === 'jefe_obra' ? 'Jefe de Obra' : 'Empleado'
+  const roleLabel = u.role === 'encargado' ? 'Encargado' : u.role === 'jefe_obra' ? 'Jefe de Obra' : u.role === 'jefe_centro' ? 'Jefe de Centro' : 'Empleado'
   const avatarColor = colors.avatarPalette[Math.abs(u.name.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0)) % colors.avatarPalette.length]
   const handleActivationAction = (action: string) => {
     if (action === 'infoPersonal') openModal('infoPersonal')

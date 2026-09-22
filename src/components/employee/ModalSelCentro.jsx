@@ -25,9 +25,9 @@ export function ModalSelCentro({ visible, data, onConfirm, onClose }) {
     <div style={OV} onClick={onClose}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="select-center-dialog-title" style={{ ...MOD, ...modalStyle }} onClick={e => e.stopPropagation()}>
         <div style={DRAG} {...dragHandlers} />
-        <h2 id="select-center-dialog-title" style={{ margin:'0 0 20px', fontSize:18, fontWeight:800, color:colors.text[900] }}>📍 Seleccionar centro de trabajo</h2>
+        <h2 id="select-center-dialog-title" style={{ margin:'0 0 20px', fontSize:18, fontWeight:800, color:colors.text[900] }}>🏗️ Selecciona tu obra</h2>
         <div style={{ marginBottom:6 }}>
-          <label style={LBL}>Centro</label>
+          <label style={LBL}>Obra</label>
           <select value={sel} onChange={e => setSel(e.target.value)} style={SEL}>
             <option value="">— Selecciona —</option>
             {(data?.centros || []).map(c => <option key={c} value={c}>{c}</option>)}

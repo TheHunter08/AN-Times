@@ -21,12 +21,14 @@ export function isOfficialSessionAuthorized(appSession, authSession, db) {
     // conceder más acceso que el rol actual de la ficha enlazada. Esto revoca
     // sesiones manipuladas y sesiones antiguas creadas antes de Auth/RLS.
     const role = employee.role || 'empleado'
-    const mayAdmin = role === 'admin' || role === 'jefe_obra' || employee.isAdmin === true
+    const mayAdmin = role === 'admin' || role === 'jefe_obra' || role === 'jefe_centro' || employee.isAdmin === true
     const mayManageSite = role === 'jefe_obra'
+    const mayLeadCenter = role === 'jefe_centro'
     const maySupervise = role === 'encargado'
     const mayAudit = role === 'auditor'
     if (appSession.isAdmin && !mayAdmin) return false
     if (appSession.isJO && !mayManageSite) return false
+    if (appSession.isJefeCentro && !mayLeadCenter) return false
     if (appSession.isEnc && !maySupervise) return false
     if (appSession.isAuditor && !mayAudit) return false
     return true

@@ -2,11 +2,11 @@
 // Lógica pura (sin DOM/export) para poder testearla sin mockear PDF/Excel.
 import { calcMin, localDateStr } from './time.js'
 
-const ROLE_ORDER = { admin: 0, jefe_obra: 1, encargado: 2, empleado: 3 }
-export const ROLE_LABEL = { admin: 'Administrador', jefe_obra: 'Jefe de obra', encargado: 'Encargado', empleado: 'Empleado' }
+const ROLE_ORDER = { admin: 0, jefe_obra: 1, jefe_centro: 2, encargado: 3, empleado: 4 }
+export const ROLE_LABEL = { admin: 'Administrador', jefe_obra: 'Jefe de obra', jefe_centro: 'Jefe de centro', encargado: 'Encargado', empleado: 'Empleado' }
 
 export function resolveRole(e) {
-  return e?.role || (e?.isAdmin ? 'admin' : e?.isEnc ? 'encargado' : e?.isJO ? 'jefe_obra' : 'empleado')
+  return e?.role || (e?.isAdmin ? 'admin' : e?.isEnc ? 'encargado' : e?.isJO ? 'jefe_obra' : e?.isJefeCentro ? 'jefe_centro' : 'empleado')
 }
 
 function daysBetween(fromStr, toStr) {

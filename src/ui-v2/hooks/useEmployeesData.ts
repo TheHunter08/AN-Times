@@ -20,6 +20,7 @@ interface DbEmployee {
   obrasAsignadas?: string[]
   isEnc?: boolean
   isJO?: boolean
+  isJefeCentro?: boolean
   authId?: string
   auth_id?: string
   authActivationPending?: boolean
@@ -77,11 +78,12 @@ export function useEmployeesData() {
     // e.role || isEnc/isJO (no solo e.role): algunos empleados solo tienen el
     // modelo legacy de rol marcado por estos booleans, sin el campo role
     // string — igual que ya contempla EmployeesPage.openEdit al editar.
-    const resolvedRole = e.role || (e.isAdmin ? 'admin' : e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : 'empleado')
+    const resolvedRole = e.role || (e.isAdmin ? 'admin' : e.isEnc ? 'encargado' : e.isJO ? 'jefe_obra' : e.isJefeCentro ? 'jefe_centro' : 'empleado')
     const roleLabel =
       resolvedRole === 'empleado'    ? 'Empleado' :
       resolvedRole === 'encargado'   ? 'Encargado' :
       resolvedRole === 'jefe_obra'   ? 'Jefe de obra' :
+      resolvedRole === 'jefe_centro' ? 'Jefe de centro' :
       resolvedRole === 'admin'       ? 'Administrador' :
       resolvedRole === 'auditor'     ? 'Auditor' :
       resolvedRole || '—'

@@ -87,7 +87,7 @@ export function ModalInfoPersonal({ visible, db, u, onClose, toast, saveDB }) {
         <Field label="Teléfono" value={tel} onChange={setTel} />
         <Field label="Obra" value={obraLabel} readonly />
         <Field label="Centro de trabajo" value={emp.centroTrabajo || '—'} readonly />
-        <Field label="Rol" value={emp.role==='encargado'?'Encargado':emp.role==='jefe_obra'?'Jefe de Obra':'Empleado'} readonly />
+        <Field label="Rol" value={emp.role==='encargado'?'Encargado':emp.role==='jefe_obra'?'Jefe de Obra':emp.role==='jefe_centro'?'Jefe de Centro':'Empleado'} readonly />
         <Field label="Fecha de alta" value={emp.fechaAlta || '—'} readonly />
         <Field label="Días vacaciones/año" value={String(vacData(u.id, db).generated || 22) + ' días'} readonly />
         <button style={btnPrimary} onClick={save}>Guardar cambios</button>

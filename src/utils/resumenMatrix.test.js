@@ -9,6 +9,7 @@ describe('resolveRole', () => {
     expect(resolveRole({ isAdmin: true })).toBe('admin')
     expect(resolveRole({ isEnc: true })).toBe('encargado')
     expect(resolveRole({ isJO: true })).toBe('jefe_obra')
+    expect(resolveRole({ isJefeCentro: true })).toBe('jefe_centro')
     expect(resolveRole({})).toBe('empleado')
   })
 })

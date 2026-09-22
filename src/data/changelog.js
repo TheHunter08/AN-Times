@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.7.0',
+    date: '2026-09-22',
+    title: 'Nuevo rol "Jefe de centro" y fichaje solo por obra',
+    items: [
+      'Al iniciar jornada, el empleado ya solo puede elegir una obra — el centro de trabajo ha dejado de aparecer como opción de fichaje. Un empleado sin ninguna obra asignada (directamente o a través de su centro) verá un aviso pidiéndole que contacte con su encargado o administrador.',
+      'Nuevo rol "Jefe de centro": tiene acceso completo al panel de administración (como un jefe de obra), pero solo ve los empleados y las obras adscritas al centro de trabajo que tenga asignado. Se crea/edita como cualquier otro empleado, indicando el rol y el centro de trabajo desde el panel de Empleados.',
+    ],
+  },
+  {
     version: '4.6.25',
     date: '2026-09-21',
     title: 'Herramienta para corregir cierres mensuales ya afectados por el bug de horas en 0',

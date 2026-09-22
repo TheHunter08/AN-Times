@@ -82,6 +82,14 @@ describe('isScopedSupervisor', () => {
     expect(isScopedSupervisor({ isEnc: true, isJO: true, user: { role: 'jefe_obra' } })).toBe(false)
     expect(isScopedSupervisor({ isEnc: true, user: { role: 'jefe_obra', isEnc: true } })).toBe(false)
   })
+
+  // Un jefe de centro recibe isAdmin=true (mismo panel completo que jefe de
+  // obra/admin), pero a diferencia de jefe de obra sí debe quedar acotado a
+  // su centro — igual que un encargado.
+  it('reconoce al jefe de centro por session.isJefeCentro o por el rol del empleado, y lo mantiene acotado', () => {
+    expect(isScopedSupervisor({ isJefeCentro: true, user: {} })).toBe(true)
+    expect(isScopedSupervisor({ user: { role: 'jefe_centro' } })).toBe(true)
+  })
 })
 
 describe('vínculo obra→centro de trabajo', () => {

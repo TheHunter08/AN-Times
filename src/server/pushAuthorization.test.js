@@ -11,7 +11,7 @@ describe('actorCanNotify', () => {
   })
 
   it('permite objetivos individuales a responsables, pero no broadcast desde navegador', () => {
-    for (const role of ['admin', 'jefe_obra', 'encargado']) {
+    for (const role of ['admin', 'jefe_obra', 'jefe_centro', 'encargado']) {
       expect(actorCanNotify({ id:'boss', role }, 'e1')).toBe(true)
       expect(actorCanNotify({ id:'boss', role }, '__all__')).toBe(false)
     }

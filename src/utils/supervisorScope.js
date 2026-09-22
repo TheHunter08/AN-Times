@@ -15,9 +15,15 @@ function normalize(value) {
 // persiste aunque el rol ya sea otro) volvía a quedar restringido pese a
 // tener acceso completo — justo el mismo síntoma para jefe de obra que el
 // bug de arriba para encargado.
+// Un jefe de centro también recibe isAdmin=true (mismo motivo que jefe de
+// obra: acceso completo al panel), pero a diferencia de jefe de obra SÍ debe
+// quedar acotado — a todo lo adscrito a su centro (obras cuyo centroTrabajo
+// coincide con el suyo, y los empleados de esas obras), vía las mismas
+// getScopedEmployees/getScopedOnlineRecords que ya usa encargado.
 export function isScopedSupervisor(session) {
   const user = session?.user || {}
   if (session?.isJO || user.role === 'jefe_obra') return false
+  if (session?.isJefeCentro || user.role === 'jefe_centro') return true
   return Boolean(session?.isEnc || user.role === 'encargado')
 }
 

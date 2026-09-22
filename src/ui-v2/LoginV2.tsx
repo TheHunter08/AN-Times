@@ -178,12 +178,16 @@ export default function LoginV2() {
   }, [selectedEmpId, db])
 
   const doLogin = useCallback((emp: any, authMethod = 'pin') => {
-    const isAdminRole = emp.role === 'admin' || emp.role === 'jefe_obra' || emp.isAdmin === true
+    // Un jefe de centro entra directo al panel de administración igual que
+    // un jefe de obra o un admin (isAdmin) — supervisorScope.js lo trata
+    // como scoped a su centro dentro de ese panel, a diferencia de jefe_obra.
+    const isAdminRole = emp.role === 'admin' || emp.role === 'jefe_obra' || emp.role === 'jefe_centro' || emp.isAdmin === true
     const ses = {
       user: emp,
       isAdmin: isAdminRole,
       isEnc: emp.role === 'encargado',
       isJO: emp.role === 'jefe_obra',
+      isJefeCentro: emp.role === 'jefe_centro',
       // Solo lectura: acceso exclusivo al Paquete de inspección (ver
       // AppV2Admin.tsx AUDITOR_PAGES). No es un empleado con jornada propia,
       // así que entra directo al panel en vez de a la vista de fichar.
@@ -448,7 +452,7 @@ export default function LoginV2() {
       const authUserId = result.user?.id
       const configuredEmails = (freshDB.config?.adminEmails || []).map((x: string) => normalizeAccountEmail(x))
       const configuredAdmin = configuredEmails.includes(em || '')
-      const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra')
+      const employeeAdmin = !!emp && (emp.isAdmin || emp.role === 'admin' || emp.role === 'jefe_obra' || emp.role === 'jefe_centro')
       const linkedAuthId = emp && (emp.authId || emp.auth_id)
       const identityMismatch = Boolean(emp && linkedAuthId && authUserId && linkedAuthId !== authUserId)
       if (emp && (!linkedAuthId || identityMismatch)) {

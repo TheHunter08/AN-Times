@@ -18,7 +18,7 @@ const TEAM_CHIPS = ['Riesgos de cumplimiento', 'Estado de las obras', '¿Quién 
 export const AI_CHIPS = PERSONAL_CHIPS
 
 const isGlobalAdmin = user => Boolean(user?.isAdmin || user?.role === 'admin')
-const canSeeTeamData = user => Boolean(isGlobalAdmin(user) || user?.role === 'encargado' || user?.role === 'jefe_obra' || user?.isEnc || user?.isJO)
+const canSeeTeamData = user => Boolean(isGlobalAdmin(user) || user?.role === 'encargado' || user?.role === 'jefe_obra' || user?.role === 'jefe_centro' || user?.isEnc || user?.isJO || user?.isJefeCentro)
 
 export function getAIChips(user) {
   return canSeeTeamData(user) ? [...TEAM_CHIPS, ...PERSONAL_CHIPS] : PERSONAL_CHIPS

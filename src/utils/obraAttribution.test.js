@@ -38,15 +38,27 @@ describe('atribución de fichajes a obras', () => {
     expect(employeeObraOptions(
       { obrasAsignadas:['obra-b', 'obra-a'], centroTrabajo:'Nave Norte' },
       obras,
-      ['Centro antiguo'],
     )).toEqual(['Nave Norte', 'Reforma Centro'])
   })
 
-  it('mantiene los centros legacy cuando no hay obras asignadas', () => {
+  it('nunca ofrece el centro de trabajo como opción, aunque no coincida con ninguna obra asignada', () => {
     expect(employeeObraOptions(
-      { centroTrabajo:'Centro habitual' },
+      { obrasAsignadas:['obra-a'], centroTrabajo:'Centro que no es una obra' },
       obras,
-      ['Centro habitual', 'Centro alternativo'],
-    )).toEqual(['Centro habitual', 'Centro alternativo'])
+    )).toEqual(['Reforma Centro'])
+  })
+
+  it('sin obras asignadas, ofrece las obras adscritas al centro de trabajo del empleado (nunca el centro en sí)', () => {
+    const obrasConCentro = [
+      { id:'obra-a', nombre:'Reforma Centro', centroTrabajo:'Centro habitual' },
+      { id:'obra-b', nombre:'Nave Norte', centroTrabajo:'Otro centro' },
+    ]
+    expect(employeeObraOptions({ centroTrabajo:'Centro habitual' }, obrasConCentro))
+      .toEqual(['Reforma Centro'])
+  })
+
+  it('sin obras asignadas ni obra adscrita a su centro, no hay ninguna opción para fichar', () => {
+    expect(employeeObraOptions({ centroTrabajo:'Centro sin obras' }, obras)).toEqual([])
+    expect(employeeObraOptions({}, obras)).toEqual([])
   })
 })

@@ -32,12 +32,16 @@ function _roleFlagsFromProfile(profile) {
   // Mismo criterio que doLogin en LoginV2.tsx: un jefe de obra cuenta como
   // isAdmin también (decisión de negocio existente, no algo nuevo de este
   // fix) — omitirlo aquí habría revertido a un JO a la pantalla de empleado
-  // en el siguiente fetch/realtime tras iniciar sesión.
+  // en el siguiente fetch/realtime tras iniciar sesión. Un jefe de centro
+  // recibe el mismo trato: acceso completo al panel de administración
+  // (isAdmin), pero acotado a su centro mediante isScopedSupervisor
+  // (supervisorScope.js), que sí distingue isJefeCentro de isJO.
   const role = profile?.role
   return {
-    isAdmin: role === 'admin' || role === 'jefe_obra' || !!profile?.isAdmin,
+    isAdmin: role === 'admin' || role === 'jefe_obra' || role === 'jefe_centro' || !!profile?.isAdmin,
     isEnc: role === 'encargado' || !!profile?.isEnc,
     isJO: role === 'jefe_obra' || !!profile?.isJO,
+    isJefeCentro: role === 'jefe_centro' || !!profile?.isJefeCentro,
     isAuditor: role === 'auditor' || !!profile?.isAuditor,
   }
 }
@@ -55,12 +59,12 @@ function _runtimeSession(session, db) {
 // _runtimeSession, así que currentScreen podía mandar a la pantalla de
 // admin a una sesión cuyo rol real ya no lo era.
 const initialSession = (() => {
-  if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false }
+  if (!storedSes) return { user: null, isAdmin: false, isEnc: false, isJO: false, isJefeCentro: false, isAuditor: false }
   if (storedSes.user) {
     const stillActive = (initialDb.employees || []).some(e => e.id === storedSes.user.id && !e.baja)
     if (!stillActive) {
       try { localStorage.removeItem('an_times_ses') } catch {}
-      return { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false }
+      return { user: null, isAdmin: false, isEnc: false, isJO: false, isJefeCentro: false, isAuditor: false }
     }
   }
   return _runtimeSession(storedSes, initialDb)
@@ -364,7 +368,7 @@ export const useAppStore = create((set, get) => ({
     try { if ('clearAppBadge' in navigator) navigator.clearAppBadge() } catch {}
     set({
       ...(SECURITY_DEPLOYMENT.authenticatedDataPath ? { db:{ ...INITIAL_DB } } : {}),
-      session: { user: null, isAdmin: false, isEnc: false, isJO: false, isAuditor: false },
+      session: { user: null, isAdmin: false, isEnc: false, isJO: false, isJefeCentro: false, isAuditor: false },
       timer: { ws: 0, bs: 0, state: 'idle' },
       currentScreen: 'login',
       currentEmpTab: 'inicio',

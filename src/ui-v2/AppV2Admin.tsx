@@ -115,11 +115,12 @@ const PAGES = [
 ]
 
 const ROLES = [
-  { value: 'empleado',   label: 'Empleado' },
-  { value: 'encargado',  label: 'Encargado' },
-  { value: 'jefe_obra',  label: 'Jefe de obra' },
-  { value: 'admin',      label: 'Administrador' },
-  { value: 'auditor',    label: 'Auditor (solo lectura)' },
+  { value: 'empleado',     label: 'Empleado' },
+  { value: 'encargado',    label: 'Encargado' },
+  { value: 'jefe_obra',    label: 'Jefe de obra' },
+  { value: 'jefe_centro',  label: 'Jefe de centro' },
+  { value: 'admin',        label: 'Administrador' },
+  { value: 'auditor',      label: 'Auditor (solo lectura)' },
 ]
 
 interface EmpForm {
@@ -203,6 +204,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         isAdmin: form.role === 'admin',
         isEnc: form.role === 'encargado',
         isJO: form.role === 'jefe_obra',
+        isJefeCentro: form.role === 'jefe_centro',
         baja: false,
         vacacionesExtra: form.vacacionesExtra || 0,
         _upd: nowIso,
@@ -324,7 +326,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px', borderRadius: 10, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)' }}>
             <span style={{ fontSize: 15, lineHeight: 1 }}>⚠️</span>
             <span style={{ fontSize: 12, color: colors.text[700], lineHeight: 1.4 }}>
-              Sin centro de trabajo ni obra asignada, este empleado no será visible en "En línea" para ningún jefe de obra o encargado, aunque fiche su jornada.
+              Sin centro de trabajo ni obra asignada, este empleado no tendrá ninguna obra que seleccionar al fichar y no será visible en "En línea" para ningún jefe de obra o encargado.
             </span>
           </div>
         )}
@@ -849,7 +851,7 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed 
   const openEdit = (id: string) => {
     const emp = (db.employees || []).find((e: any) => e.id === id)
     if (!emp) return
-    const role = emp.role || (emp.isAdmin ? 'admin' : emp.isEnc ? 'encargado' : emp.isJO ? 'jefe_obra' : 'empleado')
+    const role = emp.role || (emp.isAdmin ? 'admin' : emp.isEnc ? 'encargado' : emp.isJO ? 'jefe_obra' : emp.isJefeCentro ? 'jefe_centro' : 'empleado')
     setModal({ mode: 'edit', emp: {
       id: emp.id, name: emp.name || '', email: emp.email || '',
       role, pin: '', pinLen: emp.pinLen || null,
@@ -2315,7 +2317,7 @@ function MonthlyClosePage() {
       else recordsByEmployeeMonth.set(key, [record])
     }
     for (const employee of allEmployees) {
-      if ((employee.role === 'encargado' || employee.role === 'jefe_obra') && !employee.isAdmin) {
+      if ((employee.role === 'encargado' || employee.role === 'jefe_obra' || employee.role === 'jefe_centro') && !employee.isAdmin) {
         const center = employee.centroTrabajo || ''
         if (!supervisorByCenter.has(center)) supervisorByCenter.set(center, employee)
       }
@@ -2365,7 +2367,7 @@ function MonthlyClosePage() {
         // Supervisor: find encargado or jefe_obra assigned to same centro
         const supervisor = supervisorByCenter.get(emp?.centroTrabajo || '')
 
-        const empRole = emp?.role === 'empleado' ? 'Empleado' : emp?.role === 'encargado' ? 'Encargado' : emp?.role === 'jefe_obra' ? 'Jefe de obra' : emp?.role || 'Empleado'
+        const empRole = emp?.role === 'empleado' ? 'Empleado' : emp?.role === 'encargado' ? 'Encargado' : emp?.role === 'jefe_obra' ? 'Jefe de obra' : emp?.role === 'jefe_centro' ? 'Jefe de centro' : emp?.role || 'Empleado'
 
         return {
           id: c.id,
@@ -3417,6 +3419,8 @@ export default function AppV2Admin() {
 
   const roleLabel = session?.isJO || session?.user?.role === 'jefe_obra'
     ? 'Jefe de obra · Administrador'
+    : session?.isJefeCentro || session?.user?.role === 'jefe_centro'
+    ? 'Jefe de centro · Administrador'
     : isAuditor ? 'Auditor · Solo lectura'
     : isEnc ? encRoleLabel : 'Administrador'
 
