@@ -176,10 +176,35 @@ export function loadLocal() {
   }
 }
 
+// Cuando falla la subida a Storage, la firma de vacaciones/cierre cae a
+// guardar el PDF entero en base64 dentro del propio registro (ver
+// ModalVacSign.jsx/ModalCierreSign.jsx). Ese blob puede superar por sí solo
+// la cuota de localStorage — y como saveLocal escribe el blob COMPLETO en un
+// único setItem, que ese único campo supere la cuota tira abajo el guardado
+// local de TODO lo demás (fichajes, firma incluida). El empleado veía el
+// servidor ya con la firma correcta pero, al reabrir la app, la copia local
+// desactualizada (sin la firma) volvía a pedirla hasta que el próximo
+// fetchDB la corregía — un "parpadeo" de la firma ya hecha.
+function stripHeavyInlineBlobs(db) {
+  const stripField = (list, field) => (list || []).map(item => item?.[field] ? { ...item, [field]: null } : item)
+  return {
+    ...db,
+    vacaciones: stripField(db.vacaciones, 'pdfData'),
+    cierres: stripField(db.cierres, 'pdfData'),
+    documentos: stripField(db.documentos, 'fileData'),
+  }
+}
+
 export function saveLocal(db) {
   const storageKey = localDbStorageKey()
   if (!storageKey) return
-  try { localStorage.setItem(storageKey, JSON.stringify(db)) } catch (e) { console.error('[saveLocal] error:', e) }
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(db))
+  } catch (e) {
+    console.error('[saveLocal] error:', e)
+    try { localStorage.setItem(storageKey, JSON.stringify(stripHeavyInlineBlobs(db))) }
+    catch (e2) { console.error('[saveLocal] retry sin blobs pesados también falló:', e2) }
+  }
 }
 
 export function clearLocal() {

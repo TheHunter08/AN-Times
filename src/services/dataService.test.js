@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { auditLog, buildBlobDelta, mergeDB, persistedAuthUserId, recordTombstones, resolveLocalDbStorageKey, resolvePendingStorageKeys, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth } from './dataService.js'
+import { auditLog, buildBlobDelta, mergeDB, persistedAuthUserId, recordTombstones, resolveLocalDbStorageKey, resolvePendingStorageKeys, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth, saveLocal, loadLocal } from './dataService.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -342,5 +342,36 @@ describe('withPhase1RestAuth: mantiene PostgREST en el rol anon durante Fase 1',
   it('no toca peticiones REST de otro origen', () => {
     const opts = { headers: { Authorization: 'Bearer external.jwt' } }
     expect(withPhase1RestAuth('https://example.com/rest/v1/employees', opts)).toBe(opts)
+  })
+})
+
+describe('saveLocal', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('reintenta sin los PDFs embebidos si la cuota de localStorage falla, sin perder el resto', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('exceeded quota', 'QuotaExceededError')
+    })
+    const db = {
+      ...BASE,
+      vacaciones: [{ id: 'v1', empId: 'e1', estado: 'aprobada', firmaEmp: true, pdfData: 'data:application/pdf;base64,AAAA' }],
+      documentos: [{ id: 'd1', empId: 'e1', tipo: 'vacaciones', fileData: 'data:application/pdf;base64,BBBB' }],
+    }
+
+    saveLocal(db)
+
+    expect(setItemSpy).toHaveBeenCalledTimes(2)
+    setItemSpy.mockRestore()
+    const stored = JSON.parse(localStorage.getItem('an_times_v1'))
+    // firmaEmp (lo que decide si hay que volver a pedir la firma) sobrevive
+    // al reintento — solo se descarta el blob pesado, no el resto del dato.
+    expect(stored.vacaciones[0]).toMatchObject({ id: 'v1', firmaEmp: true, pdfData: null })
+    expect(stored.documentos[0]).toMatchObject({ id: 'd1', fileData: null })
+  })
+
+  it('guarda con normalidad cuando no hay problema de cuota', () => {
+    const db = { ...BASE, vacaciones: [{ id: 'v1', firmaEmp: true, pdfData: 'x' }] }
+    saveLocal(db)
+    expect(loadLocal().vacaciones[0]).toMatchObject({ id: 'v1', firmaEmp: true, pdfData: 'x' })
   })
 })

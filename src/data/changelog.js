@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.7.1',
+    date: '2026-09-22',
+    title: 'Corrección: obra con nombre de centro, y parpadeo de la firma de vacaciones',
+    items: [
+      'Ya no se puede crear/renombrar una obra con el mismo nombre que un centro de trabajo — evita que un centro (p. ej. "Telecomunicación") se cuele como opción de obra al iniciar jornada para un empleado sin obra asignada directamente.',
+      'Corregido un fallo por el que la firma de vacaciones ya hecha volvía a pedirse un instante al entrar en la app (y desaparecía sola): si el PDF firmado no cabía en el almacenamiento local del dispositivo, se perdía silenciosamente el resto del guardado local — incluida la propia firma — hasta que la siguiente sincronización la corregía.',
+    ],
+  },
+  {
     version: '4.7.0',
     date: '2026-09-22',
     title: 'Nuevo rol "Jefe de centro" y fichaje solo por obra',
