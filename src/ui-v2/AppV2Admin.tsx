@@ -2839,6 +2839,11 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
     if (!trimmedNombre) { toast('El nombre es obligatorio', 2500, 'warn'); return }
     const duplicate = (db.obras || []).some((o: any) => o.id !== initial?.id && (o.nombre || '').trim().toLowerCase() === trimmedNombre.toLowerCase())
     if (duplicate) { toast('Ya existe una obra con ese nombre', 3500, 'warn'); return }
+    // Un centro de trabajo no es una obra: si coincide el nombre, un empleado
+    // sin obra asignada vería el centro como si fuera una obra real en el
+    // selector de "Iniciar jornada" (ver employeeObraOptions).
+    const collidesWithCentro = centros.some((c: string) => c.trim().toLowerCase() === trimmedNombre.toLowerCase())
+    if (collidesWithCentro) { toast('Ese nombre coincide con un centro de trabajo — usa el nombre real de la obra', 4000, 'warn'); return }
     const normalizedCoords = hasAnyCoord ? normalizeObraCoords({ lat: Number(lat), lng: Number(lng) }) : null
     if (hasAnyCoord && !normalizedCoords) { toast('Revisa la latitud y la longitud: deben ser números dentro de rango (-90..90 / -180..180)', 4000, 'warn'); return }
     setSending(true)
