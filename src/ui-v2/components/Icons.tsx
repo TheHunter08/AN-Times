@@ -222,3 +222,12 @@ export function IconMoon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+export function IconCar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 13l1.7-5.2A2 2 0 0 1 6.6 6.5h10.8a2 2 0 0 1 1.9 1.3L21 13" />
+      <rect x="2" y="13" width="20" height="6" rx="1.5" />
+      <circle cx="7" cy="19.5" r="1.6" /><circle cx="17" cy="19.5" r="1.6" />
+    </svg>
+  )
+}

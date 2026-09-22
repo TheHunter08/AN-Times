@@ -16,7 +16,7 @@ import {
   IconShield, IconBuilding, IconAlertCircle, IconReceipt,
   IconCheck, IconLogout, IconRows, IconSeal, IconTrendUp, IconMapPin,
   IconHome, IconX, IconPlus, IconSun, IconMoon,
-  IconSettings,
+  IconSettings, IconCar, IconEdit,
 } from './components/Icons.js'
 import { useDashboardData } from './hooks/useDashboardData.js'
 import { useTimesheetsData } from './hooks/useTimesheetsData.js'
@@ -102,6 +102,7 @@ const PAGES = [
   { id: 'gastos',         label: 'Gastos',            group: 'Gestión', icon: <IconReceipt /> },
   { id: 'obras',          label: 'Obras',             group: 'Gestión', icon: <IconBuilding /> },
   { id: 'centros',        label: 'Centros de trabajo',group: 'Gestión', icon: <IconMapPin /> },
+  { id: 'vehiculos',      label: 'Vehículos',         group: 'Gestión', icon: <IconCar /> },
   { id: 'documentos',     label: 'Documentos',        group: 'Gestión', icon: <IconFolder /> },
   { id: 'resumen',        label: 'Resumen',           group: 'Análisis', icon: <IconGrid /> },
   { id: 'estadisticas',   label: 'Estadísticas',      group: 'Análisis', icon: <IconChart /> },
@@ -399,6 +400,194 @@ function CentrosPage() {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+interface VehiculoForm {
+  id: string; matricula: string; marca: string; modelo: string
+  itv: string; seguro: string; notas: string
+  asignadoTipo: '' | 'empleado' | 'obra'; asignadoId: string
+  activo: boolean
+}
+
+function VehiculoModal({ initial, onClose }: { initial?: any; onClose: () => void }) {
+  const db = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
+  const isEdit = !!initial
+  const blank: VehiculoForm = { id: gid(), matricula: '', marca: '', modelo: '', itv: '', seguro: '', notas: '', asignadoTipo: '', asignadoId: '', activo: true }
+  const [form, setForm] = useState<VehiculoForm>(initial ?? blank)
+  const [sending, setSending] = useState(false)
+  const setF = (k: keyof VehiculoForm, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const dialogRef = useDialogA11y(true, onClose)
+
+  const empleados = (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin)
+  const obras = (db.obras || []).filter((o: any) => o.activa !== false)
+
+  const handleSave = () => {
+    if (sending) return
+    const matricula = form.matricula.trim().toUpperCase()
+    if (!matricula) { toast('La matrícula es obligatoria', 2500, 'warn'); return }
+    const vehiculos: any[] = db.vehiculos || []
+    const duplicate = vehiculos.some((v: any) => v.id !== form.id && (v.matricula || '').trim().toUpperCase() === matricula)
+    if (duplicate) { toast('Ya existe un vehículo con esa matrícula', 3500, 'warn'); return }
+    setSending(true)
+    const nowIso = new Date().toISOString()
+    const vehiculo = {
+      id: form.id, matricula, marca: form.marca.trim() || null, modelo: form.modelo.trim() || null,
+      itv: form.itv || null, seguro: form.seguro || null, notas: form.notas.trim() || null,
+      asignadoTipo: form.asignadoId ? form.asignadoTipo : '', asignadoId: form.asignadoTipo ? form.asignadoId : '',
+      activo: form.activo, _upd: nowIso,
+    }
+    saveDB((fresh: any) => ({
+      vehiculos: isEdit
+        ? (fresh.vehiculos || []).map((v: any) => v.id === form.id ? vehiculo : v)
+        : [...(fresh.vehiculos || []), vehiculo],
+    }))
+    toast(isEdit ? 'Vehículo actualizado' : 'Vehículo creado', 2500, 'ok')
+    onClose()
+  }
+
+  const fieldStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }
+  const labelStyle = { fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: '.4px' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={isEdit ? 'Editar vehículo' : 'Nuevo vehículo'} onClick={e => e.stopPropagation()} style={{ background: colors.bg[900], borderRadius: '16px 16px 0 0', border: `1px solid ${colors.border.default}`, padding: '24px 20px 40px', width: '100%', maxWidth: 480, maxHeight: '92dvh', overflowY: 'auto', boxShadow: '0 -24px 64px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.text[900] }}>{isEdit ? 'Editar vehículo' : 'Nuevo vehículo'}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4 }}><IconX width={18} height={18} /></button>
+        </div>
+        <div>
+          <div style={labelStyle}>Matrícula *</div>
+          <input type="text" value={form.matricula} onChange={e => setF('matricula', e.target.value)} placeholder="Ej: 1234 ABC" style={{ ...fieldStyle, textTransform: 'uppercase' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <div style={labelStyle}>Marca</div>
+            <input type="text" value={form.marca} onChange={e => setF('marca', e.target.value)} placeholder="Ej: Renault" style={fieldStyle} />
+          </div>
+          <div>
+            <div style={labelStyle}>Modelo</div>
+            <input type="text" value={form.modelo} onChange={e => setF('modelo', e.target.value)} placeholder="Ej: Kangoo" style={fieldStyle} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <div style={labelStyle}>ITV</div>
+            <input type="date" value={form.itv} onChange={e => setF('itv', e.target.value)} style={fieldStyle} />
+          </div>
+          <div>
+            <div style={labelStyle}>Seguro</div>
+            <input type="date" value={form.seguro} onChange={e => setF('seguro', e.target.value)} style={fieldStyle} />
+          </div>
+        </div>
+        <div>
+          <div style={labelStyle}>Asignar a</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            {(['empleado', 'obra'] as const).map(tipo => (
+              <button key={tipo} onClick={() => setF('asignadoTipo', form.asignadoTipo === tipo ? '' : tipo)} style={{
+                padding: '10px 12px', borderRadius: 8,
+                border: `1px solid ${form.asignadoTipo === tipo ? colors.primary.base : colors.border.default}`,
+                background: form.asignadoTipo === tipo ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)',
+                color: form.asignadoTipo === tipo ? colors.primary.light : colors.text[700],
+                fontSize: 13, fontWeight: form.asignadoTipo === tipo ? 700 : 500,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>{tipo === 'empleado' ? 'Empleado' : 'Obra'}</button>
+            ))}
+          </div>
+          {form.asignadoTipo === 'empleado' && (
+            <select value={form.asignadoId} onChange={e => setF('asignadoId', e.target.value)} style={fieldStyle}>
+              <option value="">Selecciona un empleado…</option>
+              {empleados.map((e: any) => <option key={e.id} value={e.id}>{e.name || e.id}</option>)}
+            </select>
+          )}
+          {form.asignadoTipo === 'obra' && (
+            <select value={form.asignadoId} onChange={e => setF('asignadoId', e.target.value)} style={fieldStyle}>
+              <option value="">Selecciona una obra…</option>
+              {obras.map((o: any) => <option key={o.id} value={o.id}>{o.nombre || o.name || o.id}</option>)}
+            </select>
+          )}
+        </div>
+        <div>
+          <div style={labelStyle}>Notas</div>
+          <input type="text" value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Opcional" style={fieldStyle} />
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 10, border: `1px solid ${colors.border.default}`, background: form.activo ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.activo} onChange={e => setF('activo', e.target.checked)} style={{ accentColor: colors.primary.base }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: colors.text[900] }}>Vehículo activo (disponible para asignar)</span>
+        </label>
+        <button onClick={handleSave} disabled={sending} style={{ padding: '12px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 14, fontWeight: 700, cursor: sending ? 'wait' : 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: sending ? 0.7 : 1 }}>
+          {sending ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear vehículo'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function VehiculosPage() {
+  const db = useAppStore(s => s.db) as any
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
+  const [showAdd, setShowAdd] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const vehiculos: any[] = db.vehiculos || []
+  const editingVehiculo = editingId ? vehiculos.find((v: any) => v.id === editingId) : null
+
+  const assignedLabel = (v: any) => {
+    if (!v.asignadoId) return 'Sin asignar'
+    if (v.asignadoTipo === 'empleado') {
+      const emp = (db.employees || []).find((e: any) => e.id === v.asignadoId)
+      return emp ? `👤 ${emp.name || emp.id}` : 'Sin asignar'
+    }
+    if (v.asignadoTipo === 'obra') {
+      const obra = (db.obras || []).find((o: any) => o.id === v.asignadoId)
+      return obra ? `🏗️ ${obra.nombre || obra.name || obra.id}` : 'Sin asignar'
+    }
+    return 'Sin asignar'
+  }
+
+  const removeVehiculo = (v: any) => {
+    if (!window.confirm(`¿Eliminar el vehículo ${v.matricula}? Esta acción no se puede deshacer.`)) return
+    saveDB((fresh: any) => ({ vehiculos: (fresh.vehiculos || []).filter((item: any) => item.id !== v.id) }))
+    toast('Vehículo eliminado', 2000, 'ok')
+  }
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: colors.text[900], marginBottom: 4 }}>Vehículos</div>
+          <div style={{ fontSize: 13, color: colors.text[500] }}>Gestiona la flota y asígnala a empleados u obras.</div>
+        </div>
+        <button onClick={() => setShowAdd(true)} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: colors.primary.base, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <IconPlus width={14} height={14} /> Añadir
+        </button>
+      </div>
+      {vehiculos.length === 0 && (
+        <div style={{ padding: 32, textAlign: 'center', color: colors.text[500], fontSize: 13, background: 'rgba(var(--uiv2-overlay-rgb),.03)', borderRadius: 12, border: `1px solid ${colors.border.subtle}` }}>
+          No hay vehículos. Crea el primero arriba.
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {vehiculos.map((v: any) => (
+          <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(var(--uiv2-overlay-rgb),.05)', border: `1px solid ${colors.border.default}`, opacity: v.activo === false ? 0.55 : 1 }}>
+            <IconCar width={18} height={18} style={{ color: colors.primary.light, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: colors.text[900] }}>{v.matricula}{v.activo === false ? ' · inactivo' : ''}</div>
+              <div style={{ fontSize: 12, color: colors.text[500] }}>
+                {[v.marca, v.modelo].filter(Boolean).join(' ') || 'Sin marca/modelo'} · {assignedLabel(v)}
+              </div>
+            </div>
+            <button onClick={() => setEditingId(v.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4, display: 'flex' }}><IconEdit width={16} height={16} /></button>
+            <button onClick={() => removeVehiculo(v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.text[500], padding: 4, display: 'flex' }}><IconX width={16} height={16} /></button>
+          </div>
+        ))}
+      </div>
+      {showAdd && <VehiculoModal onClose={() => setShowAdd(false)} />}
+      {editingVehiculo && <VehiculoModal initial={editingVehiculo} onClose={() => setEditingId(null)} />}
     </div>
   )
 }
@@ -3544,6 +3733,7 @@ export default function AppV2Admin() {
     if (page === 'auditoria')      return <AuditPage onNavigate={setAdminPage} />
     if (page === 'obras')          return <ObrasPage onNavigate={setAdminPage} />
     if (page === 'centros')        return <CentrosPage />
+    if (page === 'vehiculos')      return <VehiculosPage />
     if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} onReviewEmployee={employeeId => { setEmployeeEditId(employeeId); setAdminPage('empleados') }} />
     return null
   }

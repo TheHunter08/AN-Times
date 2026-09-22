@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.9.0',
+    date: '2026-09-22',
+    title: 'Nuevo apartado de Vehículos',
+    items: [
+      'Nueva sección "Vehículos" en el panel de administración (Gestión): alta de vehículos con matrícula, marca, modelo, fechas de ITV y seguro, y asignación a un empleado o a una obra.',
+      'Visible para administradores, jefes de obra y jefes de centro, igual que Obras y Centros de trabajo.',
+    ],
+  },
+  {
     version: '4.8.0',
     date: '2026-09-22',
     title: 'Centro de trabajo obligatorio y ámbito estricto del encargado',

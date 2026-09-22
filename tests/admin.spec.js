@@ -122,6 +122,34 @@ test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) 
   await expect(page.getByText('PIN pendiente de actualizar', { exact:true })).toBeVisible()
 })
 
+test('vehículos permite crear un vehículo y asignarlo a un empleado', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[{ id:'e1', name:'Empleado Prueba', email:'empleado@empresa.com', role:'empleado', baja:false, centroTrabajo:'Obra Principal' }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Gestión', 'Vehículos')
+
+  await expect(page.getByText('No hay vehículos. Crea el primero arriba.', { exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Añadir', exact:true }).click()
+
+  const dialog = page.getByRole('dialog', { name:'Nuevo vehículo', exact:true })
+  await dialog.getByPlaceholder('Ej: 1234 ABC').fill('1234 abc')
+  await dialog.getByPlaceholder('Ej: Renault').fill('Renault')
+  await dialog.getByPlaceholder('Ej: Kangoo').fill('Kangoo')
+  await dialog.getByRole('button', { name:'Empleado', exact:true }).click()
+  await dialog.getByRole('combobox').filter({ hasText:'Selecciona un empleado' }).selectOption({ label:'Empleado Prueba' })
+  await dialog.getByRole('button', { name:'Crear vehículo', exact:true }).click()
+
+  await expect(page.getByText('1234 ABC', { exact:false })).toBeVisible()
+  await expect(page.getByText(/Renault Kangoo/)).toBeVisible()
+  await expect(page.getByText(/Empleado Prueba/)).toBeVisible()
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).vehiculos)
+  expect(saved).toHaveLength(1)
+  expect(saved[0]).toMatchObject({ matricula:'1234 ABC', marca:'Renault', modelo:'Kangoo', asignadoTipo:'empleado', asignadoId:'e1' })
+})
+
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {
   await loginAsAdmin(page, {
     audit: [{
