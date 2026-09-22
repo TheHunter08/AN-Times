@@ -296,7 +296,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none', letterSpacing: '0.3em' }} />
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Centro de trabajo *</div>
           {centros.length > 0 ? (
             <select value={form.centroTrabajo} onChange={e => setF('centroTrabajo', e.target.value)}
               style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border.default}`, background: 'rgba(var(--uiv2-overlay-rgb),.06)', color: colors.text[900], fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
@@ -322,11 +322,19 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             </div>
           </div>
         )}
-        {!form.centroTrabajo && form.obrasAsignadas.length === 0 && (obras.length > 0 || centros.length > 0) && (
+        {form.role === 'encargado' && (!form.centroTrabajo || form.obrasAsignadas.length === 0) && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px', borderRadius: 10, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)' }}>
             <span style={{ fontSize: 15, lineHeight: 1 }}>⚠️</span>
             <span style={{ fontSize: 12, color: colors.text[700], lineHeight: 1.4 }}>
-              Sin centro de trabajo ni obra asignada, este empleado no tendrá ninguna obra que seleccionar al fichar y no será visible en "En línea" para ningún jefe de obra o encargado.
+              Un encargado necesita centro de trabajo Y al menos una obra asignados a la vez — le falta {!form.centroTrabajo && form.obrasAsignadas.length === 0 ? 'el centro y la obra' : !form.centroTrabajo ? 'el centro' : 'la obra'}. Hasta entonces no podrá gestionar a ningún empleado.
+            </span>
+          </div>
+        )}
+        {form.role !== 'encargado' && form.obrasAsignadas.length === 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 12px', borderRadius: 10, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)' }}>
+            <span style={{ fontSize: 15, lineHeight: 1 }}>⚠️</span>
+            <span style={{ fontSize: 12, color: colors.text[700], lineHeight: 1.4 }}>
+              Sin obra asignada, este empleado solo verá al fichar la obra adscrita a su centro de trabajo (si existe alguna) — si ninguna obra tiene ese centro, no podrá iniciar jornada.
             </span>
           </div>
         )}

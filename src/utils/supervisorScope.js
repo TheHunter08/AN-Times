@@ -49,6 +49,16 @@ function obraCenterMap(obras) {
   return map
 }
 
+// El encargado (a diferencia del jefe de centro) debe coincidir en AMBAS
+// dimensiones a la vez: solo gestiona empleados de su misma obra Y su mismo
+// centro de trabajo. Un jefe de centro, en cambio, no tiene obras propias
+// asignadas — su ámbito es todo el centro, así que para él basta con
+// cualquiera de las dos coincidencias (en la práctica, solo la de centro,
+// ya que normalmente no tendrá obrasAsignadas).
+function isEncargado(supervisor) {
+  return supervisor?.role === 'encargado' || (Boolean(supervisor?.isEnc) && supervisor?.role !== 'jefe_centro')
+}
+
 export function getScopedEmployees({ employees = [], obras = [], supervisor, unrestricted = false }) {
   const active = employees.filter(employee => employee && !employee.baja && !employee.isAdmin && employee.role !== 'admin')
   if (unrestricted) return active
@@ -64,6 +74,7 @@ export function getScopedEmployees({ employees = [], obras = [], supervisor, unr
   // los empleados con centroTrabajo C también son de su ámbito aunque
   // no tengan esa obra en obrasAsignadas.
   const supervisorObraCenters = [...supervisorWorks].map(w => centersByWork.get(w)).filter(Boolean)
+  const requireBoth = isEncargado(supervisor)
 
   return active.filter(employee => {
     const employeeCenter = normalize(employee.centroTrabajo || employee.dept)
@@ -71,12 +82,9 @@ export function getScopedEmployees({ employees = [], obras = [], supervisor, unr
     const employeeWorkCenters = [...employeeWorks].map(work => centersByWork.get(work)).filter(Boolean)
     const centerMatches = Boolean(supervisorCenter) && (employeeCenter === supervisorCenter || employeeWorkCenters.includes(supervisorCenter) || supervisorObraCenters.includes(employeeCenter))
     const workMatches = supervisorWorks.size > 0 && ([...supervisorWorks].some(work => employeeWorks.has(work)) || supervisorObraCenters.includes(employeeCenter))
-    // Cuando el supervisor tiene AMBAS dimensiones (centro y obras), basta con
-    // que el empleado encaje en cualquiera de las dos — antes se exigían las
-    // dos a la vez, así que un empleado asignado solo por obra (sin
-    // centroTrabajo igual al del supervisor) o solo por centro (sin ninguna
-    // de las obras del supervisor) desaparecía del directorio aunque
-    // perteneciera realmente a su equipo.
+    if (requireBoth) return centerMatches && workMatches
+    // Jefe de centro (u otro rol acotado sin obras propias): basta con
+    // cualquiera de las dos — en la práctica, solo la de centro.
     return centerMatches || workMatches
   })
 }
@@ -98,6 +106,7 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
     return [[id, id], [name, id]].filter(([key]) => key)
   }))
   const centersByWork = obraCenterMap(obras)
+  const requireBoth = isEncargado(supervisor)
 
   return records
     .filter(record => record && !record.fin && record.inicio)
@@ -132,9 +141,10 @@ export function getScopedOnlineRecords({ records = [], employees = [], obras = [
 
       // Sin ninguna asignación no se abre accidentalmente el acceso a todo.
       if (!supervisorCenter && supervisorWorks.size === 0) return false
-      // Con las dos dimensiones configuradas, basta con que encaje en
-      // cualquiera de las dos — ver el comentario equivalente en
-      // getScopedEmployees más arriba.
+      // El encargado necesita coincidir en las dos dimensiones a la vez; el
+      // jefe de centro (sin obras propias) con cualquiera de las dos —
+      // ver el comentario equivalente en getScopedEmployees más arriba.
+      if (requireBoth) return centerMatches && workMatches
       return centerMatches || workMatches
     })
 }

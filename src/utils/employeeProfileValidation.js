@@ -8,6 +8,7 @@ export function validateEmployeeProfile(form, employees = [], isEdit = false) {
   const email = normalizeAccountEmail(form?.email)
   const pin = String(form?.pin || '')
   const telefono = String(form?.telefono || '').trim()
+  const centroTrabajo = String(form?.centroTrabajo || '').trim()
 
   if (!name) return { ok: false, error: 'El nombre es obligatorio' }
   if (!isValidAccountEmail(email)) {
@@ -15,6 +16,13 @@ export function validateEmployeeProfile(form, employees = [], isEdit = false) {
   }
   if (telefono && !PHONE_PATTERN.test(telefono)) {
     return { ok: false, error: 'Introduce un teléfono válido (solo dígitos, espacios, +, - o paréntesis).' }
+  }
+  // Sin centro de trabajo, un encargado nunca puede coincidir con nadie
+  // (getScopedEmployees le exige centro Y obra a la vez) y un empleado normal
+  // se queda sin ninguna obra que ofrecer al fichar si tampoco tiene
+  // obrasAsignadas — por eso pasa a ser obligatorio para todos los perfiles.
+  if (!centroTrabajo) {
+    return { ok: false, error: 'El centro de trabajo es obligatorio.' }
   }
 
   const duplicate = employees.find((employee) =>

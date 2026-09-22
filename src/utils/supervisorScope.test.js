@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getScopedEmployees, getScopedOnlineRecords, isScopedSupervisor } from './supervisorScope.js'
 
-const supervisor = { id: 'boss', centroTrabajo: 'Centro Norte', obrasAsignadas: ['obra-a'] }
+const encargado = { id: 'boss', role: 'encargado', centroTrabajo: 'Centro Norte', obrasAsignadas: ['obra-a'] }
+const jefeCentro = { id: 'chief', role: 'jefe_centro', centroTrabajo: 'Centro Norte', obrasAsignadas: [] }
 const obras = [{ id: 'obra-a', nombre: 'Reforma A' }, { id: 'obra-b', nombre: 'Reforma B' }]
 const records = [
   { id: 'ok', empId: 'same', inicio: '2026-07-13T08:00:00Z', centro: 'Centro Norte' },
@@ -15,40 +16,41 @@ const employees = [
   { id: 'otherCenter', name: 'Carla', centroTrabajo: 'Centro Sur', obrasAsignadas: ['obra-a'] },
 ]
 
-describe('getScopedOnlineRecords', () => {
-  // El supervisor tiene centro Y obra asignados. Antes se exigían los dos a
-  // la vez, así que un empleado que solo compartía la obra (otro centro) o
-  // solo el centro (otra obra) desaparecía aunque perteneciera a su equipo —
-  // esto era precisamente el bug reportado ("no salen todos los empleados").
-  it('muestra fichajes de empleados que coinciden en el centro o en la obra del supervisor', () => {
-    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id).sort())
-      .toEqual(['ok', 'other-center', 'other-work'].sort())
+describe('getScopedOnlineRecords — encargado exige centro Y obra a la vez', () => {
+  it('un encargado solo ve fichajes de empleados que coinciden en su centro Y su obra', () => {
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor: encargado }).map(item => item.record.id).sort())
+      .toEqual(['ok'])
   })
 
   it('acepta el nombre de la obra guardado como ubicación del fichaje', () => {
     const result = getScopedOnlineRecords({
       records: [{ id: 'by-name', empId: 'same', inicio: '2026-07-13T08:00:00Z', centro: 'Reforma A' }],
-      employees, obras, supervisor,
+      employees, obras, supervisor: encargado,
     })
     expect(result).toHaveLength(1)
   })
 
   it('no concede acceso global a un supervisor sin asignaciones', () => {
-    expect(getScopedOnlineRecords({ records, employees, obras, supervisor: { id: 'boss' } })).toEqual([])
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor: { id: 'boss', role: 'encargado' } })).toEqual([])
+  })
+
+  it('un encargado con centro pero sin ninguna obra asignada no ve a nadie (le falta la segunda dimensión)', () => {
+    const soloCentro = { id: 'boss', role: 'encargado', centroTrabajo: 'Centro Norte' }
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor: soloCentro })).toEqual([])
   })
 
   it('permite a un administrador global ver todos los fichajes abiertos', () => {
     expect(getScopedOnlineRecords({ records, employees, obras, supervisor: {}, unrestricted: true })).toHaveLength(3)
   })
 
-  it('el directorio del supervisor incluye a quien coincide en centro o en obra (no exige las dos)', () => {
-    expect(getScopedEmployees({ employees, supervisor }).map(item => item.id).sort())
-      .toEqual(['otherCenter', 'otherWork', 'same'].sort())
+  it('el directorio del encargado solo incluye a quien coincide en centro Y obra a la vez', () => {
+    expect(getScopedEmployees({ employees, supervisor: encargado }).map(item => item.id))
+      .toEqual(['same'])
   })
 
-  it('sigue sin incluir a un empleado que no comparte ni centro ni obra con el supervisor', () => {
+  it('sigue sin incluir a un empleado que no comparte ni centro ni obra con el encargado', () => {
     const unrelated = { id: 'unrelated', name: 'Zoe', centroTrabajo: 'Centro Este', obrasAsignadas: ['obra-z'] }
-    expect(getScopedEmployees({ employees: [...employees, unrelated], supervisor }).map(item => item.id))
+    expect(getScopedEmployees({ employees: [...employees, unrelated], supervisor: encargado }).map(item => item.id))
       .not.toContain('unrelated')
   })
 
@@ -58,6 +60,23 @@ describe('getScopedOnlineRecords', () => {
       supervisor:{}, unrestricted:true,
     })
     expect(result).toHaveLength(3)
+  })
+})
+
+describe('jefe de centro — sin obras propias, le basta con coincidir en centro', () => {
+  it('ve fichajes de empleados de su centro aunque no compartan ninguna obra con él', () => {
+    expect(getScopedOnlineRecords({ records, employees, obras, supervisor: jefeCentro }).map(item => item.record.id).sort())
+      .toEqual(['ok', 'other-work'].sort())
+  })
+
+  it('ve en su directorio a todo empleado de su centro, sin exigir coincidencia de obra', () => {
+    expect(getScopedEmployees({ employees, supervisor: jefeCentro }).map(item => item.id).sort())
+      .toEqual(['otherWork', 'same'].sort())
+  })
+
+  it('no ve a un empleado de otro centro aunque comparta una obra con él (jefe de centro sin obrasAsignadas)', () => {
+    expect(getScopedEmployees({ employees, supervisor: jefeCentro }).map(item => item.id))
+      .not.toContain('otherCenter')
   })
 })
 
@@ -92,50 +111,45 @@ describe('isScopedSupervisor', () => {
   })
 })
 
-describe('vínculo obra→centro de trabajo', () => {
+describe('vínculo obra→centro de trabajo (jefe de centro, sin obras propias)', () => {
   const linkedObras = [{ id: 'obra-c', nombre: 'Reforma C', centroTrabajo: 'Centro Norte' }]
 
-  it('getScopedOnlineRecords: un supervisor con solo centro ve a un empleado fichado en una obra adscrita a ese centro', () => {
-    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+  it('getScopedOnlineRecords: un jefe de centro ve a un empleado fichado en una obra adscrita a su centro', () => {
+    const soloCentro = { id: 'boss2', role: 'jefe_centro', centroTrabajo: 'Centro Norte' }
     const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
     const records = [{ id: 'dani-rec', empId: 'dani', inicio: '2026-07-13T08:00:00Z', centro: 'Reforma C' }]
-    const result = getScopedOnlineRecords({ records, employees: [employee], obras: linkedObras, supervisor: supervisorSoloCentro })
+    const result = getScopedOnlineRecords({ records, employees: [employee], obras: linkedObras, supervisor: soloCentro })
     expect(result).toHaveLength(1)
   })
 
   it('getScopedOnlineRecords: sin el vínculo obra→centro, el mismo empleado no aparece (regresión del bug original)', () => {
-    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+    const soloCentro = { id: 'boss2', role: 'jefe_centro', centroTrabajo: 'Centro Norte' }
     const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
     const records = [{ id: 'dani-rec', empId: 'dani', inicio: '2026-07-13T08:00:00Z', centro: 'Reforma C' }]
     const obrasSinCentro = [{ id: 'obra-c', nombre: 'Reforma C' }]
-    const result = getScopedOnlineRecords({ records, employees: [employee], obras: obrasSinCentro, supervisor: supervisorSoloCentro })
+    const result = getScopedOnlineRecords({ records, employees: [employee], obras: obrasSinCentro, supervisor: soloCentro })
     expect(result).toHaveLength(0)
   })
 
-  it('getScopedEmployees: un supervisor con solo centro ve a un empleado asignado a una obra adscrita a ese centro', () => {
-    const supervisorSoloCentro = { id: 'boss2', centroTrabajo: 'Centro Norte' }
+  it('getScopedEmployees: un jefe de centro ve a un empleado asignado a una obra adscrita a su centro', () => {
+    const soloCentro = { id: 'boss2', role: 'jefe_centro', centroTrabajo: 'Centro Norte' }
     const employee = { id: 'dani', name: 'Dani', obrasAsignadas: ['obra-c'] }
-    const result = getScopedEmployees({ employees: [employee], obras: linkedObras, supervisor: supervisorSoloCentro })
+    const result = getScopedEmployees({ employees: [employee], obras: linkedObras, supervisor: soloCentro })
     expect(result.map(item => item.id)).toEqual(['dani'])
   })
 
-  it('sin vínculo obra→centro, coincidir en cualquiera de las dos dimensiones sigue bastando', () => {
-    expect(getScopedOnlineRecords({ records, employees, obras, supervisor }).map(item => item.record.id).sort())
-      .toEqual(['ok', 'other-center', 'other-work'].sort())
-  })
-
-  it('getScopedOnlineRecords: jefe de obra con obra asignada por nombre ve fichaje cuyo centro coincide con el nombre (sin conversión a ID)', () => {
-    const supervisorNombre = { id: 'jefe', obrasAsignadas: ['Reforma C'] }
+  it('getScopedOnlineRecords: jefe de centro con obra asignada por nombre ve fichaje cuyo centro coincide con el nombre (sin conversión a ID)', () => {
+    const conObraPorNombre = { id: 'chief2', role: 'jefe_centro', obrasAsignadas: ['Reforma C'] }
     const emp = { id: 'emp1', name: 'Elena', centroTrabajo: 'Centro Norte', obrasAsignadas: [] }
     const recs = [{ id: 'rec1', empId: 'emp1', inicio: '2026-07-27T08:00:00Z', centro: 'Reforma C' }]
-    const result = getScopedOnlineRecords({ records: recs, employees: [emp], obras: linkedObras, supervisor: supervisorNombre })
+    const result = getScopedOnlineRecords({ records: recs, employees: [emp], obras: linkedObras, supervisor: conObraPorNombre })
     expect(result).toHaveLength(1)
   })
 
-  it('getScopedEmployees: jefe de obra con obra ligada a un centro ve empleados con solo centroTrabajo, sin obrasAsignadas', () => {
-    const supervisorNombre = { id: 'jefe', obrasAsignadas: ['obra-c'] }
+  it('getScopedEmployees: jefe de centro con obra ligada a un centro ve empleados con solo centroTrabajo, sin obrasAsignadas', () => {
+    const conObraPorId = { id: 'chief2', role: 'jefe_centro', obrasAsignadas: ['obra-c'] }
     const empSoloCentro = { id: 'emp2', name: 'Fran', centroTrabajo: 'Centro Norte', obrasAsignadas: [] }
-    const result = getScopedEmployees({ employees: [empSoloCentro], obras: linkedObras, supervisor: supervisorNombre })
+    const result = getScopedEmployees({ employees: [empSoloCentro], obras: linkedObras, supervisor: conObraPorId })
     expect(result.map(item => item.id)).toEqual(['emp2'])
   })
 })

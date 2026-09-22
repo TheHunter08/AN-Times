@@ -4,6 +4,17 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.8.0',
+    date: '2026-09-22',
+    title: 'Centro de trabajo obligatorio y ámbito estricto del encargado',
+    items: [
+      'El centro de trabajo pasa a ser obligatorio al crear o editar cualquier empleado — sin él, un encargado nunca podía coincidir con nadie y un empleado sin obra propia se quedaba sin nada que fichar.',
+      'Un encargado ahora solo gestiona (ve en su directorio, "En línea" y el asistente de IA) a los empleados que comparten a la vez su misma obra Y su mismo centro de trabajo — antes bastaba con cualquiera de las dos, lo que podía mezclar equipos de centros distintos que compartían una obra puntual.',
+      'El jefe de centro no cambia: sigue viendo a todo el que pertenezca a su centro, sin necesitar coincidir en una obra concreta (no tiene obras propias asignadas).',
+      'El formulario de empleado avisa ahora de forma más clara cuándo a un encargado le falta el centro, la obra, o ambos, para poder empezar a gestionar a su equipo.',
+    ],
+  },
+  {
     version: '4.7.1',
     date: '2026-09-22',
     title: 'Corrección: obra con nombre de centro, y parpadeo de la firma de vacaciones',
