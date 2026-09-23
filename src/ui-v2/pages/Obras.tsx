@@ -28,6 +28,7 @@ export interface ObrasProps {
   onAdd?: () => void
   onViewEmployees?: () => void
   onEdit?: (id: string) => void
+  onDelete?: (id: string) => void
 }
 
 const statusTone: Record<ObraItem['status'], 'green' | 'orange' | 'gray'> = {
@@ -37,7 +38,7 @@ const statusLabel: Record<ObraItem['status'], string> = {
   activa: 'Activa', completada: 'Completada',
 }
 
-export function Obras({ items, onAdd, onViewEmployees, onEdit }: ObrasProps) {
+export function Obras({ items, onAdd, onViewEmployees, onEdit, onDelete }: ObrasProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ObraItem['status'] | 'all'>('all')
   const [detail, setDetail] = useState<ObraItem | null>(null)
@@ -197,6 +198,11 @@ export function Obras({ items, onAdd, onViewEmployees, onEdit }: ObrasProps) {
                 </button>
               )}
             </div>
+            {onDelete && (
+              <button type="button" onClick={() => { const id = detail.id; setDetail(null); onDelete(id) }} style={{ padding: '10px 14px', borderRadius: radius.md, border: `1px solid ${colors.semantic.red}`, background: 'transparent', color: colors.semantic.red, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+                Eliminar obra
+              </button>
+            )}
           </div>
         </div>
       )}

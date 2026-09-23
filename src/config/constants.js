@@ -82,6 +82,7 @@ export const INITIAL_DB = {
   wellbeing: [],
   turnos: [],
   partesTrabajo: [],
+  vehiculos: [],
   legalAcknowledgements: [],
   anomalias_vistas: [],
   notisSent: {},

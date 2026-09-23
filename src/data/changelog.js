@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.9.1',
+    date: '2026-09-23',
+    title: 'Permite eliminar obras y corrige la sincronización de Vehículos',
+    items: [
+      'Ahora se puede eliminar una obra desde su ficha en Obras — se desasigna automáticamente de los empleados y vehículos que la tuvieran asignada.',
+      'Corregido un fallo por el que los vehículos creados en "Vehículos" desaparecían al recargar la app o sincronizar: la colección no estaba registrada en el motor de sincronización.',
+    ],
+  },
+  {
     version: '4.9.0',
     date: '2026-09-22',
     title: 'Nuevo apartado de Vehículos',

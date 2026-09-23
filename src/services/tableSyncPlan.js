@@ -3,14 +3,17 @@ export const COMPANY_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
 // (submit_denuncia/track_denuncia, ver migration-2026-07-18-denuncias-
 // privadas.sql) precisamente para que no se sincronice en bloque a todos
 // los clientes como el resto de estas colecciones.
-export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo','legalAcknowledgements']
+export const ENTITY_COLLECTIONS = ['medicos','ausencias','mensajes','notis','documentos','audit','correccionesFichaje','chats','gastos','wellbeing','turnos','partesTrabajo','legalAcknowledgements','vehiculos']
 export const MAP_ENTITY_COLLECTIONS = ['firmas']
 export const SINGLETON_COLLECTIONS = ['empresas','centrosTrabajo','monthSnapshots','anomalias_vistas','notisSent','config']
 // Los bloqueos de PIN son un control local del dispositivo. Sincronizarlos
 // permitia que un usuario alterase o leyese el estado de bloqueo de otros.
 export const LOCAL_ONLY_COLLECTIONS = ['pinLockouts']
 
-const ADMIN_ENTITY_COLLECTIONS = new Set(['audit', 'partesTrabajo', 'mensajes'])
+// vehiculos: flota de la empresa, gestionada por admin — no pertenece a un
+// empleado concreto (a diferencia de gastos/mensajes), así que va aquí igual
+// que audit/partesTrabajo, no en la clasificación por defecto (subject_emp_id).
+const ADMIN_ENTITY_COLLECTIONS = new Set(['audit', 'partesTrabajo', 'mensajes', 'vehiculos'])
 const COMPANY_ENTITY_COLLECTIONS = new Set()
 const COMPANY_SINGLETON_COLLECTIONS = new Set(['empresas', 'centrosTrabajo', 'notisSent', 'config'])
 

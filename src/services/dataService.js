@@ -434,6 +434,7 @@ export function mergeDB(base, incoming) {
     wellbeing:           _unionById(base.wellbeing,           incoming.wellbeing,           'wellbeing'),
     turnos:              _unionById(base.turnos,              incoming.turnos,              'turnos'),
     partesTrabajo:       _unionById(base.partesTrabajo,       incoming.partesTrabajo,       'partesTrabajo'),
+    vehiculos:           _unionById(base.vehiculos,           incoming.vehiculos,           'vehiculos'),
     legalAcknowledgements:_unionById(base.legalAcknowledgements, incoming.legalAcknowledgements, 'legalAcknowledgements'),
     anomalias_vistas:    _unionById(base.anomalias_vistas,    incoming.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           mergedNotisSent,

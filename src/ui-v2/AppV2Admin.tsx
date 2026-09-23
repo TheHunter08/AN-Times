@@ -3220,9 +3220,36 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const editingObra = editingId ? (db.obras || []).find((o: any) => o.id === editingId) : null
+  const saveDB = useAppStore(s => s.saveDB)
+  const toast = useAppStore(s => s.toast)
+
+  // Al eliminar una obra hay que desengancharla de todo lo que la referencia
+  // por id — si no, un empleado se quedaba con un id de obra "fantasma" en
+  // obrasAsignadas (invisible en su ficha, pero seguía contando en cualquier
+  // comprobación por id) y un vehículo asignado a ella quedaba huérfano.
+  const removeObra = (id: string) => {
+    const obra = (db.obras || []).find((o: any) => o.id === id)
+    if (!obra) return
+    const nombre = obra.nombre || obra.name || id
+    if (!window.confirm(`¿Eliminar la obra "${nombre}"? Se quitará de los empleados y vehículos que la tengan asignada. Esta acción no se puede deshacer.`)) return
+    saveDB((fresh: any) => ({
+      obras: (fresh.obras || []).filter((o: any) => o.id !== id),
+      employees: (fresh.employees || []).map((e: any) =>
+        (e.obrasAsignadas || []).includes(id)
+          ? { ...e, obrasAsignadas: e.obrasAsignadas.filter((x: string) => x !== id), _upd: new Date().toISOString() }
+          : e
+      ),
+      vehiculos: (fresh.vehiculos || []).map((v: any) =>
+        v.asignadoTipo === 'obra' && v.asignadoId === id
+          ? { ...v, asignadoTipo: '', asignadoId: '', _upd: new Date().toISOString() }
+          : v
+      ),
+    }))
+    toast('Obra eliminada', 2500, 'ok')
+  }
 
   return <>
-    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} onEdit={(id: string) => setEditingId(id)} />
+    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} onEdit={(id: string) => setEditingId(id)} onDelete={removeObra} />
     {showAdd && <ObraModal onClose={() => setShowAdd(false)} />}
     {editingObra && <ObraModal initial={editingObra} onClose={() => setEditingId(null)} />}
   </>

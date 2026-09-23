@@ -150,6 +150,29 @@ test('vehículos permite crear un vehículo y asignarlo a un empleado', async ({
   expect(saved[0]).toMatchObject({ matricula:'1234 ABC', marca:'Renault', modelo:'Kangoo', asignadoTipo:'empleado', asignadoId:'e1' })
 })
 
+test('obras permite eliminar una obra y la desasigna de empleados y vehículos', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[{ id:'e1', name:'Empleado Prueba', email:'empleado@empresa.com', role:'empleado', baja:false, centroTrabajo:'Centro Norte', obrasAsignadas:['obra-fantasma'] }],
+    obras:[{ id:'obra-fantasma', nombre:'TELECOMUNICACIONES', activa:true }],
+    vehiculos:[{ id:'v1', matricula:'1234 ABC', asignadoTipo:'obra', asignadoId:'obra-fantasma', activo:true }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Gestión', 'Obras')
+
+  await expect(page.getByRole('button', { name:/Ver detalle de la obra TELECOMUNICACIONES/i })).toBeVisible()
+  await page.getByRole('button', { name:/Ver detalle de la obra TELECOMUNICACIONES/i }).click()
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name:'Eliminar obra', exact:true }).click()
+
+  await expect(page.getByRole('button', { name:/Ver detalle de la obra TELECOMUNICACIONES/i })).toHaveCount(0)
+
+  const db = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')))
+  expect(db.obras).toHaveLength(0)
+  expect(db.employees.find(e => e.id === 'e1').obrasAsignadas).toEqual([])
+  expect(db.vehiculos[0]).toMatchObject({ asignadoTipo:'', asignadoId:'' })
+})
+
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {
   await loginAsAdmin(page, {
     audit: [{
