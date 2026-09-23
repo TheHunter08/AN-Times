@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.12.0',
+    date: '2026-09-23',
+    title: 'Cambio interno: fichajes deja de escribirse en el archivo de respaldo antiguo',
+    items: [
+      'Sin cambios visibles. Fase 2 de la migración: los fichajes (records), la tabla más grande y delicada, ya solo se escriben en su tabla normalizada de Supabase (donde ya se leían) — cada fichaje ya viajaba además por su propio camino directo y prioritario, así que este cambio no afecta a la velocidad ni fiabilidad de fichar. La lectura de la app no cambia.',
+    ],
+  },
+  {
     version: '4.11.0',
     date: '2026-09-23',
     title: 'Cambio interno: empleados deja de escribirse en el archivo de respaldo antiguo',

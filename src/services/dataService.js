@@ -472,12 +472,13 @@ function _mergeForPush(serverData, localPayload, deleted) {
     empresas:            _unionById(s.empresas,            l.empresas),
     obras:               _unionById(s.obras,               l.obras),
     centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
-    // Fase 1 del corte del blob (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya
-    // no se mezclan cambios locales de empleados en esta copia — se congela
-    // en lo que el servidor ya tenía. La tabla `employees` (_syncToTables)
-    // sigue recibiendo cada cambio exactamente igual que antes.
+    // Corte del blob por fases (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya no
+    // se mezclan cambios locales de employees/records en esta copia — se
+    // congelan en lo que el servidor ya tenía. Sus tablas (_syncToTables,
+    // persistRecordRow) siguen recibiendo cada cambio exactamente igual que
+    // antes.
     employees:           s.employees ?? l.employees,
-    records:             _mergeRecords(s.records, (l.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())), 'records'),
+    records:             s.records ?? l.records,
     vacaciones:          _unionById(s.vacaciones,          l.vacaciones,          'vacaciones'),
     medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
     ausencias:           _unionById(s.ausencias,           l.ausencias,           'ausencias'),
@@ -675,13 +676,18 @@ export function mergePendingDeletes(previous, incoming) {
   return Object.keys(out).length ? out : null
 }
 
-// Fase 1 del corte del blob legacy (ver plan de migración): 'employees' ya
-// tiene tabla completa y es la primera candidata a dejar de escribirse aquí
-// — se sigue guardando en la tabla `employees` vía _syncToTables exactamente
-// igual que antes; solo se congela la copia dentro de app_data.data a partir
-// de ahora. Las lecturas ya usan la tabla como fuente principal (dataServiceV2
-// cloudFetch), así que congelar esta copia no afecta a ningún empleado real.
-const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees'])
+// Corte del blob legacy por fases (ver plan de migración): cada colección de
+// aquí ya tiene tabla completa en Supabase y las lecturas ya la usan como
+// fuente principal (dataServiceV2 cloudFetch usa fetchAllRecords/fetchAllRows
+// para ambas, sin ningún fallback al blob salvo en cloudFetchLegacy, que no
+// se llama desde ningún sitio) — se sigue escribiendo en su tabla exactamente
+// igual que antes (_syncToTables/persistRecordRow, sin tocar); solo se
+// congela la copia dentro de app_data.data a partir de ahora.
+// - 'employees' (fase 1).
+// - 'records' (fase 2): el fichaje individual ya viaja además por su propio
+//   camino prioritario (persistRecordRow, ver appStore.js:saveDB), así que
+//   excluirlo del blob no retrasa ni arriesga ningún fichaje en curso.
+const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records'])
 
 export function buildBlobDelta(payload, deleted, syncHint) {
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null

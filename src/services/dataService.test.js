@@ -237,42 +237,51 @@ describe('cola offline', () => {
 
   it('construye un delta mínimo del blob y conserva eliminaciones', () => {
     const delta = buildBlobDelta({
-      records:[{ id:'r1', value:'viejo' }, { id:'r2', value:'nuevo' }],
+      gastos:[{ id:'g1', value:'viejo' }, { id:'g2', value:'nuevo' }],
       audit:[{ id:'a1' }, { id:'a2' }],
       config:{ wdMin:480 },
       _deleted:{ notis:['n1'] },
-    }, { records:['r0'] }, {
-      changedKeys:['records','audit','config'],
-      entityIds:{ records:['r2'], audit:['a2'] },
+    }, { gastos:['g0'] }, {
+      changedKeys:['gastos','audit','config'],
+      entityIds:{ gastos:['g2'], audit:['a2'] },
     })
     expect(delta).toEqual({
       patch:{
-        records:[{ id:'r2', value:'nuevo' }],
+        gastos:[{ id:'g2', value:'nuevo' }],
         audit:[{ id:'a2' }],
         config:{ wdMin:480 },
         _deleted:{ notis:['n1'] },
       },
-      deleted:{ records:['r0'] },
+      deleted:{ gastos:['g0'] },
     })
   })
 
-  it('excluye employees del delta del blob (fase 1 del corte del blob legacy — sigue yendo a la tabla)', () => {
+  it('excluye employees y records del delta del blob (corte del blob legacy por fases — siguen yendo a su tabla)', () => {
     const delta = buildBlobDelta({
       employees:[{ id:'e1', name:'Nuevo nombre' }],
       records:[{ id:'r1', value:'x' }],
+      vacaciones:[{ id:'v1', estado:'aprobada' }],
     }, null, {
-      changedKeys:['employees', 'records'],
-      entityIds:{ records:['r1'] },
+      changedKeys:['employees', 'records', 'vacaciones'],
+      entityIds:{ vacaciones:['v1'] },
     })
     expect(delta.patch).not.toHaveProperty('employees')
-    expect(delta.patch.records).toEqual([{ id:'r1', value:'x' }])
+    expect(delta.patch).not.toHaveProperty('records')
+    expect(delta.patch.vacaciones).toEqual([{ id:'v1', estado:'aprobada' }])
   })
 
-  it('un guardado que solo toca employees produce un delta vacío (nada que subir al blob)', () => {
-    const delta = buildBlobDelta({
+  it('un guardado que solo toca employees y/o records produce un delta vacío (nada que subir al blob)', () => {
+    expect(buildBlobDelta({
       employees:[{ id:'e1', name:'Nuevo nombre' }],
-    }, null, { changedKeys:['employees'] })
-    expect(delta.patch).toEqual({})
+    }, null, { changedKeys:['employees'] }).patch).toEqual({})
+
+    expect(buildBlobDelta({
+      records:[{ id:'r1', value:'x' }],
+    }, null, { changedKeys:['records'] }).patch).toEqual({})
+
+    expect(buildBlobDelta({
+      employees:[{ id:'e1' }], records:[{ id:'r1' }],
+    }, null, { changedKeys:['employees', 'records'] }).patch).toEqual({})
   })
 
   it('conserva tombstones remotos para proteger otros dispositivos desactualizados', () => {
