@@ -203,6 +203,26 @@ async function fetchAllRecords(sinceIso = null) {
   }
 }
 
+// Mismo problema que fetchAllRecords, para el resto de tablas que también
+// crecen con el tiempo (no con la plantilla) y que en una empresa con años
+// de histórico pueden superar el límite de fila de PostgREST en una lectura
+// completa/fría (dispositivo nuevo, caché borrada, respaldo de fase 2) —
+// vacaciones, cierres y app_entities (documentos, gastos, mensajes...) están
+// entre las más probables de cruzar ese umbral primero.
+async function fetchAllRows(table, { select = '*', sinceIso = null, orderColumn = 'id', ascending = true } = {}) {
+  const rows = []
+  for (let from = 0; ; from += RECORDS_PAGE_SIZE) {
+    let query = supabase.from(table).select(select)
+      .eq('company_id', COMPANY_ID)
+      .order(orderColumn, { ascending })
+    if (sinceIso) query = query.gt('updated_at', sinceIso)
+    const { data, error } = await query.range(from, from + RECORDS_PAGE_SIZE - 1)
+    if (error) return { data: rows, error }
+    rows.push(...(data || []))
+    if (!data || data.length < RECORDS_PAGE_SIZE) return { data: rows, error: null }
+  }
+}
+
 // ── cloudFetch V2: lee de tablas, cae en V1 si están vacías ──────────────────
 // Reloj ligero calculado sobre las tablas. app_data deja de participar en las
 // lecturas normales, aunque se mantiene como respaldo durante la fase 2.
@@ -261,18 +281,14 @@ export async function cloudFetch(sinceTs = 0) {
     }
     let employeeQuery = tableQuery('employees')
     if (!isPartial) employeeQuery = employeeQuery.order('name')
-    let entitiesQuery = supabase.from('app_entities')
-      .select('collection,entity_id,data,revision,deleted,updated_at')
-      .eq('company_id', COMPANY_ID)
-    if (sinceIso) entitiesQuery = entitiesQuery.gt('updated_at', sinceIso)
     const [empsR, recsR, vacsR, cierresR, obrasR, entitiesR, auditEventsR] = await Promise.all([
       employeeQuery,
       fetchAllRecords(sinceIso),
-      tableQuery('vacaciones'),
-      tableQuery('cierres'),
-      tableQuery('obras'),
-      entitiesQuery,
-      tableQuery('audit_events'),
+      fetchAllRows('vacaciones', { sinceIso }),
+      fetchAllRows('cierres', { sinceIso }),
+      fetchAllRows('obras', { sinceIso }),
+      fetchAllRows('app_entities', { select: 'collection,entity_id,data,revision,deleted,updated_at', sinceIso }),
+      fetchAllRows('audit_events', { sinceIso }),
     ])
     const auditTableMissing = ['42P01', 'PGRST205'].includes(auditEventsR.error?.code)
     const responses = [empsR, recsR, vacsR, cierresR, obrasR, entitiesR, ...(auditTableMissing ? [] : [auditEventsR])]

@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.9.2',
+    date: '2026-09-23',
+    title: 'Paginación completa en la lectura de tablas de Supabase',
+    items: [
+      'La lectura de vacaciones, cierres, obras, eventos de auditoría y colecciones genéricas (documentos, gastos, mensajes, turnos...) ahora se hace por páginas, igual que ya se hacía con los fichajes — evita que una empresa con años de histórico pierda datos antiguos silenciosamente al superar el límite de fila de PostgREST en una recarga completa.',
+    ],
+  },
+  {
     version: '4.9.1',
     date: '2026-09-23',
     title: 'Permite eliminar obras y corrige la sincronización de Vehículos',
