@@ -781,7 +781,9 @@ export default function EmployeePage() {
       )
       return false
     }
-    const hasUnsignedApprovedVac = (db.vacaciones || []).some(v => v.empId === u?.id && v.estado === 'aprobada' && !v.firmaEmp)
+    // Solo vacaciones exige firma obligatoria — una baja médica o un permiso
+    // retribuido se aprueban sin ese trámite (ver ModalVacSign.jsx).
+    const hasUnsignedApprovedVac = (db.vacaciones || []).some(v => v.empId === u?.id && v.estado === 'aprobada' && !v.firmaEmp && (!v.tipo || v.tipo === 'vacaciones'))
     if (hasUnsignedApprovedVac) {
       toast('Firma el documento de tus vacaciones aprobadas antes de fichar.', 6000, 'warn')
       return false
@@ -1258,7 +1260,7 @@ export default function EmployeePage() {
   // la app (ver ModalVacSign.jsx) — a diferencia de los cierres mensuales,
   // que solo muestran un aviso descartable.
   const pendingVacSignEmp = useMemo(
-    () => (db.vacaciones || []).filter(v => v.empId === uh.id && v.estado === 'aprobada' && !v.firmaEmp),
+    () => (db.vacaciones || []).filter(v => v.empId === uh.id && v.estado === 'aprobada' && !v.firmaEmp && (!v.tipo || v.tipo === 'vacaciones')),
     [db.vacaciones, uh.id]
   )
 

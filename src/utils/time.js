@@ -183,8 +183,11 @@ export const vacData = (empId, db) => {
     }
     return v.dias || 0
   }
-  const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada').reduce((s, v) => s + countDays(v), 0)
-  const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente').reduce((s, v) => s + countDays(v), 0)
+  // Solo el tipo 'vacaciones' consume saldo — una baja médica o un permiso
+  // retribuido son ausencias justificadas aparte, no días de vacaciones.
+  const isVacationType = v => !v.tipo || v.tipo === 'vacaciones'
+  const used = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'aprobada' && isVacationType(v)).reduce((s, v) => s + countDays(v), 0)
+  const pend = (db.vacaciones || []).filter(v => v.empId === empId && v.estado === 'pendiente' && isVacationType(v)).reduce((s, v) => s + countDays(v), 0)
   return { months: m, generated: gen, used, pending: pend, available: Math.max(0, parseFloat((gen - used - pend).toFixed(1))), extra }
 }
 

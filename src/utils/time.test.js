@@ -323,6 +323,20 @@ describe('vacData', () => {
     expect(r.pending).toBe(2)
     expect(r.available).toBe(parseFloat((r.generated - 7).toFixed(1)))
   })
+
+  it('no descuenta días por baja médica ni permiso retribuido, solo por vacaciones', () => {
+    const db = {
+      employees: [{ id: 'e1', startDate: '2020-01-01', jornadaHoras: 40 }],
+      vacaciones: [
+        { empId: 'e1', tipo: 'vacaciones', estado: 'aprobada', fechaInicio: '2026-06-01', fechaFin: '2026-06-05' }, // 5 días
+        { empId: 'e1', tipo: 'baja_medica', estado: 'aprobada', fechaInicio: '2026-06-10', fechaFin: '2026-06-20' }, // 11 días, no cuentan
+        { empId: 'e1', tipo: 'permiso_retribuido', estado: 'pendiente', fechaInicio: '2026-07-01', fechaFin: '2026-07-01' }, // 1 día, no cuenta
+      ],
+    }
+    const r = vacData('e1', db)
+    expect(r.used).toBe(5)
+    expect(r.pending).toBe(0)
+  })
 })
 
 describe('regresión del conteo tras modificar fichajes', () => {

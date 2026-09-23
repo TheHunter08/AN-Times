@@ -739,12 +739,12 @@ function VacacionesAdminPage() {
   })
 
   const requests = [...(db.vacaciones || [])]
-    .filter((v: any) => !v.tipo || v.tipo === 'vacaciones' || !v.tipo)
     .sort((a: any, b: any) => String(b.ts || '').localeCompare(String(a.ts || '')))
     .map((v: any) => ({
       id: v.id, empId: v.empId || '', empName: v.empName || '—',
       fechaInicio: v.fechaInicio || '', fechaFin: v.fechaFin || '',
       dias: v.dias || 0, estado: v.estado as 'pendiente' | 'aprobada' | 'rechazada',
+      tipo: (v.tipo || 'vacaciones') as 'vacaciones' | 'baja_medica' | 'permiso_retribuido',
       motivo: v.motivo, motivoRechazo: v.motivoRechazo,
     }))
 
@@ -2986,7 +2986,12 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   const [lat, setLat] = useState(initialCoords ? String(initialCoords.lat) : '')
   const [lng, setLng] = useState(initialCoords ? String(initialCoords.lng) : '')
   const [radio, setRadio] = useState(String(initial?.radio || 200))
-  const [geofenceStrict, setGeofenceStrict] = useState(initial?.geofenceStrict ?? false)
+  // Por defecto estricto SOLO en obras nuevas — una obra ya existente que
+  // hoy no lo tiene puede tener empleados fichando con GPS impreciso; activar
+  // el bloqueo retroactivamente los dejaría sin poder fichar sin que nadie
+  // lo pidiera. Al crear una obra nueva sí conviene exigirlo desde el
+  // principio, no como algo que haya que acordarse de marcar aparte.
+  const [geofenceStrict, setGeofenceStrict] = useState(initial ? (initial.geofenceStrict ?? false) : true)
   const [fechaInicio, setFechaInicio] = useState(() => initial?.fechaInicio || today())
   const [centroTrabajo, setCentroTrabajo] = useState(initial?.centroTrabajo || '')
   // Sin este campo, ninguna obra podía marcarse como completada/inactiva

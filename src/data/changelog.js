@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.10.0',
+    date: '2026-09-23',
+    title: 'Bajas médicas y permisos retribuidos, y geofencing estricto por defecto en obras nuevas',
+    items: [
+      'Al solicitar una ausencia, el empleado ya puede elegir entre Vacaciones, Baja médica o Permiso retribuido. Las bajas médicas y permisos no descuentan del saldo de vacaciones ni exigen la firma obligatoria que sí llevan las vacaciones.',
+      'El panel de Solicitudes muestra el tipo de cada petición y permite aprobarla/rechazarla igual que hasta ahora.',
+      'Las obras nuevas activan por defecto el geofencing estricto (bloquea fichar fuera del radio de la obra) — las obras ya existentes no cambian, para no dejar sin poder fichar a nadie que hoy ficha con normalidad.',
+    ],
+  },
+  {
     version: '4.9.2',
     date: '2026-09-23',
     title: 'Paginación completa en la lectura de tablas de Supabase',

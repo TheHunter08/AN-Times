@@ -315,3 +315,18 @@ test('si no se puede descargar el original de Storage (permisos/red), no se marc
   // así que el empleado puede reintentar directamente.
   await expect(page.getByRole('button', { name: 'Confirmar y firmar' })).toBeVisible()
 })
+
+test('una baja médica o permiso retribuido aprobados no exigen la firma obligatoria de vacaciones', async ({ page }) => {
+  await loginAsEmployee(page, {
+    vacaciones: [{
+      id: 'v-baja', empId: employee.id, empName: employee.name, tipo: 'baja_medica',
+      fechaInicio: '2026-01-10', fechaFin: '2026-01-15', dias: 6,
+      estado: 'aprobada', firmaEmp: false, ts: '2026-01-05T00:00:00Z', _upd: '2026-01-05T00:00:00Z',
+    }],
+  })
+  await page.goto('/')
+  // Si el gate de firma obligatoria (ModalVacSign) tratara esta baja médica
+  // como una vacación sin firmar, este botón nunca llegaría a mostrarse.
+  await expect(page.getByRole('button', { name: /Iniciar jornada.*Mantén pulsado/i })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole('dialog', { name: 'Firma obligatoria de vacaciones' })).toHaveCount(0)
+})

@@ -122,6 +122,27 @@ test.describe('Pantalla del empleado', () => {
     await expect(page.getByText(/Vacaciones|Solicitar vacaciones/i).first()).toBeVisible({ timeout: 8000 })
   })
 
+  test('permite solicitar una baja médica sin que cuente como vacación', async ({ page }) => {
+    await page.getByRole('button', { name: 'Vacaciones', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Solicitar vacaciones', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Solicitar vacaciones', exact: true })
+    await expect(dialog.getByText('Solicitar ausencia', { exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: '🩺 Baja médica', exact: true }).click()
+    const toISODate = (d) => d.toISOString().slice(0, 10)
+    const start = new Date(); start.setDate(start.getDate() + 1)
+    const end = new Date(start); end.setDate(end.getDate() + 4)
+    await dialog.locator('input[type="date"]').first().fill(toISODate(start))
+    await dialog.locator('input[type="date"]').last().fill(toISODate(end))
+    await dialog.getByRole('button', { name: 'Solicitar', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText('Baja médica', { exact: false })).toBeVisible()
+    await expect(page.getByText('5 días', { exact: false })).toBeVisible()
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).vacaciones)
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).toMatchObject({ tipo: 'baja_medica', estado: 'pendiente', dias: 5 })
+  })
+
   test('navega a Calendario', async ({ page }) => {
     await page.getByRole('button', { name: 'Calendario', exact: true }).last().click()
     await expect(page.getByText(/Calendario|Leyenda/i).first()).toBeVisible({ timeout: 8000 })

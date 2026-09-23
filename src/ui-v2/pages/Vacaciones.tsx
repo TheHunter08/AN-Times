@@ -27,8 +27,15 @@ export interface VacRequestRow {
   fechaFin: string
   dias: number
   estado: 'pendiente' | 'aprobada' | 'rechazada'
+  tipo?: 'vacaciones' | 'baja_medica' | 'permiso_retribuido'
   motivo?: string
   motivoRechazo?: string
+}
+
+export const TIPO_AUSENCIA_LABEL: Record<string, string> = {
+  vacaciones: 'Vacaciones',
+  baja_medica: 'Baja médica',
+  permiso_retribuido: 'Permiso retribuido',
 }
 
 export interface VacacionesProps {
@@ -412,7 +419,14 @@ export function Vacaciones({ employees, requests, onAdjust, onAssign, onApprove,
                   <div key={req.id} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, borderTop: i > 0 ? `1px solid ${colors.border.subtle}` : 'none', flexWrap: 'wrap' }}>
                     <Avatar name={req.empName} size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900] }}>{req.empName}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: colors.text[900], display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {req.empName}
+                        {req.tipo && req.tipo !== 'vacaciones' && (
+                          <span style={{ padding: '2px 8px', borderRadius: radius.pill, background: colors.bg[500], color: colors.text[500], fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.3px' }}>
+                            {TIPO_AUSENCIA_LABEL[req.tipo] || req.tipo}
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 11, color: colors.text[500], marginTop: 2 }}>
                         {fds(req.fechaInicio)} → {fds(req.fechaFin)} · {dias} día{dias !== 1 ? 's' : ''}
                         {req.motivo ? ` · ${req.motivo}` : ''}

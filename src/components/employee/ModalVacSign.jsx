@@ -24,7 +24,7 @@ export function ModalVacSign({ visible, db, u, toast, saveDB }) {
   const { canvasRef, handlers, clearCanvas, initCanvas, getSignatureData } = useSignatureCanvas()
   const [selIdx, setSelIdx] = useState(0)
   const [firmando, setFirmando] = useState(false)
-  const pendingVacs = (db.vacaciones || []).filter(v => v.empId === u?.id && v.estado === 'aprobada' && !v.firmaEmp)
+  const pendingVacs = (db.vacaciones || []).filter(v => v.empId === u?.id && v.estado === 'aprobada' && !v.firmaEmp && (!v.tipo || v.tipo === 'vacaciones'))
   const selVac = pendingVacs[Math.min(selIdx, pendingVacs.length - 1)] || null
 
   useEffect(() => { if (visible && selVac) initCanvas() }, [visible, selVac?.id])
