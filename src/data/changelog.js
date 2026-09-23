@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.11.0',
+    date: '2026-09-23',
+    title: 'Cambio interno: empleados deja de escribirse en el archivo de respaldo antiguo',
+    items: [
+      'Sin cambios visibles. Primer paso de la migración para dejar de depender del almacenamiento antiguo tabla por tabla: los datos de empleados ya solo se escriben en su tabla normalizada de Supabase (donde ya se leían), no en el archivo de respaldo completo. La lectura de la app no cambia.',
+    ],
+  },
+  {
     version: '4.10.1',
     date: '2026-09-23',
     title: 'Corrección: obras fantasma en el selector de "Iniciar jornada"',

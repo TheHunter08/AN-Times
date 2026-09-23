@@ -256,6 +256,25 @@ describe('cola offline', () => {
     })
   })
 
+  it('excluye employees del delta del blob (fase 1 del corte del blob legacy — sigue yendo a la tabla)', () => {
+    const delta = buildBlobDelta({
+      employees:[{ id:'e1', name:'Nuevo nombre' }],
+      records:[{ id:'r1', value:'x' }],
+    }, null, {
+      changedKeys:['employees', 'records'],
+      entityIds:{ records:['r1'] },
+    })
+    expect(delta.patch).not.toHaveProperty('employees')
+    expect(delta.patch.records).toEqual([{ id:'r1', value:'x' }])
+  })
+
+  it('un guardado que solo toca employees produce un delta vacío (nada que subir al blob)', () => {
+    const delta = buildBlobDelta({
+      employees:[{ id:'e1', name:'Nuevo nombre' }],
+    }, null, { changedKeys:['employees'] })
+    expect(delta.patch).toEqual({})
+  })
+
   it('conserva tombstones remotos para proteger otros dispositivos desactualizados', () => {
     expect(mergePersistentDeletes(
       { records:['r-old'], notis:['n1'] },

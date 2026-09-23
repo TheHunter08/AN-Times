@@ -472,7 +472,11 @@ function _mergeForPush(serverData, localPayload, deleted) {
     empresas:            _unionById(s.empresas,            l.empresas),
     obras:               _unionById(s.obras,               l.obras),
     centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
-    employees:           _unionById(s.employees,           l.employees,           'employees'),
+    // Fase 1 del corte del blob (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya
+    // no se mezclan cambios locales de empleados en esta copia — se congela
+    // en lo que el servidor ya tenía. La tabla `employees` (_syncToTables)
+    // sigue recibiendo cada cambio exactamente igual que antes.
+    employees:           s.employees ?? l.employees,
     records:             _mergeRecords(s.records, (l.records || []).filter(r => r?.inicio && !isNaN(new Date(r.inicio).getTime())), 'records'),
     vacaciones:          _unionById(s.vacaciones,          l.vacaciones,          'vacaciones'),
     medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
@@ -671,11 +675,20 @@ export function mergePendingDeletes(previous, incoming) {
   return Object.keys(out).length ? out : null
 }
 
+// Fase 1 del corte del blob legacy (ver plan de migración): 'employees' ya
+// tiene tabla completa y es la primera candidata a dejar de escribirse aquí
+// — se sigue guardando en la tabla `employees` vía _syncToTables exactamente
+// igual que antes; solo se congela la copia dentro de app_data.data a partir
+// de ahora. Las lecturas ya usan la tabla como fuente principal (dataServiceV2
+// cloudFetch), así que congelar esta copia no afecta a ningún empleado real.
+const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees'])
+
 export function buildBlobDelta(payload, deleted, syncHint) {
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null
   if (!changedKeys?.length) return null
   const patch = {}
   for (const key of changedKeys) {
+    if (BLOB_WRITE_EXCLUDED_KEYS.has(key)) continue
     const value = payload?.[key]
     if (value === undefined) continue
     const ids = Array.isArray(syncHint?.entityIds?.[key]) ? new Set(syncHint.entityIds[key].map(String)) : null
@@ -693,6 +706,12 @@ async function _tryDeltaUpsert(payload, deleted, syncHint) {
   if (USE_COLD_ROW || _deltaRpcAvailable === false) return false
   const delta = buildBlobDelta(payload, deleted, syncHint)
   if (!delta) return false
+  // Todo lo que cambió pertenece a una colección excluida del blob (por
+  // ahora, solo 'employees' — ver BLOB_WRITE_EXCLUDED_KEYS): no hay nada que
+  // escribir aquí, pero tampoco hay que caer al merge completo del blob
+  // (mucho más caro) solo porque este destino en concreto no tenía nada que
+  // hacer — se trata como un éxito silencioso.
+  if (!Object.keys(delta.patch).length && !Object.keys(delta.deleted || {}).length) return true
   const nowIso = new Date().toISOString()
   const { error } = await supabase.rpc('apply_app_data_delta', {
     p_patch:delta.patch,
