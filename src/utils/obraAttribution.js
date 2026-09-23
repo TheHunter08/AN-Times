@@ -36,12 +36,15 @@ function dedupe(values) {
 // fichar: hace falta que un admin le asigne una obra.
 export function employeeObraOptions(employee, obras) {
   const assignedReferences = employee?.obrasAsignadas || []
-  if (assignedReferences.length) {
-    return dedupe(assignedReferences.map(reference => {
-      const obra = findObra(reference, obras)
-      return obra?.nombre || obra?.name || obra?.id || String(reference ?? '').trim()
-    }))
-  }
+  // Una referencia que ya no existe como obra (renombrada, eliminada, o un
+  // resto de una migración antigua) NO debe imprimirse tal cual: antes se
+  // mostraba la cadena en bruto (p.ej. el nombre de un centro que nunca fue
+  // una obra) como si fuera una obra real y seleccionable al fichar.
+  const resolvedDirect = dedupe(assignedReferences.map(reference => {
+    const obra = findObra(reference, obras)
+    return obra ? (obra.nombre || obra.name || obra.id) : null
+  }))
+  if (resolvedDirect.length) return resolvedDirect
 
   const employeeCenter = normalize(employee?.centroTrabajo || employee?.dept)
   if (!employeeCenter) return []

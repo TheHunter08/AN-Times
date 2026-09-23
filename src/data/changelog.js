@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.10.1',
+    date: '2026-09-23',
+    title: 'Corrección: obras fantasma en el selector de "Iniciar jornada"',
+    items: [
+      'Un empleado con una referencia antigua en sus obras asignadas (de una obra ya renombrada o eliminada, como "Gecama" o "TELECOMUNICACIONES") veía esa referencia como si fuera una obra real y seleccionable al iniciar jornada. Ahora esas referencias obsoletas se ignoran — si el empleado tiene otras obras válidas se muestran esas, y si no le queda ninguna, se ofrece la obra adscrita a su centro de trabajo en su lugar.',
+    ],
+  },
+  {
     version: '4.10.0',
     date: '2026-09-23',
     title: 'Bajas médicas y permisos retribuidos, y geofencing estricto por defecto en obras nuevas',

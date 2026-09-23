@@ -61,4 +61,18 @@ describe('atribución de fichajes a obras', () => {
     expect(employeeObraOptions({ centroTrabajo:'Centro sin obras' }, obras)).toEqual([])
     expect(employeeObraOptions({}, obras)).toEqual([])
   })
+
+  it('nunca imprime una referencia obsoleta (obra renombrada/eliminada) como si fuera una obra real', () => {
+    // Bug real: un empleado con 'Gecama' u otro nombre antiguo en
+    // obrasAsignadas (de antes de renombrar/eliminar esa obra) hacía que
+    // employeeObraOptions devolviera ese texto en bruto, apareciendo como
+    // una obra fantasma seleccionable en el selector de "Iniciar jornada".
+    expect(employeeObraOptions({ obrasAsignadas:['obra-fantasma-vieja'] }, obras)).toEqual([])
+  })
+
+  it('con una referencia obsoleta, cae al centro de trabajo en vez de no ofrecer nada', () => {
+    const obrasConCentro = [{ id:'obra-a', nombre:'Reforma Centro', centroTrabajo:'Centro habitual' }]
+    expect(employeeObraOptions({ obrasAsignadas:['obra-fantasma-vieja'], centroTrabajo:'Centro habitual' }, obrasConCentro))
+      .toEqual(['Reforma Centro'])
+  })
 })

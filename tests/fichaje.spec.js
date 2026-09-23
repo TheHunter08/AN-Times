@@ -47,6 +47,32 @@ test('muestra las obras asignadas por id al iniciar una jornada', async ({ page 
   await expect(dialog.getByRole('option', { name:'Centro legacy', exact:true })).toHaveCount(0)
 })
 
+test('nunca ofrece una obra fantasma a partir de una referencia obsoleta en obrasAsignadas', async ({ page }) => {
+  // Bug real reportado: un empleado con 'Gecama'/'TELECOMUNICACIONES' (nombres
+  // antiguos, ya sin obra real que coincida tras un renombrado) veía esas
+  // cadenas en bruto como si fueran obras reales en el selector de "Iniciar
+  // jornada" — ver employeeObraOptions en obraAttribution.js.
+  await loginAsEmployee(page, {
+    employees:[{ ...employee, centroTrabajo:'', obrasAsignadas:['obra-norte', 'Gecama', 'TELECOMUNICACIONES'] }],
+    obras:[{ id:'obra-norte', nombre:'Nave Norte', activa:true }],
+  })
+  await page.goto('/')
+  const clock = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
+  await expect(clock).toBeVisible({ timeout:15000 })
+  const box = await clock.boundingBox()
+  expect(box).not.toBeNull()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(400)
+  await page.mouse.up()
+
+  const dialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('option', { name:'Nave Norte', exact:true })).toBeAttached()
+  await expect(dialog.getByRole('option', { name:'Gecama', exact:true })).toHaveCount(0)
+  await expect(dialog.getByRole('option', { name:'TELECOMUNICACIONES', exact:true })).toHaveCount(0)
+})
+
 test('completa una entrada y una salida y conserva el fichaje cerrado', async ({ page }) => {
   // Sin obrasAsignadas directas, se ofrece la obra adscrita al centro de
   // trabajo del empleado (nunca el centro en sí) — ver employeeObraOptions.
