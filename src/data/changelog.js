@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.14.0',
+    date: '2026-09-24',
+    title: 'Cambio interno: obras, documentos, gastos, mensajes y el resto de colecciones dejan de escribirse en el archivo de respaldo antiguo',
+    items: [
+      'Sin cambios visibles. Fase 4 de la migración: obras y el resto de colecciones granulares (documentos, gastos, mensajes, turnos, médicos, ausencias, correcciones de fichaje, chats, bienestar, partes de trabajo, reconocimientos legales, notificaciones, vehículos y auditoría) ya solo se escriben en sus tablas normalizadas de Supabase, donde ya se leían y ya se guardaba la fila completa. La lectura de la app no cambia.',
+    ],
+  },
+  {
     version: '4.13.0',
     date: '2026-09-24',
     title: 'Cambio interno: vacaciones y cierres dejan de escribirse en el archivo de respaldo antiguo',

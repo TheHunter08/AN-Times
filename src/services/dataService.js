@@ -3,6 +3,7 @@ import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
 import { AUTH_STORAGE_KEY, authSupabase } from './authService.js'
 import { dedupeNotifications } from '../utils/notifications.js'
+import { ENTITY_COLLECTIONS } from './tableSyncPlan.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -470,33 +471,35 @@ function _mergeForPush(serverData, localPayload, deleted) {
   const out = {
     ...l,
     empresas:            _unionById(s.empresas,            l.empresas),
-    obras:               _unionById(s.obras,               l.obras),
     centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
     // Corte del blob por fases (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya no
-    // se mezclan cambios locales de employees/records/vacaciones/cierres en
-    // esta copia — se congelan en lo que el servidor ya tenía. Sus tablas
-    // (_syncToTables, persistRecordRow) siguen recibiendo cada cambio
+    // se mezclan cambios locales de estas colecciones en esta copia — se
+    // congelan en lo que el servidor ya tenía. Sus tablas (_syncToTables,
+    // persistRecordRow, app_entities) siguen recibiendo cada cambio
     // exactamente igual que antes.
     employees:           s.employees ?? l.employees,
     records:             s.records ?? l.records,
     vacaciones:          s.vacaciones ?? l.vacaciones,
-    medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
-    ausencias:           _unionById(s.ausencias,           l.ausencias,           'ausencias'),
-    mensajes:            _unionById(s.mensajes,            l.mensajes,            'mensajes'),
-    notis:               dedupeNotifications(_unionById(s.notis, l.notis, 'notis')),
     cierres:             s.cierres ?? l.cierres,
+    obras:               s.obras ?? l.obras,
+    medicos:             s.medicos ?? l.medicos,
+    ausencias:           s.ausencias ?? l.ausencias,
+    mensajes:            s.mensajes ?? l.mensajes,
+    notis:               s.notis ?? l.notis,
+    documentos:          s.documentos ?? l.documentos,
+    audit:               s.audit ?? l.audit,
+    correccionesFichaje: s.correccionesFichaje ?? l.correccionesFichaje,
+    chats:               s.chats ?? l.chats,
+    gastos:              s.gastos ?? l.gastos,
+    wellbeing:           s.wellbeing ?? l.wellbeing,
+    turnos:              s.turnos ?? l.turnos,
+    partesTrabajo:       s.partesTrabajo ?? l.partesTrabajo,
+    legalAcknowledgements: s.legalAcknowledgements ?? l.legalAcknowledgements,
     monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
     firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
-    documentos:          _unionById(s.documentos,          l.documentos,          'documentos'),
-    audit:               _unionById(s.audit,               l.audit,               'audit'),
-    correccionesFichaje: _unionById(s.correccionesFichaje, l.correccionesFichaje, 'correccionesFichaje'),
-    chats:               _unionById(s.chats,               l.chats,               'chats'),
-    gastos:              _unionById(s.gastos,              l.gastos,              'gastos'),
+    // 'denuncias' NO está en el corte por fases: tiene tabla y RPCs propios
+    // (submit_denuncia/track_denuncia) fuera de este mecanismo genérico.
     denuncias:           _unionById(s.denuncias,           l.denuncias,           'denuncias'),
-    wellbeing:           _unionById(s.wellbeing,           l.wellbeing,           'wellbeing'),
-    turnos:              _unionById(s.turnos,              l.turnos,              'turnos'),
-    partesTrabajo:       _unionById(s.partesTrabajo,       l.partesTrabajo,       'partesTrabajo'),
-    legalAcknowledgements:_unionById(s.legalAcknowledgements, l.legalAcknowledgements, 'legalAcknowledgements'),
     anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas,    'anomalias_vistas'),
     notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
@@ -691,7 +694,16 @@ export function mergePendingDeletes(previous, incoming) {
 //   (firma, PDF, saldo) en su columna `data` vía toVacationRow/toClosureRow
 //   (_syncToTables), así que no queda ningún dato exclusivo del blob que se
 //   pierda al dejar de escribir ahí.
-const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records', 'vacaciones', 'cierres'])
+// - 'obras' y toda ENTITY_COLLECTIONS (fase 4): 'obras' tiene su propia tabla
+//   (toWorksiteRow guarda la fila completa en `data`); el resto (documentos,
+//   gastos, mensajes, turnos, medicos, ausencias, correccionesFichaje, chats,
+//   wellbeing, partesTrabajo, legalAcknowledgements, notis, vehiculos, audit)
+//   ya viven en la tabla genérica app_entities (toEntityRows, misma garantía
+//   de fila completa) — cubre el resto de colecciones granulares del blob
+//   salvo empresas/centrosTrabajo/config y afines (SINGLETON_COLLECTIONS),
+//   que quedan para una fase posterior por tener menos urgencia (cambian muy
+//   poco) y otro mecanismo de sincronización (fila `__singleton__`).
+const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS])
 
 export function buildBlobDelta(payload, deleted, syncHint) {
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null
