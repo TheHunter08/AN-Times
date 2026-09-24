@@ -113,6 +113,32 @@ test('completa una entrada y una salida y conserva el fichaje cerrado', async ({
   expect(records[0].fin).toBeTruthy()
 })
 
+test('bloquea iniciar jornada si la ruta de activación del empleado no está completa', async ({ page }) => {
+  // Cuenta sin vincular (authId:null): checkFichajePreconditions debe
+  // bloquear el inicio de jornada hasta completar toda la ruta de
+  // activación, no solo firma+notificaciones.
+  await loginAsEmployee(page, {
+    employees:[{ ...employee, authId:null }],
+    centrosTrabajo:['Obra Principal'],
+    obras:[{ id:'obra-principal', nombre:'Obra Principal', centroTrabajo:'Obra Principal', activa:true }],
+  })
+  await page.goto('/')
+
+  const startButton = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
+  await expect(startButton).toBeVisible()
+  const box = await startButton.boundingBox()
+  expect(box).not.toBeNull()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(550)
+  await page.mouse.up()
+
+  await expect(page.getByText(/Vincula tu cuenta oficial/i)).toBeVisible()
+  await expect(page.getByRole('dialog', { name:/Selecciona tu obra/i })).toHaveCount(0)
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)
+  expect(records).toHaveLength(0)
+})
+
 test('Times AI protege los datos del equipo para un empleado normal', async ({ page }) => {
   await loginAsEmployee(page, {
     employees:[{ ...employee, role:'empleado', isEnc:false, isJO:false }],

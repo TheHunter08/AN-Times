@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.16.0',
+    date: '2026-09-24',
+    title: 'No se puede iniciar jornada sin completar la ruta de activación',
+    items: [
+      'Iniciar jornada (propia o fichando a otro empleado por QR) exige ahora tener completa la ruta de activación del perfil: correo personal, cuenta vinculada, PIN protegido, firma digital y (para la jornada propia) notificaciones de este dispositivo. Antes solo se exigían firma y notificaciones.',
+      'Si falta algún paso, se avisa con el paso concreto que falta completar en vez de dejar iniciar la jornada.',
+    ],
+  },
+  {
     version: '4.15.0',
     date: '2026-09-24',
     title: 'Cambio interno: empresas, centros de trabajo y configuración dejan de escribirse en el archivo de respaldo antiguo',

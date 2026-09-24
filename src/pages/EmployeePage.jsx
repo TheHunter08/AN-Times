@@ -26,6 +26,9 @@ import { canCloseMonth } from '../utils/adminHelpers.js'
 import { getScopedEmployees } from '../utils/supervisorScope.js'
 import { finalizeRecord, MAX_OPEN_BREAK_MIN_ON_AUTOCLOSE } from '../utils/recordLifecycle.js'
 import { getLaunchRequirements, hasEmployeeSignature } from '../utils/launchRequirements.js'
+import { buildEmployeeActivation } from '../utils/employeeActivation.js'
+import { isValidAccountEmail } from '../utils/authRegistration.js'
+import { needsRehash } from '../utils/pinSecurity.js'
 import { hasSignedDocumentArtifact } from '../utils/documentSigning.js'
 import { createNotification } from '../utils/notifications.js'
 import { ACHIEVEMENTS, liveUnlockedIds } from '../utils/achievements.js'
@@ -171,6 +174,14 @@ export default function EmployeePage() {
   const launchRequirements = useMemo(
     () => getLaunchRequirements(db, u?.id, pushStatus === 'ready'),
     [db.firmas, db.employees, u?.id, pushStatus]
+  )
+  // Ruta de activación completa (correo, cuenta vinculada, PIN moderno, firma
+  // y notificaciones) — no basta con firma+notificaciones (launchRequirements):
+  // fichar sin cuenta vinculada ni correo deja al empleado sin forma de
+  // recuperar el acceso, y con un PIN sin migrar, sin la protección moderna.
+  const activation = useMemo(
+    () => buildEmployeeActivation(db, u, pushStatus === 'ready'),
+    [db.firmas, u, pushStatus]
   )
   const showNotifBanner = pushStatus !== 'ready'
   const pushBannerTitle = notifPerm === 'denied'
@@ -771,14 +782,19 @@ export default function EmployeePage() {
   // se aplique a ambos flujos de fichaje sin tener que actualizar dos sitios.
   const checkFichajePreconditions = useCallback(() => {
     if (timer.state !== 'idle' || startingRef.current) return false
-    if (!launchRequirements.ready) {
-      toast(
-        !launchRequirements.notificationsReady
-          ? 'Activa las notificaciones y confirma el registro de este dispositivo antes de fichar.'
-          : 'Guarda tu firma digital obligatoria antes de fichar.',
-        6000,
-        'warn'
-      )
+    // Bloquea el inicio de jornada hasta completar TODA la ruta de
+    // activación (correo, cuenta vinculada, PIN moderno, firma y
+    // notificaciones) — no solo firma+notificaciones.
+    if (!activation.ready) {
+      const step = activation.next
+      const messages = {
+        notifications: 'Activa las notificaciones y confirma el registro de este dispositivo antes de fichar.',
+        signature: 'Guarda tu firma digital obligatoria antes de fichar.',
+        email: 'Añade tu correo personal en Perfil → Información personal antes de fichar.',
+        auth: 'Vincula tu cuenta oficial (correo y contraseña) desde Perfil antes de fichar.',
+        pin: 'Pide al administrador que te asigne un PIN antes de fichar.',
+      }
+      toast(messages[step?.id] || 'Completa la ruta de activación de tu perfil antes de fichar.', 6000, 'warn')
       return false
     }
     // Solo vacaciones exige firma obligatoria — una baja médica o un permiso
@@ -808,7 +824,7 @@ export default function EmployeePage() {
       }
     }
     return true
-  }, [timer.state, db.vacaciones, u?.id, u?.turnoInicio, toast, launchRequirements])
+  }, [timer.state, db.vacaciones, u?.id, u?.turnoInicio, toast, activation])
 
   const doStart = () => {
     if (!checkFichajePreconditions()) return
@@ -1091,6 +1107,14 @@ export default function EmployeePage() {
       const todayQR = today()
       const empVac = (db.vacaciones || []).find(v => v.empId === emp.id && v.estado === 'aprobada' && v.fechaInicio <= todayQR && v.fechaFin >= todayQR)
       if (empVac) { toast(`${emp.name} está de vacaciones hasta el ${fds(empVac.fechaFin)}`, 4000, 'warn'); return }
+      // Misma ruta de activación que checkFichajePreconditions exige para el
+      // propio empleado (correo, cuenta vinculada, PIN moderno) — aquí no se
+      // comprueban notificaciones porque son un estado de ESTE dispositivo,
+      // no del de ${emp.name}.
+      if (!isValidAccountEmail(emp.email) || !(emp.authId || emp.auth_id) || !emp.pin || needsRehash(emp.pin)) {
+        toast(`${emp.name} todavía no ha completado su ruta de activación (correo, cuenta vinculada o PIN). Debe completarla en su perfil antes de iniciar la jornada.`, 6000, 'warn')
+        return
+      }
       // Mismo criterio que finalizar (arriba): sin confirmación, un QR mal
       // escaneado (badge equivocado, prueba) creaba un fichaje real al
       // instante para un empleado que no había iniciado nada.

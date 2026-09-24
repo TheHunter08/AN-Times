@@ -18,7 +18,10 @@ test.describe('Fichaje por QR', () => {
 })
 
 test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ page }) => {
-  const target = { id:'e2', name:'Trabajador QR', email:'trabajador.qr@times-inc.test', pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false }
+  // authId presente en ambos: handleQRScan exige la ruta de activación
+  // completa (correo, cuenta vinculada, PIN) del empleado fichado antes de
+  // dejar iniciar su jornada por QR — ver checkFichajePreconditions.
+  const target = { id:'e2', name:'Trabajador QR', email:'trabajador.qr@times-inc.test', authId:'auth-e2-qr', pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false }
   await loginAsEmployee(page, {
     employees:[
       // El encargado necesita coincidir en centro Y obra con su equipo (ver
@@ -26,7 +29,7 @@ test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ 
       // sin obrasAsignadas, getScopedEmployees lo deja sin ningún empleado
       // en su ámbito, a propósito (fail-closed ante una configuración
       // incompleta), y el fichaje por QR de otro empleado quedaría bloqueado.
-      { id:'e1', name:'Encargado', email:'encargado.qr@times-inc.test', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false },
+      { id:'e1', name:'Encargado', email:'encargado.qr@times-inc.test', authId:'auth-e1-qr', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false },
       target,
     ],
     firmas:{
@@ -60,6 +63,31 @@ test('el mismo QR inicia y después finaliza la jornada del empleado', async ({ 
   expect(targetRecords).toHaveLength(1)
   expect(targetRecords[0].fin).toBeTruthy()
   expect(targetRecords[0].closed).toBe(true)
+})
+
+test('bloquea iniciar la jornada de otro empleado por QR si no tiene la cuenta vinculada', async ({ page }) => {
+  const target = { id:'e2', name:'Trabajador QR', email:'trabajador.qr@times-inc.test', authId:null, pin:'2222', pinLen:4, role:'empleado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false }
+  await loginAsEmployee(page, {
+    employees:[
+      { id:'e1', name:'Encargado', email:'encargado.qr@times-inc.test', authId:'auth-e1-qr', pin:'1111', pinLen:4, role:'encargado', centroTrabajo:'Obra Principal', obrasAsignadas:['obra-principal'], onboardingDone:true, baja:false },
+      target,
+    ],
+    firmas:{
+      e1:{ main:{ data:'data:image/jpeg;base64,firma-encargado' } },
+      e2:{ main:{ data:'data:image/jpeg;base64,firma-trabajador' } },
+    },
+  })
+  await page.goto('/')
+
+  await page.getByRole('button', { name:'Fichar a un empleado' }).click()
+  await expect(page.getByRole('dialog', { name:'Fichar con QR' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => typeof window.__TIMES_E2E_QR_SCAN__)).toBe('function')
+  await page.evaluate(() => window.__TIMES_E2E_QR_SCAN__(`${window.location.origin}/?emp=e2`))
+
+  await expect(page.getByText(/todavía no ha completado su ruta de activación/i)).toBeVisible()
+  await expect(page.getByText('¿Iniciar la jornada de Trabajador QR?')).toHaveCount(0)
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)
+  expect(records.filter(record => record.empId === 'e2')).toHaveLength(0)
 })
 
 test.describe('Código QR del perfil', () => {

@@ -57,10 +57,28 @@ export async function seedLogin(page, extraDB = {}) {
   }, { db: baseDB(extraDB) })
 }
 
+// loginAsEmployee salta la pantalla de acceso e inyecta la sesión ya
+// autenticada — representa a alguien que YA inició sesión con su PIN al
+// menos una vez, momento en el que la app lo migra automáticamente al
+// formato moderno (ver needsRehash/PIN protegido en la ruta de activación).
+// Sin esto, cada fixture con un PIN en texto plano ('1111') quedaría con
+// "PIN protegido" pendiente y no podría iniciar jornada tras el bloqueo de
+// activación de checkFichajePreconditions, aunque nunca se probó login real.
+function withModernPins(db) {
+  return {
+    ...db,
+    employees: (db.employees || []).map(e => (
+      e?.pin && !String(e.pin).startsWith('pbkdf2:')
+        ? { ...e, pin: `pbkdf2:e2e-test-salt:e2e-test-hash:600000` }
+        : e
+    )),
+  }
+}
+
 export async function loginAsEmployee(page, extraDB = {}, options = {}) {
   await page.context().grantPermissions(['notifications'], { origin:'http://localhost:4173' })
   await page.route(/supabase\.co/i, route => route.abort())
-  const db = baseDB(extraDB)
+  const db = withModernPins(baseDB(extraDB))
   const user = db.employees.find(item => item.id === employee.id) || employee
   await page.addInitScript(({ db, user, pushReady }) => {
     window.__TIMES_E2E__ = true
