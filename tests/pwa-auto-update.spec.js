@@ -89,10 +89,9 @@ test('el centro de actualización manual instala una versión ya preparada al pu
   await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
 
   await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
-  await page.getByRole('button', { name:'Configuración', exact:true }).click()
-  const dialog = page.getByRole('dialog', { name:'Configuración', exact:true })
-  await expect(dialog.getByText('Actualizaciones', { exact:true })).toBeVisible()
-  await dialog.getByRole('button', { name:'Buscar actualizaciones', exact:true }).click()
+  await page.getByRole('button', { name:'Actualizaciones', exact:true }).click()
+  await expect(page.getByText('Versión instalada', { exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'Buscar', exact:true }).click()
 
   await expect.poll(() => page.evaluate(() => window.__pwaManualUpdateMessage), { timeout: 5000 })
     .toEqual({ type: 'SKIP_WAITING' })
@@ -116,9 +115,8 @@ test('el centro de actualización manual avisa cuando ya se tiene la última ver
   await expect(page.getByRole('button', { name:/Iniciar jornada/i })).toBeVisible({ timeout:15000 })
 
   await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
-  await page.getByRole('button', { name:'Configuración', exact:true }).click()
-  const dialog = page.getByRole('dialog', { name:'Configuración', exact:true })
-  await dialog.getByRole('button', { name:'Buscar actualizaciones', exact:true }).click()
+  await page.getByRole('button', { name:'Actualizaciones', exact:true }).click()
+  await page.getByRole('button', { name:'Buscar', exact:true }).click()
 
   await expect(page.getByText('Ya tienes la última versión instalada')).toBeVisible({ timeout:5000 })
 })

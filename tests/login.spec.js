@@ -281,7 +281,7 @@ test.describe('Acceso con PIN y email', () => {
     await seedLogin(page, {
       employees:[
         { ...employee, id:'e-antiguo', email:'empleado@empresa.com', authId:'auth-compartida', baja:true },
-        { ...employee, id:'e-nuevo', email:'empleado@empresa.com', pin:'1111', baja:false },
+        { ...employee, id:'e-nuevo', email:'empleado@empresa.com', pin:'1111', baja:false, authId:null },
       ],
     })
     await page.route(/supabase\.co\/auth\/v1\/token/i, route => route.fulfill({

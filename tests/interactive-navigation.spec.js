@@ -70,7 +70,7 @@ test('el centro operativo abre los detalles relacionados', async ({ page }) => {
   await expect(page.getByRole('button', { name:/Validaciones reales: Ninguna pendiente/i })).toBeVisible()
   await expect(page.getByText('Equipo preparado para el lanzamiento')).toBeVisible()
   await expect(page.getByText('Bloqueado', { exact:true })).toBeVisible()
-  await expect(page.getByText(/cliente de datos todavía anónimo, el acceso PIN todavía no tiene una sesión oficial de Supabase Auth, auth_id todavía no se ha contrastado con auth.users, blob legado todavía activo/)).toBeVisible()
+  await expect(page.getByText(/No activar RLS todavía: auth_id todavía no se ha contrastado con auth\.users\./)).toBeVisible()
 
   await page.getByRole('button', { name:/Acceso seguro: Ruta de datos pendiente.*Ver diagnóstico/i }).click()
   await expect(page.getByRole('heading', { name:'Auditoría', exact:true })).toBeVisible()
@@ -188,7 +188,7 @@ test('el centro operativo guía la vinculación y firma sin abrir un editor inú
   await expect(instructions).toBeVisible()
   await instructions.click()
   const note = page.getByRole('note')
-  await expect(note).toContainText('Primera vez: vincular mi cuenta')
+  await expect(note).toContainText('Debe entrar con su PIN habitual. Times INC abrirá automáticamente la activación')
   await expect(note).toContainText('En el paso “Tu firma” debe dibujarla y guardarla')
   await expect(page.getByText('Editar empleado', { exact:true })).toHaveCount(0)
 })
