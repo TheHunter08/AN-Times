@@ -3,7 +3,7 @@ import { SB_URL, SB_ANON, INITIAL_DB } from '../config/constants.js'
 import { SECURITY_DEPLOYMENT } from '../config/securityDeployment.js'
 import { AUTH_STORAGE_KEY, authSupabase } from './authService.js'
 import { dedupeNotifications } from '../utils/notifications.js'
-import { ENTITY_COLLECTIONS } from './tableSyncPlan.js'
+import { ENTITY_COLLECTIONS, SINGLETON_COLLECTIONS } from './tableSyncPlan.js'
 
 // Timeout explícito en cada petición a Supabase. Sin esto, el navegador puede
 // dejar una petición "colgada" en señal débil durante un minuto o más antes de
@@ -470,8 +470,6 @@ function _mergeForPush(serverData, localPayload, deleted) {
   const persistentDeleted = mergePersistentDeletes(s._deleted, l._deleted, deleted)
   const out = {
     ...l,
-    empresas:            _unionById(s.empresas,            l.empresas),
-    centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
     // Corte del blob por fases (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya no
     // se mezclan cambios locales de estas colecciones en esta copia — se
     // congelan en lo que el servidor ya tenía. Sus tablas (_syncToTables,
@@ -495,15 +493,19 @@ function _mergeForPush(serverData, localPayload, deleted) {
     turnos:              s.turnos ?? l.turnos,
     partesTrabajo:       s.partesTrabajo ?? l.partesTrabajo,
     legalAcknowledgements: s.legalAcknowledgements ?? l.legalAcknowledgements,
-    monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
+    // SINGLETON_COLLECTIONS (fase 5): mismo congelado — toEntityRows escribe
+    // la fila `__singleton__` con el valor completo en cada push.
+    empresas:            s.empresas ?? l.empresas,
+    centrosTrabajo:      s.centrosTrabajo ?? l.centrosTrabajo,
+    monthSnapshots:      s.monthSnapshots ?? l.monthSnapshots,
+    anomalias_vistas:    s.anomalias_vistas ?? l.anomalias_vistas,
+    notisSent:           s.notisSent ?? l.notisSent,
+    config:              s.config ?? l.config,
     firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
     // 'denuncias' NO está en el corte por fases: tiene tabla y RPCs propios
     // (submit_denuncia/track_denuncia) fuera de este mecanismo genérico.
     denuncias:           _unionById(s.denuncias,           l.denuncias,           'denuncias'),
-    anomalias_vistas:    _unionById(s.anomalias_vistas,    l.anomalias_vistas,    'anomalias_vistas'),
-    notisSent:           { ...(s.notisSent || {}), ...(l.notisSent || {}) },
     pinLockouts:         { ...(s.pinLockouts || {}), ...(l.pinLockouts || {}) },
-    config:              { ...(s.config || {}), ...(l.config || {}) },
     ...(persistentDeleted ? { _deleted:persistentDeleted } : {}),
   }
   if (persistentDeleted) {
@@ -699,11 +701,14 @@ export function mergePendingDeletes(previous, incoming) {
 //   gastos, mensajes, turnos, medicos, ausencias, correccionesFichaje, chats,
 //   wellbeing, partesTrabajo, legalAcknowledgements, notis, vehiculos, audit)
 //   ya viven en la tabla genérica app_entities (toEntityRows, misma garantía
-//   de fila completa) — cubre el resto de colecciones granulares del blob
-//   salvo empresas/centrosTrabajo/config y afines (SINGLETON_COLLECTIONS),
-//   que quedan para una fase posterior por tener menos urgencia (cambian muy
-//   poco) y otro mecanismo de sincronización (fila `__singleton__`).
-const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS])
+//   de fila completa) — cubre el resto de colecciones granulares del blob.
+// - SINGLETON_COLLECTIONS (fase 5): empresas, centrosTrabajo, monthSnapshots,
+//   anomalias_vistas, notisSent y config. toEntityRows escribe, en cada push,
+//   una fila `__singleton__` por colección con el valor completo actual
+//   (db[collection] entero, no por-id como el resto) — misma garantía de
+//   fila completa, y dataServiceV2.cloudFetch ya lee de ahí. 'denuncias'
+//   queda fuera a propósito (tabla y RPCs propios, ver tableSyncPlan.js).
+const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS, ...SINGLETON_COLLECTIONS])
 
 export function buildBlobDelta(payload, deleted, syncHint) {
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null

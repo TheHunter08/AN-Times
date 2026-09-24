@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { auditLog, buildBlobDelta, mergeDB, persistedAuthUserId, recordTombstones, resolveLocalDbStorageKey, resolvePendingStorageKeys, mergePendingDeletes, mergePendingSyncEntries, mergePersistentDeletes, mergeSyncHints, isConnectivityError, withConnectivityRetry, withPhase1RestAuth, saveLocal, loadLocal } from './dataService.js'
-import { ENTITY_COLLECTIONS } from './tableSyncPlan.js'
+import { ENTITY_COLLECTIONS, SINGLETON_COLLECTIONS } from './tableSyncPlan.js'
 
 const BASE = { empresas: [], employees: [], records: [] }
 
@@ -237,31 +237,29 @@ describe('cola offline', () => {
   })
 
   it('construye un delta mínimo del blob y conserva eliminaciones', () => {
-    // 'denuncias' y 'anomalias_vistas' se usan aquí a propósito porque quedan
+    // 'denuncias' y 'pinLockouts' se usan aquí a propósito porque quedan
     // fuera del corte del blob por fases (ver BLOB_WRITE_EXCLUDED_KEYS): no
     // deberían necesitar tocarse cada vez que crece esa lista de exclusión.
     const delta = buildBlobDelta({
       denuncias:[{ id:'g1', value:'viejo' }, { id:'g2', value:'nuevo' }],
-      anomalias_vistas:[{ id:'a1' }, { id:'a2' }],
-      config:{ wdMin:480 },
+      pinLockouts:{ e1:{ hasta:'2026-09-24T10:00:00.000Z' } },
       _deleted:{ notis:['n1'] },
     }, { denuncias:['g0'] }, {
-      changedKeys:['denuncias','anomalias_vistas','config'],
-      entityIds:{ denuncias:['g2'], anomalias_vistas:['a2'] },
+      changedKeys:['denuncias','pinLockouts'],
+      entityIds:{ denuncias:['g2'] },
     })
     expect(delta).toEqual({
       patch:{
         denuncias:[{ id:'g2', value:'nuevo' }],
-        anomalias_vistas:[{ id:'a2' }],
-        config:{ wdMin:480 },
+        pinLockouts:{ e1:{ hasta:'2026-09-24T10:00:00.000Z' } },
         _deleted:{ notis:['n1'] },
       },
       deleted:{ denuncias:['g0'] },
     })
   })
 
-  it('excluye employees/records/vacaciones/cierres/obras/ENTITY_COLLECTIONS del delta del blob (corte del blob legacy por fases — siguen yendo a su tabla)', () => {
-    const excludedKeys = ['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS]
+  it('excluye employees/records/vacaciones/cierres/obras/ENTITY_COLLECTIONS/SINGLETON_COLLECTIONS del delta del blob (corte del blob legacy por fases — siguen yendo a su tabla)', () => {
+    const excludedKeys = ['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS, ...SINGLETON_COLLECTIONS]
     const payload = {
       employees:[{ id:'e1', name:'Nuevo nombre' }],
       records:[{ id:'r1', value:'x' }],
@@ -270,6 +268,7 @@ describe('cola offline', () => {
       obras:[{ id:'o1', nombre:'Obra nueva' }],
       documentos:[{ id:'d1' }],
       mensajes:[{ id:'m1' }],
+      config:{ wdMin:480 },
       denuncias:[{ id:'g1', importe:10 }],
     }
     const delta = buildBlobDelta(payload, null, {
@@ -281,10 +280,10 @@ describe('cola offline', () => {
   })
 
   it('un guardado que solo toca colecciones excluidas produce un delta vacío (nada que subir al blob)', () => {
-    for (const key of ['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS]) {
+    const excludedKeys = ['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS, ...SINGLETON_COLLECTIONS]
+    for (const key of excludedKeys) {
       expect(buildBlobDelta({ [key]:[{ id:'x1' }] }, null, { changedKeys:[key] }).patch).toEqual({})
     }
-    const excludedKeys = ['employees', 'records', 'vacaciones', 'cierres', 'obras', ...ENTITY_COLLECTIONS]
     const payload = {}
     for (const key of excludedKeys) payload[key] = [{ id:'x1' }]
     expect(buildBlobDelta(payload, null, { changedKeys:excludedKeys }).patch).toEqual({})

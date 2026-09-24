@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.15.0',
+    date: '2026-09-24',
+    title: 'Cambio interno: empresas, centros de trabajo y configuración dejan de escribirse en el archivo de respaldo antiguo',
+    items: [
+      'Sin cambios visibles. Fase 5 de la migración: empresas, centros de trabajo, resúmenes mensuales, notificaciones enviadas, configuración y anomalías vistas ya solo se escriben en su tabla normalizada de Supabase, donde ya se leían y ya se guardaba el valor completo. La lectura de la app no cambia.',
+    ],
+  },
+  {
     version: '4.14.0',
     date: '2026-09-24',
     title: 'Cambio interno: obras, documentos, gastos, mensajes y el resto de colecciones dejan de escribirse en el archivo de respaldo antiguo',
