@@ -256,32 +256,31 @@ describe('cola offline', () => {
     })
   })
 
-  it('excluye employees y records del delta del blob (corte del blob legacy por fases — siguen yendo a su tabla)', () => {
+  it('excluye employees/records/vacaciones/cierres del delta del blob (corte del blob legacy por fases — siguen yendo a su tabla)', () => {
     const delta = buildBlobDelta({
       employees:[{ id:'e1', name:'Nuevo nombre' }],
       records:[{ id:'r1', value:'x' }],
       vacaciones:[{ id:'v1', estado:'aprobada' }],
+      cierres:[{ id:'c1', mes:'2026-09' }],
+      gastos:[{ id:'g1', importe:10 }],
     }, null, {
-      changedKeys:['employees', 'records', 'vacaciones'],
-      entityIds:{ vacaciones:['v1'] },
+      changedKeys:['employees', 'records', 'vacaciones', 'cierres', 'gastos'],
+      entityIds:{ gastos:['g1'] },
     })
     expect(delta.patch).not.toHaveProperty('employees')
     expect(delta.patch).not.toHaveProperty('records')
-    expect(delta.patch.vacaciones).toEqual([{ id:'v1', estado:'aprobada' }])
+    expect(delta.patch).not.toHaveProperty('vacaciones')
+    expect(delta.patch).not.toHaveProperty('cierres')
+    expect(delta.patch.gastos).toEqual([{ id:'g1', importe:10 }])
   })
 
-  it('un guardado que solo toca employees y/o records produce un delta vacío (nada que subir al blob)', () => {
+  it('un guardado que solo toca colecciones excluidas produce un delta vacío (nada que subir al blob)', () => {
+    for (const key of ['employees', 'records', 'vacaciones', 'cierres']) {
+      expect(buildBlobDelta({ [key]:[{ id:'x1' }] }, null, { changedKeys:[key] }).patch).toEqual({})
+    }
     expect(buildBlobDelta({
-      employees:[{ id:'e1', name:'Nuevo nombre' }],
-    }, null, { changedKeys:['employees'] }).patch).toEqual({})
-
-    expect(buildBlobDelta({
-      records:[{ id:'r1', value:'x' }],
-    }, null, { changedKeys:['records'] }).patch).toEqual({})
-
-    expect(buildBlobDelta({
-      employees:[{ id:'e1' }], records:[{ id:'r1' }],
-    }, null, { changedKeys:['employees', 'records'] }).patch).toEqual({})
+      employees:[{ id:'e1' }], records:[{ id:'r1' }], vacaciones:[{ id:'v1' }], cierres:[{ id:'c1' }],
+    }, null, { changedKeys:['employees', 'records', 'vacaciones', 'cierres'] }).patch).toEqual({})
   })
 
   it('conserva tombstones remotos para proteger otros dispositivos desactualizados', () => {

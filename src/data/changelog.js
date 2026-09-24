@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.13.0',
+    date: '2026-09-24',
+    title: 'Cambio interno: vacaciones y cierres dejan de escribirse en el archivo de respaldo antiguo',
+    items: [
+      'Sin cambios visibles. Fase 3 de la migración: vacaciones y cierres mensuales (firma, PDF y saldo incluidos) ya solo se escriben en sus tablas normalizadas de Supabase, donde ya se leían y ya se guardaba la fila completa. La lectura de la app no cambia.',
+    ],
+  },
+  {
     version: '4.12.0',
     date: '2026-09-23',
     title: 'Cambio interno: fichajes deja de escribirse en el archivo de respaldo antiguo',

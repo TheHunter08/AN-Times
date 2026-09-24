@@ -473,18 +473,18 @@ function _mergeForPush(serverData, localPayload, deleted) {
     obras:               _unionById(s.obras,               l.obras),
     centrosTrabajo:      _unionById(s.centrosTrabajo,      l.centrosTrabajo),
     // Corte del blob por fases (ver BLOB_WRITE_EXCLUDED_KEYS más abajo): ya no
-    // se mezclan cambios locales de employees/records en esta copia — se
-    // congelan en lo que el servidor ya tenía. Sus tablas (_syncToTables,
-    // persistRecordRow) siguen recibiendo cada cambio exactamente igual que
-    // antes.
+    // se mezclan cambios locales de employees/records/vacaciones/cierres en
+    // esta copia — se congelan en lo que el servidor ya tenía. Sus tablas
+    // (_syncToTables, persistRecordRow) siguen recibiendo cada cambio
+    // exactamente igual que antes.
     employees:           s.employees ?? l.employees,
     records:             s.records ?? l.records,
-    vacaciones:          _unionById(s.vacaciones,          l.vacaciones,          'vacaciones'),
+    vacaciones:          s.vacaciones ?? l.vacaciones,
     medicos:             _unionById(s.medicos,             l.medicos,             'medicos'),
     ausencias:           _unionById(s.ausencias,           l.ausencias,           'ausencias'),
     mensajes:            _unionById(s.mensajes,            l.mensajes,            'mensajes'),
     notis:               dedupeNotifications(_unionById(s.notis, l.notis, 'notis')),
-    cierres:             _unionById(s.cierres,             l.cierres,             'cierres'),
+    cierres:             s.cierres ?? l.cierres,
     monthSnapshots:      { ...(s.monthSnapshots || {}), ...(l.monthSnapshots || {}) },
     firmas:              { ...(s.firmas || {}), ...(l.firmas || {}) },
     documentos:          _unionById(s.documentos,          l.documentos,          'documentos'),
@@ -687,7 +687,11 @@ export function mergePendingDeletes(previous, incoming) {
 // - 'records' (fase 2): el fichaje individual ya viaja además por su propio
 //   camino prioritario (persistRecordRow, ver appStore.js:saveDB), así que
 //   excluirlo del blob no retrasa ni arriesga ningún fichaje en curso.
-const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records'])
+// - 'vacaciones' y 'cierres' (fase 3): sus tablas ya guardan la fila completa
+//   (firma, PDF, saldo) en su columna `data` vía toVacationRow/toClosureRow
+//   (_syncToTables), así que no queda ningún dato exclusivo del blob que se
+//   pierda al dejar de escribir ahí.
+const BLOB_WRITE_EXCLUDED_KEYS = new Set(['employees', 'records', 'vacaciones', 'cierres'])
 
 export function buildBlobDelta(payload, deleted, syncHint) {
   const changedKeys = Array.isArray(syncHint?.changedKeys) ? syncHint.changedKeys : null
