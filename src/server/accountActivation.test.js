@@ -172,6 +172,55 @@ describe('activación oficial de cuenta', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('employee_pin_archive'))).toBe(true)
   })
 
+  it('arranca la cuenta de un administrador sin PIN aunque la columna role no llegue sincronizada (solo isAdmin en data)', async () => {
+    configureEnv()
+    let pinPatched = false
+    let blobUpdated = false
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const value = String(url)
+      if (value.includes('account_activation_attempts?')) return new Response('[]')
+      // Ficha de admin antigua: nunca se le sincronizó la columna `role`
+      // (solo tiene isAdmin:true en `data`, ver isEmployeeAdmin) y nunca tuvo
+      // PIN ni auth_id — arranque inicial de la cuenta administrativa.
+      if (value.includes('/rest/v1/employees?id=eq.admin1') && options.method !== 'PATCH') return new Response(JSON.stringify([{
+        id:'admin1', company_id:'c1', name:'Admin', pin_hash:null, auth_id:null, role:null, data:{ isAdmin:true }, updated_at:'2026-08-11T10:00:00Z',
+      }]))
+      if (value.includes('/rest/v1/employees?email=eq.')) return new Response('[]')
+      if (value.includes('/rest/v1/employee_pin_archive?')) return new Response('[]')
+      if (value.endsWith('/auth/v1/admin/users')) return new Response(JSON.stringify({ id:'auth-admin1' }))
+      if (value.includes('/rest/v1/employees?id=eq.admin1') && options.method === 'PATCH') {
+        const body = JSON.parse(options.body)
+        if (body.pin_hash) {
+          pinPatched = true
+          expect(body).toMatchObject({ pin_len:4 })
+        } else {
+          expect(body).toMatchObject({ email:'admin@example.com', auth_id:'auth-admin1' })
+        }
+        return new Response(JSON.stringify([{ id:'admin1' }]))
+      }
+      if (value.includes('/rest/v1/app_data?id=eq.1&select=')) return new Response(JSON.stringify([{
+        data:{ employees:[{ id:'admin1', name:'Admin', isAdmin:true }] }, updated_at:'2026-08-11T10:00:00Z',
+      }]))
+      if (value.includes('/rest/v1/app_data?id=eq.1&updated_at=eq.') && options.method === 'PATCH') {
+        blobUpdated = true
+        const body = JSON.parse(options.body)
+        expect(body.data.employees[0]).toMatchObject({ email:'admin@example.com', authId:'auth-admin1', pinLen:4 })
+        return new Response(JSON.stringify([{ id:1 }]))
+      }
+      if (value.includes('/rpc/clear_account_activation_failures')) return new Response('null')
+      if (value.endsWith('/rest/v1/audit_events')) return new Response(null, { status:204 })
+      throw new Error(`Petición inesperada: ${value}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { default:handler } = await import('./accountActivation.js')
+    const { res, result } = response()
+    await handler({ method:'POST', body:{ employeeId:'admin1', pin:'4321', email:'admin@example.com', password:'segura123' } }, res)
+    expect(result.statusCode).toBe(200)
+    expect(result.payload).toMatchObject({ ok:true, employeeId:'admin1', authId:'auth-admin1' })
+    expect(pinPatched).toBe(true)
+    expect(blobUpdated).toBe(true)
+  })
+
   it('expone solo un directorio mínimo para la activación', async () => {
     configureEnv()
     const fetchMock = vi.fn(async url => {

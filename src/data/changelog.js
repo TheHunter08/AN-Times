@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.16.1',
+    date: '2026-09-25',
+    title: 'Fix: no se podía vincular la cuenta de un administrador sin PIN',
+    items: [
+      'Corregido: un administrador dado de alta solo con correo y contraseña (sin PIN, p. ej. personal de oficina que no ficha) no podía completar "Primera vez: vincular mi cuenta" — el servidor rechazaba la activación como "empleado no encontrado" por no reconocer su rol de administrador al consultar su ficha.',
+    ],
+  },
+  {
     version: '4.16.0',
     date: '2026-09-24',
     title: 'No se puede iniciar jornada sin completar la ruta de activación',

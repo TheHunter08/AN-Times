@@ -201,7 +201,7 @@ export default async function activateAccount(req, res) {
     }
 
     const [employeeRows, duplicateRows] = await Promise.all([
-      request(`employees?id=eq.${encodeURIComponent(employeeId)}&baja=eq.false&select=id,company_id,name,email,auth_id,pin_hash,pin_len,data,updated_at`),
+      request(`employees?id=eq.${encodeURIComponent(employeeId)}&baja=eq.false&select=id,company_id,name,email,auth_id,pin_hash,pin_len,role,data,updated_at`),
       request(`employees?email=eq.${encodeURIComponent(email)}&baja=eq.false&id=neq.${encodeURIComponent(employeeId)}&select=id`),
     ])
     const employee = employeeRows?.[0]
@@ -214,7 +214,10 @@ export default async function activateAccount(req, res) {
     // contra el que verificar, así que esta única vez el PIN introducido pasa
     // a ser el PIN oficial en vez de comprobarse contra uno existente. En
     // cuanto queda auth_id vinculado, esta puerta se cierra para siempre.
-    const isAdminBootstrap = employee.role === 'admin' && !employee.auth_id && !pinCredential?.pin_hash
+    // isAdmin en `data` cubre fichas antiguas creadas antes de que `role`
+    // existiera como columna propia (isAdmin:true sin role:'admin' sincronizado).
+    const isEmployeeAdmin = employee.role === 'admin' || employee.data?.isAdmin === true || employee.data?.role === 'admin'
+    const isAdminBootstrap = isEmployeeAdmin && !employee.auth_id && !pinCredential?.pin_hash
     if (!isAdminBootstrap && !pinCredential?.pin_hash) return res.status(404).json({ error:'Empleado activo no encontrado o sin PIN configurado' })
     if (duplicateRows?.length) return res.status(409).json({ error:'Ese correo ya pertenece a otro empleado' })
 
