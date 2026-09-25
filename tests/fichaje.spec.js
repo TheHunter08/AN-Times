@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test'
 import { employee, loginAsEmployee, seedLogin } from './helpers/session.js'
 
+// hover() (en vez de un boundingBox() capturado una sola vez) recalcula la
+// posición del botón justo antes de mousedown — si el layout se movió un
+// pixel entre medias (p. ej. por el aviso "Guardando cambios…" tras el
+// fichaje anterior), un boundingBox viejo apunta a coordenadas que ya no
+// son el botón y el gesto de mantener pulsado nunca llega a registrarse.
+async function hold(page, button, ms = 550) {
+  await button.hover()
+  await page.mouse.down()
+  // Margen sobre HOLD_DURATION: en emulación móvil requestAnimationFrame
+  // puede perder un frame cuando el estado acaba de cambiar.
+  await page.waitForTimeout(ms)
+  await page.mouse.up()
+}
+
 test('la pantalla de acceso se renderiza', async ({ page }) => {
   await seedLogin(page)
   await page.goto('/')
@@ -33,12 +47,7 @@ test('muestra las obras asignadas por id al iniciar una jornada', async ({ page 
   await page.goto('/')
   const clock = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
   await expect(clock).toBeVisible({ timeout:15000 })
-  const box = await clock.boundingBox()
-  expect(box).not.toBeNull()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.waitForTimeout(400)
-  await page.mouse.up()
+  await hold(page, clock, 400)
 
   const dialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
   await expect(dialog).toBeVisible()
@@ -59,12 +68,7 @@ test('nunca ofrece una obra fantasma a partir de una referencia obsoleta en obra
   await page.goto('/')
   const clock = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
   await expect(clock).toBeVisible({ timeout:15000 })
-  const box = await clock.boundingBox()
-  expect(box).not.toBeNull()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.waitForTimeout(400)
-  await page.mouse.up()
+  await hold(page, clock, 400)
 
   const dialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
   await expect(dialog).toBeVisible()
@@ -82,25 +86,21 @@ test('completa una entrada y una salida y conserva el fichaje cerrado', async ({
   })
   await page.goto('/')
 
-  const hold = async (button) => {
-    const box = await button.boundingBox()
-    expect(box).not.toBeNull()
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
-    // Margen sobre HOLD_DURATION: en emulación móvil requestAnimationFrame
-    // puede perder un frame cuando el estado acaba de cambiar.
-    await page.waitForTimeout(550)
-    await page.mouse.up()
-  }
-
-  await hold(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i }))
+  await hold(page, page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i }))
   const centerDialog = page.getByRole('dialog', { name:/Selecciona tu obra/i })
   await expect(centerDialog).toBeVisible()
   await centerDialog.getByRole('button', { name:'Iniciar jornada', exact:true }).click()
 
+  // El check-in de bienestar se abre al iniciar jornada (una vez al día) y
+  // tapa el resto de la pantalla — sin cerrarlo, el siguiente gesto de
+  // mantener pulsado sobre "Finalizar jornada" cae sobre el modal, no sobre
+  // el botón (con mouse.down/up "a ciegas" esto fallaba en silencio; hover()
+  // sí lo detecta como "subtree intercepts pointer events").
+  await page.getByRole('button', { name:'Omitir', exact:true }).click()
+
   const stopButton = page.getByRole('button', { name:/Finalizar jornada.*Mantén pulsado/i })
   await expect(stopButton).toBeVisible()
-  await hold(stopButton)
+  await hold(page, stopButton)
   await expect(page.getByText('¿Terminar la jornada ahora?', { exact:true })).toBeVisible()
   await page.getByRole('button', { name:'Confirmar', exact:true }).click()
   await expect(page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })).toBeVisible()
@@ -126,12 +126,7 @@ test('bloquea iniciar jornada si la ruta de activación del empleado no está co
 
   const startButton = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
   await expect(startButton).toBeVisible()
-  const box = await startButton.boundingBox()
-  expect(box).not.toBeNull()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.waitForTimeout(550)
-  await page.mouse.up()
+  await hold(page, startButton)
 
   await expect(page.getByText(/Vincula tu cuenta oficial/i)).toBeVisible()
   await expect(page.getByRole('dialog', { name:/Selecciona tu obra/i })).toHaveCount(0)
@@ -218,12 +213,16 @@ test.describe('Pantalla del empleado', () => {
   })
 
   test('muestra una ruta de activación privada y permite completar la vinculación de cuenta', async ({ page }) => {
-    // El correo, la firma y las notificaciones ya son obligatorios para pasar del
-    // onboarding, así que aquí solo pueden quedar pendientes la cuenta vinculada y el PIN.
+    // loginAsEmployee (con withModernPins) ya deja correo, PIN, firma y
+    // notificaciones completos por defecto — para probar la ruta de
+    // activación con un paso pendiente hay que quitar explícitamente la
+    // cuenta vinculada, el único que queda.
+    await loginAsEmployee(page, { employees:[{ ...employee, authId:null }] })
+    await page.goto('/')
     await page.getByRole('button', { name:'Perfil', exact:true }).last().click()
     await expect(page.getByText('Ruta de activación', { exact:true })).toBeVisible()
-    await expect(page.getByText('2 pasos para completar tu cuenta', { exact:true })).toBeVisible()
-    await expect(page.getByText('60%', { exact:true })).toBeVisible()
+    await expect(page.getByText('1 paso para completar tu cuenta', { exact:true })).toBeVisible()
+    await expect(page.getByText('80%', { exact:true })).toBeVisible()
     await page.getByRole('button', { name:'Completar: Cuenta vinculada', exact:true }).click()
     await expect(page.getByText('¿Cerrar sesión?', { exact:false })).toBeVisible()
     await page.getByRole('button', { name:'Confirmar', exact:true }).click()
