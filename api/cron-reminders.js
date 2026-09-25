@@ -82,7 +82,13 @@ async function getAppData() {
     return null
   }
   const db = {
-    employees:employeeRows.map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' })),
+    // isAdmin: OR con row.data?.isAdmin (no solo la columna `role`) — una
+    // ficha de administrador antigua, creada antes de que `role` existiera
+    // como columna propia, puede tener isAdmin:true en `data` sin que la
+    // columna llegara sincronizada a 'admin'. Sobrescribirlo solo con
+    // row.role la dejaría fuera, en silencio, de recordatorios y resúmenes
+    // que solo se envían a administradores (ver filtros más abajo).
+    employees:employeeRows.map(row => ({ ...(row.data || {}), id:row.id, name:row.name, role:row.role, baja:row.baja, telefono:row.telefono, reminderTime:row.reminder_time, salidaTime:row.salida_time, isAdmin:row.role === 'admin' || row.data?.isAdmin === true })),
     records:[],
     cierres:closureRows.map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, mes:row.mes, estado:row.estado, firmaAdmin:row.firma_admin, firmaEmp:row.firma_emp, _upd:row.updated_at })),
     vacaciones:vacacionRows.map(row => ({ ...(row.data || {}), id:row.id, empId:row.emp_id, fechaInicio:row.fecha_inicio, fechaFin:row.fecha_fin, tipo:row.tipo || 'vacaciones', estado:row.estado || 'pendiente', motivo:row.motivo, _upd:row.updated_at })),

@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.16.2',
+    date: '2026-09-25',
+    title: 'Fix: un administrador antiguo podía quedarse sin recordatorios automáticos',
+    items: [
+      'Corregido: el cron de recordatorios (fichaje, resúmenes, aniversarios) decidía si alguien era administrador mirando solo la columna interna `role`, ignorando la marca de administrador guardada en su ficha. Una cuenta de administrador dada de alta antes de que esa columna existiera podía dejar de recibir avisos pensados para administradores.',
+    ],
+  },
+  {
     version: '4.16.1',
     date: '2026-09-25',
     title: 'Fix: no se podía vincular la cuenta de un administrador sin PIN',
