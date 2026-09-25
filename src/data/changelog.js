@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.17.0',
+    date: '2026-09-25',
+    title: 'Nuevo: hoja "Horas por obra" en el informe mensual de horas',
+    items: [
+      'El informe Excel general (Administración → Cumplimiento → Informes mensuales) incluye ahora una hoja "Horas por obra": para cada obra o centro donde se haya fichado ese mes, lista qué empleados estuvieron y cuántas horas hizo cada uno — antes solo se veía el centro/obra habitual del empleado, no el desglose real de dónde fichó cada jornada.',
+    ],
+  },
+  {
     version: '4.16.3',
     date: '2026-09-25',
     title: 'Cambio interno: cobertura de tests y un responsable más podía quedarse sin avisos de push',

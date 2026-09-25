@@ -273,6 +273,67 @@ function buildSummarySheet(summaries, monthKey, monthLabel, generatedAt) {
   }
 }
 
+// Agrupa por (obra, empleado): un mismo empleado puede haber fichado en
+// varias obras distintas dentro del mes (ver el fichaje por obra en vez de
+// centro), así que el resumen general (una fila por empleado) no basta
+// para saber cuántas horas se hicieron en cada obra concreta.
+function worksiteBreakdown(summaries) {
+  const groups = new Map()
+  for (const item of summaries) {
+    for (const record of item.records) {
+      const obra = record.centro || item.employee.centroTrabajo || item.employee.dept || 'Sin asignar'
+      const key = `${obra}||${item.employee.id}`
+      if (!groups.has(key)) groups.set(key, { obra, employee:item.employee, records:[], netHours:0, breakHours:0 })
+      const group = groups.get(key)
+      const metric = recordMetrics(record)
+      group.records.push(record)
+      group.netHours += metric.netHours
+      group.breakHours += metric.breakHours
+    }
+  }
+  return [...groups.values()].sort((a, b) =>
+    String(a.obra).localeCompare(String(b.obra), 'es') || String(a.employee.name || a.employee.id).localeCompare(String(b.employee.name || b.employee.id), 'es')
+  )
+}
+
+function buildWorksiteSheet(summaries, monthKey, monthLabel, generatedAt) {
+  const columns = 6
+  const breakdown = worksiteBreakdown(summaries)
+  const worksiteCount = new Set(breakdown.map(item => item.obra)).size
+  const rows = [
+    titleRow('TIMES INC · HORAS POR OBRA', columns),
+    subtitleRow(`Periodo: ${monthLabel} (${monthKey}) · ${worksiteCount} obra${worksiteCount === 1 ? '' : 's'}/centro${worksiteCount === 1 ? '' : 's'} con actividad · Generado: ${generatedAt.toLocaleString('es-ES')}`, columns),
+    Array(columns).fill(null),
+    headerRow(['Centro / Obra', 'Empleado', 'Días', 'Fichajes', 'Horas netas', 'Descanso']),
+  ]
+  breakdown.forEach((item, index) => {
+    rows.push([
+      dataCell(item.obra, index),
+      dataCell(item.employee.name || item.employee.id, index),
+      dataCell(new Set(item.records.map(record => localDateStr(new Date(record.inicio)))).size, index, { type:Number, format:'0', align:'right' }),
+      dataCell(item.records.length, index, { type:Number, format:'0', align:'right' }),
+      dataCell(item.netHours, index, { type:Number, format:HOURS_FORMAT, align:'right', fontWeight:'bold' }),
+      dataCell(item.breakHours, index, { type:Number, format:HOURS_FORMAT, align:'right' }),
+    ])
+  })
+  if (breakdown.length) {
+    const firstDataRow = 5
+    const lastDataRow = firstDataRow + breakdown.length - 1
+    rows.push(totalsRow(columns, firstDataRow, lastDataRow, [4, 5], 3))
+  } else {
+    rows.push([baseCell('Sin fichajes cerrados en este periodo', { columnSpan:columns, height:28, textColor:COLORS.muted, backgroundColor:COLORS.stripe }), ...Array(columns - 1).fill(null)])
+  }
+  return {
+    data:rows,
+    sheet:'Horas por obra',
+    columns:[28, 24, 9, 10, 13, 12].map(width => ({ width })),
+    stickyRowsCount:4,
+    showGridLines:false,
+    zoomScale:90,
+    orientation:'landscape',
+  }
+}
+
 function buildDetailSheet(summaries, monthLabel, generatedAt) {
   const columns = 12
   const ordered = summaries.flatMap(item => item.records.map(record => ({ record, employee:item.employee })))
@@ -359,9 +420,10 @@ export async function buildHoursReportXlsxBlob({ monthKey, monthLabel, employees
   })
   selectedEmployees.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'))
   const summaries = selectedEmployees.map(employee => employeeSummary(employee, closedRecords, closures, monthKey, balanceDb))
-  const names = uniqueSheetNames(selectedEmployees, ['Resumen general', 'Detalle fichajes'])
+  const names = uniqueSheetNames(selectedEmployees, ['Resumen general', 'Horas por obra', 'Detalle fichajes'])
   const sheets = [
     buildSummarySheet(summaries, monthKey, monthLabel, generatedAt),
+    buildWorksiteSheet(summaries, monthKey, monthLabel, generatedAt),
     buildDetailSheet(summaries, monthLabel, generatedAt),
     ...summaries.map(summary => buildEmployeeSheet(summary, names.get(summary.employee.id), monthLabel, generatedAt)),
   ]
