@@ -52,7 +52,7 @@ describe('deployment quality gate', () => {
     expect(githubWorkflow).toContain('run: npm ci --include=dev')
     expect(githubWorkflow).toContain('run: npm run verify:deploy')
     expect(githubWorkflow).toContain('run: npx playwright install --with-deps chromium')
-    expect(githubWorkflow).toContain('run: npm run test:e2e:smoke')
+    expect(githubWorkflow).toContain('run: npm run test:e2e:chromium')
     expect(githubWorkflow).toContain('run: npm run test:e2e:auth-rls')
     expect(githubWorkflow).not.toContain('run: npm run build')
     expect(githubWorkflow).not.toContain('run: npm run test\n')

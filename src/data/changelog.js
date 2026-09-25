@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.16.3',
+    date: '2026-09-25',
+    title: 'Cambio interno: cobertura de tests y un responsable más podía quedarse sin avisos de push',
+    items: [
+      'Sin cambios visibles. Se amplía la suite de pruebas automáticas que corre antes de cada despliegue (ahora cubre fichaje, fichaje por QR, inicio de sesión, centro operativo y actualizaciones, no solo un subconjunto).',
+      'Corregido de paso: el mismo problema del cron de recordatorios (decidir si alguien es responsable mirando solo una columna interna) también afectaba a quién puede enviar avisos push a su equipo desde el navegador — ya usa la misma comprobación robusta en los dos sitios.',
+    ],
+  },
+  {
     version: '4.16.2',
     date: '2026-09-25',
     title: 'Fix: un administrador antiguo podía quedarse sin recordatorios automáticos',

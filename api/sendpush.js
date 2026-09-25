@@ -2,6 +2,7 @@
 // Formato ESM porque package.json tiene "type": "module".
 import webpush from 'web-push'
 import { actorCanNotify } from '../src/server/pushAuthorization.js'
+import { authenticatedBrowserActor } from '../src/server/pushActor.js'
 import { isAuthRlsServerMode } from '../src/server/securityMode.js'
 import { createHash, timingSafeEqual } from 'crypto'
 import { CANONICAL_APP_ORIGIN, isTrustedAppOrigin } from './_origin.js'
@@ -155,22 +156,6 @@ async function sendOne(sub, payload) {
     { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
     payload
   )
-}
-
-async function authenticatedBrowserActor(token) {
-  if (!token || !SB_URL || !SB_ANON || !SB_SERVICE) return null
-  const authResponse = await fetch(`${SB_URL}/auth/v1/user`, {
-    headers:{ apikey:SB_ANON, Authorization:`Bearer ${token}` },
-  })
-  if (!authResponse.ok) return null
-  const authUser = await authResponse.json().catch(() => null)
-  if (!authUser?.id) return null
-  const profileResponse = await fetch(
-    `${SB_URL}/rest/v1/employees?auth_id=eq.${encodeURIComponent(authUser.id)}&baja=eq.false&select=id,role,company_id&limit=1`,
-    { headers:{ apikey:SB_SERVICE, Authorization:`Bearer ${SB_SERVICE}` } },
-  )
-  if (!profileResponse.ok) return null
-  return (await profileResponse.json().catch(() => []))?.[0] || null
 }
 
 export default async function handler(req, res) {
