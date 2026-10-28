@@ -1198,7 +1198,7 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     })
   }, [viewMode, monthValue, weekOffset])
 
-  const { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart } = useMemo(() => {
+  const { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart, weekPendingCount, monthClosed } = useMemo(() => {
     const now = new Date()
     const days = periodDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
     const periodDaysIso = periodDays.map(d => localDateStr(d))
@@ -1211,6 +1211,17 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     const dayLocked = periodDays.map(d => isWeekClosed(closures, weekStartIso(d)))
     const currentWeekStart = periodDays.length ? weekStartIso(periodDays[0]) : null
     const weekClosed = viewMode === 'week' && !!currentWeekStart && isWeekClosed(closures, currentWeekStart)
+    // No se puede cerrar una semana con fichajes sin validar — de todos los
+    // empleados, no solo del alcance del supervisor que mira Planning: el
+    // cierre es un marcador único para toda la semana, no por supervisor.
+    const periodDaySet = new Set(periodDaysIso)
+    const weekPendingCount = viewMode === 'week'
+      ? (db.records || []).filter((r: any) => r?.inicio && isRecordPendingValidation(r) && periodDaySet.has(localDateStr(new Date(r.inicio)))).length
+      : 0
+    // Mes cerrado: todas las semanas que tocan este mes (incluida la que
+    // empieza o termina a caballo con el mes vecino) están cerradas.
+    const monthClosed = viewMode === 'month' && periodDays.length > 0
+      && [...new Set(periodDays.map(d => weekStartIso(d)))].every(ws => isWeekClosed(closures, ws))
 
     const periodLabel = viewMode === 'month'
       ? new Date(`${monthValue}-01T00:00:00`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -1255,7 +1266,7 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
       }),
     }))
 
-    return { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart }
+    return { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart, weekPendingCount, monthClosed }
   }, [db, periodDays, viewMode, monthValue, session, isScopedRole])
 
   const openAddModal = (empId: string, dayIndex: number) => {
@@ -1281,6 +1292,10 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
     if (!currentWeekStart) return
     const actor = session?.user?.name || 'Admin'
     const label = periodLabel
+    if (!weekClosed && weekPendingCount > 0) {
+      toast(`Quedan ${weekPendingCount} fichaje${weekPendingCount !== 1 ? 's' : ''} sin validar esta semana — revísalos en Validar horas antes de cerrarla`, 5000, 'warn')
+      return
+    }
     if (weekClosed) {
       if (!window.confirm(`¿Reabrir la semana del ${label}? Podrás volver a añadir fichajes manuales en ella.`)) return
       saveDB((fresh: any) => {
@@ -1368,8 +1383,10 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
         onOpenEmployee={onOpenEmployee}
         onAddRecord={openAddModal}
         weekClosed={weekClosed}
+        weekPendingCount={weekPendingCount}
         onToggleWeekClosed={viewMode === 'week' ? toggleWeekClosed : undefined}
         dayLocked={dayLocked}
+        monthClosed={monthClosed}
       />
       {addModal && (
         <div onClick={() => setAddModal(null)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.68)', backdropFilter:'blur(8px)' }}>

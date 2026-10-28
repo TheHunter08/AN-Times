@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.22.0',
+    date: '2026-10-28',
+    title: 'Planning: cerrar una semana exige validar sus horas, y aviso de mes cerrado',
+    items: [
+      'En Planning, "Cerrar semana revisada" ya no se puede pulsar si quedan fichajes de esa semana sin validar — el botón muestra cuántos faltan y señala ir a Validar horas primero.',
+      'En la vista mensual de Planning aparece un aviso "Mes cerrado" cuando todas las semanas que tocan ese mes ya están cerradas — es solo un indicador visual, no afecta al Cierre mensual de nóminas (que sigue firmándose aparte).',
+    ],
+  },
+  {
     version: '4.21.0',
     date: '2026-10-28',
     title: 'Fix: scroll bloqueado en formularios largos · horario esperado actualizado',

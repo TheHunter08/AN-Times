@@ -36,10 +36,15 @@ export interface PlanningProps {
   // como revisada, y el callback para cerrarla/reabrirla.
   weekClosed?: boolean
   onToggleWeekClosed?: () => void
+  // Fichajes de la semana en vista aún sin validar (Validar horas) — con
+  // alguno pendiente no se puede cerrar la semana todavía.
+  weekPendingCount?: number
   // Por día visible (mismo índice que `days`): si ese día cae en una semana
   // ya cerrada — se usa para mostrar el candado también en modo mes, donde
   // puede haber semanas cerradas y abiertas a la vez dentro del mismo rango.
   dayLocked?: boolean[]
+  // Modo mes: todas las semanas que tocan el mes en vista están cerradas.
+  monthClosed?: boolean
 }
 
 type PlanStatus = PlanCell['status']
@@ -88,12 +93,13 @@ const LEGEND = [
   { status: 'future', label: 'Aún no llega' },
 ] as const
 
-export function Planning({ weekLabel, days, employees, viewMode = 'week', onChangeViewMode, onPrev, onNext, onToday, onOpenEmployee, onAddRecord, weekClosed, onToggleWeekClosed, dayLocked }: PlanningProps) {
+export function Planning({ weekLabel, days, employees, viewMode = 'week', onChangeViewMode, onPrev, onNext, onToday, onOpenEmployee, onAddRecord, weekClosed, weekPendingCount = 0, onToggleWeekClosed, dayLocked, monthClosed }: PlanningProps) {
   const safeDays = Array.isArray(days) ? days : []
   const safeEmployees = Array.isArray(employees) ? employees : []
   const safeDayLocked = Array.isArray(dayLocked) ? dayLocked : []
   const anyLocked = safeDayLocked.some(Boolean)
   const navLabel = viewMode === 'month' ? 'mes' : 'semana'
+  const blockedByPending = !weekClosed && weekPendingCount > 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -120,18 +126,33 @@ export function Planning({ weekLabel, days, employees, viewMode = 'week', onChan
             <IconArrowRight width={15} height={15} />
           </button>
           <button onClick={onToday} style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: colors.bg[500], color: colors.text[700], fontSize: 12, fontWeight: 640, cursor: 'pointer', fontFamily: 'inherit' }}>Hoy</button>
+          {monthClosed && (
+            <span title="Todas las semanas de este mes están cerradas como revisadas" style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: radius.sm,
+              border: '1px solid rgba(16,185,129,.4)', background: 'rgba(16,185,129,.12)', color: colors.semantic.green,
+              fontSize: 12, fontWeight: 700,
+            }}>
+              <IconLock width={13} height={13} /> Mes cerrado
+            </span>
+          )}
           {onToggleWeekClosed && (
             <button type="button" onClick={onToggleWeekClosed}
-              title={weekClosed ? 'Reabrir esta semana para poder añadir fichajes' : 'Cerrar esta semana como revisada'}
+              disabled={blockedByPending}
+              title={weekClosed
+                ? 'Reabrir esta semana para poder añadir fichajes'
+                : blockedByPending
+                  ? `Quedan ${weekPendingCount} fichaje${weekPendingCount !== 1 ? 's' : ''} sin validar esta semana — revísalos en Validar horas antes de cerrarla`
+                  : 'Cerrar esta semana como revisada'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: radius.sm,
-                border: `1px solid ${weekClosed ? colors.border.default : 'rgba(16,185,129,.4)'}`,
-                background: weekClosed ? colors.bg[600] : 'rgba(16,185,129,.12)',
-                color: weekClosed ? colors.text[700] : colors.semantic.green,
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                border: `1px solid ${weekClosed ? colors.border.default : blockedByPending ? colors.border.subtle : 'rgba(16,185,129,.4)'}`,
+                background: weekClosed ? colors.bg[600] : blockedByPending ? colors.bg[700] : 'rgba(16,185,129,.12)',
+                color: weekClosed ? colors.text[700] : blockedByPending ? colors.text[300] : colors.semantic.green,
+                fontSize: 12, fontWeight: 700, cursor: blockedByPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                opacity: blockedByPending ? 0.7 : 1,
               }}>
               <IconLock width={13} height={13} />
-              {weekClosed ? 'Semana cerrada · Reabrir' : 'Cerrar semana revisada'}
+              {weekClosed ? 'Semana cerrada · Reabrir' : blockedByPending ? `Cerrar semana (${weekPendingCount} sin validar)` : 'Cerrar semana revisada'}
             </button>
           )}
         </div>

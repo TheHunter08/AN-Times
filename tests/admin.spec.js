@@ -410,3 +410,50 @@ test('planning permite cerrar y reabrir una semana revisada, y cambiar a vista m
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   await expect(page.locator('table thead th')).toHaveCount(daysInMonth + 1) // + la columna Empleado
 })
+
+test('planning no deja cerrar una semana con fichajes sin validar', async ({ page }) => {
+  const dateStr = new Date().toISOString().slice(0, 10)
+  await loginAsAdmin(page, {
+    records:[{ id:'r-pending', empId:'e1', empName:'Empleado Prueba', inicio:`${dateStr}T08:00:00Z`, fin:`${dateStr}T16:00:00Z`, breaks:[], aceptada:false, validado:false, rechazado:false }],
+  })
+  // persistRecordRow (aprobar en Validar horas) necesita que el upsert a
+  // /rest/v1/records responda ok (loginAsAdmin aborta todo supabase.co).
+  await page.route(/supabase\.co\/rest\/v1\/records/i, route => route.fulfill({ status:200, contentType:'application/json', body:'[]' }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Planning')
+
+  const closeButton = page.getByRole('button', { name:'Cerrar semana (1 sin validar)' })
+  await expect(closeButton).toBeVisible()
+  await expect(closeButton).toBeDisabled()
+  const closuresBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).planningClosures)
+  expect(closuresBefore ?? []).toHaveLength(0)
+
+  // Una vez validado el fichaje desde Validar horas, la semana sí se puede cerrar.
+  await openSection(page, 'Gestión', 'Validar horas')
+  await expect(page.getByRole('heading', { name:'Validar horas' })).toBeVisible()
+  await page.getByRole('button', { name:'Ok', exact:true }).click() // fila de escritorio: "Aceptar" solo va en el title/tooltip
+
+  await openSection(page, 'Equipo', 'Planning')
+  await page.getByRole('button', { name:'Cerrar semana revisada' }).click()
+  await expect(page.getByRole('button', { name:/Semana cerrada · Reabrir/ })).toBeVisible()
+})
+
+test('planning muestra "Mes cerrado" en vista mensual cuando todas sus semanas están cerradas', async ({ page }) => {
+  // Octubre 2026 (mes en curso en este entorno) toca las semanas que
+  // empiezan el 28/09, 05/10, 12/10, 19/10 y 26/10 — se cierran todas.
+  await loginAsAdmin(page, {
+    planningClosures:['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26'].map((weekStart, i) => ({
+      id:`pc${i}`, weekStart, closedAt:'2026-10-28T00:00:00.000Z', closedBy:'Admin',
+    })),
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Planning')
+  await page.getByRole('button', { name:'Mes', exact:true }).click()
+  await expect(page.getByText('Mes cerrado')).toBeVisible()
+
+  // En un mes con alguna semana sin cerrar, el aviso no aparece.
+  await page.getByRole('button', { name:'mes anterior' }).click()
+  await expect(page.getByText('Mes cerrado')).not.toBeVisible()
+})
