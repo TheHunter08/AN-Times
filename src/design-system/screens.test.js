@@ -163,7 +163,7 @@ describe('Validación de horas', () => {
     const html = renderToStaticMarkup(createElement(ValidateHours, {
       rows: [{
         id: 'record-1', empName: 'Ana Pérez', dept: 'Centro', date: '10 jul',
-        entry: '08:00', exit: '16:00', worked: '8h0m', expected: '8h 00m',
+        entry: '08:00', exit: '16:00', worked: '8h0m', expected: '8h 00m', expectedMin: 480,
         diff: '0h', diffTone: 'ok', status: 'pending',
       }],
       onModify: vi.fn(),

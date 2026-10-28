@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.18.0',
+    date: '2026-10-28',
+    title: 'Nuevo: sustituir lo trabajado por lo esperado al validar horas',
+    items: [
+      'Al modificar un fichaje desde Validar horas, un nuevo botón "Sustituir por lo esperado" ajusta la hora de salida para que la jornada dure exactamente lo esperado ese día, a partir de la hora de entrada — sin tener que calcular la hora a mano.',
+    ],
+  },
+  {
     version: '4.17.0',
     date: '2026-09-25',
     title: 'Nuevo: hoja "Horas por obra" en el informe mensual de horas',

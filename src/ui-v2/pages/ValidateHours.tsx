@@ -18,6 +18,7 @@ export interface ValidateRow {
   exit: string
   worked: string
   expected: string
+  expectedMin: number
   diff: string
   diffTone: 'ok' | 'over' | 'under'
   status: 'pending' | 'approved' | 'rejected'
@@ -99,6 +100,21 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
     setEditEntry(row.entry)
     setEditExit(row.exit)
     setEditReason('')
+  }
+  const editingRow = editingId ? localRows.find(r => r.id === editingId) : null
+  // Sustituye lo trabajado por lo esperado: conserva la entrada tal cual
+  // está en el formulario y desplaza la salida para que la duración total
+  // coincida con la jornada esperada de ese día (effectiveDailyTargetMin) —
+  // evita tener que calcular a mano "entrada + objetivo" cada vez.
+  const applyExpectedDuration = () => {
+    if (!editingRow || !editEntry) return
+    const [h, m] = editEntry.split(':').map(Number)
+    if (Number.isNaN(h) || Number.isNaN(m)) return
+    const total = (h * 60 + m + editingRow.expectedMin) % 1440
+    const nh = Math.floor(total / 60)
+    const nm = total % 60
+    setEditExit(`${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`)
+    setEditReason(prev => prev || `Sustituido por la jornada esperada (${editingRow.expected})`)
   }
   const canSaveModify = Boolean(editEntry) && Boolean(editExit) && editReason.trim().length > 0
   const handleSaveModify = async () => {
@@ -345,6 +361,23 @@ export function ValidateHours({ rows, weekLabel, onApprove, onReject, onModify, 
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Salida</div>
                 <input type="time" value={editExit} onChange={e => setEditExit(e.target.value)} aria-label="Hora de salida" style={inputStyle} />
               </div>
+              {editingRow && (
+                <button
+                  type="button"
+                  onClick={applyExpectedDuration}
+                  disabled={!editEntry}
+                  title="Ajusta la hora de salida para que la jornada dure lo esperado, a partir de la entrada"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '8px 10px', borderRadius: radius.sm, border: `1px dashed ${colors.border.default}`,
+                    background: colors.primary.dim, color: colors.primary.light,
+                    fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                    cursor: editEntry ? 'pointer' : 'default', opacity: editEntry ? 1 : .5,
+                  }}
+                >
+                  <IconClock width={13} height={13} /> Sustituir por lo esperado ({editingRow.expected})
+                </button>
+              )}
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase' }}>Motivo (obligatorio)</div>
                 <input

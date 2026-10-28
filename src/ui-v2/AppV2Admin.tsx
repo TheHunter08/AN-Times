@@ -1427,6 +1427,7 @@ function ValidateHoursPage() {
         exit: fmtTime(r.fin),
         worked: `${Math.floor(worked / 60)}h${Math.floor(worked % 60)}m`,
         expected: mhm(expected),
+        expectedMin: expected,
         diff: diffStr,
         diffTone: Math.abs(diff) < 15 ? 'ok' : diff > 0 ? 'over' : 'under',
         status: recordValidationState(r),

@@ -182,8 +182,10 @@ test.describe('Pantalla del empleado', () => {
     await dialog.locator('input[type="date"]').last().fill(toISODate(end))
     await dialog.getByRole('button', { name: 'Solicitar', exact: true }).click()
     await expect(dialog).toHaveCount(0)
-    await expect(page.getByText('Baja médica', { exact: false })).toBeVisible()
-    await expect(page.getByText('5 días', { exact: false })).toBeVisible()
+    // Texto exacto en vez de substring: "5 días" por sí solo también
+    // matchea el saldo de vacaciones ("X / 82.5 días") cuando ese número
+    // contiene un 5 antes del punto — ambiguo según la fecha del test.
+    await expect(page.getByText('5 días · Baja médica', { exact: true })).toBeVisible()
 
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).vacaciones)
     expect(saved).toHaveLength(1)

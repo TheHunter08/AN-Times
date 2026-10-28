@@ -268,3 +268,32 @@ test('Times AI resume la actividad operativa por obra', async ({ page }) => {
   await dialog.getByRole('button', { name:'Estado de las obras', exact:true }).click()
   await expect(dialog.getByText(/Obra Centro: 1 trabajando/)).toBeVisible({ timeout:3000 })
 })
+
+test('validar horas permite sustituir lo trabajado por la jornada esperada', async ({ page }) => {
+  await loginAsAdmin(page, {
+    config:{ wdMin:480 },
+    records:[{ id:'short-day', empId:'e1', empName:'Empleado Prueba', inicio:'2026-07-13T08:00:00Z', fin:'2026-07-13T15:00:00Z', workSecs:25200, breaks:[], aceptada:false, validado:false, rechazado:false }],
+  })
+  // persistRecordRow necesita que el upsert a /rest/v1/records responda ok
+  // (loginAsAdmin aborta todo supabase.co por defecto) — Playwright usa el
+  // último route() registrado que matchee, así que esto gana sobre el abort.
+  await page.route(/supabase\.co\/rest\/v1\/records/i, route => route.fulfill({ status:200, contentType:'application/json', body:'[]' }))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Gestión', 'Validar horas')
+  await expect(page.getByRole('heading', { name:'Validar horas' })).toBeVisible()
+
+  await page.getByRole('button', { name:'Modificar', exact:true }).click()
+  const dialog = page.getByRole('dialog', { name:'Modificar horario' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Hora de entrada')).toHaveValue('08:00')
+  await dialog.getByRole('button', { name:/Sustituir por lo esperado/ }).click()
+  await expect(dialog.getByLabel('Hora de salida')).toHaveValue('16:00')
+  await dialog.getByLabel('Motivo de la modificación').fill('Sustituido por la jornada esperada')
+  await dialog.getByRole('button', { name:'Guardar', exact:true }).click()
+  await expect(dialog).not.toBeVisible()
+
+  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records.find(r => r.id === 'short-day'))
+  expect(record.workSecs).toBe(28800)
+  expect(record.validado).toBe(true)
+})
