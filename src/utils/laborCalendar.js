@@ -60,16 +60,38 @@ export function calendarWeeklyHours(mondayDateStr) {
   return total
 }
 
+// Horario estándar de la empresa: lunes a jueves jornada completa (9h),
+// viernes jornada reducida (4h) — siempre a partir de las 8:00. Sustituye al
+// número de horas que marca el calendario oficial en un día laborable
+// ordinario (el calendario puede decir 8h, jornada intensiva 6-7h, etc.,
+// pero el acuerdo real de la empresa es este), sin perder por eso los días
+// no laborables (festivos/fines de semana) que el calendario sí marca
+// correctamente a 0.
+const WEEKDAY_TARGET_MIN = { 1: 9 * 60, 2: 9 * 60, 3: 9 * 60, 4: 9 * 60, 5: 4 * 60 } // 1=lunes … 5=viernes
+
+/** Minutos del horario estándar lunes-jueves/viernes para esa fecha, o null si cae en fin de semana o la fecha no es válida. */
+export function defaultWeekdayTargetMin(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  return WEEKDAY_TARGET_MIN[d.getDay()] ?? null
+}
+
 /**
- * Minutos esperados de trabajo para una fecha concreta, resolviendo la misma
- * prioridad que ya usaban las distintas pantallas antes de tener calendario:
- * 1) un `wdMin` configurado explícitamente por el admin (anula el calendario
+ * Minutos esperados de trabajo para una fecha concreta:
+ * 1) un `wdMin` configurado explícitamente por el admin (anula todo lo demás
  *    — p.ej. una jornada distinta pactada para toda la plantilla),
- * 2) el calendario laboral oficial para esa fecha, si hay uno cargado,
- * 3) 8h por defecto (WD) si ninguna de las dos anteriores aplica.
+ * 2) 0 si el calendario oficial marca ese día como no laborable (festivo o
+ *    fin de semana) — un día libre sigue siendo un día libre,
+ * 3) el horario estándar de la empresa (lunes-jueves 9h, viernes 4h) en
+ *    cualquier día laborable ordinario,
+ * 4) si no es ninguno de los anteriores (fin de semana sin calendario
+ *    cargado para ese año), el calendario oficial si existe, o 8h (WD) si no.
  */
 export function effectiveDailyTargetMin(configWdMin, dateStr) {
   if (configWdMin) return configWdMin
-  const hours = calendarDayHours(dateStr)
-  return hours !== null ? hours * 60 : WD
+  const calendarHours = calendarDayHours(dateStr)
+  if (calendarHours === 0) return 0
+  const weekdayMin = defaultWeekdayTargetMin(dateStr)
+  if (weekdayMin !== null) return weekdayMin
+  return calendarHours !== null ? calendarHours * 60 : WD
 }

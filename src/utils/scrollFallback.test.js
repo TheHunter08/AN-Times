@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findScrollTarget } from './scrollFallback.js'
+import { findScrollTarget, shouldIgnoreTarget } from './scrollFallback.js'
 
 // jsdom no calcula layout (scrollHeight/clientHeight son 0), así que el
 // encadenado se prueba con nodos simulados y un getStyle inyectado — la misma
@@ -58,5 +58,73 @@ describe('findScrollTarget: replica el encadenado de scroll del navegador', () =
   it('sin ningún ancestro desplazable, devuelve null (no secuestra nada)', () => {
     const plain = fakeNode({ parent: fakeNode() })
     expect(findScrollTarget(plain, 0, 100, getStyle)).toBeNull()
+  })
+})
+
+describe('shouldIgnoreTarget: solo los inputs con rueda propia de verdad bloquean el fallback', () => {
+  it('ignora un input number (incrementa/decrementa con la rueda en Chrome)', () => {
+    const input = document.createElement('input')
+    input.type = 'number'
+    document.body.appendChild(input)
+    expect(shouldIgnoreTarget(input)).toBe(true)
+    input.remove()
+  })
+
+  it('ignora un input range', () => {
+    const input = document.createElement('input')
+    input.type = 'range'
+    document.body.appendChild(input)
+    expect(shouldIgnoreTarget(input)).toBe(true)
+    input.remove()
+  })
+
+  it('NO ignora un input de texto, email, tel, date ni time — sin rueda propia', () => {
+    for (const type of ['text', 'email', 'tel', 'date', 'time', 'password']) {
+      const input = document.createElement('input')
+      input.type = type
+      document.body.appendChild(input)
+      expect(shouldIgnoreTarget(input)).toBe(false)
+      input.remove()
+    }
+  })
+
+  it('NO ignora un textarea ni un select — un formulario denso (p.ej. Editar empleado) debe poder hacer scroll sobre ellos', () => {
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    expect(shouldIgnoreTarget(textarea)).toBe(false)
+    textarea.remove()
+
+    const select = document.createElement('select')
+    document.body.appendChild(select)
+    expect(shouldIgnoreTarget(select)).toBe(false)
+    select.remove()
+  })
+
+  it('sigue ignorando canvas (firmas) y elementos con gesto propio declarado', () => {
+    const canvas = document.createElement('canvas')
+    document.body.appendChild(canvas)
+    expect(shouldIgnoreTarget(canvas)).toBe(true)
+    canvas.remove()
+
+    const gestureEl = document.createElement('div')
+    gestureEl.setAttribute('data-gesture-lock', 'true')
+    document.body.appendChild(gestureEl)
+    expect(shouldIgnoreTarget(gestureEl)).toBe(true)
+    gestureEl.remove()
+  })
+
+  it('un hijo de un input number también se ignora (closest sube por el árbol)', () => {
+    const input = document.createElement('input')
+    input.type = 'number'
+    const child = document.createElement('span')
+    input.appendChild(child)
+    document.body.appendChild(input)
+    expect(shouldIgnoreTarget(child)).toBe(true)
+    input.remove()
+  })
+
+  it('un elemento que no es un Element (p.ej. document) se ignora por seguridad', () => {
+    expect(shouldIgnoreTarget(document)).toBe(true)
+    expect(shouldIgnoreTarget(null)).toBe(true)
   })
 })

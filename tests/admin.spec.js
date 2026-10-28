@@ -331,6 +331,37 @@ test('resumen permite filtrar la matriz por obra', async ({ page }) => {
   await expect(page.getByRole('cell', { name:'Beto Sur' })).toBeVisible()
 })
 
+test('planning precarga el horario esperado al añadir una jornada manual: 9h lun-jue, 4h viernes, siempre desde las 8:00', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Planning')
+
+  // Semana anterior completa: así tanto el lunes como el viernes caen en el
+  // pasado (si se usara la semana en curso, el viernes podría ser un día
+  // "futuro" todavía sin fichar, y Planning no ofrece "Añadir" ahí).
+  await page.getByRole('button', { name:'Semana anterior' }).click()
+  const now = new Date()
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1) - 7)
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() + 4)
+  const mondayLabel = monday.toLocaleDateString('es-ES', { weekday:'short', day:'numeric' })
+  const fridayLabel = friday.toLocaleDateString('es-ES', { weekday:'short', day:'numeric' })
+
+  await page.getByRole('button', { name:new RegExp(`${fridayLabel}:.*Añadir jornada manual`, 'i') }).click()
+  let dialog = page.getByRole('dialog', { name:'Añadir jornada manual' })
+  await expect(dialog.getByLabel('Hora entrada')).toHaveValue('08:00')
+  await expect(dialog.getByLabel('Hora salida')).toHaveValue('12:00') // viernes: 4h
+  await dialog.getByRole('button', { name:'Cerrar' }).click()
+  await expect(dialog).not.toBeVisible()
+
+  await page.getByRole('button', { name:new RegExp(`${mondayLabel}:.*Añadir jornada manual`, 'i') }).click()
+  dialog = page.getByRole('dialog', { name:'Añadir jornada manual' })
+  await expect(dialog.getByLabel('Hora entrada')).toHaveValue('08:00')
+  await expect(dialog.getByLabel('Hora salida')).toHaveValue('17:00') // lunes: 9h
+})
+
 test('planning permite cerrar y reabrir una semana revisada, y cambiar a vista mensual', async ({ page }) => {
   page.on('dialog', dialog => dialog.accept())
   const now = new Date()
@@ -361,9 +392,13 @@ test('planning permite cerrar y reabrir una semana revisada, y cambiar a vista m
   await page.route(/supabase\.co\/rest\/v1\/records/i, route => route.fulfill({ status:200, contentType:'application/json', body:'[]' }))
 
   // Con la semana reabierta, añadir el fichaje manual funciona con normalidad.
+  // El horario esperado precarga 08:00–17:00 (9h) un día laborable lun-jue;
+  // hoy (miércoles 28/10/2026 en este entorno) cae en ese caso.
   await todayCell.click()
   const dialog = page.getByRole('dialog', { name:'Añadir jornada manual' })
   await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Hora entrada')).toHaveValue('08:00')
+  await expect(dialog.getByLabel('Hora salida')).toHaveValue('17:00')
   await dialog.getByRole('button', { name:'Añadir jornada' }).click()
   await expect(dialog).not.toBeVisible()
   const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)

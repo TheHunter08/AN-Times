@@ -1261,9 +1261,15 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
   const openAddModal = (empId: string, dayIndex: number) => {
     if (dayLocked[dayIndex]) { toast('Esta semana está cerrada como revisada — reábrela para añadir fichajes', 4500, 'warn'); return }
     const emp = (db.employees || []).find((e: any) => e.id === empId)
-    setAddModal({ empId, empName: emp?.name || empId, dateStr: periodDaysIso[dayIndex] })
+    const dateStr = periodDaysIso[dayIndex]
+    setAddModal({ empId, empName: emp?.name || empId, dateStr })
     setStartTime('08:00')
-    setEndTime('16:00')
+    // Horario esperado: siempre entrada 8:00, salida según el día (9h lun-jue,
+    // 4h viernes) — effectiveDailyTargetMin ya resuelve esto de forma
+    // centralizada (incluye festivos/fin de semana a 0, por si se añade ahí).
+    const expectedMin = effectiveDailyTargetMin(Number(db.config?.wdMin) || 0, dateStr) || 9 * 60
+    const endMinutes = (8 * 60 + expectedMin) % (24 * 60)
+    setEndTime(`${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`)
     setNote('Se olvidó fichar')
   }
 

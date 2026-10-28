@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.21.0',
+    date: '2026-10-28',
+    title: 'Fix: scroll bloqueado en formularios largos · horario esperado actualizado',
+    items: [
+      'Corregido: en algunos equipos, la rueda del ratón no hacía scroll en modales con muchos campos (p.ej. "Editar empleado") si el cursor pasaba sobre un campo de texto, fecha o selector — ya solo se excluyen los campos numéricos, que sí usan la rueda para su propio valor.',
+      'El horario esperado de la empresa (columna "Esperado" en Validar horas, estadísticas y resto de comparativas) pasa a ser lunes a jueves 9h y viernes 4h, siempre desde las 8:00 — los festivos y fines de semana del calendario oficial se siguen respetando como día libre (0h).',
+      'Planning precarga ahora ese mismo horario (8:00 de entrada, salida según el día) al añadir manualmente una jornada olvidada.',
+    ],
+  },
+  {
     version: '4.20.0',
     date: '2026-10-28',
     title: 'Nuevo: cerrar semanas revisadas y vista mensual en Planning',

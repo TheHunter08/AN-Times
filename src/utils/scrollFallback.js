@@ -55,11 +55,20 @@ function normalizedDeltas(e) {
   return { dx, dy }
 }
 
-function shouldIgnoreTarget(target) {
+// Solo los tipos de <input> con rueda propia de verdad en Chrome (number:
+// incrementa/decrementa; range: mueve el control) se excluyen — el resto
+// (text, email, tel, date, time, password, checkbox…), además de
+// textarea/select, NO tienen ningún comportamiento de rueda propio y deben
+// dejar pasar el fallback con normalidad. Antes se excluía CUALQUIER input/
+// textarea/select: en un formulario denso (p.ej. "Editar empleado", casi
+// todo ancho ocupado por campos) eso dejaba, en las máquinas afectadas por
+// el incidente de arriba, prácticamente ningún punto de la pantalla desde el
+// que la rueda pudiera hacer scroll — el modal quedaba atascado.
+const WHEEL_OWNING_INPUT = 'input[type="number"], input[type="range"]'
+
+export function shouldIgnoreTarget(target) {
   if (!(target instanceof Element)) return true
-  // Inputs con rueda propia (number), áreas de firma, y componentes con
-  // gesto propio declarado conservan su comportamiento intacto.
-  if (target.closest('input, textarea, select, canvas, [data-gesture-lock="true"]')) return true
+  if (target.closest(`${WHEEL_OWNING_INPUT}, canvas, [data-gesture-lock="true"]`)) return true
   try { if (getComputedStyle(target).touchAction === 'none') return true } catch {}
   return false
 }
