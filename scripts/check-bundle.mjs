@@ -34,11 +34,11 @@ const precacheRawBytes = (await Promise.all(
   precachedAssets.map(async name => (await readFile(new URL(`assets/${name}`, DIST))).length)
 )).reduce((sum, size) => sum + size, 0)
 // Presupuesto del conjunto offline completo (no solo del shell inicial). El
-// valor deja un margen pequeño sobre los ~1,87 MiB actuales (firma de
-// vacaciones, logros persistentes, bienestar y el resto de correcciones de
-// esta sesión) y evita que una dependencia pesada vuelva a colarse
-// silenciosamente en cada instalación.
-const PRECACHE_RAW_BUDGET = 1950 * 1024
+// valor deja un margen pequeño sobre los ~1,91 MiB actuales (filtro por obra
+// en Resumen, cierre de semanas y vista mensual en Planning, fix de scroll y
+// horario esperado de esta sesión) y evita que una dependencia pesada vuelva
+// a colarse silenciosamente en cada instalación.
+const PRECACHE_RAW_BUDGET = 2000 * 1024
 if (precacheRawBytes > PRECACHE_RAW_BUDGET) {
   throw new Error(`Precache de assets: ${(precacheRawBytes / 1024).toFixed(1)} KiB; presupuesto: ${(PRECACHE_RAW_BUDGET / 1024).toFixed(0)} KiB`)
 }
