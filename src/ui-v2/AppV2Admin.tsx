@@ -49,6 +49,7 @@ import { createNotification } from '../utils/notifications.js'
 import { validateEmployeeProfile } from '../utils/employeeProfileValidation.js'
 import { workBalanceOptions } from '../utils/workBalance.js'
 import { buildResumenMatrix, dayColumnLabel } from '../utils/resumenMatrix.js'
+import { weekStartIso, isWeekClosed, shiftMonthValue } from '../utils/planningWeeks.js'
 import { downloadResumenPdf } from '../utils/resumenPdf.js'
 import { automationHealthList } from '../server/automationHealth.js'
 import { buildOperationalPulse } from '../utils/operationalPulse.js'
@@ -1165,7 +1166,9 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
   const session = useAppStore(s => s.session)
   const saveDB = useAppStore(s => s.saveDB)
   const toast = useAppStore(s => s.toast)
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [weekOffset, setWeekOffset] = useState(0)
+  const [monthValue, setMonthValue] = useState(() => today().slice(0, 7))
   const [addModal, setAddModal] = useState<{ empId: string; empName: string; dateStr: string } | null>(null)
   const [startTime, setStartTime] = useState('08:00')
   const [endTime, setEndTime] = useState('16:00')
@@ -1173,22 +1176,47 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
   const [saving, setSaving] = useState(false)
   const isScopedRole = isScopedSupervisor(session)
 
-  const { weekLabel, days, employees, weekDaysIso } = useMemo(() => {
-    // Build Mon-Sun for current week + offset
+  // Días a mostrar: una semana lun-dom (modo semana) o todo el mes elegido
+  // (modo mes) — el resto del cálculo (estado por día, bloqueo por semana
+  // cerrada) es idéntico para ambos, solo cambia este rango de partida.
+  const periodDays = useMemo(() => {
+    if (viewMode === 'month') {
+      const [y, m] = monthValue.split('-').map(Number)
+      if (!y || !m) return []
+      const lastDay = new Date(y, m, 0).getDate()
+      return Array.from({ length: lastDay }, (_, i) => new Date(y, m - 1, i + 1))
+    }
     const now = new Date()
     const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1 // 0=Mon
     const monday = new Date(now)
     monday.setDate(now.getDate() - dayOfWeek + weekOffset * 7)
     monday.setHours(0, 0, 0, 0)
-
-    const weekDays = Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() + i)
       return d
     })
-    const days = weekDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
-    const weekLabel = `${weekDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
-    const weekDaysIso = weekDays.map(d => localDateStr(d))
+  }, [viewMode, monthValue, weekOffset])
+
+  const { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart } = useMemo(() => {
+    const now = new Date()
+    const days = periodDays.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }))
+    const periodDaysIso = periodDays.map(d => localDateStr(d))
+    const closures = db.planningClosures || []
+    // Una semana cerrada (revisada) se marca día a día — así el modo mes
+    // puede señalar con un candado qué días pertenecen a una semana ya
+    // cerrada, aunque el botón de cerrar/reabrir solo tenga sentido viendo
+    // una semana a la vez (si no, "cerrar" en modo mes cerraría de golpe
+    // varias semanas distintas sin que el admin las haya revisado una a una).
+    const dayLocked = periodDays.map(d => isWeekClosed(closures, weekStartIso(d)))
+    const currentWeekStart = periodDays.length ? weekStartIso(periodDays[0]) : null
+    const weekClosed = viewMode === 'week' && !!currentWeekStart && isWeekClosed(closures, currentWeekStart)
+
+    const periodLabel = viewMode === 'month'
+      ? new Date(`${monthValue}-01T00:00:00`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+      : periodDays.length
+        ? `${periodDays[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${periodDays[periodDays.length - 1].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+        : ''
 
     const emps = isScopedRole
       ? getScopedEmployees({ employees: db.employees || [], obras: db.obras || [], supervisor: (session as any)?.user, unrestricted: false })
@@ -1205,15 +1233,15 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
       id: e.id,
       name: e.name,
       dept: e.dept || e.centroTrabajo || '',
-      week: weekDays.map(d => {
+      week: periodDays.map((d, i) => {
         const isFuture = d > now && d.toDateString() !== now.toDateString()
-        const dateStr = localDateStr(d)
+        const dateStr = periodDaysIso[i]
         const dayRecs = records.filter((r: any) => r.empId === e.id && r.inicio && localDateStr(new Date(r.inicio)) === dateStr)
         const isWeekend = d.getDay() === 0 || d.getDay() === 6
         if (!dayRecs.length && isOnLeave(e.id, dateStr)) return { status: 'vac' as const }
         if (!dayRecs.length && isWeekend) return { status: 'weekend' as const }
         if (!dayRecs.length && isFuture)  return { status: 'future' as const }
-        if (!dayRecs.length) return { status: 'absent' as const }
+        if (!dayRecs.length) return { status: 'absent' as const, locked: dayLocked[i] }
         const live = dayRecs.some((r: any) => !r.fin)
         if (live) return { status: 'live' as const, value: fmtTime(dayRecs[0]?.inicio) }
         // calculate hours
@@ -1227,15 +1255,50 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
       }),
     }))
 
-    return { weekLabel, days, employees, weekDaysIso }
-  }, [db, weekOffset, session, isScopedRole])
+    return { periodLabel, days, employees, periodDaysIso, dayLocked, weekClosed, currentWeekStart }
+  }, [db, periodDays, viewMode, monthValue, session, isScopedRole])
 
   const openAddModal = (empId: string, dayIndex: number) => {
+    if (dayLocked[dayIndex]) { toast('Esta semana está cerrada como revisada — reábrela para añadir fichajes', 4500, 'warn'); return }
     const emp = (db.employees || []).find((e: any) => e.id === empId)
-    setAddModal({ empId, empName: emp?.name || empId, dateStr: weekDaysIso[dayIndex] })
+    setAddModal({ empId, empName: emp?.name || empId, dateStr: periodDaysIso[dayIndex] })
     setStartTime('08:00')
     setEndTime('16:00')
     setNote('Se olvidó fichar')
+  }
+
+  // Cierre de planning: un marcador ligero de "semana ya revisada", distinto
+  // del cierre mensual de nóminas (db.cierres, con firma admin/empleado) —
+  // aquí solo bloquea añadir fichajes manuales desde Planning mientras esté
+  // cerrada, para no tener que acordarse de qué semanas ya se repasaron.
+  const toggleWeekClosed = () => {
+    if (!currentWeekStart) return
+    const actor = session?.user?.name || 'Admin'
+    const label = periodLabel
+    if (weekClosed) {
+      if (!window.confirm(`¿Reabrir la semana del ${label}? Podrás volver a añadir fichajes manuales en ella.`)) return
+      saveDB((fresh: any) => {
+        const planningClosures = (fresh.planningClosures || []).filter((c: any) => c.weekStart !== currentWeekStart)
+        const withAudit = auditLog(fresh, 'Semana de planning reabierta', label, actor, {
+          category: 'documento', entityType: 'planning_closure', entityId: currentWeekStart,
+        } as any)
+        return { planningClosures, audit: withAudit.audit }
+      })
+      toast('Semana reabierta', 3000, 'ok')
+    } else {
+      saveDB((fresh: any) => {
+        const nowIso = new Date().toISOString()
+        const planningClosures = [
+          ...(fresh.planningClosures || []).filter((c: any) => c.weekStart !== currentWeekStart),
+          { id: gid(), weekStart: currentWeekStart, closedAt: nowIso, closedBy: actor, _upd: nowIso },
+        ]
+        const withAudit = auditLog(fresh, 'Semana de planning cerrada como revisada', label, actor, {
+          category: 'documento', entityType: 'planning_closure', entityId: currentWeekStart,
+        } as any)
+        return { planningClosures, audit: withAudit.audit }
+      })
+      toast('Semana marcada como revisada y cerrada', 3000, 'ok')
+    }
   }
 
   const saveRecord = async () => {
@@ -1288,14 +1351,19 @@ function PlanningPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string)
   return (
     <>
       <Planning
-        weekLabel={weekLabel}
+        weekLabel={periodLabel}
         days={days}
         employees={employees}
-        onPrev={() => setWeekOffset(o => o - 1)}
-        onNext={() => setWeekOffset(o => o + 1)}
-        onToday={() => setWeekOffset(0)}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
+        onPrev={() => viewMode === 'month' ? setMonthValue(v => shiftMonthValue(v, -1)) : setWeekOffset(o => o - 1)}
+        onNext={() => viewMode === 'month' ? setMonthValue(v => shiftMonthValue(v, 1)) : setWeekOffset(o => o + 1)}
+        onToday={() => { setWeekOffset(0); setMonthValue(today().slice(0, 7)) }}
         onOpenEmployee={onOpenEmployee}
         onAddRecord={openAddModal}
+        weekClosed={weekClosed}
+        onToggleWeekClosed={viewMode === 'week' ? toggleWeekClosed : undefined}
+        dayLocked={dayLocked}
       />
       {addModal && (
         <div onClick={() => setAddModal(null)} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, background:'rgba(0,0,0,.68)', backdropFilter:'blur(8px)' }}>

@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.20.0',
+    date: '2026-10-28',
+    title: 'Nuevo: cerrar semanas revisadas y vista mensual en Planning',
+    items: [
+      'Equipo → Planning tiene ahora un botón "Cerrar semana revisada": marca la semana en curso como ya repasada y bloquea añadir fichajes manuales en ella hasta que se reabra (con confirmación, para evitar reabrir por error).',
+      'Planning se puede ver también por mes completo, no solo semana a semana — un selector "Semana / Mes" arriba cambia la vista; en modo mes, un candado señala qué días caen en una semana ya cerrada.',
+    ],
+  },
+  {
     version: '4.19.0',
     date: '2026-10-28',
     title: 'Nuevo: filtro por obra en Análisis → Resumen',

@@ -330,3 +330,48 @@ test('resumen permite filtrar la matriz por obra', async ({ page }) => {
   await page.getByRole('button', { name:'Todas', exact:true }).click()
   await expect(page.getByRole('cell', { name:'Beto Sur' })).toBeVisible()
 })
+
+test('planning permite cerrar y reabrir una semana revisada, y cambiar a vista mensual', async ({ page }) => {
+  page.on('dialog', dialog => dialog.accept())
+  const now = new Date()
+  const dayLabel = now.toLocaleDateString('es-ES', { weekday:'short', day:'numeric' })
+  await loginAsAdmin(page) // sin fichajes: el empleado de prueba aparece "Ausente" hoy
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Planning')
+  await expect(page.getByRole('heading', { name:'Planning semanal' })).toBeVisible()
+
+  const todayCell = page.getByRole('button', { name:new RegExp(`${dayLabel}:.*Añadir jornada manual`, 'i') })
+  await expect(todayCell).toBeVisible()
+
+  // Cerrar la semana actual como revisada: no requiere confirmación.
+  await page.getByRole('button', { name:'Cerrar semana revisada' }).click()
+  const reopenButton = page.getByRole('button', { name:/Semana cerrada · Reabrir/ })
+  await expect(reopenButton).toBeVisible()
+  await expect(page.getByRole('button', { name:new RegExp(`${dayLabel}:.*Semana cerrada, no se puede añadir`, 'i') })).toBeVisible()
+  await expect(todayCell).not.toBeVisible() // ya no ofrece "Añadir jornada manual"
+
+  // Reabrir sí pide confirmación (el listener de arriba la acepta).
+  await reopenButton.click()
+  await expect(page.getByRole('button', { name:'Cerrar semana revisada' })).toBeVisible()
+  await expect(todayCell).toBeVisible()
+
+  // persistRecordRow necesita que el upsert a /rest/v1/records responda ok
+  // (loginAsAdmin aborta todo supabase.co por defecto).
+  await page.route(/supabase\.co\/rest\/v1\/records/i, route => route.fulfill({ status:200, contentType:'application/json', body:'[]' }))
+
+  // Con la semana reabierta, añadir el fichaje manual funciona con normalidad.
+  await todayCell.click()
+  const dialog = page.getByRole('dialog', { name:'Añadir jornada manual' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name:'Añadir jornada' }).click()
+  await expect(dialog).not.toBeVisible()
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)
+  expect(records).toHaveLength(1)
+
+  // Vista mensual: mismo grid, pero con todos los días del mes en curso.
+  await page.getByRole('button', { name:'Mes', exact:true }).click()
+  await expect(page.getByRole('heading', { name:'Planning mensual' })).toBeVisible()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  await expect(page.locator('table thead th')).toHaveCount(daysInMonth + 1) // + la columna Empleado
+})

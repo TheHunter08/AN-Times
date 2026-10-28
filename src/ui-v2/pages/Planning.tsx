@@ -2,29 +2,44 @@ import { Avatar } from '../components/Avatar.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconArrowLeft, IconArrowRight } from '../components/Icons.js'
+import { IconArrowLeft, IconArrowRight, IconLock } from '../components/Icons.js'
 
 export interface PlanCell {
   status: 'ok' | 'live' | 'turno' | 'absent' | 'vac' | 'weekend' | 'future'
   value?: string
+  // Solo aplica a 'absent': el día cae en una semana ya cerrada como
+  // revisada desde Planning — se bloquea añadir un fichaje manual ahí.
+  locked?: boolean
 }
 
 export interface PlanEmployee {
   id: string
   name: string
   dept: string
-  week: PlanCell[] // 7: Mon-Sun
+  week: PlanCell[] // 7 (modo semana) o todos los días del mes (modo mes)
 }
+
+export type PlanningViewMode = 'week' | 'month'
 
 export interface PlanningProps {
   weekLabel: string
   days: string[] // ['Lun 7', 'Mar 8', ...]
   employees: PlanEmployee[]
+  viewMode?: PlanningViewMode
+  onChangeViewMode?: (mode: PlanningViewMode) => void
   onPrev?: () => void
   onNext?: () => void
   onToday?: () => void
   onOpenEmployee?: (employeeId: string) => void
   onAddRecord?: (employeeId: string, dayIndex: number) => void
+  // Semana actualmente en vista (solo en modo semana): si ya está cerrada
+  // como revisada, y el callback para cerrarla/reabrirla.
+  weekClosed?: boolean
+  onToggleWeekClosed?: () => void
+  // Por día visible (mismo índice que `days`): si ese día cae en una semana
+  // ya cerrada — se usa para mostrar el candado también en modo mes, donde
+  // puede haber semanas cerradas y abiertas a la vez dentro del mismo rango.
+  dayLocked?: boolean[]
 }
 
 type PlanStatus = PlanCell['status']
@@ -60,7 +75,7 @@ function resolveCell(cell: PlanCell | Partial<PlanCell> | null | undefined): Pla
           ? legacyStatus as PlanStatus
           : 'future'
 
-  return { status, value: raw?.value }
+  return { status, value: raw?.value, locked: raw?.locked }
 }
 
 const LEGEND = [
@@ -73,23 +88,52 @@ const LEGEND = [
   { status: 'future', label: 'Aún no llega' },
 ] as const
 
-export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, onOpenEmployee, onAddRecord }: PlanningProps) {
+export function Planning({ weekLabel, days, employees, viewMode = 'week', onChangeViewMode, onPrev, onNext, onToday, onOpenEmployee, onAddRecord, weekClosed, onToggleWeekClosed, dayLocked }: PlanningProps) {
   const safeDays = Array.isArray(days) ? days : []
   const safeEmployees = Array.isArray(employees) ? employees : []
+  const safeDayLocked = Array.isArray(dayLocked) ? dayLocked : []
+  const anyLocked = safeDayLocked.some(Boolean)
+  const navLabel = viewMode === 'month' ? 'mes' : 'semana'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <PageTitle>Planning semanal</PageTitle>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" onClick={onPrev} aria-label="Semana anterior" style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
+        <PageTitle>{viewMode === 'month' ? 'Planning mensual' : 'Planning semanal'}</PageTitle>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {onChangeViewMode && (
+            <div style={{ display: 'flex', gap: 6, background: colors.bg[700], border: `1px solid ${colors.border.subtle}`, borderRadius: radius.md, padding: 3 }}>
+              {(['week', 'month'] as const).map(m => (
+                <button key={m} type="button" onClick={() => onChangeViewMode(m)} style={{
+                  padding: '7px 12px', borderRadius: radius.sm, border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  background: viewMode === m ? colors.primary.base : 'transparent',
+                  color: viewMode === m ? '#fff' : colors.text[500],
+                }}>{m === 'week' ? 'Semana' : 'Mes'}</button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={onPrev} aria-label={`${navLabel} anterior`} style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
             <IconArrowLeft width={15} height={15} />
           </button>
-          <span style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], minWidth: 160, textAlign: 'center' }}>{weekLabel}</span>
-          <button type="button" onClick={onNext} aria-label="Semana siguiente" style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
+          <span style={{ fontSize: 13, fontWeight: 640, color: colors.text[900], minWidth: 160, textAlign: 'center', textTransform: viewMode === 'month' ? 'capitalize' : 'none' }}>{weekLabel}</span>
+          <button type="button" onClick={onNext} aria-label={`${navLabel} siguiente`} style={{ display: 'flex', alignItems: 'center', padding: 7, borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: 'transparent', color: colors.text[700], cursor: 'pointer' }}>
             <IconArrowRight width={15} height={15} />
           </button>
           <button onClick={onToday} style={{ padding: '7px 14px', borderRadius: radius.sm, border: `1px solid ${colors.border.subtle}`, background: colors.bg[500], color: colors.text[700], fontSize: 12, fontWeight: 640, cursor: 'pointer', fontFamily: 'inherit' }}>Hoy</button>
+          {onToggleWeekClosed && (
+            <button type="button" onClick={onToggleWeekClosed}
+              title={weekClosed ? 'Reabrir esta semana para poder añadir fichajes' : 'Cerrar esta semana como revisada'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: radius.sm,
+                border: `1px solid ${weekClosed ? colors.border.default : 'rgba(16,185,129,.4)'}`,
+                background: weekClosed ? colors.bg[600] : 'rgba(16,185,129,.12)',
+                color: weekClosed ? colors.text[700] : colors.semantic.green,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <IconLock width={13} height={13} />
+              {weekClosed ? 'Semana cerrada · Reabrir' : 'Cerrar semana revisada'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -100,6 +144,12 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
             {l.label}
           </div>
         ))}
+        {anyLocked && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: colors.text[500] }}>
+            <IconLock width={11} height={11} />
+            Semana cerrada (revisada)
+          </div>
+        )}
       </div>
 
       <div className="uiv2-week-desktop" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -110,7 +160,10 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
               {safeDays.map((d, i) => (
                 <th key={i} style={{ padding: '6px 2px', textAlign: 'center', fontSize: 10, fontWeight: 700, color: i >= 5 ? colors.text[300] : colors.text[500] }}>
                   <div style={{ textTransform: 'uppercase', letterSpacing: '.4px' }}>{d.split(' ')[0]}</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: i >= 5 ? colors.text[300] : colors.text[900], letterSpacing: '-.3px' }}>{d.split(' ')[1]}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: i >= 5 ? colors.text[300] : colors.text[900], letterSpacing: '-.3px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                    {d.split(' ')[1]}
+                    {safeDayLocked[i] && <IconLock width={8} height={8} style={{ opacity: .6 }} />}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -137,10 +190,10 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                   return (
                     <td key={di} style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle' }}>
                       <button type="button"
-                        onClick={() => safeCell.status === 'absent' && onAddRecord ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
-                        aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? 'Añadir jornada manual' : `Abrir fichajes de ${emp.name}`}`}
+                        onClick={() => safeCell.status === 'absent' && onAddRecord && !safeCell.locked ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
+                        aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? (safeCell.locked ? 'Semana cerrada, no se puede añadir' : 'Añadir jornada manual') : `Abrir fichajes de ${emp.name}`}`}
                         style={{
-                          width:'100%', border: `1px solid ${def.border}`, cursor:(onOpenEmployee || (safeCell.status === 'absent' && onAddRecord))?'pointer':'default', fontFamily:'inherit',
+                          width:'100%', border: `1px solid ${def.border}`, cursor:(onOpenEmployee || (safeCell.status === 'absent' && onAddRecord && !safeCell.locked))?'pointer':'default', fontFamily:'inherit',
                           padding: '4px 2px', borderRadius: radius.sm, minHeight: 30,
                           background: def.bg,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -151,6 +204,8 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                         )}
                         {safeCell.value ? (
                           <span style={{ fontSize: 9.5, fontWeight: 700, color: def.color, fontVariantNumeric: 'tabular-nums' }}>{safeCell.value}</span>
+                        ) : safeCell.status === 'absent' && safeCell.locked ? (
+                          <IconLock width={9} height={9} style={{ color: def.color }} />
                         ) : (
                           <span style={{ fontSize: 9, color: def.color, fontWeight: 700 }}>
                             {safeCell.status === 'absent' ? (onAddRecord ? '+' : '—') : safeCell.status === 'vac' ? 'VAC' : safeCell.status === 'weekend' ? '·' : ''}
@@ -181,12 +236,15 @@ export function Planning({ weekLabel, days, employees, onPrev, onNext, onToday, 
                 const def = cellDef[safeCell.status]
                 return (
                   <div key={di} className="uiv2-week-day">
-                    <span className="uiv2-week-day-label">{safeDays[di] || ''}</span>
+                    <span className="uiv2-week-day-label" style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      {safeDays[di] || ''}
+                      {safeDayLocked[di] && <IconLock width={8} height={8} />}
+                    </span>
                     <button type="button"
-                      onClick={() => safeCell.status === 'absent' && onAddRecord ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
-                      aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? 'Añadir jornada manual' : `Abrir fichajes de ${emp.name}`}`}
+                      onClick={() => safeCell.status === 'absent' && onAddRecord && !safeCell.locked ? onAddRecord(emp.id, di) : onOpenEmployee?.(emp.id)}
+                      aria-label={`${safeDays[di] || `Día ${di + 1}`}: ${safeCell.value || safeCell.status}. ${safeCell.status === 'absent' && onAddRecord ? (safeCell.locked ? 'Semana cerrada, no se puede añadir' : 'Añadir jornada manual') : `Abrir fichajes de ${emp.name}`}`}
                       style={{ background: def.bg, border: `1px solid ${def.border}`, color: def.color }} className="uiv2-week-day-value">
-                      {safeCell.value || (safeCell.status === 'absent' ? (onAddRecord ? '+ Añadir' : 'Ausente') : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
+                      {safeCell.value || (safeCell.status === 'absent' ? (safeCell.locked ? 'Cerrada' : (onAddRecord ? '+ Añadir' : 'Ausente')) : safeCell.status === 'vac' ? 'Vacaciones' : safeCell.status === 'weekend' ? 'Libre' : '—')}
                     </button>
                   </div>
                 )
