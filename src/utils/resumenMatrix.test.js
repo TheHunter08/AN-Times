@@ -165,4 +165,50 @@ describe('buildResumenMatrix', () => {
     expect(result.days).toEqual([])
     expect(result.rows.every(r => r.cells.length === 0)).toBe(true)
   })
+
+  describe('filtro por obra (obraNames)', () => {
+    const obraRecords = [
+      { id: 'o1', empId: 'e1', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T16:00:00.000Z', centro: 'Obra Norte' }, // 8h
+      { id: 'o2', empId: 'e2', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T12:00:00.000Z', centro: 'Obra Sur' }, // 4h, otra obra
+    ]
+
+    it('sin obraNames (null), se comporta exactamente igual que antes', () => {
+      const withFilter = buildResumenMatrix({ employees, records: obraRecords, period: { mode: 'date', value: '2026-07-05' }, obraNames: null })
+      const without = buildResumenMatrix({ employees, records: obraRecords, period: { mode: 'date', value: '2026-07-05' } })
+      expect(withFilter).toEqual(without)
+    })
+
+    it('solo cuenta los minutos de los fichajes en las obras seleccionadas', () => {
+      const { rows } = buildResumenMatrix({ employees, records: obraRecords, period: { mode: 'date', value: '2026-07-05' }, obraNames: ['Obra Norte'] })
+      const e1 = rows.find(r => r.employee.id === 'e1')
+      const e2 = rows.find(r => r.employee.id === 'e2')
+      expect(e1.cells[0].minutes).toBe(480)
+      expect(e2).toBeUndefined() // e2 no tiene fichajes en Obra Norte, se oculta
+    })
+
+    it('marca isElsewhere (no isAbsent) el día que un empleado de la obra filtrada fichó en otra obra', () => {
+      const { rows, days } = buildResumenMatrix({
+        employees: [{ id: 'e1', name: 'Zoe', role: 'empleado' }],
+        records: [
+          { id: 'o-day5', empId: 'e1', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T16:00:00.000Z', centro: 'Obra Norte' }, // 8h, obra filtrada
+          { id: 'o-day6', empId: 'e1', inicio: '2026-07-06T08:00:00.000Z', fin: '2026-07-06T12:00:00.000Z', centro: 'Obra Sur' }, // 4h, otra obra
+        ],
+        period: { mode: 'month', value: '2026-07' },
+        obraNames: ['Obra Norte'],
+      })
+      expect(rows).toHaveLength(1) // e1 sí tiene fichajes en Obra Norte ese mes, se muestra
+      const day5 = rows[0].cells[days.indexOf('2026-07-05')]
+      const day6 = rows[0].cells[days.indexOf('2026-07-06')]
+      expect(day5.minutes).toBe(480)
+      expect(day6.minutes).toBe(0)
+      expect(day6.isElsewhere).toBe(true)
+      expect(day6.isAbsent).toBe(false)
+    })
+
+    it('con varias obras seleccionadas, incluye fichajes de cualquiera de ellas', () => {
+      const { rows } = buildResumenMatrix({ employees, records: obraRecords, period: { mode: 'date', value: '2026-07-05' }, obraNames: ['Obra Norte', 'Obra Sur'] })
+      expect(rows.find(r => r.employee.id === 'e1').cells[0].minutes).toBe(480)
+      expect(rows.find(r => r.employee.id === 'e2').cells[0].minutes).toBe(240)
+    })
+  })
 })

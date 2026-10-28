@@ -16,6 +16,7 @@ export interface ResumenCell {
   isVacation: boolean
   isWeekend: boolean
   isAbsent: boolean
+  isElsewhere?: boolean
 }
 
 export interface ResumenRow {
@@ -29,6 +30,10 @@ export interface ResumenProps {
   employees: Array<{ id: string; name: string; dept?: string }>
   employeeId: string | null
   onChangeEmployee: (id: string | null) => void
+  obras: Array<{ id: string; nombre: string }>
+  obraIds: string[]
+  onToggleObra: (id: string) => void
+  onClearObras: () => void
   mode: ResumenPeriodMode
   onChangeMode: (mode: ResumenPeriodMode) => void
   monthValue: string
@@ -69,6 +74,7 @@ const fieldStyle: CSSProperties = {
 export function Resumen(props: ResumenProps) {
   const {
     employees, employeeId, onChangeEmployee,
+    obras, obraIds, onToggleObra, onClearObras,
     mode, onChangeMode, monthValue, onChangeMonth, dateValue, onChangeDate,
     rangeFrom, rangeTo, onChangeRangeFrom, onChangeRangeTo,
     days, dayLabel, rows, onExportPdf, onExportExcel, exportingPdf, exportingExcel,
@@ -81,7 +87,7 @@ export function Resumen(props: ResumenProps) {
         <div>
           <PageTitle>Resumen</PageTitle>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: colors.text[500] }}>
-            Horas trabajadas por empleado y día — filtra por persona y periodo, luego exporta.
+            Horas trabajadas por empleado y día — filtra por persona, obra y periodo, luego exporta.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -93,6 +99,32 @@ export function Resumen(props: ResumenProps) {
           </Button>
         </div>
       </div>
+
+      {/* Obras */}
+      {obras.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Obra</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" onClick={onClearObras} style={{
+              padding: '6px 12px', borderRadius: radius.pill, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              border: `1px solid ${obraIds.length === 0 ? colors.primary.base : colors.border.default}`,
+              background: obraIds.length === 0 ? colors.primary.base : 'transparent',
+              color: obraIds.length === 0 ? '#fff' : colors.text[500],
+            }}>Todas</button>
+            {obras.map(o => {
+              const active = obraIds.includes(o.id)
+              return (
+                <button key={o.id} type="button" onClick={() => onToggleObra(o.id)} style={{
+                  padding: '6px 12px', borderRadius: radius.pill, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  border: `1px solid ${active ? colors.primary.base : colors.border.default}`,
+                  background: active ? colors.primary.dim : 'transparent',
+                  color: active ? colors.text[900] : colors.text[500],
+                }}>{o.nombre}</button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Controles */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -173,9 +205,9 @@ export function Resumen(props: ResumenProps) {
                       background: cell.isVacation ? colors.primary.dim : undefined,
                       color: cell.minutes > 0 ? colors.text[900] : cell.isAbsent ? colors.semantic.red : colors.text[300],
                       fontWeight: cell.minutes > 0 || cell.isAbsent ? 600 : 400,
-                      fontSize: cell.isAbsent || cell.isWeekend ? 10 : undefined,
+                      fontSize: cell.isAbsent || cell.isWeekend || cell.isElsewhere ? 10 : undefined,
                     }}>
-                      {cell.minutes > 0 ? fmtHours(cell.hours) : cell.isVacation ? 'Vac' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : '-'}
+                      {cell.minutes > 0 ? fmtHours(cell.hours) : cell.isVacation ? 'Vac' : cell.isElsewhere ? 'Otra obra' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : '-'}
                     </td>
                   ))}
                   <td style={{ textAlign: 'right', padding: '8px 12px', color: colors.text[900], fontWeight: 800, borderBottom: `1px solid ${colors.border.subtle}` }}>{fmtHours(row.totalHours) || '0h'}</td>

@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.19.0',
+    date: '2026-10-28',
+    title: 'Nuevo: filtro por obra en Análisis → Resumen',
+    items: [
+      'La tabla de Análisis → Resumen tiene ahora un filtro por obra arriba, junto al de empleado: al elegir una o varias obras, solo se cuentan y muestran las horas de los fichajes hechos en esas obras.',
+      'Un día en el que el empleado fichó en otra obra (no en las elegidas) se marca como "Otra obra", distinto de una ausencia real — para no confundir "trabajó en otro sitio" con "no vino a trabajar".',
+    ],
+  },
+  {
     version: '4.18.0',
     date: '2026-10-28',
     title: 'Nuevo: sustituir lo trabajado por lo esperado al validar horas',

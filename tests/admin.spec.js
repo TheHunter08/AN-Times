@@ -297,3 +297,36 @@ test('validar horas permite sustituir lo trabajado por la jornada esperada', asy
   expect(record.workSecs).toBe(28800)
   expect(record.validado).toBe(true)
 })
+
+test('resumen permite filtrar la matriz por obra', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[
+      { id:'e1', name:'Zoe Norte', role:'empleado', baja:false },
+      { id:'e2', name:'Beto Sur', role:'empleado', baja:false },
+    ],
+    obras:[
+      { id:'obra-norte', nombre:'Obra Norte', activa:true },
+      { id:'obra-sur', nombre:'Obra Sur', activa:true },
+    ],
+    records:[
+      { id:'r1', empId:'e1', empName:'Zoe Norte', inicio:'2026-07-06T08:00:00Z', fin:'2026-07-06T16:00:00Z', centro:'Obra Norte', workSecs:28800, breaks:[] },
+      { id:'r2', empId:'e2', empName:'Beto Sur', inicio:'2026-07-06T08:00:00Z', fin:'2026-07-06T12:00:00Z', centro:'Obra Sur', workSecs:14400, breaks:[] },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Análisis', 'Resumen')
+  await expect(page.getByRole('heading', { name:'Resumen' })).toBeVisible()
+  await page.getByRole('button', { name:'Fecha específica' }).click()
+  await page.locator('input[type="date"]').fill('2026-07-06')
+
+  await expect(page.getByRole('cell', { name:'Zoe Norte' })).toBeVisible()
+  await expect(page.getByRole('cell', { name:'Beto Sur' })).toBeVisible()
+
+  await page.getByRole('button', { name:'Obra Norte', exact:true }).click()
+  await expect(page.getByRole('cell', { name:'Zoe Norte' })).toBeVisible()
+  await expect(page.getByRole('cell', { name:'Beto Sur' })).not.toBeVisible()
+
+  await page.getByRole('button', { name:'Todas', exact:true }).click()
+  await expect(page.getByRole('cell', { name:'Beto Sur' })).toBeVisible()
+})

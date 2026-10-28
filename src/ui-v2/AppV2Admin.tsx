@@ -2355,6 +2355,7 @@ function ResumenPage() {
   const toast = useAppStore(s => s.toast)
 
   const [employeeId, setEmployeeId] = useState<string | null>(null)
+  const [obraIds, setObraIds] = useState<string[]>([])
   const [mode, setMode] = useState<ResumenPeriodMode>('month')
   const [monthValue, setMonthValue] = useState(() => today().slice(0, 7))
   const [dateValue, setDateValue] = useState(() => today())
@@ -2368,6 +2369,18 @@ function ResumenPage() {
     [db.employees],
   )
 
+  const obras = useMemo(
+    () => (db.obras || []).filter((o: any) => o.activa !== false).map((o: any) => ({ id: o.id, nombre: o.nombre || o.name || o.id })),
+    [db.obras],
+  )
+
+  // Los fichajes guardan la obra como texto (record.centro), no por id — ver
+  // doStartWithCentro en EmployeePage.jsx — así que se traduce aquí.
+  const obraNames = useMemo(
+    () => obraIds.length ? obraIds.map(id => obras.find((o: any) => o.id === id)?.nombre).filter(Boolean) as string[] : null,
+    [obraIds, obras],
+  )
+
   const period = useMemo(() => {
     if (mode === 'month') return { mode: 'month' as const, value: monthValue }
     if (mode === 'date') return { mode: 'date' as const, value: dateValue }
@@ -2375,17 +2388,21 @@ function ResumenPage() {
   }, [mode, monthValue, dateValue, rangeFrom, rangeTo])
 
   const matrix = useMemo(
-    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId, holidays: workBalanceOptions(db).holidays }),
-    [db.employees, db.records, db.vacaciones, period, employeeId, db.config?.usarFestivosMadrid, db.config?.festivosExtra],
+    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId, obraNames, holidays: workBalanceOptions(db).holidays }),
+    [db.employees, db.records, db.vacaciones, period, employeeId, obraNames, db.config?.usarFestivosMadrid, db.config?.festivosExtra],
   )
 
   const dayLabel = (date: string) => dayColumnLabel(date, matrix.sameMonth)
 
-  const periodLabel = mode === 'month'
+  const periodLabel = (mode === 'month'
     ? new Date(`${monthValue}-01T00:00:00`).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     : mode === 'date'
       ? new Date(`${dateValue}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-      : `${rangeFrom} — ${rangeTo}`
+      : `${rangeFrom} — ${rangeTo}`) + (obraNames ? ` · ${obraNames.join(', ')}` : '')
+
+  const toggleObraFilter = (id: string) => {
+    setObraIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   const handleExportPdf = async () => {
     if (exportingPdf || !matrix.days.length) return
@@ -2414,7 +2431,7 @@ function ResumenPage() {
       const rows = matrix.rows.map((row: any) => [
         row.employee.name || row.employee.id,
         row.roleLabel,
-        ...row.cells.map((cell: any) => cell.minutes > 0 ? Math.round(cell.hours * 100) / 100 : cell.isVacation ? 'Vac' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : ''),
+        ...row.cells.map((cell: any) => cell.minutes > 0 ? Math.round(cell.hours * 100) / 100 : cell.isVacation ? 'Vac' : cell.isElsewhere ? 'Otra obra' : cell.isAbsent ? 'Ausente' : cell.isWeekend ? 'Descanso' : ''),
         Math.round(row.totalHours * 100) / 100,
       ])
       await downloadXlsx(headers, rows, `resumen-${monthValue || dateValue || rangeFrom}.xlsx`, 'Resumen')
@@ -2430,6 +2447,10 @@ function ResumenPage() {
       employees={employees}
       employeeId={employeeId}
       onChangeEmployee={setEmployeeId}
+      obras={obras}
+      obraIds={obraIds}
+      onToggleObra={toggleObraFilter}
+      onClearObras={() => setObraIds([])}
       mode={mode}
       onChangeMode={setMode}
       monthValue={monthValue}

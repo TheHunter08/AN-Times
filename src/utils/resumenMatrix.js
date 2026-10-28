@@ -48,37 +48,59 @@ export function dayColumnLabel(dateStr, sameMonth) {
 }
 
 /**
- * @param {{ employees?: any[], records?: any[], vacaciones?: any[], period: any, employeeId?: string|null, holidays?: Record<string,string> }} args
+ * @param {{ employees?: any[], records?: any[], vacaciones?: any[], period: any, employeeId?: string|null, obraNames?: string[]|null, holidays?: Record<string,string> }} args
  */
-export function buildResumenMatrix({ employees = [], records = [], vacaciones = [], period, employeeId = null, holidays = {} }) {
+export function buildResumenMatrix({ employees = [], records = [], vacaciones = [], period, employeeId = null, obraNames = null, holidays = {} }) {
   const days = resolvePeriodDays(period)
   const sameMonth = days.length > 0 && days.every(d => d.slice(0, 7) === days[0].slice(0, 7))
 
-  // !e.baja || tiene fichajes en el periodo: mismo criterio que
-  // AppV2Admin.tsx (handleDownloadExcel/handleDownloadPDF) — sin esto, un
-  // empleado que causó baja a mitad de mes desaparecía del resumen entero,
-  // perdiendo también las horas que sí trabajó antes de la baja.
+  // Filtro por obra: compara contra record.centro (la obra fichada, ver
+  // toWorksiteRow/employeeObraOptions), no contra el centro de trabajo
+  // habitual del empleado — un mismo empleado puede ficharse en obras
+  // distintas según el día.
+  const obraFilter = obraNames && obraNames.length ? new Set(obraNames) : null
+  const matchesObra = r => !obraFilter || obraFilter.has(r?.centro)
+
+  // !e.baja || tiene fichajes en el periodo (y, si hay filtro de obra, en
+  // esa obra): mismo criterio que AppV2Admin.tsx (handleDownloadExcel/
+  // handleDownloadPDF) — sin esto, un empleado que causó baja a mitad de
+  // mes desaparecía del resumen entero, perdiendo también las horas que sí
+  // trabajó antes de la baja. Con el filtro de obra activo, se reutiliza el
+  // mismo conjunto también para los empleados activos: sin esto, cualquier
+  // empleado sin fichajes en la obra elegida aparecía igualmente, con la
+  // fila entera marcada "Ausente" como si no hubiera trabajado en ningún
+  // sitio ese día.
   const daySet0 = new Set(days)
   const empHasRecordInPeriod = new Set(
     (records || [])
-      .filter(r => r?.fin && r?.inicio && r?.empId && daySet0.has(localDateStr(new Date(r.inicio))))
+      .filter(r => r?.fin && r?.inicio && r?.empId && daySet0.has(localDateStr(new Date(r.inicio))) && matchesObra(r))
       .map(r => r.empId)
   )
   const scoped = (employees || [])
-    .filter(e => e && !e.isAdmin && e.role !== 'admin' && (!e.baja || empHasRecordInPeriod.has(e.id)) && (!employeeId || e.id === employeeId))
+    .filter(e => e && !e.isAdmin && e.role !== 'admin'
+      && (!e.baja || empHasRecordInPeriod.has(e.id))
+      && (!employeeId || e.id === employeeId)
+      && (!obraFilter || empHasRecordInPeriod.has(e.id)))
     .map(e => ({ ...e, _role: resolveRole(e) }))
     .sort((a, b) =>
       (ROLE_ORDER[a._role] ?? 9) - (ROLE_ORDER[b._role] ?? 9) ||
       String(a.name || '').localeCompare(String(b.name || ''), 'es'))
 
   const daySet = new Set(days)
+  // allMinutesByKey (sin filtrar por obra) decide si un día fue una
+  // ausencia real; minutesByKey (filtrado) es lo que se muestra y suma —
+  // sin esta distinción, un día trabajado en OTRA obra (no elegida)
+  // aparecería como "Ausente" en vez de "Otra obra".
+  const allMinutesByKey = new Map()
   const minutesByKey = new Map()
   for (const r of (records || [])) {
     if (!r?.fin || !r?.inicio || !r?.empId) continue
     const d = localDateStr(new Date(r.inicio))
     if (!daySet.has(d)) continue
     const key = `${r.empId}|${d}`
-    minutesByKey.set(key, (minutesByKey.get(key) || 0) + calcMin(r))
+    const min = calcMin(r)
+    allMinutesByKey.set(key, (allMinutesByKey.get(key) || 0) + min)
+    if (matchesObra(r)) minutesByKey.set(key, (minutesByKey.get(key) || 0) + min)
   }
 
   const vacKeys = new Set()
@@ -103,7 +125,11 @@ export function buildResumenMatrix({ employees = [], records = [], vacaciones = 
       // fichajes aparecía marcado como ausencia); los días futuros tampoco
       // cuentan como ausencia porque el empleado aún no ha podido fichar.
       const isAbsent = minutes === 0 && !isVacation && !isWeekend && !isHoliday && d <= todayStr
-      return { date: d, minutes, hours: minutes / 60, isVacation, isWeekend, isHoliday, isAbsent }
+      // Con filtro de obra activo: si no hay minutos en la obra elegida pero
+      // sí los hay en otra (allMinutesByKey), no es una ausencia real, es que
+      // ese día se trabajó en otra obra — se distingue para no pintarlo rojo.
+      const isElsewhere = Boolean(obraFilter) && minutes === 0 && (allMinutesByKey.get(key) || 0) > 0
+      return { date: d, minutes, hours: minutes / 60, isVacation, isWeekend, isHoliday, isAbsent: isAbsent && !isElsewhere, isElsewhere }
     })
     const totalMinutes = cells.reduce((sum, c) => sum + c.minutes, 0)
     return {
