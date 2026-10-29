@@ -64,6 +64,10 @@ describe('buildResumenMatrix', () => {
     { id: 'r2', empId: 'e2', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T12:00:00.000Z' }, // 4h
     { id: 'r3', empId: 'e1', inicio: '2026-06-05T08:00:00.000Z', fin: '2026-06-05T16:00:00.000Z' }, // fuera de periodo
     { id: 'r4', empId: 'e1', inicio: '2026-07-06T08:00:00.000Z', fin: null }, // abierta, no cuenta
+    // e3/e4 necesitan al menos un fichaje en julio para no quedar fuera del
+    // resumen por la regla "sin ningún fichaje ese mes, no aparece".
+    { id: 'r5', empId: 'e3', inicio: '2026-07-10T08:00:00.000Z', fin: '2026-07-10T16:00:00.000Z' }, // 8h
+    { id: 'r6', empId: 'e4', inicio: '2026-07-10T08:00:00.000Z', fin: '2026-07-10T16:00:00.000Z' }, // 8h
   ]
   const vacaciones = [
     { empId: 'e3', estado: 'aprobada', fechaInicio: '2026-07-04', fechaFin: '2026-07-06' },
@@ -71,13 +75,29 @@ describe('buildResumenMatrix', () => {
   ]
 
   it('ordena por rol (admin, jefe_obra, encargado, empleado) y luego por nombre', () => {
-    const { rows } = buildResumenMatrix({ employees, records, vacaciones, period: { mode: 'date', value: '2026-07-05' } })
+    const { rows } = buildResumenMatrix({ employees, records, vacaciones, period: { mode: 'month', value: '2026-07' } })
     expect(rows.map(r => r.employee.id)).toEqual(['e4', 'e2', 'e3', 'e1'])
   })
 
   it('excluye empleados dados de baja', () => {
     const { rows } = buildResumenMatrix({ employees, records, vacaciones, period: { mode: 'date', value: '2026-07-05' } })
     expect(rows.some(r => r.employee.id === 'baja1')).toBe(false)
+  })
+
+  it('un empleado de baja con fichajes sí aparece si se pide explícitamente por employeeId', () => {
+    const bajaConFichajes = [{ id: 'bajaX', name: 'Ex con fichajes', role: 'empleado', baja: true }]
+    const bajaRecords = [{ id: 'rb', empId: 'bajaX', inicio: '2026-07-10T08:00:00.000Z', fin: '2026-07-10T16:00:00.000Z' }]
+    const general = buildResumenMatrix({ employees: bajaConFichajes, records: bajaRecords, period: { mode: 'month', value: '2026-07' } })
+    expect(general.rows).toHaveLength(0)
+    const explicit = buildResumenMatrix({ employees: bajaConFichajes, records: bajaRecords, period: { mode: 'month', value: '2026-07' }, employeeId: 'bajaX' })
+    expect(explicit.rows).toHaveLength(1)
+    expect(explicit.rows[0].employee.id).toBe('bajaX')
+  })
+
+  it('excluye, sin seleccionar un empleado concreto, a quien no tiene ningún fichaje ese periodo', () => {
+    const sinFichajes = [{ id: 'eX', name: 'Nunca Ficha', role: 'empleado' }]
+    const { rows } = buildResumenMatrix({ employees: sinFichajes, records: [], period: { mode: 'month', value: '2026-07' } })
+    expect(rows).toHaveLength(0)
   })
 
   it('excluye al administrador — no es un empleado', () => {
@@ -209,6 +229,40 @@ describe('buildResumenMatrix', () => {
       const { rows } = buildResumenMatrix({ employees, records: obraRecords, period: { mode: 'date', value: '2026-07-05' }, obraNames: ['Obra Norte', 'Obra Sur'] })
       expect(rows.find(r => r.employee.id === 'e1').cells[0].minutes).toBe(480)
       expect(rows.find(r => r.employee.id === 'e2').cells[0].minutes).toBe(240)
+    })
+
+    describe('reasignación a otra obra (sin histórico, usa la asignación actual — obrasAsignadas)', () => {
+      const obras = [{ id: 'o-norte', nombre: 'Obra Norte' }, { id: 'o-sur', nombre: 'Obra Sur' }]
+
+      it('sigue asignado a la obra filtrada: un día sin fichar en ningún sitio es Ausente, como siempre', () => {
+        const asignado = [{ id: 'e1', name: 'Zoe', role: 'empleado', obrasAsignadas: ['o-norte'] }]
+        const unSoloDia = [{ id: 'o1', empId: 'e1', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T16:00:00.000Z', centro: 'Obra Norte' }]
+        const { rows, days } = buildResumenMatrix({ employees: asignado, records: unSoloDia, obras, period: { mode: 'month', value: '2026-07' }, obraNames: ['Obra Norte'] })
+        const day6 = rows[0].cells[days.indexOf('2026-07-06')] // lunes, sin fichar en ningún sitio
+        expect(day6.isAbsent).toBe(true)
+      })
+
+      it('ya NO está asignado a la obra filtrada: un día sin fichar en ningún sitio queda en blanco, no Ausente', () => {
+        const reasignado = [{ id: 'e1', name: 'Zoe', role: 'empleado', obrasAsignadas: ['o-sur'] }] // reasignado a otra obra
+        const unSoloDiaEnNorte = [{ id: 'o1', empId: 'e1', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T16:00:00.000Z', centro: 'Obra Norte' }]
+        const { rows, days } = buildResumenMatrix({ employees: reasignado, records: unSoloDiaEnNorte, obras, period: { mode: 'month', value: '2026-07' }, obraNames: ['Obra Norte'] })
+        const day6 = rows[0].cells[days.indexOf('2026-07-06')]
+        expect(day6.isAbsent).toBe(false)
+        expect(day6.isElsewhere).toBe(false) // tampoco fichó en ningún sitio ese día — vacío, no "otra obra"
+        expect(day6.minutes).toBe(0)
+      })
+
+      it('reasignado y fichando ya en la nueva obra: esos días se marcan "Otra obra", no Ausente', () => {
+        const reasignado = [{ id: 'e1', name: 'Zoe', role: 'empleado', obrasAsignadas: ['o-sur'] }]
+        const recs = [
+          { id: 'o1', empId: 'e1', inicio: '2026-07-05T08:00:00.000Z', fin: '2026-07-05T16:00:00.000Z', centro: 'Obra Norte' },
+          { id: 'o2', empId: 'e1', inicio: '2026-07-07T08:00:00.000Z', fin: '2026-07-07T12:00:00.000Z', centro: 'Obra Sur' },
+        ]
+        const { rows, days } = buildResumenMatrix({ employees: reasignado, records: recs, obras, period: { mode: 'month', value: '2026-07' }, obraNames: ['Obra Norte'] })
+        const day7 = rows[0].cells[days.indexOf('2026-07-07')]
+        expect(day7.isElsewhere).toBe(true)
+        expect(day7.isAbsent).toBe(false)
+      })
     })
   })
 })

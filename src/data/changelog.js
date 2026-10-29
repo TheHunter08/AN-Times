@@ -4,6 +4,16 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.23.0',
+    date: '2026-10-29',
+    title: 'Obras: ver solo los empleados asignados · Resumen más preciso',
+    items: [
+      'En el detalle de una obra, nuevo botón "Ver empleados asignados" que lleva a Empleados filtrado solo a quien tiene esa obra en su lista de obras asignadas (antes solo existía "Ver equipo de empleados", que mostraba el listado completo sin filtrar).',
+      'Análisis → Resumen ya no muestra por defecto a los empleados dados de baja ni a quien no fichó ningún día ese periodo — pero se puede seguir pidiendo el informe de un empleado de baja seleccionándolo explícitamente en el filtro (aparece marcado "(baja)").',
+      'Si un empleado deja de estar asignado a la obra que se está filtrando en Resumen, sus días sin fichar dejan de marcarse "Ausente" (ya no se le espera ahí); si fichó en otra obra ese día se señala "Otra obra".',
+    ],
+  },
+  {
     version: '4.22.0',
     date: '2026-10-28',
     title: 'Planning: cerrar una semana exige validar sus horas, y aviso de mes cerrado',

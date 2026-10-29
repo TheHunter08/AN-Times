@@ -173,6 +173,30 @@ test('obras permite eliminar una obra y la desasigna de empleados y vehículos',
   expect(db.vehiculos[0]).toMatchObject({ asignadoTipo:'', asignadoId:'' })
 })
 
+test('obras: "Ver empleados asignados" filtra a los empleados con esa obra en su lista de obras asignadas', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[
+      { id:'e1', name:'Asignado A La Obra', email:'e1@empresa.com', role:'empleado', baja:false, obrasAsignadas:['obra-1'] },
+      { id:'e2', name:'Sin Asignar', email:'e2@empresa.com', role:'empleado', baja:false, obrasAsignadas:[] },
+    ],
+    obras:[{ id:'obra-1', nombre:'TELECOMUNICACIONES', activa:true }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Gestión', 'Obras')
+  await page.getByRole('button', { name:/Ver detalle de la obra TELECOMUNICACIONES/i }).click()
+  await page.getByRole('button', { name:'Ver empleados asignados', exact:true }).click()
+
+  await expect(page.getByRole('heading', { name:'Empleados', exact:true })).toBeVisible()
+  await expect(page.getByText('Empleados asignados a TELECOMUNICACIONES (1)')).toBeVisible()
+  await expect(page.getByText('Asignado A La Obra')).toBeVisible()
+  await expect(page.getByText('Sin Asignar')).not.toBeVisible()
+
+  // Quitar el filtro vuelve a mostrar a todos.
+  await page.getByRole('button', { name:'Quitar filtro de obra' }).click()
+  await expect(page.getByText('Sin Asignar')).toBeVisible()
+})
+
 test('la auditoría muestra la cadena de trazabilidad', async ({ page }) => {
   await loginAsAdmin(page, {
     audit: [{
@@ -329,6 +353,33 @@ test('resumen permite filtrar la matriz por obra', async ({ page }) => {
 
   await page.getByRole('button', { name:'Todas', exact:true }).click()
   await expect(page.getByRole('cell', { name:'Beto Sur' })).toBeVisible()
+})
+
+test('resumen oculta por defecto a los de baja y a quien no fichó ningún día, pero permite pedir el informe de un empleado de baja explícitamente', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[
+      { id:'e1', name:'Activo Con Horas', role:'empleado', baja:false },
+      { id:'e2', name:'Activo Sin Fichar', role:'empleado', baja:false },
+      { id:'e3', name:'De Baja Con Horas', role:'empleado', baja:true },
+    ],
+    records:[
+      { id:'r1', empId:'e1', empName:'Activo Con Horas', inicio:'2026-07-06T08:00:00Z', fin:'2026-07-06T16:00:00Z', workSecs:28800, breaks:[] },
+      { id:'r3', empId:'e3', empName:'De Baja Con Horas', inicio:'2026-07-06T08:00:00Z', fin:'2026-07-06T16:00:00Z', workSecs:28800, breaks:[] },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Análisis', 'Resumen')
+  await expect(page.getByRole('heading', { name:'Resumen' })).toBeVisible()
+  await page.locator('input[type="month"]').fill('2026-07')
+
+  await expect(page.getByRole('cell', { name:'Activo Con Horas' })).toBeVisible()
+  await expect(page.getByRole('cell', { name:'Activo Sin Fichar' })).not.toBeVisible()
+  await expect(page.getByRole('cell', { name:'De Baja Con Horas' })).not.toBeVisible()
+
+  // Pero sí se puede pedir explícitamente el informe del empleado de baja.
+  await page.locator('select').first().selectOption({ label:'De Baja Con Horas (baja)' })
+  await expect(page.getByRole('cell', { name:'De Baja Con Horas' })).toBeVisible()
 })
 
 test('planning precarga el horario esperado al añadir una jornada manual: 9h lun-jue, 4h viernes, siempre desde las 8:00', async ({ page }) => {

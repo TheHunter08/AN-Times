@@ -1004,7 +1004,7 @@ function NotificationsPage({ onNavigate }: { onNavigate: (page: string) => void 
   return <Notifications items={items} onMarkRead={markRead} onMarkAllRead={markAllRead} onDismiss={dismiss} onOpen={item => { markRead(item.id); onNavigate(item.destination || 'auditoria') }} />
 }
 
-function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed }: { onViewTimesheets?: (id: string) => void; initialEditId?: string | null; onInitialEditConsumed?: () => void }) {
+function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed, initialObraFilter, onInitialObraFilterConsumed }: { onViewTimesheets?: (id: string) => void; initialEditId?: string | null; onInitialEditConsumed?: () => void; initialObraFilter?: { id: string; name: string; employeeIds: string[] } | null; onInitialObraFilterConsumed?: () => void }) {
   const rows    = useEmployeesData()
   const db      = useAppStore(s => s.db) as any
   const saveDB  = useAppStore(s => s.saveDB)
@@ -1069,9 +1069,20 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed 
     onInitialEditConsumed?.()
   }, [initialEditId])
 
+  // Se consume en cuanto se recibe: la página de Empleados sigue mostrando
+  // el filtro mientras se visita (estado propio de Employees.tsx), pero una
+  // vuelta posterior por el menú lateral ya no debe arrastrar el filtro de
+  // la última obra que se miró.
+  const [obraFilter, setObraFilter] = useState<{ id: string; name: string; employeeIds: string[] } | null>(null)
+  useEffect(() => {
+    if (!initialObraFilter) return
+    setObraFilter(initialObraFilter)
+    onInitialObraFilterConsumed?.()
+  }, [initialObraFilter])
+
   return (
     <>
-      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} onDeactivate={handleDeactivate} onResendConfirmation={handleResendConfirmation} />
+      <Employees rows={rows} onAdd={() => setModal({ mode: 'create' })} onEdit={openEdit} onViewTimesheets={onViewTimesheets} onDeactivate={handleDeactivate} onResendConfirmation={handleResendConfirmation} obraFilter={obraFilter} onClearObraFilter={() => setObraFilter(null)} />
       {modal && (
         <EmployeeModal initial={modal.mode === 'edit' ? modal.emp : undefined} onClose={() => setModal(null)} />
       )}
@@ -2455,8 +2466,13 @@ function ResumenPage() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingExcel, setExportingExcel] = useState(false)
 
+  // Los de baja se incluyen (marcados) para poder pedir explícitamente su
+  // informe — el propio buildResumenMatrix los excluye del listado general
+  // salvo que se seleccionen aquí por id.
   const employees = useMemo(
-    () => (db.employees || []).filter((e: any) => !e.baja && !e.isAdmin && e.role !== 'admin').map((e: any) => ({ id: e.id, name: e.name || e.id, dept: e.dept || e.centroTrabajo })),
+    () => (db.employees || []).filter((e: any) => !e.isAdmin && e.role !== 'admin')
+      .map((e: any) => ({ id: e.id, name: (e.name || e.id) + (e.baja ? ' (baja)' : ''), dept: e.dept || e.centroTrabajo }))
+      .sort((a: any, b: any) => a.name.localeCompare(b.name, 'es')),
     [db.employees],
   )
 
@@ -2479,8 +2495,8 @@ function ResumenPage() {
   }, [mode, monthValue, dateValue, rangeFrom, rangeTo])
 
   const matrix = useMemo(
-    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId, obraNames, holidays: workBalanceOptions(db).holidays }),
-    [db.employees, db.records, db.vacaciones, period, employeeId, obraNames, db.config?.usarFestivosMadrid, db.config?.festivosExtra],
+    () => buildResumenMatrix({ employees: db.employees || [], records: db.records || [], vacaciones: db.vacaciones || [], period, employeeId, obraNames, obras: db.obras || [], holidays: workBalanceOptions(db).holidays }),
+    [db.employees, db.records, db.vacaciones, period, employeeId, obraNames, db.obras, db.config?.usarFestivosMadrid, db.config?.festivosExtra],
   )
 
   const dayLabel = (date: string) => dayColumnLabel(date, matrix.sameMonth)
@@ -3283,7 +3299,7 @@ function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void })
   )
 }
 
-function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+function ObrasPage({ onNavigate, onViewAssignedEmployees }: { onNavigate: (page: string) => void; onViewAssignedEmployees: (obraId: string, obraName: string, employeeIds: string[]) => void }) {
   const db = useAppStore(s => s.db) as any
   const [showAdd, setShowAdd] = useState(false)
   const todayStr = today()
@@ -3326,6 +3342,7 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
         address: formatObraCoords(o.coords) ? `GPS: ${formatObraCoords(o.coords)}` : '—',
         status: (o.activa === false ? 'completada' : 'activa') as 'activa' | 'completada',
         employeeCount: assigned.length,
+        assignedEmployeeIds: assigned.map((e: any) => e.id),
         hoursToday: todayMins > 0 ? `${Math.floor(todayMins / 60)}h${todayMins % 60 > 0 ? Math.floor(todayMins % 60) + 'm' : ''}` : '0h',
         hoursMonth: monthMins > 0 ? `${Math.floor(monthMins / 60)}h ${Math.floor(monthMins % 60)}m` : '0h',
         activeNow,
@@ -3367,7 +3384,7 @@ function ObrasPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   }
 
   return <>
-    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} onEdit={(id: string) => setEditingId(id)} onDelete={removeObra} />
+    <Obras items={items} onAdd={() => setShowAdd(true)} onViewEmployees={() => onNavigate('empleados')} onViewAssignedEmployees={(id: string) => { const obra = items.find((i: any) => i.id === id); onViewAssignedEmployees(id, obra?.name || id, obra?.assignedEmployeeIds || []) }} onEdit={(id: string) => setEditingId(id)} onDelete={removeObra} />
     {showAdd && <ObraModal onClose={() => setShowAdd(false)} />}
     {editingObra && <ObraModal initial={editingObra} onClose={() => setEditingId(null)} />}
   </>
@@ -3692,6 +3709,7 @@ export default function AppV2Admin() {
   const [search, setSearch] = useState('')
   const [fichajesSearch, setFichajesSearch] = useState('')
   const [employeeEditId, setEmployeeEditId] = useState<string | null>(null)
+  const [employeeObraFilter, setEmployeeObraFilter] = useState<{ id: string; name: string; employeeIds: string[] } | null>(null)
   const [isLight, setIsLight] = useState(() => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light')
   const [manualSyncing, setManualSyncing] = useState(false)
   const [showAI, setShowAI] = useState(false)
@@ -3858,7 +3876,7 @@ export default function AppV2Admin() {
     const page = effectivePage
     if (page === 'dashboard')      return <DashboardPage onNavigate={setAdminPage} />
     if (page === 'pendientes')     return <PendingCenter onNavigate={setAdminPage} />
-    if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} initialEditId={employeeEditId} onInitialEditConsumed={() => setEmployeeEditId(null)} />
+    if (page === 'empleados')      return <EmployeesPage onViewTimesheets={goToFichajes} initialEditId={employeeEditId} onInitialEditConsumed={() => setEmployeeEditId(null)} initialObraFilter={employeeObraFilter} onInitialObraFilterConsumed={() => setEmployeeObraFilter(null)} />
     if (page === 'en_linea')       return <OnlineTeamPage onOpenEmployee={goToFichajes} />
     if (page === 'fichajes')       return <TimesheetsPage key={fichajesSearch} initialSearch={fichajesSearch} onSearchChange={setFichajesSearch} />
     if (page === 'planning')       return <PlanningPage onOpenEmployee={goToFichajes} />
@@ -3876,7 +3894,7 @@ export default function AppV2Admin() {
     if (page === 'notificaciones') return <NotificationsPage onNavigate={setAdminPage} />
     if (page === 'anomalias')      return <AnomaliesPage onOpenEmployee={name => { setFichajesSearch(name); setAdminPage('fichajes') }} />
     if (page === 'auditoria')      return <AuditPage onNavigate={setAdminPage} />
-    if (page === 'obras')          return <ObrasPage onNavigate={setAdminPage} />
+    if (page === 'obras')          return <ObrasPage onNavigate={setAdminPage} onViewAssignedEmployees={(id, name, employeeIds) => { setEmployeeObraFilter({ id, name, employeeIds }); setAdminPage('empleados') }} />
     if (page === 'centros')        return <CentrosPage />
     if (page === 'vehiculos')      return <VehiculosPage />
     if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} onReviewEmployee={employeeId => { setEmployeeEditId(employeeId); setAdminPage('empleados') }} />

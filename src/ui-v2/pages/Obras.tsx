@@ -21,12 +21,16 @@ export interface ObraItem {
   manager: string
   startDate: string
   centroTrabajo?: string
+  assignedEmployeeIds?: string[]
 }
 
 export interface ObrasProps {
   items: ObraItem[]
   onAdd?: () => void
   onViewEmployees?: () => void
+  // Distinto de onViewEmployees: lleva solo a los empleados con esta obra
+  // en su lista de obras asignadas (el mismo criterio que "Equipo asignado").
+  onViewAssignedEmployees?: (obraId: string) => void
   onEdit?: (id: string) => void
   onDelete?: (id: string) => void
 }
@@ -38,7 +42,7 @@ const statusLabel: Record<ObraItem['status'], string> = {
   activa: 'Activa', completada: 'Completada',
 }
 
-export function Obras({ items, onAdd, onViewEmployees, onEdit, onDelete }: ObrasProps) {
+export function Obras({ items, onAdd, onViewEmployees, onViewAssignedEmployees, onEdit, onDelete }: ObrasProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ObraItem['status'] | 'all'>('all')
   const [detail, setDetail] = useState<ObraItem | null>(null)
@@ -198,6 +202,11 @@ export function Obras({ items, onAdd, onViewEmployees, onEdit, onDelete }: Obras
                 </button>
               )}
             </div>
+            {onViewAssignedEmployees && (
+              <button type="button" onClick={() => { const id = detail.id; setDetail(null); onViewAssignedEmployees(id) }} title="Solo los empleados con esta obra en su lista de obras asignadas" style={{ padding: '11px 14px', borderRadius: radius.md, border: `1px solid ${colors.border.default}`, background: 'transparent', color: colors.text[700], fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                Ver empleados asignados
+              </button>
+            )}
             {onDelete && (
               <button type="button" onClick={() => { const id = detail.id; setDetail(null); onDelete(id) }} style={{ padding: '10px 14px', borderRadius: radius.md, border: `1px solid ${colors.semantic.red}`, background: 'transparent', color: colors.semantic.red, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
                 Eliminar obra

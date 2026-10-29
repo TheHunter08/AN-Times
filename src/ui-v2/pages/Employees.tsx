@@ -64,6 +64,10 @@ export interface EmployeesProps {
   onViewTimesheets?: (id: string) => void
   onDeactivate?: (id: string) => void
   onResendConfirmation?: (id: string, email: string) => Promise<void>
+  // Llegada desde "Ver empleados asignados" en Obras — acota el listado a
+  // esta lista concreta de ids hasta que se quite con onClearObraFilter.
+  obraFilter?: { id: string; name: string; employeeIds: string[] } | null
+  onClearObraFilter?: () => void
 }
 
 const statusCfg: Record<EmployeeRow['status'], { label: string; color: string; bg: string; dot: string }> = {
@@ -119,7 +123,7 @@ const ACCOUNT_FILTERS = [
   { key:'linked', label:'Vinculadas' },
 ] as const
 
-export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate, onResendConfirmation }: EmployeesProps) {
+export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onDeactivate, onResendConfirmation, obraFilter, onClearObraFilter }: EmployeesProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | EmployeeRow['status']>('all')
   const [accountFilter, setAccountFilter] = useState<'all' | 'needs-action' | 'pending-confirmation' | 'linked'>('all')
@@ -133,7 +137,8 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
     const matchAccount = accountFilter === 'all'
       || (accountFilter === 'needs-action' && r.accountStatus !== 'linked')
       || r.accountStatus === accountFilter
-    return matchSearch && matchFilter && matchAccount
+    const matchObra = !obraFilter || obraFilter.employeeIds.includes(r.id)
+    return matchSearch && matchFilter && matchAccount && matchObra
   })
 
   const total   = rows.length
@@ -170,6 +175,16 @@ export function Employees({ rows, onAdd, onEdit, onSelect, onViewTimesheets, onD
           <IconPlus width={14} height={14} /> Añadir empleado
         </button>
       </div>
+
+      {obraFilter && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: radius.pill, background: colors.primary.dim, color: colors.primary.light, fontSize: 12.5, fontWeight: 650, width: 'fit-content' }}>
+          <IconMapPin width={13} height={13} />
+          Empleados asignados a {obraFilter.name} ({filtered.length})
+          <button type="button" onClick={onClearObraFilter} aria-label="Quitar filtro de obra" style={{ display: 'flex', alignItems: 'center', border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', padding: 2 }}>
+            <IconX width={13} height={13} />
+          </button>
+        </div>
+      )}
 
       {/* Stats strip */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
