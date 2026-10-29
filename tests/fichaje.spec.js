@@ -134,6 +134,26 @@ test('bloquea iniciar jornada si la ruta de activación del empleado no está co
   expect(records).toHaveLength(0)
 })
 
+test('nivel de fichaje QR: muestra el propio QR automáticamente y bloquea el inicio manual', async ({ page }) => {
+  await loginAsEmployee(page, { employees:[{ ...employee, fichajeNivel:'qr' }] })
+  await page.goto('/')
+
+  // Al entrar, sin que el empleado haga nada, ya se le muestra su QR.
+  const qrDialog = page.getByRole('dialog', { name:'Mi código QR' })
+  await expect(qrDialog).toBeVisible()
+  await page.getByRole('button', { name:'Cerrar código QR' }).click()
+  await expect(qrDialog).not.toBeVisible()
+
+  // El botón normal de iniciar jornada sigue ahí, pero no deja fichar.
+  const startButton = page.getByRole('button', { name:/Iniciar jornada.*Mantén pulsado/i })
+  await expect(startButton).toBeVisible()
+  await hold(page, startButton)
+  await expect(page.getByText(/Tu jornada se inicia escaneando tu código QR/i)).toBeVisible()
+  await expect(qrDialog).toBeVisible() // se reabre automáticamente al bloquear el intento
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).records)
+  expect(records).toHaveLength(0)
+})
+
 test('Times AI protege los datos del equipo para un empleado normal', async ({ page }) => {
   await loginAsEmployee(page, {
     employees:[{ ...employee, role:'empleado', isEnc:false, isJO:false }],

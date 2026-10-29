@@ -782,6 +782,14 @@ export default function EmployeePage() {
   // se aplique a ambos flujos de fichaje sin tener que actualizar dos sitios.
   const checkFichajePreconditions = useCallback(() => {
     if (timer.state !== 'idle' || startingRef.current) return false
+    // Nivel de fichaje QR (fijado por admin/jefe de obra en su ficha): el
+    // empleado no puede iniciar su propia jornada — solo un encargado
+    // escaneando su QR puede hacerlo (ver doStartWithCentro/handleQRScan).
+    if (u?.fichajeNivel === 'qr') {
+      toast('Tu jornada se inicia escaneando tu código QR — muéstraselo a tu encargado.', 6000, 'warn')
+      openModal('miQR')
+      return false
+    }
     // Bloquea el inicio de jornada hasta completar TODA la ruta de
     // activación (correo, cuenta vinculada, PIN moderno, firma y
     // notificaciones) — no solo firma+notificaciones.
@@ -824,7 +832,20 @@ export default function EmployeePage() {
       }
     }
     return true
-  }, [timer.state, db.vacaciones, u?.id, u?.turnoInicio, toast, activation])
+  }, [timer.state, db.vacaciones, u?.id, u?.turnoInicio, u?.fichajeNivel, toast, activation, openModal])
+
+  // Nivel de fichaje QR: al entrar en la app, se muestra directamente su QR
+  // (mismo modal que "Mi código QR" en Perfil) para que el encargado lo
+  // escanee y así inicie o cierre la jornada — sin jornada abierta hace
+  // falta para iniciarla, y con ella abierta para cerrarla (doStop también
+  // la bloquea para este nivel). activeModal se deja fuera de las
+  // dependencias a propósito: si entrara, cerrar el modal (vuelve a null)
+  // lo reabriría al instante, sin dejar nunca dismissarlo para mirar el
+  // resto de la app.
+  useEffect(() => {
+    if (u?.fichajeNivel !== 'qr' || activeModal) return
+    openModal('miQR')
+  }, [u?.fichajeNivel, timer.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const doStart = () => {
     if (!checkFichajePreconditions()) return
@@ -1015,8 +1036,17 @@ export default function EmployeePage() {
 
   const doStop = useCallback(() => {
     if (!openRec()) return
+    // Nivel QR: cerrar jornada también pasa por que el encargado escanee su
+    // QR (handleQRScan → decodeEmployeeQR), igual que para iniciarla — ver
+    // checkFichajePreconditions. Un admin/encargado sigue pudiendo cerrarla
+    // desde Equipo en línea (finishShift), eso no pasa por aquí.
+    if (u?.fichajeNivel === 'qr') {
+      toast('Tu jornada se cierra escaneando tu código QR — muéstraselo a tu encargado.', 6000, 'warn')
+      openModal('miQR')
+      return
+    }
     showConfirm('¿Terminar la jornada ahora?', finishCurrentShift)
-  }, [openRec, showConfirm, finishCurrentShift])
+  }, [openRec, showConfirm, finishCurrentShift, u?.fichajeNivel, toast, openModal])
 
   const doBreak = useCallback(() => {
     if (breakingRef.current) return

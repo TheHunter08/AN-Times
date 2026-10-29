@@ -122,6 +122,29 @@ test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) 
   await expect(page.getByText('PIN pendiente de actualizar', { exact:true })).toBeVisible()
 })
 
+test('empleados: nivel de fichaje QR se guarda y solo aparece para rol empleado', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[{ id:'e1', name:'Empleado Prueba', email:'empleado@empresa.com', role:'empleado', baja:false, centroTrabajo:'Oficina Central' }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Equipo', 'Empleados')
+  await page.getByRole('button', { name:'Editar Empleado Prueba' }).click()
+
+  await expect(page.getByText('Nivel de fichaje')).toBeVisible()
+  await expect(page.getByRole('button', { name:'Auto Fichaje', exact:true })).toBeVisible()
+  await page.getByRole('button', { name:'QR', exact:true }).click()
+  await page.getByRole('button', { name:'Guardar cambios', exact:true }).click()
+
+  const emp = await page.evaluate(() => JSON.parse(localStorage.getItem('an_times_v1')).employees.find(e => e.id === 'e1'))
+  expect(emp.fichajeNivel).toBe('qr')
+
+  // Cambiar el rol oculta el selector (no aplica a encargados/jefes).
+  await page.getByRole('button', { name:'Editar Empleado Prueba' }).click()
+  await page.getByRole('button', { name:'Encargado', exact:true }).click()
+  await expect(page.getByText('Nivel de fichaje')).not.toBeVisible()
+})
+
 test('vehículos permite crear un vehículo y asignarlo a un empleado', async ({ page }) => {
   await loginAsAdmin(page, {
     employees:[{ id:'e1', name:'Empleado Prueba', email:'empleado@empresa.com', role:'empleado', baja:false, centroTrabajo:'Obra Principal' }],

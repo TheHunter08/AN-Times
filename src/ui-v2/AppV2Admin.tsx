@@ -131,6 +131,7 @@ interface EmpForm {
   centroTrabajo: string; telefono: string; obrasAsignadas: string[]
   fechaInicioContrato: string; turnoInicio: string; turnoFin: string
   crearTurnos: boolean; vacacionesExtra: number
+  fichajeNivel: 'auto' | 'qr'
 }
 
 function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () => void }) {
@@ -140,7 +141,7 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
   const obras  = (db.obras || []).filter((o: any) => o.activa !== false)
   const centros: string[] = db.centrosTrabajo || db.config?.centros || []
 
-  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false, vacacionesExtra: 0 }
+  const blank: EmpForm = { id: gid(), name: '', email: '', role: 'empleado', pin: '', pinLen: null, centroTrabajo: '', telefono: '', obrasAsignadas: [], fechaInicioContrato: '', turnoInicio: '08:00', turnoFin: '16:00', crearTurnos: false, vacacionesExtra: 0, fichajeNivel: 'auto' }
   const [form, setForm] = useState<EmpForm>(initial ?? blank)
   const isEdit = !!initial
   // Sin este guard, un doble clic antes de que se cierre el modal ejecuta
@@ -209,6 +210,10 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
         isJefeCentro: form.role === 'jefe_centro',
         baja: false,
         vacacionesExtra: form.vacacionesExtra || 0,
+        // Solo tiene sentido para role==='empleado' (encargados/jefes no
+        // fichan su propia jornada igual) — se conserva igualmente si ya
+        // estaba fijado y el rol cambia, por si vuelve a 'empleado' luego.
+        fichajeNivel: form.role === 'empleado' ? form.fichajeNivel : (existing.fichajeNivel || 'auto'),
         _upd: nowIso,
       }
       const updated = isEdit
@@ -288,6 +293,31 @@ function EmployeeModal({ initial, onClose }: { initial?: EmpForm; onClose: () =>
             ))}
           </div>
         </div>
+        {form.role === 'empleado' && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Nivel de fichaje</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {([
+                { value: 'auto' as const, label: 'Auto Fichaje', desc: 'El empleado inicia y finaliza su jornada desde la app, como hasta ahora.' },
+                { value: 'qr' as const, label: 'QR', desc: 'No puede iniciar su jornada por sí mismo: la app le muestra su QR para que un encargado lo escanee y la inicie/finalice.' },
+              ]).map(opt => (
+                <button key={opt.value} type="button" onClick={() => setF('fichajeNivel', opt.value)} title={opt.desc} style={{
+                  padding: '10px 12px', borderRadius: 8,
+                  border: `1px solid ${form.fichajeNivel === opt.value ? colors.primary.base : colors.border.default}`,
+                  background: form.fichajeNivel === opt.value ? colors.primary.dim : 'rgba(var(--uiv2-overlay-rgb),.04)',
+                  color: form.fichajeNivel === opt.value ? colors.primary.light : colors.text[700],
+                  fontSize: 13, fontWeight: form.fichajeNivel === opt.value ? 700 : 500,
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const,
+                }}>{opt.label}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: colors.text[500], marginTop: 6 }}>
+              {form.fichajeNivel === 'qr'
+                ? 'No podrá iniciar jornada desde su propio botón — solo escaneando su QR.'
+                : 'Puede iniciar y finalizar su jornada normalmente desde la app.'}
+            </div>
+          </div>
+        )}
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.text[500], marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>
             PIN numérico {isEdit ? '(vacío = no cambiar)' : ''}
@@ -1060,6 +1090,7 @@ function EmployeesPage({ onViewTimesheets, initialEditId, onInitialEditConsumed,
       turnoFin: emp.turnoFin || emp.shiftEnd || '16:00',
       crearTurnos: false,
       vacacionesExtra: emp.vacacionesExtra || 0,
+      fichajeNivel: emp.fichajeNivel === 'qr' ? 'qr' : 'auto',
     }})
   }
 

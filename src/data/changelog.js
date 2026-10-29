@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.24.0',
+    date: '2026-10-29',
+    title: 'Nuevo: nivel de fichaje QR para empleados',
+    items: [
+      'En Editar empleado (rol Empleado), nuevo "Nivel de fichaje": Auto Fichaje (como hasta ahora, el empleado inicia y finaliza su jornada desde la app) o QR.',
+      'Con el nivel QR, el empleado ya no puede iniciar ni finalizar su jornada por sí mismo — al abrir la app se le muestra automáticamente su código QR para que su encargado lo escanee y así inicie o cierre su jornada. Un administrador o encargado autorizado siempre puede finalizarla igualmente desde Equipo en línea.',
+    ],
+  },
+  {
     version: '4.23.0',
     date: '2026-10-29',
     title: 'Obras: ver solo los empleados asignados · Resumen más preciso',
