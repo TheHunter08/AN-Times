@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.26.0',
+    date: '2026-11-04',
+    title: 'Backup manual más visible en Centro de pendientes',
+    items: [
+      'El botón de copia de seguridad completa (empleados, fichajes, vacaciones, documentos, cierres, auditoría…) ahora confirma la descarga con un aviso y recuerda cuándo se hizo la última vez.',
+    ],
+  },
+  {
     version: '4.25.0',
     date: '2026-11-04',
     title: 'Mensajes claros cuando aún no hay datos',

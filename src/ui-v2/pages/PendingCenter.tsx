@@ -1,13 +1,23 @@
+import { useState } from 'react'
 import { useAppStore } from '../../store/appStore.js'
 import { canCloseMonth } from '../../utils/adminHelpers.js'
 import { isRecordPendingValidation } from '../../utils/recordValidation.js'
 import { colors } from '../design-system/colors'
 
+const LAST_BACKUP_KEY = 'times-inc-last-manual-backup'
+
 export function PendingCenter({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
+  const toast = useAppStore(s => s.toast)
   const offlinePending = useAppStore(s => s.offlinePending)
   const syncStatus = useAppStore(s => s.syncStatus)
   const lastSyncTime = useAppStore(s => s.lastSyncTime)
+  // Solo una conveniencia de UI (cuándo se pulsó por última vez "Descargar
+  // copia JSON" en este navegador) — no es una fuente de verdad del backup
+  // real, que es el automático diario en Supabase Storage (ver Operaciones).
+  const [lastManualBackup, setLastManualBackup] = useState<string | null>(() => {
+    try { return localStorage.getItem(LAST_BACKUP_KEY) } catch { return null }
+  })
   const now = Date.now()
   const openTooLong = (db.records || []).filter((r:any) => !r.fin && r.inicio && now - new Date(r.inicio).getTime() > 10 * 3600000).length
   const pendingHours = (db.records || []).filter(isRecordPendingValidation).length
@@ -31,20 +41,29 @@ export function PendingCenter({ onNavigate }: { onNavigate: (page: string) => vo
     { label:'Cierres sin completar', value:pendingClosures, page:'cierre', tone:colors.text[700] },
   ]
   const exportBackup = () => {
-    const payload = { exportedAt:new Date().toISOString(), app:'Times INC', version:1, data:db }
+    const exportedAt = new Date().toISOString()
+    const payload = { exportedAt, app:'Times INC', version:1, data:db }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `times-inc-backup-${new Date().toISOString().slice(0, 10)}.json`
+    anchor.download = `times-inc-backup-${exportedAt.slice(0, 10)}.json`
     anchor.click()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
+    try { localStorage.setItem(LAST_BACKUP_KEY, exportedAt) } catch { /* almacenamiento no disponible, no crítico */ }
+    setLastManualBackup(exportedAt)
+    const employeeCount = (db.employees || []).length
+    const recordCount = (db.records || []).length
+    toast(`Copia de seguridad descargada — ${employeeCount} empleados, ${recordCount} fichajes`, 3500, 'ok')
   }
 
   return <div style={{ display:'flex', flexDirection:'column', gap:20, maxWidth:1000 }}>
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
       <div><h1 style={{ margin:0, fontSize:24, color:colors.text[900] }}>Centro de pendientes</h1><p style={{ margin:'6px 0 0', color:colors.text[500], fontSize:13 }}>Todo lo que requiere atención administrativa en un único lugar.</p></div>
-      <button onClick={exportBackup} style={{ padding:'9px 13px', borderRadius:9, border:`1px solid ${colors.primary.base}`, background:colors.primary.dim, color:colors.primary.light, fontWeight:700, cursor:'pointer' }}>Descargar copia JSON</button>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5 }}>
+        <button onClick={exportBackup} title="Descarga un JSON completo con todos los datos de la empresa (empleados, fichajes, vacaciones, documentos, cierres, auditoría…)." style={{ padding:'9px 13px', borderRadius:9, border:`1px solid ${colors.primary.base}`, background:colors.primary.dim, color:colors.primary.light, fontWeight:700, cursor:'pointer' }}>Backup completo (JSON)</button>
+        {lastManualBackup && <span style={{ fontSize:11, color:colors.text[500] }}>Última descarga manual: {new Date(lastManualBackup).toLocaleString('es-ES')}</span>}
+      </div>
     </div>
     <div style={{ padding:'13px 15px', borderRadius:12, border:`1px solid ${offlinePending || syncStatus === 'error' ? 'rgba(245,158,11,.4)' : colors.border.subtle}`, background:colors.bg[600], display:'flex', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
       <strong style={{ color:offlinePending || syncStatus === 'error' ? colors.semantic.orange : colors.semantic.green }}>{offlinePending ? 'Hay un lote de cambios pendiente de subir' : syncStatus === 'synced' ? 'Datos sincronizados' : `Sincronización: ${syncStatus}`}</strong>
