@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.29.0',
+    date: '2026-11-04',
+    title: 'Rol Auditor: aviso de bienvenida en Cumplimiento',
+    items: [
+      'Al entrar un auditor externo (Inspección de Trabajo / Seguridad Social) con acceso de solo lectura, ahora ve un aviso explicando qué puede hacer (ver el Centro de cumplimiento, descargar auditoría/nómina/paquete de inspección) y qué no (editar fichajes, empleados ni cualquier otra sección) — antes no tenía ningún contexto propio al entrar por primera vez.',
+      'El aviso se puede cerrar y volver a abrir con "¿Qué puedo hacer aquí?".',
+    ],
+  },
+  {
     version: '4.28.1',
     date: '2026-11-04',
     title: 'Arregla: Estadísticas ocultaba los KPI sin motivo',

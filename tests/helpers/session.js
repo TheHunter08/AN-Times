@@ -109,3 +109,38 @@ export async function loginAsAdmin(page, extraDB = {}) {
     localStorage.setItem('an_times_privacy_v1', '1')
   }, { db: baseDB(extraDB) })
 }
+
+// A diferencia de loginAsAdmin (user:null + isAdmin:true basta: isAdmin está
+// en la lista blanca de sanitizeSession en sessionSecurity.js), isAuditor NO
+// está en esa lista — solo se recalcula desde el rol real de una ficha de
+// empleado (_runtimeSession/_roleFlagsFromProfile en appStore.js), así que
+// hace falta sembrar un empleado real con role:'auditor' y un user.id.
+const AUDITOR_ID = 'auditor-1'
+export async function loginAsAuditor(page, extraDB = {}) {
+  await page.route(/supabase\.co/i, route => route.abort())
+  await page.addInitScript(({ db }) => {
+    localStorage.clear()
+    localStorage.setItem('an_times_v1', JSON.stringify(db))
+    localStorage.setItem('an_times_ses', JSON.stringify({ user: { id: db.employees.find(e => e.role === 'auditor').id }, isAdmin: false, isEnc: false, isJO: false }))
+    localStorage.setItem('an_times_privacy_v1', '1')
+  }, {
+    db: baseDB({
+      employees: [employee, { id: AUDITOR_ID, name: 'Auditora Externa', role: 'auditor', email: 'auditora@inspeccion.test', baja: false }],
+      // Sin este reconocimiento legal propio, la pantalla de privacidad
+      // (RGPD/LOPDGDD) tapa toda la pantalla en el primer render de esta
+      // cuenta — la del empleado por defecto no vale, está indexada por su id.
+      legalAcknowledgements: [{
+        id:`legal_${AUDITOR_ID}_${LEGAL_NOTICE_VERSION}`,
+        empId:AUDITOR_ID,
+        empName:'Auditora Externa',
+        noticeVersion:LEGAL_NOTICE_VERSION,
+        eventType:'information_received',
+        acknowledgedAt:'2026-08-11T00:00:00.000Z',
+        serverConfirmed:true,
+        evidenceState:'confirmed',
+        _upd:'2026-08-11T00:00:00.000Z',
+      }],
+      ...extraDB,
+    }),
+  })
+}

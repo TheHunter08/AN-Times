@@ -2069,7 +2069,7 @@ function DocumentsPage() {
   </>
 }
 
-function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+function ReportsPage({ onNavigate, isAuditor }: { onNavigate: (page: string) => void; isAuditor?: boolean }) {
   const db = useAppStore(s => s.db) as any
   const toast = useAppStore(s => s.toast)
   const compliance = useMemo(() => buildComplianceSummary(db), [db.records, db.cierres])
@@ -2394,7 +2394,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
     }
   }), [months, db.records, db.employees, db.cierres])
 
-  return <Reports rows={rows} compliance={compliance} onExportInspection={handleExportInspection} onExportAudit={handleExportAudit} onExportPayroll={handleExportPayroll} onNavigate={onNavigate} />
+  return <Reports rows={rows} compliance={compliance} onExportInspection={handleExportInspection} onExportAudit={handleExportAudit} onExportPayroll={handleExportPayroll} onNavigate={onNavigate} isAuditor={isAuditor} />
 }
 
 function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -3934,7 +3934,7 @@ export default function AppV2Admin() {
     if (page === 'documentos')     return <DocumentsPage />
     if (page === 'resumen')        return <ResumenPage />
     if (page === 'estadisticas')   return <StatsPage onNavigate={setAdminPage} />
-    if (page === 'informes')       return <ReportsPage onNavigate={setAdminPage} />
+    if (page === 'informes')       return <ReportsPage onNavigate={setAdminPage} isAuditor={isAuditor} />
     if (page === 'cierre')         return <MonthlyClosePage />
     if (page === 'mensajes')       return <MessagesPage />
     if (page === 'notificaciones') return <NotificationsPage onNavigate={setAdminPage} />

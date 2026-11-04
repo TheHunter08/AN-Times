@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin } from './helpers/session.js'
+import { loginAsAdmin, loginAsAuditor } from './helpers/session.js'
 import { weekStartIso } from '../src/utils/planningWeeks.js'
 
 async function openSection(page, group, item) {
@@ -100,6 +100,19 @@ test('cumplimiento muestra riesgos reales y permite abrir la excepción', async 
   await expect(page.getByText('Cierres pendientes de firma', { exact:true })).toBeVisible()
   await page.getByRole('button', { name:/Jornadas sin finalizar/ }).click()
   await expect(page.getByRole('heading', { name:'Anomalías' })).toBeVisible()
+})
+
+test('auditor: entra directo en Cumplimiento con aviso de qué puede hacer, colapsable y reabrible', async ({ page }) => {
+  await loginAsAuditor(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Centro de cumplimiento' })).toBeVisible({ timeout:15000 })
+  await expect(page.getByText('Acceso de auditor — solo lectura', { exact:true })).toBeVisible()
+  await expect(page.getByText(/No puedes editar fichajes, empleados/)).toBeVisible()
+
+  await page.getByRole('button', { name:'Cerrar aviso de acceso de auditor' }).click()
+  await expect(page.getByText('Acceso de auditor — solo lectura', { exact:true })).toHaveCount(0)
+  await page.getByRole('button', { name:'¿Qué puedo hacer aquí?', exact:true }).click()
+  await expect(page.getByText('Acceso de auditor — solo lectura', { exact:true })).toBeVisible()
 })
 
 test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) => {

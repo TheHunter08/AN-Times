@@ -1,9 +1,10 @@
-﻿import { Card } from '../components/Card.js'
+﻿import { useState } from 'react'
+import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
 import { ProductState } from '../components/ProductState.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
-import { IconFileText, IconDownload, IconShield, IconCheck, IconAlertCircle } from '../components/Icons.js'
+import { IconFileText, IconDownload, IconShield, IconCheck, IconAlertCircle, IconEye, IconX } from '../components/Icons.js'
 
 export interface ReportRow {
   id: string
@@ -32,16 +33,41 @@ export interface ReportsProps {
   onExportAudit?: () => void
   onExportPayroll?: () => void
   onNavigate?: (page: string) => void
+  // Un auditor externo (Inspección de Trabajo / Seguridad Social) entra aquí
+  // SIN haber visto el resto de la app — es la única pantalla a la que tiene
+  // acceso (ver AUDITOR_PAGES en AppV2Admin.tsx) — así que necesita contexto
+  // propio de qué puede y qué no puede hacer, no solo la etiqueta "Auditor ·
+  // Solo lectura" del encabezado.
+  isAuditor?: boolean
 }
 
 // Bandeja de informes descargables — el mismo concepto que ya existe en
 // la app real (informe de registro horario para Inspección de Trabajo,
 // RD 8/2019), aquí con su propia pantalla en vez de un icono suelto en
 // "Accesos rápidos" que no llevaba a ningún sitio.
-export function Reports({ rows, compliance, onExportInspection, onExportAudit, onExportPayroll, onNavigate }: ReportsProps) {
+export function Reports({ rows, compliance, onExportInspection, onExportAudit, onExportPayroll, onNavigate, isAuditor }: ReportsProps) {
   const healthy = (compliance?.score || 0) >= 90
+  const [showAuditorInfo, setShowAuditorInfo] = useState(true)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1040 }}>
+      {isAuditor && (showAuditorInfo ? (
+        <div role="note" style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: radius.md, background: colors.primary.dim, border: `1px solid ${colors.primary.base}` }}>
+          <span style={{ display: 'flex', flexShrink: 0, color: colors.primary.light, marginTop: 1 }}><IconEye width={17} height={17} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <strong style={{ fontSize: 13, color: colors.text[900] }}>Acceso de auditor — solo lectura</strong>
+            <p style={{ margin: '5px 0 0', fontSize: 12, lineHeight: 1.6, color: colors.text[700] }}>
+              Esta es la única pantalla a la que tienes acceso: el centro de cumplimiento del registro horario. Puedes ver el índice documental, los indicadores (jornadas completas, trazabilidad, validación, cierres firmados) y descargar la auditoría en CSV, la nómina en CSV o el paquete completo de inspección en PDF. No puedes editar fichajes, empleados ni ninguna otra sección — el acceso está limitado a este apartado por diseño.
+            </p>
+          </div>
+          <button type="button" onClick={() => setShowAuditorInfo(false)} aria-label="Cerrar aviso de acceso de auditor" style={{ flexShrink: 0, display: 'flex', alignSelf: 'flex-start', background: 'none', border: 'none', color: colors.text[500], cursor: 'pointer', padding: 2 }}>
+            <IconX width={14} height={14} />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setShowAuditorInfo(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', padding: '6px 11px', borderRadius: radius.pill, border: `1px solid ${colors.border.default}`, background: colors.bg[600], color: colors.text[500], fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <IconEye width={12} height={12} /> ¿Qué puedo hacer aquí?
+        </button>
+      ))}
       <div className="uiv2-compliance-heading">
         <div>
           <PageTitle>Centro de cumplimiento</PageTitle>
