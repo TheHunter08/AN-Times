@@ -133,6 +133,7 @@ export function Operations(props: OperationsProps) {
   const automationLabels: Record<string, string> = {
     reminders:'Recordatorios', autoclose:'Autocierre', sync:'Sincronización offline', reports:'Informes',
     monthlyClose:'Cierre mensual', backup:'Backup verificado', migration:'Paridad de migración',
+    pushCleanup:'Suscripciones push huérfanas',
   }
   const orderedWidgets = [...WIDGETS].sort((a, b) => {
     const ai = props.visibleWidgets.indexOf(a.id), bi = props.visibleWidgets.indexOf(b.id)

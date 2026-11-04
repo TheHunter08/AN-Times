@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.27.0',
+    date: '2026-11-04',
+    title: 'Limpieza automática de suscripciones push huérfanas',
+    items: [
+      'Nueva tarea semanal (domingos) que retira solas las suscripciones de notificaciones push de empleados que ya no existen, y las duplicadas que compartían el mismo dispositivo entre dos cuentas — antes solo se podía hacer a mano con un script.',
+      'Su estado aparece en Operaciones junto al resto de automatizaciones (recordatorios, backup, cierre mensual…).',
+    ],
+  },
+  {
     version: '4.26.0',
     date: '2026-11-04',
     title: 'Backup manual más visible en Centro de pendientes',

@@ -9,6 +9,9 @@ const DEFAULT_MAX_AGE_MS = Object.freeze({
   sync: 26 * 60 * 60 * 1000,
   monthlyClose: 26 * 60 * 60 * 1000,
   backup: 26 * 60 * 60 * 1000,
+  // Semanal (domingos) en vez de diario — margen amplio para no avisar en
+  // falso por un domingo con el cron retrasado.
+  pushCleanup: 8 * 24 * 60 * 60 * 1000,
 })
 
 export function createAutomationRun(job, {
@@ -62,7 +65,7 @@ export function evaluateAutomationRun(run, {
 }
 
 export function automationHealthList(health, options) {
-  return ['reminders', 'autoclose', 'sync', 'reports', 'monthlyClose', 'backup', 'migration'].map(job => {
+  return ['reminders', 'autoclose', 'sync', 'reports', 'monthlyClose', 'backup', 'migration', 'pushCleanup'].map(job => {
     const run = health?.[job] || null
     return { job, run, ...evaluateAutomationRun(run, options) }
   })

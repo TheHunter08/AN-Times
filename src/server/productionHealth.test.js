@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createAutomationRun } from './automationHealth.js'
 import { buildProductionHealth } from './productionHealth.js'
 
-const jobs = ['reminders', 'autoclose', 'sync', 'reports', 'monthlyClose', 'backup', 'migration']
+const jobs = ['reminders', 'autoclose', 'sync', 'reports', 'monthlyClose', 'backup', 'migration', 'pushCleanup']
 
 describe('productionHealth', () => {
   it('solo declara saludable una fuente válida con todas las automatizaciones al día', () => {
@@ -26,7 +26,7 @@ describe('productionHealth', () => {
     const result = buildProductionHealth({ records:[], employees:[], config:{ automationHealth } }, { now })
     expect(result.status).toBe('healthy')
     expect(result.healthy).toBe(true)
-    expect(result.automations.unhealthy).toBe(7)
+    expect(result.automations.unhealthy).toBe(8)
     expect(result.automations.jobs.find(job => job.job === 'backup')?.state).toBe('stale')
   })
 })

@@ -60,7 +60,7 @@ describe('deployment quality gate', () => {
 
   it('uses evening reminder slots to reinforce autoclose without extra crons', () => {
     const rewrites = new Map(vercel.rewrites.map(item => [item.source, item.destination]))
-    expect(vercel.crons).toHaveLength(10)
+    expect(vercel.crons).toHaveLength(11)
     expect(rewrites.get('/api/cron-reminders-midday')).toBe('/api/cron-reminders')
     expect(rewrites.get('/api/cron-reminders-evening')).toBe('/api/cron-reminders-and-autoclose')
     expect(rewrites.get('/api/cron-reminders-night')).toBe('/api/cron-reminders-and-autoclose')
@@ -70,6 +70,7 @@ describe('deployment quality gate', () => {
   it('keeps GitHub backstops for every daily business process', () => {
     expect(dailyBusinessWorkflow).toContain('/api/cron-reports')
     expect(dailyBusinessWorkflow).toContain('/api/cron-monthly-close')
+    expect(dailyBusinessWorkflow).toContain('/api/cron-cleanup-push-subs')
     expect(dailyBusinessWorkflow).toContain('Authorization: Bearer ${CRON_SECRET}')
     expect(backupWorkflow).toContain('/api/backup')
     expect(backupWorkflow).toContain('Crear y verificar backup productivo')

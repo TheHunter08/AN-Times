@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { readAllRestRows } from './read-all-rest-rows.mjs'
+import { findPushSubscriptionCleanup } from '../src/server/pushSubscriptionCleanup.js'
 
 function loadEnvFile(path) {
   try {
@@ -29,24 +30,9 @@ const [employees, subscriptions] = await Promise.all([
   readAllRestRows({ baseUrl:url, path:'employees?select=id,baja&order=id.asc', headers }),
   readAllRestRows({ baseUrl:url, path:'push_subs?select=user_id,endpoint,updated_at&order=endpoint.asc,user_id.asc', headers }),
 ])
-const activeIds = new Set(employees.filter(item => !item.baja).map(item => item.id))
-const byEndpoint = new Map()
-for (const item of subscriptions) {
-  if (!byEndpoint.has(item.endpoint)) byEndpoint.set(item.endpoint, [])
-  byEndpoint.get(item.endpoint).push(item)
-}
+const { orphaned, duplicated, removals } = findPushSubscriptionCleanup({ employees, subscriptions })
 
-const removals = []
-for (const group of byEndpoint.values()) {
-  if (group.length < 2) continue
-  const ordered = [...group].sort((a, b) => {
-    const activeDelta = Number(activeIds.has(b.user_id)) - Number(activeIds.has(a.user_id))
-    return activeDelta || String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
-  })
-  removals.push(...ordered.slice(1))
-}
-
-console.log(JSON.stringify({ mode:apply ? 'apply' : 'dry-run', subscriptions:subscriptions.length, duplicatedEndpoints:[...byEndpoint.values()].filter(group => group.length > 1).length, associationsToRemove:removals.length }, null, 2))
+console.log(JSON.stringify({ mode:apply ? 'apply' : 'dry-run', subscriptions:subscriptions.length, orphanedSubscriptions:orphaned.length, duplicatedAssociations:duplicated.length, associationsToRemove:removals.length }, null, 2))
 if (apply) {
   for (const item of removals) {
     await request(`push_subs?user_id=eq.${encodeURIComponent(item.user_id)}&endpoint=eq.${encodeURIComponent(item.endpoint)}`, {

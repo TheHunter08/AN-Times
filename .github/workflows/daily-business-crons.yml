@@ -38,3 +38,15 @@ jobs:
             --retry 3 --retry-all-errors --retry-delay 5 --max-time 180 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${APP_URL}/api/cron-monthly-close"
+
+      - name: Respaldo semanal de limpieza de suscripciones push
+        # Solo domingo (día 7) — el cron de Vercel ya cubre el día a día;
+        # esto es respaldo por si esa ejecución falla.
+        if: always()
+        run: |
+          if [ "$(date -u +%u)" != "7" ]; then echo "No es domingo, se omite."; exit 0; fi
+          APP_URL=$(printf '%s' "${VERCEL_APP_URL:-https://times-inc.vercel.app}" | tr -d $'\r\n\t ' | sed 's/^\xef\xbb\xbf//')
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 5 --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron-cleanup-push-subs"

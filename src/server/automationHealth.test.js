@@ -15,7 +15,7 @@ describe('automationHealth', () => {
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('healthy')
     expect(evaluateAutomationRun({ job:'reminders', status:'error', finishedAt:'2026-08-06T11:30:00Z' }, { now }).state).toBe('error')
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-05T20:00:00Z' }, { now }).state).toBe('stale')
-    expect(automationHealthList({})).toHaveLength(7)
+    expect(automationHealthList({})).toHaveLength(8)
   })
 
   it('respeta la ventana nocturna y la frecuencia diaria de los cron reales', () => {
@@ -23,6 +23,12 @@ describe('automationHealth', () => {
     expect(evaluateAutomationRun({ job:'reminders', status:'ok', finishedAt:'2026-08-06T20:05:00Z' }, { now }).state).toBe('healthy')
     expect(evaluateAutomationRun({ job:'autoclose', status:'ok', finishedAt:'2026-08-06T22:10:00Z' }, { now }).state).toBe('healthy')
     expect(evaluateAutomationRun({ job:'autoclose', status:'ok', finishedAt:'2026-08-05T22:10:00Z' }, { now }).state).toBe('stale')
+  })
+
+  it('da margen de una semana a la limpieza de suscripciones push (cron dominical)', () => {
+    const now = Date.parse('2026-08-14T07:55:00Z') // viernes siguiente
+    expect(evaluateAutomationRun({ job:'pushCleanup', status:'ok', finishedAt:'2026-08-09T05:20:00Z' }, { now }).state).toBe('healthy')
+    expect(evaluateAutomationRun({ job:'pushCleanup', status:'ok', finishedAt:'2026-08-01T05:20:00Z' }, { now }).state).toBe('stale')
   })
 
   it('resume procesos sanos, fallidos y pendientes para la auditorÃ­a operativa', () => {
@@ -33,7 +39,7 @@ describe('automationHealth', () => {
     }, { now })
 
     expect(summary.healthy).toBe(1)
-    expect(summary.unhealthy).toBe(6)
+    expect(summary.unhealthy).toBe(7)
     expect(summary.jobs.find(job => job.job === 'reminders')).toMatchObject({ state:'healthy', status:'ok' })
     expect(summary.jobs.find(job => job.job === 'autoclose')).toMatchObject({ state:'error', error:'write failed' })
     expect(summary.jobs.find(job => job.job === 'backup')).toMatchObject({ state:'unknown', finishedAt:null })

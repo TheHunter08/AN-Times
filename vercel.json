@@ -13,7 +13,8 @@
     { "path": "/api/cron-autoclose",  "schedule": "10 22 * * *" },
     { "path": "/api/cron-monthly-close", "schedule": "25 8 * * *" },
     { "path": "/api/backup",         "schedule": "0 3 * * *" },
-    { "path": "/api/sync-ping",      "schedule": "17 12 * * *" }
+    { "path": "/api/sync-ping",      "schedule": "17 12 * * *" },
+    { "path": "/api/cron-cleanup-push-subs", "schedule": "20 5 * * 0" }
   ],
   "rewrites": [
     { "source": "/api/migrate-to-tables", "destination": "/api/admin-tools?op=migrate-to-tables" },
