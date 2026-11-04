@@ -4007,7 +4007,7 @@ export default function AppV2Admin() {
             title="Centro de mando · Ctrl/⌘ K"
             style={{ minWidth:32, height:32, padding:'0 9px', display:'flex', alignItems:'center', justifyContent:'center', gap:6, borderRadius:9, border:`1px solid ${colors.primary.glow}`, background:colors.primary.dim, color:colors.primary.light, cursor:'pointer', fontSize:11, fontWeight:800 }}
           >
-            <IconGrid width={15} height={15} /> <span className="uiv2-sync-label">Nexo</span><kbd style={{ padding:'1px 4px', border:`1px solid ${colors.border.default}`, borderRadius:4, fontSize:8, color:colors.text[500] }}>⌘K</kbd>
+            <IconGrid width={15} height={15} /> <span className="uiv2-sync-label">Nexo</span><kbd className="uiv2-kbd-hint" style={{ padding:'1px 4px', border:`1px solid ${colors.border.default}`, borderRadius:4, fontSize:8, color:colors.text[500] }}>⌘K</kbd>
           </button>
           <button
             type="button"

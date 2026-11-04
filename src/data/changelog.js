@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.30.0',
+    date: '2026-11-04',
+    title: 'Arregla: el botón de abrir el menú no respondía en móviles estrechos',
+    items: [
+      'En pantallas de hasta unos 430px de ancho (móviles de gama de entrada), el botón de abrir el menú lateral del panel de administración quedaba exactamente debajo del botón "Nexo" (centro de mando) y dejaba de recibir toques — un fallo de CSS en la cabecera.',
+      'De paso, Nexo, el estado de sincronización, "IA" y el atajo de teclado ⌘K pasan a mostrarse solo con icono en esas pantallas (como ya hacían el resto de botones de la cabecera), para que quepan todos sin amontonarse.',
+    ],
+  },
+  {
     version: '4.29.0',
     date: '2026-11-04',
     title: 'Rol Auditor: aviso de bienvenida en Cumplimiento',

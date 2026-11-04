@@ -94,12 +94,32 @@ export function Header({ title, breadcrumb, actions }: HeaderProps) {
           .uiv2-desktop-topbar { gap: 10px; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
           .uiv2-header-context { display: none; }
           .uiv2-header-actions { justify-content: space-between; }
-          .uiv2-header-actions > div { width: auto; flex: 0 1 auto; }
+          /* justify-content: flex-start (la base de arriba pone flex-end,
+             heredado del layout de escritorio donde este div ocupa todo el
+             ancho sobrante). Aquí ancho/flex pasan a "ajustado al
+             contenido" (width:auto; flex:0 1 auto) pero SIN resetear
+             justify-content, el contenido se empaquetaba alineado a la
+             derecha de una caja cuyo ancho "disponible" seguía calculándose
+             como si aún tuviera flex-grow — el primer botón visible (Nexo)
+             terminaba renderizado ~50px a la izquierda de donde debía,
+             exactamente encima del botón de abrir el menú lateral, que
+             dejaba de recibir toques (tests/mobile-overflow.spec.js lo
+             cubre: openSection() se queda colgado ahí si esto vuelve a
+             romperse). */
+          .uiv2-header-actions > div { width: auto; flex: 0 1 auto; justify-content: flex-start; }
           .uiv2-header-actions > div > div:first-child { display: none; }
         }
         @media (max-width: 430px) {
           .uiv2-header-actions > div { gap: 7px !important; }
           .uiv2-header-actions > div > div:last-child > span { display: none; }
+          /* Botones a icono-solo: con el buscador y el breadcrumb ya ocultos
+             (reglas de arriba), en 320-375px seguían quedando "Nexo", el
+             estado de sincronización, "IA" y el atajo ⌘K con su texto
+             completo, demasiado anchos para esta pantalla. El resto de
+             botones del header (centro de mando, notificaciones, tema) ya
+             eran solo icono; esto los iguala. */
+          .uiv2-sync-label, .uiv2-kbd-hint { display: none; }
+          .uiv2-header-actions button { padding-left: 0 !important; padding-right: 0 !important; }
         }
         @media (prefers-reduced-motion: reduce) {
           .uiv2-header-actions button { transition: none; }
