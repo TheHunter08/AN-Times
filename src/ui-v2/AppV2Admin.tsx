@@ -2400,7 +2400,7 @@ function ReportsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
 function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const db = useAppStore(s => s.db) as any
 
-  const { kpis, bars, centrosBars, donut, rawSlices, monthRecsCount } = useMemo(() => {
+  const { kpis, bars, centrosBars, donut, rawSlices, activeEmployeeCount } = useMemo(() => {
     const allRecs = (db.records || []).filter((r: any) => r.fin && r.inicio)
     const thisMonth = localMonthKey(new Date())
     // localMonthKey(r.inicio) (no r.inicio.startsWith(thisMonth)): inicio se
@@ -2468,7 +2468,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       centerLabel: 'fichajes',
     }
 
-    return { kpis, bars, centrosBars, donut, rawSlices, monthRecsCount: monthRecs.length }
+    return { kpis, bars, centrosBars, donut, rawSlices, activeEmployeeCount: emps.length }
   }, [db.records, db.employees, db.vacaciones, db.medicos, db.ausencias, db.config])
 
   return (
@@ -2478,7 +2478,7 @@ function StatsPage({ onNavigate }: { onNavigate: (page: string) => void }) {
       bars={bars}
       centrosBars={centrosBars}
       donut={donut}
-      isEmpty={monthRecsCount === 0}
+      isEmpty={activeEmployeeCount === 0}
       comparison={[
         { label: 'Jornada completa', value: `${Math.round((rawSlices[0].value / Math.max(rawSlices.reduce((s, x) => s + x.value, 0), 1)) * 100)}%`, deltaTone: 'up' },
         { label: 'Jornadas largas', value: `${rawSlices[2].value}`, deltaTone: 'up' },

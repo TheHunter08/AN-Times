@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { loginAsAdmin } from './helpers/session.js'
+import { weekStartIso } from '../src/utils/planningWeeks.js'
 
 async function openSection(page, group, item) {
   const menu = page.getByRole('button', { name:/Abrir menú/i })
@@ -150,6 +151,26 @@ test('cuentas con incidencia lista correos/identidades duplicadas y huérfanas, 
   await expect(page.getByRole('heading', { name:'Empleados' })).toBeVisible()
   await expect(page.getByText('Editar empleado', { exact:true })).toBeVisible()
   await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Sin Vincular')
+})
+
+test('estadísticas: sin empleados activos muestra el estado vacío', async ({ page }) => {
+  await loginAsAdmin(page, { employees:[] })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Análisis', 'Estadísticas')
+  await expect(page.getByText('Sin datos este periodo', { exact:true })).toBeVisible()
+})
+
+test('estadísticas: con un empleado activo, los KPI siguen activos aunque no haya fichajes cerrados', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[{ id:'e1', name:'Empleado Prueba', email:'empleado@empresa.com', role:'empleado', baja:false }],
+    records:[{ id:'r-open', empId:'e1', empName:'Empleado Prueba', inicio:new Date().toISOString(), fin:null }],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Análisis', 'Estadísticas')
+  await expect(page.getByText('Sin datos este periodo', { exact:true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name:/Empleados activos: 1.*Abrir detalle/i })).toBeVisible()
 })
 
 test('empleados: nivel de fichaje QR se guarda y solo aparece para rol empleado', async ({ page }) => {
@@ -544,11 +565,19 @@ test('planning no deja cerrar una semana con fichajes sin validar', async ({ pag
 })
 
 test('planning muestra "Mes cerrado" en vista mensual cuando todas sus semanas están cerradas', async ({ page }) => {
-  // Octubre 2026 (mes en curso en este entorno) toca las semanas que
-  // empiezan el 28/09, 05/10, 12/10, 19/10 y 26/10 — se cierran todas.
+  // Semanas (lunes) que tocan el mes en curso en este entorno — mismo
+  // cálculo que monthClosed en AppV2Admin.tsx (PlanningPage), para no fijar
+  // fechas de un mes concreto que deje de ser "el mes en curso" con el tiempo.
+  const now = new Date()
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const weekStarts = new Set()
+  for (let d = new Date(firstOfMonth); d <= lastOfMonth; d.setDate(d.getDate() + 1)) {
+    weekStarts.add(weekStartIso(d))
+  }
   await loginAsAdmin(page, {
-    planningClosures:['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26'].map((weekStart, i) => ({
-      id:`pc${i}`, weekStart, closedAt:'2026-10-28T00:00:00.000Z', closedBy:'Admin',
+    planningClosures:[...weekStarts].map((weekStart, i) => ({
+      id:`pc${i}`, weekStart, closedAt:new Date().toISOString(), closedBy:'Admin',
     })),
   })
   await page.goto('/')

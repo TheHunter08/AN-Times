@@ -31,10 +31,12 @@ export interface StatsProps {
   centrosBars?: StatsBar[]
   comparison?: { label: string; value: string; deltaTone: 'up' | 'down' }[]
   donut?: { slices: DonutSlice[]; centerValue: string; centerLabel: string }
-  // Sin ningún fichaje cerrado en el periodo (p.ej. una obra recién creada,
-  // o los primeros días de un mes nuevo): sin esto, la página seguía
-  // mostrando KPIs a "0h" y gráficos vacíos sin más, como si algo hubiera
-  // fallado en vez de "todavía no hay datos este periodo".
+  // Sin ningún empleado activo todavía (empresa recién creada): sin esto,
+  // la página seguía mostrando KPIs a "0h" y gráficos vacíos sin más, como
+  // si algo hubiera fallado en vez de "todavía no hay nada que analizar".
+  // Ojo: no depende de si hay fichajes CERRADOS este mes — con empleados
+  // activos (aunque solo tengan jornadas en curso, sin cerrar aún) los KPIs
+  // siguen siendo información real y no deben ocultarse.
   isEmpty?: boolean
 }
 

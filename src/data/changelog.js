@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.28.1',
+    date: '2026-11-04',
+    title: 'Arregla: Estadísticas ocultaba los KPI sin motivo',
+    items: [
+      'El aviso de "sin datos todavía" en Estadísticas se activaba de más: aparecía incluso con empleados activos y jornadas en curso, solo porque ninguna estaba cerrada aún. Ahora solo aparece cuando no hay ningún empleado activo.',
+    ],
+  },
+  {
     version: '4.28.0',
     date: '2026-11-04',
     title: 'Nueva pantalla: cuentas con incidencia',
