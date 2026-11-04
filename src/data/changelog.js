@@ -4,6 +4,15 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.28.0',
+    date: '2026-11-04',
+    title: 'Nueva pantalla: cuentas con incidencia',
+    items: [
+      'Nueva pantalla en Sistema → "Cuentas con incidencia" que muestra qué empleados tienen un correo o una identidad de acceso (Auth) duplicada con otro empleado, o sin vincular todavía — antes solo se veía el número en Operaciones, sin saber quién, y había que mirarlo con un script.',
+      'Desde ahí se puede abrir directamente el perfil del empleado afectado para corregirlo.',
+    ],
+  },
+  {
     version: '4.27.0',
     date: '2026-11-04',
     title: 'Limpieza automática de suscripciones push huérfanas',

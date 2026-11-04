@@ -56,6 +56,7 @@ import { buildOperationalPulse } from '../utils/operationalPulse.js'
 import { findMissingVacacionDocuments, hasSignedDocumentArtifact, shouldUsePrivateDocumentStorage } from '../utils/documentSigning.js'
 import { buildVacacionPDF } from '../utils/vacacionPdf.js'
 import { buildInspectionEvidenceSummary } from '../utils/inspectionEvidence.js'
+import { findAccountIssues } from '../utils/accountIssues.js'
 import type { ResumenPeriodMode } from './pages/Resumen.js'
 
 const Timesheets = lazy(() => import('./pages/Timesheets.js').then(module => ({ default: module.Timesheets })))
@@ -73,6 +74,7 @@ const Stats = lazy(() => import('./pages/Stats.js').then(module => ({ default: m
 const MonthlyClose = lazy(() => import('./pages/MonthlyClose.js').then(module => ({ default: module.MonthlyClose })))
 const Audit = lazy(() => import('./pages/Audit.js').then(module => ({ default: module.Audit })))
 const Anomalies = lazy(() => import('./pages/Anomalies.js').then(module => ({ default: module.Anomalies })))
+const AccountIssues = lazy(() => import('./pages/AccountIssues.js').then(module => ({ default: module.AccountIssues })))
 const Messages = lazy(() => import('./pages/Messages.js').then(module => ({ default: module.Messages })))
 const Obras = lazy(() => import('./pages/Obras.js').then(module => ({ default: module.Obras })))
 const OnlineTeam = lazy(() => import('./pages/OnlineTeam.js').then(module => ({ default: module.OnlineTeam })))
@@ -114,6 +116,7 @@ const PAGES = [
   { id: 'mensajes',       label: 'Mensajes',          group: 'Comunicación', icon: <IconChat /> },
   { id: 'notificaciones', label: 'Notificaciones',    group: 'Comunicación', icon: <IconBell /> },
   { id: 'operaciones',    label: 'Centro operativo',  group: 'Sistema', icon: <IconSettings /> },
+  { id: 'cuentas-incidencia', label: 'Cuentas con incidencia', group: 'Sistema', icon: <IconShield /> },
 ]
 
 const ROLES = [
@@ -3137,6 +3140,17 @@ function AnomaliesPage({ onOpenEmployee }: { onOpenEmployee: (name: string) => v
   return <Anomalies items={items} onResolve={resolveAnomaly} onOpen={item => onOpenEmployee(item.empName)} />
 }
 
+function AccountIssuesPage({ onOpenEmployee }: { onOpenEmployee: (employeeId: string) => void }) {
+  const db = useAppStore(s => s.db) as any
+  // Mismo filtro de "sin baja" que ya usa OperationsContainer.tsx para los
+  // contadores del widget de acceso seguro — este listado es el detalle de
+  // esos mismos empleados (findAccountIssues excluye admin aparte, lo que
+  // el widget de arriba no hace, así que sus totales pueden diferir en 1
+  // si no hay ningún empleado real marcado como admin).
+  const items = useMemo(() => findAccountIssues((db.employees || []).filter((e: any) => !e.baja)).items, [db.employees])
+  return <AccountIssues items={items} onOpen={item => onOpenEmployee(item.id)} />
+}
+
 function ObraModal({ initial, onClose }: { initial?: any; onClose: () => void }) {
   const db     = useAppStore(s => s.db) as any
   const saveDB = useAppStore(s => s.saveDB)
@@ -3930,6 +3944,7 @@ export default function AppV2Admin() {
     if (page === 'centros')        return <CentrosPage />
     if (page === 'vehiculos')      return <VehiculosPage />
     if (page === 'operaciones')    return <OperationsPage onNavigate={setAdminPage} onReviewEmployee={employeeId => { setEmployeeEditId(employeeId); setAdminPage('empleados') }} />
+    if (page === 'cuentas-incidencia') return <AccountIssuesPage onOpenEmployee={employeeId => { setEmployeeEditId(employeeId); setAdminPage('empleados') }} />
     return null
   }
 

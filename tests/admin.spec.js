@@ -53,6 +53,7 @@ test.describe('Panel de administración', () => {
     ['Análisis', 'Cumplimiento', 'Centro de cumplimiento'],
     ['Análisis', 'Auditoría', 'Auditoría'],
     ['Sistema', 'Centro operativo', 'Centro operativo'],
+    ['Sistema', 'Cuentas con incidencia', 'Cuentas con incidencia'],
   ]) {
     test(`navega a ${destination[1]}`, async ({ page }) => {
       await openSection(page, destination[0], destination[1])
@@ -120,6 +121,35 @@ test('empleados muestra qué falta para vincular cada cuenta', async ({ page }) 
   await expect(page.getByText('Lista para vincular', { exact:true })).toBeVisible()
   await expect(page.getByText('Falta correo', { exact:true })).toBeVisible()
   await expect(page.getByText('PIN pendiente de actualizar', { exact:true })).toBeVisible()
+})
+
+test('cuentas con incidencia lista correos/identidades duplicadas y huérfanas, y abre el perfil al pulsar', async ({ page }) => {
+  await loginAsAdmin(page, {
+    employees:[
+      { id:'dup-a', name:'Primera Cuenta', email:'compartido@empresa.com', authId:'auth-1', role:'empleado', baja:false },
+      { id:'dup-b', name:'Segunda Cuenta', email:'compartido@empresa.com', authId:'auth-1', role:'empleado', baja:false },
+      { id:'ok', name:'Cuenta Sin Problemas', email:'ok@empresa.com', authId:'auth-ok', role:'empleado', baja:false },
+      { id:'orphan', name:'Sin Vincular', email:'', authId:null, role:'empleado', baja:false, centroTrabajo:'Oficina Central' },
+    ],
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name:'Dashboard' })).toBeVisible({ timeout:15000 })
+  await openSection(page, 'Sistema', 'Cuentas con incidencia')
+  await expect(page.getByRole('heading', { name:'Cuentas con incidencia', exact:true })).toBeVisible()
+
+  await expect(page.getByText('Primera Cuenta', { exact:true })).toBeVisible()
+  await expect(page.getByText('Segunda Cuenta', { exact:true })).toBeVisible()
+  await expect(page.getByText('Sin Vincular', { exact:true })).toBeVisible()
+  await expect(page.getByText('Cuenta Sin Problemas', { exact:true })).toHaveCount(0)
+  await expect(page.getByText('Correo duplicado', { exact:true })).toHaveCount(2)
+  await expect(page.getByText('Identidad duplicada', { exact:true })).toHaveCount(2)
+  await expect(page.getByText('Sin correo', { exact:true })).toBeVisible()
+  await expect(page.getByText('Sin identidad vinculada', { exact:true })).toBeVisible()
+
+  await page.getByRole('button', { name:/Sin Vincular:/ }).click()
+  await expect(page.getByRole('heading', { name:'Empleados' })).toBeVisible()
+  await expect(page.getByText('Editar empleado', { exact:true })).toBeVisible()
+  await expect(page.getByPlaceholder('Ej: Juan García')).toHaveValue('Sin Vincular')
 })
 
 test('empleados: nivel de fichaje QR se guarda y solo aparece para rol empleado', async ({ page }) => {
