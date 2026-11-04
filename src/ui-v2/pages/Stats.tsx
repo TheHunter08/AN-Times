@@ -2,6 +2,8 @@
 import { DonutChart } from '../components/DonutChart.js'
 import type { DonutSlice } from '../components/DonutChart.js'
 import { PageTitle } from '../components/PageTitle.js'
+import { ProductState } from '../components/ProductState.js'
+import { IconChart } from '../components/Icons.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { transition } from '../design-system/animations.js'
@@ -29,6 +31,11 @@ export interface StatsProps {
   centrosBars?: StatsBar[]
   comparison?: { label: string; value: string; deltaTone: 'up' | 'down' }[]
   donut?: { slices: DonutSlice[]; centerValue: string; centerLabel: string }
+  // Sin ningún fichaje cerrado en el periodo (p.ej. una obra recién creada,
+  // o los primeros días de un mes nuevo): sin esto, la página seguía
+  // mostrando KPIs a "0h" y gráficos vacíos sin más, como si algo hubiera
+  // fallado en vez de "todavía no hay datos este periodo".
+  isEmpty?: boolean
 }
 
 type KpiTone = 'primary' | 'accent' | 'cyan' | 'amber'
@@ -41,7 +48,16 @@ const darkPanel: React.CSSProperties = {
   boxShadow: shadows.sm,
 }
 
-export function Stats({ title, kpis, bars, centrosBars, comparison, donut }: StatsProps) {
+export function Stats({ title, kpis, bars, centrosBars, comparison, donut, isEmpty }: StatsProps) {
+  if (isEmpty) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>
+        <PageTitle>{title}</PageTitle>
+        <ProductState icon={<IconChart />} title="Sin datos este periodo" description="Todavía no hay fichajes cerrados para calcular estadísticas. Vuelve cuando haya jornadas registradas." />
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>
       <PageTitle>{title}</PageTitle>

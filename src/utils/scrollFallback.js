@@ -73,68 +73,43 @@ export function shouldIgnoreTarget(target) {
   return false
 }
 
-// Diagnóstico temporal (quitar cuando se confirme la causa): registra en
-// consola cada decisión del fallback, sin ningún elemento visible en
-// pantalla — activar pegando `localStorage.setItem('an_times_scroll_debug','1')`
-// en la consola del navegador y recargando.
-function debugLog(msg, data) {
-  try {
-    if (localStorage.getItem('an_times_scroll_debug') !== '1') return
-    // Un objeto como segundo argumento de console.log a veces se captura como
-    // "Object" sin desplegar (herramientas de lectura remota de consola) —
-    // se serializa aquí mismo para que el texto sea legible siempre.
-    console.log('[scrollFallback]', msg, data !== undefined ? JSON.stringify(data) : '')
-  } catch {}
-}
-
 function onWheel(e) {
-  debugLog('wheel', {
-    target: e.target?.tagName + '.' + (e.target?.className || ''),
-    deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode,
-    cancelable: e.cancelable, defaultPrevented: e.defaultPrevented,
-    ctrlKey: e.ctrlKey, isTrusted: e.isTrusted,
-  })
-  if (e.ctrlKey || e.defaultPrevented || !e.cancelable) { debugLog('  -> ignorado (ctrl/defaultPrevented/no cancelable)'); return }
-  if (shouldIgnoreTarget(e.target)) { debugLog('  -> ignorado (shouldIgnoreTarget)'); return }
+  if (e.ctrlKey || e.defaultPrevented || !e.cancelable) return
+  if (shouldIgnoreTarget(e.target)) return
   const { dx, dy } = normalizedDeltas(e)
-  if (!dx && !dy) { debugLog('  -> ignorado (delta 0 tras normalizar)'); return }
+  if (!dx && !dy) return
   const hit = findScrollTarget(e.target, dx, dy)
-  if (!hit) { debugLog('  -> sin objetivo de scroll (findScrollTarget null)', { dx, dy }); return }
+  if (!hit) return
   e.preventDefault()
-  const before = hit.el.scrollTop
   if (hit.axis === 'y') hit.el.scrollTop += dy
   else hit.el.scrollLeft += dx || dy
-  debugLog('  -> aplicado', { axis: hit.axis, el: hit.el.tagName + '.' + hit.el.className, before, after: hit.el.scrollTop })
 }
 
 // ── Touch en escritorio ──────────────────────────────────────────────────────
 let touchState = null
 
 function onTouchStart(e) {
-  debugLog('touchstart', { innerWidth: window.innerWidth, touches: e.touches.length, target: e.target?.tagName + '.' + (e.target?.className || '') })
-  if (window.innerWidth < 1024 || e.touches.length !== 1) { debugLog('  -> ignorado (viewport <1024 o multitouch)'); touchState = null; return }
-  if (shouldIgnoreTarget(e.target)) { debugLog('  -> ignorado (shouldIgnoreTarget)'); touchState = null; return }
+  if (window.innerWidth < 1024 || e.touches.length !== 1) { touchState = null; return }
+  if (shouldIgnoreTarget(e.target)) { touchState = null; return }
   touchState = { x: e.touches[0].clientX, y: e.touches[0].clientY, target: e.target }
 }
 
 function onTouchMove(e) {
-  if (!touchState) { debugLog('touchmove -> ignorado (sin touchState — el touchstart no lo activó)'); return }
-  if (!e.cancelable) { debugLog('touchmove -> ignorado (no cancelable)'); return }
-  if (e.touches.length !== 1) { debugLog('touchmove -> ignorado (multitouch)', { touches: e.touches.length }); return }
+  if (!touchState) return
+  if (!e.cancelable) return
+  if (e.touches.length !== 1) return
   const dx = touchState.x - e.touches[0].clientX
   const dy = touchState.y - e.touches[0].clientY
   const hit = findScrollTarget(touchState.target, dx, dy)
-  if (!hit) { debugLog('touchmove -> sin objetivo de scroll', { dx, dy }); return }
+  if (!hit) return
   e.preventDefault()
-  const before = hit.el.scrollTop
   if (hit.axis === 'y') hit.el.scrollTop += dy
   else hit.el.scrollLeft += dx
-  debugLog('touchmove -> aplicado', { axis: hit.axis, dx, dy, before, after: hit.el.scrollTop })
   touchState.x = e.touches[0].clientX
   touchState.y = e.touches[0].clientY
 }
 
-function onTouchEnd() { debugLog('touchend'); touchState = null }
+function onTouchEnd() { touchState = null }
 
 let installed = false
 export function installScrollFallback() {

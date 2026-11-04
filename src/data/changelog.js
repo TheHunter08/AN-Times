@@ -4,6 +4,14 @@
 // añade una entrada aquí) cuando publiques cambios que el usuario deba notar.
 export const APP_CHANGELOG = [
   {
+    version: '4.25.0',
+    date: '2026-11-04',
+    title: 'Mensajes claros cuando aún no hay datos',
+    items: [
+      'Estadísticas y Centro de cumplimiento (Informes) ya no muestran gráficos o listas vacías sin explicación cuando todavía no hay fichajes cerrados en el periodo — ahora se avisa con un mensaje claro.',
+    ],
+  },
+  {
     version: '4.24.0',
     date: '2026-10-29',
     title: 'Nuevo: nivel de fichaje QR para empleados',

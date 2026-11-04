@@ -1,5 +1,6 @@
 ﻿import { Card } from '../components/Card.js'
 import { PageTitle } from '../components/PageTitle.js'
+import { ProductState } from '../components/ProductState.js'
 import { colors } from '../design-system/colors'
 import { radius } from '../design-system/radius'
 import { IconFileText, IconDownload, IconShield, IconCheck, IconAlertCircle } from '../components/Icons.js'
@@ -91,6 +92,9 @@ export function Reports({ rows, compliance, onExportInspection, onExportAudit, o
 
       <div><h2 style={{ margin:0, fontSize:19, color:colors.text[900], letterSpacing:'-.35px' }}>Informes mensuales</h2><p style={{ margin:'5px 0 0', fontSize:12, color:colors.text[500] }}>Excel general con resumen, detalle completo y una hoja por empleado; informes individuales disponibles por trabajador.</p></div>
       <Card>
+        {rows.length === 0 ? (
+          <ProductState icon={<IconFileText />} title="Todavía no hay informes" description="En cuanto haya fichajes cerrados en un mes, aquí aparecerá su informe descargable." compact />
+        ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {rows.map((r, i) => (
             <div
@@ -142,6 +146,7 @@ export function Reports({ rows, compliance, onExportInspection, onExportAudit, o
             </div>
           ))}
         </div>
+        )}
       </Card>
       <style>{`
         .uiv2-report-row:hover { background: rgba(var(--uiv2-overlay-rgb),.02); }
